@@ -1,0 +1,314 @@
+{
+  "camion-camion-benne-4x2": {
+    "total": 0,
+    "marche": 0,
+    "panne": 0,
+    "arret": 0
+  },
+  "camion-camion-benne-6x4": {
+    "total": 0,
+    "marche": 0,
+    "panne": 0,
+    "arret": 0
+  },
+  "camion-camion-benne-8x4": {
+    "total": 46,
+    "marche": 35,
+    "panne": 11,
+    "arret": 0
+  },
+  "camion-camion-semi-remorque": {
+    "total": 2,
+    "marche": 2,
+    "panne": 0,
+    "arret": 0
+  },
+  "camion-citerne-a-eau-pulverulent": {
+    "total": 5,
+    "marche": 5,
+    "panne": 0,
+    "arret": 0
+  },
+  "camion-entretien-ravitailleur-go": {
+    "total": 2,
+    "marche": 2,
+    "panne": 0,
+    "arret": 0
+  },
+  "camion-plateau-hyab": {
+    "total": 2,
+    "marche": 2,
+    "panne": 0,
+    "arret": 0
+  },
+  "camion-rem-plateau-porte-chars-porteur": {
+    "total": 3,
+    "marche": 3,
+    "panne": 0,
+    "arret": 0
+  },
+  "camion-rem": {
+    "total": 2,
+    "marche": 2,
+    "panne": 0,
+    "arret": 0
+  },
+  "camion-repandeuse-liant": {
+    "total": 1,
+    "marche": 1,
+    "panne": 0,
+    "arret": 0
+  },
+  "camion-epandeur-ciment": {
+    "total": 0,
+    "marche": 0,
+    "panne": 0,
+    "arret": 0
+  },
+  "camion-toupie": {
+    "total": 3,
+    "marche": 3,
+    "panne": 0,
+    "arret": 0
+  },
+  "camion-tracteur-routier": {
+    "total": 4,
+    "marche": 4,
+    "panne": 0,
+    "arret": 0
+  },
+  "compacteur-double-bille": {
+    "total": 2,
+    "marche": 2,
+    "panne": 0,
+    "arret": 0
+  },
+  "compacteur-monobille": {
+    "total": 6,
+    "marche": 5,
+    "panne": 1,
+    "arret": 0
+  },
+  "compacteur-pied-de-mouton": {
+    "total": 0,
+    "marche": 0,
+    "panne": 0,
+    "arret": 0
+  },
+  "compacteur-rouleaux-a-pneu": {
+    "total": 2,
+    "marche": 2,
+    "panne": 0,
+    "arret": 0
+  },
+  "compacteur-a-timon": {
+    "total": 14,
+    "marche": 10,
+    "panne": 4,
+    "arret": 0
+  },
+  "engins-bulldozers": {
+    "total": 4,
+    "marche": 4,
+    "panne": 0,
+    "arret": 0
+  },
+  "engins-chargeurs": {
+    "total": 8,
+    "marche": 7,
+    "panne": 1,
+    "arret": 0
+  },
+  "engins-tractopelle": {
+    "total": 1,
+    "marche": 1,
+    "panne": 0,
+    "arret": 0
+  },
+  "engins-extrudeuse": {
+    "total": 0,
+    "marche": 0,
+    "panne": 0,
+    "arret": 0
+  },
+  "engins-finisseur": {
+    "total": 3,
+    "marche": 3,
+    "panne": 0,
+    "arret": 0
+  },
+  "engins-foreuse": {
+    "total": 1,
+    "marche": 1,
+    "panne": 0,
+    "arret": 0
+  },
+  "engins-niveleuses": {
+    "total": 3,
+    "marche": 2,
+    "panne": 1,
+    "arret": 0
+  },
+  "engins-pelle-a-chenille-et-pneu": {
+    "total": 6,
+    "marche": 5,
+    "panne": 1,
+    "arret": 0
+  },
+  "engins-recycleuse-malaxeuse-raboteuse": {
+    "total": 1,
+    "marche": 1,
+    "panne": 0,
+    "arret": 0
+  },
+  "engins-tracteur-agricole-balayeuse": {
+    "total": 0,
+    "marche": 0,
+    "panne": 0,
+    "arret": 0
+  },
+  "industrie-centrale-a-beton": {
+    "total": 1,
+    "marche": 1,
+    "panne": 0,
+    "arret": 0
+  },
+  "industrie-concasseur-reconstitution": {
+    "total": 1,
+    "marche": 1,
+    "panne": 0,
+    "arret": 0
+  },
+  "industrie-poste-d-enrobage": {
+    "total": 1,
+    "marche": 1,
+    "panne": 0,
+    "arret": 0
+  },
+  "industrie-fluxage-emulsion": {
+    "total": 1,
+    "marche": 1,
+    "panne": 0,
+    "arret": 0
+  },
+  "levage-elevateur-a-fourche-bobcat": {
+    "total": 2,
+    "marche": 2,
+    "panne": 0,
+    "arret": 0
+  },
+  "levage-grue-mobile": {
+    "total": 1,
+    "marche": 1,
+    "panne": 0,
+    "arret": 0
+  },
+  "logistique-bus-camion-personnel": {
+    "total": 0,
+    "marche": 0,
+    "panne": 0,
+    "arret": 0
+  },
+  "logistique-camionnette": {
+    "total": 13,
+    "marche": 12,
+    "panne": 1,
+    "arret": 0
+  },
+  "logistique-ambulance": {
+    "total": 0,
+    "marche": 0,
+    "panne": 0,
+    "arret": 0
+  },
+  "logistique-vehicule-leger": {
+    "total": 5,
+    "marche": 2,
+    "panne": 3,
+    "arret": 0
+  },
+  "accessoires-autre-materiel": {
+    "total": 6,
+    "marche": 6,
+    "panne": 0,
+    "arret": 0
+  },
+  "accessoires-brh-pinces-demol-caisson-bras": {
+    "total": 2,
+    "marche": 1,
+    "panne": 1,
+    "arret": 0
+  },
+  "accessoires-compresseur": {
+    "total": 3,
+    "marche": 1,
+    "panne": 2,
+    "arret": 0
+  },
+  "accessoires-tc-stations-centrifugeuses-potabilisation": {
+    "total": 2,
+    "marche": 2,
+    "panne": 0,
+    "arret": 0
+  },
+  "accessoires-cuve-a-gasoil-bitume": {
+    "total": 3,
+    "marche": 3,
+    "panne": 0,
+    "arret": 0
+  },
+  "accessoires-betonniere": {
+    "total": 2,
+    "marche": 2,
+    "panne": 0,
+    "arret": 0
+  },
+  "accessoires-gravillonneur-porte": {
+    "total": 0,
+    "marche": 0,
+    "panne": 0,
+    "arret": 0
+  },
+  "accessoires-bitucontainer-bruleur": {
+    "total": 1,
+    "marche": 1,
+    "panne": 0,
+    "arret": 0
+  },
+  "accessoires-bruleur": {
+    "total": 1,
+    "marche": 1,
+    "panne": 0,
+    "arret": 0
+  },
+  "accessoires-elargisseur-accotement": {
+    "total": 0,
+    "marche": 0,
+    "panne": 0,
+    "arret": 0
+  },
+  "accessoires-groupe-electrogene": {
+    "total": 13,
+    "marche": 10,
+    "panne": 3,
+    "arret": 0
+  },
+  "accessoires-motopompe": {
+    "total": 6,
+    "marche": 6,
+    "panne": 0,
+    "arret": 0
+  },
+  "accessoires-poste-de-soudure": {
+    "total": 10,
+    "marche": 10,
+    "panne": 0,
+    "arret": 0
+  },
+  "accessoires-pesage-pont-bascule-pese-essieux": {
+    "total": 1,
+    "marche": 1,
+    "panne": 0,
+    "arret": 0
+  }
+}
