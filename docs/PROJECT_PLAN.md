@@ -3,14 +3,14 @@
 ## 1. 当前目标
 - 用网页替代 Excel 日报：工长在线填写、保存历史。
 - 通过 AI 对原始日报做润色和项目级汇总，减少人工编辑。
-- 所有数据落本地 Postgres，便于内网部署和权限控制。
+- 所有数据托管在 Supabase Postgres（云端托管版本），同时保留原有权限与内网导出策略。
 
 ## 2. 技术基线
 - 前端/后端：Next.js（App Router + Server Actions 或 API Routes 即可）。
-- 数据库：本地 Postgres，建议配 Prisma/Drizzle 做 schema 管理。
+- 数据库：Supabase Postgres（生产/预发共用），通过 Prisma 进行 schema 管理与迁移。
 - AI：服务端调用（OpenAI/自建模型均可），在写 DB 后触发润色与汇总。
-- 环境变量：`.env` 提供 `DATABASE_URL` 和 `DEEPSEEK_API_KEY`（DeepSeek Chat Key，用于服务端调用大模型）。
-- 部署：先本地开发，后续可用内网服务器或 Vercel + 内网数据库。
+- 环境变量：`.env.local` 提供 `DATABASE_URL`（Supabase 连接池端点，对应 `POSTGRES_PRISMA_URL`）、`DIRECT_DATABASE_URL`（Supabase 非连接池端点 `POSTGRES_URL_NON_POOLING`，供 Prisma 迁移使用）以及 `DEEPSEEK_API_KEY`（DeepSeek Chat Key）。
+- 部署：本地/预发统一连到 Supabase；正式环境可在 Vercel/自托管 Node 上运行，仍复用 Supabase 数据库。
 
 ## 3. 待确认输入
 1. 日报字段清单：包含字段名、类型、是否必填、分组（例：施工进度、安全、材料）。

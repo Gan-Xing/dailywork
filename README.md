@@ -5,7 +5,7 @@ A Next.js app for collecting daily construction reports with bilingual copy and 
 ## Prerequisites
 
 - Node.js 18.16 (current dev environment)
-- PostgreSQL running locally with a database you can access
+- A Supabase project with Postgres enabled (pooling + non-pooling URLs available)
 
 ## Setup
 
@@ -13,11 +13,14 @@ A Next.js app for collecting daily construction reports with bilingual copy and 
    ```bash
    npm install
    ```
-2. Configure the database connection. Copy `.env.example` to `.env` and update `DATABASE_URL` (the current dev instance uses `postgresql://ganxing:Admin1234.@localhost:5432/ganxing?schema=public`).
-3. Apply Prisma migrations
+2. Configure the database connection. Copy `.env.example` to `.env.local` and fill in:
+   - `DATABASE_URL` → Supabase `POSTGRES_PRISMA_URL` (pgBouncer 6543 endpoint, used by the running app)
+   - `DIRECT_DATABASE_URL` → Supabase `POSTGRES_URL_NON_POOLING` (5432 endpoint, used by Prisma for migrations)
+3. Apply Prisma migrations to Supabase
    ```bash
-   npx prisma migrate dev
+   npx prisma migrate deploy
    ```
+   > `prisma/schema.prisma` is already wired with `directUrl`, so `migrate deploy` will automatically open the non-pooling connection. For new schema changes, run `npx prisma migrate dev --name <change>` locally, check in the migration, then redeploy with the command above.
 
 ## Development
 
