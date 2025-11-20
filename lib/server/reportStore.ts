@@ -40,8 +40,12 @@ const formatDateKey = (value: Date) => value.toISOString().split('T')[0]
 
 const toDateTime = (dateKey: string) => new Date(`${dateKey}T00:00:00.000Z`)
 
-const clonePayload = (payload: Prisma.JsonValue | null | undefined): DailyReport =>
-  cloneReport(payload as DailyReport)
+const clonePayload = (payload: Prisma.JsonValue | null | undefined): DailyReport => {
+  if (!payload) {
+    throw new Error('Missing report payload')
+  }
+  return cloneReport(payload as unknown as DailyReport)
+}
 
 const toJsonPayload = (report: DailyReport): Prisma.JsonObject =>
   JSON.parse(JSON.stringify(report)) as Prisma.JsonObject

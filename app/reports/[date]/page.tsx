@@ -28,6 +28,7 @@ import {
 	createInitialReportState,
 	type DailyReport,
 	type EquipmentStatus,
+	type LocalizedRichText,
 	type MaterialStock,
 	type PersonnelCount,
 	type WeatherEntry
@@ -623,13 +624,14 @@ export default function ReportEditorPage() {
 			let nextAdditional = prev.additional;
 
 			narrativeSections.forEach((section) => {
-				const groupMap =
-					section.group === 'observations'
-						? nextObservations
-						: section.group === 'works'
-						? nextWorks
-						: nextAdditional;
-				const entry = groupMap[section.id];
+				let entry: LocalizedRichText | undefined;
+				if (section.group === 'observations') {
+					entry = nextObservations[section.id];
+				} else if (section.group === 'works') {
+					entry = nextWorks[section.id];
+				} else {
+					entry = nextAdditional[section.id];
+				}
 				const chineseValue = entry?.zh ?? '';
 				if (hasMeaningfulChineseContent(chineseValue)) {
 					return;

@@ -110,6 +110,7 @@ const uiCopy: Record<Locale, CopyShape> = {
     },
     header: {
       logosTitle: 'Logos et entités',
+      siteLabel: 'Nom du chantier',
       siteDescription:
         "TRAVAUX DE RENFORCEMENT DE LA ROUTE BONDOUKOU - BOUNA Y COMPRIS L'AMENAGEMENT DES TRAVERSEES DE BOUNA, BONDOUKOU ET AGNIBILEKROU (MARCHE 2024 - 0 - 11 - 00 - 2 - 0560/-330)",
     },

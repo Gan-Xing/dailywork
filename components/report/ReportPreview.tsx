@@ -15,7 +15,7 @@ import {
 	weatherPeriods,
 	worksExecutedBlocks
 } from '@/lib/reportSchema';
-import type { DailyReport, LocalizedRichText } from '@/lib/reportState';
+import type { DailyReport, LocalizedRichText, PersonnelCount } from '@/lib/reportState';
 
 const participantEntities = [
 	{
@@ -1111,11 +1111,11 @@ function NarrativeStack({
 											POUR
 											LA
 											MAITRISE
-											D'OEUVRE
+											D&apos;OEUVRE
 										</div>
 										<div className='flex min-h-[120px] flex-1 flex-col justify-start px-3 py-2 text-center'>
 											POUR
-											L'ENTREPRENEUR
+											L&apos;ENTREPRENEUR
 										</div>
 									</div>
 								</div>

@@ -8,4 +8,6 @@
 
 body {
   min-height: 100vh;
+  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, 'Noto Sans', sans-serif;
 }
