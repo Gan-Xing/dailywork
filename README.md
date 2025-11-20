@@ -35,7 +35,7 @@ Visit `http://localhost:3000` for the dashboard. Creating or editing a report wi
 | Command | Description |
 | --- | --- |
 | `npm run dev` | Start Next.js locally |
-| `npm run build` | Production build |
+| `npm run build` | Production build (automatically runs `prisma generate` first so Vercel caches stay fresh) |
 | `npm run lint` | ESLint checks |
 | `npx prisma studio` | Inspect the Postgres data via Prisma Studio |
 

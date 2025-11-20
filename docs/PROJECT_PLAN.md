@@ -10,6 +10,7 @@
 - 数据库：Supabase Postgres（生产/预发共用），通过 Prisma 进行 schema 管理与迁移。
 - AI：服务端调用（OpenAI/自建模型均可），在写 DB 后触发润色与汇总。
 - 环境变量：`.env.local` 提供 `DATABASE_URL`（Supabase 连接池端点，对应 `POSTGRES_PRISMA_URL`）、`DIRECT_DATABASE_URL`（Supabase 非连接池端点 `POSTGRES_URL_NON_POOLING`，供 Prisma 迁移使用）以及 `DEEPSEEK_API_KEY`（DeepSeek Chat Key）。
+- 构建约定：所有服务器/Vercel 构建在运行 `next build` 前必须执行 `prisma generate`（现由 `npm run build` 自动完成），以避免缓存造成的旧版 Prisma Client。
 - 部署：本地/预发统一连到 Supabase；正式环境可在 Vercel/自托管 Node 上运行，仍复用 Supabase 数据库。
 
 ## 3. 待确认输入
