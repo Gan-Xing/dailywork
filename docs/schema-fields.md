@@ -162,6 +162,7 @@
 
 - **用途**：由管理员维护道路起终点信息，作为报检与分项工程配置的归属入口。
 - **字段**
+     0. `slug`：路由标识（仅小写字母/数字/连字符，唯一），创建时指定，用于路段详情 URL，例如 `bondoukou-university`。
      1. `name`：路段名称，文本，必填。
      2. `startPk`：起点标识，文本，支持 `PK0+000` 或交叉口描述，必填。
      3. `endPk`：终点标识，文本，必填。
@@ -172,4 +173,4 @@
 - **Permission**：`code`（唯一标识，如 `road:manage`、`report:edit`）、`name`、`createdAt`、`updatedAt`。
 - **Role**：`name`（唯一，如 `Admin`、`Employee`）、`permissions`（多对多）、`createdAt`、`updatedAt`。
 - **User**：`username`（唯一）、`passwordHash`（salt + hash）、`roles`（多对多）、`createdAt`、`updatedAt`。
-- 默认账号：`GanXing`（密码 `Admin1234`，角色 `Admin`，拥有全部权限）、`User1`（密码 `use1`，角色 `Employee`，只有填写日报/修改权限）。
+- 默认账号：`GanXing`（密码 `Admin`，角色 `Admin`，拥有全部权限）、`User1`（密码 `use1`，角色 `Employee`，只有填写日报/修改权限）。

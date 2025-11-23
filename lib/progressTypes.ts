@@ -1,4 +1,5 @@
 export interface RoadSectionPayload {
+  slug: string
   name: string
   startPk: string
   endPk: string

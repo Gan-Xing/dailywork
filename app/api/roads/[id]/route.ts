@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server'
 
-import { deleteRoadSection, isRecordNotFound, updateRoadSection } from '@/lib/server/roadStore'
+import {
+  deleteRoadSection,
+  isRecordNotFound,
+  isUniqueConstraintError,
+  updateRoadSection,
+} from '@/lib/server/roadStore'
 import { hasPermission } from '@/lib/server/authSession'
 
 interface RouteParams {
@@ -20,19 +25,25 @@ export async function PUT(request: Request, { params }: RouteParams) {
     return invalidIdResponse
   }
 
-  let payload: { name?: string; startPk?: string; endPk?: string }
+  let payload: { slug?: string; name?: string; startPk?: string; endPk?: string }
   try {
-    payload = (await request.json()) as { name?: string; startPk?: string; endPk?: string }
+    payload = (await request.json()) as {
+      slug?: string
+      name?: string
+      startPk?: string
+      endPk?: string
+    }
   } catch {
     return NextResponse.json({ message: 'Invalid JSON body' }, { status: 400 })
   }
 
-  if (!payload?.name || !payload.startPk || !payload.endPk) {
-    return NextResponse.json({ message: '缺少必填字段：名称、起点、终点' }, { status: 400 })
+  if (!payload?.slug || !payload.name || !payload.startPk || !payload.endPk) {
+    return NextResponse.json({ message: '缺少必填字段：路由、名称、起点、终点' }, { status: 400 })
   }
 
   try {
     const road = await updateRoadSection(id, {
+      slug: payload.slug,
       name: payload.name,
       startPk: payload.startPk,
       endPk: payload.endPk,
@@ -41,6 +52,9 @@ export async function PUT(request: Request, { params }: RouteParams) {
   } catch (error) {
     if (isRecordNotFound(error)) {
       return NextResponse.json({ message: '路段不存在' }, { status: 404 })
+    }
+    if (isUniqueConstraintError(error)) {
+      return NextResponse.json({ message: '路由已存在，请换一个' }, { status: 400 })
     }
     return NextResponse.json({ message: (error as Error).message }, { status: 400 })
   }

@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import type { FormEvent } from 'react'
 import { useState, useTransition } from 'react'
 
@@ -11,12 +12,14 @@ interface Props {
 }
 
 interface FormState {
+  slug: string
   name: string
   startPk: string
   endPk: string
 }
 
 const emptyForm: FormState = {
+  slug: '',
   name: '',
   startPk: '',
   endPk: '',
@@ -67,10 +70,11 @@ export function RoadBoard({ initialRoads, canManage }: Props) {
         return
       }
 
+      const road = data.road
       setRoads((prev) => {
         const next = editingId
-          ? prev.map((item) => (item.id === data.road?.id ? data.road : item))
-          : [...prev, data.road]
+          ? prev.map((item) => (item.id === road.id ? road : item))
+          : [...prev, road]
         return sortRoads(next)
       })
       resetForm()
@@ -100,6 +104,7 @@ export function RoadBoard({ initialRoads, canManage }: Props) {
 
   const startEdit = (road: RoadSectionDTO) => {
     setForm({
+      slug: road.slug,
       name: road.name,
       startPk: road.startPk,
       endPk: road.endPk,
@@ -130,13 +135,23 @@ export function RoadBoard({ initialRoads, canManage }: Props) {
           </div>
 
           <form className="mt-5 grid gap-4 md:grid-cols-3" onSubmit={upsertRoad}>
-            <label className="flex flex-col gap-2 text-sm text-slate-100">
-              名称
-              <input
-                className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-slate-50 placeholder:text-slate-200/60 focus:border-emerald-300 focus:outline-none"
-                value={form.name}
-                onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
-                placeholder="如：大学城路"
+          <label className="flex flex-col gap-2 text-sm text-slate-100">
+            路由
+            <input
+              className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-slate-50 placeholder:text-slate-200/60 focus:border-emerald-300 focus:outline-none"
+              value={form.slug}
+              onChange={(event) => setForm((prev) => ({ ...prev, slug: event.target.value }))}
+              placeholder="如：bondoukou-university"
+              required
+            />
+          </label>
+          <label className="flex flex-col gap-2 text-sm text-slate-100">
+            名称
+            <input
+              className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-slate-50 placeholder:text-slate-200/60 focus:border-emerald-300 focus:outline-none"
+              value={form.name}
+              onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
+              placeholder="如：大学城路"
                 required
               />
             </label>
@@ -225,44 +240,54 @@ interface RoadCardProps {
 const chipTone = 'rounded-full bg-white/10 px-3 py-1 text-[11px] font-semibold text-slate-100 shadow-inner shadow-slate-900/30'
 
 const RoadCard = ({ road, onEdit, onDelete, canManage }: RoadCardProps) => (
-  <div
-    className="relative overflow-hidden rounded-3xl border border-white/10 bg-white/5 p-5 shadow-xl shadow-slate-950/30 transition duration-150 hover:-translate-y-0.5 hover:border-white/25"
+  <Link
+    href={`/progress/${road.slug}`}
+    className="group block"
   >
-    <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-300 via-blue-300 to-cyan-200" />
-    <div className="flex items-start justify-between gap-3">
-      <div>
-        <p className="text-xs text-slate-200/70">路段</p>
-        <h3 className="text-xl font-semibold text-slate-50">{road.name}</h3>
-        <p className="mt-1 text-xs text-slate-200/70">
-          起点 <span className={chipTone}>{road.startPk}</span> · 终点 <span className={chipTone}>{road.endPk}</span>
+    <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-white/5 p-5 shadow-xl shadow-slate-950/30 transition duration-150 group-hover:-translate-y-0.5 group-hover:border-white/25">
+      <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-300 via-blue-300 to-cyan-200" />
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-xs text-slate-200/70">路段</p>
+          <h3 className="text-xl font-semibold text-slate-50">{road.name}</h3>
+          <p className="mt-1 text-xs text-slate-200/70">
+            起点 <span className={chipTone}>{road.startPk}</span> · 终点 <span className={chipTone}>{road.endPk}</span>
+          </p>
+          <p className="mt-1 text-[11px] text-emerald-100/80">路由：{road.slug}</p>
+        </div>
+        {canManage ? (
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={(event) => {
+                event.preventDefault()
+                onEdit(road)
+              }}
+              className="rounded-xl border border-white/15 px-3 py-2 text-[11px] font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/10"
+            >
+              编辑
+            </button>
+            <button
+              type="button"
+              onClick={(event) => {
+                event.preventDefault()
+                onDelete(road.id)
+              }}
+              className="rounded-xl border border-white/15 px-3 py-2 text-[11px] font-semibold text-rose-100 transition hover:border-rose-200/60 hover:bg-rose-200/10"
+            >
+              删除
+            </button>
+          </div>
+        ) : null}
+      </div>
+      <div className="mt-4 space-y-2 text-sm text-slate-200/90">
+        <p>
+          分项工程：待进入路段详情后配置。当前仅管理员维护路段范围，后续验收数据会自动驱动进度色带。
+        </p>
+        <p className="text-xs text-slate-400">
+          最近更新：{new Date(road.updatedAt).toLocaleString('zh-CN', { hour12: false })}
         </p>
       </div>
-      {canManage ? (
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => onEdit(road)}
-            className="rounded-xl border border-white/15 px-3 py-2 text-[11px] font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/10"
-          >
-            编辑
-          </button>
-          <button
-            type="button"
-            onClick={() => onDelete(road.id)}
-            className="rounded-xl border border-white/15 px-3 py-2 text-[11px] font-semibold text-rose-100 transition hover:border-rose-200/60 hover:bg-rose-200/10"
-          >
-            删除
-          </button>
-        </div>
-      ) : null}
     </div>
-    <div className="mt-4 space-y-2 text-sm text-slate-200/90">
-      <p>
-        分项工程：待进入路段详情后配置。当前仅管理员维护路段范围，后续验收数据会自动驱动进度色带。
-      </p>
-      <p className="text-xs text-slate-400">
-        最近更新：{new Date(road.updatedAt).toLocaleString('zh-CN', { hour12: false })}
-      </p>
-    </div>
-  </div>
+  </Link>
 )

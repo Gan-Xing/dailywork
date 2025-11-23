@@ -6,12 +6,19 @@ import type { RoadSectionDTO, RoadSectionPayload } from '@/lib/progressTypes'
 const normalizeValue = (value: string) => value.trim()
 
 const normalizePayload = (payload: RoadSectionPayload): RoadSectionPayload => ({
+  slug: normalizeValue(payload.slug),
   name: normalizeValue(payload.name),
   startPk: normalizeValue(payload.startPk),
   endPk: normalizeValue(payload.endPk),
 })
 
 const validatePayload = (payload: RoadSectionPayload) => {
+  if (!payload.slug) {
+    throw new Error('路由标识不能为空')
+  }
+  if (!/^[a-z0-9-]+$/.test(payload.slug)) {
+    throw new Error('路由标识仅允许小写字母、数字和连字符')
+  }
   if (!payload.name) {
     throw new Error('路段名称不能为空')
   }
@@ -26,8 +33,17 @@ const validatePayload = (payload: RoadSectionPayload) => {
   }
 }
 
-const mapToDTO = (row: { id: number; name: string; startPk: string; endPk: string; createdAt: Date; updatedAt: Date }): RoadSectionDTO => ({
+const mapToDTO = (row: {
+  id: number
+  slug: string
+  name: string
+  startPk: string
+  endPk: string
+  createdAt: Date
+  updatedAt: Date
+}): RoadSectionDTO => ({
   id: row.id,
+  slug: row.slug,
   name: row.name,
   startPk: row.startPk,
   endPk: row.endPk,
@@ -75,4 +91,15 @@ export const deleteRoadSection = async (id: number) => {
 
 export const isRecordNotFound = (error: unknown) => {
   return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025'
+}
+
+export const isUniqueConstraintError = (error: unknown) => {
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002'
+}
+
+export const getRoadBySlug = async (slug: string) => {
+  const row = await prisma.roadSection.findUnique({
+    where: { slug },
+  })
+  return row ? mapToDTO(row) : null
 }
