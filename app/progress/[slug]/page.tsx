@@ -1,6 +1,9 @@
 import Link from 'next/link'
 
+import { PhaseEditor } from './PhaseEditor'
 import type { RoadSectionDTO } from '@/lib/progressTypes'
+import { getSessionUser } from '@/lib/server/authSession'
+import { listPhases } from '@/lib/server/progressStore'
 import { getRoadBySlug } from '@/lib/server/roadStore'
 
 interface Params {
@@ -11,6 +14,8 @@ interface Params {
 
 export default async function RoadDetailPage({ params }: Params) {
   const road = (await getRoadBySlug(params.slug)) as RoadSectionDTO | null
+  const sessionUser = getSessionUser()
+  const canManage = sessionUser?.permissions.includes('road:manage') ?? false
 
   if (!road) {
     return (
@@ -30,6 +35,8 @@ export default async function RoadDetailPage({ params }: Params) {
       </main>
     )
   }
+
+  const phases = await listPhases(road.id)
 
   return (
     <main className="min-h-screen bg-slate-950 text-slate-50">
@@ -53,12 +60,9 @@ export default async function RoadDetailPage({ params }: Params) {
           </div>
         </header>
 
-        <section className="mt-8 rounded-3xl border border-dashed border-white/15 bg-white/5 p-6 text-sm text-slate-200/90 backdrop-blur">
-          <h2 className="text-lg font-semibold text-slate-50">分项工程</h2>
-          <p className="mt-2">
-            该路段的分项工程、设计段和报检数据尚未配置。请后续在此处补充分项工程卡片、左右侧设计段和报检记录。
-          </p>
-        </section>
+        <div className="mt-8">
+          <PhaseEditor road={road} initialPhases={phases} canManage={canManage} />
+        </div>
       </div>
     </main>
   )

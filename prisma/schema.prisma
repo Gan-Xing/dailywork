@@ -14,6 +14,16 @@ datasource db {
   directUrl = env("DIRECT_DATABASE_URL")
 }
 
+enum PhaseMeasure {
+  LINEAR
+}
+
+enum IntervalSide {
+  BOTH
+  LEFT
+  RIGHT
+}
+
 model DailyReport {
   id         Int      @id @default(autoincrement())
   reportDate DateTime @unique
@@ -30,6 +40,30 @@ model RoadSection {
   endPk     String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  phases    RoadPhase[]
+}
+
+model RoadPhase {
+  id            Int            @id @default(autoincrement())
+  roadId        Int
+  road          RoadSection    @relation(fields: [roadId], references: [id], onDelete: Cascade)
+  name          String
+  measure       PhaseMeasure
+  designLength  Float          @default(0)
+  intervals     PhaseInterval[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+}
+
+model PhaseInterval {
+  id        Int           @id @default(autoincrement())
+  phaseId   Int
+  phase     RoadPhase     @relation(fields: [phaseId], references: [id], onDelete: Cascade)
+  startPk   Float
+  endPk     Float
+  side      IntervalSide
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
 }
 
 model Permission {
