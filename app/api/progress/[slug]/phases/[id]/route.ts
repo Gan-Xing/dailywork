@@ -1,28 +1,26 @@
 import { NextResponse } from 'next/server'
 
 import { hasPermission } from '@/lib/server/authSession'
-import { createPhase, listPhases } from '@/lib/server/progressStore'
+import { updatePhase } from '@/lib/server/progressStore'
 import { getRoadBySlug } from '@/lib/server/roadStore'
 
 interface RouteParams {
   params: {
     slug: string
+    id: string
   }
 }
 
-export async function GET(_request: Request, { params }: RouteParams) {
-  const road = await getRoadBySlug(params.slug)
-  if (!road) {
-    return NextResponse.json({ message: '路段不存在' }, { status: 404 })
-  }
-  const phases = await listPhases(road.id)
-  return NextResponse.json({ road, phases })
-}
-
-export async function POST(request: Request, { params }: RouteParams) {
+export async function PUT(request: Request, { params }: RouteParams) {
   if (!hasPermission('road:manage')) {
     return NextResponse.json({ message: '缺少编辑进度权限' }, { status: 403 })
   }
+
+  const phaseId = Number(params.id)
+  if (!Number.isInteger(phaseId) || phaseId <= 0) {
+    return NextResponse.json({ message: '无效的分项 ID' }, { status: 400 })
+  }
+
   const road = await getRoadBySlug(params.slug)
   if (!road) {
     return NextResponse.json({ message: '路段不存在' }, { status: 404 })
@@ -40,7 +38,7 @@ export async function POST(request: Request, { params }: RouteParams) {
   }
 
   try {
-    const phase = await createPhase(road.id, {
+    const phase = await updatePhase(road.id, phaseId, {
       name: payload.name,
       measure: payload.measure as 'LINEAR' | 'POINT',
       intervals:

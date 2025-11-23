@@ -6,6 +6,8 @@ import { getSessionUser } from '@/lib/server/authSession'
 import { listPhases } from '@/lib/server/progressStore'
 import { getRoadBySlug } from '@/lib/server/roadStore'
 
+export const dynamic = 'force-dynamic'
+
 interface Params {
   params: {
     slug: string

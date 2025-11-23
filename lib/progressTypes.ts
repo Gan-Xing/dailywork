@@ -11,7 +11,7 @@ export interface RoadSectionDTO extends RoadSectionPayload {
   updatedAt: string
 }
 
-export type PhaseMeasure = 'LINEAR'
+export type PhaseMeasure = 'LINEAR' | 'POINT'
 export type IntervalSide = 'BOTH' | 'LEFT' | 'RIGHT'
 
 export interface PhaseIntervalPayload {
