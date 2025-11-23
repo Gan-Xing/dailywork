@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 
 import { createRoadSection, listRoadSections } from '@/lib/server/roadStore'
+import { hasPermission } from '@/lib/server/authSession'
 
 export async function GET() {
   const roads = await listRoadSections()
@@ -8,6 +9,10 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  if (!hasPermission('road:manage')) {
+    return NextResponse.json({ message: '缺少路段管理权限' }, { status: 403 })
+  }
+
   let payload: { name?: string; startPk?: string; endPk?: string }
   try {
     payload = (await request.json()) as { name?: string; startPk?: string; endPk?: string }

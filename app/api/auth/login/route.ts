@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 
 import { login } from '@/lib/server/authStore'
+import { issueSession } from '@/lib/server/authSession'
 
 export async function POST(request: Request) {
   let payload: { username?: string; password?: string }
@@ -16,7 +17,9 @@ export async function POST(request: Request) {
 
   try {
     const user = await login(payload.username, payload.password)
-    return NextResponse.json({ user })
+    const response = NextResponse.json({ user })
+    issueSession(user)
+    return response
   } catch (error) {
     return NextResponse.json({ message: (error as Error).message }, { status: 401 })
   }

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 
 import { deleteRoadSection, isRecordNotFound, updateRoadSection } from '@/lib/server/roadStore'
+import { hasPermission } from '@/lib/server/authSession'
 
 interface RouteParams {
   params: {
@@ -11,6 +12,9 @@ interface RouteParams {
 const invalidIdResponse = NextResponse.json({ message: '无效的路段 ID' }, { status: 400 })
 
 export async function PUT(request: Request, { params }: RouteParams) {
+  if (!hasPermission('road:manage')) {
+    return NextResponse.json({ message: '缺少路段管理权限' }, { status: 403 })
+  }
   const id = Number(params.id)
   if (!Number.isInteger(id) || id <= 0) {
     return invalidIdResponse
@@ -43,6 +47,9 @@ export async function PUT(request: Request, { params }: RouteParams) {
 }
 
 export async function DELETE(_request: Request, { params }: RouteParams) {
+  if (!hasPermission('road:manage')) {
+    return NextResponse.json({ message: '缺少路段管理权限' }, { status: 403 })
+  }
   const id = Number(params.id)
   if (!Number.isInteger(id) || id <= 0) {
     return invalidIdResponse
