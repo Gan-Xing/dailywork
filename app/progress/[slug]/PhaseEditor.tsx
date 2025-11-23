@@ -18,7 +18,7 @@ const sideOptions: { value: IntervalSide; label: string }[] = [
   { value: 'RIGHT', label: '右侧' },
 ]
 
-type Status = '未施工' | '验收中' | '已验收' | '非设计'
+type Status = '未验收' | '验收中' | '已验收' | '非设计'
 
 interface Segment {
   start: number
@@ -43,7 +43,7 @@ interface PointView {
 }
 
 const statusTone: Record<Status, string> = {
-  未施工: 'bg-gradient-to-r from-white via-slate-100 to-white text-slate-900 shadow-sm shadow-slate-900/10',
+  未验收: 'bg-gradient-to-r from-white via-slate-100 to-white text-slate-900 shadow-sm shadow-slate-900/10',
   验收中: 'bg-gradient-to-r from-amber-300 via-orange-200 to-amber-200 text-slate-900 shadow-md shadow-amber-400/30',
   已验收: 'bg-gradient-to-r from-emerald-300 via-lime-200 to-emerald-200 text-slate-900 shadow-md shadow-emerald-400/30',
   非设计: 'bg-slate-800 text-slate-100 shadow-inner shadow-slate-900/30',
@@ -105,7 +105,7 @@ const buildLinearView = (phase: PhaseDTO, roadLength: number): LinearView => {
   const left: Segment[] = []
   const right: Segment[] = []
   normalized.forEach((interval) => {
-    const seg = { start: interval.startPk, end: interval.endPk, status: '未施工' as Status }
+    const seg = { start: interval.startPk, end: interval.endPk, status: '未验收' as Status }
     if (interval.side === 'LEFT') left.push(seg)
     if (interval.side === 'RIGHT') right.push(seg)
     if (interval.side === 'BOTH') {
@@ -156,12 +156,25 @@ const calcCombinedPercent = (left: Segment[], right: Segment[]) => {
 }
 
 export function PhaseEditor({ road, initialPhases, canManage }: Props) {
+  const roadStart = useMemo(() => {
+    const start = Number(road.startPk)
+    return Number.isFinite(start) ? start : 0
+  }, [road.startPk])
+
+  const roadEnd = useMemo(() => {
+    const end = Number(road.endPk)
+    return Number.isFinite(end) ? end : roadStart
+  }, [road.endPk, roadStart])
+
+  const defaultInterval = useMemo<PhaseIntervalPayload>(
+    () => ({ startPk: roadStart, endPk: roadEnd, side: 'BOTH' }),
+    [roadStart, roadEnd],
+  )
+
   const [phases, setPhases] = useState<PhaseDTO[]>(initialPhases)
   const [name, setName] = useState('')
   const [measure, setMeasure] = useState<PhaseMeasure>('LINEAR')
-  const [intervals, setIntervals] = useState<PhaseIntervalPayload[]>([
-    { startPk: 0, endPk: 0, side: 'BOTH' },
-  ])
+  const [intervals, setIntervals] = useState<PhaseIntervalPayload[]>([defaultInterval])
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const [editingId, setEditingId] = useState<number | null>(null)
@@ -190,7 +203,7 @@ export function PhaseEditor({ road, initialPhases, canManage }: Props) {
   }
 
   const addInterval = () => {
-    setIntervals((prev) => [...prev, { startPk: 0, endPk: 0, side: 'BOTH' }])
+    setIntervals((prev) => [...prev, { ...defaultInterval }])
   }
 
   const removeInterval = (index: number) => {
@@ -200,7 +213,7 @@ export function PhaseEditor({ road, initialPhases, canManage }: Props) {
   const resetForm = () => {
     setName('')
     setMeasure('LINEAR')
-    setIntervals([{ startPk: 0, endPk: 0, side: 'BOTH' }])
+    setIntervals([defaultInterval])
     setEditingId(null)
     setError(null)
   }
@@ -303,6 +316,15 @@ export function PhaseEditor({ road, initialPhases, canManage }: Props) {
                 <span className="rounded-full bg-amber-200/80 px-3 py-1 text-xs font-semibold text-slate-900">
                   编辑分项 · ID {editingId}
                 </span>
+              ) : null}
+              {editingId ? (
+                <button
+                  type="button"
+                  className="rounded-full border border-white/20 px-3 py-1 text-[11px] font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/10"
+                  onClick={resetForm}
+                >
+                  退出编辑
+                </button>
               ) : null}
               <button
                 type="button"
@@ -431,9 +453,9 @@ export function PhaseEditor({ road, initialPhases, canManage }: Props) {
 
       <section className="space-y-6 rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur">
         <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-200">
-          已有分项（白色区段可点击预约报检）
+          已有分项（白色=未验收，可点击预约报检）
           <span className="h-px w-12 bg-white/30" />
-          灰=非设计 白=未施工
+          灰=非设计 白=未验收
         </div>
 
         {phases.length === 0 ? (
