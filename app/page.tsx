@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { useEffect, useState } from 'react'
 
 import { LocaleSwitcher } from '@/components/LocaleSwitcher'
 import { locales, type Locale } from '@/lib/i18n'
@@ -149,9 +150,62 @@ const copy: Record<Locale, Copy> = {
   },
 }
 
+type SessionUser = {
+  username: string
+  roles: { id: number; name: string }[]
+  permissions: string[]
+}
+
 export default function HomePage() {
   const { locale, setLocale } = usePreferredLocale('zh', locales)
   const t = copy[locale]
+  const [session, setSession] = useState<SessionUser | null>(null)
+  const [loginOpen, setLoginOpen] = useState(false)
+  const [username, setUsername] = useState('GanXing')
+  const [password, setPassword] = useState('Admin1234')
+  const [loginMessage, setLoginMessage] = useState<string | null>(null)
+  const [isSubmitting, setSubmitting] = useState(false)
+
+  useEffect(() => {
+    const loadSession = async () => {
+      try {
+        const res = await fetch('/api/auth/session', { credentials: 'include' })
+        const data = (await res.json()) as { user: SessionUser | null }
+        if (data.user) {
+          setSession(data.user)
+        }
+      } catch {
+        // ignore
+      }
+    }
+    loadSession()
+  }, [])
+
+  const handleLogin = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    setSubmitting(true)
+    setLoginMessage(null)
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      })
+      const data = (await res.json()) as { user?: SessionUser; message?: string }
+      if (!res.ok || !data.user) {
+        setLoginMessage(data.message ?? '登录失败')
+      } else {
+        setSession(data.user)
+        setLoginOpen(false)
+        setLoginMessage('登录成功，权限已更新')
+      }
+    } catch (error) {
+      setLoginMessage((error as Error).message)
+    } finally {
+      setSubmitting(false)
+    }
+  }
 
   return (
     <main className="relative isolate min-h-screen overflow-hidden bg-slate-950 text-slate-50">
@@ -159,7 +213,20 @@ export default function HomePage() {
       <div className="absolute left-1/2 top-0 -z-10 h-80 w-[60vw] -translate-x-1/2 rounded-full bg-gradient-to-br from-white/8 via-blue-400/10 to-transparent blur-3xl" />
 
       <div className="relative mx-auto max-w-6xl px-6 py-16 sm:px-8 lg:px-12">
-        <div className="mb-6 flex justify-end">
+        <div className="mb-6 flex flex-wrap items-center justify-end gap-3">
+          {session ? (
+            <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-emerald-100">
+              已登录 · {session.username}
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setLoginOpen(true)}
+              className="rounded-full border border-white/20 px-3 py-1 text-xs font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/10"
+            >
+              登录
+            </button>
+          )}
           <LocaleSwitcher locale={locale} onChange={setLocale} variant="dark" />
         </div>
         <header className="flex flex-col gap-10 lg:flex-row lg:items-end lg:justify-between">
@@ -278,6 +345,62 @@ export default function HomePage() {
           <p className="text-slate-200/80">{t.extension.description}</p>
         </section>
       </div>
+
+      {loginOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur">
+          <div className="w-full max-w-md rounded-3xl border border-white/10 bg-slate-900 p-6 shadow-2xl shadow-emerald-500/20">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-slate-50">登录</h2>
+              <button
+                type="button"
+                onClick={() => setLoginOpen(false)}
+                className="rounded-full border border-white/20 px-3 py-1 text-xs text-slate-200 transition hover:border-white/40 hover:bg-white/10"
+              >
+                关闭
+              </button>
+            </div>
+            <form className="mt-4 space-y-3" onSubmit={handleLogin}>
+              <label className="flex flex-col gap-2 text-sm text-slate-100">
+                用户名
+                <input
+                  className="rounded-2xl border border-white/15 bg-white/5 px-4 py-3 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  autoComplete="username"
+                  required
+                />
+              </label>
+              <label className="flex flex-col gap-2 text-sm text-slate-100">
+                密码
+                <input
+                  type="password"
+                  className="rounded-2xl border border-white/15 bg-white/5 px-4 py-3 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  autoComplete="current-password"
+                  required
+                />
+              </label>
+              <div className="flex items-center gap-3">
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="inline-flex items-center justify-center rounded-2xl bg-emerald-300 px-5 py-3 text-sm font-semibold text-slate-900 shadow-lg shadow-emerald-400/30 transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {isSubmitting ? '登录中...' : '登录'}
+                </button>
+                {loginMessage ? (
+                  <span className="text-xs text-amber-200">{loginMessage}</span>
+                ) : (
+                  <span className="text-xs text-slate-300">
+                    默认账号：GanXing / Admin1234 或 User1 / use1
+                  </span>
+                )}
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
     </main>
   )
 }

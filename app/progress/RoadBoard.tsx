@@ -110,85 +110,81 @@ export function RoadBoard({ initialRoads, canManage }: Props) {
 
   return (
     <div className="space-y-8">
-      <section className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur">
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-100">Admin</p>
-            <h2 className="text-xl font-semibold text-slate-50">路段管理</h2>
-            <p className="text-sm text-slate-200/80">仅管理员可维护路段清单，分项工程稍后在详情内补充。</p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {editingId ? (
-              <span className="rounded-full bg-amber-200/80 px-3 py-1 text-xs font-semibold text-slate-900">
-                编辑模式 · ID {editingId}
-              </span>
-            ) : null}
-            {!canManage ? (
-              <span className="rounded-full bg-white/10 px-3 py-1 text-[11px] font-semibold text-slate-100/80">
-                只读 · 需要路段管理权限
-              </span>
-            ) : null}
-          </div>
-        </div>
-
-        <form className="mt-5 grid gap-4 md:grid-cols-3" onSubmit={upsertRoad}>
-          <label className="flex flex-col gap-2 text-sm text-slate-100">
-            名称
-            <input
-              className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-slate-50 placeholder:text-slate-200/60 focus:border-emerald-300 focus:outline-none"
-              value={form.name}
-              onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
-              placeholder="如：大学城路"
-              required
-              disabled={!canManage}
-            />
-          </label>
-          <label className="flex flex-col gap-2 text-sm text-slate-100">
-            起点
-            <input
-              className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-slate-50 placeholder:text-slate-200/60 focus:border-emerald-300 focus:outline-none"
-              value={form.startPk}
-              onChange={(event) => setForm((prev) => ({ ...prev, startPk: event.target.value }))}
-              placeholder="例：PK0+000 / 交叉口 A"
-              required
-              disabled={!canManage}
-            />
-          </label>
-          <label className="flex flex-col gap-2 text-sm text-slate-100">
-            终点
-            <div className="flex items-center gap-2">
-              <input
-                className="w-full rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-slate-50 placeholder:text-slate-200/60 focus:border-emerald-300 focus:outline-none"
-                value={form.endPk}
-                onChange={(event) => setForm((prev) => ({ ...prev, endPk: event.target.value }))}
-                placeholder="例：PK1+940 / 桥头"
-                required
-                disabled={!canManage}
-              />
+      {canManage ? (
+        <section className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-100">
+                Admin
+              </p>
+              <h2 className="text-xl font-semibold text-slate-50">路段管理</h2>
+              <p className="text-sm text-slate-200/80">仅管理员可维护路段清单，分项工程稍后在详情内补充。</p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
               {editingId ? (
-                <button
-                  type="button"
-                  className="rounded-xl border border-white/20 px-3 py-2 text-xs font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/10"
-                  onClick={resetForm}
-                >
-                  退出编辑
-                </button>
+                <span className="rounded-full bg-amber-200/80 px-3 py-1 text-xs font-semibold text-slate-900">
+                  编辑模式 · ID {editingId}
+                </span>
               ) : null}
             </div>
-          </label>
-          <div className="md:col-span-3 flex flex-wrap items-center gap-3">
-            <button
-              type="submit"
-              disabled={isPending || !canManage}
-              className="inline-flex items-center justify-center rounded-2xl bg-emerald-300 px-5 py-3 text-sm font-semibold text-slate-900 shadow-lg shadow-emerald-400/30 transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-70"
-            >
-              {editingId ? '保存修改' : '添加路段'}
-            </button>
-            {error ? <span className="text-sm text-amber-200">{error}</span> : null}
-            {isPending ? <span className="text-xs text-slate-200/70">正在保存...</span> : null}
           </div>
-        </form>
-      </section>
+
+          <form className="mt-5 grid gap-4 md:grid-cols-3" onSubmit={upsertRoad}>
+            <label className="flex flex-col gap-2 text-sm text-slate-100">
+              名称
+              <input
+                className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-slate-50 placeholder:text-slate-200/60 focus:border-emerald-300 focus:outline-none"
+                value={form.name}
+                onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
+                placeholder="如：大学城路"
+                required
+              />
+            </label>
+            <label className="flex flex-col gap-2 text-sm text-slate-100">
+              起点
+              <input
+                className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-slate-50 placeholder:text-slate-200/60 focus:border-emerald-300 focus:outline-none"
+                value={form.startPk}
+                onChange={(event) => setForm((prev) => ({ ...prev, startPk: event.target.value }))}
+                placeholder="例：PK0+000 / 交叉口 A"
+                required
+              />
+            </label>
+            <label className="flex flex-col gap-2 text-sm text-slate-100">
+              终点
+              <div className="flex items-center gap-2">
+                <input
+                  className="w-full rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-slate-50 placeholder:text-slate-200/60 focus:border-emerald-300 focus:outline-none"
+                  value={form.endPk}
+                  onChange={(event) => setForm((prev) => ({ ...prev, endPk: event.target.value }))}
+                  placeholder="例：PK1+940 / 桥头"
+                  required
+                />
+                {editingId ? (
+                  <button
+                    type="button"
+                    className="rounded-xl border border-white/20 px-3 py-2 text-xs font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/10"
+                    onClick={resetForm}
+                  >
+                    退出编辑
+                  </button>
+                ) : null}
+              </div>
+            </label>
+            <div className="md:col-span-3 flex flex-wrap items-center gap-3">
+              <button
+                type="submit"
+                disabled={isPending}
+                className="inline-flex items-center justify-center rounded-2xl bg-emerald-300 px-5 py-3 text-sm font-semibold text-slate-900 shadow-lg shadow-emerald-400/30 transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {editingId ? '保存修改' : '添加路段'}
+              </button>
+              {error ? <span className="text-sm text-amber-200">{error}</span> : null}
+              {isPending ? <span className="text-xs text-slate-200/70">正在保存...</span> : null}
+            </div>
+          </form>
+        </section>
+      ) : null}
 
       <section className="space-y-4">
         <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-200">
