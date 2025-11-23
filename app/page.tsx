@@ -402,50 +402,6 @@ export default function HomePage() {
 						</div>
 					</div>
 
-					<div className='grid w-full max-w-xs gap-3 self-start rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-slate-100 backdrop-blur lg:max-w-sm'>
-						<div className='flex items-center justify-between'>
-							<p className='text-slate-300'>
-								{
-									t.stats
-										.entriesLabel
-								}
-							</p>
-							<p className='text-lg font-semibold'>
-								{
-									t.stats
-										.entriesValue
-								}
-							</p>
-						</div>
-						<div className='flex items-center justify-between'>
-							<p className='text-slate-300'>
-								{
-									t.stats
-										.recentLabel
-								}
-							</p>
-							<p className='text-lg font-semibold'>
-								{
-									t.stats
-										.recentValue
-								}
-							</p>
-						</div>
-						<div className='rounded-xl bg-gradient-to-r from-blue-400/20 via-cyan-300/20 to-emerald-300/20 p-3 text-xs text-slate-900 shadow-inner shadow-blue-500/20'>
-							<p className='font-semibold uppercase tracking-widest text-slate-950/70'>
-								{
-									t.stats
-										.upcomingTitle
-								}
-							</p>
-							<p className='mt-1 text-slate-900'>
-								{
-									t.stats
-										.upcomingBody
-								}
-							</p>
-						</div>
-					</div>
 				</header>
 
 				<section className='mt-12 grid gap-6 md:grid-cols-2'>
