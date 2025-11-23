@@ -1,6 +1,7 @@
 import type { Prisma } from '@prisma/client'
 
 import { verifyPassword } from '@/lib/auth/password'
+import { hashPassword } from '@/lib/auth/password'
 import { prisma } from '@/lib/prisma'
 
 export interface AuthPermission {
@@ -118,6 +119,17 @@ export const listPermissions = async () => {
   }))
 }
 
+export const getUserWithPermissions = async (userId: number) => {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: userSelection,
+  })
+  if (!user) {
+    return null
+  }
+  return mapUser(user)
+}
+
 export const listRoles = async () => {
   const roles = await prisma.role.findMany({
     orderBy: { id: 'asc' },
@@ -141,4 +153,34 @@ export const listRoles = async () => {
     createdAt: role.createdAt.toISOString(),
     updatedAt: role.updatedAt.toISOString(),
   }))
+}
+
+export const changePassword = async (userId: number, currentPassword: string, newPassword: string) => {
+  if (!newPassword || newPassword.length < 6) {
+    throw new Error('新密码长度至少 6 位')
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      passwordHash: true,
+    },
+  })
+
+  if (!user) {
+    throw new Error('用户不存在')
+  }
+
+  const ok = verifyPassword(currentPassword, user.passwordHash)
+  if (!ok) {
+    throw new Error('当前密码错误')
+  }
+
+  const passwordHash = hashPassword(newPassword)
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: { passwordHash },
+  })
 }

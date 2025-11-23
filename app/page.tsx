@@ -160,10 +160,17 @@ export default function HomePage() {
 	const [session, setSession] = useState<SessionUser | null>(null);
 	const [loginOpen, setLoginOpen] = useState(false);
 	const [username, setUsername] = useState('GanXing');
-	const [password, setPassword] = useState('Admin');
+	const [password, setPassword] = useState('Admin1234');
 	const [loginMessage, setLoginMessage] = useState<string | null>(null);
 	const [isSubmitting, setSubmitting] = useState(false);
 	const [isLoggingOut, setIsLoggingOut] = useState(false);
+	const [menuOpen, setMenuOpen] = useState(false);
+	const [changeOpen, setChangeOpen] = useState(false);
+	const [currentPassword, setCurrentPassword] = useState('');
+	const [newPassword, setNewPassword] = useState('');
+	const [confirmPassword, setConfirmPassword] = useState('');
+	const [changeMessage, setChangeMessage] = useState<string | null>(null);
+	const [isChanging, setIsChanging] = useState(false);
 
 	useEffect(() => {
 		const loadSession = async () => {
@@ -204,6 +211,7 @@ export default function HomePage() {
 			} else {
 				setSession(data.user);
 				setLoginOpen(false);
+				setMenuOpen(false);
 				setLoginMessage('登录成功，权限已更新');
 			}
 		} catch (error) {
@@ -222,8 +230,46 @@ export default function HomePage() {
 				credentials: 'include'
 			});
 			setSession(null);
+			setMenuOpen(false);
+			setChangeOpen(false);
 		} finally {
 			setIsLoggingOut(false);
+		}
+	};
+
+	const handleChangePassword = async (event: React.FormEvent<HTMLFormElement>) => {
+		event.preventDefault();
+		setIsChanging(true);
+		setChangeMessage(null);
+
+		if (newPassword !== confirmPassword) {
+			setChangeMessage('两次输入的新密码不一致');
+			setIsChanging(false);
+			return;
+		}
+
+		try {
+			const res = await fetch('/api/auth/change-password', {
+				method: 'POST',
+				credentials: 'include',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ currentPassword, newPassword })
+			});
+			const data = (await res.json()) as { message?: string };
+			if (!res.ok) {
+				setChangeMessage(data.message ?? '修改失败');
+			} else {
+				setChangeMessage('密码已更新，请妥善保存');
+				setCurrentPassword('');
+				setNewPassword('');
+				setConfirmPassword('');
+				setChangeOpen(false);
+				setMenuOpen(false);
+			}
+		} catch (error) {
+			setChangeMessage((error as Error).message);
+		} finally {
+			setIsChanging(false);
 		}
 	};
 
@@ -235,24 +281,53 @@ export default function HomePage() {
 			<div className='relative mx-auto max-w-6xl px-6 py-16 sm:px-8 lg:px-12'>
 				<div className='mb-6 flex flex-wrap items-center justify-end gap-3'>
 					{session ? (
-						<div className='flex items-center gap-2'>
-							<span className='rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-emerald-100'>
-								已登录 ·{' '}
-								{session.username}
-							</span>
+						<div className='relative'>
 							<button
 								type='button'
-								onClick={
-									handleLogout
+								onClick={() =>
+									setMenuOpen(
+										(prev) => !prev
+									)
 								}
-								disabled={
-									isLoggingOut
-								}
-								className='rounded-full border border-white/20 px-3 py-1 text-xs font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60'>
-								{isLoggingOut
-									? '正在退出...'
-									: '退出登录'}
+								className='inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-emerald-100 transition hover:bg-white/20'>
+								已登录 · {session.username}
+								<span aria-hidden>
+									▾
+								</span>
 							</button>
+							{menuOpen ? (
+								<div className='absolute right-0 mt-2 w-40 rounded-2xl border border-white/15 bg-slate-900/95 p-2 text-xs text-slate-50 shadow-xl shadow-slate-950/30 backdrop-blur'>
+									<button
+										type='button'
+										className='flex w-full items-center justify-between rounded-xl px-3 py-2 text-left transition hover:bg-white/10'
+										onClick={() => {
+											setChangeOpen(true);
+											setMenuOpen(false);
+										}}>
+										修改密码
+										<span aria-hidden>
+											↗
+										</span>
+									</button>
+									<button
+										type='button'
+										className='flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-rose-100 transition hover:bg-white/10'
+										onClick={() => {
+											setMenuOpen(false);
+											handleLogout();
+										}}
+										disabled={
+											isLoggingOut
+										}>
+										{isLoggingOut
+											? '正在退出...'
+											: '退出登录'}
+										<span aria-hidden>
+											⎋
+										</span>
+									</button>
+								</div>
+							) : null}
 						</div>
 					) : (
 						<button
@@ -537,6 +612,75 @@ export default function HomePage() {
 										User1
 										/
 										use1
+									</span>
+								)}
+							</div>
+						</form>
+					</div>
+				</div>
+			) : null}
+
+			{changeOpen ? (
+				<div className='fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur'>
+					<div className='w-full max-w-md rounded-3xl border border-white/10 bg-slate-900 p-6 shadow-2xl shadow-blue-500/20'>
+						<div className='flex items-center justify-between'>
+							<h2 className='text-lg font-semibold text-slate-50'>
+								修改密码
+							</h2>
+							<button
+								type='button'
+								onClick={() => setChangeOpen(false)}
+								className='rounded-full border border-white/20 px-3 py-1 text-xs text-slate-200 transition hover:border-white/40 hover:bg-white/10'>
+								关闭
+							</button>
+						</div>
+						<form className='mt-4 space-y-3' onSubmit={handleChangePassword}>
+							<label className='flex flex-col gap-2 text-sm text-slate-100'>
+								当前密码
+								<input
+									type='password'
+									className='rounded-2xl border border-white/15 bg-white/5 px-4 py-3 text-sm text-slate-50 focus:border-blue-300 focus:outline-none'
+									value={currentPassword}
+									onChange={(e) => setCurrentPassword(e.target.value)}
+									required
+								/>
+							</label>
+							<label className='flex flex-col gap-2 text-sm text-slate-100'>
+								新密码
+								<input
+									type='password'
+									className='rounded-2xl border border-white/15 bg-white/5 px-4 py-3 text-sm text-slate-50 focus:border-blue-300 focus:outline-none'
+									value={newPassword}
+									onChange={(e) => setNewPassword(e.target.value)}
+									required
+									minLength={6}
+								/>
+							</label>
+							<label className='flex flex-col gap-2 text-sm text-slate-100'>
+								确认新密码
+								<input
+									type='password'
+									className='rounded-2xl border border-white/15 bg-white/5 px-4 py-3 text-sm text-slate-50 focus:border-blue-300 focus:outline-none'
+									value={confirmPassword}
+									onChange={(e) => setConfirmPassword(e.target.value)}
+									required
+									minLength={6}
+								/>
+							</label>
+							<div className='flex items-center gap-3'>
+								<button
+									type='submit'
+									disabled={isChanging}
+									className='inline-flex items-center justify-center rounded-2xl bg-blue-200 px-5 py-3 text-sm font-semibold text-slate-900 shadow-lg shadow-blue-400/30 transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-70'>
+									{isChanging ? '提交中...' : '保存密码'}
+								</button>
+								{changeMessage ? (
+									<span className='text-xs text-amber-200'>
+										{changeMessage}
+									</span>
+								) : (
+									<span className='text-xs text-slate-300'>
+										最短 6 位，修改后会保持登录状态
 									</span>
 								)}
 							</div>
