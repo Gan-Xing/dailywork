@@ -1,5 +1,6 @@
 import './globals.css'
 import type { Metadata } from 'next'
+import Providers from './providers'
 
 export const metadata: Metadata = {
   title: 'Daily Report Builder',
@@ -14,7 +15,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="fr">
-      <body className="bg-slate-100 text-slate-900">{children}</body>
+      <body className="bg-slate-100 text-slate-900">
+        <Providers>{children}</Providers>
+      </body>
     </html>
   )
 }

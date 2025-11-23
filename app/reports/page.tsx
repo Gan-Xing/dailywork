@@ -4,6 +4,10 @@ import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
+import { LocaleSwitcher } from '@/components/LocaleSwitcher'
+import { locales, type Locale } from '@/lib/i18n'
+import { usePreferredLocale } from '@/lib/usePreferredLocale'
+
 interface ReportSummary {
   date: string
   createdAt: string
@@ -32,27 +36,128 @@ const buildCalendar = (anchor: Date) => {
   })
 }
 
-const weekdayLabels = ['日', '一', '二', '三', '四', '五', '六']
-
 const formatMonthKey = (date: Date) =>
   `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
 
+const dateLocales: Record<Locale, string> = {
+  fr: 'fr-FR',
+  zh: 'zh-CN',
+}
+
+type LandingCopy = {
+  create: {
+    badge: string
+    title: string
+    description: string
+    createButton: string
+    viewButton: string
+    prototype: string
+    hintFilled: string
+    hintEmpty: string
+  }
+  calendar: {
+    badge: string
+    prevLabel: string
+    nextLabel: string
+    filledLabel: string
+    pendingLabel: string
+    loading: string
+    error: string
+    weekdays: string[]
+  }
+  recent: {
+    badge: string
+    loading: string
+    error: string
+    empty: string
+    view: string
+    updatedPrefix: string
+  }
+}
+
+const landingCopy: Record<Locale, LandingCopy> = {
+  zh: {
+    create: {
+      badge: '创建日报',
+      title: '选择日期，开始录入',
+      description: '请选择尚未填报的日期，完成后内容会被保存并在首页高亮。',
+      createButton: '创建并前往填报',
+      viewButton: '查看该日报',
+      prototype: '查看原型图',
+      hintFilled: '该日期已经完成，可以查看或继续修改。',
+      hintEmpty: '该日期尚无日报，可直接创建。',
+    },
+    calendar: {
+      badge: '历史记录',
+      prevLabel: '上个月',
+      nextLabel: '下个月',
+      filledLabel: '已填',
+      pendingLabel: '待填',
+      loading: '日历加载中...',
+      error: '加载历史记录失败。',
+      weekdays: ['日', '一', '二', '三', '四', '五', '六'],
+    },
+    recent: {
+      badge: '最近更新',
+      loading: '加载中...',
+      error: '加载最新日报失败。',
+      empty: '还没有任何日报，先创建一条吧。',
+      view: '查看',
+      updatedPrefix: '最近更新：',
+    },
+  },
+  fr: {
+    create: {
+      badge: 'Créer un rapport',
+      title: 'Choisissez la date et commencez la saisie',
+      description:
+        "Sélectionnez une journée non renseignée; une fois enregistrée, elle sera mise en avant sur l'accueil.",
+      createButton: 'Créer et ouvrir',
+      viewButton: 'Ouvrir ce rapport',
+      prototype: 'Voir la maquette',
+      hintFilled: 'Cette date est déjà renseignée; vous pouvez la consulter ou la modifier.',
+      hintEmpty: 'Aucun rapport pour cette date, vous pouvez le créer.',
+    },
+    calendar: {
+      badge: 'Historique',
+      prevLabel: 'Mois précédent',
+      nextLabel: 'Mois suivant',
+      filledLabel: 'Déclaré',
+      pendingLabel: 'À remplir',
+      loading: 'Chargement du calendrier...',
+      error: "Impossible de charger l'historique.",
+      weekdays: ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'],
+    },
+    recent: {
+      badge: 'Mises à jour récentes',
+      loading: 'Chargement...',
+      error: 'Échec du chargement des derniers rapports.',
+      empty: 'Aucun rapport pour le moment, créez le premier.',
+      view: 'Voir',
+      updatedPrefix: 'Dernière mise à jour : ',
+    },
+  },
+}
+
 export default function ReportsLandingPage() {
   const router = useRouter()
+  const { locale, setLocale } = usePreferredLocale('zh', locales)
+  const t = landingCopy[locale]
   const [selectedDate, setSelectedDate] = useState(() => formatDateInput(new Date()))
   const [recentReports, setRecentReports] = useState<ReportSummary[]>([])
   const [monthReports, setMonthReports] = useState<ReportSummary[]>([])
   const [monthCursor, setMonthCursor] = useState(() => new Date())
   const [isMonthLoading, setIsMonthLoading] = useState(true)
   const [isRecentLoading, setIsRecentLoading] = useState(true)
-  const [monthError, setMonthError] = useState<string | null>(null)
-  const [recentError, setRecentError] = useState<string | null>(null)
+  const [hasMonthError, setHasMonthError] = useState(false)
+  const [hasRecentError, setHasRecentError] = useState(false)
 
   const monthKey = useMemo(() => formatMonthKey(monthCursor), [monthCursor])
+  const dateLocale = dateLocales[locale]
 
   const fetchMonthReports = useCallback(async (key: string) => {
     setIsMonthLoading(true)
-    setMonthError(null)
+    setHasMonthError(false)
     try {
       const response = await fetch(`/api/reports?month=${key}`, { cache: 'no-store' })
       if (!response.ok) {
@@ -61,7 +166,7 @@ export default function ReportsLandingPage() {
       const data = (await response.json()) as { reports: ReportSummary[] }
       setMonthReports(data.reports)
     } catch (error) {
-      setMonthError('加载历史记录失败。')
+      setHasMonthError(true)
       setMonthReports([])
     } finally {
       setIsMonthLoading(false)
@@ -70,7 +175,7 @@ export default function ReportsLandingPage() {
 
   const fetchRecentReports = useCallback(async () => {
     setIsRecentLoading(true)
-    setRecentError(null)
+    setHasRecentError(false)
     try {
       const response = await fetch('/api/reports?limit=5', { cache: 'no-store' })
       if (!response.ok) {
@@ -79,7 +184,7 @@ export default function ReportsLandingPage() {
       const data = (await response.json()) as { reports: ReportSummary[] }
       setRecentReports(data.reports)
     } catch (error) {
-      setRecentError('加载最新日报失败。')
+      setHasRecentError(true)
       setRecentReports([])
     } finally {
       setIsRecentLoading(false)
@@ -131,15 +236,18 @@ export default function ReportsLandingPage() {
   }
 
   return (
-    <main className="mx-auto flex max-w-5xl flex-col gap-8 px-4 py-10 lg:px-0">
+    <main className="relative mx-auto flex max-w-5xl flex-col gap-8 px-4 py-10 lg:px-0">
+      <div className="flex justify-end">
+        <LocaleSwitcher locale={locale} onChange={setLocale} variant="light" />
+      </div>
       <section className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-sm shadow-slate-100">
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">创建日报</p>
-            <h1 className="mt-2 text-2xl font-semibold text-slate-900">选择日期，开始录入</h1>
-            <p className="mt-1 text-sm text-slate-600">
-              请选择尚未填报的日期，完成后内容会被保存并在首页高亮。
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              {t.create.badge}
             </p>
+            <h1 className="mt-2 text-2xl font-semibold text-slate-900">{t.create.title}</h1>
+            <p className="mt-1 text-sm text-slate-600">{t.create.description}</p>
           </div>
           <div className="flex flex-col gap-3 md:items-end">
             <input
@@ -155,20 +263,18 @@ export default function ReportsLandingPage() {
                 onClick={handleCreate}
                 disabled={!selectedDate}
               >
-                {hasReportForSelectedDate ? '查看该日报' : '创建并前往填报'}
+                {hasReportForSelectedDate ? t.create.viewButton : t.create.createButton}
               </button>
               <Link
                 href="/prototype"
                 className="inline-flex items-center justify-center rounded-2xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-white"
               >
-                查看原型图
+                {t.create.prototype}
               </Link>
             </div>
             {selectedDate ? (
               <p className="text-xs text-slate-500">
-                {hasReportForSelectedDate
-                  ? '该日期已经完成，可以查看或继续修改。'
-                  : '该日期尚无日报，可直接创建。'}
+                {hasReportForSelectedDate ? t.create.hintFilled : t.create.hintEmpty}
               </p>
             ) : null}
           </div>
@@ -178,15 +284,17 @@ export default function ReportsLandingPage() {
       <section className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-sm shadow-slate-100">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">历史记录</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              {t.calendar.badge}
+            </p>
             <h2 className="mt-1 text-xl font-semibold text-slate-900">
-              {monthLabel(monthCursor, 'zh-CN')}
+              {monthLabel(monthCursor, dateLocale)}
             </h2>
           </div>
           <div className="flex items-center gap-2">
             <button
               type="button"
-              aria-label="上个月"
+              aria-label={t.calendar.prevLabel}
               className="rounded-full border border-slate-200 p-2 text-slate-600 transition hover:bg-slate-50"
               onClick={() => handleMonthChange(-1)}
             >
@@ -194,7 +302,7 @@ export default function ReportsLandingPage() {
             </button>
             <button
               type="button"
-              aria-label="下个月"
+              aria-label={t.calendar.nextLabel}
               className="rounded-full border border-slate-200 p-2 text-slate-600 transition hover:bg-slate-50"
               onClick={() => handleMonthChange(1)}
             >
@@ -203,7 +311,7 @@ export default function ReportsLandingPage() {
           </div>
         </div>
         <div className="mt-4 grid grid-cols-7 text-center text-xs font-semibold uppercase tracking-wide text-slate-500">
-          {weekdayLabels.map((label) => (
+          {t.calendar.weekdays.map((label) => (
             <div key={label} className="py-2">
               {label}
             </div>
@@ -226,27 +334,29 @@ export default function ReportsLandingPage() {
               >
                 <span className="text-base font-semibold">{day.date.getDate()}</span>
                 <span className="text-[10px] uppercase tracking-wide">
-                  {hasReport ? '已填' : '待填'}
+                  {hasReport ? t.calendar.filledLabel : t.calendar.pendingLabel}
                 </span>
               </button>
             )
           })}
         </div>
-        {monthError ? (
-          <p className="mt-3 text-xs text-red-600">{monthError}</p>
+        {hasMonthError ? (
+          <p className="mt-3 text-xs text-red-600">{t.calendar.error}</p>
         ) : isMonthLoading ? (
-          <p className="mt-3 text-xs text-slate-500">日历加载中...</p>
+          <p className="mt-3 text-xs text-slate-500">{t.calendar.loading}</p>
         ) : null}
       </section>
 
       <section className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-sm shadow-slate-100">
-        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">最近更新</p>
+        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+          {t.recent.badge}
+        </p>
         {isRecentLoading ? (
-          <p className="mt-4 text-sm text-slate-500">加载中...</p>
-        ) : recentError ? (
-          <p className="mt-4 text-sm text-red-600">{recentError}</p>
+          <p className="mt-4 text-sm text-slate-500">{t.recent.loading}</p>
+        ) : hasRecentError ? (
+          <p className="mt-4 text-sm text-red-600">{t.recent.error}</p>
         ) : recentReports.length === 0 ? (
-          <p className="mt-4 text-sm text-slate-500">还没有任何日报，先创建一条吧。</p>
+          <p className="mt-4 text-sm text-slate-500">{t.recent.empty}</p>
         ) : (
           <ul className="mt-4 space-y-3">
             {recentReports.map((entry) => (
@@ -257,7 +367,8 @@ export default function ReportsLandingPage() {
                 <div>
                   <p className="text-sm font-semibold text-slate-900">{entry.date}</p>
                   <p className="text-xs text-slate-500">
-                    最近更新：{new Intl.DateTimeFormat('zh-CN', {
+                    {t.recent.updatedPrefix}
+                    {new Intl.DateTimeFormat(dateLocale, {
                       dateStyle: 'medium',
                       timeStyle: 'short',
                     }).format(new Date(entry.updatedAt))}
@@ -268,7 +379,7 @@ export default function ReportsLandingPage() {
                   className="text-sm font-semibold text-blue-600 hover:text-blue-800"
                   onClick={() => handleDayClick(entry.date)}
                 >
-                  查看
+                  {t.recent.view}
                 </button>
               </li>
             ))}
