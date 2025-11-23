@@ -5,6 +5,7 @@ import {
   useEffect,
   useMemo,
   useState,
+  useCallback,
   type ReactNode,
 } from 'react'
 
@@ -53,8 +54,10 @@ export const LocaleProvider = ({
   fallback?: Locale
   supported?: readonly Locale[]
 }) => {
-  const selectSupported = (value: Locale) =>
-    supported.includes(value) ? value : (supported[0] as Locale)
+  const selectSupported = useCallback(
+    (value: Locale) => (supported.includes(value) ? value : (supported[0] as Locale)),
+    [supported],
+  )
 
   const [locale, setLocale] = useState<Locale>(() => selectSupported(fallback))
   const [hasManualChoice, setHasManualChoice] = useState(false)
@@ -87,17 +90,20 @@ export const LocaleProvider = ({
     window.localStorage.setItem(STORAGE_KEY, locale)
   }, [hasManualChoice, locale])
 
-  const setPreferredLocale = (next: Locale) => {
-    setHasManualChoice(true)
-    setLocale(selectSupported(next))
-  }
+  const setPreferredLocale = useCallback(
+    (next: Locale) => {
+      setHasManualChoice(true)
+      setLocale(selectSupported(next))
+    },
+    [selectSupported],
+  )
 
   const value = useMemo<PreferredLocaleState>(
     () => ({
       locale,
       setLocale: setPreferredLocale,
     }),
-    [locale],
+    [locale, setPreferredLocale],
   )
 
   return createElement(LocaleContext.Provider, { value }, children)
@@ -108,15 +114,17 @@ export const usePreferredLocale = (
   supported: readonly Locale[] = supportedLocales,
 ): PreferredLocaleState => {
   const context = useContext(LocaleContext)
-  if (context) return context
-
-  const selectSupported = (value: Locale) =>
-    supported.includes(value) ? value : (supported[0] as Locale)
+  const selectSupported = useCallback(
+    (value: Locale) => (supported.includes(value) ? value : (supported[0] as Locale)),
+    [supported],
+  )
 
   const [locale, setLocale] = useState<Locale>(() => selectSupported(fallback))
   const [hasManualChoice, setHasManualChoice] = useState(false)
 
   useEffect(() => {
+    if (context) return
+
     const updateLocale = () => {
       if (hasManualChoice) return
       setLocale(detectLocale(supported, fallback))
@@ -126,12 +134,21 @@ export const usePreferredLocale = (
     updateLocale()
 
     return () => window.removeEventListener('languagechange', updateLocale)
-  }, [fallback, supported, hasManualChoice])
+  }, [fallback, supported, hasManualChoice, context])
 
-  const setPreferredLocale = (next: Locale) => {
-    setHasManualChoice(true)
-    setLocale(selectSupported(next))
-  }
+  const setPreferredLocale = useCallback(
+    (next: Locale) => {
+      if (context) {
+        context.setLocale(selectSupported(next))
+        return
+      }
+      setHasManualChoice(true)
+      setLocale(selectSupported(next))
+    },
+    [context, selectSupported],
+  )
+
+  if (context) return context
 
   return { locale, setLocale: setPreferredLocale }
 }
