@@ -19,8 +19,14 @@ const sideOptions: { value: IntervalSide; label: string }[] = [
 
 const computeDesign = (intervals: PhaseIntervalPayload[]) => {
   return intervals.reduce((sum, item) => {
-    const raw = item.endPk - item.startPk
-    const base = raw === 0 ? 1 : Math.max(raw, 0)
+    const start = Number(item.startPk)
+    const end = Number(item.endPk)
+    const safeStart = Number.isFinite(start) ? start : 0
+    const safeEnd = Number.isFinite(end) ? end : safeStart
+    const [orderedStart, orderedEnd] =
+      safeStart <= safeEnd ? [safeStart, safeEnd] : [safeEnd, safeStart]
+    const raw = orderedEnd - orderedStart
+    const base = raw === 0 ? 1 : raw
     const factor = item.side === 'BOTH' ? 2 : 1
     return sum + base * factor
   }, 0)
@@ -80,7 +86,8 @@ export function PhaseEditor({ road, initialPhases, canManage }: Props) {
         setError(data.message ?? '保存失败')
         return
       }
-      setPhases((prev) => [...prev, data.phase])
+      const phase = data.phase
+      setPhases((prev) => [...prev, phase])
       setName('')
       setIntervals([{ startPk: 0, endPk: 0, side: 'BOTH' }])
     })

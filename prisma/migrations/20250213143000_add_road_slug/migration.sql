@@ -16,7 +16,7 @@ WITH dupes AS (
   FROM "RoadSection"
 )
 UPDATE "RoadSection" r
-SET slug = slug || '-' || id
+SET slug = r.slug || '-' || r.id
 FROM dupes d
 WHERE r.id = d.id
   AND d.rn > 1;

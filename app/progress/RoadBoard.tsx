@@ -135,23 +135,27 @@ export function RoadBoard({ initialRoads, canManage }: Props) {
           </div>
 
           <form className="mt-5 grid gap-4 md:grid-cols-3" onSubmit={upsertRoad}>
-          <label className="flex flex-col gap-2 text-sm text-slate-100">
-            路由
-            <input
-              className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-slate-50 placeholder:text-slate-200/60 focus:border-emerald-300 focus:outline-none"
-              value={form.slug}
-              onChange={(event) => setForm((prev) => ({ ...prev, slug: event.target.value }))}
-              placeholder="如：bondoukou-university"
-              required
-            />
-          </label>
-          <label className="flex flex-col gap-2 text-sm text-slate-100">
-            名称
-            <input
-              className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-slate-50 placeholder:text-slate-200/60 focus:border-emerald-300 focus:outline-none"
-              value={form.name}
-              onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
-              placeholder="如：大学城路"
+            <label className="flex flex-col gap-2 text-sm text-slate-100">
+              路由
+              <input
+                className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-slate-50 placeholder:text-slate-200/60 focus:border-emerald-300 focus:outline-none"
+                value={form.slug}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, slug: event.target.value.toLowerCase() }))
+                }
+                placeholder="如：bondoukou-university"
+                pattern="[a-z0-9-]+"
+                title="仅允许小写字母、数字和连字符"
+                required
+              />
+            </label>
+            <label className="flex flex-col gap-2 text-sm text-slate-100">
+              名称
+              <input
+                className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-slate-50 placeholder:text-slate-200/60 focus:border-emerald-300 focus:outline-none"
+                value={form.name}
+                onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
+                placeholder="如：大学城路"
                 required
               />
             </label>
@@ -171,7 +175,9 @@ export function RoadBoard({ initialRoads, canManage }: Props) {
                 <input
                   className="w-full rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-slate-50 placeholder:text-slate-200/60 focus:border-emerald-300 focus:outline-none"
                   value={form.endPk}
-                  onChange={(event) => setForm((prev) => ({ ...prev, endPk: event.target.value }))}
+                  onChange={(event) =>
+                    setForm((prev) => ({ ...prev, endPk: event.target.value }))
+                  }
                   placeholder="例：PK1+940 / 桥头"
                   required
                 />
@@ -186,7 +192,7 @@ export function RoadBoard({ initialRoads, canManage }: Props) {
                 ) : null}
               </div>
             </label>
-            <div className="md:col-span-3 flex flex-wrap items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3 md:col-span-3">
               <button
                 type="submit"
                 disabled={isPending}
