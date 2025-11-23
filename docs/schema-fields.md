@@ -166,3 +166,10 @@
      2. `startPk`：起点标识，文本，支持 `PK0+000` 或交叉口描述，必填。
      3. `endPk`：终点标识，文本，必填。
      4. `createdAt` / `updatedAt`：系统维护的时间戳，用于审计与排序。
+
+## 权限与账户模型
+
+- **Permission**：`code`（唯一标识，如 `road:manage`、`report:edit`）、`name`、`createdAt`、`updatedAt`。
+- **Role**：`name`（唯一，如 `Admin`、`Employee`）、`permissions`（多对多）、`createdAt`、`updatedAt`。
+- **User**：`username`（唯一）、`passwordHash`（salt + hash）、`roles`（多对多）、`createdAt`、`updatedAt`。
+- 默认账号：`GanXing`（密码 `Admin1234`，角色 `Admin`，拥有全部权限）、`User1`（密码 `use1`，角色 `Employee`，只有填写日报/修改权限）。
