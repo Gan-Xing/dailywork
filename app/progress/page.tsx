@@ -38,61 +38,6 @@ const roads: Road[] = [
     ],
   },
   {
-    name: '邦杜库1号路',
-    city: 'Bondoukou / 邦杜库',
-    status: '未开工',
-    progress: 0,
-    phases: [
-      { name: '土方', status: '未启动', progress: 0 },
-      { name: '垫层', status: '未启动', progress: 0 },
-      { name: '底基层', status: '未启动', progress: 0 },
-    ],
-  },
-  {
-    name: '邦杜库2号路',
-    city: 'Bondoukou / 邦杜库',
-    status: '未开工',
-    progress: 0,
-    phases: [
-      { name: '土方', status: '未启动', progress: 0 },
-      { name: '垫层', status: '未启动', progress: 0 },
-      { name: '底基层', status: '未启动', progress: 0 },
-    ],
-  },
-  {
-    name: '邦杜库3号路',
-    city: 'Bondoukou / 邦杜库',
-    status: '未开工',
-    progress: 0,
-    phases: [
-      { name: '土方', status: '未启动', progress: 0 },
-      { name: '垫层', status: '未启动', progress: 0 },
-      { name: '底基层', status: '未启动', progress: 0 },
-    ],
-  },
-  {
-    name: '邦杜库4号路',
-    city: 'Bondoukou / 邦杜库',
-    status: '未开工',
-    progress: 0,
-    phases: [
-      { name: '土方', status: '未启动', progress: 0 },
-      { name: '垫层', status: '未启动', progress: 0 },
-      { name: '底基层', status: '未启动', progress: 0 },
-    ],
-  },
-  {
-    name: '邦杜库5号路',
-    city: 'Bondoukou / 邦杜库',
-    status: '未开工',
-    progress: 0,
-    phases: [
-      { name: '土方', status: '未启动', progress: 0 },
-      { name: '垫层', status: '未启动', progress: 0 },
-      { name: '底基层', status: '未启动', progress: 0 },
-    ],
-  },
-  {
     name: '穿城路',
     city: 'Tanda / 丹达',
     status: '施工中',
@@ -148,14 +93,6 @@ const roads: Road[] = [
       { name: '底基层', status: '未启动', progress: 0 },
     ],
   },
-  {
-    name: '丹达4号路（取消）',
-    city: 'Tanda / 丹达',
-    status: '取消',
-    progress: 0,
-    note: '项目方确认取消，不再排产。',
-    phases: [],
-  },
 ]
 
 const statusTone: Record<RoadStatus, string> = {
@@ -172,10 +109,6 @@ const phaseTone: Record<PhaseStatus, string> = {
 }
 
 export default function ProgressPage() {
-  const startedCount = roads.filter((road) => road.status === '施工中').length
-  const pendingCount = roads.filter((road) => road.status === '未开工').length
-  const canceledCount = roads.filter((road) => road.status === '取消').length
-
   return (
     <main className="min-h-screen bg-slate-950 text-slate-50">
       <div className="relative mx-auto max-w-5xl px-6 py-14 sm:px-8">
@@ -203,24 +136,6 @@ export default function ProgressPage() {
             </Link>
           </div>
         </header>
-
-        <section className="mt-10 grid gap-3 rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur sm:grid-cols-3">
-          <div className="rounded-2xl border border-white/10 bg-emerald-300/20 p-4 text-slate-900 shadow-inner shadow-emerald-400/20">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-900/70">施工中</p>
-            <p className="mt-2 text-3xl font-semibold">{startedCount}</p>
-            <p className="text-xs text-slate-900/70">已有图纸并开工的道路</p>
-          </div>
-          <div className="rounded-2xl border border-white/10 bg-white/10 p-4 text-slate-50 shadow-inner shadow-slate-900/20">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-200">未开工</p>
-            <p className="mt-2 text-3xl font-semibold">{pendingCount}</p>
-            <p className="text-xs text-slate-200/80">等待图纸或指令</p>
-          </div>
-          <div className="rounded-2xl border border-white/10 bg-slate-500/30 p-4 text-slate-50 shadow-inner shadow-slate-900/30">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-200">取消</p>
-            <p className="mt-2 text-3xl font-semibold">{canceledCount}</p>
-            <p className="text-xs text-slate-200/80">已确认取消的道路</p>
-          </div>
-        </section>
 
         <section className="mt-8 space-y-4">
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-200">
