@@ -57,7 +57,7 @@ export const issueSession = (user: AuthUser) => {
 
 export const clearSession = () => {
   const jar = cookies()
-  jar.delete(SESSION_COOKIE, { path: '/' })
+  jar.delete(SESSION_COOKIE)
 }
 
 export const getSessionUser = (): SessionUser | null => {
