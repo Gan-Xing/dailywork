@@ -70,11 +70,11 @@ WHERE layer IS NOT NULL AND TRIM(layer) <> ''
 ON CONFLICT ("name") DO NOTHING;
 
 INSERT INTO "CheckDefinition" ("name", "isActive", "createdAt", "updatedAt")
-SELECT DISTINCT TRIM(check) AS name, TRUE, NOW(), NOW()
+SELECT DISTINCT TRIM(chk) AS name, TRUE, NOW(), NOW()
 FROM (
-  SELECT UNNEST(COALESCE("commonChecks", ARRAY[]::TEXT[])) AS check FROM "RoadPhase"
+  SELECT UNNEST(COALESCE("commonChecks", ARRAY[]::TEXT[])) AS chk FROM "RoadPhase"
 ) t
-WHERE check IS NOT NULL AND TRIM(check) <> ''
+WHERE chk IS NOT NULL AND TRIM(chk) <> ''
 ON CONFLICT ("name") DO NOTHING;
 
 -- Link definitions to default layers/checks (based on historical phase values)

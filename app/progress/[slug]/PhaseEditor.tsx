@@ -437,7 +437,10 @@ const splitTokensToIds = (
       newNames.push(token)
     }
   })
-  return { ids: [...new Set(ids)], newNames: [...new Set(newNames)] }
+  return {
+    ids: Array.from(new Set(ids)),
+    newNames: Array.from(new Set(newNames)),
+  }
 }
 
 const addLayerToken = () => {

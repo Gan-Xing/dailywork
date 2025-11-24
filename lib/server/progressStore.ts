@@ -1,4 +1,5 @@
 import { IntervalSide, PhaseMeasure, Prisma } from '@prisma/client'
+import type { CheckDefinition, LayerDefinition } from '@prisma/client'
 
 import type { CheckDefinitionDTO, LayerDefinitionDTO, PhaseDTO, PhaseDefinitionDTO, PhasePayload } from '@/lib/progressTypes'
 import { prisma } from '@/lib/prisma'
@@ -54,13 +55,13 @@ const mapDefinitionToDTO = (
   updatedAt: definition.updatedAt.toISOString(),
 })
 
-const mapLayerDefinitionToDTO = (layer: Prisma.LayerDefinition) => ({
+const mapLayerDefinitionToDTO = (layer: LayerDefinition) => ({
   id: layer.id,
   name: layer.name,
   isActive: layer.isActive,
 })
 
-const mapCheckDefinitionToDTO = (check: Prisma.CheckDefinition) => ({
+const mapCheckDefinitionToDTO = (check: CheckDefinition) => ({
   id: check.id,
   name: check.name,
   isActive: check.isActive,
@@ -113,8 +114,8 @@ const mapPhaseToDTO = (
 }
 
 const ensureLayerDefinitions = async (names: string[], tx: Prisma.TransactionClient) => {
-  const unique = [...new Set(normalizeCommonList(names))]
-  if (!unique.length) return [] as Prisma.LayerDefinition[]
+  const unique = Array.from(new Set(normalizeCommonList(names)))
+  if (!unique.length) return [] as LayerDefinition[]
   await Promise.all(
     unique.map((name) =>
       tx.layerDefinition.upsert({
@@ -128,8 +129,8 @@ const ensureLayerDefinitions = async (names: string[], tx: Prisma.TransactionCli
 }
 
 const ensureCheckDefinitions = async (names: string[], tx: Prisma.TransactionClient) => {
-  const unique = [...new Set(normalizeCommonList(names))]
-  if (!unique.length) return [] as Prisma.CheckDefinition[]
+  const unique = Array.from(new Set(normalizeCommonList(names)))
+  if (!unique.length) return [] as CheckDefinition[]
   await Promise.all(
     unique.map((name) =>
       tx.checkDefinition.upsert({
@@ -252,8 +253,8 @@ export const createPhase = async (roadId: number, payload: PhasePayload) => {
     const checkIds = payload.checkIds ?? []
     const newLayerDefs = await ensureLayerDefinitions(payload.newLayers ?? [], tx)
     const newCheckDefs = await ensureCheckDefinitions(payload.newChecks ?? [], tx)
-    const resolvedLayerIds = [...new Set([...layerIds, ...newLayerDefs.map((l) => l.id)])]
-    const resolvedCheckIds = [...new Set([...checkIds, ...newCheckDefs.map((c) => c.id)])]
+    const resolvedLayerIds = Array.from(new Set([...layerIds, ...newLayerDefs.map((l) => l.id)]))
+    const resolvedCheckIds = Array.from(new Set([...checkIds, ...newCheckDefs.map((c) => c.id)]))
 
     const created = await tx.roadPhase.create({
       data: {
@@ -341,8 +342,8 @@ export const updatePhase = async (roadId: number, phaseId: number, payload: Phas
     const checkIds = payload.checkIds ?? []
     const newLayerDefs = await ensureLayerDefinitions(payload.newLayers ?? [], tx)
     const newCheckDefs = await ensureCheckDefinitions(payload.newChecks ?? [], tx)
-    const resolvedLayerIds = [...new Set([...layerIds, ...newLayerDefs.map((l) => l.id)])]
-    const resolvedCheckIds = [...new Set([...checkIds, ...newCheckDefs.map((c) => c.id)])]
+    const resolvedLayerIds = Array.from(new Set([...layerIds, ...newLayerDefs.map((l) => l.id)]))
+    const resolvedCheckIds = Array.from(new Set([...checkIds, ...newCheckDefs.map((c) => c.id)]))
 
     const updated = await tx.roadPhase.update({
       where: { id: phaseId, roadId },
