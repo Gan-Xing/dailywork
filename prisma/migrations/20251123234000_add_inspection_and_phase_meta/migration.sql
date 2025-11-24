@@ -1,5 +1,5 @@
 -- Add enum for inspection status
-CREATE TYPE "InspectionStatus" AS ENUM (PENDING, IN_PROGRESS, APPROVED);
+CREATE TYPE "InspectionStatus" AS ENUM ('PENDING', 'IN_PROGRESS', 'APPROVED');
 
 -- Extend RoadPhase with common layers/checks
 ALTER TABLE "RoadPhase" ADD COLUMN "commonLayers" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[];
@@ -17,7 +17,7 @@ CREATE TABLE "InspectionRequest" (
     "checks" TEXT[] NOT NULL,
     "types" TEXT[] NOT NULL,
     "remark" TEXT,
-    "status" "InspectionStatus" NOT NULL DEFAULT PENDING,
+    "status" "InspectionStatus" NOT NULL DEFAULT 'PENDING',
     "createdBy" INTEGER,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL
