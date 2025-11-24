@@ -41,6 +41,8 @@ const mapPhaseToDTO = (phase: Prisma.RoadPhaseGetPayload<{ include: { intervals:
   name: phase.name,
   measure: phase.measure,
   designLength: phase.designLength,
+  commonLayers: phase.commonLayers ?? [],
+  commonChecks: phase.commonChecks ?? [],
   intervals: phase.intervals.map((i) => ({
     startPk: i.startPk,
     endPk: i.endPk,
@@ -86,6 +88,8 @@ export const createPhase = async (roadId: number, payload: PhasePayload) => {
       name: payload.name,
       measure: payload.measure === 'POINT' ? PhaseMeasure.POINT : PhaseMeasure.LINEAR,
       designLength,
+      commonLayers: payload.commonLayers ?? [],
+      commonChecks: payload.commonChecks ?? [],
       intervals: {
         create: normalizedIntervals.map((item) => ({
           startPk: item.startPk,
@@ -131,6 +135,8 @@ export const updatePhase = async (roadId: number, phaseId: number, payload: Phas
         name: payload.name,
         measure: payload.measure === 'POINT' ? PhaseMeasure.POINT : PhaseMeasure.LINEAR,
         designLength,
+        commonLayers: payload.commonLayers ?? [],
+        commonChecks: payload.commonChecks ?? [],
       },
     })
 

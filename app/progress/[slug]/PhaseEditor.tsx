@@ -1,7 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 'use client'
 
-import { useMemo, useState, useTransition } from 'react'
+import { useEffect, useMemo, useState, useTransition } from 'react'
 
 import type { IntervalSide, PhaseDTO, PhaseIntervalPayload, PhasePayload, RoadSectionDTO } from '@/lib/progressTypes'
 import type { PhaseMeasure } from '@/lib/progressTypes'
@@ -41,6 +41,8 @@ interface PointView {
   total: number
   points: { startPk: number; endPk: number; side: IntervalSide }
 }
+
+const inspectionTypes = ['现场验收', '测量验收', '试验验收', '其他']
 
 const statusTone: Record<Status, string> = {
   未验收: 'bg-gradient-to-r from-white via-slate-100 to-white text-slate-900 shadow-sm shadow-slate-900/10',
@@ -175,6 +177,10 @@ export function PhaseEditor({ road, initialPhases, canManage }: Props) {
   const [name, setName] = useState('')
   const [measure, setMeasure] = useState<PhaseMeasure>('LINEAR')
   const [intervals, setIntervals] = useState<PhaseIntervalPayload[]>([defaultInterval])
+  const [commonLayers, setCommonLayers] = useState<string[]>([])
+  const [commonChecks, setCommonChecks] = useState<string[]>([])
+  const [layerInput, setLayerInput] = useState('')
+  const [checkInput, setCheckInput] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const [editingId, setEditingId] = useState<number | null>(null)
@@ -214,6 +220,10 @@ export function PhaseEditor({ road, initialPhases, canManage }: Props) {
     setName('')
     setMeasure('LINEAR')
     setIntervals([defaultInterval])
+    setCommonLayers([])
+    setCommonChecks([])
+    setLayerInput('')
+    setCheckInput('')
     setEditingId(null)
     setError(null)
   }
@@ -221,6 +231,10 @@ export function PhaseEditor({ road, initialPhases, canManage }: Props) {
   const startEdit = (phase: PhaseDTO) => {
     setName(phase.name)
     setMeasure(phase.measure)
+    setCommonLayers(phase.commonLayers ?? [])
+    setCommonChecks(phase.commonChecks ?? [])
+    setLayerInput('')
+    setCheckInput('')
     setIntervals(
       phase.intervals.map((i) => ({
         startPk: i.startPk,
@@ -240,6 +254,8 @@ export function PhaseEditor({ road, initialPhases, canManage }: Props) {
       const payload: PhasePayload = {
         name,
         measure,
+        commonLayers,
+        commonChecks,
         intervals: intervals.map((item) => {
           const startPk = Number(item.startPk)
           const endPk = measure === 'POINT' ? startPk : Number(item.endPk)
@@ -293,12 +309,114 @@ export function PhaseEditor({ road, initialPhases, canManage }: Props) {
       }))
   }, [phases, roadLength])
 
+  const toggleToken = (value: string, list: string[], setter: (next: string[]) => void) => {
+    const exists = list.includes(value)
+    setter(exists ? list.filter((item) => item !== value) : [...list, value])
+  }
+
+  const addLayerToken = () => {
+    const value = layerInput.trim()
+    if (!value) return
+    if (!commonLayers.includes(value)) {
+      setCommonLayers((prev) => [...prev, value])
+    }
+    if (!selectedLayers.includes(value)) {
+      setSelectedLayers((prev) => [...prev, value])
+    }
+    setLayerInput('')
+  }
+
+  const addCheckToken = () => {
+    const value = checkInput.trim()
+    if (!value) return
+    if (!commonChecks.includes(value)) {
+      setCommonChecks((prev) => [...prev, value])
+    }
+    if (!selectedChecks.includes(value)) {
+      setSelectedChecks((prev) => [...prev, value])
+    }
+    setCheckInput('')
+  }
+
+  const resetInspectionForm = () => {
+    setSelectedLayers([])
+    setSelectedChecks([])
+    setSelectedTypes([])
+    setRemark('')
+    setSubmitError(null)
+  }
+
+  const submitInspection = async () => {
+    if (!selectedSegment) return
+    if (!selectedLayers.length) {
+      setSubmitError('请选择至少一个层次')
+      return
+    }
+    if (!selectedChecks.length) {
+      setSubmitError('请选择至少一个验收内容')
+      return
+    }
+    if (!selectedTypes.length) {
+      setSubmitError('请选择至少一个验收类型')
+      return
+    }
+    setSubmitPending(true)
+    setSubmitError(null)
+    const payload = {
+      phaseId: selectedSegment.phaseId,
+      side: selectedSegment.side === '左侧' ? 'LEFT' : selectedSegment.side === '右侧' ? 'RIGHT' : 'BOTH',
+      startPk: selectedSegment.start,
+      endPk: selectedSegment.end,
+      layers: selectedLayers,
+      checks: selectedChecks,
+      types: selectedTypes,
+      remark,
+    }
+
+    const res = await fetch(`/api/progress/${road.slug}/inspections`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(payload),
+    })
+    const data = (await res.json().catch(() => ({}))) as { message?: string }
+    setSubmitPending(false)
+    if (!res.ok) {
+      setSubmitError(data.message ?? '提交失败')
+      return
+    }
+    setSelectedSegment(null)
+    resetInspectionForm()
+  }
+
   const [selectedSegment, setSelectedSegment] = useState<{
     phase: string
+    phaseId: number
+    measure: PhaseMeasure
+    commonLayers: string[]
+    commonChecks: string[]
     side: string
     start: number
     end: number
   } | null>(null)
+  const [selectedLayers, setSelectedLayers] = useState<string[]>([])
+  const [selectedChecks, setSelectedChecks] = useState<string[]>([])
+  const [selectedTypes, setSelectedTypes] = useState<string[]>([])
+  const [remark, setRemark] = useState('')
+  const [submitError, setSubmitError] = useState<string | null>(null)
+  const [submitPending, setSubmitPending] = useState(false)
+  const [inspectionCheckInput, setInspectionCheckInput] = useState('')
+
+  useEffect(() => {
+    if (selectedSegment) {
+      setSelectedLayers([])
+      setSelectedChecks([])
+      setSelectedTypes([])
+      setRemark('')
+      setSubmitError(null)
+      setInspectionCheckInput('')
+    }
+  }, [selectedSegment])
 
   return (
     <div className="space-y-8">
@@ -433,6 +551,96 @@ export function PhaseEditor({ road, initialPhases, canManage }: Props) {
               </div>
             </div>
 
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2 rounded-2xl border border-white/10 bg-white/5 p-4">
+                <div className="flex items-center justify-between text-sm text-slate-100">
+                  <p>常见层次（多选备选）</p>
+                  <button
+                    type="button"
+                    onClick={addLayerToken}
+                    className="rounded-xl border border-white/20 px-3 py-2 text-xs font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/10"
+                  >
+                    添加
+                  </button>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <input
+                    className="w-full rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-200/60 focus:border-emerald-300 focus:outline-none"
+                    placeholder="如：第一层上土"
+                    value={layerInput}
+                    onChange={(e) => setLayerInput(e.target.value)}
+                  />
+                  {commonLayers.length === 0 ? (
+                    <p className="text-xs text-slate-300">暂无层次，输入后点击添加。</p>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      {commonLayers.map((item) => (
+                        <span
+                          key={item}
+                          className="flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-[11px] font-semibold text-slate-100"
+                        >
+                          {item}
+                          <button
+                            type="button"
+                            className="text-[10px] text-rose-200"
+                            onClick={() =>
+                              setCommonLayers((prev) => prev.filter((token) => token !== item))
+                            }
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-2 rounded-2xl border border-white/10 bg-white/5 p-4">
+                <div className="flex items-center justify-between text-sm text-slate-100">
+                  <p>常见验收内容（多选备选）</p>
+                  <button
+                    type="button"
+                    onClick={addCheckToken}
+                    className="rounded-xl border border-white/20 px-3 py-2 text-xs font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/10"
+                  >
+                    添加
+                  </button>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <input
+                    className="w-full rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-200/60 focus:border-emerald-300 focus:outline-none"
+                    placeholder="如：压实度/平整度"
+                    value={checkInput}
+                    onChange={(e) => setCheckInput(e.target.value)}
+                  />
+                  {commonChecks.length === 0 ? (
+                    <p className="text-xs text-slate-300">暂无内容，输入后点击添加。</p>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      {commonChecks.map((item) => (
+                        <span
+                          key={item}
+                          className="flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-[11px] font-semibold text-slate-100"
+                        >
+                          {item}
+                          <button
+                            type="button"
+                            className="text-[10px] text-rose-200"
+                            onClick={() =>
+                              setCommonChecks((prev) => prev.filter((token) => token !== item))
+                            }
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
             <div className="flex flex-wrap items-center gap-3">
               <button
                 type="submit"
@@ -527,6 +735,10 @@ export function PhaseEditor({ road, initialPhases, canManage }: Props) {
                                       if (seg.status === '未施工') {
                                         setSelectedSegment({
                                           phase: phase.name,
+                                          phaseId: phase.id,
+                                          measure: phase.measure,
+                                          commonLayers: phase.commonLayers ?? [],
+                                          commonChecks: phase.commonChecks ?? [],
                                           side: side.label,
                                           start: seg.start,
                                           end: seg.end,
@@ -558,10 +770,28 @@ export function PhaseEditor({ road, initialPhases, canManage }: Props) {
                               Math.max(0, Math.round((item.startPk / point.view.total) * 100)),
                             )
                             return (
-                              <div
+                              <button
                                 key={`${item.startPk}-${idx}`}
-                                className="absolute top-1/2 flex -translate-y-1/2 flex-col items-center gap-1 text-center"
+                                type="button"
+                                className="absolute top-1/2 flex -translate-y-1/2 flex-col items-center gap-1 text-center transition hover:scale-105"
                                 style={{ left: `${position}%`, transform: 'translate(-50%, -50%)' }}
+                                onClick={() =>
+                                  setSelectedSegment({
+                                    phase: phase.name,
+                                    phaseId: phase.id,
+                                    measure: phase.measure,
+                                    commonLayers: phase.commonLayers ?? [],
+                                    commonChecks: phase.commonChecks ?? [],
+                                    side:
+                                      item.side === 'LEFT'
+                                        ? '左侧'
+                                        : item.side === 'RIGHT'
+                                          ? '右侧'
+                                          : '双侧',
+                                    start: item.startPk,
+                                    end: item.endPk,
+                                  })
+                                }
                               >
                                 <div
                                   className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-950 text-xs font-semibold text-white shadow-lg shadow-emerald-400/25 ring-2 ring-white/20"
@@ -571,15 +801,15 @@ export function PhaseEditor({ road, initialPhases, canManage }: Props) {
                                 </div>
                                 <div className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-semibold text-slate-200">
                                   {formatPK(item.startPk)}
-                                </div>
-                                <p className="text-[10px] text-slate-300">
-                                  {item.side === 'BOTH' ? '双侧' : item.side === 'LEFT' ? '左侧' : '右侧'}
-                                </p>
-                              </div>
-                            )
-                          })}
+                                  </div>
+                                  <p className="text-[10px] text-slate-300">
+                                    {item.side === 'BOTH' ? '双侧' : item.side === 'LEFT' ? '左侧' : '右侧'}
+                                  </p>
+                                </button>
+                              )
+                            })}
+                          </div>
                         </div>
-                      </div>
                     </div>
                   ) : null}
                 </div>
@@ -606,30 +836,127 @@ export function PhaseEditor({ road, initialPhases, canManage }: Props) {
               </button>
             </div>
 
-            <div className="mt-4 space-y-2 text-sm text-slate-100">
+            <div className="mt-4 space-y-3 text-sm text-slate-100">
               <p>侧别：{selectedSegment.side}</p>
               <p>
                 区间：{formatPK(selectedSegment.start)} ~ {formatPK(selectedSegment.end)}
               </p>
-              <p className="text-xs text-slate-400">
-                说明：此为示意弹窗，未来会接入真实报检表单（选择监理、备注、提交）。
-              </p>
+
+              <div className="space-y-1">
+                <p className="text-xs font-semibold text-slate-200">层次（多选）</p>
+                <div className="flex flex-wrap gap-2">
+                  {(selectedSegment.commonLayers.length ? selectedSegment.commonLayers : ['第一层上土', '第二层上土']).map((item) => (
+                    <button
+                      key={item}
+                      type="button"
+                      className={`rounded-full px-3 py-1 text-[11px] font-semibold ${
+                        selectedLayers.includes(item)
+                          ? 'bg-emerald-300 text-slate-900'
+                          : 'bg-white/10 text-slate-100'
+                      }`}
+                      onClick={() => toggleToken(item, selectedLayers, setSelectedLayers)}
+                    >
+                      {item}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <p className="text-xs font-semibold text-slate-200">验收内容（多选，可临时添加）</p>
+                <div className="flex flex-wrap gap-2">
+                  {(selectedSegment.commonChecks.length ? selectedSegment.commonChecks : ['压实度', '平整度']).map((item) => (
+                    <button
+                      key={item}
+                      type="button"
+                      className={`rounded-full px-3 py-1 text-[11px] font-semibold ${
+                        selectedChecks.includes(item)
+                          ? 'bg-emerald-300 text-slate-900'
+                          : 'bg-white/10 text-slate-100'
+                      }`}
+                      onClick={() => toggleToken(item, selectedChecks, setSelectedChecks)}
+                    >
+                      {item}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    className="w-full rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-200/60 focus:border-emerald-300 focus:outline-none"
+                    placeholder="临时新增验收内容"
+                    value={inspectionCheckInput}
+                    onChange={(e) => setInspectionCheckInput(e.target.value)}
+                  />
+                  <button
+                    type="button"
+                    className="rounded-xl border border-white/20 px-3 py-2 text-[11px] font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/10"
+                    onClick={() => {
+                      if (inspectionCheckInput.trim()) {
+                        const value = inspectionCheckInput.trim()
+                        if (!selectedChecks.includes(value)) {
+                          setSelectedChecks((prev) => [...prev, value])
+                        }
+                        setInspectionCheckInput('')
+                      }
+                    }}
+                  >
+                    添加
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <p className="text-xs font-semibold text-slate-200">验收类型（多选）</p>
+                <div className="flex flex-wrap gap-2">
+                  {inspectionTypes.map((item) => (
+                    <button
+                      key={item}
+                      type="button"
+                      className={`rounded-full px-3 py-1 text-[11px] font-semibold ${
+                        selectedTypes.includes(item)
+                          ? 'bg-emerald-300 text-slate-900'
+                          : 'bg-white/10 text-slate-100'
+                      }`}
+                      onClick={() => toggleToken(item, selectedTypes, setSelectedTypes)}
+                    >
+                      {item}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <p className="text-xs font-semibold text-slate-200">备注（可选）</p>
+                <textarea
+                  className="mt-1 w-full rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-200/60 focus:border-emerald-300 focus:outline-none"
+                  rows={3}
+                  value={remark}
+                  onChange={(e) => setRemark(e.target.value)}
+                  placeholder="位置、作业面、机具、试件编号等"
+                />
+              </div>
+
+              {submitError ? <p className="text-xs text-amber-300">{submitError}</p> : null}
             </div>
 
             <div className="mt-6 flex justify-end gap-3">
               <button
                 type="button"
                 className="rounded-full border border-white/20 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-white/40 hover:bg-white/5"
-                onClick={() => setSelectedSegment(null)}
+                onClick={() => {
+                  setSelectedSegment(null)
+                  resetInspectionForm()
+                }}
               >
                 取消
               </button>
               <button
                 type="button"
-                className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-900 shadow-lg shadow-emerald-400/25 transition hover:-translate-y-0.5"
-                onClick={() => setSelectedSegment(null)}
+                className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-900 shadow-lg shadow-emerald-400/25 transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={submitPending}
+                onClick={submitInspection}
               >
-                确认预约（占位）
+                {submitPending ? '提交中...' : '提交报检'}
               </button>
             </div>
           </div>

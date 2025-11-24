@@ -26,7 +26,13 @@ export async function PUT(request: Request, { params }: RouteParams) {
     return NextResponse.json({ message: '路段不存在' }, { status: 404 })
   }
 
-  let payload: { name?: string; measure?: string; intervals?: { startPk?: number; endPk?: number; side?: string }[] }
+  let payload: {
+    name?: string
+    measure?: string
+    intervals?: { startPk?: number; endPk?: number; side?: string }[]
+    commonLayers?: string[]
+    commonChecks?: string[]
+  }
   try {
     payload = (await request.json()) as typeof payload
   } catch {
@@ -41,6 +47,8 @@ export async function PUT(request: Request, { params }: RouteParams) {
     const phase = await updatePhase(road.id, phaseId, {
       name: payload.name,
       measure: payload.measure as 'LINEAR' | 'POINT',
+      commonLayers: payload.commonLayers ?? [],
+      commonChecks: payload.commonChecks ?? [],
       intervals:
         payload.intervals?.map((i) => ({
           startPk: Number(i.startPk ?? 0),

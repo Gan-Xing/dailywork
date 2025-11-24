@@ -19,6 +19,12 @@ enum PhaseMeasure {
   POINT
 }
 
+enum InspectionStatus {
+  PENDING
+  IN_PROGRESS
+  APPROVED
+}
+
 enum IntervalSide {
   BOTH
   LEFT
@@ -42,6 +48,7 @@ model RoadSection {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   phases    RoadPhase[]
+  inspections InspectionRequest[]
 }
 
 model RoadPhase {
@@ -51,7 +58,10 @@ model RoadPhase {
   name          String
   measure       PhaseMeasure
   designLength  Float          @default(0)
+  commonLayers  String[]       @default([])
+  commonChecks  String[]       @default([])
   intervals     PhaseInterval[]
+  inspections   InspectionRequest[]
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 }
@@ -65,6 +75,26 @@ model PhaseInterval {
   side      IntervalSide
   createdAt DateTime      @default(now())
   updatedAt DateTime      @updatedAt
+}
+
+model InspectionRequest {
+  id         Int              @id @default(autoincrement())
+  roadId     Int
+  road       RoadSection      @relation(fields: [roadId], references: [id], onDelete: Cascade)
+  phaseId    Int
+  phase      RoadPhase        @relation(fields: [phaseId], references: [id], onDelete: Cascade)
+  side       IntervalSide
+  startPk    Float
+  endPk      Float
+  layers     String[]
+  checks     String[]
+  types      String[]
+  remark     String?
+  status     InspectionStatus @default(PENDING)
+  createdBy  Int?
+  creator    User?            @relation(fields: [createdBy], references: [id])
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
 }
 
 model Permission {
@@ -90,6 +120,7 @@ model User {
   username     String     @unique
   passwordHash String
   roles        UserRole[]
+  inspectionRequests InspectionRequest[]
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 }
