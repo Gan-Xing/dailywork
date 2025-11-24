@@ -4,6 +4,8 @@ import type { CheckDefinition, LayerDefinition } from '@prisma/client'
 import type { CheckDefinitionDTO, LayerDefinitionDTO, PhaseDTO, PhaseDefinitionDTO, PhasePayload } from '@/lib/progressTypes'
 import { prisma } from '@/lib/prisma'
 
+const TRANSACTION_TIMEOUT_MS = 15000
+
 const normalizeCommonList = (value?: string[] | null) =>
   Array.isArray(value) ? value.map((item) => `${item}`.trim()).filter(Boolean) : []
 
@@ -233,69 +235,72 @@ export const createPhase = async (roadId: number, payload: PhasePayload) => {
   const normalizedIntervals = payload.intervals.map((i) => normalizeInterval(i, payload.measure))
   const designLength = calcDesignLength(payload.measure, normalizedIntervals)
 
-  const phase = await prisma.$transaction(async (tx) => {
-    const duplicate = await tx.roadPhase.findFirst({
-      where: { roadId, name: payload.name },
-    })
-    if (duplicate) {
-      throw new Error('分项名称已存在，请更换')
-    }
+  const phase = await prisma.$transaction(
+    async (tx) => {
+      const duplicate = await tx.roadPhase.findFirst({
+        where: { roadId, name: payload.name },
+      })
+      if (duplicate) {
+        throw new Error('分项名称已存在，请更换')
+      }
 
-    const definition = await ensurePhaseDefinition(tx, {
-      phaseDefinitionId: payload.phaseDefinitionId,
-      name: payload.name,
-      measure: payload.measure === 'POINT' ? PhaseMeasure.POINT : PhaseMeasure.LINEAR,
-      defaultLayers: payload.newLayers,
-      defaultChecks: payload.newChecks,
-    })
-
-    const layerIds = payload.layerIds ?? []
-    const checkIds = payload.checkIds ?? []
-    const newLayerDefs = await ensureLayerDefinitions(payload.newLayers ?? [], tx)
-    const newCheckDefs = await ensureCheckDefinitions(payload.newChecks ?? [], tx)
-    const resolvedLayerIds = Array.from(new Set([...layerIds, ...newLayerDefs.map((l) => l.id)]))
-    const resolvedCheckIds = Array.from(new Set([...checkIds, ...newCheckDefs.map((c) => c.id)]))
-
-    const created = await tx.roadPhase.create({
-      data: {
-        roadId,
-        phaseDefinitionId: definition.id,
+      const definition = await ensurePhaseDefinition(tx, {
+        phaseDefinitionId: payload.phaseDefinitionId,
         name: payload.name,
         measure: payload.measure === 'POINT' ? PhaseMeasure.POINT : PhaseMeasure.LINEAR,
-        designLength,
-        intervals: {
-          create: normalizedIntervals.map((item) => ({
-            startPk: item.startPk,
-            endPk: item.endPk,
-            side: item.side,
-          })),
+        defaultLayers: payload.newLayers,
+        defaultChecks: payload.newChecks,
+      })
+
+      const layerIds = payload.layerIds ?? []
+      const checkIds = payload.checkIds ?? []
+      const newLayerDefs = await ensureLayerDefinitions(payload.newLayers ?? [], tx)
+      const newCheckDefs = await ensureCheckDefinitions(payload.newChecks ?? [], tx)
+      const resolvedLayerIds = Array.from(new Set([...layerIds, ...newLayerDefs.map((l) => l.id)]))
+      const resolvedCheckIds = Array.from(new Set([...checkIds, ...newCheckDefs.map((c) => c.id)]))
+
+      const created = await tx.roadPhase.create({
+        data: {
+          roadId,
+          phaseDefinitionId: definition.id,
+          name: payload.name,
+          measure: payload.measure === 'POINT' ? PhaseMeasure.POINT : PhaseMeasure.LINEAR,
+          designLength,
+          intervals: {
+            create: normalizedIntervals.map((item) => ({
+              startPk: item.startPk,
+              endPk: item.endPk,
+              side: item.side,
+            })),
+          },
+          layerLinks: resolvedLayerIds.length
+            ? {
+                create: resolvedLayerIds.map((id) => ({ layerDefinitionId: id })),
+              }
+            : undefined,
+          checkLinks: resolvedCheckIds.length
+            ? {
+                create: resolvedCheckIds.map((id) => ({ checkDefinitionId: id })),
+              }
+            : undefined,
         },
-        layerLinks: resolvedLayerIds.length
-          ? {
-              create: resolvedLayerIds.map((id) => ({ layerDefinitionId: id })),
-            }
-          : undefined,
-        checkLinks: resolvedCheckIds.length
-          ? {
-              create: resolvedCheckIds.map((id) => ({ checkDefinitionId: id })),
-            }
-          : undefined,
-      },
-      include: {
-        intervals: true,
-        layerLinks: { include: { layerDefinition: true } },
-        checkLinks: { include: { checkDefinition: true } },
-        phaseDefinition: {
-          include: {
-            defaultLayers: { include: { layerDefinition: true } },
-            defaultChecks: { include: { checkDefinition: true } },
+        include: {
+          intervals: true,
+          layerLinks: { include: { layerDefinition: true } },
+          checkLinks: { include: { checkDefinition: true } },
+          phaseDefinition: {
+            include: {
+              defaultLayers: { include: { layerDefinition: true } },
+              defaultChecks: { include: { checkDefinition: true } },
+            },
           },
         },
-      },
-    })
+      })
 
-    return created
-  })
+      return created
+    },
+    { timeout: TRANSACTION_TIMEOUT_MS },
+  )
 
   return mapPhaseToDTO(phase)
 }
@@ -317,83 +322,86 @@ export const updatePhase = async (roadId: number, phaseId: number, payload: Phas
   const normalizedIntervals = payload.intervals.map((i) => normalizeInterval(i, payload.measure))
   const designLength = calcDesignLength(payload.measure, normalizedIntervals)
 
-  const phase = await prisma.$transaction(async (tx) => {
-    const duplicate = await tx.roadPhase.findFirst({
-      where: { roadId, name: payload.name, NOT: { id: phaseId } },
-    })
-    if (duplicate) {
-      throw new Error('分项名称已存在，请更换')
-    }
+  const phase = await prisma.$transaction(
+    async (tx) => {
+      const duplicate = await tx.roadPhase.findFirst({
+        where: { roadId, name: payload.name, NOT: { id: phaseId } },
+      })
+      if (duplicate) {
+        throw new Error('分项名称已存在，请更换')
+      }
 
-    const existing = await tx.roadPhase.findUnique({ where: { id: phaseId, roadId } })
-    if (!existing) {
-      throw new Error('分项不存在或不属于当前路段')
-    }
+      const existing = await tx.roadPhase.findUnique({ where: { id: phaseId, roadId } })
+      if (!existing) {
+        throw new Error('分项不存在或不属于当前路段')
+      }
 
-    const definition = await ensurePhaseDefinition(tx, {
-      phaseDefinitionId: payload.phaseDefinitionId ?? existing.phaseDefinitionId,
-      name: payload.name,
-      measure: payload.measure === 'POINT' ? PhaseMeasure.POINT : PhaseMeasure.LINEAR,
-      defaultLayers: payload.newLayers,
-      defaultChecks: payload.newChecks,
-    })
-
-    const layerIds = payload.layerIds ?? []
-    const checkIds = payload.checkIds ?? []
-    const newLayerDefs = await ensureLayerDefinitions(payload.newLayers ?? [], tx)
-    const newCheckDefs = await ensureCheckDefinitions(payload.newChecks ?? [], tx)
-    const resolvedLayerIds = Array.from(new Set([...layerIds, ...newLayerDefs.map((l) => l.id)]))
-    const resolvedCheckIds = Array.from(new Set([...checkIds, ...newCheckDefs.map((c) => c.id)]))
-
-    const updated = await tx.roadPhase.update({
-      where: { id: phaseId, roadId },
-      data: {
-        phaseDefinitionId: definition.id,
+      const definition = await ensurePhaseDefinition(tx, {
+        phaseDefinitionId: payload.phaseDefinitionId ?? existing.phaseDefinitionId,
         name: payload.name,
         measure: payload.measure === 'POINT' ? PhaseMeasure.POINT : PhaseMeasure.LINEAR,
-        designLength,
-      },
-    })
-
-    await tx.phaseInterval.deleteMany({ where: { phaseId } })
-    await tx.phaseInterval.createMany({
-      data: normalizedIntervals.map((item) => ({
-        phaseId: updated.id,
-        startPk: item.startPk,
-        endPk: item.endPk,
-        side: item.side,
-      })),
-    })
-
-    await tx.roadPhaseLayer.deleteMany({ where: { roadPhaseId: phaseId } })
-    if (resolvedLayerIds.length) {
-      await tx.roadPhaseLayer.createMany({
-        data: resolvedLayerIds.map((id) => ({ roadPhaseId: phaseId, layerDefinitionId: id })),
+        defaultLayers: payload.newLayers,
+        defaultChecks: payload.newChecks,
       })
-    }
 
-    await tx.roadPhaseCheck.deleteMany({ where: { roadPhaseId: phaseId } })
-    if (resolvedCheckIds.length) {
-      await tx.roadPhaseCheck.createMany({
-        data: resolvedCheckIds.map((id) => ({ roadPhaseId: phaseId, checkDefinitionId: id })),
+      const layerIds = payload.layerIds ?? []
+      const checkIds = payload.checkIds ?? []
+      const newLayerDefs = await ensureLayerDefinitions(payload.newLayers ?? [], tx)
+      const newCheckDefs = await ensureCheckDefinitions(payload.newChecks ?? [], tx)
+      const resolvedLayerIds = Array.from(new Set([...layerIds, ...newLayerDefs.map((l) => l.id)]))
+      const resolvedCheckIds = Array.from(new Set([...checkIds, ...newCheckDefs.map((c) => c.id)]))
+
+      const updated = await tx.roadPhase.update({
+        where: { id: phaseId, roadId },
+        data: {
+          phaseDefinitionId: definition.id,
+          name: payload.name,
+          measure: payload.measure === 'POINT' ? PhaseMeasure.POINT : PhaseMeasure.LINEAR,
+          designLength,
+        },
       })
-    }
 
-    return tx.roadPhase.findUniqueOrThrow({
-      where: { id: phaseId },
-      include: {
-        intervals: true,
-        layerLinks: { include: { layerDefinition: true } },
-        checkLinks: { include: { checkDefinition: true } },
-        phaseDefinition: {
-          include: {
-            defaultLayers: { include: { layerDefinition: true } },
-            defaultChecks: { include: { checkDefinition: true } },
+      await tx.phaseInterval.deleteMany({ where: { phaseId } })
+      await tx.phaseInterval.createMany({
+        data: normalizedIntervals.map((item) => ({
+          phaseId: updated.id,
+          startPk: item.startPk,
+          endPk: item.endPk,
+          side: item.side,
+        })),
+      })
+
+      await tx.roadPhaseLayer.deleteMany({ where: { roadPhaseId: phaseId } })
+      if (resolvedLayerIds.length) {
+        await tx.roadPhaseLayer.createMany({
+          data: resolvedLayerIds.map((id) => ({ roadPhaseId: phaseId, layerDefinitionId: id })),
+        })
+      }
+
+      await tx.roadPhaseCheck.deleteMany({ where: { roadPhaseId: phaseId } })
+      if (resolvedCheckIds.length) {
+        await tx.roadPhaseCheck.createMany({
+          data: resolvedCheckIds.map((id) => ({ roadPhaseId: phaseId, checkDefinitionId: id })),
+        })
+      }
+
+      return tx.roadPhase.findUniqueOrThrow({
+        where: { id: phaseId },
+        include: {
+          intervals: true,
+          layerLinks: { include: { layerDefinition: true } },
+          checkLinks: { include: { checkDefinition: true } },
+          phaseDefinition: {
+            include: {
+              defaultLayers: { include: { layerDefinition: true } },
+              defaultChecks: { include: { checkDefinition: true } },
+            },
           },
         },
-      },
-    })
-  })
+      })
+    },
+    { timeout: TRANSACTION_TIMEOUT_MS },
+  )
 
   return mapPhaseToDTO(phase)
 }
@@ -403,15 +411,18 @@ export const deletePhase = async (roadId: number, phaseId: number) => {
     throw new Error('无效的分项 ID')
   }
 
-  const removed = await prisma.$transaction(async (tx) => {
-    const phase = await tx.roadPhase.findFirst({ where: { id: phaseId, roadId } })
-    if (!phase) {
-      throw new Error('分项不存在或不属于当前路段')
-    }
+  const removed = await prisma.$transaction(
+    async (tx) => {
+      const phase = await tx.roadPhase.findFirst({ where: { id: phaseId, roadId } })
+      if (!phase) {
+        throw new Error('分项不存在或不属于当前路段')
+      }
 
-    await tx.roadPhase.delete({ where: { id: phaseId } })
-    return phase
-  })
+      await tx.roadPhase.delete({ where: { id: phaseId } })
+      return phase
+    },
+    { timeout: TRANSACTION_TIMEOUT_MS },
+  )
 
   return removed.id
 }

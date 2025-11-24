@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import type { FormEvent } from 'react'
-import { useState, useTransition } from 'react'
+import { useRef, useState, useTransition } from 'react'
 
 import type { RoadSectionDTO } from '@/lib/progressTypes'
 
@@ -34,6 +34,8 @@ export function RoadBoard({ initialRoads, canManage }: Props) {
   const [editingId, setEditingId] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
+  const formRef = useRef<HTMLFormElement | null>(null)
+  const nameInputRef = useRef<HTMLInputElement | null>(null)
 
   const resetForm = () => {
     setForm(emptyForm)
@@ -111,6 +113,10 @@ export function RoadBoard({ initialRoads, canManage }: Props) {
     })
     setEditingId(road.id)
     setError(null)
+    requestAnimationFrame(() => {
+      formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      nameInputRef.current?.focus()
+    })
   }
 
   return (
@@ -134,7 +140,7 @@ export function RoadBoard({ initialRoads, canManage }: Props) {
             </div>
           </div>
 
-          <form className="mt-5 grid gap-4 md:grid-cols-3" onSubmit={upsertRoad}>
+          <form ref={formRef} className="mt-5 grid gap-4 md:grid-cols-3" onSubmit={upsertRoad}>
             <label className="flex flex-col gap-2 text-sm text-slate-100">
               路由
               <input
@@ -152,6 +158,7 @@ export function RoadBoard({ initialRoads, canManage }: Props) {
             <label className="flex flex-col gap-2 text-sm text-slate-100">
               名称
               <input
+                ref={nameInputRef}
                 className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-slate-50 placeholder:text-slate-200/60 focus:border-emerald-300 focus:outline-none"
                 value={form.name}
                 onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}

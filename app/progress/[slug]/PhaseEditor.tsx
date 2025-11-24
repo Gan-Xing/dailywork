@@ -1,7 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 'use client'
 
-import { useEffect, useMemo, useState, useTransition } from 'react'
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 
 import type {
   CheckDefinitionDTO,
@@ -213,9 +213,12 @@ export function PhaseEditor({ road, initialPhases, phaseDefinitions, layerOption
   const [layerInput, setLayerInput] = useState('')
   const [checkInput, setCheckInput] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const [editingId, setEditingId] = useState<number | null>(null)
   const [deletingId, setDeletingId] = useState<number | null>(null)
+  const formRef = useRef<HTMLElement | null>(null)
+  const nameInputRef = useRef<HTMLInputElement | null>(null)
 
   const designLength = useMemo(() => computeDesign(measure, intervals), [measure, intervals])
 
@@ -279,11 +282,16 @@ export function PhaseEditor({ road, initialPhases, phaseDefinitions, layerOption
     )
     setEditingId(normalized.id)
     setError(null)
+    requestAnimationFrame(() => {
+      formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      nameInputRef.current?.focus()
+    })
   }
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     setError(null)
+    setSuccessMessage(null)
     if (!canManage) return
     startTransition(async () => {
       const { ids: layerIds, newNames: newLayers } = splitTokensToIds(layerTokens, layerOptionsState)
@@ -366,6 +374,7 @@ export function PhaseEditor({ road, initialPhases, phaseDefinitions, layerOption
       setPhases((prev) =>
         editingId ? prev.map((item) => (item.id === editingId ? phase : item)) : [...prev, phase],
       )
+      setSuccessMessage(editingId ? `分项「${phase.name}」已更新` : `分项「${phase.name}」已创建`)
       resetForm()
     })
   }
@@ -562,9 +571,20 @@ const submitInspection = async () => {
     }
   }, [selectedSegment])
 
+  useEffect(() => {
+    if (!successMessage) return
+    const timer = setTimeout(() => setSuccessMessage(null), 3200)
+    return () => clearTimeout(timer)
+  }, [successMessage])
+
   return (
     <div className="space-y-8">
-      <section className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur">
+      {successMessage ? (
+        <div className="fixed bottom-6 right-6 z-40 max-w-sm rounded-2xl border border-emerald-200/60 bg-emerald-50/90 px-4 py-3 text-sm font-semibold text-emerald-900 shadow-xl shadow-emerald-400/30">
+          {successMessage}
+        </div>
+      ) : null}
+      <section ref={formRef} className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur">
         <div className="flex flex-wrap items-center gap-3">
           <h2 className="text-xl font-semibold text-slate-50">分项工程</h2>
           <span className="rounded-full bg-white/10 px-3 py-1 text-[11px] font-semibold text-slate-100">
@@ -630,6 +650,7 @@ const submitInspection = async () => {
               <label className="flex flex-col gap-2 text-sm text-slate-100">
                 名称
                 <input
+                  ref={nameInputRef}
                   className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-slate-50 placeholder:text-slate-200/60 focus:border-emerald-300 focus:outline-none"
                   value={name}
                   onChange={(e) => setName(e.target.value)}

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { LocaleSwitcher } from '@/components/LocaleSwitcher';
 import { locales, type Locale } from '@/lib/i18n';
@@ -171,6 +171,7 @@ export default function HomePage() {
 	const [confirmPassword, setConfirmPassword] = useState('');
 	const [changeMessage, setChangeMessage] = useState<string | null>(null);
 	const [isChanging, setIsChanging] = useState(false);
+	const menuRef = useRef<HTMLDivElement | null>(null);
 
 	useEffect(() => {
 		const loadSession = async () => {
@@ -190,6 +191,26 @@ export default function HomePage() {
 		};
 		loadSession();
 	}, []);
+
+	useEffect(() => {
+		const handleClickOutside = (event: MouseEvent | TouchEvent) => {
+			if (
+				menuOpen &&
+				menuRef.current &&
+				!menuRef.current.contains(event.target as Node)
+			) {
+				setMenuOpen(false);
+			}
+		};
+
+		document.addEventListener('mousedown', handleClickOutside);
+		document.addEventListener('touchstart', handleClickOutside);
+
+		return () => {
+			document.removeEventListener('mousedown', handleClickOutside);
+			document.removeEventListener('touchstart', handleClickOutside);
+		};
+	}, [menuOpen]);
 
 	const handleLogin = async (event: React.FormEvent<HTMLFormElement>) => {
 		event.preventDefault();
@@ -281,7 +302,7 @@ export default function HomePage() {
 			<div className='relative mx-auto max-w-6xl px-6 py-16 sm:px-8 lg:px-12'>
 				<div className='mb-6 flex flex-wrap items-center justify-end gap-3'>
 					{session ? (
-						<div className='relative'>
+						<div className='relative' ref={menuRef}>
 							<button
 								type='button'
 								onClick={() =>
