@@ -160,7 +160,7 @@ export default function HomePage() {
 	const [session, setSession] = useState<SessionUser | null>(null);
 	const [loginOpen, setLoginOpen] = useState(false);
 	const [username, setUsername] = useState('GanXing');
-	const [password, setPassword] = useState('Admin1234');
+	const [password, setPassword] = useState('Admin888');
 	const [loginMessage, setLoginMessage] = useState<string | null>(null);
 	const [isSubmitting, setSubmitting] = useState(false);
 	const [isLoggingOut, setIsLoggingOut] = useState(false);
