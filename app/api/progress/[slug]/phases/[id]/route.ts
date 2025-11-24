@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 
 import { hasPermission } from '@/lib/server/authSession'
-import { updatePhase } from '@/lib/server/progressStore'
+import { deletePhase, updatePhase } from '@/lib/server/progressStore'
 import { getRoadBySlug } from '@/lib/server/roadStore'
 
 interface RouteParams {
@@ -27,11 +27,14 @@ export async function PUT(request: Request, { params }: RouteParams) {
   }
 
   let payload: {
+    phaseDefinitionId?: number
     name?: string
     measure?: string
     intervals?: { startPk?: number; endPk?: number; side?: string }[]
-    commonLayers?: string[]
-    commonChecks?: string[]
+    layerIds?: number[]
+    checkIds?: number[]
+    newLayers?: string[]
+    newChecks?: string[]
   }
   try {
     payload = (await request.json()) as typeof payload
@@ -45,10 +48,13 @@ export async function PUT(request: Request, { params }: RouteParams) {
 
   try {
     const phase = await updatePhase(road.id, phaseId, {
+      phaseDefinitionId: payload.phaseDefinitionId,
       name: payload.name,
       measure: payload.measure as 'LINEAR' | 'POINT',
-      commonLayers: payload.commonLayers ?? [],
-      commonChecks: payload.commonChecks ?? [],
+      layerIds: payload.layerIds ?? [],
+      checkIds: payload.checkIds ?? [],
+      newLayers: payload.newLayers ?? [],
+      newChecks: payload.newChecks ?? [],
       intervals:
         payload.intervals?.map((i) => ({
           startPk: Number(i.startPk ?? 0),
@@ -60,6 +66,29 @@ export async function PUT(request: Request, { params }: RouteParams) {
         })) ?? [],
     })
     return NextResponse.json({ phase })
+  } catch (error) {
+    return NextResponse.json({ message: (error as Error).message }, { status: 400 })
+  }
+}
+
+export async function DELETE(_request: Request, { params }: RouteParams) {
+  if (!hasPermission('road:manage')) {
+    return NextResponse.json({ message: '缺少编辑进度权限' }, { status: 403 })
+  }
+
+  const phaseId = Number(params.id)
+  if (!Number.isInteger(phaseId) || phaseId <= 0) {
+    return NextResponse.json({ message: '无效的分项 ID' }, { status: 400 })
+  }
+
+  const road = await getRoadBySlug(params.slug)
+  if (!road) {
+    return NextResponse.json({ message: '路段不存在' }, { status: 404 })
+  }
+
+  try {
+    await deletePhase(road.id, phaseId)
+    return NextResponse.json({ phaseId })
   } catch (error) {
     return NextResponse.json({ message: (error as Error).message }, { status: 400 })
   }

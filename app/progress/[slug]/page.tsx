@@ -1,9 +1,9 @@
 import Link from 'next/link'
 
 import { PhaseEditor } from './PhaseEditor'
-import type { RoadSectionDTO } from '@/lib/progressTypes'
+import type { CheckDefinitionDTO, LayerDefinitionDTO, PhaseDefinitionDTO, RoadSectionDTO } from '@/lib/progressTypes'
 import { getSessionUser } from '@/lib/server/authSession'
-import { listPhases } from '@/lib/server/progressStore'
+import { listCheckDefinitions, listLayerDefinitions, listPhaseDefinitions, listPhases } from '@/lib/server/progressStore'
 import { getRoadBySlug } from '@/lib/server/roadStore'
 
 export const dynamic = 'force-dynamic'
@@ -38,7 +38,12 @@ export default async function RoadDetailPage({ params }: Params) {
     )
   }
 
-  const phases = await listPhases(road.id)
+  const [phases, phaseDefinitions, layerOptions, checkOptions] = await Promise.all([
+    listPhases(road.id),
+    listPhaseDefinitions(),
+    listLayerDefinitions(),
+    listCheckDefinitions(),
+  ])
 
   return (
     <main className="min-h-screen bg-slate-950 text-slate-50">
@@ -63,7 +68,14 @@ export default async function RoadDetailPage({ params }: Params) {
         </header>
 
         <div className="mt-8">
-          <PhaseEditor road={road} initialPhases={phases} canManage={canManage} />
+          <PhaseEditor
+            road={road}
+            initialPhases={phases}
+            phaseDefinitions={phaseDefinitions as PhaseDefinitionDTO[]}
+            layerOptions={layerOptions as LayerDefinitionDTO[]}
+            checkOptions={checkOptions as CheckDefinitionDTO[]}
+            canManage={canManage}
+          />
         </div>
       </div>
     </main>

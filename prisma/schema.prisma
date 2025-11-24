@@ -31,6 +31,56 @@ enum IntervalSide {
   RIGHT
 }
 
+model PhaseDefinition {
+  id             Int                     @id @default(autoincrement())
+  name           String                  @unique
+  measure        PhaseMeasure
+  isActive       Boolean                 @default(true)
+  defaultLayers  PhaseDefinitionLayer[]
+  defaultChecks  PhaseDefinitionCheck[]
+  phases         RoadPhase[]
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+}
+
+model LayerDefinition {
+  id               Int                     @id @default(autoincrement())
+  name             String                  @unique
+  isActive         Boolean                 @default(true)
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+  definitionLinks  PhaseDefinitionLayer[]
+  phaseLinks       RoadPhaseLayer[]
+}
+
+model CheckDefinition {
+  id               Int                     @id @default(autoincrement())
+  name             String                  @unique
+  isActive         Boolean                 @default(true)
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+  definitionLinks  PhaseDefinitionCheck[]
+  phaseLinks       RoadPhaseCheck[]
+}
+
+model PhaseDefinitionLayer {
+  phaseDefinitionId Int
+  layerDefinitionId Int
+  phaseDefinition   PhaseDefinition @relation(fields: [phaseDefinitionId], references: [id], onDelete: Cascade)
+  layerDefinition   LayerDefinition @relation(fields: [layerDefinitionId], references: [id], onDelete: Cascade)
+
+  @@id([phaseDefinitionId, layerDefinitionId])
+}
+
+model PhaseDefinitionCheck {
+  phaseDefinitionId Int
+  checkDefinitionId Int
+  phaseDefinition   PhaseDefinition @relation(fields: [phaseDefinitionId], references: [id], onDelete: Cascade)
+  checkDefinition   CheckDefinition @relation(fields: [checkDefinitionId], references: [id], onDelete: Cascade)
+
+  @@id([phaseDefinitionId, checkDefinitionId])
+}
+
 model DailyReport {
   id         Int      @id @default(autoincrement())
   reportDate DateTime @unique
@@ -52,18 +102,20 @@ model RoadSection {
 }
 
 model RoadPhase {
-  id            Int            @id @default(autoincrement())
-  roadId        Int
-  road          RoadSection    @relation(fields: [roadId], references: [id], onDelete: Cascade)
-  name          String
-  measure       PhaseMeasure
-  designLength  Float          @default(0)
-  commonLayers  String[]       @default([])
-  commonChecks  String[]       @default([])
-  intervals     PhaseInterval[]
-  inspections   InspectionRequest[]
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
+  id                Int                 @id @default(autoincrement())
+  roadId            Int
+  road              RoadSection         @relation(fields: [roadId], references: [id], onDelete: Cascade)
+  phaseDefinitionId Int
+  phaseDefinition   PhaseDefinition     @relation(fields: [phaseDefinitionId], references: [id])
+  name              String
+  measure           PhaseMeasure
+  designLength      Float               @default(0)
+  intervals         PhaseInterval[]
+  inspections       InspectionRequest[]
+  layerLinks        RoadPhaseLayer[]
+  checkLinks        RoadPhaseCheck[]
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
 }
 
 model PhaseInterval {
@@ -95,6 +147,24 @@ model InspectionRequest {
   creator    User?            @relation(fields: [createdBy], references: [id])
   createdAt  DateTime         @default(now())
   updatedAt  DateTime         @updatedAt
+}
+
+model RoadPhaseLayer {
+  roadPhaseId       Int
+  layerDefinitionId Int
+  roadPhase         RoadPhase     @relation(fields: [roadPhaseId], references: [id], onDelete: Cascade)
+  layerDefinition   LayerDefinition @relation(fields: [layerDefinitionId], references: [id], onDelete: Cascade)
+
+  @@id([roadPhaseId, layerDefinitionId])
+}
+
+model RoadPhaseCheck {
+  roadPhaseId       Int
+  checkDefinitionId Int
+  roadPhase         RoadPhase      @relation(fields: [roadPhaseId], references: [id], onDelete: Cascade)
+  checkDefinition   CheckDefinition @relation(fields: [checkDefinitionId], references: [id], onDelete: Cascade)
+
+  @@id([roadPhaseId, checkDefinitionId])
 }
 
 model Permission {

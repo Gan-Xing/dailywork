@@ -1,7 +1,13 @@
 import { NextResponse } from 'next/server'
 
 import { hasPermission } from '@/lib/server/authSession'
-import { createPhase, listPhases } from '@/lib/server/progressStore'
+import {
+  createPhase,
+  listCheckDefinitions,
+  listLayerDefinitions,
+  listPhaseDefinitions,
+  listPhases,
+} from '@/lib/server/progressStore'
 import { getRoadBySlug } from '@/lib/server/roadStore'
 
 interface RouteParams {
@@ -16,7 +22,12 @@ export async function GET(_request: Request, { params }: RouteParams) {
     return NextResponse.json({ message: '路段不存在' }, { status: 404 })
   }
   const phases = await listPhases(road.id)
-  return NextResponse.json({ road, phases })
+  const [definitions, layerOptions, checkOptions] = await Promise.all([
+    listPhaseDefinitions(),
+    listLayerDefinitions(),
+    listCheckDefinitions(),
+  ])
+  return NextResponse.json({ road, phases, definitions, layerOptions, checkOptions })
 }
 
 export async function POST(request: Request, { params }: RouteParams) {
@@ -29,11 +40,14 @@ export async function POST(request: Request, { params }: RouteParams) {
   }
 
   let payload: {
+    phaseDefinitionId?: number
     name?: string
     measure?: string
     intervals?: { startPk?: number; endPk?: number; side?: string }[]
-    commonLayers?: string[]
-    commonChecks?: string[]
+    layerIds?: number[]
+    checkIds?: number[]
+    newLayers?: string[]
+    newChecks?: string[]
   }
   try {
     payload = (await request.json()) as typeof payload
@@ -47,10 +61,13 @@ export async function POST(request: Request, { params }: RouteParams) {
 
   try {
     const phase = await createPhase(road.id, {
+      phaseDefinitionId: payload.phaseDefinitionId,
       name: payload.name,
       measure: payload.measure as 'LINEAR' | 'POINT',
-      commonLayers: payload.commonLayers ?? [],
-      commonChecks: payload.commonChecks ?? [],
+      layerIds: payload.layerIds ?? [],
+      checkIds: payload.checkIds ?? [],
+      newLayers: payload.newLayers ?? [],
+      newChecks: payload.newChecks ?? [],
       intervals:
         payload.intervals?.map((i) => ({
           startPk: Number(i.startPk ?? 0),

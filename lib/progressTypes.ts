@@ -21,20 +21,52 @@ export interface PhaseIntervalPayload {
 }
 
 export interface PhasePayload {
+  phaseDefinitionId?: number
   name: string
   measure: PhaseMeasure
   intervals: PhaseIntervalPayload[]
-  commonLayers?: string[]
-  commonChecks?: string[]
+  layerIds?: number[]
+  checkIds?: number[]
+  newLayers?: string[]
+  newChecks?: string[]
 }
 
 export interface PhaseDTO extends PhasePayload {
   id: number
   designLength: number
-  commonLayers: string[]
-  commonChecks: string[]
+  resolvedLayers: string[]
+  resolvedChecks: string[]
+  definitionName: string
+  definitionId: number
+  definitionLayerIds: number[]
+  definitionCheckIds: number[]
+  layerIds: number[]
+  checkIds: number[]
   createdAt: string
   updatedAt: string
+}
+
+export interface PhaseDefinitionDTO {
+  id: number
+  name: string
+  measure: PhaseMeasure
+  defaultLayers: string[]
+  defaultChecks: string[]
+  isActive: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export interface LayerDefinitionDTO {
+  id: number
+  name: string
+  isActive: boolean
+}
+
+export interface CheckDefinitionDTO {
+  id: number
+  name: string
+  isActive: boolean
 }
 
 export type InspectionStatus = 'PENDING' | 'IN_PROGRESS' | 'APPROVED'

@@ -3,12 +3,24 @@
 
 import { useEffect, useMemo, useState, useTransition } from 'react'
 
-import type { IntervalSide, PhaseDTO, PhaseIntervalPayload, PhasePayload, RoadSectionDTO } from '@/lib/progressTypes'
+import type {
+  CheckDefinitionDTO,
+  IntervalSide,
+  LayerDefinitionDTO,
+  PhaseDTO,
+  PhaseDefinitionDTO,
+  PhaseIntervalPayload,
+  PhasePayload,
+  RoadSectionDTO,
+} from '@/lib/progressTypes'
 import type { PhaseMeasure } from '@/lib/progressTypes'
 
 interface Props {
   road: RoadSectionDTO
   initialPhases: PhaseDTO[]
+  phaseDefinitions: PhaseDefinitionDTO[]
+  layerOptions: LayerDefinitionDTO[]
+  checkOptions: CheckDefinitionDTO[]
   canManage: boolean
 }
 
@@ -50,6 +62,21 @@ const statusTone: Record<Status, string> = {
   已验收: 'bg-gradient-to-r from-emerald-300 via-lime-200 to-emerald-200 text-slate-900 shadow-md shadow-emerald-400/30',
   非设计: 'bg-slate-800 text-slate-100 shadow-inner shadow-slate-900/30',
 }
+
+const normalizePhaseDTO = (phase: PhaseDTO): PhaseDTO => ({
+  ...phase,
+  resolvedLayers: Array.isArray(phase.resolvedLayers) ? [...phase.resolvedLayers] : [],
+  resolvedChecks: Array.isArray(phase.resolvedChecks) ? [...phase.resolvedChecks] : [],
+  definitionLayerIds: Array.isArray(phase.definitionLayerIds) ? [...phase.definitionLayerIds] : [],
+  definitionCheckIds: Array.isArray(phase.definitionCheckIds) ? [...phase.definitionCheckIds] : [],
+  layerIds: Array.isArray(phase.layerIds) ? [...phase.layerIds] : [],
+  checkIds: Array.isArray(phase.checkIds) ? [...phase.checkIds] : [],
+  intervals: phase.intervals.map((interval) => ({
+    startPk: Number(interval.startPk) || 0,
+    endPk: Number(interval.endPk) || 0,
+    side: interval.side,
+  })),
+})
 
 const formatPK = (value: number) => {
   const km = Math.floor(value / 1000)
@@ -157,7 +184,7 @@ const calcCombinedPercent = (left: Segment[], right: Segment[]) => {
   return Math.round((completed / total) * 100)
 }
 
-export function PhaseEditor({ road, initialPhases, canManage }: Props) {
+export function PhaseEditor({ road, initialPhases, phaseDefinitions, layerOptions, checkOptions, canManage }: Props) {
   const roadStart = useMemo(() => {
     const start = Number(road.startPk)
     return Number.isFinite(start) ? start : 0
@@ -173,17 +200,22 @@ export function PhaseEditor({ road, initialPhases, canManage }: Props) {
     [roadStart, roadEnd],
   )
 
-  const [phases, setPhases] = useState<PhaseDTO[]>(initialPhases)
+  const [phases, setPhases] = useState<PhaseDTO[]>(() => initialPhases.map(normalizePhaseDTO))
+  const [definitions, setDefinitions] = useState<PhaseDefinitionDTO[]>(phaseDefinitions)
+  const [layerOptionsState, setLayerOptionsState] = useState<LayerDefinitionDTO[]>(layerOptions)
+  const [checkOptionsState, setCheckOptionsState] = useState<CheckDefinitionDTO[]>(checkOptions)
   const [name, setName] = useState('')
   const [measure, setMeasure] = useState<PhaseMeasure>('LINEAR')
   const [intervals, setIntervals] = useState<PhaseIntervalPayload[]>([defaultInterval])
-  const [commonLayers, setCommonLayers] = useState<string[]>([])
-  const [commonChecks, setCommonChecks] = useState<string[]>([])
+  const [definitionId, setDefinitionId] = useState<number | null>(null)
+  const [layerTokens, setLayerTokens] = useState<string[]>([])
+  const [checkTokens, setCheckTokens] = useState<string[]>([])
   const [layerInput, setLayerInput] = useState('')
   const [checkInput, setCheckInput] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const [editingId, setEditingId] = useState<number | null>(null)
+  const [deletingId, setDeletingId] = useState<number | null>(null)
 
   const designLength = useMemo(() => computeDesign(measure, intervals), [measure, intervals])
 
@@ -220,8 +252,9 @@ export function PhaseEditor({ road, initialPhases, canManage }: Props) {
     setName('')
     setMeasure('LINEAR')
     setIntervals([defaultInterval])
-    setCommonLayers([])
-    setCommonChecks([])
+    setDefinitionId(null)
+    setLayerTokens([])
+    setCheckTokens([])
     setLayerInput('')
     setCheckInput('')
     setEditingId(null)
@@ -229,20 +262,22 @@ export function PhaseEditor({ road, initialPhases, canManage }: Props) {
   }
 
   const startEdit = (phase: PhaseDTO) => {
-    setName(phase.name)
-    setMeasure(phase.measure)
-    setCommonLayers(phase.commonLayers ?? [])
-    setCommonChecks(phase.commonChecks ?? [])
+    const normalized = normalizePhaseDTO(phase)
+    setName(normalized.name)
+    setMeasure(normalized.measure)
+    setDefinitionId(normalized.definitionId)
+    setLayerTokens(normalized.resolvedLayers)
+    setCheckTokens(normalized.resolvedChecks)
     setLayerInput('')
     setCheckInput('')
     setIntervals(
-      phase.intervals.map((i) => ({
+      normalized.intervals.map((i) => ({
         startPk: i.startPk,
         endPk: i.endPk,
         side: i.side,
       })),
     )
-    setEditingId(phase.id)
+    setEditingId(normalized.id)
     setError(null)
   }
 
@@ -251,11 +286,16 @@ export function PhaseEditor({ road, initialPhases, canManage }: Props) {
     setError(null)
     if (!canManage) return
     startTransition(async () => {
+      const { ids: layerIds, newNames: newLayers } = splitTokensToIds(layerTokens, layerOptionsState)
+      const { ids: checkIds, newNames: newChecks } = splitTokensToIds(checkTokens, checkOptionsState)
       const payload: PhasePayload = {
+        phaseDefinitionId: definitionId ?? undefined,
         name,
         measure,
-        commonLayers,
-        commonChecks,
+        layerIds,
+        checkIds,
+        newLayers,
+        newChecks,
         intervals: intervals.map((item) => {
           const startPk = Number(item.startPk)
           const endPk = measure === 'POINT' ? startPk : Number(item.endPk)
@@ -283,12 +323,80 @@ export function PhaseEditor({ road, initialPhases, canManage }: Props) {
         setError(data.message ?? '保存失败')
         return
       }
-      const phase = data.phase
+      const phase = normalizePhaseDTO(data.phase)
+      if (!definitions.find((d) => d.id === phase.definitionId)) {
+        setDefinitions((prev) => [
+          ...prev,
+          {
+            id: phase.definitionId,
+            name: phase.definitionName,
+            measure: phase.measure,
+            defaultLayers: phase.resolvedLayers,
+            defaultChecks: phase.resolvedChecks,
+            isActive: true,
+            createdAt: phase.createdAt,
+            updatedAt: phase.updatedAt,
+          },
+        ])
+      }
+      if (payload.newLayers?.length) {
+        const newLayerOptions = payload.newLayers
+          .filter((name) => !layerOptionsState.some((opt) => opt.name === name))
+          .map((name, idx) => ({
+            id: -(layerOptionsState.length + idx + 1),
+            name,
+            isActive: true,
+          }))
+        if (newLayerOptions.length) {
+          setLayerOptionsState((prev) => [...prev, ...newLayerOptions])
+        }
+      }
+      if (payload.newChecks?.length) {
+        const newCheckOptions = payload.newChecks
+          .filter((name) => !checkOptionsState.some((opt) => opt.name === name))
+          .map((name, idx) => ({
+            id: -(checkOptionsState.length + idx + 1),
+            name,
+            isActive: true,
+          }))
+        if (newCheckOptions.length) {
+          setCheckOptionsState((prev) => [...prev, ...newCheckOptions])
+        }
+      }
       setPhases((prev) =>
         editingId ? prev.map((item) => (item.id === editingId ? phase : item)) : [...prev, phase],
       )
       resetForm()
     })
+  }
+
+  const handleDelete = (phase: PhaseDTO) => {
+    if (!canManage) return
+    const confirmDelete = window.confirm(`确定删除分项「${phase.name}」吗？相关区间与报检记录也会被一并移除。`)
+    if (!confirmDelete) return
+    setError(null)
+    setDeletingId(phase.id)
+    fetch(`/api/progress/${road.slug}/phases/${phase.id}`, {
+      method: 'DELETE',
+      credentials: 'include',
+    })
+      .then((res) => res.json().then((data) => ({ ok: res.ok, data })).catch(() => ({ ok: res.ok, data: {} })))
+      .then(({ ok, data }) => {
+        if (!ok) {
+          setError((data as { message?: string }).message ?? '删除失败')
+          return
+        }
+        setPhases((prev) => prev.filter((item) => item.id !== phase.id))
+        if (editingId === phase.id) {
+          resetForm()
+        }
+        if (selectedSegment?.phaseId === phase.id) {
+          setSelectedSegment(null)
+          resetInspectionForm()
+        }
+      })
+      .catch(() => setError('删除失败'))
+      .finally(() => setDeletingId(null))
   }
 
   const linearViews = useMemo(() => {
@@ -309,96 +417,123 @@ export function PhaseEditor({ road, initialPhases, canManage }: Props) {
       }))
   }, [phases, roadLength])
 
-  const toggleToken = (value: string, list: string[], setter: (next: string[]) => void) => {
-    const exists = list.includes(value)
-    setter(exists ? list.filter((item) => item !== value) : [...list, value])
+const toggleToken = (value: string, list: string[], setter: (next: string[]) => void) => {
+  const exists = list.includes(value)
+  setter(exists ? list.filter((item) => item !== value) : [...list, value])
+}
+
+const splitTokensToIds = (
+  tokens: string[],
+  options: { id: number; name: string }[],
+): { ids: number[]; newNames: string[] } => {
+  const normalized = tokens.map((t) => t.trim()).filter(Boolean)
+  const ids: number[] = []
+  const newNames: string[] = []
+  normalized.forEach((token) => {
+    const matched = options.find((opt) => opt.name === token)
+    if (matched) {
+      ids.push(matched.id)
+    } else {
+      newNames.push(token)
+    }
+  })
+  return { ids: [...new Set(ids)], newNames: [...new Set(newNames)] }
+}
+
+const addLayerToken = () => {
+  const value = layerInput.trim()
+  if (!value) return
+  if (!layerTokens.includes(value)) {
+    setLayerTokens((prev) => [...prev, value])
+  }
+  if (!selectedLayers.includes(value)) {
+    setSelectedLayers((prev) => [...prev, value])
+  }
+  setLayerInput('')
+}
+
+const addCheckToken = () => {
+  const value = checkInput.trim()
+  if (!value) return
+  if (!checkTokens.includes(value)) {
+    setCheckTokens((prev) => [...prev, value])
+  }
+  if (!selectedChecks.includes(value)) {
+    setSelectedChecks((prev) => [...prev, value])
+  }
+  setCheckInput('')
+}
+
+const resetInspectionForm = () => {
+  setSelectedLayers([])
+  setSelectedChecks([])
+  setSelectedTypes([])
+  setRemark('')
+  setSubmitError(null)
+}
+
+const submitInspection = async () => {
+  if (!selectedSegment) return
+  const startPk = Number(startPkInput)
+  const endPk = Number(endPkInput)
+  if (!Number.isFinite(startPk) || !Number.isFinite(endPk)) {
+    setSubmitError('请输入有效的起点和终点')
+    return
+  }
+  if (!selectedLayers.length) {
+    setSubmitError('请选择至少一个层次')
+    return
+  }
+  if (!selectedChecks.length) {
+    setSubmitError('请选择至少一个验收内容')
+    return
+  }
+  if (!selectedTypes.length) {
+    setSubmitError('请选择至少一个验收类型')
+    return
+  }
+  setSubmitPending(true)
+  setSubmitError(null)
+  const payload = {
+    phaseId: selectedSegment.phaseId,
+    side: selectedSide,
+    startPk,
+    endPk,
+    layers: selectedLayers,
+    checks: selectedChecks,
+    types: selectedTypes,
+    remark,
   }
 
-  const addLayerToken = () => {
-    const value = layerInput.trim()
-    if (!value) return
-    if (!commonLayers.includes(value)) {
-      setCommonLayers((prev) => [...prev, value])
-    }
-    if (!selectedLayers.includes(value)) {
-      setSelectedLayers((prev) => [...prev, value])
-    }
-    setLayerInput('')
+  const res = await fetch(`/api/progress/${road.slug}/inspections`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(payload),
+  })
+  const data = (await res.json().catch(() => ({}))) as { message?: string }
+  setSubmitPending(false)
+  if (!res.ok) {
+    setSubmitError(data.message ?? '提交失败')
+    return
   }
-
-  const addCheckToken = () => {
-    const value = checkInput.trim()
-    if (!value) return
-    if (!commonChecks.includes(value)) {
-      setCommonChecks((prev) => [...prev, value])
-    }
-    if (!selectedChecks.includes(value)) {
-      setSelectedChecks((prev) => [...prev, value])
-    }
-    setCheckInput('')
-  }
-
-  const resetInspectionForm = () => {
-    setSelectedLayers([])
-    setSelectedChecks([])
-    setSelectedTypes([])
-    setRemark('')
-    setSubmitError(null)
-  }
-
-  const submitInspection = async () => {
-    if (!selectedSegment) return
-    if (!selectedLayers.length) {
-      setSubmitError('请选择至少一个层次')
-      return
-    }
-    if (!selectedChecks.length) {
-      setSubmitError('请选择至少一个验收内容')
-      return
-    }
-    if (!selectedTypes.length) {
-      setSubmitError('请选择至少一个验收类型')
-      return
-    }
-    setSubmitPending(true)
-    setSubmitError(null)
-    const payload = {
-      phaseId: selectedSegment.phaseId,
-      side: selectedSegment.side === '左侧' ? 'LEFT' : selectedSegment.side === '右侧' ? 'RIGHT' : 'BOTH',
-      startPk: selectedSegment.start,
-      endPk: selectedSegment.end,
-      layers: selectedLayers,
-      checks: selectedChecks,
-      types: selectedTypes,
-      remark,
-    }
-
-    const res = await fetch(`/api/progress/${road.slug}/inspections`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify(payload),
-    })
-    const data = (await res.json().catch(() => ({}))) as { message?: string }
-    setSubmitPending(false)
-    if (!res.ok) {
-      setSubmitError(data.message ?? '提交失败')
-      return
-    }
-    setSelectedSegment(null)
-    resetInspectionForm()
-  }
+  setSelectedSegment(null)
+  resetInspectionForm()
+}
 
   const [selectedSegment, setSelectedSegment] = useState<{
     phase: string
     phaseId: number
     measure: PhaseMeasure
-    commonLayers: string[]
-    commonChecks: string[]
+    layers: string[]
+    checks: string[]
     side: string
     start: number
     end: number
   } | null>(null)
+  const [selectedSide, setSelectedSide] = useState<IntervalSide>('BOTH')
+  const [startPkInput, setStartPkInput] = useState<number>(0)
+  const [endPkInput, setEndPkInput] = useState<number>(0)
   const [selectedLayers, setSelectedLayers] = useState<string[]>([])
   const [selectedChecks, setSelectedChecks] = useState<string[]>([])
   const [selectedTypes, setSelectedTypes] = useState<string[]>([])
@@ -415,6 +550,12 @@ export function PhaseEditor({ road, initialPhases, canManage }: Props) {
       setRemark('')
       setSubmitError(null)
       setInspectionCheckInput('')
+      const sideLabel = selectedSegment.side
+      const normalizedSide: IntervalSide =
+        sideLabel === '左侧' ? 'LEFT' : sideLabel === '右侧' ? 'RIGHT' : 'BOTH'
+      setSelectedSide(normalizedSide)
+      setStartPkInput(selectedSegment.start)
+      setEndPkInput(selectedSegment.end)
     }
   }, [selectedSegment])
 
@@ -453,7 +594,36 @@ export function PhaseEditor({ road, initialPhases, canManage }: Props) {
               </button>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-4 md:grid-cols-4">
+              <label className="flex flex-col gap-2 text-sm text-slate-100">
+                分项模板
+                <select
+                  className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
+                  value={definitionId ?? ''}
+                  onChange={(e) => {
+                    const value = e.target.value
+                    if (!value) {
+                      setDefinitionId(null)
+                      return
+                    }
+                    const found = definitions.find((item) => item.id === Number(value))
+                    if (found) {
+                      setDefinitionId(found.id)
+                      setName(found.name)
+                      setMeasure(found.measure)
+                      setLayerTokens(found.defaultLayers)
+                      setCheckTokens(found.defaultChecks)
+                    }
+                  }}
+                >
+                  <option value="">自定义/新建</option>
+                  {definitions.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.name} · {item.measure === 'POINT' ? '单体' : '延米'}
+                    </option>
+                  ))}
+                </select>
+              </label>
               <label className="flex flex-col gap-2 text-sm text-slate-100">
                 名称
                 <input
@@ -554,7 +724,7 @@ export function PhaseEditor({ road, initialPhases, canManage }: Props) {
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2 rounded-2xl border border-white/10 bg-white/5 p-4">
                 <div className="flex items-center justify-between text-sm text-slate-100">
-                  <p>常见层次（多选备选）</p>
+                  <p>层次（当前分项使用的候选）</p>
                   <button
                     type="button"
                     onClick={addLayerToken}
@@ -566,15 +736,31 @@ export function PhaseEditor({ road, initialPhases, canManage }: Props) {
                 <div className="flex flex-wrap items-center gap-2">
                   <input
                     className="w-full rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-200/60 focus:border-emerald-300 focus:outline-none"
-                    placeholder="如：第一层上土"
+                    placeholder="选择或新增层次，如：第一层上土"
                     value={layerInput}
                     onChange={(e) => setLayerInput(e.target.value)}
                   />
-                  {commonLayers.length === 0 ? (
-                    <p className="text-xs text-slate-300">暂无层次，输入后点击添加。</p>
+                  <div className="flex flex-wrap gap-2">
+                    {layerOptionsState.map((option) => (
+                      <button
+                        key={option.id}
+                        type="button"
+                        className={`rounded-full px-3 py-1 text-[11px] font-semibold ${
+                          layerTokens.includes(option.name)
+                            ? 'bg-emerald-300 text-slate-900'
+                            : 'bg-white/10 text-slate-100'
+                        }`}
+                        onClick={() => toggleToken(option.name, layerTokens, setLayerTokens)}
+                      >
+                        {option.name}
+                      </button>
+                    ))}
+                  </div>
+                  {layerTokens.length === 0 ? (
+                    <p className="text-xs text-slate-300">暂无已选层次，输入后点击添加，或从上方候选中选择。</p>
                   ) : (
                     <div className="flex flex-wrap gap-2">
-                      {commonLayers.map((item) => (
+                      {layerTokens.map((item) => (
                         <span
                           key={item}
                           className="flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-[11px] font-semibold text-slate-100"
@@ -583,9 +769,7 @@ export function PhaseEditor({ road, initialPhases, canManage }: Props) {
                           <button
                             type="button"
                             className="text-[10px] text-rose-200"
-                            onClick={() =>
-                              setCommonLayers((prev) => prev.filter((token) => token !== item))
-                            }
+                            onClick={() => setLayerTokens((prev) => prev.filter((token) => token !== item))}
                           >
                             ×
                           </button>
@@ -598,7 +782,7 @@ export function PhaseEditor({ road, initialPhases, canManage }: Props) {
 
               <div className="space-y-2 rounded-2xl border border-white/10 bg-white/5 p-4">
                 <div className="flex items-center justify-between text-sm text-slate-100">
-                  <p>常见验收内容（多选备选）</p>
+                  <p>验收内容（当前分项使用的候选）</p>
                   <button
                     type="button"
                     onClick={addCheckToken}
@@ -614,11 +798,27 @@ export function PhaseEditor({ road, initialPhases, canManage }: Props) {
                     value={checkInput}
                     onChange={(e) => setCheckInput(e.target.value)}
                   />
-                  {commonChecks.length === 0 ? (
-                    <p className="text-xs text-slate-300">暂无内容，输入后点击添加。</p>
+                  <div className="flex flex-wrap gap-2">
+                    {checkOptionsState.map((option) => (
+                      <button
+                        key={option.id}
+                        type="button"
+                        className={`rounded-full px-3 py-1 text-[11px] font-semibold ${
+                          checkTokens.includes(option.name)
+                            ? 'bg-emerald-300 text-slate-900'
+                            : 'bg-white/10 text-slate-100'
+                        }`}
+                        onClick={() => toggleToken(option.name, checkTokens, setCheckTokens)}
+                      >
+                        {option.name}
+                      </button>
+                    ))}
+                  </div>
+                  {checkTokens.length === 0 ? (
+                    <p className="text-xs text-slate-300">暂无已选验收内容，输入后点击添加，或从上方候选中选择。</p>
                   ) : (
                     <div className="flex flex-wrap gap-2">
-                      {commonChecks.map((item) => (
+                      {checkTokens.map((item) => (
                         <span
                           key={item}
                           className="flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-[11px] font-semibold text-slate-100"
@@ -627,9 +827,7 @@ export function PhaseEditor({ road, initialPhases, canManage }: Props) {
                           <button
                             type="button"
                             className="text-[10px] text-rose-200"
-                            onClick={() =>
-                              setCommonChecks((prev) => prev.filter((token) => token !== item))
-                            }
+                            onClick={() => setCheckTokens((prev) => prev.filter((token) => token !== item))}
                           >
                             ×
                           </button>
@@ -697,13 +895,23 @@ export function PhaseEditor({ road, initialPhases, canManage }: Props) {
                         </span>
                       ) : null}
                       {canManage ? (
-                        <button
-                          type="button"
-                          className="rounded-xl border border-white/15 px-3 py-2 text-[11px] font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/10"
-                          onClick={() => startEdit(phase)}
-                        >
-                          编辑分项
-                        </button>
+                        <>
+                          <button
+                            type="button"
+                            className="rounded-xl border border-white/15 px-3 py-2 text-[11px] font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/10"
+                            onClick={() => startEdit(phase)}
+                          >
+                            编辑分项
+                          </button>
+                          <button
+                            type="button"
+                            className="rounded-xl border border-rose-200/60 px-3 py-2 text-[11px] font-semibold text-rose-100 transition hover:border-rose-200 hover:bg-rose-200/10"
+                            onClick={() => handleDelete(phase)}
+                            disabled={deletingId === phase.id}
+                          >
+                            {deletingId === phase.id ? '删除中...' : '删除分项'}
+                          </button>
+                        </>
                       ) : null}
                     </div>
                   </div>
@@ -737,8 +945,8 @@ export function PhaseEditor({ road, initialPhases, canManage }: Props) {
                                           phase: phase.name,
                                           phaseId: phase.id,
                                           measure: phase.measure,
-                                          commonLayers: phase.commonLayers ?? [],
-                                          commonChecks: phase.commonChecks ?? [],
+                                          layers: phase.resolvedLayers,
+                                          checks: phase.resolvedChecks,
                                           side: side.label,
                                           start: seg.start,
                                           end: seg.end,
@@ -780,8 +988,8 @@ export function PhaseEditor({ road, initialPhases, canManage }: Props) {
                                     phase: phase.name,
                                     phaseId: phase.id,
                                     measure: phase.measure,
-                                    commonLayers: phase.commonLayers ?? [],
-                                    commonChecks: phase.commonChecks ?? [],
+                                    layers: phase.resolvedLayers,
+                                    checks: phase.resolvedChecks,
                                     side:
                                       item.side === 'LEFT'
                                         ? '左侧'
@@ -837,49 +1045,87 @@ export function PhaseEditor({ road, initialPhases, canManage }: Props) {
             </div>
 
             <div className="mt-4 space-y-3 text-sm text-slate-100">
-              <p>侧别：{selectedSegment.side}</p>
-              <p>
-                区间：{formatPK(selectedSegment.start)} ~ {formatPK(selectedSegment.end)}
-              </p>
+              <div className="grid gap-3 md:grid-cols-3">
+                <label className="flex flex-col gap-1">
+                  侧别
+                  <select
+                    className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
+                    value={selectedSide}
+                    onChange={(e) => setSelectedSide(e.target.value as IntervalSide)}
+                  >
+                    <option value="LEFT">左侧</option>
+                    <option value="RIGHT">右侧</option>
+                    <option value="BOTH">双侧</option>
+                  </select>
+                </label>
+                <label className="flex flex-col gap-1">
+                  起点
+                  <input
+                    type="number"
+                    className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
+                    value={startPkInput}
+                    onChange={(e) => setStartPkInput(Number(e.target.value))}
+                    placeholder="输入起点 PK"
+                  />
+                </label>
+                <label className="flex flex-col gap-1">
+                  终点
+                  <input
+                    type="number"
+                    className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
+                    value={endPkInput}
+                    onChange={(e) => setEndPkInput(Number(e.target.value))}
+                    placeholder="输入终点 PK"
+                  />
+                </label>
+              </div>
 
               <div className="space-y-1">
                 <p className="text-xs font-semibold text-slate-200">层次（多选）</p>
-                <div className="flex flex-wrap gap-2">
-                  {(selectedSegment.commonLayers.length ? selectedSegment.commonLayers : ['第一层上土', '第二层上土']).map((item) => (
-                    <button
-                      key={item}
-                      type="button"
-                      className={`rounded-full px-3 py-1 text-[11px] font-semibold ${
-                        selectedLayers.includes(item)
-                          ? 'bg-emerald-300 text-slate-900'
-                          : 'bg-white/10 text-slate-100'
-                      }`}
-                      onClick={() => toggleToken(item, selectedLayers, setSelectedLayers)}
-                    >
-                      {item}
-                    </button>
-                  ))}
-                </div>
+                {selectedSegment.layers.length === 0 ? (
+                  <p className="text-[11px] text-amber-200">暂无层次，请先在分项维护中添加。</p>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {selectedSegment.layers.map((item) => (
+                      <button
+                        key={item}
+                        type="button"
+                        className={`rounded-full px-3 py-1 text-[11px] font-semibold ${
+                          selectedLayers.includes(item)
+                            ? 'bg-emerald-300 text-slate-900'
+                            : 'bg-white/10 text-slate-100'
+                        }`}
+                        onClick={() => toggleToken(item, selectedLayers, setSelectedLayers)}
+                      >
+                        {item}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="space-y-1">
                 <p className="text-xs font-semibold text-slate-200">验收内容（多选，可临时添加）</p>
-                <div className="flex flex-wrap gap-2">
-                  {(selectedSegment.commonChecks.length ? selectedSegment.commonChecks : ['压实度', '平整度']).map((item) => (
-                    <button
-                      key={item}
-                      type="button"
-                      className={`rounded-full px-3 py-1 text-[11px] font-semibold ${
-                        selectedChecks.includes(item)
-                          ? 'bg-emerald-300 text-slate-900'
-                          : 'bg-white/10 text-slate-100'
-                      }`}
-                      onClick={() => toggleToken(item, selectedChecks, setSelectedChecks)}
-                    >
-                      {item}
-                    </button>
-                  ))}
-                </div>
+                {selectedSegment.checks.length === 0 ? (
+                  <p className="text-[11px] text-amber-200">暂无验收内容，请在分项维护中添加或临时新增。</p>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {selectedSegment.checks.map((item) => (
+                      <button
+                        key={item}
+                        type="button"
+                        className={`rounded-full px-3 py-1 text-[11px] font-semibold ${
+                          selectedChecks.includes(item)
+                            ? 'bg-emerald-300 text-slate-900'
+                            : 'bg-white/10 text-slate-100'
+                        }`}
+                        onClick={() => toggleToken(item, selectedChecks, setSelectedChecks)}
+                      >
+                        {item}
+                      </button>
+                    ))}
+                  </div>
+                )}
                 <div className="flex items-center gap-2">
                   <input
                     className="w-full rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-200/60 focus:border-emerald-300 focus:outline-none"

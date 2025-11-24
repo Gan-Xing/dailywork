@@ -168,6 +168,45 @@
      3. `endPk`：终点标识，文本，必填。
      4. `createdAt` / `updatedAt`：系统维护的时间戳，用于审计与排序。
 
+## 分项定义（PhaseDefinition）
+
+- **用途**：全局的分项模板库，用于跨道路复用分项名称、展示方式及默认的层次/验收内容。
+- **字段**
+     0. `id`：唯一标识（自增或 UUID）。
+     1. `name`：分项名称（如“土方”），唯一，必填。
+     2. `measure`：枚举 `LINEAR` / `POINT`，必填。
+     3. `defaultLayers`：字符串数组，模板级默认层次列表，可为空。
+     4. `defaultChecks`：字符串数组，模板级默认验收内容列表，可为空。
+     5. `isActive`：布尔，控制是否可被新实例选择，默认 `true`。
+     6. `createdAt` / `updatedAt`：系统时间戳。
+
+## 层次与验收内容定义（LayerDefinition / CheckDefinition）
+
+- **用途**：去重存储全局可选的层次/验收内容，供分项模板或分项实例选择与继承，避免同名条目分散为孤立字符串。
+- **字段（两类结构一致）**
+     0. `id`：唯一标识。
+     1. `name`：名称（唯一，不区分大小写），必填。
+     2. `isActive`：布尔，可停用旧条目避免继续被选择。
+     3. `createdAt` / `updatedAt`：系统时间戳。
+
+## 道路分项实例（RoadPhase）
+
+- **用途**：某条道路上实例化的分项工程，绑定一个分项定义，并允许对默认层次/验收内容进行覆盖或扩展。
+- **字段**
+     0. `id`：唯一标识。
+     1. `roadId`：关联 `RoadSection`。
+     2. `phaseDefinitionId`：关联 `PhaseDefinition`（必填）。
+     3. `name`：显示名称，默认继承模板，可在实例层重命名。
+     4. `measure`：枚举，默认继承模板；如与模板不同则以实例为准。
+     5. `intervals`：区间列表 `{ startPk, endPk, side }`，实例必填（设计量由此计算）。
+     6. `layerIds`：引用 `LayerDefinition` 的 ID 列表，实例可选；为空时使用模板默认层次。
+     7. `checkIds`：引用 `CheckDefinition` 的 ID 列表，实例可选；为空时使用模板默认验收内容。
+     8. `resolvedLayers` / `resolvedChecks`：派生字段（API/视图用），规则为“若实例有绑定则使用实例列表，否则使用模板默认值”。
+     9. `designLength`：数值，按区间与侧别计算。
+    10. `createdAt` / `updatedAt`：系统时间戳。
+
+> 继承与覆盖规则：路段下新建分项实例时选择一个模板，初始层次/验收内容取模板默认值；实例可新增/删除候选，保存后 `layerIds`/`checkIds` 记录实例实际选中的定义集合。报检弹窗展示与提交时使用 `resolvedLayers`/`resolvedChecks`。
+
 ## 权限与账户模型
 
 - **Permission**：`code`（唯一标识，如 `road:manage`、`report:edit`）、`name`、`createdAt`、`updatedAt`。
