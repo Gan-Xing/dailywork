@@ -39,7 +39,7 @@ interface LinearView {
 
 interface PointView {
   total: number
-  points: { startPk: number; endPk: number; side: IntervalSide }
+  points: { startPk: number; endPk: number; side: IntervalSide }[]
 }
 
 const inspectionTypes = ['现场验收', '测量验收', '试验验收', '其他']
@@ -732,7 +732,7 @@ export function PhaseEditor({ road, initialPhases, canManage }: Props) {
                                     style={{ width: `${width}%` }}
                                     title={`${side.label} ${formatPK(seg.start)} ~ ${formatPK(seg.end)} · ${seg.status}`}
                                     onClick={() => {
-                                      if (seg.status === '未施工') {
+                                      if (seg.status === '未验收') {
                                         setSelectedSegment({
                                           phase: phase.name,
                                           phaseId: phase.id,
