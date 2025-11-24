@@ -1,3 +1,5 @@
+import type { LocalizedString } from './i18n'
+
 export interface RoadSectionPayload {
   slug: string
   name: string
@@ -7,6 +9,7 @@ export interface RoadSectionPayload {
 
 export interface RoadSectionDTO extends RoadSectionPayload {
   id: number
+  labels: LocalizedString
   createdAt: string
   updatedAt: string
 }

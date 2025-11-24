@@ -2,9 +2,13 @@
 
 import Link from 'next/link'
 import type { FormEvent } from 'react'
-import { useRef, useState, useTransition } from 'react'
+import { useEffect, useRef, useState, useTransition } from 'react'
 
 import type { RoadSectionDTO } from '@/lib/progressTypes'
+import { resolveRoadName } from '@/lib/i18n/roadDictionary'
+import { getProgressCopy, formatProgressCopy } from '@/lib/i18n/progress'
+import { locales, type Locale } from '@/lib/i18n'
+import { usePreferredLocale } from '@/lib/usePreferredLocale'
 
 interface Props {
   initialRoads: RoadSectionDTO[]
@@ -25,17 +29,28 @@ const emptyForm: FormState = {
   endPk: '',
 }
 
-const sortRoads = (roads: RoadSectionDTO[]) =>
-  [...roads].sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'))
+const sortRoads = (roads: RoadSectionDTO[], locale: Locale) =>
+  [...roads].sort((a, b) =>
+    resolveRoadName(a, locale).localeCompare(
+      resolveRoadName(b, locale),
+      locale === 'fr' ? 'fr-FR' : 'zh-CN',
+    ),
+  )
 
 export function RoadBoard({ initialRoads, canManage }: Props) {
-  const [roads, setRoads] = useState<RoadSectionDTO[]>(sortRoads(initialRoads))
+  const { locale } = usePreferredLocale('zh', locales)
+  const t = getProgressCopy(locale)
+  const [roads, setRoads] = useState<RoadSectionDTO[]>(sortRoads(initialRoads, locale))
   const [form, setForm] = useState<FormState>(emptyForm)
   const [editingId, setEditingId] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const formRef = useRef<HTMLFormElement | null>(null)
   const nameInputRef = useRef<HTMLInputElement | null>(null)
+
+  useEffect(() => {
+    setRoads((prev) => sortRoads(prev, locale))
+  }, [locale])
 
   const resetForm = () => {
     setForm(emptyForm)
@@ -47,7 +62,7 @@ export function RoadBoard({ initialRoads, canManage }: Props) {
     setError(null)
 
     if (!canManage) {
-      setError('暂无路段管理权限')
+      setError(t.errors.noPermission)
       return
     }
 
@@ -62,13 +77,13 @@ export function RoadBoard({ initialRoads, canManage }: Props) {
 
       if (!response.ok) {
         const data = (await response.json().catch(() => ({}))) as { message?: string }
-        setError(data.message ?? '保存失败，请重试')
+        setError(data.message ?? t.errors.saveFailed)
         return
       }
 
       const data = (await response.json()) as { road?: RoadSectionDTO }
       if (!data.road) {
-        setError('保存成功，但未收到返回数据')
+        setError(t.errors.saveMissing)
         return
       }
 
@@ -77,7 +92,7 @@ export function RoadBoard({ initialRoads, canManage }: Props) {
         const next = editingId
           ? prev.map((item) => (item.id === road.id ? road : item))
           : [...prev, road]
-        return sortRoads(next)
+        return sortRoads(next, locale)
       })
       resetForm()
     })
@@ -85,7 +100,7 @@ export function RoadBoard({ initialRoads, canManage }: Props) {
 
   const handleDelete = (id: number) => {
     if (!canManage) {
-      setError('暂无路段管理权限')
+      setError(t.errors.noPermission)
       return
     }
 
@@ -94,7 +109,7 @@ export function RoadBoard({ initialRoads, canManage }: Props) {
       const response = await fetch(`/api/roads/${id}`, { method: 'DELETE' })
       if (!response.ok) {
         const data = (await response.json().catch(() => ({}))) as { message?: string }
-        setError(data.message ?? '删除失败，请重试')
+        setError(data.message ?? t.errors.deleteFailed)
         return
       }
       setRoads((prev) => prev.filter((item) => item.id !== id))
@@ -126,15 +141,15 @@ export function RoadBoard({ initialRoads, canManage }: Props) {
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-100">
-                Admin
+                {t.admin.badge}
               </p>
-              <h2 className="text-xl font-semibold text-slate-50">路段管理</h2>
-              <p className="text-sm text-slate-200/80">仅管理员可维护路段清单，分项工程稍后在详情内补充。</p>
+              <h2 className="text-xl font-semibold text-slate-50">{t.admin.title}</h2>
+              <p className="text-sm text-slate-200/80">{t.admin.description}</p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               {editingId ? (
                 <span className="rounded-full bg-amber-200/80 px-3 py-1 text-xs font-semibold text-slate-900">
-                  编辑模式 · ID {editingId}
+                  {formatProgressCopy(t.admin.editMode, { id: editingId })}
                 </span>
               ) : null}
             </div>
@@ -142,42 +157,42 @@ export function RoadBoard({ initialRoads, canManage }: Props) {
 
           <form ref={formRef} className="mt-5 grid gap-4 md:grid-cols-3" onSubmit={upsertRoad}>
             <label className="flex flex-col gap-2 text-sm text-slate-100">
-              路由
+              {t.form.slugLabel}
               <input
                 className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-slate-50 placeholder:text-slate-200/60 focus:border-emerald-300 focus:outline-none"
                 value={form.slug}
                 onChange={(event) =>
                   setForm((prev) => ({ ...prev, slug: event.target.value.toLowerCase() }))
                 }
-                placeholder="如：bondoukou-university"
+                placeholder={t.form.slugPlaceholder}
                 pattern="[a-z0-9-]+"
-                title="仅允许小写字母、数字和连字符"
+                title={t.form.slugTitle}
                 required
               />
             </label>
             <label className="flex flex-col gap-2 text-sm text-slate-100">
-              名称
+              {t.form.nameLabel}
               <input
                 ref={nameInputRef}
                 className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-slate-50 placeholder:text-slate-200/60 focus:border-emerald-300 focus:outline-none"
                 value={form.name}
                 onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
-                placeholder="如：大学城路"
+                placeholder={t.form.namePlaceholder}
                 required
               />
             </label>
             <label className="flex flex-col gap-2 text-sm text-slate-100">
-              起点
+              {t.form.startLabel}
               <input
                 className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-slate-50 placeholder:text-slate-200/60 focus:border-emerald-300 focus:outline-none"
                 value={form.startPk}
                 onChange={(event) => setForm((prev) => ({ ...prev, startPk: event.target.value }))}
-                placeholder="例：PK0+000 / 交叉口 A"
+                placeholder={t.form.startPlaceholder}
                 required
               />
             </label>
             <label className="flex flex-col gap-2 text-sm text-slate-100">
-              终点
+              {t.form.endLabel}
               <div className="flex items-center gap-2">
                 <input
                   className="w-full rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-slate-50 placeholder:text-slate-200/60 focus:border-emerald-300 focus:outline-none"
@@ -185,7 +200,7 @@ export function RoadBoard({ initialRoads, canManage }: Props) {
                   onChange={(event) =>
                     setForm((prev) => ({ ...prev, endPk: event.target.value }))
                   }
-                  placeholder="例：PK1+940 / 桥头"
+                  placeholder={t.form.endPlaceholder}
                   required
                 />
                 {editingId ? (
@@ -194,7 +209,7 @@ export function RoadBoard({ initialRoads, canManage }: Props) {
                     className="rounded-xl border border-white/20 px-3 py-2 text-xs font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/10"
                     onClick={resetForm}
                   >
-                    退出编辑
+                    {t.form.exitEdit}
                   </button>
                 ) : null}
               </div>
@@ -205,10 +220,10 @@ export function RoadBoard({ initialRoads, canManage }: Props) {
                 disabled={isPending}
                 className="inline-flex items-center justify-center rounded-2xl bg-emerald-300 px-5 py-3 text-sm font-semibold text-slate-900 shadow-lg shadow-emerald-400/30 transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-70"
               >
-                {editingId ? '保存修改' : '添加路段'}
+                {editingId ? t.actions.save : t.actions.add}
               </button>
               {error ? <span className="text-sm text-amber-200">{error}</span> : null}
-              {isPending ? <span className="text-xs text-slate-200/70">正在保存...</span> : null}
+              {isPending ? <span className="text-xs text-slate-200/70">{t.admin.saving}</span> : null}
             </div>
           </form>
         </section>
@@ -216,14 +231,16 @@ export function RoadBoard({ initialRoads, canManage }: Props) {
 
       <section className="space-y-4">
         <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-200">
-          路段总览
+          {t.list.overview}
           <span className="h-px w-12 bg-white/30" />
-          {roads.length === 0 ? '尚未添加' : `共 ${roads.length} 条`}
+          {roads.length === 0
+            ? t.list.none
+            : formatProgressCopy(t.list.count, { count: roads.length })}
         </div>
 
         {roads.length === 0 ? (
           <div className="rounded-3xl border border-dashed border-white/15 bg-white/5 p-6 text-sm text-slate-200/80">
-            暂无路段，先在上方填写“名称 + 起点 + 终点”添加第一条。
+            {t.list.emptyHelp}
           </div>
         ) : (
           <div className="grid gap-4 md:grid-cols-2">
@@ -234,6 +251,7 @@ export function RoadBoard({ initialRoads, canManage }: Props) {
                 onEdit={startEdit}
                 onDelete={handleDelete}
                 canManage={canManage}
+                locale={locale}
               />
             ))}
           </div>
@@ -248,59 +266,67 @@ interface RoadCardProps {
   onEdit: (road: RoadSectionDTO) => void
   onDelete: (id: number) => void
   canManage: boolean
+  locale: Locale
 }
 
 const chipTone = 'rounded-full bg-white/10 px-3 py-1 text-[11px] font-semibold text-slate-100 shadow-inner shadow-slate-900/30'
 
-const RoadCard = ({ road, onEdit, onDelete, canManage }: RoadCardProps) => (
-  <Link
-    href={`/progress/${road.slug}`}
-    className="group block"
-  >
-    <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-white/5 p-5 shadow-xl shadow-slate-950/30 transition duration-150 group-hover:-translate-y-0.5 group-hover:border-white/25">
-      <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-300 via-blue-300 to-cyan-200" />
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-xs text-slate-200/70">路段</p>
-          <h3 className="text-xl font-semibold text-slate-50">{road.name}</h3>
-          <p className="mt-1 text-xs text-slate-200/70">
-            起点 <span className={chipTone}>{road.startPk}</span> · 终点 <span className={chipTone}>{road.endPk}</span>
-          </p>
-          <p className="mt-1 text-[11px] text-emerald-100/80">路由：{road.slug}</p>
-        </div>
-        {canManage ? (
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={(event) => {
-                event.preventDefault()
-                onEdit(road)
-              }}
-              className="rounded-xl border border-white/15 px-3 py-2 text-[11px] font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/10"
-            >
-              编辑
-            </button>
-            <button
-              type="button"
-              onClick={(event) => {
-                event.preventDefault()
-                onDelete(road.id)
-              }}
-              className="rounded-xl border border-white/15 px-3 py-2 text-[11px] font-semibold text-rose-100 transition hover:border-rose-200/60 hover:bg-rose-200/10"
-            >
-              删除
-            </button>
+const RoadCard = ({ road, onEdit, onDelete, canManage, locale }: RoadCardProps) => {
+  const copy = getProgressCopy(locale)
+  return (
+    <Link
+      href={`/progress/${road.slug}`}
+      className="group block"
+    >
+      <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-white/5 p-5 shadow-xl shadow-slate-950/30 transition duration-150 group-hover:-translate-y-0.5 group-hover:border-white/25">
+        <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-300 via-blue-300 to-cyan-200" />
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-xs text-slate-200/70">{copy.card.label}</p>
+            <h3 className="text-xl font-semibold text-slate-50">{resolveRoadName(road, locale)}</h3>
+            <p className="mt-1 text-xs text-slate-200/70">
+              {copy.card.start} <span className={chipTone}>{road.startPk}</span> · {copy.card.end}{' '}
+              <span className={chipTone}>{road.endPk}</span>
+            </p>
+            <p className="mt-1 text-[11px] text-emerald-100/80">
+              {copy.card.slug}：{road.slug}
+            </p>
           </div>
-        ) : null}
+          {canManage ? (
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.preventDefault()
+                  onEdit(road)
+                }}
+                className="rounded-xl border border-white/15 px-3 py-2 text-[11px] font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/10"
+              >
+                {copy.card.edit}
+              </button>
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.preventDefault()
+                  onDelete(road.id)
+                }}
+                className="rounded-xl border border-white/15 px-3 py-2 text-[11px] font-semibold text-rose-100 transition hover:border-rose-200/60 hover:bg-rose-200/10"
+              >
+                {copy.card.delete}
+              </button>
+            </div>
+          ) : null}
+        </div>
+        <div className="mt-4 space-y-2 text-sm text-slate-200/90">
+          <p>{copy.card.workNote}</p>
+          <p className="text-xs text-slate-400">
+            {copy.card.updated}
+            {new Date(road.updatedAt).toLocaleString(locale === 'fr' ? 'fr-FR' : 'zh-CN', {
+              hour12: false,
+            })}
+          </p>
+        </div>
       </div>
-      <div className="mt-4 space-y-2 text-sm text-slate-200/90">
-        <p>
-          分项工程：待进入路段详情后配置。当前仅管理员维护路段范围，后续验收数据会自动驱动进度色带。
-        </p>
-        <p className="text-xs text-slate-400">
-          最近更新：{new Date(road.updatedAt).toLocaleString('zh-CN', { hour12: false })}
-        </p>
-      </div>
-    </div>
-  </Link>
-)
+    </Link>
+  )
+}

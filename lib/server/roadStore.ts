@@ -2,6 +2,7 @@ import { Prisma } from '@prisma/client'
 
 import { prisma } from '@/lib/prisma'
 import type { RoadSectionDTO, RoadSectionPayload } from '@/lib/progressTypes'
+import { resolveRoadLabels } from '@/lib/i18n/roadDictionary'
 
 const normalizeValue = (value: string) => value.trim()
 
@@ -45,6 +46,7 @@ const mapToDTO = (row: {
   id: row.id,
   slug: row.slug,
   name: row.name,
+  labels: resolveRoadLabels({ slug: row.slug, name: row.name }),
   startPk: row.startPk,
   endPk: row.endPk,
   createdAt: row.createdAt.toISOString(),

@@ -1052,182 +1052,195 @@ const submitInspection = async () => {
       </section>
 
       {selectedSegment ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 px-4 py-8 backdrop-blur">
-          <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-slate-950 p-6 shadow-2xl shadow-slate-900/50">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-200">预约报检</p>
-                <h2 className="text-xl font-semibold text-white">{selectedSegment.phase}</h2>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 px-4 py-8 backdrop-blur">
+          <div className="relative w-full max-w-3xl overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-b from-slate-900 to-slate-950 shadow-2xl shadow-slate-900/70">
+            <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-300 via-cyan-300 to-blue-400" />
+            <div className="flex flex-wrap items-start justify-between gap-3 px-6 pt-5">
+              <div className="space-y-2">
+                <div className="flex items-center gap-3">
+                  <span className="inline-flex items-center rounded-full bg-emerald-300/15 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-200 ring-1 ring-emerald-300/40">
+                    预约报检
+                  </span>
+                  <span className="rounded-full bg-white/5 px-3 py-1 text-xs font-semibold text-slate-100 ring-1 ring-white/10">
+                    {selectedSegment.phase}
+                  </span>
+                </div>
+                <div className="flex flex-wrap items-center gap-2 text-xs text-slate-300">
+                  <span className="rounded-full bg-white/5 px-2.5 py-1 font-semibold text-slate-100 ring-1 ring-white/10">
+                    {selectedSegment.sideLabel}
+                  </span>
+                  <span className="rounded-full bg-white/5 px-2.5 py-1 font-semibold text-slate-100 ring-1 ring-white/10">
+                    {formatPK(selectedSegment.start)} → {formatPK(selectedSegment.end)}
+                  </span>
+                </div>
               </div>
               <button
                 type="button"
-                className="rounded-full border border-white/20 px-3 py-1 text-xs font-semibold text-slate-200 hover:border-white/40"
+                className="rounded-full border border-white/20 px-3 py-1 text-xs font-semibold text-slate-200 transition hover:border-white/40 hover:bg-white/5"
                 onClick={() => setSelectedSegment(null)}
               >
                 关闭
               </button>
             </div>
 
-            <div className="mt-4 space-y-3 text-sm text-slate-100">
-              <div className="grid gap-3 md:grid-cols-3">
-                <label className="flex flex-col gap-1">
-                  侧别
-                  <select
-                    className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
-                    value={selectedSide}
-                    onChange={(e) => setSelectedSide(e.target.value as IntervalSide)}
-                  >
-                    <option value="LEFT">左侧</option>
-                    <option value="RIGHT">右侧</option>
-                    <option value="BOTH">双侧</option>
-                  </select>
-                </label>
-                <label className="flex flex-col gap-1">
-                  起点
-                  <input
-                    type="number"
-                    className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
-                    value={startPkInput}
-                    onChange={(e) => setStartPkInput(Number(e.target.value))}
-                    placeholder="输入起点 PK"
-                  />
-                </label>
-                <label className="flex flex-col gap-1">
-                  终点
-                  <input
-                    type="number"
-                    className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
-                    value={endPkInput}
-                    onChange={(e) => setEndPkInput(Number(e.target.value))}
-                    placeholder="输入终点 PK"
-                  />
-                </label>
-              </div>
+            <div className="mt-4 grid gap-4 border-t border-white/5 bg-white/2 px-6 py-6 text-sm text-slate-100 lg:grid-cols-5">
+              <div className="lg:col-span-5 space-y-4">
+                <div className="grid gap-3 md:grid-cols-3">
+                  <label className="flex flex-col gap-1 text-xs text-slate-200">
+                    <span className="font-semibold">侧别</span>
+                    <select
+                      className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 shadow-inner shadow-slate-900/40 focus:border-emerald-300 focus:outline-none"
+                      value={selectedSide}
+                      onChange={(e) => setSelectedSide(e.target.value as IntervalSide)}
+                    >
+                      <option value="LEFT">左侧</option>
+                      <option value="RIGHT">右侧</option>
+                      <option value="BOTH">双侧</option>
+                    </select>
+                  </label>
+                  <label className="flex flex-col gap-1 text-xs text-slate-200">
+                    <span className="font-semibold">起点</span>
+                    <input
+                      type="number"
+                      className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 shadow-inner shadow-slate-900/40 focus:border-emerald-300 focus:outline-none"
+                      value={startPkInput}
+                      onChange={(e) => setStartPkInput(Number(e.target.value))}
+                      placeholder="输入起点 PK"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1 text-xs text-slate-200">
+                    <span className="font-semibold">终点</span>
+                    <input
+                      type="number"
+                      className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 shadow-inner shadow-slate-900/40 focus:border-emerald-300 focus:outline-none"
+                      value={endPkInput}
+                      onChange={(e) => setEndPkInput(Number(e.target.value))}
+                      placeholder="输入终点 PK"
+                    />
+                  </label>
+                </div>
 
-              <div className="space-y-1">
-                <p className="text-xs font-semibold text-slate-200">层次（多选）</p>
-                {selectedSegment.layers.length === 0 ? (
-                  <p className="text-[11px] text-amber-200">暂无层次，请先在分项维护中添加。</p>
-                ) : (
+                <div className="space-y-2 rounded-2xl border border-white/10 bg-white/5 p-4 shadow-inner shadow-slate-900/30">
+                  <p className="text-xs font-semibold text-slate-200">层次（多选）</p>
+                  {selectedSegment.layers.length === 0 ? (
+                    <p className="text-[11px] text-amber-200">暂无层次，请先在分项维护中添加。</p>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      {selectedSegment.layers.map((item) => (
+                        <button
+                          key={item}
+                          type="button"
+                          className={`rounded-full px-3 py-1 text-[11px] font-semibold transition ${
+                            selectedLayers.includes(item)
+                              ? 'bg-emerald-300 text-slate-900 shadow shadow-emerald-300/40'
+                              : 'bg-white/10 text-slate-100 hover:bg-white/15'
+                          }`}
+                          onClick={() => toggleToken(item, selectedLayers, setSelectedLayers)}
+                        >
+                          {item}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-2 rounded-2xl border border-white/10 bg-white/5 p-4 shadow-inner shadow-slate-900/30">
+                  <p className="text-xs font-semibold text-slate-200">验收内容（多选，可临时添加）</p>
+                  {selectedSegment.checks.length === 0 ? (
+                    <p className="text-[11px] text-amber-200">暂无验收内容，请在分项维护中添加或临时新增。</p>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      {selectedSegment.checks.map((item) => (
+                        <button
+                          key={item}
+                          type="button"
+                          className={`rounded-full px-3 py-1 text-[11px] font-semibold transition ${
+                            selectedChecks.includes(item)
+                              ? 'bg-emerald-300 text-slate-900 shadow shadow-emerald-300/40'
+                              : 'bg-white/10 text-slate-100 hover:bg-white/15'
+                          }`}
+                          onClick={() => toggleToken(item, selectedChecks, setSelectedChecks)}
+                        >
+                          {item}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2">
+                    <input
+                      className="w-full rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-200/60 shadow-inner shadow-slate-900/40 focus:border-emerald-300 focus:outline-none"
+                      placeholder="临时新增验收内容"
+                      value={inspectionCheckInput}
+                      onChange={(e) => setInspectionCheckInput(e.target.value)}
+                    />
+                    <button
+                      type="button"
+                      className="rounded-xl border border-white/20 px-3 py-2 text-[11px] font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/10"
+                      onClick={() => {
+                        if (inspectionCheckInput.trim()) {
+                          const value = inspectionCheckInput.trim()
+                          if (!selectedChecks.includes(value)) {
+                            setSelectedChecks((prev) => [...prev, value])
+                          }
+                          setInspectionCheckInput('')
+                        }
+                      }}
+                    >
+                      添加
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-2 rounded-2xl border border-white/10 bg-white/5 p-4 shadow-inner shadow-slate-900/30">
+                  <p className="text-xs font-semibold text-slate-200">验收类型（多选）</p>
                   <div className="flex flex-wrap gap-2">
-                    {selectedSegment.layers.map((item) => (
+                    {inspectionTypes.map((item) => (
                       <button
                         key={item}
                         type="button"
-                        className={`rounded-full px-3 py-1 text-[11px] font-semibold ${
-                          selectedLayers.includes(item)
-                            ? 'bg-emerald-300 text-slate-900'
-                            : 'bg-white/10 text-slate-100'
+                        className={`rounded-full px-3 py-1 text-[11px] font-semibold transition ${
+                          selectedTypes.includes(item)
+                            ? 'bg-emerald-300 text-slate-900 shadow shadow-emerald-300/40'
+                            : 'bg-white/10 text-slate-100 hover:bg-white/15'
                         }`}
-                        onClick={() => toggleToken(item, selectedLayers, setSelectedLayers)}
+                        onClick={() => toggleToken(item, selectedTypes, setSelectedTypes)}
                       >
                         {item}
                       </button>
                     ))}
                   </div>
-                )}
+                </div>
               </div>
+            </div>
 
-              <div className="space-y-1">
-                <p className="text-xs font-semibold text-slate-200">验收内容（多选，可临时添加）</p>
-                {selectedSegment.checks.length === 0 ? (
-                  <p className="text-[11px] text-amber-200">暂无验收内容，请在分项维护中添加或临时新增。</p>
-                ) : (
-                  <div className="flex flex-wrap gap-2">
-                    {selectedSegment.checks.map((item) => (
-                      <button
-                        key={item}
-                        type="button"
-                        className={`rounded-full px-3 py-1 text-[11px] font-semibold ${
-                          selectedChecks.includes(item)
-                            ? 'bg-emerald-300 text-slate-900'
-                            : 'bg-white/10 text-slate-100'
-                        }`}
-                        onClick={() => toggleToken(item, selectedChecks, setSelectedChecks)}
-                      >
-                        {item}
-                      </button>
-                    ))}
-                  </div>
-                )}
-                <div className="flex items-center gap-2">
-                  <input
-                    className="w-full rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-200/60 focus:border-emerald-300 focus:outline-none"
-                    placeholder="临时新增验收内容"
-                    value={inspectionCheckInput}
-                    onChange={(e) => setInspectionCheckInput(e.target.value)}
-                  />
+            <div className="border-t border-white/10 bg-slate-900/60 px-6 py-5">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-[11px] text-slate-300">
+                  {submitError
+                    ? submitError
+                    : '提示：若区间与侧别与上方段落一致，可直接提交；否则请修改起讫点或侧别。'}
+                </p>
+                <div className="grid w-full gap-3 sm:w-auto sm:min-w-[320px] sm:grid-cols-2">
                   <button
                     type="button"
-                    className="rounded-xl border border-white/20 px-3 py-2 text-[11px] font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/10"
+                    className="w-full rounded-2xl border border-white/20 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/40 hover:bg-white/5"
                     onClick={() => {
-                      if (inspectionCheckInput.trim()) {
-                        const value = inspectionCheckInput.trim()
-                        if (!selectedChecks.includes(value)) {
-                          setSelectedChecks((prev) => [...prev, value])
-                        }
-                        setInspectionCheckInput('')
-                      }
+                      setSelectedSegment(null)
+                      resetInspectionForm()
                     }}
                   >
-                    添加
+                    取消
+                  </button>
+                  <button
+                    type="button"
+                    className="w-full rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-slate-900 shadow-lg shadow-emerald-400/25 transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+                    disabled={submitPending}
+                    onClick={submitInspection}
+                  >
+                    {submitPending ? '提交中...' : '提交报检'}
                   </button>
                 </div>
               </div>
-
-              <div className="space-y-1">
-                <p className="text-xs font-semibold text-slate-200">验收类型（多选）</p>
-                <div className="flex flex-wrap gap-2">
-                  {inspectionTypes.map((item) => (
-                    <button
-                      key={item}
-                      type="button"
-                      className={`rounded-full px-3 py-1 text-[11px] font-semibold ${
-                        selectedTypes.includes(item)
-                          ? 'bg-emerald-300 text-slate-900'
-                          : 'bg-white/10 text-slate-100'
-                      }`}
-                      onClick={() => toggleToken(item, selectedTypes, setSelectedTypes)}
-                    >
-                      {item}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <p className="text-xs font-semibold text-slate-200">备注（可选）</p>
-                <textarea
-                  className="mt-1 w-full rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-200/60 focus:border-emerald-300 focus:outline-none"
-                  rows={3}
-                  value={remark}
-                  onChange={(e) => setRemark(e.target.value)}
-                  placeholder="位置、作业面、机具、试件编号等"
-                />
-              </div>
-
-              {submitError ? <p className="text-xs text-amber-300">{submitError}</p> : null}
-            </div>
-
-            <div className="mt-6 flex justify-end gap-3">
-              <button
-                type="button"
-                className="rounded-full border border-white/20 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-white/40 hover:bg-white/5"
-                onClick={() => {
-                  setSelectedSegment(null)
-                  resetInspectionForm()
-                }}
-              >
-                取消
-              </button>
-              <button
-                type="button"
-                className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-900 shadow-lg shadow-emerald-400/25 transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
-                disabled={submitPending}
-                onClick={submitInspection}
-              >
-                {submitPending ? '提交中...' : '提交报检'}
-              </button>
             </div>
           </div>
         </div>
