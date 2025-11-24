@@ -72,11 +72,11 @@ const computeDesign = (measure: PhaseMeasure, intervals: PhaseIntervalPayload[])
         return sum + base * factor
       }, 0)
 
-const normalizeInterval = (interval: PhaseIntervalPayload) => {
+const normalizeInterval = (interval: PhaseIntervalPayload, measure: PhaseMeasure) => {
   const start = Number(interval.startPk)
   const end = Number(interval.endPk)
   const safeStart = Number.isFinite(start) ? start : 0
-  const safeEnd = Number.isFinite(end) ? end : safeStart
+  const safeEnd = measure === 'POINT' ? safeStart : Number.isFinite(end) ? end : safeStart
   const [orderedStart, orderedEnd] = safeStart <= safeEnd ? [safeStart, safeEnd] : [safeEnd, safeStart]
   return {
     startPk: orderedStart,
