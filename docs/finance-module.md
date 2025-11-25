@@ -23,6 +23,23 @@
 - Future list view: sortable table with filters by project, category, payment type, date range.
 - Editing: inline row edit or drawer; deletion requires confirm dialog.
 
+## Cost Categories (大类/小类)
+- UI: 单列树状选择器，按层级展开/折叠后逐级点选，支持键盘导航与搜索，后续也可作为列表筛选器使用。
+- Data source: `lib/data/finance-cost-categories.json` stores the hierarchy with stable ASCII `key` + Chinese `label.zh` + optional `code`（原始编号）。后续多语言可在同文件补充 `label.en`、`label.fr` 等或在 i18n 资源中用 `key` 做查找。
+- Storage: finance records存所选叶子节点的 `categoryKey`，同时持久化 `parentKeys` 数组（从根到父节点的 key）便于快速还原路径/面包屑；前端仍可用树数据按 key 反查父链，用于筛选标签或详情展示。
+- Notes: 原始清单中“分包工程费”含两个“其他分包”条目，分别保留为 `other-subcontract-a` 与 `other-subcontract-b` 以确保 key 唯一。
+
+## 权限等级（仅财务模块）
+- `finance:view`（查看）：可进入财务列表，查看记录与分类树。
+- `finance:edit`（编辑）：具备查看权限，且可新增/修改/查询/软删除财务记录（软删通过布尔+时间戳标记，不物理删除）。
+- `finance:manage`（管理）：具备编辑权限，且可维护财务主数据：项目 Project 新增/删/改/查，事项分类树维护，金额单位维护，支付方式维护。
+
+## 主数据（字典）
+- 项目（Project）：独立于道路，初始 5 个——邦杜库市政路项目、邦杜库边境路项目、邦杜库供料项目、铁布高速项目、阿比让办事处；字段含 `id`、`name`、`code`（可选）、`isActive`、`createdAt`、`updatedAt`。
+- 金额单位：默认包含“西法”“美金”“人民币”，支持管理权限下增删改查，字段含 `id`、`name`、`symbol?`、`isActive`、`sortOrder`。
+- 支付方式：默认包含“现金”“现金支票”“转账支票”“办事处代付”“无票据支出”，可被管理权限维护，字段含 `id`、`name`、`isActive`、`sortOrder`。
+- 财务分类树：来源于 `lib/data/finance-cost-categories.json`，管理权限下允许增删改查节点，需保证 `key` 唯一且稳定；若启用多语言可追加 `label.en` 等。
+
 ## Open Questions
 - Do we need multi-currency support or exchange rates?
 - Should `amount` store tax-exclusive or tax-inclusive values (current plan assumes tax-inclusive with explicit `tva`)?

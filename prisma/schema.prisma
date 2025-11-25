@@ -191,6 +191,8 @@ model User {
   passwordHash String
   roles        UserRole[]
   inspectionRequests InspectionRequest[]
+  createdFinances FinanceEntry[] @relation("FinanceEntryCreator")
+  deletedFinances FinanceEntry[] @relation("FinanceEntryDeleter")
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 }
@@ -211,4 +213,84 @@ model UserRole {
   role   Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
 
   @@id([userId, roleId])
+}
+
+model Project {
+  id        Int       @id @default(autoincrement())
+  name      String    @unique
+  code      String?   @unique
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  finances  FinanceEntry[]
+}
+
+model FinanceUnit {
+  id        Int       @id @default(autoincrement())
+  name      String    @unique
+  symbol    String?
+  isActive  Boolean   @default(true)
+  sortOrder Int       @default(0)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  finances  FinanceEntry[]
+}
+
+model PaymentType {
+  id        Int       @id @default(autoincrement())
+  name      String    @unique
+  isActive  Boolean   @default(true)
+  sortOrder Int       @default(0)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  finances  FinanceEntry[]
+}
+
+model FinanceCategory {
+  key       String   @id
+  parentKey String?
+  labelZh   String
+  labelEn   String?
+  labelFr   String?
+  code      String?
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  children  FinanceCategory[] @relation("FinanceCategoryToFinanceCategory")
+  parent    FinanceCategory?  @relation("FinanceCategoryToFinanceCategory", fields: [parentKey], references: [key])
+  finances  FinanceEntry[]
+}
+
+model FinanceEntry {
+  id            Int            @id @default(autoincrement())
+  sequence      Int            @default(autoincrement())
+  projectId     Int
+  reason        String
+  categoryKey   String
+  parentKeys    String[]       @default([])
+  amount        Decimal        @db.Decimal(18, 2)
+  unitId        Int
+  paymentTypeId Int
+  paymentDate   DateTime
+  tva           Decimal?       @db.Decimal(18, 2)
+  remark        String?
+  isDeleted     Boolean        @default(false)
+  deletedAt     DateTime?
+  deletedBy     Int?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  createdBy     Int?
+  project       Project        @relation(fields: [projectId], references: [id])
+  category      FinanceCategory @relation(fields: [categoryKey], references: [key])
+  unit          FinanceUnit    @relation(fields: [unitId], references: [id])
+  paymentType   PaymentType    @relation(fields: [paymentTypeId], references: [id])
+  creator       User?          @relation("FinanceEntryCreator", fields: [createdBy], references: [id])
+  deleter       User?          @relation("FinanceEntryDeleter", fields: [deletedBy], references: [id])
+
+  @@unique([sequence])
+  @@index([projectId])
+  @@index([categoryKey])
+  @@index([paymentDate])
+  @@index([isDeleted])
 }

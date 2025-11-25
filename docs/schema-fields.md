@@ -207,6 +207,35 @@
 
 > 继承与覆盖规则：路段下新建分项实例时选择一个模板，初始层次/验收内容取模板默认值；实例可新增/删除候选，保存后 `layerIds`/`checkIds` 记录实例实际选中的定义集合。报检弹窗展示与提交时使用 `resolvedLayers`/`resolvedChecks`。
 
+## 财务记账字段（FinanceEntry）
+
+- **用途**：记录项目级财务流水，分类依赖 `lib/data/finance-cost-categories.json` 的树状分类。
+- **字段**
+     0. `id`：唯一标识（UUID）。
+     1. `sequence`：自增流水号，按创建顺序生成。
+     2. `projectId`：关联项目（必填，独立于道路 `RoadSection`，用于在同一系统下管理不同项目的财务，不与道路进度绑定）。
+     3. `reason`：事由（文本，必填）。
+     4. `categoryKey`：所选分类叶子节点的 key（必填，对应分类树的 `key`）。
+     5. `parentKeys`：字符串数组，从根到父节点的 key，便于快速还原路径/面包屑与筛选（保存时写入）。
+     6. `amount`：金额（decimal，必填）。
+     7. `unitId`：关联金额单位字典（必填，可维护列表，初始包含“西法”“美金”“人民币”）。
+     8. `paymentTypeId`：关联支付方式字典（必填，可维护列表，初始包含“现金”“现金支票”“转账支票”“办事处代付”“无票据支出”）。
+     9. `paymentDate`：支付日期（日期，必填）。
+    10. `tva`：税费（decimal，可空，默认为 0）。
+    11. `remark`：备注（可空）。
+    12. `isDeleted`：布尔，软删标记，默认 `false`。
+    13. `deletedAt`：软删时间（可空）。
+    14. `deletedBy`：关联 User（可空，软删操作者）。
+    15. `createdAt` / `updatedAt`：时间戳。
+    16. `createdBy`：关联 User（记录填报人）。
+
+## 财务主数据
+
+- **Project（财务项目）**：`id`、`name`、`code?`、`isActive`、`createdAt`、`updatedAt`；初始 5 个项目：邦杜库市政路项目、邦杜库边境路项目、邦杜库供料项目、铁布高速项目、阿比让办事处。
+- **FinanceUnit（金额单位）**：`id`、`name`、`symbol?`、`isActive`、`sortOrder`、`createdAt`、`updatedAt`；默认包含“西法”“美金”“人民币”。
+- **PaymentType（支付方式）**：`id`、`name`、`isActive`、`sortOrder`、`createdAt`、`updatedAt`；默认包含“现金”“现金支票”“转账支票”“办事处代付”“无票据支出”。
+- **FinanceCategory（分类树）**：存储自定义/扩展后的财务分类节点，字段含 `key`（唯一）、`parentKey`、`label.zh`、`label.en?`、`label.fr?`、`code?`、`isActive`、`sortOrder`、`createdAt`、`updatedAt`。
+
 ## 权限与账户模型
 
 - **Permission**：`code`（唯一标识，如 `road:manage`、`report:edit`）、`name`、`createdAt`、`updatedAt`。

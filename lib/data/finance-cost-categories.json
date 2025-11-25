@@ -1,0 +1,957 @@
+[
+  {
+    "key": "construction-installation",
+    "code": "1",
+    "label": {
+      "zh": "建筑安装工程费"
+    },
+    "children": [
+      {
+        "key": "direct-costs",
+        "code": "1.1",
+        "label": {
+          "zh": "直接费"
+        },
+        "children": [
+          {
+            "key": "labor-costs",
+            "code": "1.1.1",
+            "label": {
+              "zh": "人工费"
+            },
+            "children": [
+              {
+                "key": "local-staff",
+                "code": "1.1.1.1",
+                "label": {
+                  "zh": "当地员工费用"
+                }
+              },
+              {
+                "key": "other-labor",
+                "code": "1.1.1.2",
+                "label": {
+                  "zh": "其他人工费"
+                }
+              }
+            ]
+          },
+          {
+            "key": "material-costs",
+            "code": "1.1.2",
+            "label": {
+              "zh": "材料费"
+            },
+            "children": [
+              {
+                "key": "engineering-materials",
+                "code": "1.1.2.1",
+                "label": {
+                  "zh": "工程材料"
+                },
+                "children": [
+                  {
+                    "key": "steel",
+                    "code": "1.1.2.1.1",
+                    "label": {
+                      "zh": "钢材"
+                    }
+                  },
+                  {
+                    "key": "bulk-cement",
+                    "code": "1.1.2.1.2",
+                    "label": {
+                      "zh": "散装水泥"
+                    }
+                  },
+                  {
+                    "key": "bagged-cement",
+                    "code": "1.1.2.1.3",
+                    "label": {
+                      "zh": "袋装水泥"
+                    }
+                  },
+                  {
+                    "key": "cement-products",
+                    "code": "1.1.2.1.4",
+                    "label": {
+                      "zh": "水泥制品"
+                    }
+                  },
+                  {
+                    "key": "asphalt-30-50",
+                    "code": "1.1.2.1.5",
+                    "label": {
+                      "zh": "30-50沥青"
+                    }
+                  },
+                  {
+                    "key": "prime-coat-asphalt",
+                    "code": "1.1.2.1.6",
+                    "label": {
+                      "zh": "透层油沥青"
+                    }
+                  },
+                  {
+                    "key": "tack-coat-asphalt",
+                    "code": "1.1.2.1.7",
+                    "label": {
+                      "zh": "粘层油沥青"
+                    }
+                  },
+                  {
+                    "key": "asphalt-additives",
+                    "code": "1.1.2.1.8",
+                    "label": {
+                      "zh": "沥青添加剂"
+                    }
+                  },
+                  {
+                    "key": "concrete-additives",
+                    "code": "1.1.2.1.9",
+                    "label": {
+                      "zh": "混凝土添加剂"
+                    }
+                  },
+                  {
+                    "key": "sand-stone-for-concrete",
+                    "code": "1.1.2.1.10",
+                    "label": {
+                      "zh": "沙石料（用于砼）"
+                    }
+                  },
+                  {
+                    "key": "gb-aggregate",
+                    "code": "1.1.2.1.11",
+                    "label": {
+                      "zh": "GB层骨料"
+                    }
+                  },
+                  {
+                    "key": "bb-aggregate",
+                    "code": "1.1.2.1.12",
+                    "label": {
+                      "zh": "BB层骨料"
+                    }
+                  },
+                  {
+                    "key": "gnt-aggregate",
+                    "code": "1.1.2.1.13",
+                    "label": {
+                      "zh": "碎石统料（GNT)"
+                    }
+                  },
+                  {
+                    "key": "other-engineering-materials",
+                    "code": "1.1.2.1.14",
+                    "label": {
+                      "zh": "其他"
+                    }
+                  }
+                ]
+              },
+              {
+                "key": "turnover-materials",
+                "code": "1.1.2.2",
+                "label": {
+                  "zh": "周转材料"
+                },
+                "children": [
+                  {
+                    "key": "formwork",
+                    "code": "1.1.2.2.1",
+                    "label": {
+                      "zh": "模板"
+                    }
+                  },
+                  {
+                    "key": "scaffolding-and-fittings",
+                    "code": "1.1.2.2.2",
+                    "label": {
+                      "zh": "脚手架、扣件、顶托等"
+                    }
+                  },
+                  {
+                    "key": "lumber",
+                    "code": "1.1.2.2.3",
+                    "label": {
+                      "zh": "木材"
+                    }
+                  },
+                  {
+                    "key": "hardware-tools",
+                    "code": "1.1.2.2.4",
+                    "label": {
+                      "zh": "五金工具"
+                    }
+                  },
+                  {
+                    "key": "electrical-supplies",
+                    "code": "1.1.2.2.5",
+                    "label": {
+                      "zh": "五金电料"
+                    }
+                  },
+                  {
+                    "key": "small-machinery",
+                    "code": "1.1.2.2.6",
+                    "label": {
+                      "zh": "小型机具"
+                    }
+                  },
+                  {
+                    "key": "other-turnover-materials",
+                    "code": "1.1.2.2.7",
+                    "label": {
+                      "zh": "其他"
+                    }
+                  }
+                ]
+              },
+              {
+                "key": "auxiliary-project-materials",
+                "code": "1.1.2.3",
+                "label": {
+                  "zh": "附属工程材料"
+                },
+                "children": [
+                  {
+                    "key": "lighting",
+                    "code": "1.1.2.3.1",
+                    "label": {
+                      "zh": "照明"
+                    }
+                  },
+                  {
+                    "key": "toll-station",
+                    "code": "1.1.2.3.2",
+                    "label": {
+                      "zh": "收费站"
+                    }
+                  },
+                  {
+                    "key": "geotextile-waterproof",
+                    "code": "1.1.2.3.3",
+                    "label": {
+                      "zh": "土工布、防水材料"
+                    }
+                  },
+                  {
+                    "key": "pavement-markings",
+                    "code": "1.1.2.3.4",
+                    "label": {
+                      "zh": "路面标线漆/油漆/玻璃珠"
+                    }
+                  },
+                  {
+                    "key": "signage",
+                    "code": "1.1.2.3.5",
+                    "label": {
+                      "zh": "标志标牌"
+                    }
+                  },
+                  {
+                    "key": "s7-guardrail",
+                    "code": "1.1.2.3.6",
+                    "label": {
+                      "zh": "S7护栏"
+                    }
+                  },
+                  {
+                    "key": "wave-guardrail",
+                    "code": "1.1.2.3.7",
+                    "label": {
+                      "zh": "波形护栏"
+                    }
+                  },
+                  {
+                    "key": "rubber-bearings",
+                    "code": "1.1.2.3.8",
+                    "label": {
+                      "zh": "板式橡胶支座"
+                    }
+                  },
+                  {
+                    "key": "bridge-expansion-joints",
+                    "code": "1.1.2.3.9",
+                    "label": {
+                      "zh": "桥梁路面接缝（伸缩缝）"
+                    }
+                  },
+                  {
+                    "key": "metal-mesh-wall",
+                    "code": "1.1.2.3.10",
+                    "label": {
+                      "zh": "金属网墙"
+                    }
+                  },
+                  {
+                    "key": "fabric-and-tarpaulin",
+                    "code": "1.1.2.3.11",
+                    "label": {
+                      "zh": "布、篷布、雨布"
+                    }
+                  },
+                  {
+                    "key": "pvc-pipe",
+                    "code": "1.1.2.3.12",
+                    "label": {
+                      "zh": "PVC管"
+                    }
+                  },
+                  {
+                    "key": "grass-seed",
+                    "code": "1.1.2.3.13",
+                    "label": {
+                      "zh": "草籽"
+                    }
+                  },
+                  {
+                    "key": "other-auxiliary-materials",
+                    "code": "1.1.2.3.14",
+                    "label": {
+                      "zh": "其他"
+                    }
+                  }
+                ]
+              },
+              {
+                "key": "explosive-materials",
+                "code": "1.1.2.4",
+                "label": {
+                  "zh": "火工材料"
+                },
+                "children": [
+                  {
+                    "key": "ammonium-nitrate-explosives",
+                    "code": "1.1.2.4.1",
+                    "label": {
+                      "zh": "硝铵炸药"
+                    }
+                  },
+                  {
+                    "key": "emulsion-explosives",
+                    "code": "1.1.2.4.2",
+                    "label": {
+                      "zh": "乳化炸药"
+                    }
+                  },
+                  {
+                    "key": "diesel",
+                    "code": "1.1.2.4.3",
+                    "label": {
+                      "zh": "柴油"
+                    }
+                  },
+                  {
+                    "key": "other-explosive-materials",
+                    "code": "1.1.2.4.4",
+                    "label": {
+                      "zh": "其他"
+                    }
+                  },
+                  {
+                    "key": "blasting-fee",
+                    "code": "1.1.2.4.5",
+                    "label": {
+                      "zh": "爆破费用"
+                    }
+                  }
+                ]
+              },
+              {
+                "key": "other-material-transport-fees",
+                "code": "1.1.2.5",
+                "label": {
+                  "zh": "其他材料机械运输费等基财务缴纳的相关其他费用"
+                },
+                "children": [
+                  {
+                    "key": "customs-duty",
+                    "code": "1.1.2.5.1",
+                    "label": {
+                      "zh": "关税"
+                    }
+                  },
+                  {
+                    "key": "customs-clearance-fee",
+                    "code": "1.1.2.5.2",
+                    "label": {
+                      "zh": "清关代理费、清关费"
+                    }
+                  },
+                  {
+                    "key": "customs-storage-fee",
+                    "code": "1.1.2.5.3",
+                    "label": {
+                      "zh": "海关仓储费用"
+                    }
+                  },
+                  {
+                    "key": "freight-and-insurance",
+                    "code": "1.1.2.5.4",
+                    "label": {
+                      "zh": "运费、运输保险费"
+                    }
+                  },
+                  {
+                    "key": "other-transport-related-fees",
+                    "code": "1.1.2.5.5",
+                    "label": {
+                      "zh": "其他费用"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "key": "equipment-usage-fees",
+            "code": "1.1.3",
+            "label": {
+              "zh": "施工机具使用费"
+            },
+            "children": [
+              {
+                "key": "equipment-depreciation",
+                "code": "1.1.3.1",
+                "label": {
+                  "zh": "设备折旧费"
+                }
+              },
+              {
+                "key": "equipment-repair",
+                "code": "1.1.3.2",
+                "label": {
+                  "zh": "设备修理费"
+                }
+              },
+              {
+                "key": "equipment-power",
+                "code": "1.1.3.3",
+                "label": {
+                  "zh": "设备动力费"
+                }
+              },
+              {
+                "key": "equipment-labor",
+                "code": "1.1.3.4",
+                "label": {
+                  "zh": "设备人工费"
+                }
+              },
+              {
+                "key": "equipment-leasing",
+                "code": "1.1.3.5",
+                "label": {
+                  "zh": "设备租赁费"
+                }
+              },
+              {
+                "key": "equipment-insurance",
+                "code": "1.1.3.6",
+                "label": {
+                  "zh": "设备保险"
+                }
+              },
+              {
+                "key": "other-equipment-usage",
+                "code": "1.1.3.7",
+                "label": {
+                  "zh": "其他"
+                }
+              }
+            ]
+          },
+          {
+            "key": "subcontract-fees",
+            "code": "1.1.4",
+            "label": {
+              "zh": "分包工程费"
+            },
+            "children": [
+              {
+                "key": "design-subcontract",
+                "code": "1.1.4.1",
+                "label": {
+                  "zh": "设计分包"
+                }
+              },
+              {
+                "key": "traffic-safety-subcontract",
+                "code": "1.1.4.2",
+                "label": {
+                  "zh": "交安分包"
+                }
+              },
+              {
+                "key": "lighting-subcontract",
+                "code": "1.1.4.3",
+                "label": {
+                  "zh": "照明分包"
+                }
+              },
+              {
+                "key": "other-subcontract-a",
+                "code": "1.1.4.4",
+                "label": {
+                  "zh": "其他分包"
+                }
+              },
+              {
+                "key": "ong-subcontract",
+                "code": "1.1.4.5",
+                "label": {
+                  "zh": "ONG分包"
+                }
+              },
+              {
+                "key": "other-subcontract-b",
+                "code": "1.1.4.6",
+                "label": {
+                  "zh": "其他分包"
+                }
+              }
+            ]
+          },
+          {
+            "key": "other-engineering-fees",
+            "code": "1.1.5",
+            "label": {
+              "zh": "其他工程费"
+            },
+            "children": [
+              {
+                "key": "rainy-season-cost",
+                "code": "1.1.5.1",
+                "label": {
+                  "zh": "雨季施工增加费"
+                }
+              },
+              {
+                "key": "safety-and-civilized-construction",
+                "code": "1.1.5.2",
+                "label": {
+                  "zh": "安全文明施工费"
+                }
+              },
+              {
+                "key": "night-construction",
+                "code": "1.1.5.3",
+                "label": {
+                  "zh": "夜间施工增加费"
+                }
+              },
+              {
+                "key": "temporary-facilities",
+                "code": "1.1.5.4",
+                "label": {
+                  "zh": "临时建设及设施费"
+                }
+              },
+              {
+                "key": "temporary-works",
+                "code": "1.1.5.5",
+                "label": {
+                  "zh": "临时工程费"
+                }
+              },
+              {
+                "key": "equipment-mobilization",
+                "code": "1.1.5.6",
+                "label": {
+                  "zh": "设备调遣费"
+                }
+              },
+              {
+                "key": "engineering-insurance",
+                "code": "1.1.5.7",
+                "label": {
+                  "zh": "工程保险费"
+                }
+              },
+              {
+                "key": "agency-consulting",
+                "code": "1.1.5.8",
+                "label": {
+                  "zh": "代理咨询费"
+                }
+              },
+              {
+                "key": "other-engineering-other",
+                "code": "1.1.5.9",
+                "label": {
+                  "zh": "其他"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "key": "indirect-costs",
+        "code": "1.2",
+        "label": {
+          "zh": "间接费"
+        },
+        "children": [
+          {
+            "key": "corporate-management-fees",
+            "code": "1.2.1",
+            "label": {
+              "zh": "企业管理费"
+            },
+            "children": [
+              {
+                "key": "basic-expenses",
+                "code": "1.2.1.1",
+                "label": {
+                  "zh": "基本费用"
+                },
+                "children": [
+                  {
+                    "key": "management-salary",
+                    "code": "1.2.1.1.1",
+                    "label": {
+                      "zh": "管理人员工资"
+                    }
+                  },
+                  {
+                    "key": "office-expense",
+                    "code": "1.2.1.1.2",
+                    "label": {
+                      "zh": "办公费"
+                    }
+                  },
+                  {
+                    "key": "communication-fee",
+                    "code": "1.2.1.1.3",
+                    "label": {
+                      "zh": "通讯费、网费、电视费"
+                    }
+                  },
+                  {
+                    "key": "culture-recreation",
+                    "code": "1.2.1.1.4",
+                    "label": {
+                      "zh": "文体（娱乐等）"
+                    }
+                  },
+                  {
+                    "key": "travel-expense",
+                    "code": "1.2.1.1.5",
+                    "label": {
+                      "zh": "差旅费"
+                    }
+                  },
+                  {
+                    "key": "tools-usage",
+                    "code": "1.2.1.1.6",
+                    "label": {
+                      "zh": "工具用具使用费"
+                    }
+                  },
+                  {
+                    "key": "lab-consumables",
+                    "code": "1.2.1.1.7",
+                    "label": {
+                      "zh": "实验耗材采购费"
+                    }
+                  },
+                  {
+                    "key": "staff-education",
+                    "code": "1.2.1.1.8",
+                    "label": {
+                      "zh": "职工教育经费"
+                    }
+                  },
+                  {
+                    "key": "logistics-vehicle",
+                    "code": "1.2.1.1.9",
+                    "label": {
+                      "zh": "后勤车辆使用费"
+                    }
+                  },
+                  {
+                    "key": "daily-necessities",
+                    "code": "1.2.1.1.10",
+                    "label": {
+                      "zh": "生活用品采购费"
+                    }
+                  },
+                  {
+                    "key": "meals",
+                    "code": "1.2.1.1.11",
+                    "label": {
+                      "zh": "伙食费"
+                    }
+                  },
+                  {
+                    "key": "medical-fee",
+                    "code": "1.2.1.1.12",
+                    "label": {
+                      "zh": "医疗费"
+                    }
+                  },
+                  {
+                    "key": "utilities",
+                    "code": "1.2.1.1.13",
+                    "label": {
+                      "zh": "水电费"
+                    }
+                  },
+                  {
+                    "key": "external-liaison",
+                    "code": "1.2.1.1.14",
+                    "label": {
+                      "zh": "外联费用"
+                    }
+                  },
+                  {
+                    "key": "land-acquisition",
+                    "code": "1.2.1.1.15",
+                    "label": {
+                      "zh": "征地费用"
+                    }
+                  },
+                  {
+                    "key": "camp-land-purchase",
+                    "code": "1.2.1.1.16",
+                    "label": {
+                      "zh": "营地购地费用"
+                    }
+                  },
+                  {
+                    "key": "camp-rental",
+                    "code": "1.2.1.1.17",
+                    "label": {
+                      "zh": "营地租赁费用"
+                    }
+                  },
+                  {
+                    "key": "camp-maintenance",
+                    "code": "1.2.1.1.18",
+                    "label": {
+                      "zh": "营地维护费"
+                    }
+                  },
+                  {
+                    "key": "staff-benefits",
+                    "code": "1.2.1.1.19",
+                    "label": {
+                      "zh": "职工福利费"
+                    }
+                  },
+                  {
+                    "key": "litigation",
+                    "code": "1.2.1.1.20",
+                    "label": {
+                      "zh": "诉讼相关费用"
+                    }
+                  },
+                  {
+                    "key": "other-basic-expense",
+                    "code": "1.2.1.1.21",
+                    "label": {
+                      "zh": "其他"
+                    }
+                  }
+                ]
+              },
+              {
+                "key": "home-leave-travel",
+                "code": "1.2.1.2",
+                "label": {
+                  "zh": "职工探亲路费"
+                },
+                "children": [
+                  {
+                    "key": "home-leave-travel-detail",
+                    "code": "1.2.1.2.1",
+                    "label": {
+                      "zh": "职工探亲路费"
+                    }
+                  }
+                ]
+              },
+              {
+                "key": "finance-fee",
+                "code": "1.2.1.3",
+                "label": {
+                  "zh": "财务费"
+                },
+                "children": [
+                  {
+                    "key": "finance-expenses",
+                    "code": "1.2.1.3.1",
+                    "label": {
+                      "zh": "财务费用"
+                    }
+                  }
+                ]
+              },
+              {
+                "key": "supervision-and-owner-fee",
+                "code": "1.2.1.4",
+                "label": {
+                  "zh": "监理、业主费用"
+                },
+                "children": [
+                  {
+                    "key": "rental",
+                    "code": "1.2.1.4.1",
+                    "label": {
+                      "zh": "租房"
+                    }
+                  },
+                  {
+                    "key": "utilities-for-owner",
+                    "code": "1.2.1.4.2",
+                    "label": {
+                      "zh": "水电、电视、网费等"
+                    }
+                  },
+                  {
+                    "key": "overtime",
+                    "code": "1.2.1.4.3",
+                    "label": {
+                      "zh": "加班费"
+                    }
+                  },
+                  {
+                    "key": "coordination-fee",
+                    "code": "1.2.1.4.4",
+                    "label": {
+                      "zh": "协调费用"
+                    }
+                  },
+                  {
+                    "key": "other-supervision-owner",
+                    "code": "1.2.1.4.5",
+                    "label": {
+                      "zh": "其他"
+                    }
+                  }
+                ]
+              },
+              {
+                "key": "other-management-fee",
+                "code": "1.2.1.5",
+                "label": {
+                  "zh": "其他"
+                },
+                "children": [
+                  {
+                    "key": "other-management-detail",
+                    "code": "1.2.1.5.1",
+                    "label": {
+                      "zh": "其他"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "key": "statutory-fees",
+            "code": "1.2.2",
+            "label": {
+              "zh": "规费"
+            },
+            "children": [
+              {
+                "key": "statutory-fees-detail",
+                "code": "1.2.2.1",
+                "label": {
+                  "zh": "规费"
+                }
+              }
+            ]
+          },
+          {
+            "key": "taxes",
+            "code": "1.2.3",
+            "label": {
+              "zh": "税金"
+            },
+            "children": [
+              {
+                "key": "taxes-detail",
+                "code": "1.2.3.1",
+                "label": {
+                  "zh": "税金"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "key": "equipment-tools-furniture",
+    "code": "2",
+    "label": {
+      "zh": "设备、工具、器具及家具购置费"
+    },
+    "children": [
+      {
+        "key": "equipment-tools-purchase",
+        "code": "2.1",
+        "label": {
+          "zh": "设备、工具、器具购置费"
+        },
+        "children": [
+          {
+            "key": "equipment-tools-furniture-purchase",
+            "code": "2.1.1",
+            "label": {
+              "zh": "设备、工具、器具及家具购置费"
+            }
+          }
+        ]
+      },
+      {
+        "key": "office-and-living-furniture",
+        "code": "2.2",
+        "label": {
+          "zh": "办公及生活家具购置费"
+        },
+        "children": [
+          {
+            "key": "office-and-living-furniture-purchase",
+            "code": "2.2.1",
+            "label": {
+              "zh": "办公及生活家具购置费"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "key": "other-construction-costs",
+    "code": "3",
+    "label": {
+      "zh": "工程建设其他费"
+    },
+    "children": [
+      {
+        "key": "land-compensation",
+        "code": "3.1",
+        "label": {
+          "zh": "土地征用及拆迁补偿费"
+        },
+        "children": [
+          {
+            "key": "land-compensation-detail",
+            "code": "3.1.1",
+            "label": {
+              "zh": "土地征用及拆迁补偿费"
+            }
+          }
+        ]
+      }
+    ]
+  }
+]
