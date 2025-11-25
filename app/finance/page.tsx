@@ -59,26 +59,14 @@ type EntryForm = {
   remark: string
 }
 
-const initialForm: EntryForm = {
-  projectId: '',
-  reason: '',
-  categoryKey: '',
-  amount: '',
-  unitId: '',
-  paymentTypeId: '',
-  paymentDate: '',
-  tva: '',
-  remark: '',
-}
-
 const formatDateInput = (iso: string) => iso.split('T')[0]
 
 const buildCategoryOptions = (nodes: FinanceCategoryDTO[], parentLabel: string): { key: string; label: string }[] =>
   nodes.flatMap((node) => {
     const label = parentLabel ? `${parentLabel} / ${node.labelZh}` : node.labelZh
-    const self = [{ key: node.key, label }]
     const children = node.children?.length ? buildCategoryOptions(node.children, label) : []
-    return [...self, ...children]
+    if (node.children?.length) return children
+    return [{ key: node.key, label }]
   })
 
 export default function FinancePage() {
@@ -88,7 +76,17 @@ export default function FinancePage() {
   const [filters, setFilters] = useState<{ projectId?: number }>({})
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
-  const [form, setForm] = useState<EntryForm>(initialForm)
+  const [form, setForm] = useState<EntryForm>({
+    projectId: '',
+    reason: '',
+    categoryKey: '',
+    amount: '',
+    unitId: '',
+    paymentTypeId: '',
+    paymentDate: formatDateInput(new Date().toISOString()),
+    tva: '',
+    remark: '',
+  })
   const [editingId, setEditingId] = useState<number | null>(null)
   const [manageProject, setManageProject] = useState({ name: '', code: '' })
   const [manageUnit, setManageUnit] = useState({ name: '', symbol: '' })
@@ -99,6 +97,7 @@ export default function FinancePage() {
     labelZh: '',
     sortOrder: '',
   })
+  const [showManage, setShowManage] = useState(false)
 
   const canView = session?.permissions.includes('finance:view')
   const canEdit = session?.permissions.includes('finance:edit')
@@ -133,6 +132,18 @@ export default function FinancePage() {
         paymentTypes: data.paymentTypes,
         categories: data.categories,
       })
+      const defaultProject = data.projects.find((p) => p.name === '邦杜库市政路项目')
+      const defaultPayment = data.paymentTypes.find((p) => p.name === '现金支票')
+      const defaultUnit = data.units.find((u) => u.name === '西法')
+      const defaultCategory = buildCategoryOptions(data.categories, '')[0]?.key
+      setForm((prev) => ({
+        ...prev,
+        projectId: defaultProject?.id ?? prev.projectId,
+        paymentTypeId: defaultPayment?.id ?? prev.paymentTypeId,
+        unitId: defaultUnit?.id ?? prev.unitId,
+        categoryKey: defaultCategory ?? prev.categoryKey,
+        paymentDate: prev.paymentDate || formatDateInput(new Date().toISOString()),
+      }))
     } catch (error) {
       setMessage((error as Error).message)
     }
@@ -174,7 +185,17 @@ export default function FinancePage() {
   }, [canView, filters.projectId, loadEntries, loadMetadata])
 
   const resetForm = () => {
-    setForm(initialForm)
+    setForm({
+      projectId: metadata?.projects.find((p) => p.name === '邦杜库市政路项目')?.id ?? '',
+      reason: '',
+      categoryKey: categoryOptions[0]?.key ?? '',
+      amount: '',
+      unitId: metadata?.units.find((u) => u.name === '西法')?.id ?? '',
+      paymentTypeId: metadata?.paymentTypes.find((p) => p.name === '现金支票')?.id ?? '',
+      paymentDate: formatDateInput(new Date().toISOString()),
+      tva: '',
+      remark: '',
+    })
     setEditingId(null)
   }
 
@@ -352,6 +373,14 @@ export default function FinancePage() {
             >
               刷新列表
             </button>
+            {canManage && (
+              <button
+                onClick={() => setShowManage(true)}
+                className="rounded border border-slate-300 px-3 py-2 text-sm text-slate-800 hover:bg-slate-50"
+              >
+                主数据管理
+              </button>
+            )}
           </div>
 
           {canEdit && (
@@ -467,9 +496,9 @@ export default function FinancePage() {
         </div>
       )}
 
-      {canView && (
-        <div className="space-y-3 rounded-lg bg-white p-4 shadow">
-          <h2 className="text-lg font-semibold">记录列表</h2>
+          {canView && (
+            <div className="space-y-3 rounded-lg bg-white p-4 shadow">
+              <h2 className="text-lg font-semibold">记录列表</h2>
           {loading && <p className="text-sm text-slate-600">加载中...</p>}
           <div className="overflow-auto">
             <table className="min-w-full text-sm">
@@ -483,7 +512,7 @@ export default function FinancePage() {
                   <th className="px-3 py-2">支付方式</th>
                   <th className="px-3 py-2">支付日期</th>
                   <th className="px-3 py-2">备注</th>
-                  <th className="px-3 py-2">操作</th>
+                  <th className="px-3 py-2 w-36">操作</th>
                 </tr>
               </thead>
               <tbody>
@@ -501,17 +530,25 @@ export default function FinancePage() {
                     <td className="px-3 py-2">{entry.paymentTypeName}</td>
                     <td className="px-3 py-2">{formatDateInput(entry.paymentDate)}</td>
                     <td className="px-3 py-2">{entry.remark}</td>
-                    <td className="px-3 py-2 space-x-2">
+                    <td className="px-3 py-2">
+                      <div className="flex flex-wrap gap-2">
                       {canEdit && !entry.isDeleted && (
-                        <button className="text-blue-600 hover:underline" onClick={() => handleEdit(entry)}>
+                        <button
+                          className="rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700 ring-1 ring-blue-100 hover:bg-blue-100"
+                          onClick={() => handleEdit(entry)}
+                        >
                           编辑
                         </button>
                       )}
                       {canEdit && (
-                        <button className="text-red-600 hover:underline" onClick={() => handleDelete(entry.id)}>
-                          软删
+                        <button
+                          className="rounded-full bg-red-50 px-3 py-1 text-xs font-medium text-red-700 ring-1 ring-red-100 hover:bg-red-100"
+                          onClick={() => handleDelete(entry.id)}
+                        >
+                          删除
                         </button>
                       )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -521,120 +558,130 @@ export default function FinancePage() {
         </div>
       )}
 
-      {canManage && (
-        <div className="space-y-4 rounded-lg bg-white p-4 shadow">
-          <h2 className="text-lg font-semibold">主数据管理</h2>
-          <div className="grid gap-3 md:grid-cols-2">
-            <div className="space-y-2">
-              <h3 className="font-semibold text-slate-800">项目</h3>
-              <input
-                className="w-full rounded border px-3 py-2 text-sm"
-                placeholder="项目名称"
-                value={manageProject.name}
-                onChange={(e) => setManageProject((prev) => ({ ...prev, name: e.target.value }))}
-              />
-              <input
-                className="w-full rounded border px-3 py-2 text-sm"
-                placeholder="项目编码 (可选)"
-                value={manageProject.code}
-                onChange={(e) => setManageProject((prev) => ({ ...prev, code: e.target.value }))}
-              />
+      {canManage && showManage && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-4xl rounded-lg bg-white p-6 shadow-xl">
+            <div className="flex items-center justify-between pb-4">
+              <h2 className="text-lg font-semibold">主数据管理</h2>
               <button
-                onClick={() =>
-                  manageCall('/api/finance/projects', { name: manageProject.name, code: manageProject.code || null })
-                }
-                className="rounded bg-slate-900 px-3 py-2 text-sm text-white hover:bg-slate-800"
+                onClick={() => setShowManage(false)}
+                className="rounded-full px-3 py-1 text-sm text-slate-700 hover:bg-slate-100"
               >
-                新增项目
+                关闭
               </button>
             </div>
-            <div className="space-y-2">
-              <h3 className="font-semibold text-slate-800">金额单位</h3>
-              <input
-                className="w-full rounded border px-3 py-2 text-sm"
-                placeholder="单位名称"
-                value={manageUnit.name}
-                onChange={(e) => setManageUnit((prev) => ({ ...prev, name: e.target.value }))}
-              />
-              <input
-                className="w-full rounded border px-3 py-2 text-sm"
-                placeholder="符号 (可选)"
-                value={manageUnit.symbol}
-                onChange={(e) => setManageUnit((prev) => ({ ...prev, symbol: e.target.value }))}
-              />
-              <button
-                onClick={() =>
-                  manageCall('/api/finance/units', {
-                    name: manageUnit.name,
-                    symbol: manageUnit.symbol || null,
-                  })
-                }
-                className="rounded bg-slate-900 px-3 py-2 text-sm text-white hover:bg-slate-800"
-              >
-                新增金额单位
-              </button>
-            </div>
-            <div className="space-y-2">
-              <h3 className="font-semibold text-slate-800">支付方式</h3>
-              <input
-                className="w-full rounded border px-3 py-2 text-sm"
-                placeholder="支付方式名称"
-                value={managePayment.name}
-                onChange={(e) => setManagePayment((prev) => ({ ...prev, name: e.target.value }))}
-              />
-              <button
-                onClick={() => manageCall('/api/finance/payment-types', { name: managePayment.name })}
-                className="rounded bg-slate-900 px-3 py-2 text-sm text-white hover:bg-slate-800"
-              >
-                新增支付方式
-              </button>
-            </div>
-            <div className="space-y-2">
-              <h3 className="font-semibold text-slate-800">分类树</h3>
-              <input
-                className="w-full rounded border px-3 py-2 text-sm"
-                placeholder="Key（唯一）"
-                value={manageCategory.key}
-                onChange={(e) => setManageCategory((prev) => ({ ...prev, key: e.target.value }))}
-              />
-              <input
-                className="w-full rounded border px-3 py-2 text-sm"
-                placeholder="父级 key（可选）"
-                value={manageCategory.parentKey}
-                onChange={(e) => setManageCategory((prev) => ({ ...prev, parentKey: e.target.value }))}
-              />
-              <input
-                className="w-full rounded border px-3 py-2 text-sm"
-                placeholder="中文名称"
-                value={manageCategory.labelZh}
-                onChange={(e) => setManageCategory((prev) => ({ ...prev, labelZh: e.target.value }))}
-              />
-              <input
-                className="w-full rounded border px-3 py-2 text-sm"
-                placeholder="排序（数字，可选）"
-                value={manageCategory.sortOrder}
-                onChange={(e) => setManageCategory((prev) => ({ ...prev, sortOrder: e.target.value }))}
-              />
-              <div className="flex gap-2">
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2 rounded border border-slate-200 p-4">
+                <h3 className="font-semibold text-slate-800">项目</h3>
+                <input
+                  className="w-full rounded border px-3 py-2 text-sm"
+                  placeholder="项目名称"
+                  value={manageProject.name}
+                  onChange={(e) => setManageProject((prev) => ({ ...prev, name: e.target.value }))}
+                />
+                <input
+                  className="w-full rounded border px-3 py-2 text-sm"
+                  placeholder="项目编码 (可选)"
+                  value={manageProject.code}
+                  onChange={(e) => setManageProject((prev) => ({ ...prev, code: e.target.value }))}
+                />
                 <button
                   onClick={() =>
-                    manageCall('/api/finance/categories', {
-                      key: manageCategory.key,
-                      parentKey: manageCategory.parentKey || null,
-                      labelZh: manageCategory.labelZh,
-                      sortOrder: manageCategory.sortOrder ? Number(manageCategory.sortOrder) : 0,
+                    manageCall('/api/finance/projects', { name: manageProject.name, code: manageProject.code || null })
+                  }
+                  className="w-full rounded bg-slate-900 px-3 py-2 text-sm text-white hover:bg-slate-800"
+                >
+                  新增项目
+                </button>
+              </div>
+              <div className="space-y-2 rounded border border-slate-200 p-4">
+                <h3 className="font-semibold text-slate-800">金额单位</h3>
+                <input
+                  className="w-full rounded border px-3 py-2 text-sm"
+                  placeholder="单位名称"
+                  value={manageUnit.name}
+                  onChange={(e) => setManageUnit((prev) => ({ ...prev, name: e.target.value }))}
+                />
+                <input
+                  className="w-full rounded border px-3 py-2 text-sm"
+                  placeholder="符号 (可选)"
+                  value={manageUnit.symbol}
+                  onChange={(e) => setManageUnit((prev) => ({ ...prev, symbol: e.target.value }))}
+                />
+                <button
+                  onClick={() =>
+                    manageCall('/api/finance/units', {
+                      name: manageUnit.name,
+                      symbol: manageUnit.symbol || null,
                     })
                   }
-                  className="rounded bg-slate-900 px-3 py-2 text-sm text-white hover:bg-slate-800"
+                  className="w-full rounded bg-slate-900 px-3 py-2 text-sm text-white hover:bg-slate-800"
                 >
-                  新增/更新分类
+                  新增金额单位
                 </button>
+              </div>
+              <div className="space-y-2 rounded border border-slate-200 p-4">
+                <h3 className="font-semibold text-slate-800">支付方式</h3>
+                <input
+                  className="w-full rounded border px-3 py-2 text-sm"
+                  placeholder="支付方式名称"
+                  value={managePayment.name}
+                  onChange={(e) => setManagePayment((prev) => ({ ...prev, name: e.target.value }))}
+                />
                 <button
-                  onClick={() => deleteCategory(manageCategory.key)}
-                  className="rounded border px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+                  onClick={() => manageCall('/api/finance/payment-types', { name: managePayment.name })}
+                  className="w-full rounded bg-slate-900 px-3 py-2 text-sm text-white hover:bg-slate-800"
                 >
-                  停用分类
+                  新增支付方式
                 </button>
+              </div>
+              <div className="space-y-2 rounded border border-slate-200 p-4">
+                <h3 className="font-semibold text-slate-800">分类树</h3>
+                <input
+                  className="w-full rounded border px-3 py-2 text-sm"
+                  placeholder="Key（唯一）"
+                  value={manageCategory.key}
+                  onChange={(e) => setManageCategory((prev) => ({ ...prev, key: e.target.value }))}
+                />
+                <input
+                  className="w-full rounded border px-3 py-2 text-sm"
+                  placeholder="父级 key（可选）"
+                  value={manageCategory.parentKey}
+                  onChange={(e) => setManageCategory((prev) => ({ ...prev, parentKey: e.target.value }))}
+                />
+                <input
+                  className="w-full rounded border px-3 py-2 text-sm"
+                  placeholder="中文名称"
+                  value={manageCategory.labelZh}
+                  onChange={(e) => setManageCategory((prev) => ({ ...prev, labelZh: e.target.value }))}
+                />
+                <input
+                  className="w-full rounded border px-3 py-2 text-sm"
+                  placeholder="排序（数字，可选）"
+                  value={manageCategory.sortOrder}
+                  onChange={(e) => setManageCategory((prev) => ({ ...prev, sortOrder: e.target.value }))}
+                />
+                <div className="flex gap-2">
+                  <button
+                    onClick={() =>
+                      manageCall('/api/finance/categories', {
+                        key: manageCategory.key,
+                        parentKey: manageCategory.parentKey || null,
+                        labelZh: manageCategory.labelZh,
+                        sortOrder: manageCategory.sortOrder ? Number(manageCategory.sortOrder) : 0,
+                      })
+                    }
+                    className="flex-1 rounded bg-slate-900 px-3 py-2 text-sm text-white hover:bg-slate-800"
+                  >
+                    新增/更新分类
+                  </button>
+                  <button
+                    onClick={() => deleteCategory(manageCategory.key)}
+                    className="rounded border px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+                  >
+                    停用
+                  </button>
+                </div>
               </div>
             </div>
           </div>
