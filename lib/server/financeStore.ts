@@ -74,6 +74,19 @@ type MasterDataPayload = {
   sortOrder?: number
 }
 
+const assertFinanceModels = () => {
+  const client = prisma as unknown as Record<string, unknown>
+  const missing =
+    !client.project ||
+    !client.financeUnit ||
+    !client.paymentType ||
+    !client.financeCategory ||
+    !client.financeEntry
+  if (missing) {
+    throw new Error('Prisma Client 未包含财务相关模型，请先执行 `npx prisma migrate deploy && npx prisma generate`')
+  }
+}
+
 const flattenCategories = (
   nodes: FinanceCategoryNode[],
   parentKey: string | null,
@@ -139,6 +152,7 @@ const resolveParentKeys = (map: Map<string, { parentKey: string | null }>, key: 
 }
 
 export const ensureFinanceDefaults = async () => {
+  assertFinanceModels()
   await prisma.$transaction(
     [
       prisma.project.createMany({
@@ -175,6 +189,7 @@ export const ensureFinanceDefaults = async () => {
 }
 
 export const ensureFinanceCategories = async () => {
+  assertFinanceModels()
   const flat: FlatCategory[] = []
   flattenCategories(financeCategories as FinanceCategoryNode[], null, [], flat, 0)
 
@@ -206,6 +221,7 @@ export const ensureFinanceCategories = async () => {
 }
 
 export const listFinanceMetadata = async () => {
+  assertFinanceModels()
   await ensureFinanceDefaults()
   await ensureFinanceCategories()
 
@@ -255,6 +271,7 @@ export const listFinanceMetadata = async () => {
 }
 
 export const listFinanceEntries = async (options: { projectId?: number; includeDeleted?: boolean }) => {
+  assertFinanceModels()
   const where: Prisma.FinanceEntryWhereInput = {
     projectId: options.projectId,
     isDeleted: options.includeDeleted ? undefined : false,
@@ -328,6 +345,7 @@ const normalizeNumber = (value: number | string | null | undefined) => {
 }
 
 export const createFinanceEntry = async (payload: EntryPayload, userId?: number | null) => {
+  assertFinanceModels()
   const category = await assertCategoryExists(payload.categoryKey)
   const categories = await prisma.financeCategory.findMany()
   const map = buildCategoryMap(categories)
@@ -387,6 +405,7 @@ export const createFinanceEntry = async (payload: EntryPayload, userId?: number 
 }
 
 export const updateFinanceEntry = async (id: number, payload: Partial<EntryPayload>) => {
+  assertFinanceModels()
   const existing = await prisma.financeEntry.findUnique({ where: { id } })
   if (!existing) {
     throw new Error('记录不存在')
@@ -453,6 +472,7 @@ export const updateFinanceEntry = async (id: number, payload: Partial<EntryPaylo
 }
 
 export const softDeleteFinanceEntry = async (id: number, userId?: number | null) => {
+  assertFinanceModels()
   const existing = await prisma.financeEntry.findUnique({ where: { id } })
   if (!existing) {
     throw new Error('记录不存在')
@@ -474,6 +494,7 @@ export const softDeleteFinanceEntry = async (id: number, userId?: number | null)
 }
 
 export const upsertProject = async (id: number | null, payload: MasterDataPayload) => {
+  assertFinanceModels()
   const data = {
     name: payload.name,
     code: payload.code ?? null,
@@ -486,6 +507,7 @@ export const upsertProject = async (id: number | null, payload: MasterDataPayloa
 }
 
 export const upsertFinanceUnit = async (id: number | null, payload: MasterDataPayload) => {
+  assertFinanceModels()
   const data = {
     name: payload.name,
     symbol: payload.symbol ?? null,
@@ -499,6 +521,7 @@ export const upsertFinanceUnit = async (id: number | null, payload: MasterDataPa
 }
 
 export const upsertPaymentType = async (id: number | null, payload: MasterDataPayload) => {
+  assertFinanceModels()
   const data = {
     name: payload.name,
     isActive: payload.isActive ?? true,
@@ -520,6 +543,7 @@ export const upsertFinanceCategory = async (payload: {
   sortOrder?: number
   isActive?: boolean
 }) => {
+  assertFinanceModels()
   if (payload.parentKey) {
     const parent = await prisma.financeCategory.findUnique({ where: { key: payload.parentKey } })
     if (!parent) {
@@ -553,6 +577,7 @@ export const upsertFinanceCategory = async (payload: {
 }
 
 export const deactivateFinanceCategory = async (key: string) => {
+  assertFinanceModels()
   return prisma.financeCategory.update({
     where: { key },
     data: { isActive: false },
