@@ -59,6 +59,17 @@ type EntryForm = {
   remark: string
 }
 
+type ListFilters = {
+  categoryKey: string
+  paymentTypeId: number | ''
+  amountMin: string
+  amountMax: string
+  dateFrom: string
+  dateTo: string
+  sortField: 'paymentDate' | 'amount' | 'category'
+  sortDir: 'asc' | 'desc'
+}
+
 const formatDateInput = (iso: string) => iso.split('T')[0]
 
 const buildCategoryOptions = (nodes: FinanceCategoryDTO[], parentLabel: string): { key: string; label: string }[] =>
@@ -69,11 +80,39 @@ const buildCategoryOptions = (nodes: FinanceCategoryDTO[], parentLabel: string):
     return [{ key: node.key, label }]
   })
 
+const buildCategoryOptionsWithParents = (nodes: FinanceCategoryDTO[], parentLabel: string): { key: string; label: string }[] =>
+  nodes.flatMap((node) => {
+    const label = parentLabel ? `${parentLabel} / ${node.labelZh}` : node.labelZh
+    const self = [{ key: node.key, label }]
+    const children = node.children?.length ? buildCategoryOptionsWithParents(node.children, label) : []
+    return [...self, ...children]
+  })
+
 export default function FinancePage() {
   const [session, setSession] = useState<SessionUser | null>(null)
   const [metadata, setMetadata] = useState<Metadata | null>(null)
   const [entries, setEntries] = useState<FinanceEntry[]>([])
-  const [filters, setFilters] = useState<{ projectId?: number }>({})
+const [filters, setFilters] = useState<{ projectId?: number }>({})
+  const [listFilters, setListFilters] = useState<ListFilters>({
+    categoryKey: '',
+    paymentTypeId: '',
+    amountMin: '',
+    amountMax: '',
+    dateFrom: '',
+    dateTo: '',
+    sortField: 'paymentDate',
+    sortDir: 'desc',
+  })
+  const [listDraft, setListDraft] = useState<ListFilters>({
+    categoryKey: '',
+    paymentTypeId: '',
+    amountMin: '',
+    amountMax: '',
+    dateFrom: '',
+    dateTo: '',
+    sortField: 'paymentDate',
+    sortDir: 'desc',
+  })
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [form, setForm] = useState<EntryForm>({
@@ -107,6 +146,48 @@ export default function FinancePage() {
     () => (metadata ? buildCategoryOptions(metadata.categories, '') : []),
     [metadata],
   )
+  const categoryOptionsWithParents = useMemo(
+    () => (metadata ? buildCategoryOptionsWithParents(metadata.categories, '') : []),
+    [metadata],
+  )
+  const filteredEntries = useMemo(() => {
+    let result = [...entries]
+    if (listFilters.categoryKey) {
+      result = result.filter((e) => e.categoryKey === listFilters.categoryKey)
+    }
+    if (listFilters.paymentTypeId) {
+      result = result.filter((e) => e.paymentTypeId === Number(listFilters.paymentTypeId))
+    }
+    if (listFilters.amountMin !== '') {
+      const min = Number(listFilters.amountMin)
+      if (Number.isFinite(min)) result = result.filter((e) => e.amount >= min)
+    }
+    if (listFilters.amountMax !== '') {
+      const max = Number(listFilters.amountMax)
+      if (Number.isFinite(max)) result = result.filter((e) => e.amount <= max)
+    }
+    if (listFilters.dateFrom) {
+      const from = new Date(listFilters.dateFrom).getTime()
+      result = result.filter((e) => new Date(e.paymentDate).getTime() >= from)
+    }
+    if (listFilters.dateTo) {
+      const to = new Date(listFilters.dateTo).getTime()
+      result = result.filter((e) => new Date(e.paymentDate).getTime() <= to)
+    }
+
+    const sorters: Record<ListFilters['sortField'], (a: FinanceEntry, b: FinanceEntry) => number> = {
+      paymentDate: (a, b) => new Date(a.paymentDate).getTime() - new Date(b.paymentDate).getTime(),
+      amount: (a, b) => a.amount - b.amount,
+      category: (a, b) =>
+        a.categoryPath.map((c) => c.label).join(' / ').localeCompare(b.categoryPath.map((c) => c.label).join(' / ')),
+    }
+    const sortFn = sorters[listFilters.sortField]
+    result.sort((a, b) => {
+      const val = sortFn(a, b)
+      return listFilters.sortDir === 'asc' ? val : -val
+    })
+    return result
+  }, [entries, listFilters])
 
   const loadSession = async () => {
     try {
@@ -144,6 +225,20 @@ export default function FinancePage() {
         categoryKey: defaultCategory ?? prev.categoryKey,
         paymentDate: prev.paymentDate || formatDateInput(new Date().toISOString()),
       }))
+      setListDraft((prev) => {
+        const defaults = {
+          categoryKey: '',
+          paymentTypeId: '',
+          amountMin: prev.amountMin,
+          amountMax: prev.amountMax,
+          dateFrom: prev.dateFrom,
+          dateTo: prev.dateTo,
+          sortField: prev.sortField,
+          sortDir: prev.sortDir,
+        } satisfies ListFilters
+        setListFilters(defaults)
+        return defaults
+      })
     } catch (error) {
       setMessage((error as Error).message)
     }
@@ -499,24 +594,143 @@ export default function FinancePage() {
           {canView && (
             <div className="space-y-3 rounded-lg bg-white p-4 shadow">
               <h2 className="text-lg font-semibold">记录列表</h2>
-          {loading && <p className="text-sm text-slate-600">加载中...</p>}
-          <div className="overflow-auto">
+              <div className="grid gap-2 md:grid-cols-4">
+                <select
+                  className="w-full rounded border px-3 py-2 text-sm"
+                  value={listDraft.categoryKey}
+                  onChange={(e) => setListDraft((prev) => ({ ...prev, categoryKey: e.target.value }))}
+                >
+                  <option value="">全部分类</option>
+                  {categoryOptionsWithParents.map((cat) => (
+                    <option key={cat.key} value={cat.key}>
+                      {cat.label}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  className="w-full rounded border px-3 py-2 text-sm"
+                  value={listDraft.paymentTypeId}
+                  onChange={(e) =>
+                    setListDraft((prev) => ({
+                      ...prev,
+                      paymentTypeId: e.target.value ? Number(e.target.value) : '',
+                    }))
+                  }
+                >
+                  <option value="">全部支付方式</option>
+                  {metadata?.paymentTypes.map((type) => (
+                    <option key={type.id} value={type.id}>
+                      {type.name}
+                    </option>
+                  ))}
+                </select>
+                <div className="flex gap-2">
+                  <input
+                    className="w-full rounded border px-3 py-2 text-sm"
+                    placeholder="金额最小"
+                    value={listDraft.amountMin}
+                    onChange={(e) => setListDraft((prev) => ({ ...prev, amountMin: e.target.value }))}
+                  />
+                  <input
+                    className="w-full rounded border px-3 py-2 text-sm"
+                    placeholder="金额最大"
+                    value={listDraft.amountMax}
+                    onChange={(e) => setListDraft((prev) => ({ ...prev, amountMax: e.target.value }))}
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    className="w-full rounded border px-3 py-2 text-sm"
+                    type="date"
+                    value={listDraft.dateFrom}
+                    onChange={(e) => setListDraft((prev) => ({ ...prev, dateFrom: e.target.value }))}
+                  />
+                  <input
+                    className="w-full rounded border px-3 py-2 text-sm"
+                    type="date"
+                    value={listDraft.dateTo}
+                    onChange={(e) => setListDraft((prev) => ({ ...prev, dateTo: e.target.value }))}
+                  />
+                </div>
+                <div className="flex items-center gap-2 md:col-span-2">
+                  <button
+                    onClick={() => setListFilters(listDraft)}
+                    className="rounded bg-slate-900 px-3 py-2 text-sm text-white hover:bg-slate-800"
+                  >
+                    应用筛选
+                  </button>
+                  <button
+                    onClick={() => {
+                      const reset = {
+                        categoryKey: '',
+                        paymentTypeId: '',
+                        amountMin: '',
+                        amountMax: '',
+                        dateFrom: '',
+                        dateTo: '',
+                        sortField: 'paymentDate',
+                        sortDir: 'desc',
+                      } satisfies ListFilters
+                      setListDraft(reset)
+                      setListFilters(reset)
+                    }}
+                    className="rounded border px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                  >
+                    重置筛选
+                  </button>
+                </div>
+              </div>
+              {loading && <p className="text-sm text-slate-600">加载中...</p>}
+              <div className="overflow-auto">
             <table className="min-w-full text-sm">
               <thead>
                 <tr className="border-b text-left">
                   <th className="px-3 py-2">序号</th>
                   <th className="px-3 py-2">项目</th>
-                  <th className="px-3 py-2">分类</th>
+                  <th
+                    className="px-3 py-2 cursor-pointer select-none"
+                    onClick={() =>
+                      setListFilters((prev) => {
+                        const dir = prev.sortField === 'category' && prev.sortDir === 'asc' ? 'desc' : 'asc'
+                        setListDraft((draft) => ({ ...draft, sortField: 'category', sortDir: dir }))
+                        return { ...prev, sortField: 'category', sortDir: dir }
+                      })
+                    }
+                  >
+                    分类 {listFilters.sortField === 'category' ? (listFilters.sortDir === 'asc' ? '↑' : '↓') : ''}
+                  </th>
                   <th className="px-3 py-2">事由</th>
-                  <th className="px-3 py-2">金额</th>
+                  <th
+                    className="px-3 py-2 cursor-pointer select-none"
+                    onClick={() =>
+                      setListFilters((prev) => {
+                        const dir = prev.sortField === 'amount' && prev.sortDir === 'asc' ? 'desc' : 'asc'
+                        setListDraft((draft) => ({ ...draft, sortField: 'amount', sortDir: dir }))
+                        return { ...prev, sortField: 'amount', sortDir: dir }
+                      })
+                    }
+                  >
+                    金额 {listFilters.sortField === 'amount' ? (listFilters.sortDir === 'asc' ? '↑' : '↓') : ''}
+                  </th>
                   <th className="px-3 py-2">支付方式</th>
-                  <th className="px-3 py-2">支付日期</th>
-                  <th className="px-3 py-2">备注</th>
+                  <th
+                    className="px-3 py-2 cursor-pointer select-none"
+                    onClick={() =>
+                      setListFilters((prev) => {
+                        const dir = prev.sortField === 'paymentDate' && prev.sortDir === 'asc' ? 'desc' : 'asc'
+                        setListDraft((draft) => ({ ...draft, sortField: 'paymentDate', sortDir: dir }))
+                        return { ...prev, sortField: 'paymentDate', sortDir: dir }
+                      })
+                    }
+                  >
+                    支付日期 {listFilters.sortField === 'paymentDate' ? (listFilters.sortDir === 'asc' ? '↑' : '↓') : ''}
+                  </th>
                   <th className="px-3 py-2 w-36">操作</th>
+                  <th className="px-3 py-2">备注</th>
                 </tr>
               </thead>
               <tbody>
-                {entries.map((entry) => (
+                {filteredEntries.map((entry) => (
                   <tr key={entry.id} className={`border-b ${entry.isDeleted ? 'text-slate-400 line-through' : ''}`}>
                     <td className="px-3 py-2">{entry.sequence}</td>
                     <td className="px-3 py-2">{entry.projectName}</td>
@@ -529,7 +743,6 @@ export default function FinancePage() {
                     </td>
                     <td className="px-3 py-2">{entry.paymentTypeName}</td>
                     <td className="px-3 py-2">{formatDateInput(entry.paymentDate)}</td>
-                    <td className="px-3 py-2">{entry.remark}</td>
                     <td className="px-3 py-2">
                       <div className="flex flex-wrap gap-2">
                       {canEdit && !entry.isDeleted && (
@@ -550,6 +763,7 @@ export default function FinancePage() {
                       )}
                       </div>
                     </td>
+                    <td className="px-3 py-2">{entry.remark}</td>
                   </tr>
                 ))}
               </tbody>
