@@ -53,7 +53,7 @@ const copy: Record<Locale, Copy> = {
 			connector: '与',
 			progress: '进度',
 			suffix: '。',
-			description: '把一线更新、项目里程碑放在同一块操作面板，保持团队节奏一致。当前开放 2 个核心入口，后续模块可随时接入。',
+			description: '把一线更新、项目里程碑放在同一块操作面板，保持团队节奏一致。当前开放 3 个核心入口（含财务记账），后续模块可随时接入。',
 			primaryCta: '立即填写日报',
 			secondaryCta: '查看项目进度'
 		},
@@ -75,13 +75,21 @@ const copy: Record<Locale, Copy> = {
 				description: '汇总工期节点、关键风险与甘特视图，规划对齐更直观。',
 				tags: ['里程碑', '风险跟踪', '甘特预览'],
 				cta: '查看进度'
+			},
+			{
+				title: '财务记账',
+				href: '/finance',
+				tone: 'from-emerald-300/80 via-teal-300/80 to-blue-400/70',
+				description: '按项目录入财务流水，支持序号自动生成、分类与税费字段，方便后续统计。',
+				tags: ['项目选择', '分类/支付方式', '含税金额'],
+				cta: '进入财务'
 			}
 		],
 		stats: {
 			entriesLabel: '当前入口',
-			entriesValue: '2',
+			entriesValue: '3',
 			recentLabel: '最近更新',
-			recentValue: '日报与进度模块同步',
+			recentValue: '新增财务入口，日报与进度持续维护',
 			upcomingTitle: '即将推出',
 			upcomingBody: '支持更多入口：质量巡检、物资追踪、风险复盘。'
 		},
@@ -98,7 +106,7 @@ const copy: Record<Locale, Copy> = {
 			connector: 'et le',
 			progress: "suivi d'avancement",
 			suffix: '.',
-			description: 'Regroupez les mises à jour terrain et les jalons projet sur le même tableau de bord. Deux accès clés sont prêts, les suivants se brancheront facilement.',
+			description: 'Regroupez les mises à jour terrain et les jalons projet sur le même tableau de bord. Trois accès clés (dont la comptabilité) sont prêts, les suivants se brancheront facilement.',
 			primaryCta: 'Remplir un rapport',
 			secondaryCta: "Voir l'avancement"
 		},
@@ -124,13 +132,21 @@ const copy: Record<Locale, Copy> = {
 				description: 'Rassembler jalons, risques clés et aperçu Gantt pour un alignement clair.',
 				tags: ['Jalons', 'Suivi des risques', 'Vue Gantt'],
 				cta: "Consulter l'avancement"
+			},
+			{
+				title: 'Comptabilité',
+				href: '/finance',
+				tone: 'from-emerald-300/80 via-teal-300/80 to-blue-400/70',
+				description: 'Saisir les écritures par projet avec numéro auto, catégorie, mode de paiement et TVA pour préparer les états financiers.',
+				tags: ['Projet', 'Catégorie/paiement', 'Montant TTC'],
+				cta: 'Ouvrir la compta'
 			}
 		],
 		stats: {
 			entriesLabel: 'Entrées actives',
-			entriesValue: '2',
+			entriesValue: '3',
 			recentLabel: 'Mise à jour',
-			recentValue: 'Rapport et module avancement synchronisés',
+			recentValue: 'Entrée comptabilité ajoutée, rapport et avancement synchronisés',
 			upcomingTitle: 'Prochainement',
 			upcomingBody: 'Inspection qualité, flux matériaux, revues de risques.'
 		},
