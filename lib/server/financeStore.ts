@@ -153,39 +153,36 @@ const resolveParentKeys = (map: Map<string, { parentKey: string | null }>, key: 
 
 export const ensureFinanceDefaults = async () => {
   assertFinanceModels()
-  await prisma.$transaction(
-    [
-      prisma.project.createMany({
-        data: [
-          { name: '邦杜库市政路项目', code: 'project-bondoukou-city' },
-          { name: '邦杜库边境路项目', code: 'project-bondoukou-border' },
-          { name: '邦杜库供料项目', code: 'project-bondoukou-supply' },
-          { name: '铁布高速项目', code: 'project-tieb-highway' },
-          { name: '阿比让办事处', code: 'project-abidjan-office' },
-        ],
-        skipDuplicates: true,
-      }),
-      prisma.financeUnit.createMany({
-        data: [
-          { name: '西法', symbol: null, sortOrder: 1 },
-          { name: '美金', symbol: '$', sortOrder: 2 },
-          { name: '人民币', symbol: '¥', sortOrder: 3 },
-        ],
-        skipDuplicates: true,
-      }),
-      prisma.paymentType.createMany({
-        data: [
-          { name: '现金', sortOrder: 1 },
-          { name: '现金支票', sortOrder: 2 },
-          { name: '转账支票', sortOrder: 3 },
-          { name: '办事处代付', sortOrder: 4 },
-          { name: '无票据支出', sortOrder: 5 },
-        ],
-        skipDuplicates: true,
-      }),
-    ],
-    { timeout: 15000 },
-  )
+  await prisma.$transaction([
+    prisma.project.createMany({
+      data: [
+        { name: '邦杜库市政路项目', code: 'project-bondoukou-city' },
+        { name: '邦杜库边境路项目', code: 'project-bondoukou-border' },
+        { name: '邦杜库供料项目', code: 'project-bondoukou-supply' },
+        { name: '铁布高速项目', code: 'project-tieb-highway' },
+        { name: '阿比让办事处', code: 'project-abidjan-office' },
+      ],
+      skipDuplicates: true,
+    }),
+    prisma.financeUnit.createMany({
+      data: [
+        { name: '西法', symbol: null, sortOrder: 1 },
+        { name: '美金', symbol: '$', sortOrder: 2 },
+        { name: '人民币', symbol: '¥', sortOrder: 3 },
+      ],
+      skipDuplicates: true,
+    }),
+    prisma.paymentType.createMany({
+      data: [
+        { name: '现金', sortOrder: 1 },
+        { name: '现金支票', sortOrder: 2 },
+        { name: '转账支票', sortOrder: 3 },
+        { name: '办事处代付', sortOrder: 4 },
+        { name: '无票据支出', sortOrder: 5 },
+      ],
+      skipDuplicates: true,
+    }),
+  ])
 }
 
 export const ensureFinanceCategories = async () => {
@@ -344,6 +341,11 @@ const normalizeNumber = (value: number | string | null | undefined) => {
   return num
 }
 
+const toOptionalNumber = (value: number | Prisma.Decimal | null | undefined) => {
+  if (value == null) return undefined
+  return new Prisma.Decimal(value).toNumber()
+}
+
 export const createFinanceEntry = async (payload: EntryPayload, userId?: number | null) => {
   assertFinanceModels()
   const category = await assertCategoryExists(payload.categoryKey)
@@ -396,7 +398,7 @@ export const createFinanceEntry = async (payload: EntryPayload, userId?: number 
     paymentTypeId: entry.paymentTypeId,
     paymentTypeName: entry.paymentType.name,
     paymentDate: entry.paymentDate.toISOString(),
-    tva: tva == null ? undefined : tva,
+    tva: toOptionalNumber(tva),
     remark: entry.remark,
     isDeleted: entry.isDeleted,
     createdAt: entry.createdAt.toISOString(),
@@ -463,7 +465,7 @@ export const updateFinanceEntry = async (id: number, payload: Partial<EntryPaylo
     paymentTypeId: entry.paymentTypeId,
     paymentTypeName: entry.paymentType.name,
     paymentDate: entry.paymentDate.toISOString(),
-    tva: tva == null ? undefined : tva,
+    tva: toOptionalNumber(tva),
     remark: entry.remark,
     isDeleted: entry.isDeleted,
     createdAt: entry.createdAt.toISOString(),

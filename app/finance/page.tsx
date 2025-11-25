@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
 type SessionUser = {
   id: number
@@ -119,7 +119,7 @@ export default function FinancePage() {
     }
   }
 
-  const loadMetadata = async () => {
+  const loadMetadata = useCallback(async () => {
     try {
       const res = await fetch('/api/finance/metadata', { credentials: 'include' })
       const data = (await res.json()) as Metadata & { message?: string }
@@ -136,28 +136,31 @@ export default function FinancePage() {
     } catch (error) {
       setMessage((error as Error).message)
     }
-  }
+  }, [])
 
-  const loadEntries = async (projectId?: number) => {
-    if (!canView) return
-    setLoading(true)
-    setMessage(null)
-    const params = new URLSearchParams()
-    if (projectId) params.set('projectId', String(projectId))
-    try {
-      const res = await fetch(`/api/finance/entries?${params.toString()}`, { credentials: 'include' })
-      const data = (await res.json()) as { entries?: FinanceEntry[]; message?: string }
-      if (!res.ok) {
-        setMessage(data.message ?? '加载失败')
-        return
+  const loadEntries = useCallback(
+    async (projectId?: number) => {
+      if (!canView) return
+      setLoading(true)
+      setMessage(null)
+      const params = new URLSearchParams()
+      if (projectId) params.set('projectId', String(projectId))
+      try {
+        const res = await fetch(`/api/finance/entries?${params.toString()}`, { credentials: 'include' })
+        const data = (await res.json()) as { entries?: FinanceEntry[]; message?: string }
+        if (!res.ok) {
+          setMessage(data.message ?? '加载失败')
+          return
+        }
+        setEntries(data.entries ?? [])
+      } catch (error) {
+        setMessage((error as Error).message)
+      } finally {
+        setLoading(false)
       }
-      setEntries(data.entries ?? [])
-    } catch (error) {
-      setMessage((error as Error).message)
-    } finally {
-      setLoading(false)
-    }
-  }
+    },
+    [canView],
+  )
 
   useEffect(() => {
     void loadSession()
@@ -168,7 +171,7 @@ export default function FinancePage() {
       void loadMetadata()
       void loadEntries(filters.projectId)
     }
-  }, [canView])
+  }, [canView, filters.projectId, loadEntries, loadMetadata])
 
   const resetForm = () => {
     setForm(initialForm)
