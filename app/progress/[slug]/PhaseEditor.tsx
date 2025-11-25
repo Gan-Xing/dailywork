@@ -539,7 +539,8 @@ const submitInspection = async () => {
     measure: PhaseMeasure
     layers: string[]
     checks: string[]
-    side: string
+    side: IntervalSide
+    sideLabel: string
     start: number
     end: number
   } | null>(null)
@@ -562,10 +563,7 @@ const submitInspection = async () => {
       setRemark('')
       setSubmitError(null)
       setInspectionCheckInput('')
-      const sideLabel = selectedSegment.side
-      const normalizedSide: IntervalSide =
-        sideLabel === '左侧' ? 'LEFT' : sideLabel === '右侧' ? 'RIGHT' : 'BOTH'
-      setSelectedSide(normalizedSide)
+      setSelectedSide(selectedSegment.side)
       setStartPkInput(selectedSegment.start)
       setEndPkInput(selectedSegment.end)
     }
@@ -965,13 +963,15 @@ const submitInspection = async () => {
                                     title={`${side.label} ${formatPK(seg.start)} ~ ${formatPK(seg.end)} · ${seg.status}`}
                                     onClick={() => {
                                       if (seg.status === '未验收') {
+                                        const sideLabel = side.label
                                         setSelectedSegment({
                                           phase: phase.name,
                                           phaseId: phase.id,
                                           measure: phase.measure,
                                           layers: phase.resolvedLayers,
                                           checks: phase.resolvedChecks,
-                                          side: side.label,
+                                          side: sideLabel === '左侧' ? 'LEFT' : 'RIGHT',
+                                          sideLabel,
                                           start: seg.start,
                                           end: seg.end,
                                         })
@@ -1007,23 +1007,25 @@ const submitInspection = async () => {
                                 type="button"
                                 className="absolute top-1/2 flex -translate-y-1/2 flex-col items-center gap-1 text-center transition hover:scale-105"
                                 style={{ left: `${position}%`, transform: 'translate(-50%, -50%)' }}
-                                onClick={() =>
+                                onClick={() => {
+                                  const sideLabel =
+                                    item.side === 'LEFT'
+                                      ? '左侧'
+                                      : item.side === 'RIGHT'
+                                        ? '右侧'
+                                        : '双侧'
                                   setSelectedSegment({
                                     phase: phase.name,
                                     phaseId: phase.id,
                                     measure: phase.measure,
                                     layers: phase.resolvedLayers,
                                     checks: phase.resolvedChecks,
-                                    side:
-                                      item.side === 'LEFT'
-                                        ? '左侧'
-                                        : item.side === 'RIGHT'
-                                          ? '右侧'
-                                          : '双侧',
+                                    side: item.side,
+                                    sideLabel,
                                     start: item.startPk,
                                     end: item.endPk,
                                   })
-                                }
+                                }}
                               >
                                 <div
                                   className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-950 text-xs font-semibold text-white shadow-lg shadow-emerald-400/25 ring-2 ring-white/20"

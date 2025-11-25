@@ -6,12 +6,13 @@ A Next.js app for collecting daily construction reports with bilingual copy and 
 
 - Node.js 18.16 (current dev environment)
 - A Supabase project with Postgres enabled (pooling + non-pooling URLs available)
+- Package manager: `pnpm` (use pnpm commands; npm is not used in this repo)
 
 ## Setup
 
 1. Install dependencies
    ```bash
-   npm install
+   pnpm install
    ```
 2. Configure the database connection. Copy `.env.example` to `.env.local` and fill in:
    - `DATABASE_URL` → Supabase `POSTGRES_PRISMA_URL` (pgBouncer 6543 endpoint, used by the running app)
@@ -26,7 +27,7 @@ A Next.js app for collecting daily construction reports with bilingual copy and 
 
 Run the dev server:
 ```bash
-npm run dev
+pnpm run dev
 ```
 Visit `http://localhost:3000` for the dashboard. Creating or editing a report will read/write through the `/api/reports` endpoints backed by Postgres.
 
@@ -34,9 +35,9 @@ Visit `http://localhost:3000` for the dashboard. Creating or editing a report wi
 
 | Command | Description |
 | --- | --- |
-| `npm run dev` | Start Next.js locally |
-| `npm run build` | Production build (automatically runs `prisma generate` first so Vercel caches stay fresh) |
-| `npm run lint` | ESLint checks |
+| `pnpm run dev` | Start Next.js locally |
+| `pnpm run build` | Production build (automatically runs `prisma generate` first so Vercel caches stay fresh) |
+| `pnpm run lint` | ESLint checks |
 | `npx prisma studio` | Inspect the Postgres data via Prisma Studio |
 
 ## API Overview
