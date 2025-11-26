@@ -23,6 +23,7 @@ export async function PUT(request: Request, { params }: RouteParams) {
     amount?: number
     unitId?: number
     paymentTypeId?: number
+    handlerId?: number | null
     paymentDate?: string
     tva?: number | null
     remark?: string | null

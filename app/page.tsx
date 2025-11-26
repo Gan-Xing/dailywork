@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { LocaleSwitcher } from '@/components/LocaleSwitcher';
 import { locales, type Locale } from '@/lib/i18n';
@@ -208,6 +209,29 @@ export default function HomePage() {
 	const [changeMessage, setChangeMessage] = useState<string | null>(null);
 	const [isChanging, setIsChanging] = useState(false);
 	const menuRef = useRef<HTMLDivElement | null>(null);
+	const searchParams = useSearchParams();
+
+	const can = useCallback(
+		(required: string[]) => {
+			if (!session) return required.length === 0;
+			return required.some((perm) => session.permissions.includes(perm));
+		},
+		[session]
+	);
+	const modulePermissions: Record<string, string[]> = useMemo(
+		() => ({
+			'/reports': ['report:view', 'report:edit'],
+			'/progress': [],
+			'/members': ['member:view'],
+			'/finance': ['finance:view']
+		}),
+		[]
+	);
+
+	const canViewReports = can(modulePermissions['/reports']);
+	const canViewProgress = can(modulePermissions['/progress']);
+	const canViewMembers = can(modulePermissions['/members']);
+	const canViewFinance = can(modulePermissions['/finance']);
 
 	useEffect(() => {
 		const loadSession = async () => {
@@ -227,6 +251,12 @@ export default function HomePage() {
 		};
 		loadSession();
 	}, []);
+
+	useEffect(() => {
+		if (searchParams?.get('login') === '1') {
+			setLoginOpen(true);
+		}
+	}, [searchParams]);
 
 	useEffect(() => {
 		const handleClickOutside = (event: MouseEvent | TouchEvent) => {
@@ -292,6 +322,25 @@ export default function HomePage() {
 		} finally {
 			setIsLoggingOut(false);
 		}
+	};
+
+	const handleModuleClick = (
+		event: React.MouseEvent,
+		href: string,
+		requiredPermissions: string[]
+	) => {
+		const allowed = can(requiredPermissions);
+		if (allowed) return;
+		event.preventDefault();
+		if (!session) {
+			setLoginOpen(true);
+			setLoginMessage('请先登录后再访问该模块');
+			return;
+		}
+		const codes = requiredPermissions.length
+			? requiredPermissions.join(' / ')
+			: '权限不足';
+		alert(`缺少访问权限：${codes}`);
 	};
 
 	const handleChangePassword = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -442,7 +491,11 @@ export default function HomePage() {
 						<div className='flex flex-wrap gap-3'>
 							<Link
 								href='/reports'
-								className='inline-flex items-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-semibold text-slate-900 shadow-lg shadow-blue-500/20 transition hover:-translate-y-0.5 hover:shadow-blue-500/30'>
+								onClick={(event) =>
+									handleModuleClick(event, '/reports', modulePermissions['/reports'])
+								}
+								aria-disabled={!canViewReports}
+								className='inline-flex items-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-semibold text-slate-900 shadow-lg shadow-blue-500/20 transition hover:-translate-y-0.5 hover:shadow-blue-500/30 aria-disabled:cursor-not-allowed aria-disabled:opacity-60'>
 								{t.hero.primaryCta}
 								<span aria-hidden>
 									↗
@@ -450,7 +503,11 @@ export default function HomePage() {
 							</Link>
 							<Link
 								href='/progress'
-								className='inline-flex items-center gap-2 rounded-2xl border border-white/20 px-5 py-3 text-sm font-semibold text-slate-50 transition hover:-translate-y-0.5 hover:border-white/40 hover:bg-white/10'>
+								onClick={(event) =>
+									handleModuleClick(event, '/progress', modulePermissions['/progress'])
+								}
+								aria-disabled={!canViewProgress}
+								className='inline-flex items-center gap-2 rounded-2xl border border-white/20 px-5 py-3 text-sm font-semibold text-slate-50 transition hover:-translate-y-0.5 hover:border-white/40 hover:bg-white/10 aria-disabled:cursor-not-allowed aria-disabled:opacity-60'>
 								{
 									t.hero
 										.secondaryCta
@@ -462,57 +519,53 @@ export default function HomePage() {
 				</header>
 
 				<section className='mt-12 grid gap-6 md:grid-cols-2'>
-					{t.modules.map((module) => (
-						<Link
-							key={module.title}
-							href={module.href}
-							className='group relative overflow-hidden rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl shadow-slate-950/30 transition duration-200 hover:-translate-y-1 hover:border-white/25 hover:shadow-slate-950/40'>
-							<div
-								className={`absolute inset-0 -z-10 bg-gradient-to-br ${module.tone} opacity-60 transition duration-200 group-hover:opacity-90`}
-							/>
-							<div className='flex items-center gap-3'>
-								<span className='rounded-full bg-white/15 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-50'>
-									{
-										t.moduleBadge
-									}
-								</span>
-								<span className='text-xs text-slate-100/80'>
-									{
-										t.moduleStatus
-									}
-								</span>
-							</div>
-							<h2 className='mt-4 text-2xl font-semibold text-slate-950'>
-								{module.title}
-							</h2>
-							<p className='mt-2 text-sm text-slate-900/90'>
-								{module.description}
-							</p>
-							<div className='mt-4 flex flex-wrap gap-2'>
-								{module.tags.map(
-									(tag) => (
-										<span
-											key={
-												tag
-											}
-											className='rounded-full bg-white/60 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-900'>
-											{
-												tag
-											}
+					{t.modules.map((module) => {
+						const required = modulePermissions[module.href] ?? [];
+						const allowed = can(required);
+						const locked = !allowed;
+						return (
+							<Link
+								key={module.title}
+								href={module.href}
+								onClick={(event) => handleModuleClick(event, module.href, required)}
+								aria-disabled={locked}
+								className={`group relative overflow-hidden rounded-3xl border border-white/10 bg-white/5 p-5 shadow-xl shadow-slate-950/30 transition duration-200 hover:-translate-y-1 hover:border-white/25 hover:shadow-slate-950/40 aria-disabled:cursor-not-allowed aria-disabled:opacity-60 sm:p-6`}
+							>
+								<div
+									className={`absolute inset-0 -z-10 bg-gradient-to-br ${module.tone} opacity-60 transition duration-200 group-hover:opacity-90`}
+								/>
+								{locked ? (
+									<div className='absolute inset-0 z-10 bg-slate-950/30 backdrop-blur-[1px]' />
+								) : null}
+								<div className='mt-3 flex items-center justify-between gap-3'>
+									<h2 className='text-xl font-semibold leading-tight text-slate-950 sm:text-2xl'>
+										{module.title}
+									</h2>
+									{locked ? (
+										<span className='shrink-0 rounded-full bg-white/10 px-3 py-1.5 text-[11px] font-semibold leading-none text-amber-100'>
+											{session ? '权限不足' : '需登录'}
 										</span>
-									)
-								)}
-							</div>
-							<div className='mt-6 inline-flex items-center gap-2 text-sm font-semibold text-slate-900 transition group-hover:translate-x-0.5'>
-								{module.cta}
-								<span
-									aria-hidden
-									className='text-base'>
-									→
-								</span>
-							</div>
-						</Link>
-					))}
+									) : null}
+								</div>
+								<p className='mt-2 text-sm text-slate-900/90'>{module.description}</p>
+								<div className='mt-3 flex flex-wrap gap-2'>
+									{module.tags.map((tag) => (
+										<span
+											key={tag}
+											className='rounded-full bg-white/60 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-900'>
+											{tag}
+										</span>
+									))}
+								</div>
+								<div className='mt-4 inline-flex items-center gap-2 text-sm font-semibold text-slate-900 transition group-hover:translate-x-0.5'>
+									{module.cta}
+									<span aria-hidden className='text-base'>
+										→
+									</span>
+								</div>
+							</Link>
+						);
+					})}
 				</section>
 
 				<section className='mt-12 grid gap-4 rounded-3xl border border-white/10 bg-white/5 p-6 text-sm text-slate-100 backdrop-blur'>
@@ -620,7 +673,7 @@ export default function HomePage() {
 									<span className='text-xs text-slate-300'>
 										默认账号：GanXing
 										/
-										Admin
+										Admin888
 										或
 										User1
 										/

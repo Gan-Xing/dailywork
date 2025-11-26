@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
+import { AccessDenied } from '@/components/AccessDenied'
+
 type SessionUser = {
   id: number
   username: string
@@ -20,12 +22,14 @@ type FinanceCategoryDTO = {
 type Project = { id: number; name: string; code: string | null; isActive: boolean }
 type Unit = { id: number; name: string; symbol: string | null; isActive: boolean }
 type PaymentType = { id: number; name: string; isActive: boolean }
+type Handler = { id: number; name: string; username: string }
 
 type Metadata = {
   projects: Project[]
   units: Unit[]
   paymentTypes: PaymentType[]
   categories: FinanceCategoryDTO[]
+  handlers: Handler[]
 }
 
 type FinanceEntry = {
@@ -41,6 +45,9 @@ type FinanceEntry = {
   unitName: string
   paymentTypeId: number
   paymentTypeName: string
+  handlerId: number | null
+  handlerName?: string | null
+  handlerUsername?: string | null
   paymentDate: string
   tva?: number
   remark?: string | null
@@ -64,6 +71,7 @@ type EntryForm = {
   amount: string
   unitId: number | ''
   paymentTypeId: number | ''
+  handlerId: number | ''
   paymentDate: string
   tva: string
   remark: string
@@ -73,6 +81,7 @@ type ListFilters = {
   projectIds: number[]
   categoryKeys: string[]
   paymentTypeIds: number[]
+  handlerIds: number[]
   reasonKeyword: string
   amountMin: string
   amountMax: string
@@ -116,12 +125,14 @@ const toggleValue = <T,>(list: T[], value: T) =>
 
 export default function FinancePage() {
   const [session, setSession] = useState<SessionUser | null>(null)
+  const [authLoaded, setAuthLoaded] = useState(false)
   const [metadata, setMetadata] = useState<Metadata | null>(null)
   const [entries, setEntries] = useState<FinanceEntry[]>([])
   const [listFilters, setListFilters] = useState<ListFilters>({
     projectIds: [],
     categoryKeys: [],
     paymentTypeIds: [],
+    handlerIds: [],
     reasonKeyword: '',
     amountMin: '',
     amountMax: '',
@@ -134,6 +145,7 @@ export default function FinancePage() {
     projectIds: [],
     categoryKeys: [],
     paymentTypeIds: [],
+    handlerIds: [],
     reasonKeyword: '',
     amountMin: '',
     amountMax: '',
@@ -145,6 +157,7 @@ export default function FinancePage() {
   const [categorySearch, setCategorySearch] = useState('')
   const [projectOpen, setProjectOpen] = useState(false)
   const [paymentOpen, setPaymentOpen] = useState(false)
+  const [handlerOpen, setHandlerOpen] = useState(false)
   const [categoryOpen, setCategoryOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [insightsLoading, setInsightsLoading] = useState(false)
@@ -159,6 +172,7 @@ export default function FinancePage() {
     amount: '',
     unitId: '',
     paymentTypeId: '',
+    handlerId: '',
     paymentDate: formatDateInput(new Date().toISOString()),
     tva: '',
     remark: '',
@@ -176,9 +190,10 @@ export default function FinancePage() {
   })
   const [showManage, setShowManage] = useState(false)
 
-  const canView = session?.permissions.includes('finance:view')
-  const canEdit = session?.permissions.includes('finance:edit')
-  const canManage = session?.permissions.includes('finance:manage')
+  const canView = session?.permissions.includes('finance:view') ?? false
+  const canEdit = session?.permissions.includes('finance:edit') ?? false
+  const canManage = session?.permissions.includes('finance:manage') ?? false
+  const shouldShowAccessDenied = authLoaded && !canView
 
   const categoryOptions = useMemo(
     () => (metadata ? buildCategoryOptions(metadata.categories, '') : []),
@@ -193,6 +208,11 @@ export default function FinancePage() {
     if (!keyword) return categoryOptionsWithParents
     return categoryOptionsWithParents.filter((cat) => cat.label.toLowerCase().includes(keyword))
   }, [categoryOptionsWithParents, categorySearch])
+
+  const defaultHandlerId = useMemo(() => {
+    const match = metadata?.handlers.find((handler) => handler.name === '何柳琴' || handler.username === '何柳琴')
+    return match?.id ?? ''
+  }, [metadata?.handlers])
 
   const projectLabel = useMemo(() => {
     if (!metadata?.projects?.length || !listDraft.projectIds.length) return '全部项目'
@@ -211,6 +231,15 @@ export default function FinancePage() {
     if (!names.length) return '全部支付方式'
     return names.length <= 2 ? names.join('、') : `${names[0]}等${names.length}个`
   }, [listDraft.paymentTypeIds, metadata?.paymentTypes])
+
+  const handlerLabel = useMemo(() => {
+    if (!metadata?.handlers?.length || !listDraft.handlerIds.length) return '全部经办人'
+    const names = metadata.handlers
+      .filter((handler) => listDraft.handlerIds.includes(handler.id))
+      .map((handler) => handler.name || handler.username)
+    if (!names.length) return '全部经办人'
+    return names.length <= 2 ? names.join('、') : `${names[0]}等${names.length}个`
+  }, [listDraft.handlerIds, metadata?.handlers])
 
   const categoryLabel = useMemo(() => {
     if (!categoryOptionsWithParents.length || !listDraft.categoryKeys.length) return '全部分类'
@@ -243,6 +272,9 @@ export default function FinancePage() {
     }
     if (listFilters.paymentTypeIds.length) {
       result = result.filter((e) => listFilters.paymentTypeIds.includes(e.paymentTypeId))
+    }
+    if (listFilters.handlerIds.length) {
+      result = result.filter((e) => (e.handlerId ? listFilters.handlerIds.includes(e.handlerId) : false))
     }
     if (listFilters.reasonKeyword.trim()) {
       const keyword = listFilters.reasonKeyword.trim().toLowerCase()
@@ -289,6 +321,7 @@ export default function FinancePage() {
     filtersInput.projectIds.forEach((id) => params.append('projectId', String(id)))
     filtersInput.categoryKeys.forEach((key) => params.append('categoryKey', key))
     filtersInput.paymentTypeIds.forEach((id) => params.append('paymentTypeId', String(id)))
+    filtersInput.handlerIds.forEach((id) => params.append('handlerId', String(id)))
     if (filtersInput.reasonKeyword.trim()) params.set('reasonKeyword', filtersInput.reasonKeyword.trim())
     if (filtersInput.amountMin !== '') params.set('amountMin', filtersInput.amountMin)
     if (filtersInput.amountMax !== '') params.set('amountMax', filtersInput.amountMax)
@@ -304,6 +337,8 @@ export default function FinancePage() {
       setSession(data.user)
     } catch (error) {
       console.error(error)
+    } finally {
+      setAuthLoaded(true)
     }
   }
 
@@ -320,23 +355,28 @@ export default function FinancePage() {
         units: data.units,
         paymentTypes: data.paymentTypes,
         categories: data.categories,
+        handlers: data.handlers ?? [],
       })
       const defaultProject = data.projects.find((p) => p.name === '邦杜库市政路项目')
       const defaultPayment = data.paymentTypes.find((p) => p.name === '现金支票')
       const defaultUnit = data.units.find((u) => u.name === '西法')
       const defaultCategory = buildCategoryOptions(data.categories, '')[0]?.key
+      const defaultHandler =
+        data.handlers?.find((handler) => handler.name === '何柳琴' || handler.username === '何柳琴')
       setForm((prev) => ({
         ...prev,
         projectId: defaultProject?.id ?? prev.projectId,
         paymentTypeId: defaultPayment?.id ?? prev.paymentTypeId,
         unitId: defaultUnit?.id ?? prev.unitId,
         categoryKey: defaultCategory ?? prev.categoryKey,
+        handlerId: defaultHandler?.id ?? prev.handlerId,
         paymentDate: prev.paymentDate || formatDateInput(new Date().toISOString()),
       }))
       const defaults: ListFilters = {
         projectIds: defaultProject?.id ? [defaultProject.id] : [],
         categoryKeys: [],
         paymentTypeIds: defaultPayment?.id ? [defaultPayment.id] : [],
+        handlerIds: [],
         reasonKeyword: '',
         amountMin: '',
         amountMax: '',
@@ -418,6 +458,7 @@ export default function FinancePage() {
     projectIds: filtersProjectIds,
     categoryKeys: filtersCategoryKeys,
     paymentTypeIds: filtersPaymentTypeIds,
+    handlerIds: filtersHandlerIds,
     reasonKeyword: filtersReasonKeyword,
     amountMin: filtersAmountMin,
     amountMax: filtersAmountMax,
@@ -433,6 +474,7 @@ export default function FinancePage() {
       projectIds: filtersProjectIds,
       categoryKeys: filtersCategoryKeys,
       paymentTypeIds: filtersPaymentTypeIds,
+      handlerIds: filtersHandlerIds,
       reasonKeyword: filtersReasonKeyword,
       amountMin: filtersAmountMin,
       amountMax: filtersAmountMax,
@@ -449,6 +491,7 @@ export default function FinancePage() {
     filtersProjectIds,
     filtersCategoryKeys,
     filtersPaymentTypeIds,
+    filtersHandlerIds,
     filtersReasonKeyword,
     filtersAmountMin,
     filtersAmountMax,
@@ -528,6 +571,7 @@ export default function FinancePage() {
       amount: '',
       unitId: metadata?.units.find((u) => u.name === '西法')?.id ?? '',
       paymentTypeId: metadata?.paymentTypes.find((p) => p.name === '现金支票')?.id ?? '',
+      handlerId: defaultHandlerId || '',
       paymentDate: formatDateInput(new Date().toISOString()),
       tva: '',
       remark: '',
@@ -549,6 +593,7 @@ export default function FinancePage() {
       amount: Number(form.amount),
       unitId: Number(form.unitId),
       paymentTypeId: Number(form.paymentTypeId),
+      handlerId: form.handlerId ? Number(form.handlerId) : null,
       paymentDate: form.paymentDate || new Date().toISOString(),
       tva: form.tva ? Number(form.tva) : null,
       remark: form.remark || null,
@@ -591,6 +636,7 @@ export default function FinancePage() {
       amount: String(entry.amount),
       unitId: entry.unitId,
       paymentTypeId: entry.paymentTypeId,
+      handlerId: entry.handlerId ?? '',
       paymentDate: formatDateInput(entry.paymentDate),
       tva: entry.tva != null ? String(entry.tva) : '',
       remark: entry.remark ?? '',
@@ -671,6 +717,15 @@ export default function FinancePage() {
     }
   }
 
+  if (shouldShowAccessDenied) {
+    return (
+      <AccessDenied
+        permissions={['finance:view']}
+        hint="请先登录并开通 finance:view 权限以查看财务流水。"
+      />
+    )
+  }
+
   return (
     <div className="mx-auto max-w-6xl p-6 space-y-6">
       <div className="flex items-center justify-between">
@@ -720,7 +775,7 @@ export default function FinancePage() {
           <div className="grid gap-3 md:grid-cols-12">
             <div className="md:col-span-3">
               <label className="space-y-1 text-sm">
-                <span className="text-slate-700">项目（可多选）</span>
+                <span className="text-slate-700">项目</span>
                 <div className="relative">
                   <button
                     type="button"
@@ -786,7 +841,7 @@ export default function FinancePage() {
 
             <div className="md:col-span-3">
               <label className="space-y-1 text-sm">
-                <span className="text-slate-700">支付方式（可多选）</span>
+                <span className="text-slate-700">支付方式</span>
                 <div className="relative">
                   <button
                     type="button"
@@ -852,6 +907,72 @@ export default function FinancePage() {
 
             <div className="md:col-span-3">
               <label className="space-y-1 text-sm">
+                <span className="text-slate-700">经办人</span>
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setHandlerOpen((prev) => !prev)}
+                    className="flex w-full items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-left text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
+                  >
+                    <span className="truncate">{handlerLabel}</span>
+                    <span className="text-xs text-slate-500">⌕</span>
+                  </button>
+                  {handlerOpen && (
+                    <div
+                      className="absolute z-20 mt-2 w-full rounded-lg border border-slate-200 bg-white shadow-lg"
+                      onMouseLeave={() => setHandlerOpen(false)}
+                    >
+                      <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2 text-xs text-slate-600">
+                        <span>已选 {listDraft.handlerIds.length || '全部'}</span>
+                        <div className="flex gap-2">
+                          <button
+                            className="text-emerald-700 hover:underline"
+                            onClick={() =>
+                              setListDraft((prev) => ({
+                                ...prev,
+                                handlerIds: metadata?.handlers.map((h) => h.id) ?? [],
+                              }))
+                            }
+                          >
+                            全选
+                          </button>
+                          <button
+                            className="text-slate-600 hover:underline"
+                            onClick={() => setListDraft((prev) => ({ ...prev, handlerIds: [] }))}
+                          >
+                            清空
+                          </button>
+                        </div>
+                      </div>
+                      <div className="max-h-56 space-y-1 overflow-y-auto p-2 text-sm">
+                        {metadata?.handlers.map((handler) => (
+                          <label
+                            key={handler.id}
+                            className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 hover:bg-slate-50"
+                          >
+                            <input
+                              type="checkbox"
+                              className="h-4 w-4"
+                              checked={listDraft.handlerIds.includes(handler.id)}
+                              onChange={() =>
+                                setListDraft((prev) => ({
+                                  ...prev,
+                                  handlerIds: toggleValue(prev.handlerIds, handler.id),
+                                }))
+                              }
+                            />
+                            <span className="truncate">{handler.name || handler.username}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </label>
+            </div>
+
+            <div className="md:col-span-3">
+              <label className="space-y-1 text-sm">
                 <span className="text-slate-700">事由</span>
                 <input
                   className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
@@ -862,9 +983,9 @@ export default function FinancePage() {
               </label>
             </div>
 
-            <div className="md:col-span-3">
+            <div className="md:col-span-8">
               <label className="space-y-1 text-sm">
-                <span className="text-slate-700">分类（可多选）</span>
+                <span className="text-slate-700">分类</span>
                 <div className="relative">
                   <button
                     type="button"
@@ -942,7 +1063,7 @@ export default function FinancePage() {
               </label>
             </div>
 
-            <div className="md:col-span-12 flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 p-3 shadow-sm">
+            <div className="md:col-span-4 flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 p-3 shadow-sm">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium text-slate-700">金额范围</span>
                 <div className="flex items-center gap-2">
@@ -1011,8 +1132,10 @@ export default function FinancePage() {
                   </div>
                 </div>
               </div>
+            </div>
 
-              <div className="flex items-center gap-2">
+            <div className="md:col-span-12 flex flex-col gap-3 rounded-lg border border-slate-200 p-3 shadow-sm md:flex-row md:items-center md:justify-between">
+              <div className="flex flex-wrap items-center gap-2">
                 <span className="text-sm font-medium text-slate-700">日期范围</span>
                 <div className="flex items-center gap-2">
                   <input
@@ -1030,13 +1153,13 @@ export default function FinancePage() {
                   />
                 </div>
               </div>
-
-              <div className="ml-auto flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <button
                   onClick={() => {
                     setListFilters({ ...listDraft })
                     setProjectOpen(false)
                     setPaymentOpen(false)
+                    setHandlerOpen(false)
                     setCategoryOpen(false)
                     setRefreshKey((prev) => prev + 1)
                   }}
@@ -1050,6 +1173,7 @@ export default function FinancePage() {
                       projectIds: [],
                       categoryKeys: [],
                       paymentTypeIds: [],
+                      handlerIds: [],
                       reasonKeyword: '',
                       amountMin: '',
                       amountMax: '',
@@ -1062,6 +1186,7 @@ export default function FinancePage() {
                     setListFilters(reset)
                     setProjectOpen(false)
                     setPaymentOpen(false)
+                    setHandlerOpen(false)
                     setCategoryOpen(false)
                     setRefreshKey((prev) => prev + 1)
                   }}
@@ -1138,6 +1263,7 @@ export default function FinancePage() {
                     >
                       支付日期 {listFilters.sortField === 'paymentDate' ? (listFilters.sortDir === 'asc' ? '↑' : '↓') : ''}
                     </th>
+                    <th className="px-3 py-2">经办人</th>
                     <th className="px-3 py-2 w-36">操作</th>
                     <th className="px-3 py-2">备注</th>
                   </tr>
@@ -1156,6 +1282,7 @@ export default function FinancePage() {
                       </td>
                       <td className="px-3 py-2">{entry.paymentTypeName}</td>
                       <td className="px-3 py-2">{formatDateInput(entry.paymentDate)}</td>
+                      <td className="px-3 py-2">{entry.handlerName || entry.handlerUsername || '—'}</td>
                       <td className="px-3 py-2">
                         <div className="flex flex-wrap gap-2">
                           {canEdit && !entry.isDeleted && (
@@ -1656,15 +1783,37 @@ export default function FinancePage() {
                 </label>
               </div>
 
-              <label className="space-y-1">
-                <span className="text-sm font-medium text-slate-700">支付日期</span>
-                <input
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
-                  type="date"
-                  value={form.paymentDate}
-                  onChange={(e) => setForm((prev) => ({ ...prev, paymentDate: e.target.value }))}
-                />
-              </label>
+              <div className="grid gap-3 md:grid-cols-2">
+                <label className="space-y-1">
+                  <span className="text-sm font-medium text-slate-700">支付日期</span>
+                  <input
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
+                    type="date"
+                    value={form.paymentDate}
+                    onChange={(e) => setForm((prev) => ({ ...prev, paymentDate: e.target.value }))}
+                  />
+                </label>
+                <label className="space-y-1">
+                  <span className="text-sm font-medium text-slate-700">经办人</span>
+                  <select
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
+                    value={form.handlerId}
+                    onChange={(e) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        handlerId: e.target.value ? Number(e.target.value) : '',
+                      }))
+                    }
+                  >
+                    <option value="">选择经办人</option>
+                    {metadata?.handlers.map((handler) => (
+                      <option key={handler.id} value={handler.id}>
+                        {handler.name || handler.username}（{handler.username}）
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
 
               <div className="grid gap-3 md:grid-cols-2">
                 <label className="space-y-1">

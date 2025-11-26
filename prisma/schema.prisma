@@ -209,6 +209,7 @@ model User {
   inspectionRequests InspectionRequest[]
   createdFinances FinanceEntry[] @relation("FinanceEntryCreator")
   deletedFinances FinanceEntry[] @relation("FinanceEntryDeleter")
+  handledFinances FinanceEntry[] @relation("FinanceEntryHandler")
   chineseProfile UserChineseProfile?
   expatProfile UserExpatProfile?
   createdById  Int?
@@ -327,6 +328,7 @@ model FinanceEntry {
   paymentDate   DateTime
   tva           Decimal?       @db.Decimal(18, 2)
   remark        String?
+  handlerId     Int?
   isDeleted     Boolean        @default(false)
   deletedAt     DateTime?
   deletedBy     Int?
@@ -339,10 +341,12 @@ model FinanceEntry {
   paymentType   PaymentType    @relation(fields: [paymentTypeId], references: [id])
   creator       User?          @relation("FinanceEntryCreator", fields: [createdBy], references: [id])
   deleter       User?          @relation("FinanceEntryDeleter", fields: [deletedBy], references: [id])
+  handler       User?          @relation("FinanceEntryHandler", fields: [handlerId], references: [id])
 
   @@unique([sequence])
   @@index([projectId])
   @@index([categoryKey])
   @@index([paymentDate])
   @@index([isDeleted])
+  @@index([handlerId])
 }

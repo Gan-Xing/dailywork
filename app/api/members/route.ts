@@ -1,17 +1,24 @@
 import { NextResponse } from 'next/server'
 
 import { hashPassword } from '@/lib/auth/password'
+import { hasPermission } from '@/lib/server/authSession'
 import { listUsers } from '@/lib/server/authStore'
 import { prisma } from '@/lib/prisma'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET() {
+  if (!hasPermission('member:view')) {
+    return NextResponse.json({ error: '缺少成员查看权限' }, { status: 403 })
+  }
   const members = await listUsers()
   return NextResponse.json({ members })
 }
 
 export async function POST(request: Request) {
+  if (!hasPermission('member:manage')) {
+    return NextResponse.json({ error: '缺少成员管理权限' }, { status: 403 })
+  }
   const body = await request.json()
   const {
     username,

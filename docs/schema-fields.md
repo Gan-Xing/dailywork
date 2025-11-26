@@ -238,10 +238,17 @@
 
 ## 权限与账户模型
 
-- **Permission**：`code`（唯一标识，如 `road:manage`、`report:edit`）、`name`、`createdAt`、`updatedAt`。
+- **Permission**：`code`（唯一标识，如 `road:manage`、`report:edit`）、`name`、`createdAt`、`updatedAt`；当前权限编码覆盖：
+  - 成员：`member:view`、`member:edit`、`member:manage`、`role:manage`、`permission:view`
+  - 道路/进度/报检：`road:view`、`road:manage`、`progress:view`、`progress:edit`、`inspection:create`
+  - 日报：`report:view`、`report:edit`
+  - 财务：`finance:view`、`finance:edit`、`finance:manage`
 - **Role**：`name`（唯一，如 `Admin`、`Employee`）、`permissions`（多对多）、`createdAt`、`updatedAt`。
 - **User**：账号/权限字段包含 `username`（唯一）、`passwordHash`（salt + hash）、`roles`（多对多）、`createdAt`、`updatedAt`；个人资料字段见下方“成员管理字段”。
-- 默认账号：`GanXing`（密码 `Admin`，角色 `Admin`，拥有全部权限）、`User1`（密码 `use1`，角色 `Employee`，只有填写日报/修改权限）。
+- 默认角色与权限：
+  - Admin：拥有全部权限。
+  - Employee：`road:view`、`progress:view`、`inspection:create`、`report:view`、`report:edit`、`finance:view`。
+- 默认账号：`GanXing`（密码 `Admin888`，角色 `Admin`，拥有全部权限）、`User1`（密码 `use1`，角色 `Employee`，只有填写日报/修改权限）。
 
 ## 成员管理字段
 

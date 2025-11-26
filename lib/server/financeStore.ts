@@ -47,6 +47,9 @@ export type FinanceEntryDTO = {
   paymentTypeId: number
   paymentTypeName: string
   paymentDate: string
+  handlerId?: number | null
+  handlerName?: string | null
+  handlerUsername?: string | null
   tva?: number
   remark?: string | null
   isDeleted: boolean
@@ -62,6 +65,7 @@ type EntryPayload = {
   unitId: number
   paymentTypeId: number
   paymentDate: string
+  handlerId?: number | null
   tva?: number | null
   remark?: string | null
 }
@@ -70,6 +74,7 @@ export type FinanceEntryFilterOptions = {
   projectIds?: number[]
   categoryKeys?: string[]
   paymentTypeIds?: number[]
+  handlerIds?: number[]
   reasonKeyword?: string
   amountMin?: number
   amountMax?: number
@@ -234,11 +239,16 @@ export const listFinanceMetadata = async () => {
   await ensureFinanceDefaults()
   await ensureFinanceCategories()
 
-  const [projects, units, paymentTypes, categories] = await Promise.all([
+  const [projects, units, paymentTypes, categories, handlers] = await Promise.all([
     prisma.project.findMany({ where: { isActive: true }, orderBy: [{ name: 'asc' }, { id: 'asc' }] }),
     prisma.financeUnit.findMany({ where: { isActive: true }, orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }] }),
     prisma.paymentType.findMany({ where: { isActive: true }, orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }] }),
     prisma.financeCategory.findMany({ where: { isActive: true }, orderBy: [{ sortOrder: 'asc' }, { key: 'asc' }] }),
+    prisma.user.findMany({
+      where: { nationality: 'china' },
+      orderBy: [{ name: 'asc' }, { username: 'asc' }],
+      select: { id: true, name: true, username: true },
+    }),
   ])
 
   const map = new Map<string, FinanceCategoryDTO>()
@@ -276,6 +286,11 @@ export const listFinanceMetadata = async () => {
     units,
     paymentTypes,
     categories: roots,
+    handlers: handlers.map((handler) => ({
+      id: handler.id,
+      name: handler.name,
+      username: handler.username,
+    })),
   }
 }
 
@@ -307,6 +322,7 @@ const buildEntryWhere = (options: FinanceEntryFilterOptions): Prisma.FinanceEntr
   const where: Prisma.FinanceEntryWhereInput = {
     projectId: options.projectIds?.length ? { in: options.projectIds } : undefined,
     paymentTypeId: options.paymentTypeIds?.length ? { in: options.paymentTypeIds } : undefined,
+    handlerId: options.handlerIds?.length ? { in: options.handlerIds } : undefined,
     isDeleted: options.includeDeleted ? undefined : false,
     AND: andConditions.length ? andConditions : undefined,
   }
@@ -326,6 +342,7 @@ export const listFinanceEntries = async (options: FinanceEntryFilterOptions) => 
         project: true,
         unit: true,
         paymentType: true,
+        handler: true,
       },
     }),
     prisma.financeCategory.findMany(),
@@ -361,6 +378,9 @@ export const listFinanceEntries = async (options: FinanceEntryFilterOptions) => 
     paymentTypeId: entry.paymentTypeId,
     paymentTypeName: entry.paymentType.name,
     paymentDate: entry.paymentDate.toISOString(),
+    handlerId: entry.handlerId ?? null,
+    handlerName: entry.handler?.name ?? null,
+    handlerUsername: entry.handler?.username ?? null,
     tva: toNumber(entry.tva),
     remark: entry.remark,
     isDeleted: entry.isDeleted,
@@ -375,6 +395,21 @@ const assertCategoryExists = async (categoryKey: string) => {
     throw new Error('分类不存在或已停用')
   }
   return cat
+}
+
+const assertHandlerIsChinese = async (handlerId?: number | null) => {
+  if (!handlerId) return null
+  const handler = await prisma.user.findUnique({
+    where: { id: handlerId },
+    select: { id: true, name: true, username: true, nationality: true },
+  })
+  if (!handler) {
+    throw new Error('经办人不存在')
+  }
+  if (handler.nationality !== 'china') {
+    throw new Error('经办人必须为中国籍成员')
+  }
+  return handler
 }
 
 const normalizeNumber = (value: number | string | null | undefined) => {
@@ -490,6 +525,7 @@ export const createFinanceEntry = async (payload: EntryPayload, userId?: number 
   const categories = await prisma.financeCategory.findMany()
   const map = buildCategoryMap(categories)
   const parentKeys = resolveParentKeys(map, payload.categoryKey)
+  const handler = await assertHandlerIsChinese(payload.handlerId)
 
   const amount = normalizeNumber(payload.amount)
   const tva = payload.tva != null ? normalizeNumber(payload.tva) : null
@@ -506,12 +542,14 @@ export const createFinanceEntry = async (payload: EntryPayload, userId?: number 
       paymentDate: new Date(payload.paymentDate),
       tva: tva == null ? null : new Prisma.Decimal(tva),
       remark: payload.remark ?? null,
+      handlerId: handler?.id ?? null,
       createdBy: userId ?? null,
     },
     include: {
       project: true,
       unit: true,
       paymentType: true,
+      handler: true,
     },
   })
 
@@ -536,6 +574,9 @@ export const createFinanceEntry = async (payload: EntryPayload, userId?: number 
     paymentTypeId: entry.paymentTypeId,
     paymentTypeName: entry.paymentType.name,
     paymentDate: entry.paymentDate.toISOString(),
+    handlerId: entry.handlerId ?? null,
+    handlerName: entry.handler?.name ?? null,
+    handlerUsername: entry.handler?.username ?? null,
     tva: toOptionalNumber(tva),
     remark: entry.remark,
     isDeleted: entry.isDeleted,
@@ -555,6 +596,7 @@ export const updateFinanceEntry = async (id: number, payload: Partial<EntryPaylo
   const categories = await prisma.financeCategory.findMany()
   const map = buildCategoryMap(categories)
   const parentKeys = resolveParentKeys(map, categoryKey)
+  const handler = await assertHandlerIsChinese(payload.handlerId ?? existing.handlerId ?? undefined)
 
   const amount =
     payload.amount != null ? normalizeNumber(payload.amount) : new Prisma.Decimal(existing.amount).toNumber()
@@ -574,11 +616,13 @@ export const updateFinanceEntry = async (id: number, payload: Partial<EntryPaylo
       paymentDate: payload.paymentDate ? new Date(payload.paymentDate) : existing.paymentDate,
       tva: tva == null ? null : new Prisma.Decimal(tva),
       remark: payload.remark ?? existing.remark,
+      handlerId: handler?.id ?? null,
     },
     include: {
       project: true,
       unit: true,
       paymentType: true,
+      handler: true,
     },
   })
 
@@ -603,6 +647,9 @@ export const updateFinanceEntry = async (id: number, payload: Partial<EntryPaylo
     paymentTypeId: entry.paymentTypeId,
     paymentTypeName: entry.paymentType.name,
     paymentDate: entry.paymentDate.toISOString(),
+    handlerId: entry.handlerId ?? null,
+    handlerName: entry.handler?.name ?? null,
+    handlerUsername: entry.handler?.username ?? null,
     tva: toOptionalNumber(tva),
     remark: entry.remark,
     isDeleted: entry.isDeleted,

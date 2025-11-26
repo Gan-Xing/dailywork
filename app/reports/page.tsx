@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
+import { AccessDenied } from '@/components/AccessDenied'
 import { LocaleSwitcher } from '@/components/LocaleSwitcher'
 import { locales, type Locale } from '@/lib/i18n'
 import { usePreferredLocale } from '@/lib/usePreferredLocale'
@@ -139,6 +140,12 @@ const landingCopy: Record<Locale, LandingCopy> = {
   },
 }
 
+type SessionUser = {
+  id: number
+  username: string
+  permissions: string[]
+}
+
 export default function ReportsLandingPage() {
   const router = useRouter()
   const { locale, setLocale } = usePreferredLocale('zh', locales)
@@ -151,9 +158,29 @@ export default function ReportsLandingPage() {
   const [isRecentLoading, setIsRecentLoading] = useState(true)
   const [hasMonthError, setHasMonthError] = useState(false)
   const [hasRecentError, setHasRecentError] = useState(false)
+  const [session, setSession] = useState<SessionUser | null>(null)
+  const [authLoaded, setAuthLoaded] = useState(false)
 
   const monthKey = useMemo(() => formatMonthKey(monthCursor), [monthCursor])
   const dateLocale = dateLocales[locale]
+
+  const canView = session?.permissions.some((perm) => perm === 'report:view' || perm === 'report:edit') ?? false
+  const canEdit = session?.permissions.includes('report:edit') ?? false
+
+  useEffect(() => {
+    const loadSession = async () => {
+      try {
+        const res = await fetch('/api/auth/session', { credentials: 'include' })
+        const data = (await res.json()) as { user?: SessionUser | null }
+        setSession(data.user ?? null)
+      } catch {
+        setSession(null)
+      } finally {
+        setAuthLoaded(true)
+      }
+    }
+    void loadSession()
+  }, [])
 
   const fetchMonthReports = useCallback(async (key: string) => {
     setIsMonthLoading(true)
@@ -192,12 +219,26 @@ export default function ReportsLandingPage() {
   }, [])
 
   useEffect(() => {
+    if (!authLoaded) return
+    if (!canView) {
+      setIsMonthLoading(false)
+      setHasMonthError(false)
+      setMonthReports([])
+      return
+    }
     fetchMonthReports(monthKey)
-  }, [fetchMonthReports, monthKey])
+  }, [authLoaded, canView, fetchMonthReports, monthKey])
 
   useEffect(() => {
+    if (!authLoaded) return
+    if (!canView) {
+      setIsRecentLoading(false)
+      setHasRecentError(false)
+      setRecentReports([])
+      return
+    }
     fetchRecentReports()
-  }, [fetchRecentReports])
+  }, [authLoaded, canView, fetchRecentReports])
 
   const reportDates = useMemo(
     () => new Set(monthReports.map((entry) => entry.date)),
@@ -210,10 +251,18 @@ export default function ReportsLandingPage() {
 
   const handleCreate = () => {
     if (!selectedDate) return
+    if (!canEdit) {
+      window.alert('缺少 report:edit 权限，无法创建或修改日报。')
+      return
+    }
     router.push(`/reports/${selectedDate}`)
   }
 
   const handleDayClick = (date: string) => {
+    if (!canView) {
+      window.alert('缺少 report:view 权限，无法查看日报。')
+      return
+    }
     router.push(`/reports/${date}`)
   }
 
@@ -233,6 +282,16 @@ export default function ReportsLandingPage() {
         setMonthCursor(parsed)
       }
     }
+  }
+
+  if (authLoaded && !canView) {
+    return (
+      <AccessDenied
+        locale={locale}
+        permissions={['report:view', 'report:edit']}
+        hint={locale === 'fr' ? "Contactez l'admin pour obtenir l'accès à la consultation/édition des rapports." : '需要拥有 report:view 或 report:edit 权限才能创建或查看日报。'}
+      />
+    )
   }
 
   return (
@@ -261,7 +320,7 @@ export default function ReportsLandingPage() {
                 type="button"
                 className="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
                 onClick={handleCreate}
-                disabled={!selectedDate}
+                disabled={!selectedDate || !canEdit}
               >
                 {hasReportForSelectedDate ? t.create.viewButton : t.create.createButton}
               </button>

@@ -16,6 +16,9 @@ export async function POST(request: Request, { params }: RouteParams) {
   if (!sessionUser) {
     return NextResponse.json({ message: '请先登录后再报检' }, { status: 401 })
   }
+  if (!hasPermission('inspection:create') && !hasPermission('road:manage')) {
+    return NextResponse.json({ message: '缺少报检权限' }, { status: 403 })
+  }
 
   const road = await getRoadBySlug(params.slug)
   if (!road) {

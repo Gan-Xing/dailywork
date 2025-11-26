@@ -2,16 +2,23 @@ import { Prisma } from '@prisma/client'
 import { NextResponse } from 'next/server'
 
 import { listRoles } from '@/lib/server/authStore'
+import { hasPermission } from '@/lib/server/authSession'
 import { prisma } from '@/lib/prisma'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET() {
+  if (!hasPermission('member:view')) {
+    return NextResponse.json({ error: '缺少成员查看权限' }, { status: 403 })
+  }
   const roles = await listRoles()
   return NextResponse.json({ roles })
 }
 
 export async function POST(request: Request) {
+  if (!hasPermission('role:manage')) {
+    return NextResponse.json({ error: '缺少角色管理权限' }, { status: 403 })
+  }
   const body = await request.json()
   const { name, permissionIds } = body ?? {}
 

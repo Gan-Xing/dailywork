@@ -14,6 +14,7 @@ const toNumberArray = (values: string[]) =>
 export const parseFinanceFilters = (searchParams: URLSearchParams): FinanceEntryFilterOptions => {
   const projectIds = toNumberArray(searchParams.getAll('projectId'))
   const paymentTypeIds = toNumberArray(searchParams.getAll('paymentTypeId'))
+  const handlerIds = toNumberArray(searchParams.getAll('handlerId'))
   const amountMin = toNumber(searchParams.get('amountMin'))
   const amountMax = toNumber(searchParams.get('amountMax'))
   const dateFrom = searchParams.get('dateFrom') || undefined
@@ -28,6 +29,7 @@ export const parseFinanceFilters = (searchParams: URLSearchParams): FinanceEntry
   return {
     projectIds: projectIds.length ? projectIds : undefined,
     paymentTypeIds: paymentTypeIds.length ? paymentTypeIds : undefined,
+    handlerIds: handlerIds.length ? handlerIds : undefined,
     amountMin,
     amountMax,
     dateFrom,

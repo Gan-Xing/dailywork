@@ -30,6 +30,7 @@ export async function POST(request: Request) {
     amount?: number
     unitId?: number
     paymentTypeId?: number
+    handlerId?: number | null
     paymentDate?: string
     tva?: number | null
     remark?: string | null
@@ -62,6 +63,7 @@ export async function POST(request: Request) {
         amount: Number(payload.amount),
         unitId: Number(payload.unitId),
         paymentTypeId: Number(payload.paymentTypeId),
+        handlerId: payload.handlerId == null ? null : Number(payload.handlerId),
         paymentDate: payload.paymentDate,
         tva: payload.tva == null ? null : Number(payload.tva),
         remark: payload.remark ?? null,

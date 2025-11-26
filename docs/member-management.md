@@ -37,6 +37,11 @@
 - 敏感信息：暂无额外加密/脱敏要求，可依赖权限控制访问。
 - 筛选/排序：成员列表至少支持按角色、状态、国籍、岗位过滤，支持姓名/账号搜索、入职时间排序。
 
+## 权限策略
+- 权限编码：`member:view`、`member:edit`、`member:manage`、`role:manage`、`permission:view`；日报 `report:view|edit`；道路/进度/报检 `road:view|manage`、`progress:view|edit`、`inspection:create`；财务 `finance:view|edit|manage`。
+- 默认角色：Admin 拥有全部；Employee 拥有 `road:view`、`progress:view`、`inspection:create`、`report:view`、`report:edit`、`finance:view`。
+- API 护栏：成员/角色/权限的读写需对应权限（读 `member:view|permission:view`，写 `member:edit|member:manage|role:manage`）；道路/进度读取需要 `road:view` 或 `progress:view`，进度写入需要 `progress:edit` 或 `road:manage`；报检需要 `inspection:create`；日报读取/写入分别需要 `report:view` / `report:edit`。
+
 ## 后续扩展留口
 - 外籍扩展字段：预留 `UserExpatProfile`，后续新增字段保持后向兼容。
 - 报警/提醒：后续可基于红皮书年限、累计出国年限增加提醒或报表。
