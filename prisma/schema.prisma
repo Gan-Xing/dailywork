@@ -32,6 +32,12 @@ enum IntervalSide {
   RIGHT
 }
 
+enum EmploymentStatus {
+  ACTIVE
+  TERMINATED
+  ON_LEAVE
+}
+
 model PhaseDefinition {
   id             Int                     @id @default(autoincrement())
   name           String                  @unique
@@ -188,12 +194,29 @@ model Role {
 
 model User {
   id           Int        @id @default(autoincrement())
+  name         String     @default("")
+  gender       String?
+  nationality  String?
+  phones       String[]   @default([])
+  joinDate     DateTime?
+  position     String?
+  employmentStatus EmploymentStatus @default(ACTIVE)
+  terminationDate DateTime?
+  terminationReason String?
   username     String     @unique
   passwordHash String
   roles        UserRole[]
   inspectionRequests InspectionRequest[]
   createdFinances FinanceEntry[] @relation("FinanceEntryCreator")
   deletedFinances FinanceEntry[] @relation("FinanceEntryDeleter")
+  chineseProfile UserChineseProfile?
+  expatProfile UserExpatProfile?
+  createdById  Int?
+  updatedById  Int?
+  createdBy    User?      @relation("UserCreator", fields: [createdById], references: [id])
+  updatedBy    User?      @relation("UserUpdater", fields: [updatedById], references: [id])
+  createdUsers User[]     @relation("UserCreator")
+  updatedUsers User[]     @relation("UserUpdater")
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 }
@@ -214,6 +237,34 @@ model UserRole {
   role   Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
 
   @@id([userId, roleId])
+}
+
+model UserChineseProfile {
+  userId                 Int     @id
+  user                   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  frenchName             String?
+  idNumber               String?
+  passportNumber         String?
+  educationAndMajor      String?
+  certifications         String[] @default([])
+  domesticMobile         String?
+  emergencyContactName   String?
+  emergencyContactPhone  String?
+  redBookValidYears      Int?    @default(0)
+  cumulativeAbroadYears  Int?    @default(0)
+  birthplace             String?
+  residenceInChina       String?
+  medicalHistory         String?
+  healthStatus           String?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+}
+
+model UserExpatProfile {
+  userId    Int     @id
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Project {

@@ -2,6 +2,9 @@ export type Locale = 'fr' | 'zh'
 
 export type LocalizedString = Record<Locale, string>
 
+export * from './progress'
+export * from './roadDictionary'
+
 interface SummaryCardCopy {
   label: string
   unit: string

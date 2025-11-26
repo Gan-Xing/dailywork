@@ -240,5 +240,49 @@
 
 - **Permission**：`code`（唯一标识，如 `road:manage`、`report:edit`）、`name`、`createdAt`、`updatedAt`。
 - **Role**：`name`（唯一，如 `Admin`、`Employee`）、`permissions`（多对多）、`createdAt`、`updatedAt`。
-- **User**：`username`（唯一）、`passwordHash`（salt + hash）、`roles`（多对多）、`createdAt`、`updatedAt`。
+- **User**：账号/权限字段包含 `username`（唯一）、`passwordHash`（salt + hash）、`roles`（多对多）、`createdAt`、`updatedAt`；个人资料字段见下方“成员管理字段”。
 - 默认账号：`GanXing`（密码 `Admin`，角色 `Admin`，拥有全部权限）、`User1`（密码 `use1`，角色 `Employee`，只有填写日报/修改权限）。
+
+## 成员管理字段
+
+### User（主表/共有字段）
+- `id`：自增整型。
+- `name`：姓名，必填（默认空字符串）。
+- `gender?`：枚举（男/女）。
+- `nationality`：受控下拉（中/法双语标签），候选见下方“国籍列表”。
+- `phones`：字符串数组，不区分主次、不强制国家码。
+- `joinDate`：入职日期（date，创建成员默认当天）。
+- `position`：岗位名称，来源于现有成员岗位去重下拉，可手动新增。
+- `employmentStatus`：枚举，`ACTIVE`（在职）、`TERMINATED`（离职）、`ON_LEAVE`（休假）。
+- `terminationDate?` / `terminationReason?`：离职日期与原因（仅详情展示，不在列表列出）。
+- `username` / `passwordHash`：账户名与哈希密码（复用现有认证流程）。
+- `roleIds`：多对多角色关联。
+- `createdAt` / `updatedAt`：自动时间戳。
+- `createdBy` / `updatedBy`：操作用户（审计）。
+
+### UserChineseProfile（中方扩展）
+- `userId`：关联 `User`。
+- `frenchName?`：法语名。
+- `idNumber?`：身份证号。
+- `passportNumber?`：护照号。
+- `educationAndMajor?`：毕业院校与专业。
+- `certifications`：资格证书数组（名称列表）。
+- `domesticMobile?`：国内手机号。
+- `emergencyContactName?` / `emergencyContactPhone?`：紧急联系人及电话（单个）。
+- `redBookValidYears?`：红皮书有效年限（整数，手动输入，每个自然年末自动减 1，至 0 停止）。
+- `cumulativeAbroadYears?`：累计出国年限（手动输入，自 2025-12-31 起每年自动加 1）。
+- `birthplace?`：籍贯。
+- `residenceInChina?`：国内常住地。
+- `medicalHistory?`：既往病史。
+- `healthStatus?`：健康状况。
+
+### UserExpatProfile（外籍扩展，预留）
+- `userId`：关联 `User`。
+- 其他字段暂未定义，保留以便后续无破坏扩展。
+
+### 国籍列表（中文 / Français）
+- 中国 / Chine
+- 西非：科特迪瓦 / Côte d’Ivoire、塞内加尔 / Sénégal、几内亚 / Guinée、马里 / Mali、布基纳法索 / Burkina Faso、尼日尔 / Niger、贝宁 / Bénin、多哥 / Togo、毛里塔尼亚 / Mauritanie、佛得角 / Cap-Vert、加纳 / Ghana、冈比亚 / Gambie
+- 中非：喀麦隆 / Cameroun、乍得 / Tchad、刚果（布）/ Congo、刚果（金）/ RDC、中非共和国 / Centrafrique、加蓬 / Gabon、赤道几内亚 / Guinée équatoriale、卢旺达 / Rwanda
+- 东非：吉布提 / Djibouti、科摩罗 / Comores、塞舌尔 / Seychelles、马达加斯加 / Madagascar、毛里求斯 / Maurice
+- 南部非洲：刚果（金） / RDC、刚果（布） / Congo、布隆迪 / Burundi、莫桑比克 / Mozambique

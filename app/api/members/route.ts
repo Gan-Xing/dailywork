@@ -1,0 +1,96 @@
+import { NextResponse } from 'next/server'
+
+import { hashPassword } from '@/lib/auth/password'
+import { listUsers } from '@/lib/server/authStore'
+import { prisma } from '@/lib/prisma'
+
+export const dynamic = 'force-dynamic'
+
+export async function GET() {
+  const members = await listUsers()
+  return NextResponse.json({ members })
+}
+
+export async function POST(request: Request) {
+  const body = await request.json()
+  const {
+    username,
+    password,
+    name,
+    gender,
+    nationality,
+    phones,
+    joinDate,
+    position,
+    employmentStatus,
+    roleIds,
+  } = body ?? {}
+
+  if (!username || !password) {
+    return NextResponse.json({ error: '缺少账号或密码' }, { status: 400 })
+  }
+
+  const phoneList: string[] = Array.isArray(phones)
+    ? phones.filter(Boolean)
+    : typeof phones === 'string'
+      ? phones
+          .split(/[,，]/)
+          .map((item: string) => item.trim())
+          .filter(Boolean)
+      : []
+
+  let resolvedPositionName = typeof position === 'string' && position.trim().length ? position.trim() : null
+
+  const roleIdList: number[] = Array.isArray(roleIds)
+    ? roleIds.map((value: unknown) => Number(value)).filter(Boolean)
+    : []
+
+  try {
+    const user = await prisma.user.create({
+      data: {
+        username,
+        passwordHash: hashPassword(password),
+        name: name ?? '',
+        gender: gender ?? null,
+        nationality: nationality ?? null,
+        phones: phoneList,
+        joinDate: joinDate ? new Date(joinDate) : new Date(),
+        position: resolvedPositionName,
+        employmentStatus: employmentStatus ?? 'ACTIVE',
+        roles:
+          roleIdList.length === 0
+            ? undefined
+            : {
+                create: roleIdList.map((id) => ({
+                  role: { connect: { id } },
+                })),
+              },
+      },
+      include: {
+        roles: { include: { role: true } },
+      },
+    })
+
+    return NextResponse.json({
+      member: {
+        id: user.id,
+        username: user.username,
+        name: user.name,
+        gender: user.gender,
+        nationality: user.nationality,
+        phones: user.phones,
+        joinDate: user.joinDate?.toISOString() ?? null,
+        position: user.position,
+        employmentStatus: user.employmentStatus,
+        createdAt: user.createdAt.toISOString(),
+        updatedAt: user.updatedAt.toISOString(),
+        roles: user.roles.map((item) => ({ id: item.role.id, name: item.role.name })),
+      },
+    })
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : '创建成员失败' },
+      { status: 500 },
+    )
+  }
+}

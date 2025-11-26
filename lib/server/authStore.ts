@@ -86,6 +86,13 @@ export const listUsers = async () => {
     select: {
       id: true,
       username: true,
+      name: true,
+      gender: true,
+      nationality: true,
+      phones: true,
+      joinDate: true,
+      position: true,
+      employmentStatus: true,
       createdAt: true,
       updatedAt: true,
       roles: {
@@ -100,9 +107,19 @@ export const listUsers = async () => {
   return users.map((user) => ({
     id: user.id,
     username: user.username,
+    name: user.name,
+    gender: user.gender,
+    nationality: user.nationality,
+    phones: user.phones,
+    joinDate: user.joinDate ? user.joinDate.toISOString() : null,
+    position: user.position,
+    employmentStatus: user.employmentStatus,
     createdAt: user.createdAt.toISOString(),
     updatedAt: user.updatedAt.toISOString(),
-    roles: user.roles.map((item) => item.role.name),
+    roles: user.roles.map((item) => ({
+      id: item.role.id,
+      name: item.role.name,
+    })),
   }))
 }
 
