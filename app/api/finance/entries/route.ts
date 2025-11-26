@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 
 import { getSessionUser, hasPermission } from '@/lib/server/authSession'
+import { parseFinanceFilters } from '@/lib/server/financeFilters'
 import { createFinanceEntry, listFinanceEntries } from '@/lib/server/financeStore'
 
 export async function GET(request: Request) {
@@ -8,12 +9,10 @@ export async function GET(request: Request) {
     return NextResponse.json({ message: '缺少财务查看权限' }, { status: 403 })
   }
   const { searchParams } = new URL(request.url)
-  const projectIdParam = searchParams.get('projectId')
-  const includeDeleted = searchParams.get('includeDeleted') === 'true'
-  const projectId = projectIdParam ? Number(projectIdParam) : undefined
+  const filters = parseFinanceFilters(searchParams)
 
   try {
-    const entries = await listFinanceEntries({ projectId, includeDeleted })
+    const entries = await listFinanceEntries(filters)
     return NextResponse.json({ entries })
   } catch (error) {
     return NextResponse.json({ message: (error as Error).message }, { status: 500 })

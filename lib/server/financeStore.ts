@@ -66,6 +66,18 @@ type EntryPayload = {
   remark?: string | null
 }
 
+export type FinanceEntryFilterOptions = {
+  projectId?: number
+  categoryKey?: string
+  paymentTypeId?: number
+  reasonKeyword?: string
+  amountMin?: number
+  amountMax?: number
+  dateFrom?: string
+  dateTo?: string
+  includeDeleted?: boolean
+}
+
 type MasterDataPayload = {
   name: string
   code?: string | null
@@ -267,12 +279,38 @@ export const listFinanceMetadata = async () => {
   }
 }
 
-export const listFinanceEntries = async (options: { projectId?: number; includeDeleted?: boolean }) => {
-  assertFinanceModels()
+const buildEntryWhere = (options: FinanceEntryFilterOptions): Prisma.FinanceEntryWhereInput => {
+  const andConditions: Prisma.FinanceEntryWhereInput[] = []
+  if (options.amountMin !== undefined) {
+    andConditions.push({ amount: { gte: new Prisma.Decimal(options.amountMin) } })
+  }
+  if (options.amountMax !== undefined) {
+    andConditions.push({ amount: { lte: new Prisma.Decimal(options.amountMax) } })
+  }
+  if (options.dateFrom) {
+    andConditions.push({ paymentDate: { gte: new Date(options.dateFrom) } })
+  }
+  if (options.dateTo) {
+    andConditions.push({ paymentDate: { lte: new Date(options.dateTo) } })
+  }
+  if (options.reasonKeyword) {
+    andConditions.push({ reason: { contains: options.reasonKeyword, mode: 'insensitive' } })
+  }
   const where: Prisma.FinanceEntryWhereInput = {
     projectId: options.projectId,
+    paymentTypeId: options.paymentTypeId,
     isDeleted: options.includeDeleted ? undefined : false,
+    AND: andConditions.length ? andConditions : undefined,
   }
+  if (options.categoryKey) {
+    where.OR = [{ categoryKey: options.categoryKey }, { parentKeys: { has: options.categoryKey } }]
+  }
+  return where
+}
+
+export const listFinanceEntries = async (options: FinanceEntryFilterOptions) => {
+  assertFinanceModels()
+  const where = buildEntryWhere(options)
 
   const [entries, categories] = await Promise.all([
     prisma.financeEntry.findMany({
@@ -344,6 +382,100 @@ const normalizeNumber = (value: number | string | null | undefined) => {
 const toOptionalNumber = (value: number | Prisma.Decimal | null | undefined) => {
   if (value == null) return undefined
   return new Prisma.Decimal(value).toNumber()
+}
+
+export type FinanceInsights = {
+  totalAmount: number
+  entryCount: number
+  averageAmount: number
+  latestPaymentDate?: string | null
+  topCategories: { key: string; label: string; amount: number; count: number; share: number }[]
+  paymentBreakdown: { id: number; name: string; amount: number; count: number; share: number }[]
+  monthlyTrend: { month: string; amount: number; count: number }[]
+}
+
+export const getFinanceInsights = async (options: FinanceEntryFilterOptions) => {
+  const entries = await listFinanceEntries(options)
+  const totalAmount = entries.reduce((sum, entry) => sum + entry.amount, 0)
+  const entryCount = entries.length
+  const averageAmount = entryCount ? Math.round((totalAmount / entryCount) * 100) / 100 : 0
+  const latestPaymentDate =
+    entries.length > 0 ? entries.reduce((latest, entry) => (entry.paymentDate > latest ? entry.paymentDate : latest), '') : null
+
+  const topCategoryMap = new Map<string, { label: string; amount: number; count: number }>()
+  entries.forEach((entry) => {
+    const root = entry.categoryPath[0] ?? { key: entry.categoryKey, label: entry.categoryKey }
+    const existing = topCategoryMap.get(root.key)
+    if (existing) {
+      existing.amount += entry.amount
+      existing.count += 1
+    } else {
+      topCategoryMap.set(root.key, { label: root.label, amount: entry.amount, count: 1 })
+    }
+  })
+  const topCategories = Array.from(topCategoryMap.entries())
+    .map(([key, value]) => ({
+      key,
+      label: value.label,
+      amount: Math.round(value.amount * 100) / 100,
+      count: value.count,
+      share: totalAmount ? Math.round((value.amount / totalAmount) * 1000) / 10 : 0,
+    }))
+    .sort((a, b) => b.amount - a.amount)
+
+  const paymentMap = new Map<number, { name: string; amount: number; count: number }>()
+  entries.forEach((entry) => {
+    const existing = paymentMap.get(entry.paymentTypeId)
+    if (existing) {
+      existing.amount += entry.amount
+      existing.count += 1
+    } else {
+      paymentMap.set(entry.paymentTypeId, {
+        name: entry.paymentTypeName,
+        amount: entry.amount,
+        count: 1,
+      })
+    }
+  })
+  const paymentBreakdown = Array.from(paymentMap.entries())
+    .map(([id, value]) => ({
+      id,
+      name: value.name,
+      amount: Math.round(value.amount * 100) / 100,
+      count: value.count,
+      share: totalAmount ? Math.round((value.amount / totalAmount) * 1000) / 10 : 0,
+    }))
+    .sort((a, b) => b.amount - a.amount)
+
+  const monthlyMap = new Map<string, { amount: number; count: number }>()
+  entries.forEach((entry) => {
+    const date = new Date(entry.paymentDate)
+    const month = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+    const existing = monthlyMap.get(month)
+    if (existing) {
+      existing.amount += entry.amount
+      existing.count += 1
+    } else {
+      monthlyMap.set(month, { amount: entry.amount, count: 1 })
+    }
+  })
+  const monthlyTrend = Array.from(monthlyMap.entries())
+    .map(([month, value]) => ({
+      month,
+      amount: Math.round(value.amount * 100) / 100,
+      count: value.count,
+    }))
+    .sort((a, b) => a.month.localeCompare(b.month))
+
+  return {
+    totalAmount: Math.round(totalAmount * 100) / 100,
+    entryCount,
+    averageAmount,
+    latestPaymentDate,
+    topCategories,
+    paymentBreakdown,
+    monthlyTrend,
+  } satisfies FinanceInsights
 }
 
 export const createFinanceEntry = async (payload: EntryPayload, userId?: number | null) => {

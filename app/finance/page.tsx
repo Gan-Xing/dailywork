@@ -47,6 +47,16 @@ type FinanceEntry = {
   isDeleted: boolean
 }
 
+type FinanceInsights = {
+  totalAmount: number
+  entryCount: number
+  averageAmount: number
+  latestPaymentDate?: string | null
+  topCategories: { key: string; label: string; amount: number; count: number; share: number }[]
+  paymentBreakdown: { id: number; name: string; amount: number; count: number; share: number }[]
+  monthlyTrend: { month: string; amount: number; count: number }[]
+}
+
 type EntryForm = {
   projectId: number | ''
   reason: string
@@ -60,8 +70,10 @@ type EntryForm = {
 }
 
 type ListFilters = {
+  projectId: number | ''
   categoryKey: string
   paymentTypeId: number | ''
+  reasonKeyword: string
   amountMin: string
   amountMax: string
   dateFrom: string
@@ -88,14 +100,26 @@ const buildCategoryOptionsWithParents = (nodes: FinanceCategoryDTO[], parentLabe
     return [...self, ...children]
   })
 
+const findCategoryNode = (nodes: FinanceCategoryDTO[], key: string): FinanceCategoryDTO | null => {
+  for (const node of nodes) {
+    if (node.key === key) return node
+    if (node.children?.length) {
+      const found = findCategoryNode(node.children, key)
+      if (found) return found
+    }
+  }
+  return null
+}
+
 export default function FinancePage() {
   const [session, setSession] = useState<SessionUser | null>(null)
   const [metadata, setMetadata] = useState<Metadata | null>(null)
   const [entries, setEntries] = useState<FinanceEntry[]>([])
-const [filters, setFilters] = useState<{ projectId?: number }>({})
   const [listFilters, setListFilters] = useState<ListFilters>({
+    projectId: '',
     categoryKey: '',
     paymentTypeId: '',
+    reasonKeyword: '',
     amountMin: '',
     amountMax: '',
     dateFrom: '',
@@ -104,8 +128,10 @@ const [filters, setFilters] = useState<{ projectId?: number }>({})
     sortDir: 'desc',
   })
   const [listDraft, setListDraft] = useState<ListFilters>({
+    projectId: '',
     categoryKey: '',
     paymentTypeId: '',
+    reasonKeyword: '',
     amountMin: '',
     amountMax: '',
     dateFrom: '',
@@ -113,8 +139,14 @@ const [filters, setFilters] = useState<{ projectId?: number }>({})
     sortField: 'paymentDate',
     sortDir: 'desc',
   })
+  const [categorySearch, setCategorySearch] = useState('')
+  const [categoryOpen, setCategoryOpen] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [insightsLoading, setInsightsLoading] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
+  const [viewMode, setViewMode] = useState<'table' | 'charts'>('table')
+  const [insights, setInsights] = useState<FinanceInsights | null>(null)
+  const [refreshKey, setRefreshKey] = useState(0)
   const [form, setForm] = useState<EntryForm>({
     projectId: '',
     reason: '',
@@ -127,6 +159,7 @@ const [filters, setFilters] = useState<{ projectId?: number }>({})
     remark: '',
   })
   const [editingId, setEditingId] = useState<number | null>(null)
+  const [showEntryModal, setShowEntryModal] = useState(false)
   const [manageProject, setManageProject] = useState({ name: '', code: '' })
   const [manageUnit, setManageUnit] = useState({ name: '', symbol: '' })
   const [managePayment, setManagePayment] = useState({ name: '' })
@@ -150,13 +183,38 @@ const [filters, setFilters] = useState<{ projectId?: number }>({})
     () => (metadata ? buildCategoryOptionsWithParents(metadata.categories, '') : []),
     [metadata],
   )
+  const filteredCategoryOptions = useMemo(() => {
+    const keyword = categorySearch.trim().toLowerCase()
+    if (!keyword) return categoryOptionsWithParents
+    return categoryOptionsWithParents.filter((cat) => cat.label.toLowerCase().includes(keyword))
+  }, [categoryOptionsWithParents, categorySearch])
+
+  const categoryMap = useMemo(() => {
+    const map = new Map<string, FinanceCategoryDTO>()
+    const walk = (nodes: FinanceCategoryDTO[]) => {
+      nodes.forEach((node) => {
+        map.set(node.key, node)
+        if (node.children?.length) walk(node.children)
+      })
+    }
+    if (metadata?.categories) walk(metadata.categories)
+    return map
+  }, [metadata])
+
   const filteredEntries = useMemo(() => {
     let result = [...entries]
     if (listFilters.categoryKey) {
-      result = result.filter((e) => e.categoryKey === listFilters.categoryKey)
+      result = result.filter((e) => e.categoryPath.some((c) => c.key === listFilters.categoryKey))
+    }
+    if (listFilters.projectId) {
+      result = result.filter((e) => e.projectId === Number(listFilters.projectId))
     }
     if (listFilters.paymentTypeId) {
       result = result.filter((e) => e.paymentTypeId === Number(listFilters.paymentTypeId))
+    }
+    if (listFilters.reasonKeyword.trim()) {
+      const keyword = listFilters.reasonKeyword.trim().toLowerCase()
+      result = result.filter((e) => e.reason.toLowerCase().includes(keyword))
     }
     if (listFilters.amountMin !== '') {
       const min = Number(listFilters.amountMin)
@@ -188,6 +246,24 @@ const [filters, setFilters] = useState<{ projectId?: number }>({})
     })
     return result
   }, [entries, listFilters])
+
+  const tableRows = useMemo(
+    () => filteredEntries.map((entry, index) => ({ entry, displayIndex: index + 1 })),
+    [filteredEntries],
+  )
+
+  const buildFilterParams = (filtersInput: ListFilters) => {
+    const params = new URLSearchParams()
+    if (filtersInput.projectId) params.set('projectId', String(filtersInput.projectId))
+    if (filtersInput.categoryKey) params.set('categoryKey', filtersInput.categoryKey)
+    if (filtersInput.paymentTypeId) params.set('paymentTypeId', String(filtersInput.paymentTypeId))
+    if (filtersInput.reasonKeyword.trim()) params.set('reasonKeyword', filtersInput.reasonKeyword.trim())
+    if (filtersInput.amountMin !== '') params.set('amountMin', filtersInput.amountMin)
+    if (filtersInput.amountMax !== '') params.set('amountMax', filtersInput.amountMax)
+    if (filtersInput.dateFrom) params.set('dateFrom', filtersInput.dateFrom)
+    if (filtersInput.dateTo) params.set('dateTo', filtersInput.dateTo)
+    return params
+  }
 
   const loadSession = async () => {
     try {
@@ -225,34 +301,37 @@ const [filters, setFilters] = useState<{ projectId?: number }>({})
         categoryKey: defaultCategory ?? prev.categoryKey,
         paymentDate: prev.paymentDate || formatDateInput(new Date().toISOString()),
       }))
-      setListDraft((prev) => {
-        const defaults = {
-          categoryKey: '',
-          paymentTypeId: '',
-          amountMin: prev.amountMin,
-          amountMax: prev.amountMax,
-          dateFrom: prev.dateFrom,
-          dateTo: prev.dateTo,
-          sortField: prev.sortField,
-          sortDir: prev.sortDir,
-        } satisfies ListFilters
-        setListFilters(defaults)
-        return defaults
-      })
+      const defaults: ListFilters = {
+        projectId: defaultProject?.id ?? '',
+        categoryKey: '',
+        paymentTypeId: '',
+        reasonKeyword: '',
+        amountMin: '',
+        amountMax: '',
+        dateFrom: '',
+        dateTo: '',
+        sortField: 'paymentDate',
+        sortDir: 'desc',
+      }
+      setListDraft(defaults)
+      setListFilters(defaults)
+      setRefreshKey((prevKey) => prevKey + 1)
     } catch (error) {
       setMessage((error as Error).message)
     }
   }, [])
 
   const loadEntries = useCallback(
-    async (projectId?: number) => {
+    async (filtersInput: ListFilters) => {
       if (!canView) return
       setLoading(true)
       setMessage(null)
-      const params = new URLSearchParams()
-      if (projectId) params.set('projectId', String(projectId))
+      const params = buildFilterParams(filtersInput)
+      const query = params.toString()
       try {
-        const res = await fetch(`/api/finance/entries?${params.toString()}`, { credentials: 'include' })
+        const res = await fetch(query ? `/api/finance/entries?${query}` : '/api/finance/entries', {
+          credentials: 'include',
+        })
         const data = (await res.json()) as { entries?: FinanceEntry[]; message?: string }
         if (!res.ok) {
           setMessage(data.message ?? '加载失败')
@@ -268,6 +347,31 @@ const [filters, setFilters] = useState<{ projectId?: number }>({})
     [canView],
   )
 
+  const loadInsights = useCallback(
+    async (filtersInput: ListFilters) => {
+      if (!canView) return
+      setInsightsLoading(true)
+      const params = buildFilterParams(filtersInput)
+      const query = params.toString()
+      try {
+        const res = await fetch(query ? `/api/finance/insights?${query}` : '/api/finance/insights', {
+          credentials: 'include',
+        })
+        const data = (await res.json()) as { insights?: FinanceInsights; message?: string }
+        if (!res.ok) {
+          setMessage(data.message ?? '加载分析数据失败')
+          return
+        }
+        setInsights(data.insights ?? null)
+      } catch (error) {
+        setMessage((error as Error).message)
+      } finally {
+        setInsightsLoading(false)
+      }
+    },
+    [canView],
+  )
+
   useEffect(() => {
     void loadSession()
   }, [])
@@ -275,9 +379,109 @@ const [filters, setFilters] = useState<{ projectId?: number }>({})
   useEffect(() => {
     if (canView) {
       void loadMetadata()
-      void loadEntries(filters.projectId)
     }
-  }, [canView, filters.projectId, loadEntries, loadMetadata])
+  }, [canView, loadMetadata])
+
+  const {
+    projectId: filtersProjectId,
+    categoryKey: filtersCategoryKey,
+    paymentTypeId: filtersPaymentTypeId,
+    reasonKeyword: filtersReasonKeyword,
+    amountMin: filtersAmountMin,
+    amountMax: filtersAmountMax,
+    dateFrom: filtersDateFrom,
+    dateTo: filtersDateTo,
+    sortField,
+    sortDir,
+  } = listFilters
+
+  useEffect(() => {
+    if (!canView) return
+    const currentFilters: ListFilters = {
+      projectId: filtersProjectId,
+      categoryKey: filtersCategoryKey,
+      paymentTypeId: filtersPaymentTypeId,
+      reasonKeyword: filtersReasonKeyword,
+      amountMin: filtersAmountMin,
+      amountMax: filtersAmountMax,
+      dateFrom: filtersDateFrom,
+      dateTo: filtersDateTo,
+      sortField,
+      sortDir,
+    }
+    void loadEntries(currentFilters)
+    void loadInsights(currentFilters)
+  }, [
+    canView,
+    refreshKey,
+    filtersProjectId,
+    filtersCategoryKey,
+    filtersPaymentTypeId,
+    filtersReasonKeyword,
+    filtersAmountMin,
+    filtersAmountMax,
+    filtersDateFrom,
+    filtersDateTo,
+    sortField,
+    sortDir,
+    loadEntries,
+    loadInsights,
+  ])
+
+  const classificationBreakdown = useMemo(() => {
+    if (!metadata?.categories) return null
+    const rootKey = listFilters.categoryKey || null
+    const rootLabel = rootKey ? categoryMap.get(rootKey)?.labelZh ?? rootKey : '全部分类'
+    if (!entries.length) {
+      return { rootKey, rootLabel, total: 0, children: [] }
+    }
+
+    const childMap = new Map<string, { label: string; amount: number; count: number }>()
+    let total = 0
+
+    entries.forEach((entry) => {
+      const path = entry.categoryPath
+      let childNode = path[0]
+      if (rootKey) {
+        const idx = path.findIndex((node) => node.key === rootKey)
+        if (idx >= 0 && path[idx + 1]) {
+          childNode = path[idx + 1]
+        } else if (idx >= 0) {
+          childNode = path[idx]
+        }
+      }
+
+      const childKey = childNode?.key ?? entry.categoryKey
+      const childLabel = childNode?.label ?? categoryMap.get(childKey)?.labelZh ?? childKey
+
+      const existing = childMap.get(childKey)
+      if (existing) {
+        existing.amount += entry.amount
+        existing.count += 1
+      } else {
+        childMap.set(childKey, { label: childLabel, amount: entry.amount, count: 1 })
+      }
+
+      total += entry.amount
+    })
+
+    const children = Array.from(childMap.entries())
+      .map(([key, value]) => ({
+        key,
+        label: value.label,
+        amount: Math.round(value.amount * 100) / 100,
+        count: value.count,
+        share: total ? Math.round((value.amount / total) * 1000) / 10 : 0,
+      }))
+      .sort((a, b) => b.amount - a.amount)
+
+    return {
+      rootKey,
+      rootLabel,
+      total: Math.round(total * 100) / 100,
+      children,
+    }
+  }, [categoryMap, entries, listFilters.categoryKey, metadata?.categories])
 
   const resetForm = () => {
     setForm({
@@ -331,7 +535,9 @@ const [filters, setFilters] = useState<{ projectId?: number }>({})
       }
       setMessage('保存成功')
       resetForm()
-      await loadEntries(filters.projectId)
+      setShowEntryModal(false)
+      await loadEntries(listFilters)
+      await loadInsights(listFilters)
     } catch (error) {
       setMessage((error as Error).message)
     } finally {
@@ -352,6 +558,7 @@ const [filters, setFilters] = useState<{ projectId?: number }>({})
       tva: entry.tva != null ? String(entry.tva) : '',
       remark: entry.remark ?? '',
     })
+    setShowEntryModal(true)
   }
 
   const handleDelete = async (id: number) => {
@@ -368,7 +575,8 @@ const [filters, setFilters] = useState<{ projectId?: number }>({})
         return
       }
       setMessage('已软删除')
-      await loadEntries(filters.projectId)
+      await loadEntries(listFilters)
+      await loadInsights(listFilters)
     } catch (error) {
       setMessage((error as Error).message)
     } finally {
@@ -444,171 +652,63 @@ const [filters, setFilters] = useState<{ projectId?: number }>({})
       {message && <p className="rounded bg-yellow-100 px-3 py-2 text-sm text-yellow-800">{message}</p>}
 
       {canView && (
-        <div className="space-y-4 rounded-lg bg-white p-4 shadow">
-          <div className="flex flex-wrap gap-3">
-            <select
-              className="rounded border px-3 py-2 text-sm"
-              value={filters.projectId ?? ''}
-              onChange={(e) => {
-                const value = e.target.value ? Number(e.target.value) : undefined
-                setFilters({ projectId: value })
-                void loadEntries(value)
-              }}
-            >
-              <option value="">全部项目</option>
-              {metadata?.projects.map((project) => (
-                <option key={project.id} value={project.id}>
-                  {project.name}
-                </option>
-              ))}
-            </select>
-            <button
-              onClick={() => void loadEntries(filters.projectId)}
-              className="rounded bg-slate-900 px-3 py-2 text-sm text-white hover:bg-slate-800"
-            >
-              刷新列表
-            </button>
-            {canManage && (
-              <button
-                onClick={() => setShowManage(true)}
-                className="rounded border border-slate-300 px-3 py-2 text-sm text-slate-800 hover:bg-slate-50"
-              >
-                主数据管理
-              </button>
-            )}
-          </div>
-
-          {canEdit && (
-            <div className="grid gap-3 md:grid-cols-2">
-              <div className="space-y-3">
-                <h2 className="text-lg font-semibold">{editingId ? '编辑记录' : '新增记录'}</h2>
-                <select
-                  className="w-full rounded border px-3 py-2 text-sm"
-                  value={form.projectId}
-                  onChange={(e) => setForm((prev) => ({ ...prev, projectId: e.target.value ? Number(e.target.value) : '' }))}
+        <div className="space-y-3 rounded-lg bg-white p-4 shadow">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold">筛选与操作</h2>
+              <p className="text-sm text-slate-600">选择范围后应用筛选并刷新列表。</p>
+            </div>
+            <div className="flex gap-2">
+              {canManage && (
+                <button
+                  onClick={() => setShowManage(true)}
+                  className="rounded border border-slate-300 px-3 py-2 text-sm text-slate-800 hover:bg-slate-50"
                 >
-                  <option value="">选择项目</option>
+                  主数据管理
+                </button>
+              )}
+              {canEdit && (
+                <button
+                  onClick={() => {
+                    resetForm()
+                    setShowEntryModal(true)
+                  }}
+                  className="rounded bg-emerald-600 px-3 py-2 text-sm text-white hover:bg-emerald-500"
+                >
+                  新增记录
+                </button>
+              )}
+            </div>
+          </div>
+          <div className="grid gap-3 md:grid-cols-12">
+            <div className="md:col-span-2">
+              <label className="space-y-1 text-sm">
+                <span className="text-slate-700">项目</span>
+                <select
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
+                  value={listDraft.projectId}
+                  onChange={(e) =>
+                    setListDraft((prev) => ({
+                      ...prev,
+                      projectId: e.target.value ? Number(e.target.value) : '',
+                    }))
+                  }
+                >
+                  <option value="">全部项目</option>
                   {metadata?.projects.map((project) => (
                     <option key={project.id} value={project.id}>
                       {project.name}
                     </option>
                   ))}
                 </select>
-                <input
-                  className="w-full rounded border px-3 py-2 text-sm"
-                  placeholder="事由"
-                  value={form.reason}
-                  onChange={(e) => setForm((prev) => ({ ...prev, reason: e.target.value }))}
-                />
-                <select
-                  className="w-full rounded border px-3 py-2 text-sm"
-                  value={form.categoryKey}
-                  onChange={(e) => setForm((prev) => ({ ...prev, categoryKey: e.target.value }))}
-                >
-                  <option value="">选择分类</option>
-                  {categoryOptions.map((cat) => (
-                    <option key={cat.key} value={cat.key}>
-                      {cat.label}
-                    </option>
-                  ))}
-                </select>
-                <div className="grid grid-cols-2 gap-2">
-                  <input
-                    className="rounded border px-3 py-2 text-sm"
-                    placeholder="金额"
-                    value={form.amount}
-                    onChange={(e) => setForm((prev) => ({ ...prev, amount: e.target.value }))}
-                  />
-                  <select
-                    className="rounded border px-3 py-2 text-sm"
-                    value={form.unitId}
-                    onChange={(e) => setForm((prev) => ({ ...prev, unitId: e.target.value ? Number(e.target.value) : '' }))}
-                  >
-                    <option value="">金额单位</option>
-                    {metadata?.units.map((unit) => (
-                      <option key={unit.id} value={unit.id}>
-                        {unit.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <div className="space-y-3">
-                <div className="grid grid-cols-2 gap-2">
-                  <select
-                    className="rounded border px-3 py-2 text-sm"
-                    value={form.paymentTypeId}
-                    onChange={(e) =>
-                      setForm((prev) => ({ ...prev, paymentTypeId: e.target.value ? Number(e.target.value) : '' }))
-                    }
-                  >
-                    <option value="">支付方式</option>
-                    {metadata?.paymentTypes.map((type) => (
-                      <option key={type.id} value={type.id}>
-                        {type.name}
-                      </option>
-                    ))}
-                  </select>
-                  <input
-                    className="rounded border px-3 py-2 text-sm"
-                    type="date"
-                    value={form.paymentDate}
-                    onChange={(e) => setForm((prev) => ({ ...prev, paymentDate: e.target.value }))}
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <input
-                    className="rounded border px-3 py-2 text-sm"
-                    placeholder="税费 (可选)"
-                    value={form.tva}
-                    onChange={(e) => setForm((prev) => ({ ...prev, tva: e.target.value }))}
-                  />
-                  <input
-                    className="rounded border px-3 py-2 text-sm"
-                    placeholder="备注 (可选)"
-                    value={form.remark}
-                    onChange={(e) => setForm((prev) => ({ ...prev, remark: e.target.value }))}
-                  />
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={handleSubmit}
-                    disabled={loading}
-                    className="rounded bg-emerald-600 px-3 py-2 text-sm text-white hover:bg-emerald-500 disabled:opacity-60"
-                  >
-                    {editingId ? '保存修改' : '新增'}
-                  </button>
-                  <button
-                    onClick={resetForm}
-                    className="rounded border px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
-                  >
-                    重置
-                  </button>
-                </div>
-              </div>
+              </label>
             </div>
-          )}
-        </div>
-      )}
 
-          {canView && (
-            <div className="space-y-3 rounded-lg bg-white p-4 shadow">
-              <h2 className="text-lg font-semibold">记录列表</h2>
-              <div className="grid gap-2 md:grid-cols-4">
+            <div className="md:col-span-2">
+              <label className="space-y-1 text-sm">
+                <span className="text-slate-700">支付方式</span>
                 <select
-                  className="w-full rounded border px-3 py-2 text-sm"
-                  value={listDraft.categoryKey}
-                  onChange={(e) => setListDraft((prev) => ({ ...prev, categoryKey: e.target.value }))}
-                >
-                  <option value="">全部分类</option>
-                  {categoryOptionsWithParents.map((cat) => (
-                    <option key={cat.key} value={cat.key}>
-                      {cat.label}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  className="w-full rounded border px-3 py-2 text-sm"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
                   value={listDraft.paymentTypeId}
                   onChange={(e) =>
                     setListDraft((prev) => ({
@@ -624,150 +724,831 @@ const [filters, setFilters] = useState<{ projectId?: number }>({})
                     </option>
                   ))}
                 </select>
-                <div className="flex gap-2">
-                  <input
-                    className="w-full rounded border px-3 py-2 text-sm"
-                    placeholder="金额最小"
-                    value={listDraft.amountMin}
-                    onChange={(e) => setListDraft((prev) => ({ ...prev, amountMin: e.target.value }))}
-                  />
-                  <input
-                    className="w-full rounded border px-3 py-2 text-sm"
-                    placeholder="金额最大"
-                    value={listDraft.amountMax}
-                    onChange={(e) => setListDraft((prev) => ({ ...prev, amountMax: e.target.value }))}
-                  />
+              </label>
+            </div>
+
+            <div className="md:col-span-3">
+              <label className="space-y-1 text-sm">
+                <span className="text-slate-700">事由</span>
+                <input
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
+                  placeholder="模糊搜索事由"
+                  value={listDraft.reasonKeyword}
+                  onChange={(e) => setListDraft((prev) => ({ ...prev, reasonKeyword: e.target.value }))}
+                />
+              </label>
+            </div>
+
+            <div className="md:col-span-5">
+              <label className="space-y-1 text-sm">
+                <span className="text-slate-700">分类</span>
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setCategoryOpen((prev) => !prev)}
+                    className="flex w-full items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-left text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
+                  >
+                    <span className="truncate">
+                      {listDraft.categoryKey
+                        ? categoryOptionsWithParents.find((c) => c.key === listDraft.categoryKey)?.label ?? '全部分类'
+                        : '全部分类'}
+                    </span>
+                    <span className="text-xs text-slate-500">⌕</span>
+                  </button>
+                  {categoryOpen && (
+                    <div
+                      className="absolute z-20 mt-2 w-full rounded-lg border border-slate-200 bg-white shadow-lg"
+                      onMouseLeave={() => setCategoryOpen(false)}
+                    >
+                      <div className="border-b border-slate-100 p-2">
+                        <input
+                          className="w-full rounded border px-2 py-1 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-100"
+                          placeholder="搜索分类"
+                          value={categorySearch}
+                          onChange={(e) => setCategorySearch(e.target.value)}
+                        />
+                      </div>
+                      <div className="max-h-56 space-y-1 overflow-y-auto p-2 text-sm">
+                        <button
+                          className="block w-full rounded px-2 py-1 text-left hover:bg-slate-50"
+                          onClick={() => {
+                            setListDraft((prev) => ({ ...prev, categoryKey: '' }))
+                            setCategoryOpen(false)
+                          }}
+                        >
+                          全部分类
+                        </button>
+                        {filteredCategoryOptions.map((cat) => (
+                          <button
+                            key={cat.key}
+                            className={`block w-full rounded px-2 py-1 text-left hover:bg-emerald-50 ${
+                              listDraft.categoryKey === cat.key ? 'bg-emerald-50 text-emerald-700' : 'text-slate-700'
+                            }`}
+                            onClick={() => {
+                              setListDraft((prev) => ({ ...prev, categoryKey: cat.key }))
+                              setCategoryOpen(false)
+                            }}
+                          >
+                            {cat.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
-                <div className="flex gap-2">
+              </label>
+            </div>
+
+            <div className="md:col-span-12 flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 p-3 shadow-sm">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-slate-700">金额范围</span>
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center rounded-lg border border-slate-200">
+                    <button
+                      className="px-2 text-sm text-slate-600 hover:bg-slate-50"
+                      onClick={() =>
+                        setListDraft((prev) => ({
+                          ...prev,
+                          amountMin: prev.amountMin ? String(Number(prev.amountMin) - 1) : '0',
+                        }))
+                      }
+                    >
+                      -
+                    </button>
+                    <input
+                      className="w-20 border-x border-slate-200 px-2 py-1 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-100"
+                      type="number"
+                      value={listDraft.amountMin}
+                      placeholder="最小值"
+                      onChange={(e) => setListDraft((prev) => ({ ...prev, amountMin: e.target.value }))}
+                    />
+                    <button
+                      className="px-2 text-sm text-slate-600 hover:bg-slate-50"
+                      onClick={() =>
+                        setListDraft((prev) => ({
+                          ...prev,
+                          amountMin: prev.amountMin ? String(Number(prev.amountMin) + 1) : '1',
+                        }))
+                      }
+                    >
+                      +
+                    </button>
+                  </div>
+                  <span className="text-sm text-slate-500">—</span>
+                  <div className="flex items-center rounded-lg border border-slate-200">
+                    <button
+                      className="px-2 text-sm text-slate-600 hover:bg-slate-50"
+                      onClick={() =>
+                        setListDraft((prev) => ({
+                          ...prev,
+                          amountMax: prev.amountMax ? String(Number(prev.amountMax) - 1) : '0',
+                        }))
+                      }
+                    >
+                      -
+                    </button>
+                    <input
+                      className="w-20 border-x border-slate-200 px-2 py-1 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-100"
+                      type="number"
+                      value={listDraft.amountMax}
+                      placeholder="最大值"
+                      onChange={(e) => setListDraft((prev) => ({ ...prev, amountMax: e.target.value }))}
+                    />
+                    <button
+                      className="px-2 text-sm text-slate-600 hover:bg-slate-50"
+                      onClick={() =>
+                        setListDraft((prev) => ({
+                          ...prev,
+                          amountMax: prev.amountMax ? String(Number(prev.amountMax) + 1) : '1',
+                        }))
+                      }
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-slate-700">日期范围</span>
+                <div className="flex items-center gap-2">
                   <input
-                    className="w-full rounded border px-3 py-2 text-sm"
+                    className="w-36 rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
                     type="date"
                     value={listDraft.dateFrom}
                     onChange={(e) => setListDraft((prev) => ({ ...prev, dateFrom: e.target.value }))}
                   />
+                  <span className="text-sm text-slate-500">至</span>
                   <input
-                    className="w-full rounded border px-3 py-2 text-sm"
+                    className="w-36 rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
                     type="date"
                     value={listDraft.dateTo}
                     onChange={(e) => setListDraft((prev) => ({ ...prev, dateTo: e.target.value }))}
                   />
                 </div>
-                <div className="flex items-center gap-2 md:col-span-2">
-                  <button
-                    onClick={() => setListFilters(listDraft)}
-                    className="rounded bg-slate-900 px-3 py-2 text-sm text-white hover:bg-slate-800"
-                  >
-                    应用筛选
-                  </button>
-                  <button
-                    onClick={() => {
-                      const reset = {
-                        categoryKey: '',
-                        paymentTypeId: '',
-                        amountMin: '',
-                        amountMax: '',
-                        dateFrom: '',
-                        dateTo: '',
-                        sortField: 'paymentDate',
-                        sortDir: 'desc',
-                      } satisfies ListFilters
-                      setListDraft(reset)
-                      setListFilters(reset)
-                    }}
-                    className="rounded border px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
-                  >
-                    重置筛选
-                  </button>
+              </div>
+
+              <div className="ml-auto flex flex-wrap items-center gap-2">
+                <button
+                  onClick={() => {
+                    setListFilters({ ...listDraft })
+                    setRefreshKey((prev) => prev + 1)
+                  }}
+                  className="rounded bg-slate-900 px-4 py-2 text-sm text-white hover:bg-slate-800"
+                >
+                  应用筛选并刷新
+                </button>
+                <button
+                  onClick={() => {
+                    const reset = {
+                      projectId: '',
+                      categoryKey: '',
+                      paymentTypeId: '',
+                      reasonKeyword: '',
+                      amountMin: '',
+                      amountMax: '',
+                      dateFrom: '',
+                      dateTo: '',
+                      sortField: 'paymentDate',
+                      sortDir: 'desc',
+                    } satisfies ListFilters
+                    setListDraft(reset)
+                    setListFilters(reset)
+                    setRefreshKey((prev) => prev + 1)
+                  }}
+                  className="rounded border px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                >
+                  重置筛选
+                </button>
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center justify-between pt-2">
+            <div>
+              <h3 className="text-base font-semibold text-slate-900">数据视图</h3>
+              <p className="text-xs text-slate-500">切换表格/图表，序号按当前筛选从 1 递增</p>
+            </div>
+            <div className="flex rounded-full border border-slate-200 bg-slate-50 p-1 text-sm">
+              <button
+                className={`rounded-full px-3 py-1 transition ${viewMode === 'table' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
+                onClick={() => setViewMode('table')}
+              >
+                表格列表
+              </button>
+              <button
+                className={`rounded-full px-3 py-1 transition ${viewMode === 'charts' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
+                onClick={() => setViewMode('charts')}
+              >
+                图表分析
+              </button>
+            </div>
+          </div>
+          {loading && <p className="text-sm text-slate-600">加载中...</p>}
+          {viewMode === 'table' ? (
+            <div className="overflow-auto">
+              <table className="min-w-full text-sm">
+                <thead>
+                  <tr className="border-b text-left">
+                    <th className="px-3 py-2">序号</th>
+                    <th className="px-3 py-2">项目</th>
+                    <th
+                      className="px-3 py-2 cursor-pointer select-none"
+                      onClick={() =>
+                        setListFilters((prev) => {
+                          const dir = prev.sortField === 'category' && prev.sortDir === 'asc' ? 'desc' : 'asc'
+                          setListDraft((draft) => ({ ...draft, sortField: 'category', sortDir: dir }))
+                          return { ...prev, sortField: 'category', sortDir: dir }
+                        })
+                      }
+                    >
+                      分类 {listFilters.sortField === 'category' ? (listFilters.sortDir === 'asc' ? '↑' : '↓') : ''}
+                    </th>
+                    <th className="px-3 py-2">事由</th>
+                    <th
+                      className="px-3 py-2 cursor-pointer select-none"
+                      onClick={() =>
+                        setListFilters((prev) => {
+                          const dir = prev.sortField === 'amount' && prev.sortDir === 'asc' ? 'desc' : 'asc'
+                          setListDraft((draft) => ({ ...draft, sortField: 'amount', sortDir: dir }))
+                          return { ...prev, sortField: 'amount', sortDir: dir }
+                        })
+                      }
+                    >
+                      金额 {listFilters.sortField === 'amount' ? (listFilters.sortDir === 'asc' ? '↑' : '↓') : ''}
+                    </th>
+                    <th className="px-3 py-2">支付方式</th>
+                    <th
+                      className="px-3 py-2 cursor-pointer select-none"
+                      onClick={() =>
+                        setListFilters((prev) => {
+                          const dir = prev.sortField === 'paymentDate' && prev.sortDir === 'asc' ? 'desc' : 'asc'
+                          setListDraft((draft) => ({ ...draft, sortField: 'paymentDate', sortDir: dir }))
+                          return { ...prev, sortField: 'paymentDate', sortDir: dir }
+                        })
+                      }
+                    >
+                      支付日期 {listFilters.sortField === 'paymentDate' ? (listFilters.sortDir === 'asc' ? '↑' : '↓') : ''}
+                    </th>
+                    <th className="px-3 py-2 w-36">操作</th>
+                    <th className="px-3 py-2">备注</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {tableRows.map(({ entry, displayIndex }) => (
+                    <tr key={entry.id} className={`border-b ${entry.isDeleted ? 'text-slate-400 line-through' : ''}`}>
+                      <td className="px-3 py-2">{displayIndex}</td>
+                      <td className="px-3 py-2">{entry.projectName}</td>
+                      <td className="px-3 py-2">
+                        {entry.categoryPath.map((c) => c.label).join(' / ')}
+                      </td>
+                      <td className="px-3 py-2">{entry.reason}</td>
+                      <td className="px-3 py-2">
+                        {entry.amount} {entry.unitName}
+                      </td>
+                      <td className="px-3 py-2">{entry.paymentTypeName}</td>
+                      <td className="px-3 py-2">{formatDateInput(entry.paymentDate)}</td>
+                      <td className="px-3 py-2">
+                        <div className="flex flex-wrap gap-2">
+                          {canEdit && !entry.isDeleted && (
+                            <button
+                              className="rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700 ring-1 ring-blue-100 hover:bg-blue-100"
+                              onClick={() => handleEdit(entry)}
+                            >
+                              编辑
+                            </button>
+                          )}
+                          {canEdit && (
+                            <button
+                              className="rounded-full bg-red-50 px-3 py-1 text-xs font-medium text-red-700 ring-1 ring-red-100 hover:bg-red-100"
+                              onClick={() => handleDelete(entry.id)}
+                            >
+                              删除
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-3 py-2">{entry.remark}</td>
+                    </tr>
+                  ))}
+                  {!tableRows.length && (
+                    <tr>
+                      <td colSpan={8} className="px-3 py-6 text-center text-slate-500">
+                        暂无数据，调整筛选试试。
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="space-y-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
+              <div className="grid gap-3 md:grid-cols-3">
+                <div className="rounded-xl bg-gradient-to-br from-emerald-600 to-teal-500 p-4 text-white shadow">
+                  <p className="text-xs uppercase tracking-wide text-emerald-50">总金额</p>
+                  <p className="mt-2 text-2xl font-semibold">
+                    {insights ? insights.totalAmount.toLocaleString('zh-CN', { minimumFractionDigits: 2 }) : '—'}
+                  </p>
+                  <p className="text-xs text-emerald-50">
+                    {insights?.entryCount ? `共 ${insights.entryCount} 笔` : '暂无记录'}
+                  </p>
+                </div>
+                <div className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-emerald-50">
+                  <p className="text-xs font-semibold text-slate-600">平均金额</p>
+                  <p className="mt-2 text-2xl font-semibold text-slate-900">
+                    {insights ? insights.averageAmount.toLocaleString('zh-CN', { minimumFractionDigits: 2 }) : '—'}
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    {insights?.latestPaymentDate ? `最近支付：${formatDateInput(insights.latestPaymentDate)}` : '等待首笔数据'}
+                  </p>
+                </div>
+                <div className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-emerald-50">
+                  <p className="text-xs font-semibold text-slate-600">高频分类</p>
+                  {insights?.topCategories?.length ? (
+                    <div className="mt-2 space-y-2">
+                      {insights.topCategories.slice(0, 2).map((cat, idx) => (
+                        <div key={cat.key} className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 text-sm text-slate-800">
+                            <span
+                              className="h-3 w-3 rounded-full"
+                              style={{ backgroundColor: ['#0f766e', '#0ea5e9', '#f97316'][idx] ?? '#0f172a' }}
+                            />
+                            {cat.label}
+                          </div>
+                          <div className="text-right text-xs text-slate-600">
+                            <div>{cat.amount.toLocaleString('zh-CN', { minimumFractionDigits: 2 })}</div>
+                            <div>{cat.share}% 占比</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="mt-2 text-sm text-slate-500">等待分类数据</p>
+                  )}
                 </div>
               </div>
-              {loading && <p className="text-sm text-slate-600">加载中...</p>}
-              <div className="overflow-auto">
-            <table className="min-w-full text-sm">
-              <thead>
-                <tr className="border-b text-left">
-                  <th className="px-3 py-2">序号</th>
-                  <th className="px-3 py-2">项目</th>
-                  <th
-                    className="px-3 py-2 cursor-pointer select-none"
-                    onClick={() =>
-                      setListFilters((prev) => {
-                        const dir = prev.sortField === 'category' && prev.sortDir === 'asc' ? 'desc' : 'asc'
-                        setListDraft((draft) => ({ ...draft, sortField: 'category', sortDir: dir }))
-                        return { ...prev, sortField: 'category', sortDir: dir }
-                      })
-                    }
-                  >
-                    分类 {listFilters.sortField === 'category' ? (listFilters.sortDir === 'asc' ? '↑' : '↓') : ''}
-                  </th>
-                  <th className="px-3 py-2">事由</th>
-                  <th
-                    className="px-3 py-2 cursor-pointer select-none"
-                    onClick={() =>
-                      setListFilters((prev) => {
-                        const dir = prev.sortField === 'amount' && prev.sortDir === 'asc' ? 'desc' : 'asc'
-                        setListDraft((draft) => ({ ...draft, sortField: 'amount', sortDir: dir }))
-                        return { ...prev, sortField: 'amount', sortDir: dir }
-                      })
-                    }
-                  >
-                    金额 {listFilters.sortField === 'amount' ? (listFilters.sortDir === 'asc' ? '↑' : '↓') : ''}
-                  </th>
-                  <th className="px-3 py-2">支付方式</th>
-                  <th
-                    className="px-3 py-2 cursor-pointer select-none"
-                    onClick={() =>
-                      setListFilters((prev) => {
-                        const dir = prev.sortField === 'paymentDate' && prev.sortDir === 'asc' ? 'desc' : 'asc'
-                        setListDraft((draft) => ({ ...draft, sortField: 'paymentDate', sortDir: dir }))
-                        return { ...prev, sortField: 'paymentDate', sortDir: dir }
-                      })
-                    }
-                  >
-                    支付日期 {listFilters.sortField === 'paymentDate' ? (listFilters.sortDir === 'asc' ? '↑' : '↓') : ''}
-                  </th>
-                  <th className="px-3 py-2 w-36">操作</th>
-                  <th className="px-3 py-2">备注</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredEntries.map((entry) => (
-                  <tr key={entry.id} className={`border-b ${entry.isDeleted ? 'text-slate-400 line-through' : ''}`}>
-                    <td className="px-3 py-2">{entry.sequence}</td>
-                    <td className="px-3 py-2">{entry.projectName}</td>
-                    <td className="px-3 py-2">
-                      {entry.categoryPath.map((c) => c.label).join(' / ')}
-                    </td>
-                    <td className="px-3 py-2">{entry.reason}</td>
-                    <td className="px-3 py-2">
-                      {entry.amount} {entry.unitName}
-                    </td>
-                    <td className="px-3 py-2">{entry.paymentTypeName}</td>
-                    <td className="px-3 py-2">{formatDateInput(entry.paymentDate)}</td>
-                    <td className="px-3 py-2">
-                      <div className="flex flex-wrap gap-2">
-                      {canEdit && !entry.isDeleted && (
-                        <button
-                          className="rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700 ring-1 ring-blue-100 hover:bg-blue-100"
-                          onClick={() => handleEdit(entry)}
-                        >
-                          编辑
-                        </button>
-                      )}
-                      {canEdit && (
-                        <button
-                          className="rounded-full bg-red-50 px-3 py-1 text-xs font-medium text-red-700 ring-1 ring-red-100 hover:bg-red-100"
-                          onClick={() => handleDelete(entry.id)}
-                        >
-                          删除
-                        </button>
-                      )}
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900">分类占比</p>
+                      <div className="mt-1 flex flex-wrap items-center gap-1 text-xs">
+                        {(() => {
+                          const rootPath: { key: string; label: string }[] = []
+                          if (classificationBreakdown?.rootKey) {
+                            const buildPath = (key: string) => {
+                              const node = categoryMap.get(key)
+                              if (node?.parentKey) buildPath(node.parentKey)
+                              if (node) rootPath.push({ key: node.key, label: node.labelZh })
+                            }
+                            buildPath(classificationBreakdown.rootKey)
+                          }
+                          if (!rootPath.length) rootPath.push({ key: '', label: '全部分类' })
+                          return rootPath.map((node, idx) => (
+                            <span key={node.key || idx} className="flex items-center gap-1">
+                              <button
+                                className="rounded-full border border-slate-200 px-2 py-0.5 text-slate-700 transition hover:border-emerald-300 hover:text-emerald-700"
+                                onClick={() => {
+                                  setListDraft((prev) => ({ ...prev, categoryKey: node.key }))
+                                  setListFilters((prev) => ({ ...prev, categoryKey: node.key }))
+                                  setViewMode('charts')
+                                }}
+                              >
+                                {node.label}
+                              </button>
+                              {idx < rootPath.length - 1 && <span className="text-slate-400">/</span>}
+                            </span>
+                          ))
+                        })()}
                       </div>
-                    </td>
-                    <td className="px-3 py-2">{entry.remark}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    </div>
+                    <span className="rounded-full bg-emerald-50 px-2 py-1 text-xs text-emerald-700">
+                      {classificationBreakdown?.rootLabel ?? '全部分类'}
+                    </span>
+                  </div>
+                  {insightsLoading && <p className="text-xs text-slate-500">分析加载中...</p>}
+                  {classificationBreakdown ? (
+                    classificationBreakdown.children.length ? (
+                      <div className="mt-3 grid gap-3 md:grid-cols-[1fr_1.4fr]">
+                        <div className="flex items-center justify-center">
+                          {(() => {
+                            const top = classificationBreakdown.children
+                            const total = top.reduce((sum, cat) => sum + cat.amount, 0)
+                            if (!total) return <p className="text-sm text-slate-500">暂无金额</p>
+                            let start = 0
+                            const colors = ['#0f766e', '#0ea5e9', '#f97316', '#6366f1', '#f43f5e', '#14b8a6', '#8b5cf6', '#22d3ee']
+                            const slices = top.map((cat, idx) => {
+                              const angle = (cat.amount / total) * 360
+                              const end = start + angle
+                              const segment = `${colors[idx % colors.length]} ${start}deg ${end}deg`
+                              start = end
+                              return segment
+                            })
+                            return (
+                              <div className="relative h-40 w-40">
+                                <div
+                                  className="absolute inset-0 rounded-full"
+                                  style={{ backgroundImage: `conic-gradient(${slices.join(',')})` }}
+                                />
+                                <div className="absolute inset-6 rounded-full bg-white shadow-inner" />
+                                <div className="absolute inset-10 flex items-center justify-center">
+                                  <div className="text-center text-xs text-slate-600">
+                                    <p className="font-semibold text-slate-900">总额</p>
+                                    <p className="mt-1 text-sm">
+                                      {total.toLocaleString('zh-CN', { maximumFractionDigits: 0 })}
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                            )
+                          })()}
+                        </div>
+                        <div className="space-y-2">
+                          {classificationBreakdown.children.map((cat, idx) => (
+                            <button
+                              key={cat.key}
+                              onClick={() => {
+                                setListDraft((prev) => ({ ...prev, categoryKey: cat.key }))
+                                setListFilters((prev) => ({ ...prev, categoryKey: cat.key }))
+                                setViewMode('charts')
+                              }}
+                              className="w-full rounded-lg border border-slate-100 px-3 py-2 text-left transition hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-sm"
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-2 text-sm font-medium text-slate-900">
+                                  <span
+                                    className="h-2.5 w-2.5 rounded-full"
+                                    style={{
+                                      backgroundColor: [
+                                        '#0f766e',
+                                        '#0ea5e9',
+                                        '#f97316',
+                                        '#6366f1',
+                                        '#f43f5e',
+                                        '#14b8a6',
+                                        '#8b5cf6',
+                                        '#22d3ee',
+                                      ][idx % 8],
+                                    }}
+                                  />
+                                  {cat.label}
+                                </div>
+                                <div className="text-right text-xs text-slate-600">
+                                  <p>{cat.amount.toLocaleString('zh-CN', { minimumFractionDigits: 2 })}</p>
+                                  <p>{cat.share}%</p>
+                                </div>
+                              </div>
+                              <div className="mt-2 h-2 rounded-full bg-slate-100">
+                                <div
+                                  className="h-2 rounded-full"
+                                  style={{
+                                    width: `${Math.min(cat.share, 100)}%`,
+                                    background:
+                                      'linear-gradient(90deg, rgba(16,185,129,0.8) 0%, rgba(59,130,246,0.7) 100%)',
+                                  }}
+                                />
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="mt-2 text-sm text-slate-500">当前筛选下暂无子分类数据</p>
+                    )
+                  ) : (
+                    <p className="mt-2 text-sm text-slate-500">暂无分类数据</p>
+                  )}
+                </div>
+
+                <div className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900">按月趋势</p>
+                      <p className="text-xs text-slate-500">金额折线，点按月份可聚焦</p>
+                    </div>
+                    <span className="rounded-full bg-blue-50 px-2 py-1 text-xs text-blue-700">
+                      {insights?.monthlyTrend.length ?? 0} 个月
+                    </span>
+                  </div>
+                  <div className="mt-3 h-52 w-full overflow-hidden rounded-lg bg-slate-50 p-3">
+                    {insights?.monthlyTrend?.length ? (
+                      (() => {
+                        const trend = insights.monthlyTrend
+                        const maxVal = Math.max(...trend.map((item) => item.amount), 1)
+                          const points = trend.map((item, idx) => {
+                            const x = (idx / Math.max(trend.length - 1, 1)) * 100
+                            const y = 100 - (item.amount / maxVal) * 90
+                            return `${x},${y}`
+                          })
+                        return (
+                          <svg viewBox="0 0 100 100" className="h-full w-full text-emerald-600">
+                            <defs>
+                              <linearGradient id="trend" x1="0%" y1="0%" x2="0%" y2="100%">
+                                <stop offset="0%" stopColor="#10b981" stopOpacity="0.35" />
+                                <stop offset="100%" stopColor="#0ea5e9" stopOpacity="0" />
+                              </linearGradient>
+                            </defs>
+                            <polygon
+                              fill="url(#trend)"
+                              points={`0,100 ${points.join(' ')} 100,100`}
+                              className="transition-all"
+                            />
+                            <polyline
+                              fill="none"
+                              stroke="url(#trend)"
+                              strokeWidth="1.2"
+                              points={points.join(' ')}
+                              strokeLinecap="round"
+                            />
+                            {trend.map((item, idx) => {
+                              const x = (idx / Math.max(trend.length - 1, 1)) * 100
+                              const y = 100 - (item.amount / maxVal) * 90
+                              const labelY = Math.max(y - 8, 12)
+                              return (
+                                <g key={item.month}>
+                                  <circle cx={x} cy={y} r={1.4} fill="#0ea5e9" />
+                                  <text
+                                    x={x}
+                                    y={labelY}
+                                    textAnchor="middle"
+                                    fontSize="6"
+                                    fill="#0f172a"
+                                    style={{ fontWeight: 600 }}
+                                  >
+                                    {item.amount.toLocaleString('zh-CN', { maximumFractionDigits: 0 })}
+                                  </text>
+                                  <text
+                                    x={x}
+                                    y={97}
+                                    textAnchor="middle"
+                                    fontSize="6"
+                                    fill="#1f2937"
+                                    style={{ fontWeight: 600 }}
+                                  >
+                                    {item.month.slice(5)}
+                                  </text>
+                                </g>
+                              )
+                            })}
+                          </svg>
+                        )
+                      })()
+                    ) : (
+                      <p className="text-sm text-slate-500">暂无趋势数据</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900">支付方式分布</p>
+                      <p className="text-xs text-slate-500">按金额排序，可快速筛选</p>
+                    </div>
+                    <span className="rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-700">
+                      {insights?.paymentBreakdown.length ?? 0} 种
+                    </span>
+                  </div>
+                  {insights?.paymentBreakdown?.length ? (
+                    <div className="mt-3 space-y-2">
+                      {insights.paymentBreakdown.map((item, idx) => (
+                        <button
+                          key={item.id}
+                          onClick={() => {
+                            setListDraft((prev) => ({ ...prev, paymentTypeId: item.id }))
+                            setListFilters((prev) => ({ ...prev, paymentTypeId: item.id }))
+                            setViewMode('table')
+                            setRefreshKey((prev) => prev + 1)
+                          }}
+                          className="w-full rounded-lg border border-slate-100 px-3 py-2 text-left transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-sm"
+                        >
+                          <div className="flex items-center justify-between gap-2 text-sm">
+                            <span className="flex items-center gap-2 font-medium text-slate-900">
+                              <span
+                                className="h-2 w-2 rounded-full"
+                                style={{ backgroundColor: ['#0ea5e9', '#10b981', '#f97316', '#6366f1', '#f43f5e'][idx % 5] }}
+                              />
+                              {item.name}
+                            </span>
+                            <span className="text-xs text-slate-600">
+                              {item.amount.toLocaleString('zh-CN', { minimumFractionDigits: 2 })} · {item.share}%
+                            </span>
+                          </div>
+                          <div className="mt-2 h-2 rounded-full bg-slate-100">
+                            <div
+                              className="h-2 rounded-full"
+                              style={{
+                                width: `${Math.min(item.share, 100)}%`,
+                                background:
+                                  'linear-gradient(90deg, rgba(14,165,233,0.85) 0%, rgba(59,130,246,0.7) 100%)',
+                              }}
+                            />
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="mt-2 text-sm text-slate-500">暂无支付方式数据</p>
+                  )}
+                </div>
+
+                <div className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900">近期待办</p>
+                      <p className="text-xs text-slate-500">高金额条目可快速核查</p>
+                    </div>
+                    <span className="rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-700">Top 5</span>
+                  </div>
+                  {filteredEntries.length ? (
+                    <div className="mt-3 space-y-2">
+                      {[...filteredEntries]
+                        .sort((a, b) => b.amount - a.amount)
+                        .slice(0, 5)
+                        .map((entry) => (
+                          <div
+                            key={entry.id}
+                            className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-sm text-slate-800 shadow-sm"
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="truncate font-semibold">{entry.reason}</div>
+                              <div className="text-xs text-slate-500">{formatDateInput(entry.paymentDate)}</div>
+                            </div>
+                            <div className="mt-1 flex items-center justify-between text-xs text-slate-600">
+                              <span>{entry.categoryPath.map((c) => c.label).join(' / ')}</span>
+                              <span className="font-semibold text-emerald-700">
+                                {entry.amount.toLocaleString('zh-CN', { minimumFractionDigits: 2 })} {entry.unitName}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  ) : (
+                    <p className="mt-2 text-sm text-slate-500">暂无条目</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {canEdit && showEntryModal && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 px-4 py-8 backdrop-blur-sm">
+          <div className="w-full max-w-3xl overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-slate-900/10">
+            <div className="flex items-center justify-between bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-500 px-6 py-4 text-white">
+              <div>
+                <span className="rounded-full bg-white/20 px-3 py-1 text-xs font-semibold tracking-wide">
+                  {editingId ? '编辑模式' : '快速新增'}
+                </span>
+                <h2 className="mt-2 text-xl font-semibold">{editingId ? '编辑财务记录' : '新增财务记录'}</h2>
+              </div>
+              <button
+                onClick={() => {
+                  setShowEntryModal(false)
+                  resetForm()
+                }}
+                className="rounded-full border border-white/30 px-3 py-1 text-sm font-medium text-white hover:bg-white/15"
+              >
+                关闭
+              </button>
+            </div>
+
+            <div className="space-y-4 px-6 pb-6 pt-5">
+              <label className="space-y-1">
+                <span className="text-sm font-medium text-slate-700">所属项目</span>
+                <select
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
+                  value={form.projectId}
+                  onChange={(e) => setForm((prev) => ({ ...prev, projectId: e.target.value ? Number(e.target.value) : '' }))}
+                >
+                  <option value="">选择项目</option>
+                  {metadata?.projects.map((project) => (
+                    <option key={project.id} value={project.id}>
+                      {project.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="space-y-1">
+                <span className="text-sm font-medium text-slate-700">支付方式</span>
+                <select
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
+                  value={form.paymentTypeId}
+                  onChange={(e) => setForm((prev) => ({ ...prev, paymentTypeId: e.target.value ? Number(e.target.value) : '' }))}
+                >
+                  <option value="">选择支付方式</option>
+                  {metadata?.paymentTypes.map((type) => (
+                    <option key={type.id} value={type.id}>
+                      {type.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="space-y-1">
+                <span className="text-sm font-medium text-slate-700">事由</span>
+                <input
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
+                  placeholder="如：采购油料、支付人工、补贴等"
+                  value={form.reason}
+                  onChange={(e) => setForm((prev) => ({ ...prev, reason: e.target.value }))}
+                />
+              </label>
+
+              <label className="space-y-1">
+                <span className="text-sm font-medium text-slate-700">分类</span>
+                <select
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
+                  value={form.categoryKey}
+                  onChange={(e) => setForm((prev) => ({ ...prev, categoryKey: e.target.value }))}
+                >
+                  <option value="">选择分类</option>
+                  {categoryOptions.map((cat) => (
+                    <option key={cat.key} value={cat.key}>
+                      {cat.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <div className="grid gap-3 md:grid-cols-[1.4fr_1fr]">
+                <label className="space-y-1">
+                  <span className="text-sm font-medium text-slate-700">金额</span>
+                  <input
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
+                    placeholder="请输入金额"
+                    value={form.amount}
+                    onChange={(e) => setForm((prev) => ({ ...prev, amount: e.target.value }))}
+                  />
+                </label>
+                <label className="space-y-1">
+                  <span className="text-sm font-medium text-slate-700">单位</span>
+                  <select
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
+                    value={form.unitId}
+                    onChange={(e) => setForm((prev) => ({ ...prev, unitId: e.target.value ? Number(e.target.value) : '' }))}
+                  >
+                    <option value="">金额单位</option>
+                    {metadata?.units.map((unit) => (
+                      <option key={unit.id} value={unit.id}>
+                        {unit.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+
+              <label className="space-y-1">
+                <span className="text-sm font-medium text-slate-700">支付日期</span>
+                <input
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
+                  type="date"
+                  value={form.paymentDate}
+                  onChange={(e) => setForm((prev) => ({ ...prev, paymentDate: e.target.value }))}
+                />
+              </label>
+
+              <div className="grid gap-3 md:grid-cols-2">
+                <label className="space-y-1">
+                  <span className="text-sm font-medium text-slate-700">税费 (可选)</span>
+                  <input
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
+                    placeholder="0.00"
+                    value={form.tva}
+                    onChange={(e) => setForm((prev) => ({ ...prev, tva: e.target.value }))}
+                  />
+                </label>
+                <label className="space-y-1">
+                  <span className="text-sm font-medium text-slate-700">备注 (可选)</span>
+                  <input
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
+                    placeholder="发票号/供应商"
+                    value={form.remark}
+                    onChange={(e) => setForm((prev) => ({ ...prev, remark: e.target.value }))}
+                  />
+                </label>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  onClick={resetForm}
+                  className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-white"
+                >
+                  重置
+                </button>
+                <button
+                  onClick={handleSubmit}
+                  disabled={loading}
+                  className="rounded-lg bg-emerald-600 px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-500 disabled:opacity-60"
+                >
+                  确认保存
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
