@@ -67,9 +67,9 @@ type EntryPayload = {
 }
 
 export type FinanceEntryFilterOptions = {
-  projectId?: number
-  categoryKey?: string
-  paymentTypeId?: number
+  projectIds?: number[]
+  categoryKeys?: string[]
+  paymentTypeIds?: number[]
   reasonKeyword?: string
   amountMin?: number
   amountMax?: number
@@ -296,15 +296,21 @@ const buildEntryWhere = (options: FinanceEntryFilterOptions): Prisma.FinanceEntr
   if (options.reasonKeyword) {
     andConditions.push({ reason: { contains: options.reasonKeyword, mode: 'insensitive' } })
   }
+  if (options.categoryKeys?.length) {
+    const orConditions = options.categoryKeys.flatMap((key) => [
+      { categoryKey: key },
+      { parentKeys: { has: key } },
+    ])
+    andConditions.push({ OR: orConditions })
+  }
+
   const where: Prisma.FinanceEntryWhereInput = {
-    projectId: options.projectId,
-    paymentTypeId: options.paymentTypeId,
+    projectId: options.projectIds?.length ? { in: options.projectIds } : undefined,
+    paymentTypeId: options.paymentTypeIds?.length ? { in: options.paymentTypeIds } : undefined,
     isDeleted: options.includeDeleted ? undefined : false,
     AND: andConditions.length ? andConditions : undefined,
   }
-  if (options.categoryKey) {
-    where.OR = [{ categoryKey: options.categoryKey }, { parentKeys: { has: options.categoryKey } }]
-  }
+
   return where
 }
 

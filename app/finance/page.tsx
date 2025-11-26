@@ -70,9 +70,9 @@ type EntryForm = {
 }
 
 type ListFilters = {
-  projectId: number | ''
-  categoryKey: string
-  paymentTypeId: number | ''
+  projectIds: number[]
+  categoryKeys: string[]
+  paymentTypeIds: number[]
   reasonKeyword: string
   amountMin: string
   amountMax: string
@@ -111,14 +111,17 @@ const findCategoryNode = (nodes: FinanceCategoryDTO[], key: string): FinanceCate
   return null
 }
 
+const toggleValue = <T,>(list: T[], value: T) =>
+  list.includes(value) ? list.filter((item) => item !== value) : [...list, value]
+
 export default function FinancePage() {
   const [session, setSession] = useState<SessionUser | null>(null)
   const [metadata, setMetadata] = useState<Metadata | null>(null)
   const [entries, setEntries] = useState<FinanceEntry[]>([])
   const [listFilters, setListFilters] = useState<ListFilters>({
-    projectId: '',
-    categoryKey: '',
-    paymentTypeId: '',
+    projectIds: [],
+    categoryKeys: [],
+    paymentTypeIds: [],
     reasonKeyword: '',
     amountMin: '',
     amountMax: '',
@@ -128,9 +131,9 @@ export default function FinancePage() {
     sortDir: 'desc',
   })
   const [listDraft, setListDraft] = useState<ListFilters>({
-    projectId: '',
-    categoryKey: '',
-    paymentTypeId: '',
+    projectIds: [],
+    categoryKeys: [],
+    paymentTypeIds: [],
     reasonKeyword: '',
     amountMin: '',
     amountMax: '',
@@ -140,6 +143,8 @@ export default function FinancePage() {
     sortDir: 'desc',
   })
   const [categorySearch, setCategorySearch] = useState('')
+  const [projectOpen, setProjectOpen] = useState(false)
+  const [paymentOpen, setPaymentOpen] = useState(false)
   const [categoryOpen, setCategoryOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [insightsLoading, setInsightsLoading] = useState(false)
@@ -189,6 +194,33 @@ export default function FinancePage() {
     return categoryOptionsWithParents.filter((cat) => cat.label.toLowerCase().includes(keyword))
   }, [categoryOptionsWithParents, categorySearch])
 
+  const projectLabel = useMemo(() => {
+    if (!metadata?.projects?.length || !listDraft.projectIds.length) return '全部项目'
+    const names = metadata.projects
+      .filter((project) => listDraft.projectIds.includes(project.id))
+      .map((project) => project.name)
+    if (!names.length) return '全部项目'
+    return names.length <= 2 ? names.join('、') : `${names[0]}等${names.length}个`
+  }, [listDraft.projectIds, metadata?.projects])
+
+  const paymentLabel = useMemo(() => {
+    if (!metadata?.paymentTypes?.length || !listDraft.paymentTypeIds.length) return '全部支付方式'
+    const names = metadata.paymentTypes
+      .filter((type) => listDraft.paymentTypeIds.includes(type.id))
+      .map((type) => type.name)
+    if (!names.length) return '全部支付方式'
+    return names.length <= 2 ? names.join('、') : `${names[0]}等${names.length}个`
+  }, [listDraft.paymentTypeIds, metadata?.paymentTypes])
+
+  const categoryLabel = useMemo(() => {
+    if (!categoryOptionsWithParents.length || !listDraft.categoryKeys.length) return '全部分类'
+    const labels = categoryOptionsWithParents
+      .filter((cat) => listDraft.categoryKeys.includes(cat.key))
+      .map((cat) => cat.label)
+    if (!labels.length) return '全部分类'
+    return labels.length <= 2 ? labels.join('、') : `${labels[0]}等${labels.length}个`
+  }, [categoryOptionsWithParents, listDraft.categoryKeys])
+
   const categoryMap = useMemo(() => {
     const map = new Map<string, FinanceCategoryDTO>()
     const walk = (nodes: FinanceCategoryDTO[]) => {
@@ -203,14 +235,14 @@ export default function FinancePage() {
 
   const filteredEntries = useMemo(() => {
     let result = [...entries]
-    if (listFilters.categoryKey) {
-      result = result.filter((e) => e.categoryPath.some((c) => c.key === listFilters.categoryKey))
+    if (listFilters.categoryKeys.length) {
+      result = result.filter((e) => e.categoryPath.some((c) => listFilters.categoryKeys.includes(c.key)))
     }
-    if (listFilters.projectId) {
-      result = result.filter((e) => e.projectId === Number(listFilters.projectId))
+    if (listFilters.projectIds.length) {
+      result = result.filter((e) => listFilters.projectIds.includes(e.projectId))
     }
-    if (listFilters.paymentTypeId) {
-      result = result.filter((e) => e.paymentTypeId === Number(listFilters.paymentTypeId))
+    if (listFilters.paymentTypeIds.length) {
+      result = result.filter((e) => listFilters.paymentTypeIds.includes(e.paymentTypeId))
     }
     if (listFilters.reasonKeyword.trim()) {
       const keyword = listFilters.reasonKeyword.trim().toLowerCase()
@@ -254,9 +286,9 @@ export default function FinancePage() {
 
   const buildFilterParams = (filtersInput: ListFilters) => {
     const params = new URLSearchParams()
-    if (filtersInput.projectId) params.set('projectId', String(filtersInput.projectId))
-    if (filtersInput.categoryKey) params.set('categoryKey', filtersInput.categoryKey)
-    if (filtersInput.paymentTypeId) params.set('paymentTypeId', String(filtersInput.paymentTypeId))
+    filtersInput.projectIds.forEach((id) => params.append('projectId', String(id)))
+    filtersInput.categoryKeys.forEach((key) => params.append('categoryKey', key))
+    filtersInput.paymentTypeIds.forEach((id) => params.append('paymentTypeId', String(id)))
     if (filtersInput.reasonKeyword.trim()) params.set('reasonKeyword', filtersInput.reasonKeyword.trim())
     if (filtersInput.amountMin !== '') params.set('amountMin', filtersInput.amountMin)
     if (filtersInput.amountMax !== '') params.set('amountMax', filtersInput.amountMax)
@@ -302,9 +334,9 @@ export default function FinancePage() {
         paymentDate: prev.paymentDate || formatDateInput(new Date().toISOString()),
       }))
       const defaults: ListFilters = {
-        projectId: defaultProject?.id ?? '',
-        categoryKey: '',
-        paymentTypeId: '',
+        projectIds: defaultProject?.id ? [defaultProject.id] : [],
+        categoryKeys: [],
+        paymentTypeIds: defaultPayment?.id ? [defaultPayment.id] : [],
         reasonKeyword: '',
         amountMin: '',
         amountMax: '',
@@ -383,9 +415,9 @@ export default function FinancePage() {
   }, [canView, loadMetadata])
 
   const {
-    projectId: filtersProjectId,
-    categoryKey: filtersCategoryKey,
-    paymentTypeId: filtersPaymentTypeId,
+    projectIds: filtersProjectIds,
+    categoryKeys: filtersCategoryKeys,
+    paymentTypeIds: filtersPaymentTypeIds,
     reasonKeyword: filtersReasonKeyword,
     amountMin: filtersAmountMin,
     amountMax: filtersAmountMax,
@@ -398,9 +430,9 @@ export default function FinancePage() {
   useEffect(() => {
     if (!canView) return
     const currentFilters: ListFilters = {
-      projectId: filtersProjectId,
-      categoryKey: filtersCategoryKey,
-      paymentTypeId: filtersPaymentTypeId,
+      projectIds: filtersProjectIds,
+      categoryKeys: filtersCategoryKeys,
+      paymentTypeIds: filtersPaymentTypeIds,
       reasonKeyword: filtersReasonKeyword,
       amountMin: filtersAmountMin,
       amountMax: filtersAmountMax,
@@ -414,9 +446,9 @@ export default function FinancePage() {
   }, [
     canView,
     refreshKey,
-    filtersProjectId,
-    filtersCategoryKey,
-    filtersPaymentTypeId,
+    filtersProjectIds,
+    filtersCategoryKeys,
+    filtersPaymentTypeIds,
     filtersReasonKeyword,
     filtersAmountMin,
     filtersAmountMax,
@@ -430,8 +462,13 @@ export default function FinancePage() {
 
   const classificationBreakdown = useMemo(() => {
     if (!metadata?.categories) return null
-    const rootKey = listFilters.categoryKey || null
-    const rootLabel = rootKey ? categoryMap.get(rootKey)?.labelZh ?? rootKey : '全部分类'
+    const rootKey = listFilters.categoryKeys.length === 1 ? listFilters.categoryKeys[0] : null
+    const rootLabel =
+      listFilters.categoryKeys.length > 1
+        ? '已选分类'
+        : rootKey
+          ? categoryMap.get(rootKey)?.labelZh ?? rootKey
+          : '全部分类'
     if (!entries.length) {
       return { rootKey, rootLabel, total: 0, children: [] }
     }
@@ -481,7 +518,7 @@ export default function FinancePage() {
       total: Math.round(total * 100) / 100,
       children,
     }
-  }, [categoryMap, entries, listFilters.categoryKey, metadata?.categories])
+  }, [categoryMap, entries, listFilters.categoryKeys, metadata?.categories])
 
   const resetForm = () => {
     setForm({
@@ -681,49 +718,135 @@ export default function FinancePage() {
             </div>
           </div>
           <div className="grid gap-3 md:grid-cols-12">
-            <div className="md:col-span-2">
+            <div className="md:col-span-3">
               <label className="space-y-1 text-sm">
-                <span className="text-slate-700">项目</span>
-                <select
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
-                  value={listDraft.projectId}
-                  onChange={(e) =>
-                    setListDraft((prev) => ({
-                      ...prev,
-                      projectId: e.target.value ? Number(e.target.value) : '',
-                    }))
-                  }
-                >
-                  <option value="">全部项目</option>
-                  {metadata?.projects.map((project) => (
-                    <option key={project.id} value={project.id}>
-                      {project.name}
-                    </option>
-                  ))}
-                </select>
+                <span className="text-slate-700">项目（可多选）</span>
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setProjectOpen((prev) => !prev)}
+                    className="flex w-full items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-left text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
+                  >
+                    <span className="truncate">{projectLabel}</span>
+                    <span className="text-xs text-slate-500">⌕</span>
+                  </button>
+                  {projectOpen && (
+                    <div
+                      className="absolute z-20 mt-2 w-full rounded-lg border border-slate-200 bg-white shadow-lg"
+                      onMouseLeave={() => setProjectOpen(false)}
+                    >
+                      <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2 text-xs text-slate-600">
+                        <span>已选 {listDraft.projectIds.length || '全部'}</span>
+                        <div className="flex gap-2">
+                          <button
+                            className="text-emerald-700 hover:underline"
+                            onClick={() =>
+                              setListDraft((prev) => ({
+                                ...prev,
+                                projectIds: metadata?.projects.map((p) => p.id) ?? [],
+                              }))
+                            }
+                          >
+                            全选
+                          </button>
+                          <button
+                            className="text-slate-600 hover:underline"
+                            onClick={() => setListDraft((prev) => ({ ...prev, projectIds: [] }))}
+                          >
+                            清空
+                          </button>
+                        </div>
+                      </div>
+                      <div className="max-h-56 space-y-1 overflow-y-auto p-2 text-sm">
+                        {metadata?.projects.map((project) => (
+                          <label
+                            key={project.id}
+                            className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 hover:bg-slate-50"
+                          >
+                            <input
+                              type="checkbox"
+                              className="h-4 w-4"
+                              checked={listDraft.projectIds.includes(project.id)}
+                              onChange={() =>
+                                setListDraft((prev) => ({
+                                  ...prev,
+                                  projectIds: toggleValue(prev.projectIds, project.id),
+                                }))
+                              }
+                            />
+                            <span className="truncate">{project.name}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </label>
             </div>
 
-            <div className="md:col-span-2">
+            <div className="md:col-span-3">
               <label className="space-y-1 text-sm">
-                <span className="text-slate-700">支付方式</span>
-                <select
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
-                  value={listDraft.paymentTypeId}
-                  onChange={(e) =>
-                    setListDraft((prev) => ({
-                      ...prev,
-                      paymentTypeId: e.target.value ? Number(e.target.value) : '',
-                    }))
-                  }
-                >
-                  <option value="">全部支付方式</option>
-                  {metadata?.paymentTypes.map((type) => (
-                    <option key={type.id} value={type.id}>
-                      {type.name}
-                    </option>
-                  ))}
-                </select>
+                <span className="text-slate-700">支付方式（可多选）</span>
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setPaymentOpen((prev) => !prev)}
+                    className="flex w-full items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-left text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
+                  >
+                    <span className="truncate">{paymentLabel}</span>
+                    <span className="text-xs text-slate-500">⌕</span>
+                  </button>
+                  {paymentOpen && (
+                    <div
+                      className="absolute z-20 mt-2 w-full rounded-lg border border-slate-200 bg-white shadow-lg"
+                      onMouseLeave={() => setPaymentOpen(false)}
+                    >
+                      <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2 text-xs text-slate-600">
+                        <span>已选 {listDraft.paymentTypeIds.length || '全部'}</span>
+                        <div className="flex gap-2">
+                          <button
+                            className="text-emerald-700 hover:underline"
+                            onClick={() =>
+                              setListDraft((prev) => ({
+                                ...prev,
+                                paymentTypeIds: metadata?.paymentTypes.map((p) => p.id) ?? [],
+                              }))
+                            }
+                          >
+                            全选
+                          </button>
+                          <button
+                            className="text-slate-600 hover:underline"
+                            onClick={() => setListDraft((prev) => ({ ...prev, paymentTypeIds: [] }))}
+                          >
+                            清空
+                          </button>
+                        </div>
+                      </div>
+                      <div className="max-h-56 space-y-1 overflow-y-auto p-2 text-sm">
+                        {metadata?.paymentTypes.map((type) => (
+                          <label
+                            key={type.id}
+                            className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 hover:bg-slate-50"
+                          >
+                            <input
+                              type="checkbox"
+                              className="h-4 w-4"
+                              checked={listDraft.paymentTypeIds.includes(type.id)}
+                              onChange={() =>
+                                setListDraft((prev) => ({
+                                  ...prev,
+                                  paymentTypeIds: toggleValue(prev.paymentTypeIds, type.id),
+                                }))
+                              }
+                            />
+                            <span className="truncate">{type.name}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </label>
             </div>
 
@@ -739,20 +862,16 @@ export default function FinancePage() {
               </label>
             </div>
 
-            <div className="md:col-span-5">
+            <div className="md:col-span-3">
               <label className="space-y-1 text-sm">
-                <span className="text-slate-700">分类</span>
+                <span className="text-slate-700">分类（可多选）</span>
                 <div className="relative">
                   <button
                     type="button"
                     onClick={() => setCategoryOpen((prev) => !prev)}
                     className="flex w-full items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-left text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
                   >
-                    <span className="truncate">
-                      {listDraft.categoryKey
-                        ? categoryOptionsWithParents.find((c) => c.key === listDraft.categoryKey)?.label ?? '全部分类'
-                        : '全部分类'}
-                    </span>
+                    <span className="truncate">{categoryLabel}</span>
                     <span className="text-xs text-slate-500">⌕</span>
                   </button>
                   {categoryOpen && (
@@ -767,30 +886,54 @@ export default function FinancePage() {
                           value={categorySearch}
                           onChange={(e) => setCategorySearch(e.target.value)}
                         />
+                        <div className="mt-2 flex items-center justify-between text-xs text-slate-600">
+                          <button
+                            className="text-emerald-700 hover:underline"
+                            onClick={() =>
+                              setListDraft((prev) => ({
+                                ...prev,
+                                categoryKeys: filteredCategoryOptions.map((cat) => cat.key),
+                              }))
+                            }
+                          >
+                            当前搜索全选
+                          </button>
+                          <button
+                            className="text-slate-600 hover:underline"
+                            onClick={() => setListDraft((prev) => ({ ...prev, categoryKeys: [] }))}
+                          >
+                            清空
+                          </button>
+                        </div>
                       </div>
                       <div className="max-h-56 space-y-1 overflow-y-auto p-2 text-sm">
                         <button
                           className="block w-full rounded px-2 py-1 text-left hover:bg-slate-50"
                           onClick={() => {
-                            setListDraft((prev) => ({ ...prev, categoryKey: '' }))
+                            setListDraft((prev) => ({ ...prev, categoryKeys: [] }))
                             setCategoryOpen(false)
                           }}
                         >
                           全部分类
                         </button>
                         {filteredCategoryOptions.map((cat) => (
-                          <button
+                          <label
                             key={cat.key}
-                            className={`block w-full rounded px-2 py-1 text-left hover:bg-emerald-50 ${
-                              listDraft.categoryKey === cat.key ? 'bg-emerald-50 text-emerald-700' : 'text-slate-700'
-                            }`}
-                            onClick={() => {
-                              setListDraft((prev) => ({ ...prev, categoryKey: cat.key }))
-                              setCategoryOpen(false)
-                            }}
+                            className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 hover:bg-emerald-50"
                           >
-                            {cat.label}
-                          </button>
+                            <input
+                              type="checkbox"
+                              className="h-4 w-4"
+                              checked={listDraft.categoryKeys.includes(cat.key)}
+                              onChange={() =>
+                                setListDraft((prev) => ({
+                                  ...prev,
+                                  categoryKeys: toggleValue(prev.categoryKeys, cat.key),
+                                }))
+                              }
+                            />
+                            <span className="truncate">{cat.label}</span>
+                          </label>
                         ))}
                       </div>
                     </div>
@@ -892,6 +1035,9 @@ export default function FinancePage() {
                 <button
                   onClick={() => {
                     setListFilters({ ...listDraft })
+                    setProjectOpen(false)
+                    setPaymentOpen(false)
+                    setCategoryOpen(false)
                     setRefreshKey((prev) => prev + 1)
                   }}
                   className="rounded bg-slate-900 px-4 py-2 text-sm text-white hover:bg-slate-800"
@@ -901,9 +1047,9 @@ export default function FinancePage() {
                 <button
                   onClick={() => {
                     const reset = {
-                      projectId: '',
-                      categoryKey: '',
-                      paymentTypeId: '',
+                      projectIds: [],
+                      categoryKeys: [],
+                      paymentTypeIds: [],
                       reasonKeyword: '',
                       amountMin: '',
                       amountMax: '',
@@ -914,6 +1060,9 @@ export default function FinancePage() {
                     } satisfies ListFilters
                     setListDraft(reset)
                     setListFilters(reset)
+                    setProjectOpen(false)
+                    setPaymentOpen(false)
+                    setCategoryOpen(false)
                     setRefreshKey((prev) => prev + 1)
                   }}
                   className="rounded border px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
@@ -1103,14 +1252,19 @@ export default function FinancePage() {
                             }
                             buildPath(classificationBreakdown.rootKey)
                           }
-                          if (!rootPath.length) rootPath.push({ key: '', label: '全部分类' })
+                          if (!rootPath.length) {
+                            rootPath.push({
+                              key: '',
+                              label: listFilters.categoryKeys.length > 1 ? '已选分类' : '全部分类',
+                            })
+                          }
                           return rootPath.map((node, idx) => (
                             <span key={node.key || idx} className="flex items-center gap-1">
                               <button
                                 className="rounded-full border border-slate-200 px-2 py-0.5 text-slate-700 transition hover:border-emerald-300 hover:text-emerald-700"
                                 onClick={() => {
-                                  setListDraft((prev) => ({ ...prev, categoryKey: node.key }))
-                                  setListFilters((prev) => ({ ...prev, categoryKey: node.key }))
+                                  setListDraft((prev) => ({ ...prev, categoryKeys: node.key ? [node.key] : [] }))
+                                  setListFilters((prev) => ({ ...prev, categoryKeys: node.key ? [node.key] : [] }))
                                   setViewMode('charts')
                                 }}
                               >
@@ -1168,8 +1322,8 @@ export default function FinancePage() {
                             <button
                               key={cat.key}
                               onClick={() => {
-                                setListDraft((prev) => ({ ...prev, categoryKey: cat.key }))
-                                setListFilters((prev) => ({ ...prev, categoryKey: cat.key }))
+                                setListDraft((prev) => ({ ...prev, categoryKeys: [cat.key] }))
+                                setListFilters((prev) => ({ ...prev, categoryKeys: [cat.key] }))
                                 setViewMode('charts')
                               }}
                               className="w-full rounded-lg border border-slate-100 px-3 py-2 text-left transition hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-sm"
@@ -1317,8 +1471,8 @@ export default function FinancePage() {
                         <button
                           key={item.id}
                           onClick={() => {
-                            setListDraft((prev) => ({ ...prev, paymentTypeId: item.id }))
-                            setListFilters((prev) => ({ ...prev, paymentTypeId: item.id }))
+                            setListDraft((prev) => ({ ...prev, paymentTypeIds: [item.id] }))
+                            setListFilters((prev) => ({ ...prev, paymentTypeIds: [item.id] }))
                             setViewMode('table')
                             setRefreshKey((prev) => prev + 1)
                           }}

@@ -6,25 +6,33 @@ const toNumber = (value: string | null) => {
   return Number.isFinite(num) ? num : undefined
 }
 
+const toNumberArray = (values: string[]) =>
+  values
+    .map((value) => Number(value))
+    .filter((num) => Number.isFinite(num))
+
 export const parseFinanceFilters = (searchParams: URLSearchParams): FinanceEntryFilterOptions => {
-  const projectId = toNumber(searchParams.get('projectId'))
-  const paymentTypeId = toNumber(searchParams.get('paymentTypeId'))
+  const projectIds = toNumberArray(searchParams.getAll('projectId'))
+  const paymentTypeIds = toNumberArray(searchParams.getAll('paymentTypeId'))
   const amountMin = toNumber(searchParams.get('amountMin'))
   const amountMax = toNumber(searchParams.get('amountMax'))
   const dateFrom = searchParams.get('dateFrom') || undefined
   const dateTo = searchParams.get('dateTo') || undefined
-  const categoryKey = searchParams.get('categoryKey') || undefined
+  const categoryKeys = searchParams
+    .getAll('categoryKey')
+    .map((key) => key.trim())
+    .filter(Boolean)
   const reasonKeyword = searchParams.get('reasonKeyword')?.trim() || undefined
   const includeDeleted = searchParams.get('includeDeleted') === 'true'
 
   return {
-    projectId,
-    paymentTypeId,
+    projectIds: projectIds.length ? projectIds : undefined,
+    paymentTypeIds: paymentTypeIds.length ? paymentTypeIds : undefined,
     amountMin,
     amountMax,
     dateFrom,
     dateTo,
-    categoryKey,
+    categoryKeys: categoryKeys.length ? categoryKeys : undefined,
     reasonKeyword,
     includeDeleted,
   }
