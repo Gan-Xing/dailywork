@@ -11,18 +11,12 @@ export default async function ProgressPage() {
   let loadError: string | null = null
   const sessionUser = getSessionUser()
   const canView =
-    !sessionUser ||
-    sessionUser?.permissions.includes('progress:view') ||
-    sessionUser?.permissions.includes('road:view') ||
-    sessionUser?.permissions.includes('road:manage') ||
-    false
+    !sessionUser || sessionUser?.permissions.includes('progress:view') || false
   const canManage =
-    sessionUser?.permissions.includes('road:manage') ||
-    sessionUser?.permissions.includes('progress:edit') ||
-    false
+    sessionUser?.permissions.includes('progress:edit') || false
 
   if (!canView) {
-    return <AccessDenied permissions={['progress:view', 'road:view']} hint="开通查看权限后可使用甘特与里程碑视图。" />
+    return <AccessDenied permissions={['progress:view']} hint="开通查看权限后可使用甘特与里程碑视图。" />
   }
 
   try {

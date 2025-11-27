@@ -213,7 +213,8 @@ export default function HomePage() {
 
 	const can = useCallback(
 		(required: string[]) => {
-			if (!session) return required.length === 0;
+			if (!required.length) return true;
+			if (!session) return false;
 			return required.some((perm) => session.permissions.includes(perm));
 		},
 		[session]
@@ -221,7 +222,7 @@ export default function HomePage() {
 	const modulePermissions: Record<string, string[]> = useMemo(
 		() => ({
 			'/reports': ['report:view', 'report:edit'],
-			'/progress': [],
+			'/progress': ['progress:view'],
 			'/members': ['member:view'],
 			'/finance': ['finance:view']
 		}),

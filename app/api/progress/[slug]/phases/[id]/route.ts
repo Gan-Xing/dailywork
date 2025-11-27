@@ -12,8 +12,7 @@ interface RouteParams {
 }
 
 export async function PUT(request: Request, { params }: RouteParams) {
-  const canEdit = hasPermission('progress:edit') || hasPermission('road:manage')
-  if (!canEdit) {
+  if (!hasPermission('progress:edit')) {
     return NextResponse.json({ message: '缺少编辑进度权限' }, { status: 403 })
   }
 
@@ -73,8 +72,7 @@ export async function PUT(request: Request, { params }: RouteParams) {
 }
 
 export async function DELETE(_request: Request, { params }: RouteParams) {
-  const canEdit = hasPermission('progress:edit') || hasPermission('road:manage')
-  if (!canEdit) {
+  if (!hasPermission('progress:edit')) {
     return NextResponse.json({ message: '缺少编辑进度权限' }, { status: 403 })
   }
 

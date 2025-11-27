@@ -19,20 +19,14 @@ export default async function RoadDetailPage({ params }: Params) {
   const road = (await getRoadBySlug(params.slug)) as RoadSectionDTO | null
   const sessionUser = getSessionUser()
   const canView =
-    !sessionUser ||
-    sessionUser?.permissions.includes('progress:view') ||
-    sessionUser?.permissions.includes('road:view') ||
-    sessionUser?.permissions.includes('road:manage') ||
-    false
-  const canManage =
-    sessionUser?.permissions.includes('road:manage') ||
-    sessionUser?.permissions.includes('progress:edit') ||
-    false
+    !sessionUser || sessionUser?.permissions.includes('progress:view') || false
+  const canManage = sessionUser?.permissions.includes('progress:edit') || false
+  const canInspect = sessionUser?.permissions.includes('inspection:create') || false
 
   if (!canView) {
     return (
       <AccessDenied
-        permissions={['progress:view', 'road:view']}
+        permissions={['progress:view']}
         hint="开通查看权限后可使用甘特、风险与节点详情。"
       />
     )
@@ -65,6 +59,7 @@ export default async function RoadDetailPage({ params }: Params) {
             layerOptions={layerOptions as LayerDefinitionDTO[]}
             checkOptions={checkOptions as CheckDefinitionDTO[]}
             canManage={canManage}
+            canInspect={canInspect}
           />
         </div>
       </div>

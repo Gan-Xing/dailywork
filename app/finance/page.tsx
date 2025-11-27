@@ -1677,8 +1677,8 @@ export default function FinancePage() {
       )}
 
       {canEdit && showEntryModal && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 px-4 py-8 backdrop-blur-sm">
-          <div className="w-full max-w-3xl overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-slate-900/10">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 px-4 py-6 backdrop-blur-sm sm:py-8">
+          <div className="flex h-full w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-slate-900/10 max-h-[90vh]">
             <div className="flex items-center justify-between bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-500 px-6 py-4 text-white">
               <div>
                 <span className="rounded-full bg-white/20 px-3 py-1 text-xs font-semibold tracking-wide">
@@ -1697,7 +1697,7 @@ export default function FinancePage() {
               </button>
             </div>
 
-            <div className="space-y-4 px-6 pb-6 pt-5">
+            <div className="flex-1 space-y-4 overflow-y-auto px-6 pb-6 pt-5">
               <label className="space-y-1">
                 <span className="text-sm font-medium text-slate-700">所属项目</span>
                 <select

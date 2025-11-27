@@ -17,11 +17,7 @@ interface RouteParams {
 }
 
 export async function GET(_request: Request, { params }: RouteParams) {
-  const canView =
-    hasPermission('progress:view') ||
-    hasPermission('road:view') ||
-    hasPermission('road:manage')
-  if (!canView) {
+  if (!hasPermission('progress:view')) {
     return NextResponse.json({ message: '缺少进度查看权限' }, { status: 403 })
   }
   const road = await getRoadBySlug(params.slug)
@@ -38,8 +34,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
 }
 
 export async function POST(request: Request, { params }: RouteParams) {
-  const canEdit = hasPermission('progress:edit') || hasPermission('road:manage')
-  if (!canEdit) {
+  if (!hasPermission('progress:edit')) {
     return NextResponse.json({ message: '缺少编辑进度权限' }, { status: 403 })
   }
   const road = await getRoadBySlug(params.slug)

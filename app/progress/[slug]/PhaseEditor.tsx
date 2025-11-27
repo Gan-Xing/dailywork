@@ -22,6 +22,7 @@ interface Props {
   layerOptions: LayerDefinitionDTO[]
   checkOptions: CheckDefinitionDTO[]
   canManage: boolean
+  canInspect: boolean
 }
 
 const sideOptions: { value: IntervalSide; label: string }[] = [
@@ -184,7 +185,15 @@ const calcCombinedPercent = (left: Segment[], right: Segment[]) => {
   return Math.round((completed / total) * 100)
 }
 
-export function PhaseEditor({ road, initialPhases, phaseDefinitions, layerOptions, checkOptions, canManage }: Props) {
+export function PhaseEditor({
+  road,
+  initialPhases,
+  phaseDefinitions,
+  layerOptions,
+  checkOptions,
+  canManage,
+  canInspect,
+}: Props) {
   const roadStart = useMemo(() => {
     const start = Number(road.startPk)
     return Number.isFinite(start) ? start : 0
@@ -217,7 +226,7 @@ export function PhaseEditor({ road, initialPhases, phaseDefinitions, layerOption
   const [isPending, startTransition] = useTransition()
   const [editingId, setEditingId] = useState<number | null>(null)
   const [deletingId, setDeletingId] = useState<number | null>(null)
-  const formRef = useRef<HTMLElement | null>(null)
+  const [showFormModal, setShowFormModal] = useState(false)
   const nameInputRef = useRef<HTMLInputElement | null>(null)
 
   const designLength = useMemo(() => computeDesign(measure, intervals), [measure, intervals])
@@ -264,6 +273,19 @@ export function PhaseEditor({ road, initialPhases, phaseDefinitions, layerOption
     setError(null)
   }
 
+  const openCreateModal = () => {
+    resetForm()
+    setShowFormModal(true)
+    requestAnimationFrame(() => {
+      nameInputRef.current?.focus()
+    })
+  }
+
+  const closeFormModal = () => {
+    resetForm()
+    setShowFormModal(false)
+  }
+
   const startEdit = (phase: PhaseDTO) => {
     const normalized = normalizePhaseDTO(phase)
     setName(normalized.name)
@@ -283,9 +305,9 @@ export function PhaseEditor({ road, initialPhases, phaseDefinitions, layerOption
     setEditingId(normalized.id)
     setError(null)
     requestAnimationFrame(() => {
-      formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
       nameInputRef.current?.focus()
     })
+    setShowFormModal(true)
   }
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
@@ -294,6 +316,15 @@ export function PhaseEditor({ road, initialPhases, phaseDefinitions, layerOption
     setSuccessMessage(null)
     if (!canManage) return
     startTransition(async () => {
+      const intervalInvalid = intervals.some((item) => {
+        const start = Number(item.startPk)
+        const end = measure === 'POINT' ? start : Number(item.endPk)
+        return !Number.isFinite(start) || !Number.isFinite(end)
+      })
+      if (intervalInvalid) {
+        setError('请填写有效的起点/终点')
+        return
+      }
       const { ids: layerIds, newNames: newLayers } = splitTokensToIds(layerTokens, layerOptionsState)
       const { ids: checkIds, newNames: newChecks } = splitTokensToIds(checkTokens, checkOptionsState)
       const payload: PhasePayload = {
@@ -347,34 +378,66 @@ export function PhaseEditor({ road, initialPhases, phaseDefinitions, layerOption
           },
         ])
       }
-      if (payload.newLayers?.length) {
-        const newLayerOptions = payload.newLayers
-          .filter((name) => !layerOptionsState.some((opt) => opt.name === name))
-          .map((name, idx) => ({
-            id: -(layerOptionsState.length + idx + 1),
-            name,
-            isActive: true,
-          }))
-        if (newLayerOptions.length) {
-          setLayerOptionsState((prev) => [...prev, ...newLayerOptions])
-        }
+      const layerPairs =
+        phase.layerIds.length && phase.resolvedLayers.length === phase.layerIds.length
+          ? phase.layerIds.map((id, idx) => ({ id, name: phase.resolvedLayers[idx] }))
+          : phase.definitionLayerIds.map((id, idx) => ({ id, name: phase.resolvedLayers[idx] }))
+
+      if (layerPairs.length) {
+        setLayerOptionsState((prev) => {
+          let next = [...prev]
+          layerPairs.forEach(({ id, name }) => {
+            if (!name || id <= 0) return
+            const existingIndex = next.findIndex((opt) => opt.name === name)
+            if (existingIndex >= 0) {
+              const existing = next[existingIndex]
+              if (existing.id <= 0) {
+                next = [
+                  ...next.slice(0, existingIndex),
+                  { ...existing, id },
+                  ...next.slice(existingIndex + 1),
+                ]
+              }
+            } else {
+              next = [...next, { id, name, isActive: true }]
+            }
+          })
+          return next
+        })
       }
-      if (payload.newChecks?.length) {
-        const newCheckOptions = payload.newChecks
-          .filter((name) => !checkOptionsState.some((opt) => opt.name === name))
-          .map((name, idx) => ({
-            id: -(checkOptionsState.length + idx + 1),
-            name,
-            isActive: true,
-          }))
-        if (newCheckOptions.length) {
-          setCheckOptionsState((prev) => [...prev, ...newCheckOptions])
-        }
+
+      const checkPairs =
+        phase.checkIds.length && phase.resolvedChecks.length === phase.checkIds.length
+          ? phase.checkIds.map((id, idx) => ({ id, name: phase.resolvedChecks[idx] }))
+          : phase.definitionCheckIds.map((id, idx) => ({ id, name: phase.resolvedChecks[idx] }))
+
+      if (checkPairs.length) {
+        setCheckOptionsState((prev) => {
+          let next = [...prev]
+          checkPairs.forEach(({ id, name }) => {
+            if (!name || id <= 0) return
+            const existingIndex = next.findIndex((opt) => opt.name === name)
+            if (existingIndex >= 0) {
+              const existing = next[existingIndex]
+              if (existing.id <= 0) {
+                next = [
+                  ...next.slice(0, existingIndex),
+                  { ...existing, id },
+                  ...next.slice(existingIndex + 1),
+                ]
+              }
+            } else {
+              next = [...next, { id, name, isActive: true }]
+            }
+          })
+          return next
+        })
       }
       setPhases((prev) =>
         editingId ? prev.map((item) => (item.id === editingId ? phase : item)) : [...prev, phase],
       )
       setSuccessMessage(editingId ? `分项「${phase.name}」已更新` : `分项「${phase.name}」已创建`)
+      setShowFormModal(false)
       resetForm()
     })
   }
@@ -440,7 +503,7 @@ const splitTokensToIds = (
   const newNames: string[] = []
   normalized.forEach((token) => {
     const matched = options.find((opt) => opt.name === token)
-    if (matched) {
+    if (matched && matched.id > 0) {
       ids.push(matched.id)
     } else {
       newNames.push(token)
@@ -476,19 +539,21 @@ const addCheckToken = () => {
   setCheckInput('')
 }
 
-const resetInspectionForm = () => {
-  setSelectedLayers([])
-  setSelectedChecks([])
-  setSelectedTypes([])
-  setRemark('')
-  setSubmitError(null)
-}
+  const resetInspectionForm = () => {
+    setSelectedLayers([])
+    setSelectedChecks([])
+    setSelectedTypes([])
+    setRemark('')
+    setSubmitError(null)
+  }
 
 const submitInspection = async () => {
   if (!selectedSegment) return
+  const hasStart = startPkInput.trim() !== ''
+  const hasEnd = endPkInput.trim() !== ''
   const startPk = Number(startPkInput)
   const endPk = Number(endPkInput)
-  if (!Number.isFinite(startPk) || !Number.isFinite(endPk)) {
+  if (!hasStart || !hasEnd || !Number.isFinite(startPk) || !Number.isFinite(endPk)) {
     setSubmitError('请输入有效的起点和终点')
     return
   }
@@ -545,8 +610,8 @@ const submitInspection = async () => {
     end: number
   } | null>(null)
   const [selectedSide, setSelectedSide] = useState<IntervalSide>('BOTH')
-  const [startPkInput, setStartPkInput] = useState<number>(0)
-  const [endPkInput, setEndPkInput] = useState<number>(0)
+  const [startPkInput, setStartPkInput] = useState<string>('')
+  const [endPkInput, setEndPkInput] = useState<string>('')
   const [selectedLayers, setSelectedLayers] = useState<string[]>([])
   const [selectedChecks, setSelectedChecks] = useState<string[]>([])
   const [selectedTypes, setSelectedTypes] = useState<string[]>([])
@@ -564,8 +629,8 @@ const submitInspection = async () => {
       setSubmitError(null)
       setInspectionCheckInput('')
       setSelectedSide(selectedSegment.side)
-      setStartPkInput(selectedSegment.start)
-      setEndPkInput(selectedSegment.end)
+      setStartPkInput(String(selectedSegment.start ?? ''))
+      setEndPkInput(String(selectedSegment.end ?? ''))
     }
   }, [selectedSegment])
 
@@ -582,302 +647,348 @@ const submitInspection = async () => {
           {successMessage}
         </div>
       ) : null}
-      <section ref={formRef} className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur">
-        <div className="flex flex-wrap items-center gap-3">
-          <h2 className="text-xl font-semibold text-slate-50">分项工程</h2>
-          <span className="rounded-full bg-white/10 px-3 py-1 text-[11px] font-semibold text-slate-100">
-            道路长度（估算）：{roadLength || '未填写'} m
-          </span>
+      <section className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <h2 className="text-xl font-semibold text-slate-50">分项工程</h2>
+            <span className="rounded-full bg-white/10 px-3 py-1 text-[11px] font-semibold text-slate-100">
+              道路长度（估算）：{roadLength || '未填写'} m
+            </span>
+          </div>
+          {canManage ? (
+            <button
+              type="button"
+              className="inline-flex items-center gap-2 rounded-2xl bg-emerald-300 px-4 py-2 text-xs font-semibold text-slate-900 shadow-lg shadow-emerald-400/30 transition hover:-translate-y-0.5"
+              onClick={openCreateModal}
+            >
+              新增分项
+            </button>
+          ) : null}
         </div>
-        {canManage ? (
-          <form className="mt-5 space-y-4" onSubmit={handleSubmit}>
-            <div className="flex flex-wrap items-center gap-3">
-              {editingId ? (
-                <span className="rounded-full bg-amber-200/80 px-3 py-1 text-xs font-semibold text-slate-900">
-                  编辑分项 · ID {editingId}
-                </span>
-              ) : null}
-              {editingId ? (
+        <p className="mt-3 text-sm text-slate-200/80">
+          {canManage
+            ? '新增/编辑分项会在弹窗中完成，便于手机端查看。'
+            : '当前账号缺少编辑权限，仅可查看已有分项。'}
+        </p>
+      </section>
+
+      {showFormModal && canManage ? (
+        <div
+          className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/70 px-4 py-6 sm:items-center sm:py-10"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) {
+              closeFormModal()
+            }
+          }}
+        >
+          <div
+            className="relative w-full max-w-4xl overflow-hidden rounded-3xl border border-white/10 bg-slate-900/90 shadow-2xl shadow-emerald-500/20 backdrop-blur"
+            role="dialog"
+            aria-modal="true"
+          >
+            <button
+              type="button"
+              className="absolute right-4 top-4 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/20"
+              onClick={closeFormModal}
+            >
+              关闭
+            </button>
+            <div className="max-h-[90vh] overflow-y-auto p-5 sm:p-8">
+              <div className="flex flex-wrap items-center gap-3">
+                {editingId ? (
+                  <span className="rounded-full bg-amber-200/80 px-3 py-1 text-xs font-semibold text-slate-900">
+                    编辑分项 · ID {editingId}
+                  </span>
+                ) : (
+                  <span className="rounded-full bg-emerald-200/80 px-3 py-1 text-xs font-semibold text-slate-900">
+                    新增分项
+                  </span>
+                )}
                 <button
                   type="button"
                   className="rounded-full border border-white/20 px-3 py-1 text-[11px] font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/10"
                   onClick={resetForm}
                 >
-                  退出编辑
+                  {editingId ? '退出编辑' : '重置表单'}
                 </button>
-              ) : null}
-              <button
-                type="button"
-                className="text-xs text-emerald-200 underline decoration-dotted"
-                onClick={resetForm}
-              >
-                重置表单
-              </button>
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-4">
-              <label className="flex flex-col gap-2 text-sm text-slate-100">
-                分项模板
-                <select
-                  className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
-                  value={definitionId ?? ''}
-                  onChange={(e) => {
-                    const value = e.target.value
-                    if (!value) {
-                      setDefinitionId(null)
-                      return
-                    }
-                    const found = definitions.find((item) => item.id === Number(value))
-                    if (found) {
-                      setDefinitionId(found.id)
-                      setName(found.name)
-                      setMeasure(found.measure)
-                      setLayerTokens(found.defaultLayers)
-                      setCheckTokens(found.defaultChecks)
-                    }
-                  }}
-                >
-                  <option value="">自定义/新建</option>
-                  {definitions.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.name} · {item.measure === 'POINT' ? '单体' : '延米'}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="flex flex-col gap-2 text-sm text-slate-100">
-                名称
-                <input
-                  ref={nameInputRef}
-                  className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-slate-50 placeholder:text-slate-200/60 focus:border-emerald-300 focus:outline-none"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="如：土方"
-                  required
-                />
-              </label>
-              <label className="flex flex-col gap-2 text-sm text-slate-100">
-                显示方式
-                <select
-                  className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
-                  value={measure}
-                  onChange={(e) => setMeasure(e.target.value as PhaseMeasure)}
-                >
-                  <option value="LINEAR">延米（按起终点展示进度）</option>
-                  <option value="POINT">单体（按点位/条目展示）</option>
-                </select>
-              </label>
-              <div className="flex flex-col justify-end text-sm text-slate-100">
                 <span className="text-xs text-slate-300">
-                  设计量自动计算：
-                  {measure === 'POINT'
-                    ? `${designLength} 个（按条目数）`
-                    : `${designLength} m（双侧区间按左右叠加）`}
+                  道路长度（估算）：{roadLength || '未填写'} m · 设计量自动计算：
+                  {measure === 'POINT' ? `${designLength} 个` : `${designLength} m`}
                 </span>
               </div>
-            </div>
 
-            <div className="space-y-3 rounded-2xl border border-white/10 bg-white/5 p-4">
-              <div className="flex items-center justify-between text-sm text-slate-100">
-                <p>起点-终点列表（起点=终点可表示一个点）</p>
-                <button
-                  type="button"
-                  onClick={addInterval}
-                  className="rounded-xl border border-white/20 px-3 py-2 text-xs font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/10"
-                >
-                  添加区间
-                </button>
-              </div>
+              <form className="mt-5 space-y-4" onSubmit={handleSubmit}>
+                <div className="grid gap-4 md:grid-cols-4">
+                  <label className="flex flex-col gap-2 text-sm text-slate-100">
+                    分项模板
+                    <select
+                      className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
+                      value={definitionId ?? ''}
+                      onChange={(e) => {
+                        const value = e.target.value
+                        if (!value) {
+                          setDefinitionId(null)
+                          return
+                        }
+                        const found = definitions.find((item) => item.id === Number(value))
+                        if (found) {
+                          setDefinitionId(found.id)
+                          setName(found.name)
+                          setMeasure(found.measure)
+                          setLayerTokens(found.defaultLayers)
+                          setCheckTokens(found.defaultChecks)
+                        }
+                      }}
+                    >
+                      <option value="">自定义/新建</option>
+                      {definitions.map((item) => (
+                        <option key={item.id} value={item.id}>
+                          {item.name} · {item.measure === 'POINT' ? '单体' : '延米'}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="flex flex-col gap-2 text-sm text-slate-100">
+                    名称
+                    <input
+                      ref={nameInputRef}
+                      className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-slate-50 placeholder:text-slate-200/60 focus:border-emerald-300 focus:outline-none"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="如：土方"
+                      required
+                    />
+                  </label>
+                  <label className="flex flex-col gap-2 text-sm text-slate-100">
+                    显示方式
+                    <select
+                      className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
+                      value={measure}
+                      onChange={(e) => setMeasure(e.target.value as PhaseMeasure)}
+                    >
+                      <option value="LINEAR">延米（按起终点展示进度）</option>
+                      <option value="POINT">单体（按点位/条目展示）</option>
+                    </select>
+                  </label>
+                  <div className="flex flex-col justify-end text-sm text-slate-100">
+                    <span className="text-xs text-slate-300">
+                      设计量自动计算：
+                      {measure === 'POINT'
+                        ? `${designLength} 个（按条目数）`
+                        : `${designLength} m（双侧区间按左右叠加）`}
+                    </span>
+                  </div>
+                </div>
 
-              <div className="space-y-3">
-                {intervals.map((item, index) => (
-                  <div
-                    key={index}
-                    className="grid grid-cols-1 gap-3 rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-slate-100 md:grid-cols-4 md:items-center"
-                  >
-                    <label className="flex flex-col gap-1">
-                      起点
-                      <input
-                        type="number"
-                        className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
-                        value={item.startPk}
-                        onChange={(e) => updateInterval(index, { startPk: Number(e.target.value) })}
-                      />
-                    </label>
-                    <label className="flex flex-col gap-1">
-                      终点
-                      <input
-                        type="number"
-                        className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
-                        value={item.endPk}
-                        onChange={(e) => updateInterval(index, { endPk: Number(e.target.value) })}
-                      />
-                    </label>
-                    <label className="flex flex-col gap-1">
-                      侧别
-                      <select
-                        className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
-                        value={item.side}
-                        onChange={(e) => updateInterval(index, { side: e.target.value as IntervalSide })}
+                <div className="space-y-3 rounded-2xl border border-white/10 bg-white/5 p-4">
+                  <div className="flex items-center justify-between text-sm text-slate-100">
+                    <p>起点-终点列表（起点=终点可表示一个点）</p>
+                    <button
+                      type="button"
+                      onClick={addInterval}
+                      className="rounded-xl border border-white/20 px-3 py-2 text-xs font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/10"
+                    >
+                      添加区间
+                    </button>
+                  </div>
+
+                  <div className="space-y-3">
+                    {intervals.map((item, index) => (
+                      <div
+                        key={index}
+                        className="grid grid-cols-1 gap-3 rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-slate-100 md:grid-cols-4 md:items-center"
                       >
-                        {sideOptions.map((option) => (
-                          <option key={option.value} value={option.value}>
-                            {option.label}
-                          </option>
+                        <label className="flex flex-col gap-1">
+                          起点
+                          <input
+                            type="number"
+                            className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
+                            value={Number.isFinite(item.startPk) ? item.startPk : ''}
+                            onChange={(e) =>
+                              updateInterval(index, {
+                                startPk: e.target.value === '' ? Number.NaN : Number(e.target.value),
+                              })
+                            }
+                          />
+                        </label>
+                        <label className="flex flex-col gap-1">
+                          终点
+                          <input
+                            type="number"
+                            className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
+                            value={Number.isFinite(item.endPk) ? item.endPk : ''}
+                            onChange={(e) =>
+                              updateInterval(index, { endPk: e.target.value === '' ? Number.NaN : Number(e.target.value) })
+                            }
+                          />
+                        </label>
+                        <label className="flex flex-col gap-1">
+                          侧别
+                          <select
+                            className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
+                            value={item.side}
+                            onChange={(e) => updateInterval(index, { side: e.target.value as IntervalSide })}
+                          >
+                            {sideOptions.map((option) => (
+                              <option key={option.value} value={option.value}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <div className="flex items-end justify-end">
+                          {intervals.length > 1 ? (
+                            <button
+                              type="button"
+                              className="rounded-xl border border-white/20 px-3 py-2 text-xs font-semibold text-rose-100 transition hover:border-rose-200/60 hover:bg-rose-200/10"
+                              onClick={() => removeInterval(index)}
+                            >
+                              删除
+                            </button>
+                          ) : null}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2 rounded-2xl border border-white/10 bg-white/5 p-4">
+                    <div className="flex items-center justify-between text-sm text-slate-100">
+                      <p>层次（当前分项使用的候选）</p>
+                      <button
+                        type="button"
+                        onClick={addLayerToken}
+                        className="rounded-xl border border-white/20 px-3 py-2 text-xs font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/10"
+                      >
+                        添加
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <input
+                        className="w-full rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-200/60 focus:border-emerald-300 focus:outline-none"
+                        placeholder="选择或新增层次，如：第一层上土"
+                        value={layerInput}
+                        onChange={(e) => setLayerInput(e.target.value)}
+                      />
+                      <div className="flex flex-wrap gap-2">
+                        {layerOptionsState.map((option) => (
+                          <button
+                            key={option.id}
+                            type="button"
+                            className={`rounded-full px-3 py-1 text-[11px] font-semibold ${
+                              layerTokens.includes(option.name)
+                                ? 'bg-emerald-300 text-slate-900'
+                                : 'bg-white/10 text-slate-100'
+                            }`}
+                            onClick={() => toggleToken(option.name, layerTokens, setLayerTokens)}
+                          >
+                            {option.name}
+                          </button>
                         ))}
-                      </select>
-                    </label>
-                    <div className="flex items-end justify-end">
-                      {intervals.length > 1 ? (
-                        <button
-                          type="button"
-                          className="rounded-xl border border-white/20 px-3 py-2 text-xs font-semibold text-rose-100 transition hover:border-rose-200/60 hover:bg-rose-200/10"
-                          onClick={() => removeInterval(index)}
-                        >
-                          删除
-                        </button>
-                      ) : null}
+                      </div>
+                      {layerTokens.length === 0 ? (
+                        <p className="text-xs text-slate-300">暂无已选层次，输入后点击添加，或从上方候选中选择。</p>
+                      ) : (
+                        <div className="flex flex-wrap gap-2">
+                          {layerTokens.map((item) => (
+                            <span
+                              key={item}
+                              className="flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-[11px] font-semibold text-slate-100"
+                            >
+                              {item}
+                              <button
+                                type="button"
+                                className="text-[10px] text-rose-200"
+                                onClick={() => setLayerTokens((prev) => prev.filter((token) => token !== item))}
+                              >
+                                ×
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
-                ))}
-              </div>
-            </div>
 
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2 rounded-2xl border border-white/10 bg-white/5 p-4">
-                <div className="flex items-center justify-between text-sm text-slate-100">
-                  <p>层次（当前分项使用的候选）</p>
-                  <button
-                    type="button"
-                    onClick={addLayerToken}
-                    className="rounded-xl border border-white/20 px-3 py-2 text-xs font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/10"
-                  >
-                    添加
-                  </button>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <input
-                    className="w-full rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-200/60 focus:border-emerald-300 focus:outline-none"
-                    placeholder="选择或新增层次，如：第一层上土"
-                    value={layerInput}
-                    onChange={(e) => setLayerInput(e.target.value)}
-                  />
-                  <div className="flex flex-wrap gap-2">
-                    {layerOptionsState.map((option) => (
+                  <div className="space-y-2 rounded-2xl border border-white/10 bg-white/5 p-4">
+                    <div className="flex items-center justify-between text-sm text-slate-100">
+                      <p>验收内容（当前分项使用的候选）</p>
                       <button
-                        key={option.id}
                         type="button"
-                        className={`rounded-full px-3 py-1 text-[11px] font-semibold ${
-                          layerTokens.includes(option.name)
-                            ? 'bg-emerald-300 text-slate-900'
-                            : 'bg-white/10 text-slate-100'
-                        }`}
-                        onClick={() => toggleToken(option.name, layerTokens, setLayerTokens)}
+                        onClick={addCheckToken}
+                        className="rounded-xl border border-white/20 px-3 py-2 text-xs font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/10"
                       >
-                        {option.name}
+                        添加
                       </button>
-                    ))}
-                  </div>
-                  {layerTokens.length === 0 ? (
-                    <p className="text-xs text-slate-300">暂无已选层次，输入后点击添加，或从上方候选中选择。</p>
-                  ) : (
-                    <div className="flex flex-wrap gap-2">
-                      {layerTokens.map((item) => (
-                        <span
-                          key={item}
-                          className="flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-[11px] font-semibold text-slate-100"
-                        >
-                          {item}
-                          <button
-                            type="button"
-                            className="text-[10px] text-rose-200"
-                            onClick={() => setLayerTokens((prev) => prev.filter((token) => token !== item))}
-                          >
-                            ×
-                          </button>
-                        </span>
-                      ))}
                     </div>
-                  )}
+                    <div className="flex flex-wrap items-center gap-2">
+                      <input
+                        className="w-full rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-200/60 focus:border-emerald-300 focus:outline-none"
+                        placeholder="如：压实度/平整度"
+                        value={checkInput}
+                        onChange={(e) => setCheckInput(e.target.value)}
+                      />
+                      <div className="flex flex-wrap gap-2">
+                        {checkOptionsState.map((option) => (
+                          <button
+                            key={option.id}
+                            type="button"
+                            className={`rounded-full px-3 py-1 text-[11px] font-semibold ${
+                              checkTokens.includes(option.name)
+                                ? 'bg-emerald-300 text-slate-900'
+                                : 'bg-white/10 text-slate-100'
+                            }`}
+                            onClick={() => toggleToken(option.name, checkTokens, setCheckTokens)}
+                          >
+                            {option.name}
+                          </button>
+                        ))}
+                      </div>
+                      {checkTokens.length === 0 ? (
+                        <p className="text-xs text-slate-300">暂无已选验收内容，输入后点击添加，或从上方候选中选择。</p>
+                      ) : (
+                        <div className="flex flex-wrap gap-2">
+                          {checkTokens.map((item) => (
+                            <span
+                              key={item}
+                              className="flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-[11px] font-semibold text-slate-100"
+                            >
+                              {item}
+                              <button
+                                type="button"
+                                className="text-[10px] text-rose-200"
+                                onClick={() => setCheckTokens((prev) => prev.filter((token) => token !== item))}
+                              >
+                                ×
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
-              </div>
 
-              <div className="space-y-2 rounded-2xl border border-white/10 bg-white/5 p-4">
-                <div className="flex items-center justify-between text-sm text-slate-100">
-                  <p>验收内容（当前分项使用的候选）</p>
+                <div className="flex flex-wrap items-center gap-3">
                   <button
-                    type="button"
-                    onClick={addCheckToken}
-                    className="rounded-xl border border-white/20 px-3 py-2 text-xs font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/10"
+                    type="submit"
+                    disabled={isPending}
+                    className="inline-flex items-center justify-center rounded-2xl bg-emerald-300 px-5 py-3 text-sm font-semibold text-slate-900 shadow-lg shadow-emerald-400/30 transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-70"
                   >
-                    添加
+                    保存分项
                   </button>
+                  {error ? <span className="text-sm text-amber-200">{error}</span> : null}
+                  {isPending ? <span className="text-xs text-slate-200/70">正在保存...</span> : null}
                 </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <input
-                    className="w-full rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-200/60 focus:border-emerald-300 focus:outline-none"
-                    placeholder="如：压实度/平整度"
-                    value={checkInput}
-                    onChange={(e) => setCheckInput(e.target.value)}
-                  />
-                  <div className="flex flex-wrap gap-2">
-                    {checkOptionsState.map((option) => (
-                      <button
-                        key={option.id}
-                        type="button"
-                        className={`rounded-full px-3 py-1 text-[11px] font-semibold ${
-                          checkTokens.includes(option.name)
-                            ? 'bg-emerald-300 text-slate-900'
-                            : 'bg-white/10 text-slate-100'
-                        }`}
-                        onClick={() => toggleToken(option.name, checkTokens, setCheckTokens)}
-                      >
-                        {option.name}
-                      </button>
-                    ))}
-                  </div>
-                  {checkTokens.length === 0 ? (
-                    <p className="text-xs text-slate-300">暂无已选验收内容，输入后点击添加，或从上方候选中选择。</p>
-                  ) : (
-                    <div className="flex flex-wrap gap-2">
-                      {checkTokens.map((item) => (
-                        <span
-                          key={item}
-                          className="flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-[11px] font-semibold text-slate-100"
-                        >
-                          {item}
-                          <button
-                            type="button"
-                            className="text-[10px] text-rose-200"
-                            onClick={() => setCheckTokens((prev) => prev.filter((token) => token !== item))}
-                          >
-                            ×
-                          </button>
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
+                <p className="text-xs text-slate-300">
+                  说明：显示方式决定进度展示形态；设计量自动按区间或单体数量统计，延米类双侧会叠加左右长度。
+                </p>
+              </form>
             </div>
-
-            <div className="flex flex-wrap items-center gap-3">
-              <button
-                type="submit"
-                disabled={isPending}
-                className="inline-flex items-center justify-center rounded-2xl bg-emerald-300 px-5 py-3 text-sm font-semibold text-slate-900 shadow-lg shadow-emerald-400/30 transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-70"
-              >
-                保存分项
-              </button>
-              {error ? <span className="text-sm text-amber-200">{error}</span> : null}
-              {isPending ? <span className="text-xs text-slate-200/70">正在保存...</span> : null}
-            </div>
-            <p className="text-xs text-slate-300">
-              说明：显示方式决定进度展示形态；设计量自动按区间或单体数量统计，延米类双侧会叠加左右长度。
-            </p>
-          </form>
-        ) : null}
-      </section>
+          </div>
+        </div>
+      ) : null}
 
       <section className="space-y-6 rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur">
         <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-200">
@@ -963,6 +1074,10 @@ const submitInspection = async () => {
                                     title={`${side.label} ${formatPK(seg.start)} ~ ${formatPK(seg.end)} · ${seg.status}`}
                                     onClick={() => {
                                       if (seg.status === '未验收') {
+                                        if (!canInspect) {
+                                          alert('缺少报检权限')
+                                          return
+                                        }
                                         const sideLabel = side.label
                                         setSelectedSegment({
                                           phase: phase.name,
@@ -1008,6 +1123,10 @@ const submitInspection = async () => {
                                 className="absolute top-1/2 flex -translate-y-1/2 flex-col items-center gap-1 text-center transition hover:scale-105"
                                 style={{ left: `${position}%`, transform: 'translate(-50%, -50%)' }}
                                 onClick={() => {
+                                  if (!canInspect) {
+                                    alert('缺少报检权限')
+                                    return
+                                  }
                                   const sideLabel =
                                     item.side === 'LEFT'
                                       ? '左侧'
@@ -1054,8 +1173,8 @@ const submitInspection = async () => {
       </section>
 
       {selectedSegment ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 px-4 py-8 backdrop-blur">
-          <div className="relative w-full max-w-3xl overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-b from-slate-900 to-slate-950 shadow-2xl shadow-slate-900/70">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/80 px-4 py-6 backdrop-blur sm:items-center sm:py-10">
+          <div className="relative flex w-full max-w-3xl flex-col overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-b from-slate-900 to-slate-950 shadow-2xl shadow-slate-900/70 max-h-[calc(100vh-2rem)] sm:max-h-[calc(100vh-4rem)]">
             <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-300 via-cyan-300 to-blue-400" />
             <div className="flex flex-wrap items-start justify-between gap-3 px-6 pt-5">
               <div className="space-y-2">
@@ -1085,28 +1204,29 @@ const submitInspection = async () => {
               </button>
             </div>
 
-            <div className="mt-4 grid gap-4 border-t border-white/5 bg-white/2 px-6 py-6 text-sm text-slate-100 lg:grid-cols-5">
-              <div className="lg:col-span-5 space-y-4">
-                <div className="grid gap-3 md:grid-cols-3">
-                  <label className="flex flex-col gap-1 text-xs text-slate-200">
-                    <span className="font-semibold">侧别</span>
-                    <select
-                      className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 shadow-inner shadow-slate-900/40 focus:border-emerald-300 focus:outline-none"
-                      value={selectedSide}
-                      onChange={(e) => setSelectedSide(e.target.value as IntervalSide)}
-                    >
-                      <option value="LEFT">左侧</option>
-                      <option value="RIGHT">右侧</option>
-                      <option value="BOTH">双侧</option>
-                    </select>
-                  </label>
-                  <label className="flex flex-col gap-1 text-xs text-slate-200">
-                    <span className="font-semibold">起点</span>
+            <div className="mt-4 flex-1 overflow-y-auto">
+              <div className="grid gap-4 border-t border-white/5 bg-white/2 px-6 py-6 text-sm text-slate-100 lg:grid-cols-5">
+                <div className="lg:col-span-5 space-y-4">
+                  <div className="grid gap-3 md:grid-cols-3">
+                    <label className="flex flex-col gap-1 text-xs text-slate-200">
+                      <span className="font-semibold">侧别</span>
+                      <select
+                        className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 shadow-inner shadow-slate-900/40 focus:border-emerald-300 focus:outline-none"
+                        value={selectedSide}
+                        onChange={(e) => setSelectedSide(e.target.value as IntervalSide)}
+                      >
+                        <option value="LEFT">左侧</option>
+                        <option value="RIGHT">右侧</option>
+                        <option value="BOTH">双侧</option>
+                      </select>
+                    </label>
+                    <label className="flex flex-col gap-1 text-xs text-slate-200">
+                      <span className="font-semibold">起点</span>
                     <input
                       type="number"
                       className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 shadow-inner shadow-slate-900/40 focus:border-emerald-300 focus:outline-none"
                       value={startPkInput}
-                      onChange={(e) => setStartPkInput(Number(e.target.value))}
+                      onChange={(e) => setStartPkInput(e.target.value)}
                       placeholder="输入起点 PK"
                     />
                   </label>
@@ -1116,100 +1236,101 @@ const submitInspection = async () => {
                       type="number"
                       className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 shadow-inner shadow-slate-900/40 focus:border-emerald-300 focus:outline-none"
                       value={endPkInput}
-                      onChange={(e) => setEndPkInput(Number(e.target.value))}
+                      onChange={(e) => setEndPkInput(e.target.value)}
                       placeholder="输入终点 PK"
                     />
                   </label>
-                </div>
-
-                <div className="space-y-2 rounded-2xl border border-white/10 bg-white/5 p-4 shadow-inner shadow-slate-900/30">
-                  <p className="text-xs font-semibold text-slate-200">层次（多选）</p>
-                  {selectedSegment.layers.length === 0 ? (
-                    <p className="text-[11px] text-amber-200">暂无层次，请先在分项维护中添加。</p>
-                  ) : (
-                    <div className="flex flex-wrap gap-2">
-                      {selectedSegment.layers.map((item) => (
-                        <button
-                          key={item}
-                          type="button"
-                          className={`rounded-full px-3 py-1 text-[11px] font-semibold transition ${
-                            selectedLayers.includes(item)
-                              ? 'bg-emerald-300 text-slate-900 shadow shadow-emerald-300/40'
-                              : 'bg-white/10 text-slate-100 hover:bg-white/15'
-                          }`}
-                          onClick={() => toggleToken(item, selectedLayers, setSelectedLayers)}
-                        >
-                          {item}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                <div className="space-y-2 rounded-2xl border border-white/10 bg-white/5 p-4 shadow-inner shadow-slate-900/30">
-                  <p className="text-xs font-semibold text-slate-200">验收内容（多选，可临时添加）</p>
-                  {selectedSegment.checks.length === 0 ? (
-                    <p className="text-[11px] text-amber-200">暂无验收内容，请在分项维护中添加或临时新增。</p>
-                  ) : (
-                    <div className="flex flex-wrap gap-2">
-                      {selectedSegment.checks.map((item) => (
-                        <button
-                          key={item}
-                          type="button"
-                          className={`rounded-full px-3 py-1 text-[11px] font-semibold transition ${
-                            selectedChecks.includes(item)
-                              ? 'bg-emerald-300 text-slate-900 shadow shadow-emerald-300/40'
-                              : 'bg-white/10 text-slate-100 hover:bg-white/15'
-                          }`}
-                          onClick={() => toggleToken(item, selectedChecks, setSelectedChecks)}
-                        >
-                          {item}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                  <div className="flex items-center gap-2">
-                    <input
-                      className="w-full rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-200/60 shadow-inner shadow-slate-900/40 focus:border-emerald-300 focus:outline-none"
-                      placeholder="临时新增验收内容"
-                      value={inspectionCheckInput}
-                      onChange={(e) => setInspectionCheckInput(e.target.value)}
-                    />
-                    <button
-                      type="button"
-                      className="rounded-xl border border-white/20 px-3 py-2 text-[11px] font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/10"
-                      onClick={() => {
-                        if (inspectionCheckInput.trim()) {
-                          const value = inspectionCheckInput.trim()
-                          if (!selectedChecks.includes(value)) {
-                            setSelectedChecks((prev) => [...prev, value])
-                          }
-                          setInspectionCheckInput('')
-                        }
-                      }}
-                    >
-                      添加
-                    </button>
                   </div>
-                </div>
 
-                <div className="space-y-2 rounded-2xl border border-white/10 bg-white/5 p-4 shadow-inner shadow-slate-900/30">
-                  <p className="text-xs font-semibold text-slate-200">验收类型（多选）</p>
-                  <div className="flex flex-wrap gap-2">
-                    {inspectionTypes.map((item) => (
+                  <div className="space-y-2 rounded-2xl border border-white/10 bg-white/5 p-4 shadow-inner shadow-slate-900/30">
+                    <p className="text-xs font-semibold text-slate-200">层次（多选）</p>
+                    {selectedSegment.layers.length === 0 ? (
+                      <p className="text-[11px] text-amber-200">暂无层次，请先在分项维护中添加。</p>
+                    ) : (
+                      <div className="flex flex-wrap gap-2">
+                        {selectedSegment.layers.map((item) => (
+                          <button
+                            key={item}
+                            type="button"
+                            className={`rounded-full px-3 py-1 text-[11px] font-semibold transition ${
+                              selectedLayers.includes(item)
+                                ? 'bg-emerald-300 text-slate-900 shadow shadow-emerald-300/40'
+                                : 'bg-white/10 text-slate-100 hover:bg-white/15'
+                            }`}
+                            onClick={() => toggleToken(item, selectedLayers, setSelectedLayers)}
+                          >
+                            {item}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-2 rounded-2xl border border-white/10 bg-white/5 p-4 shadow-inner shadow-slate-900/30">
+                    <p className="text-xs font-semibold text-slate-200">验收内容（多选，可临时添加）</p>
+                    {selectedSegment.checks.length === 0 ? (
+                      <p className="text-[11px] text-amber-200">暂无验收内容，请在分项维护中添加或临时新增。</p>
+                    ) : (
+                      <div className="flex flex-wrap gap-2">
+                        {selectedSegment.checks.map((item) => (
+                          <button
+                            key={item}
+                            type="button"
+                            className={`rounded-full px-3 py-1 text-[11px] font-semibold transition ${
+                              selectedChecks.includes(item)
+                                ? 'bg-emerald-300 text-slate-900 shadow shadow-emerald-300/40'
+                                : 'bg-white/10 text-slate-100 hover:bg-white/15'
+                            }`}
+                            onClick={() => toggleToken(item, selectedChecks, setSelectedChecks)}
+                          >
+                            {item}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    <div className="flex items-center gap-2">
+                      <input
+                        className="w-full rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-200/60 shadow-inner shadow-slate-900/40 focus:border-emerald-300 focus:outline-none"
+                        placeholder="临时新增验收内容"
+                        value={inspectionCheckInput}
+                        onChange={(e) => setInspectionCheckInput(e.target.value)}
+                      />
                       <button
-                        key={item}
                         type="button"
-                        className={`rounded-full px-3 py-1 text-[11px] font-semibold transition ${
-                          selectedTypes.includes(item)
-                            ? 'bg-emerald-300 text-slate-900 shadow shadow-emerald-300/40'
-                            : 'bg-white/10 text-slate-100 hover:bg-white/15'
-                        }`}
-                        onClick={() => toggleToken(item, selectedTypes, setSelectedTypes)}
+                        className="rounded-xl border border-white/20 px-3 py-2 text-[11px] font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/10"
+                        onClick={() => {
+                          if (inspectionCheckInput.trim()) {
+                            const value = inspectionCheckInput.trim()
+                            if (!selectedChecks.includes(value)) {
+                              setSelectedChecks((prev) => [...prev, value])
+                            }
+                            setInspectionCheckInput('')
+                          }
+                        }}
                       >
-                        {item}
+                        添加
                       </button>
-                    ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 rounded-2xl border border-white/10 bg-white/5 p-4 shadow-inner shadow-slate-900/30">
+                    <p className="text-xs font-semibold text-slate-200">验收类型（多选）</p>
+                    <div className="flex flex-wrap gap-2">
+                      {inspectionTypes.map((item) => (
+                        <button
+                          key={item}
+                          type="button"
+                          className={`rounded-full px-3 py-1 text-[11px] font-semibold transition ${
+                            selectedTypes.includes(item)
+                              ? 'bg-emerald-300 text-slate-900 shadow shadow-emerald-300/40'
+                              : 'bg-white/10 text-slate-100 hover:bg-white/15'
+                          }`}
+                          onClick={() => toggleToken(item, selectedTypes, setSelectedTypes)}
+                        >
+                          {item}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>
