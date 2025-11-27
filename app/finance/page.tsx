@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { AccessDenied } from '@/components/AccessDenied'
 
@@ -14,6 +14,9 @@ type FinanceCategoryDTO = {
   key: string
   parentKey: string | null
   labelZh: string
+  labelEn?: string | null
+  labelFr?: string | null
+  isActive?: boolean
   code?: string | null
   sortOrder: number
   children?: FinanceCategoryDTO[]
@@ -170,6 +173,8 @@ export default function FinancePage() {
   const [paymentOpen, setPaymentOpen] = useState(false)
   const [handlerOpen, setHandlerOpen] = useState(false)
   const [categoryOpen, setCategoryOpen] = useState(false)
+  const [formCategoryOpen, setFormCategoryOpen] = useState(false)
+  const [formCategorySearch, setFormCategorySearch] = useState('')
   const [loading, setLoading] = useState(false)
   const [insightsLoading, setInsightsLoading] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
@@ -200,18 +205,31 @@ export default function FinancePage() {
   })
   const [editingId, setEditingId] = useState<number | null>(null)
   const [showEntryModal, setShowEntryModal] = useState(false)
-  const [manageProject, setManageProject] = useState({ name: '', code: '' })
-  const [manageUnit, setManageUnit] = useState({ name: '', symbol: '' })
-  const [managePayment, setManagePayment] = useState({ name: '' })
+  const [manageProject, setManageProject] = useState({ name: '', code: '', isActive: true })
+  const [manageUnit, setManageUnit] = useState({ name: '', symbol: '', isActive: true })
+  const [managePayment, setManagePayment] = useState({ name: '', isActive: true })
   const [manageCategory, setManageCategory] = useState({
     key: '',
     parentKey: '',
     labelZh: '',
     sortOrder: '',
+    isActive: true,
   })
+  const [editingProjectId, setEditingProjectId] = useState<number | null>(null)
+  const [editingUnitId, setEditingUnitId] = useState<number | null>(null)
+  const [editingPaymentTypeId, setEditingPaymentTypeId] = useState<number | null>(null)
+  const [editingCategoryKey, setEditingCategoryKey] = useState<string | null>(null)
   const [showManage, setShowManage] = useState(false)
   const [showColumnChooser, setShowColumnChooser] = useState(false)
   const [viewingEntry, setViewingEntry] = useState<{ entry: FinanceEntry; displayIndex: number } | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<FinanceEntry | null>(null)
+  const [deletingId, setDeletingId] = useState<number | null>(null)
+  const projectRef = useRef<HTMLDivElement | null>(null)
+  const paymentRef = useRef<HTMLDivElement | null>(null)
+  const handlerRef = useRef<HTMLDivElement | null>(null)
+  const columnChooserRef = useRef<HTMLDivElement | null>(null)
+  const categoryRef = useRef<HTMLDivElement | null>(null)
+  const formCategoryRef = useRef<HTMLDivElement | null>(null)
 
   const canView = session?.permissions.includes('finance:view') ?? false
   const canEdit = session?.permissions.includes('finance:edit') ?? false
@@ -226,6 +244,11 @@ export default function FinancePage() {
     () => (metadata ? buildCategoryOptionsWithParents(metadata.categories, '') : []),
     [metadata],
   )
+  const filteredFormCategoryOptions = useMemo(() => {
+    const keyword = formCategorySearch.trim().toLowerCase()
+    if (!keyword) return categoryOptions
+    return categoryOptions.filter((cat) => cat.label.toLowerCase().includes(keyword))
+  }, [categoryOptions, formCategorySearch])
   const filteredCategoryOptions = useMemo(() => {
     const keyword = categorySearch.trim().toLowerCase()
     if (!keyword) return categoryOptionsWithParents
@@ -272,6 +295,10 @@ export default function FinancePage() {
     if (!labels.length) return '全部分类'
     return labels.length <= 2 ? labels.join('、') : `${labels[0]}等${labels.length}个`
   }, [categoryOptionsWithParents, listDraft.categoryKeys])
+  const selectedCategoryLabel = useMemo(() => {
+    if (!form.categoryKey) return '选择分类'
+    return categoryOptions.find((cat) => cat.key === form.categoryKey)?.label ?? '选择分类'
+  }, [categoryOptions, form.categoryKey])
 
   const categoryMap = useMemo(() => {
     const map = new Map<string, FinanceCategoryDTO>()
@@ -284,6 +311,25 @@ export default function FinancePage() {
     if (metadata?.categories) walk(metadata.categories)
     return map
   }, [metadata])
+
+  const manageCategories = useMemo(() => {
+    const list: { key: string; label: string; parentKey: string | null; isActive?: boolean; sortOrder: number }[] = []
+    const walk = (nodes: FinanceCategoryDTO[], parentLabel: string) => {
+      nodes.forEach((node) => {
+        const label = parentLabel ? `${parentLabel} / ${node.labelZh}` : node.labelZh
+        list.push({
+          key: node.key,
+          label,
+          parentKey: node.parentKey,
+          isActive: node.isActive,
+          sortOrder: node.sortOrder,
+        })
+        if (node.children?.length) walk(node.children, label)
+      })
+    }
+    if (metadata?.categories) walk(metadata.categories, '')
+    return list.sort((a, b) => a.sortOrder - b.sortOrder || a.label.localeCompare(b.label, 'zh-CN'))
+  }, [metadata?.categories])
 
 const filteredEntries = useMemo(() => {
   let result = [...entries]
@@ -528,6 +574,20 @@ const filteredEntries = useMemo(() => {
   }, [columnsReady, visibleColumns])
 
   useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node
+      if (projectRef.current && !projectRef.current.contains(target)) setProjectOpen(false)
+      if (paymentRef.current && !paymentRef.current.contains(target)) setPaymentOpen(false)
+      if (handlerRef.current && !handlerRef.current.contains(target)) setHandlerOpen(false)
+      if (columnChooserRef.current && !columnChooserRef.current.contains(target)) setShowColumnChooser(false)
+      if (categoryRef.current && !categoryRef.current.contains(target)) setCategoryOpen(false)
+      if (formCategoryRef.current && !formCategoryRef.current.contains(target)) setFormCategoryOpen(false)
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  useEffect(() => {
     if (canView) {
       void loadMetadata()
     }
@@ -726,6 +786,7 @@ const filteredEntries = useMemo(() => {
 
   const handleDelete = async (id: number) => {
     if (!canEdit) return
+    setDeletingId(id)
     setLoading(true)
     try {
       const res = await fetch(`/api/finance/entries/${id}`, {
@@ -737,63 +798,193 @@ const filteredEntries = useMemo(() => {
         setMessage(data.message ?? '删除失败')
         return
       }
-      setMessage('已软删除')
+      setMessage('删除成功')
+      setDeleteTarget(null)
       await loadEntries(listFilters)
       await loadInsights(listFilters)
     } catch (error) {
       setMessage((error as Error).message)
     } finally {
+      setDeletingId(null)
       setLoading(false)
     }
   }
 
-  const manageCall = async (path: string, body: Record<string, unknown>) => {
+  type ManageRequest = {
+    path: string
+    method: 'POST' | 'PUT' | 'DELETE'
+    body?: Record<string, unknown>
+    successMessage: string
+  }
+
+  const manageRequest = async ({ path, method, body, successMessage }: ManageRequest) => {
     setLoading(true)
+    const hasBody = body && Object.keys(body).length > 0
     try {
       const res = await fetch(path, {
-        method: 'POST',
+        method,
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        headers: hasBody ? { 'Content-Type': 'application/json' } : undefined,
+        body: hasBody ? JSON.stringify(body) : undefined,
       })
       const data = (await res.json()) as { message?: string }
       if (!res.ok) {
-        setMessage(data.message ?? '保存失败')
-        return
+        setMessage(data.message ?? '操作失败')
+        return false
       }
-      setMessage('已更新主数据')
+      setMessage(successMessage)
       await loadMetadata()
+      return true
     } catch (error) {
       setMessage((error as Error).message)
+      return false
     } finally {
       setLoading(false)
     }
   }
 
-  const deleteCategory = async (key: string) => {
-    if (!key) {
-      setMessage('请先填写分类 key')
+  const deleteCategory = async (key: string) =>
+    manageRequest({
+      path: '/api/finance/categories',
+      method: 'DELETE',
+      body: { key },
+      successMessage: '已停用分类',
+    })
+
+  const resetManageForms = () => {
+    setManageProject({ name: '', code: '', isActive: true })
+    setManageUnit({ name: '', symbol: '', isActive: true })
+    setManagePayment({ name: '', isActive: true })
+    setManageCategory({ key: '', parentKey: '', labelZh: '', sortOrder: '', isActive: true })
+    setEditingProjectId(null)
+    setEditingUnitId(null)
+    setEditingPaymentTypeId(null)
+    setEditingCategoryKey(null)
+  }
+
+  const saveProject = async () => {
+    if (!manageProject.name.trim()) {
+      setMessage('请填写项目名称')
       return
     }
-    setLoading(true)
-    try {
-      const res = await fetch('/api/finance/categories', {
-        method: 'DELETE',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key }),
-      })
-      const data = (await res.json()) as { message?: string }
-      if (!res.ok) {
-        setMessage(data.message ?? '停用分类失败')
-        return
-      }
-      setMessage('已停用分类')
-      await loadMetadata()
-    } catch (error) {
-      setMessage((error as Error).message)
-    } finally {
-      setLoading(false)
+    const success = await manageRequest({
+      path: editingProjectId ? `/api/finance/projects/${editingProjectId}` : '/api/finance/projects',
+      method: editingProjectId ? 'PUT' : 'POST',
+      body: { name: manageProject.name.trim(), code: manageProject.code || null, isActive: manageProject.isActive },
+      successMessage: '项目已保存',
+    })
+    if (success) {
+      setManageProject({ name: '', code: '', isActive: true })
+      setEditingProjectId(null)
+    }
+  }
+
+  const deleteProject = async (id: number) => {
+    if (!confirm('确认删除该项目吗？')) return
+    const success = await manageRequest({
+      path: `/api/finance/projects/${id}`,
+      method: 'DELETE',
+      successMessage: '项目已停用',
+    })
+    if (success && editingProjectId === id) {
+      setManageProject({ name: '', code: '', isActive: true })
+      setEditingProjectId(null)
+    }
+  }
+
+  const saveUnit = async () => {
+    if (!manageUnit.name.trim()) {
+      setMessage('请填写金额单位名称')
+      return
+    }
+    const success = await manageRequest({
+      path: editingUnitId ? `/api/finance/units/${editingUnitId}` : '/api/finance/units',
+      method: editingUnitId ? 'PUT' : 'POST',
+      body: {
+        name: manageUnit.name.trim(),
+        symbol: manageUnit.symbol || null,
+        isActive: manageUnit.isActive,
+      },
+      successMessage: '金额单位已保存',
+    })
+    if (success) {
+      setManageUnit({ name: '', symbol: '', isActive: true })
+      setEditingUnitId(null)
+    }
+  }
+
+  const deleteUnit = async (id: number) => {
+    if (!confirm('确认删除该金额单位吗？')) return
+    const success = await manageRequest({
+      path: `/api/finance/units/${id}`,
+      method: 'DELETE',
+      successMessage: '金额单位已停用',
+    })
+    if (success && editingUnitId === id) {
+      setManageUnit({ name: '', symbol: '', isActive: true })
+      setEditingUnitId(null)
+    }
+  }
+
+  const savePaymentType = async () => {
+    if (!managePayment.name.trim()) {
+      setMessage('请填写支付方式名称')
+      return
+    }
+    const success = await manageRequest({
+      path: editingPaymentTypeId ? `/api/finance/payment-types/${editingPaymentTypeId}` : '/api/finance/payment-types',
+      method: editingPaymentTypeId ? 'PUT' : 'POST',
+      body: { name: managePayment.name.trim(), isActive: managePayment.isActive },
+      successMessage: '支付方式已保存',
+    })
+    if (success) {
+      setManagePayment({ name: '', isActive: true })
+      setEditingPaymentTypeId(null)
+    }
+  }
+
+  const deletePaymentType = async (id: number) => {
+    if (!confirm('确认删除该支付方式吗？')) return
+    const success = await manageRequest({
+      path: `/api/finance/payment-types/${id}`,
+      method: 'DELETE',
+      successMessage: '支付方式已停用',
+    })
+    if (success && editingPaymentTypeId === id) {
+      setManagePayment({ name: '', isActive: true })
+      setEditingPaymentTypeId(null)
+    }
+  }
+
+  const saveCategory = async () => {
+    if (!manageCategory.key.trim() || !manageCategory.labelZh.trim()) {
+      setMessage('请填写分类 key 和名称')
+      return
+    }
+    const success = await manageRequest({
+      path: '/api/finance/categories',
+      method: 'POST',
+      body: {
+        key: manageCategory.key.trim(),
+        parentKey: manageCategory.parentKey.trim() || null,
+        labelZh: manageCategory.labelZh.trim(),
+        sortOrder: manageCategory.sortOrder ? Number(manageCategory.sortOrder) : 0,
+        isActive: manageCategory.isActive,
+      },
+      successMessage: '分类已保存',
+    })
+    if (success) {
+      setManageCategory({ key: '', parentKey: '', labelZh: '', sortOrder: '', isActive: true })
+      setEditingCategoryKey(null)
+    }
+  }
+
+  const deleteCategoryByKey = async (key: string) => {
+    if (!confirm('确认删除该分类吗？')) return
+    const success = await deleteCategory(key)
+    if (success && editingCategoryKey === key) {
+      setManageCategory({ key: '', parentKey: '', labelZh: '', sortOrder: '', isActive: true })
+      setEditingCategoryKey(null)
     }
   }
 
@@ -811,9 +1002,7 @@ const filteredEntries = useMemo(() => {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold">财务记账</h1>
-          <p className="text-sm text-slate-600">
-            按项目录入流水，支持分类、金额单位、支付方式与软删。
-          </p>
+          <p className="text-sm text-slate-600">按项目录入流水，支持分类、金额单位与支付方式。</p>
         </div>
         <div className="text-sm text-slate-600">
           {session ? `已登录：${session.username}` : '未登录'}
@@ -833,7 +1022,10 @@ const filteredEntries = useMemo(() => {
             <div className="flex flex-wrap gap-2">
               {canManage && (
                 <button
-                  onClick={() => setShowManage(true)}
+                  onClick={() => {
+                    resetManageForms()
+                    setShowManage(true)
+                  }}
                   className="rounded border border-slate-300 px-3 py-2 text-sm text-slate-800 hover:bg-slate-50"
                 >
                   主数据管理
@@ -856,7 +1048,7 @@ const filteredEntries = useMemo(() => {
             <div className="min-w-0 md:col-span-3">
               <label className="space-y-1 text-sm">
                 <span className="text-slate-700">项目</span>
-                <div className="relative">
+                <div className="relative" ref={projectRef}>
                   <button
                     type="button"
                     onClick={() => setProjectOpen((prev) => !prev)}
@@ -922,7 +1114,7 @@ const filteredEntries = useMemo(() => {
             <div className="min-w-0 md:col-span-3">
               <label className="space-y-1 text-sm">
                 <span className="text-slate-700">支付方式</span>
-                <div className="relative">
+                <div className="relative" ref={paymentRef}>
                   <button
                     type="button"
                     onClick={() => setPaymentOpen((prev) => !prev)}
@@ -988,7 +1180,7 @@ const filteredEntries = useMemo(() => {
             <div className="min-w-0 md:col-span-3">
               <label className="space-y-1 text-sm">
                 <span className="text-slate-700">经办人</span>
-                <div className="relative">
+                <div className="relative" ref={handlerRef}>
                   <button
                     type="button"
                     onClick={() => setHandlerOpen((prev) => !prev)}
@@ -1052,7 +1244,7 @@ const filteredEntries = useMemo(() => {
             </div>
 
             <div className="min-w-0 md:col-span-3">
-              <div className="relative space-y-1 text-sm">
+              <div className="relative space-y-1 text-sm" ref={columnChooserRef}>
                 <span className="text-slate-700">显示列</span>
                 <div>
                   <button
@@ -1117,7 +1309,7 @@ const filteredEntries = useMemo(() => {
             <div className="min-w-0 md:col-span-7 flex items-center">
               <div className="flex w-full items-center gap-3 text-sm">
                 <span className="shrink-0 text-slate-700">分类</span>
-                <div className="relative w-full">
+                <div className="relative w-full" ref={categoryRef}>
                   <button
                     type="button"
                     onClick={() => setCategoryOpen((prev) => !prev)}
@@ -1500,7 +1692,7 @@ const filteredEntries = useMemo(() => {
                             {canEdit && (
                               <button
                                 className="rounded-full bg-red-50 px-3 py-1 text-xs font-medium text-red-700 ring-1 ring-red-100 hover:bg-red-100"
-                                onClick={() => handleDelete(entry.id)}
+                                onClick={() => setDeleteTarget(entry)}
                               >
                                 删除
                               </button>
@@ -1887,10 +2079,7 @@ const filteredEntries = useMemo(() => {
           <div className="flex w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-slate-900/10 max-h-[80vh]">
             <div className="flex items-center justify-between bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-500 px-6 py-4 text-white">
               <div>
-                <span className="rounded-full bg-white/20 px-3 py-1 text-xs font-semibold tracking-wide">
-                  {editingId ? '编辑模式' : '快速新增'}
-                </span>
-                <h2 className="mt-2 text-xl font-semibold">{editingId ? '编辑财务记录' : '新增财务记录'}</h2>
+                <h2 className="text-xl font-semibold">{editingId ? '编辑财务记录' : '新增财务记录'}</h2>
               </div>
               <button
                 onClick={() => {
@@ -1946,23 +2135,60 @@ const filteredEntries = useMemo(() => {
                 />
               </label>
 
-              <label className="space-y-1">
+              <div className="space-y-1">
                 <span className="text-sm font-medium text-slate-700">分类</span>
-                <select
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
-                  value={form.categoryKey}
-                  onChange={(e) => setForm((prev) => ({ ...prev, categoryKey: e.target.value }))}
-                >
-                  <option value="">选择分类</option>
-                  {categoryOptions.map((cat) => (
-                    <option key={cat.key} value={cat.key}>
-                      {cat.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                <div className="relative" ref={formCategoryRef}>
+                  <button
+                    type="button"
+                    onClick={() => setFormCategoryOpen((prev) => !prev)}
+                    className="flex w-full items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-left text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
+                  >
+                    <span className="line-clamp-2 break-words text-slate-900">
+                      {selectedCategoryLabel}
+                    </span>
+                    <span className="text-xs text-slate-500">⌕</span>
+                  </button>
+                  {formCategoryOpen && (
+                    <div
+                      className="absolute inset-x-0 z-30 mt-2 rounded-lg border border-slate-200 bg-white shadow-lg"
+                      onMouseLeave={() => setFormCategoryOpen(false)}
+                    >
+                      <div className="border-b border-slate-100 p-2">
+                        <input
+                          className="w-full rounded border px-2 py-1 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-100"
+                          placeholder="搜索分类"
+                          value={formCategorySearch}
+                          onChange={(e) => setFormCategorySearch(e.target.value)}
+                        />
+                      </div>
+                      <div className="max-h-56 space-y-1 overflow-y-auto p-2 text-sm">
+                        {filteredFormCategoryOptions.length ? (
+                          filteredFormCategoryOptions.map((cat) => (
+                            <button
+                              key={cat.key}
+                              className={`flex w-full items-center justify-between rounded px-2 py-1 text-left transition ${
+                                form.categoryKey === cat.key ? 'bg-emerald-50 text-emerald-700' : 'hover:bg-slate-50'
+                              }`}
+                              onClick={() => {
+                                setForm((prev) => ({ ...prev, categoryKey: cat.key }))
+                                setFormCategoryOpen(false)
+                                setFormCategorySearch('')
+                              }}
+                            >
+                              <span className="line-clamp-2 break-words">{cat.label}</span>
+                              {form.categoryKey === cat.key && <span className="text-xs">已选</span>}
+                            </button>
+                          ))
+                        ) : (
+                          <p className="px-2 py-3 text-sm text-slate-500">无匹配分类</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
 
-              <div className="grid gap-3 md:grid-cols-[1.4fr_1fr]">
+              <div className="grid gap-3 md:grid-cols-[1.2fr_1fr_1fr]">
                 <label className="space-y-1">
                   <span className="text-sm font-medium text-slate-700">金额</span>
                   <input
@@ -1986,6 +2212,15 @@ const filteredEntries = useMemo(() => {
                       </option>
                     ))}
                   </select>
+                </label>
+                <label className="space-y-1">
+                  <span className="text-sm font-medium text-slate-700">税费 (可选)</span>
+                  <input
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
+                    placeholder="0.00"
+                    value={form.tva}
+                    onChange={(e) => setForm((prev) => ({ ...prev, tva: e.target.value }))}
+                  />
                 </label>
               </div>
 
@@ -2021,26 +2256,16 @@ const filteredEntries = useMemo(() => {
                 </label>
               </div>
 
-              <div className="grid gap-3 md:grid-cols-2">
-                <label className="space-y-1">
-                  <span className="text-sm font-medium text-slate-700">税费 (可选)</span>
-                  <input
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
-                    placeholder="0.00"
-                    value={form.tva}
-                    onChange={(e) => setForm((prev) => ({ ...prev, tva: e.target.value }))}
-                  />
-                </label>
-                <label className="space-y-1">
-                  <span className="text-sm font-medium text-slate-700">备注 (可选)</span>
-                  <input
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
-                    placeholder="发票号/供应商"
-                    value={form.remark}
-                    onChange={(e) => setForm((prev) => ({ ...prev, remark: e.target.value }))}
-                  />
-                </label>
-              </div>
+              <label className="space-y-1">
+                <span className="text-sm font-medium text-slate-700">备注 (可选)</span>
+                <textarea
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
+                  placeholder="发票号/供应商"
+                  value={form.remark}
+                  rows={3}
+                  onChange={(e) => setForm((prev) => ({ ...prev, remark: e.target.value }))}
+                />
+              </label>
 
               <div className="flex justify-end gap-2 pt-2">
                 <button
@@ -2057,6 +2282,63 @@ const filteredEntries = useMemo(() => {
                   确认保存
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deleteTarget && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 py-6 backdrop-blur-sm"
+          onClick={(event) => {
+            if (event.target === event.currentTarget && !deletingId) {
+              setDeleteTarget(null)
+            }
+          }}
+        >
+          <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl ring-1 ring-slate-900/10">
+            <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-5 py-4">
+              <div className="space-y-1">
+                <p className="text-lg font-semibold text-slate-900">确认删除</p>
+                <p className="text-sm text-slate-600">
+                  确定删除「{deleteTarget.reason}」吗？删除后无法恢复，请谨慎操作。
+                </p>
+              </div>
+              <button
+                type="button"
+                className="rounded-full border border-slate-200 px-2 py-1 text-sm text-slate-600 hover:bg-slate-50"
+                onClick={() => {
+                  if (deletingId) return
+                  setDeleteTarget(null)
+                }}
+                aria-label="关闭删除确认"
+              >
+                ×
+              </button>
+            </div>
+            <div className="px-5 py-4 text-sm text-slate-700">
+              <p className="rounded-lg bg-amber-50 px-3 py-2 text-amber-700 ring-1 ring-amber-100">删除后无法恢复。</p>
+            </div>
+            <div className="flex items-center justify-end gap-3 border-t border-slate-100 px-5 py-4">
+              <button
+                type="button"
+                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                onClick={() => {
+                  if (deletingId) return
+                  setDeleteTarget(null)
+                }}
+                disabled={Boolean(deletingId)}
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                className="rounded-lg bg-red-600 px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-red-500 disabled:opacity-60"
+                onClick={() => deleteTarget && handleDelete(deleteTarget.id)}
+                disabled={deletingId === deleteTarget.id}
+              >
+                {deletingId === deleteTarget.id ? '正在删除...' : '确认删除'}
+              </button>
             </div>
           </div>
         </div>
@@ -2149,126 +2431,345 @@ const filteredEntries = useMemo(() => {
       {canManage && showManage && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
           <div className="w-full max-w-4xl rounded-lg bg-white p-6 shadow-xl">
-            <div className="flex items-center justify-between pb-4">
-              <h2 className="text-lg font-semibold">主数据管理</h2>
+            <div className="flex items-start justify-between pb-4">
+              <div>
+                <h2 className="text-lg font-semibold">主数据管理</h2>
+                <p className="text-sm text-slate-600">新增/编辑后自动调用后端并刷新元数据。</p>
+              </div>
               <button
-                onClick={() => setShowManage(false)}
+                onClick={() => {
+                  resetManageForms()
+                  setShowManage(false)
+                }}
                 className="rounded-full px-3 py-1 text-sm text-slate-700 hover:bg-slate-100"
               >
                 关闭
               </button>
             </div>
             <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2 rounded border border-slate-200 p-4">
-                <h3 className="font-semibold text-slate-800">项目</h3>
-                <input
-                  className="w-full rounded border px-3 py-2 text-sm"
-                  placeholder="项目名称"
-                  value={manageProject.name}
-                  onChange={(e) => setManageProject((prev) => ({ ...prev, name: e.target.value }))}
-                />
-                <input
-                  className="w-full rounded border px-3 py-2 text-sm"
-                  placeholder="项目编码 (可选)"
-                  value={manageProject.code}
-                  onChange={(e) => setManageProject((prev) => ({ ...prev, code: e.target.value }))}
-                />
-                <button
-                  onClick={() =>
-                    manageCall('/api/finance/projects', { name: manageProject.name, code: manageProject.code || null })
-                  }
-                  className="w-full rounded bg-slate-900 px-3 py-2 text-sm text-white hover:bg-slate-800"
-                >
-                  新增项目
-                </button>
-              </div>
-              <div className="space-y-2 rounded border border-slate-200 p-4">
-                <h3 className="font-semibold text-slate-800">金额单位</h3>
-                <input
-                  className="w-full rounded border px-3 py-2 text-sm"
-                  placeholder="单位名称"
-                  value={manageUnit.name}
-                  onChange={(e) => setManageUnit((prev) => ({ ...prev, name: e.target.value }))}
-                />
-                <input
-                  className="w-full rounded border px-3 py-2 text-sm"
-                  placeholder="符号 (可选)"
-                  value={manageUnit.symbol}
-                  onChange={(e) => setManageUnit((prev) => ({ ...prev, symbol: e.target.value }))}
-                />
-                <button
-                  onClick={() =>
-                    manageCall('/api/finance/units', {
-                      name: manageUnit.name,
-                      symbol: manageUnit.symbol || null,
-                    })
-                  }
-                  className="w-full rounded bg-slate-900 px-3 py-2 text-sm text-white hover:bg-slate-800"
-                >
-                  新增金额单位
-                </button>
-              </div>
-              <div className="space-y-2 rounded border border-slate-200 p-4">
-                <h3 className="font-semibold text-slate-800">支付方式</h3>
-                <input
-                  className="w-full rounded border px-3 py-2 text-sm"
-                  placeholder="支付方式名称"
-                  value={managePayment.name}
-                  onChange={(e) => setManagePayment((prev) => ({ ...prev, name: e.target.value }))}
-                />
-                <button
-                  onClick={() => manageCall('/api/finance/payment-types', { name: managePayment.name })}
-                  className="w-full rounded bg-slate-900 px-3 py-2 text-sm text-white hover:bg-slate-800"
-                >
-                  新增支付方式
-                </button>
-              </div>
-              <div className="space-y-2 rounded border border-slate-200 p-4">
-                <h3 className="font-semibold text-slate-800">分类树</h3>
-                <input
-                  className="w-full rounded border px-3 py-2 text-sm"
-                  placeholder="Key（唯一）"
-                  value={manageCategory.key}
-                  onChange={(e) => setManageCategory((prev) => ({ ...prev, key: e.target.value }))}
-                />
-                <input
-                  className="w-full rounded border px-3 py-2 text-sm"
-                  placeholder="父级 key（可选）"
-                  value={manageCategory.parentKey}
-                  onChange={(e) => setManageCategory((prev) => ({ ...prev, parentKey: e.target.value }))}
-                />
-                <input
-                  className="w-full rounded border px-3 py-2 text-sm"
-                  placeholder="中文名称"
-                  value={manageCategory.labelZh}
-                  onChange={(e) => setManageCategory((prev) => ({ ...prev, labelZh: e.target.value }))}
-                />
-                <input
-                  className="w-full rounded border px-3 py-2 text-sm"
-                  placeholder="排序（数字，可选）"
-                  value={manageCategory.sortOrder}
-                  onChange={(e) => setManageCategory((prev) => ({ ...prev, sortOrder: e.target.value }))}
-                />
+              <div className="space-y-3 rounded border border-slate-200 p-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold text-slate-800">项目</h3>
+                  {editingProjectId && <span className="text-xs text-amber-600">编辑中 #{editingProjectId}</span>}
+                </div>
+                <div className="grid gap-2 md:grid-cols-2">
+                  <input
+                    className="w-full rounded border px-3 py-2 text-sm"
+                    placeholder="项目名称"
+                    value={manageProject.name}
+                    onChange={(e) => setManageProject((prev) => ({ ...prev, name: e.target.value }))}
+                  />
+                  <input
+                    className="w-full rounded border px-3 py-2 text-sm"
+                    placeholder="项目编码 (可选)"
+                    value={manageProject.code}
+                    onChange={(e) => setManageProject((prev) => ({ ...prev, code: e.target.value }))}
+                  />
+                  <label className="flex items-center gap-2 text-sm text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={manageProject.isActive}
+                      onChange={(e) => setManageProject((prev) => ({ ...prev, isActive: e.target.checked }))}
+                    />
+                    启用
+                  </label>
+                </div>
                 <div className="flex gap-2">
                   <button
-                    onClick={() =>
-                      manageCall('/api/finance/categories', {
-                        key: manageCategory.key,
-                        parentKey: manageCategory.parentKey || null,
-                        labelZh: manageCategory.labelZh,
-                        sortOrder: manageCategory.sortOrder ? Number(manageCategory.sortOrder) : 0,
-                      })
-                    }
+                    onClick={saveProject}
                     className="flex-1 rounded bg-slate-900 px-3 py-2 text-sm text-white hover:bg-slate-800"
                   >
-                    新增/更新分类
+                    {editingProjectId ? '保存项目' : '新增项目'}
                   </button>
+                  {editingProjectId && (
+                    <button
+                      onClick={() => {
+                        setManageProject({ name: '', code: '', isActive: true })
+                        setEditingProjectId(null)
+                      }}
+                      className="rounded border px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                    >
+                      取消编辑
+                    </button>
+                  )}
+                </div>
+                <div className="max-h-48 space-y-2 overflow-y-auto rounded border border-slate-100 p-2">
+                  {metadata?.projects.map((project) => (
+                    <div
+                      key={project.id}
+                      className="flex items-center justify-between rounded px-2 py-1 hover:bg-slate-50"
+                    >
+                      <div>
+                        <p className="text-sm font-semibold text-slate-800">{project.name}</p>
+                        <p className="text-xs text-slate-500">
+                          {project.code || '—'} {project.isActive ? '' : '（已停用）'}
+                        </p>
+                      </div>
+                      <div className="flex gap-2 text-xs">
+                        <button
+                          className="rounded border px-2 py-1 text-slate-700 hover:bg-slate-100"
+                          onClick={() => {
+                            setManageProject({ name: project.name, code: project.code ?? '', isActive: project.isActive })
+                            setEditingProjectId(project.id)
+                          }}
+                        >
+                          编辑
+                        </button>
+                        <button
+                          className="rounded border border-red-200 px-2 py-1 text-red-700 hover:bg-red-50"
+                          onClick={() => deleteProject(project.id)}
+                        >
+                          删除
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  {!metadata?.projects.length && <p className="text-sm text-slate-500">暂无项目</p>}
+                </div>
+              </div>
+
+              <div className="space-y-3 rounded border border-slate-200 p-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold text-slate-800">金额单位</h3>
+                  {editingUnitId && <span className="text-xs text-amber-600">编辑中 #{editingUnitId}</span>}
+                </div>
+                <div className="grid gap-2 md:grid-cols-2">
+                  <input
+                    className="w-full rounded border px-3 py-2 text-sm"
+                    placeholder="单位名称"
+                    value={manageUnit.name}
+                    onChange={(e) => setManageUnit((prev) => ({ ...prev, name: e.target.value }))}
+                  />
+                  <input
+                    className="w-full rounded border px-3 py-2 text-sm"
+                    placeholder="符号 (可选)"
+                    value={manageUnit.symbol}
+                    onChange={(e) => setManageUnit((prev) => ({ ...prev, symbol: e.target.value }))}
+                  />
+                  <label className="flex items-center gap-2 text-sm text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={manageUnit.isActive}
+                      onChange={(e) => setManageUnit((prev) => ({ ...prev, isActive: e.target.checked }))}
+                    />
+                    启用
+                  </label>
+                </div>
+                <div className="flex gap-2">
                   <button
-                    onClick={() => deleteCategory(manageCategory.key)}
-                    className="rounded border px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+                    onClick={saveUnit}
+                    className="flex-1 rounded bg-slate-900 px-3 py-2 text-sm text-white hover:bg-slate-800"
                   >
-                    停用
+                    {editingUnitId ? '保存金额单位' : '新增金额单位'}
                   </button>
+                  {editingUnitId && (
+                    <button
+                      onClick={() => {
+                        setManageUnit({ name: '', symbol: '', isActive: true })
+                        setEditingUnitId(null)
+                      }}
+                      className="rounded border px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                    >
+                      取消编辑
+                    </button>
+                  )}
+                </div>
+                <div className="max-h-48 space-y-2 overflow-y-auto rounded border border-slate-100 p-2">
+                  {metadata?.units.map((unit) => (
+                    <div key={unit.id} className="flex items-center justify-between rounded px-2 py-1 hover:bg-slate-50">
+                      <div>
+                        <p className="text-sm font-semibold text-slate-800">{unit.name}</p>
+                        <p className="text-xs text-slate-500">
+                          {unit.symbol || '—'} {unit.isActive ? '' : '（已停用）'}
+                        </p>
+                      </div>
+                      <div className="flex gap-2 text-xs">
+                        <button
+                          className="rounded border px-2 py-1 text-slate-700 hover:bg-slate-100"
+                          onClick={() => {
+                            setManageUnit({ name: unit.name, symbol: unit.symbol ?? '', isActive: unit.isActive })
+                            setEditingUnitId(unit.id)
+                          }}
+                        >
+                          编辑
+                        </button>
+                        <button
+                          className="rounded border border-red-200 px-2 py-1 text-red-700 hover:bg-red-50"
+                          onClick={() => deleteUnit(unit.id)}
+                        >
+                          删除
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  {!metadata?.units.length && <p className="text-sm text-slate-500">暂无金额单位</p>}
+                </div>
+              </div>
+
+              <div className="space-y-3 rounded border border-slate-200 p-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold text-slate-800">支付方式</h3>
+                  {editingPaymentTypeId && <span className="text-xs text-amber-600">编辑中 #{editingPaymentTypeId}</span>}
+                </div>
+                <div className="grid gap-2 md:grid-cols-2">
+                  <input
+                    className="w-full rounded border px-3 py-2 text-sm"
+                    placeholder="支付方式名称"
+                    value={managePayment.name}
+                    onChange={(e) => setManagePayment((prev) => ({ ...prev, name: e.target.value }))}
+                  />
+                  <label className="flex items-center gap-2 text-sm text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={managePayment.isActive}
+                      onChange={(e) => setManagePayment((prev) => ({ ...prev, isActive: e.target.checked }))}
+                    />
+                    启用
+                  </label>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={savePaymentType}
+                    className="flex-1 rounded bg-slate-900 px-3 py-2 text-sm text-white hover:bg-slate-800"
+                  >
+                    {editingPaymentTypeId ? '保存支付方式' : '新增支付方式'}
+                  </button>
+                  {editingPaymentTypeId && (
+                    <button
+                      onClick={() => {
+                        setManagePayment({ name: '', isActive: true })
+                        setEditingPaymentTypeId(null)
+                      }}
+                      className="rounded border px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                    >
+                      取消编辑
+                    </button>
+                  )}
+                </div>
+                <div className="max-h-48 space-y-2 overflow-y-auto rounded border border-slate-100 p-2">
+                  {metadata?.paymentTypes.map((type) => (
+                    <div key={type.id} className="flex items-center justify-between rounded px-2 py-1 hover:bg-slate-50">
+                      <div>
+                        <p className="text-sm font-semibold text-slate-800">{type.name}</p>
+                        <p className="text-xs text-slate-500">{type.isActive ? '启用中' : '已停用'}</p>
+                      </div>
+                      <div className="flex gap-2 text-xs">
+                        <button
+                          className="rounded border px-2 py-1 text-slate-700 hover:bg-slate-100"
+                          onClick={() => {
+                            setManagePayment({ name: type.name, isActive: type.isActive })
+                            setEditingPaymentTypeId(type.id)
+                          }}
+                        >
+                          编辑
+                        </button>
+                        <button
+                          className="rounded border border-red-200 px-2 py-1 text-red-700 hover:bg-red-50"
+                          onClick={() => deletePaymentType(type.id)}
+                        >
+                          删除
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  {!metadata?.paymentTypes.length && <p className="text-sm text-slate-500">暂无支付方式</p>}
+                </div>
+              </div>
+
+              <div className="space-y-3 rounded border border-slate-200 p-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold text-slate-800">分类树</h3>
+                  {editingCategoryKey && <span className="text-xs text-amber-600">编辑中 {editingCategoryKey}</span>}
+                </div>
+                <div className="grid gap-2 md:grid-cols-2">
+                  <input
+                    className="w-full rounded border px-3 py-2 text-sm"
+                    placeholder="Key（唯一）"
+                    value={manageCategory.key}
+                    onChange={(e) => setManageCategory((prev) => ({ ...prev, key: e.target.value }))}
+                  />
+                  <input
+                    className="w-full rounded border px-3 py-2 text-sm"
+                    placeholder="父级 key（可选）"
+                    value={manageCategory.parentKey}
+                    onChange={(e) => setManageCategory((prev) => ({ ...prev, parentKey: e.target.value }))}
+                  />
+                  <input
+                    className="w-full rounded border px-3 py-2 text-sm"
+                    placeholder="中文名称"
+                    value={manageCategory.labelZh}
+                    onChange={(e) => setManageCategory((prev) => ({ ...prev, labelZh: e.target.value }))}
+                  />
+                  <input
+                    className="w-full rounded border px-3 py-2 text-sm"
+                    placeholder="排序（数字，可选）"
+                    value={manageCategory.sortOrder}
+                    onChange={(e) => setManageCategory((prev) => ({ ...prev, sortOrder: e.target.value }))}
+                  />
+                  <label className="flex items-center gap-2 text-sm text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={manageCategory.isActive}
+                      onChange={(e) => setManageCategory((prev) => ({ ...prev, isActive: e.target.checked }))}
+                    />
+                    启用
+                  </label>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={saveCategory}
+                    className="flex-1 rounded bg-slate-900 px-3 py-2 text-sm text-white hover:bg-slate-800"
+                  >
+                    {editingCategoryKey ? '保存分类' : '新增/更新分类'}
+                  </button>
+                  {(editingCategoryKey || manageCategory.key) && (
+                    <button
+                      onClick={() => {
+                        setManageCategory({ key: '', parentKey: '', labelZh: '', sortOrder: '', isActive: true })
+                        setEditingCategoryKey(null)
+                      }}
+                      className="rounded border px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                    >
+                      清空表单
+                    </button>
+                  )}
+                </div>
+                <div className="max-h-48 space-y-2 overflow-y-auto rounded border border-slate-100 p-2">
+                  {manageCategories.map((cat) => (
+                    <div key={cat.key} className="flex items-center justify-between rounded px-2 py-1 hover:bg-slate-50">
+                      <div>
+                        <p className="text-sm font-semibold text-slate-800">{cat.label}</p>
+                        <p className="text-xs text-slate-500">
+                          key: {cat.key} {cat.isActive ? '' : '（已停用）'}
+                        </p>
+                      </div>
+                      <div className="flex gap-2 text-xs">
+                        <button
+                          className="rounded border px-2 py-1 text-slate-700 hover:bg-slate-100"
+                          onClick={() => {
+                            const node = categoryMap.get(cat.key)
+                            setManageCategory({
+                              key: cat.key,
+                              parentKey: node?.parentKey ?? '',
+                              labelZh: node?.labelZh ?? cat.label.split(' / ').slice(-1)[0] ?? '',
+                              sortOrder: String(node?.sortOrder ?? 0),
+                              isActive: node?.isActive ?? true,
+                            })
+                            setEditingCategoryKey(cat.key)
+                          }}
+                        >
+                          编辑
+                        </button>
+                        <button
+                          className="rounded border border-red-200 px-2 py-1 text-red-700 hover:bg-red-50"
+                          onClick={() => deleteCategoryByKey(cat.key)}
+                        >
+                          删除
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  {!manageCategories.length && <p className="text-sm text-slate-500">暂无分类</p>}
                 </div>
               </div>
             </div>
