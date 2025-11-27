@@ -55,6 +55,12 @@ export type FinanceEntryDTO = {
   isDeleted: boolean
   createdAt: string
   updatedAt: string
+  createdById?: number | null
+  createdByName?: string | null
+  createdByUsername?: string | null
+  updatedById?: number | null
+  updatedByName?: string | null
+  updatedByUsername?: string | null
 }
 
 type EntryPayload = {
@@ -343,6 +349,8 @@ export const listFinanceEntries = async (options: FinanceEntryFilterOptions) => 
         unit: true,
         paymentType: true,
         handler: true,
+        creator: true,
+        updater: true,
       },
     }),
     prisma.financeCategory.findMany(),
@@ -386,6 +394,12 @@ export const listFinanceEntries = async (options: FinanceEntryFilterOptions) => 
     isDeleted: entry.isDeleted,
     createdAt: entry.createdAt.toISOString(),
     updatedAt: entry.updatedAt.toISOString(),
+    createdById: entry.createdBy ?? null,
+    createdByName: entry.creator?.name ?? null,
+    createdByUsername: entry.creator?.username ?? null,
+    updatedById: entry.updatedBy ?? null,
+    updatedByName: entry.updater?.name ?? null,
+    updatedByUsername: entry.updater?.username ?? null,
   }))
 }
 
@@ -550,6 +564,8 @@ export const createFinanceEntry = async (payload: EntryPayload, userId?: number 
       unit: true,
       paymentType: true,
       handler: true,
+      creator: true,
+      updater: true,
     },
   })
 
@@ -582,10 +598,16 @@ export const createFinanceEntry = async (payload: EntryPayload, userId?: number 
     isDeleted: entry.isDeleted,
     createdAt: entry.createdAt.toISOString(),
     updatedAt: entry.updatedAt.toISOString(),
+    createdById: entry.createdBy ?? null,
+    createdByName: entry.creator?.name ?? null,
+    createdByUsername: entry.creator?.username ?? null,
+    updatedById: entry.updatedBy ?? null,
+    updatedByName: entry.updater?.name ?? null,
+    updatedByUsername: entry.updater?.username ?? null,
   } satisfies FinanceEntryDTO
 }
 
-export const updateFinanceEntry = async (id: number, payload: Partial<EntryPayload>) => {
+export const updateFinanceEntry = async (id: number, payload: Partial<EntryPayload>, userId?: number | null) => {
   assertFinanceModels()
   const existing = await prisma.financeEntry.findUnique({ where: { id } })
   if (!existing) {
@@ -617,12 +639,15 @@ export const updateFinanceEntry = async (id: number, payload: Partial<EntryPaylo
       tva: tva == null ? null : new Prisma.Decimal(tva),
       remark: payload.remark ?? existing.remark,
       handlerId: handler?.id ?? null,
+      updatedBy: userId ?? null,
     },
     include: {
       project: true,
       unit: true,
       paymentType: true,
       handler: true,
+      creator: true,
+      updater: true,
     },
   })
 
@@ -655,6 +680,12 @@ export const updateFinanceEntry = async (id: number, payload: Partial<EntryPaylo
     isDeleted: entry.isDeleted,
     createdAt: entry.createdAt.toISOString(),
     updatedAt: entry.updatedAt.toISOString(),
+    createdById: entry.createdBy ?? null,
+    createdByName: entry.creator?.name ?? null,
+    createdByUsername: entry.creator?.username ?? null,
+    updatedById: entry.updatedBy ?? null,
+    updatedByName: entry.updater?.name ?? null,
+    updatedByUsername: entry.updater?.username ?? null,
   } satisfies FinanceEntryDTO
 }
 

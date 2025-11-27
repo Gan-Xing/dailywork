@@ -52,6 +52,14 @@ type FinanceEntry = {
   tva?: number
   remark?: string | null
   isDeleted: boolean
+  createdAt: string
+  updatedAt: string
+  createdById?: number | null
+  createdByName?: string | null
+  createdByUsername?: string | null
+  updatedById?: number | null
+  updatedByName?: string | null
+  updatedByUsername?: string | null
 }
 
 type FinanceInsights = {
@@ -87,7 +95,7 @@ type ListFilters = {
   amountMax: string
   dateFrom: string
   dateTo: string
-  sortField: 'paymentDate' | 'amount' | 'category'
+  sortField: 'paymentDate' | 'amount' | 'category' | 'updatedAt'
   sortDir: 'asc' | 'desc'
 }
 
@@ -124,7 +132,7 @@ const toggleValue = <T,>(list: T[], value: T) =>
   list.includes(value) ? list.filter((item) => item !== value) : [...list, value]
 
 const COLUMN_STORAGE_KEY = 'finance-visible-columns'
-const defaultVisibleColumns = ['sequence', 'project', 'reason', 'amount', 'unit', 'handler', 'action'] as const
+const defaultVisibleColumns = ['sequence', 'project', 'reason', 'amount', 'handler', 'action'] as const
 
 export default function FinancePage() {
   const [session, setSession] = useState<SessionUser | null>(null)
@@ -169,6 +177,15 @@ export default function FinancePage() {
   const [insights, setInsights] = useState<FinanceInsights | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
   const [visibleColumns, setVisibleColumns] = useState<string[]>([...defaultVisibleColumns])
+  const [columnsReady, setColumnsReady] = useState(false)
+  const persistColumns = (next: string[]) => {
+    setVisibleColumns(next)
+    try {
+      localStorage.setItem(COLUMN_STORAGE_KEY, JSON.stringify(next))
+    } catch (error) {
+      console.error('Failed to persist visible columns', error)
+    }
+  }
   const [form, setForm] = useState<EntryForm>({
     projectId: '',
     reason: '',
@@ -268,8 +285,8 @@ export default function FinancePage() {
     return map
   }, [metadata])
 
-  const filteredEntries = useMemo(() => {
-    let result = [...entries]
+const filteredEntries = useMemo(() => {
+  let result = [...entries]
     if (listFilters.categoryKeys.length) {
       result = result.filter((e) => e.categoryPath.some((c) => listFilters.categoryKeys.includes(c.key)))
     }
@@ -303,12 +320,13 @@ export default function FinancePage() {
       result = result.filter((e) => new Date(e.paymentDate).getTime() <= to)
     }
 
-    const sorters: Record<ListFilters['sortField'], (a: FinanceEntry, b: FinanceEntry) => number> = {
-      paymentDate: (a, b) => new Date(a.paymentDate).getTime() - new Date(b.paymentDate).getTime(),
-      amount: (a, b) => a.amount - b.amount,
-      category: (a, b) =>
-        a.categoryPath.map((c) => c.label).join(' / ').localeCompare(b.categoryPath.map((c) => c.label).join(' / ')),
-    }
+  const sorters: Record<ListFilters['sortField'], (a: FinanceEntry, b: FinanceEntry) => number> = {
+    paymentDate: (a, b) => new Date(a.paymentDate).getTime() - new Date(b.paymentDate).getTime(),
+    amount: (a, b) => a.amount - b.amount,
+    category: (a, b) =>
+      a.categoryPath.map((c) => c.label).join(' / ').localeCompare(b.categoryPath.map((c) => c.label).join(' / ')),
+    updatedAt: (a, b) => new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime(),
+  }
     const sortFn = sorters[listFilters.sortField]
     result.sort((a, b) => {
       const val = sortFn(a, b)
@@ -332,13 +350,24 @@ export default function FinancePage() {
     { key: 'paymentType', label: '支付方式' },
     { key: 'paymentDate', label: '支付日期' },
     { key: 'handler', label: '经办人' },
+    { key: 'createdBy', label: '创建人' },
+    { key: 'updatedBy', label: '更新人' },
     { key: 'remark', label: '备注' },
     { key: 'tax', label: '税费' },
+    { key: 'updatedAt', label: '最近更新' },
     { key: 'action', label: '操作' },
   ]
 
   const toggleColumn = (key: string) => {
-    setVisibleColumns((prev) => (prev.includes(key) ? prev.filter((item) => item !== key) : [...prev, key]))
+    setVisibleColumns((prev) => {
+      const next = prev.includes(key) ? prev.filter((item) => item !== key) : [...prev, key]
+      try {
+        localStorage.setItem(COLUMN_STORAGE_KEY, JSON.stringify(next))
+      } catch (error) {
+        console.error('Failed to persist visible columns', error)
+      }
+      return next
+    })
   }
 
   const buildFilterParams = (filtersInput: ListFilters) => {
@@ -383,7 +412,7 @@ export default function FinancePage() {
         handlers: data.handlers ?? [],
       })
       const defaultProject = data.projects.find((p) => p.name === '邦杜库市政路项目')
-      const defaultPayment = data.paymentTypes.find((p) => p.name === '现金支票')
+      const defaultPayment = data.paymentTypes.find((p) => p.name === '现金支票') ?? data.paymentTypes[0]
       const defaultUnit = data.units.find((u) => u.name === '西法')
       const defaultCategory = buildCategoryOptions(data.categories, '')[0]?.key
       const defaultHandler =
@@ -398,9 +427,9 @@ export default function FinancePage() {
         paymentDate: prev.paymentDate || formatDateInput(new Date().toISOString()),
       }))
       const defaults: ListFilters = {
-        projectIds: defaultProject?.id ? [defaultProject.id] : [],
+        projectIds: [],
         categoryKeys: [],
-        paymentTypeIds: defaultPayment?.id ? [defaultPayment.id] : [],
+        paymentTypeIds: [],
         handlerIds: [],
         reasonKeyword: '',
         amountMin: '',
@@ -482,18 +511,21 @@ export default function FinancePage() {
           setVisibleColumns(parsed)
         }
       }
+      setColumnsReady(true)
     } catch (error) {
       console.error('Failed to load visible columns', error)
+      setColumnsReady(true)
     }
   }, [])
 
   useEffect(() => {
+    if (!columnsReady) return
     try {
       localStorage.setItem(COLUMN_STORAGE_KEY, JSON.stringify(visibleColumns))
     } catch (error) {
       console.error('Failed to persist visible columns', error)
     }
-  }, [visibleColumns])
+  }, [columnsReady, visibleColumns])
 
   useEffect(() => {
     if (canView) {
@@ -611,13 +643,14 @@ export default function FinancePage() {
   }, [categoryMap, entries, listFilters.categoryKeys, metadata?.categories])
 
   const resetForm = () => {
+    const defaultPayment = metadata?.paymentTypes.find((p) => p.name === '现金支票') ?? metadata?.paymentTypes[0]
     setForm({
       projectId: metadata?.projects.find((p) => p.name === '邦杜库市政路项目')?.id ?? '',
       reason: '',
       categoryKey: categoryOptions[0]?.key ?? '',
       amount: '',
       unitId: metadata?.units.find((u) => u.name === '西法')?.id ?? '',
-      paymentTypeId: metadata?.paymentTypes.find((p) => p.name === '现金支票')?.id ?? '',
+      paymentTypeId: defaultPayment?.id ?? '',
       handlerId: defaultHandlerId || '',
       paymentDate: formatDateInput(new Date().toISOString()),
       tva: '',
@@ -774,8 +807,8 @@ export default function FinancePage() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl p-6 space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="mx-auto max-w-6xl overflow-x-hidden p-4 space-y-6 sm:p-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold">财务记账</h1>
           <p className="text-sm text-slate-600">
@@ -791,13 +824,13 @@ export default function FinancePage() {
       {message && <p className="rounded bg-yellow-100 px-3 py-2 text-sm text-yellow-800">{message}</p>}
 
       {canView && (
-        <div className="space-y-3 rounded-lg bg-white p-4 shadow">
-          <div className="flex items-start justify-between gap-3">
+        <div className="space-y-3 rounded-lg bg-white p-4 shadow sm:p-5 overflow-hidden">
+          <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <h2 className="text-lg font-semibold">筛选与操作</h2>
               <p className="text-sm text-slate-600">选择范围后应用筛选并刷新列表。</p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               {canManage && (
                 <button
                   onClick={() => setShowManage(true)}
@@ -819,22 +852,22 @@ export default function FinancePage() {
               )}
             </div>
           </div>
-          <div className="grid gap-3 md:grid-cols-12">
-            <div className="md:col-span-3">
+          <div className="grid min-w-0 gap-3 md:grid-cols-12">
+            <div className="min-w-0 md:col-span-3">
               <label className="space-y-1 text-sm">
                 <span className="text-slate-700">项目</span>
                 <div className="relative">
                   <button
                     type="button"
                     onClick={() => setProjectOpen((prev) => !prev)}
-                    className="flex w-full items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-left text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
+                    className="flex w-full max-w-full items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-left text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
                   >
                     <span className="truncate">{projectLabel}</span>
                     <span className="text-xs text-slate-500">⌕</span>
                   </button>
                   {projectOpen && (
                     <div
-                      className="absolute z-20 mt-2 w-full rounded-lg border border-slate-200 bg-white shadow-lg"
+                      className="absolute inset-x-0 z-20 mt-2 w-full max-w-full rounded-lg border border-slate-200 bg-white shadow-lg"
                       onMouseLeave={() => setProjectOpen(false)}
                     >
                       <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2 text-xs text-slate-600">
@@ -886,21 +919,21 @@ export default function FinancePage() {
               </label>
             </div>
 
-            <div className="md:col-span-3">
+            <div className="min-w-0 md:col-span-3">
               <label className="space-y-1 text-sm">
                 <span className="text-slate-700">支付方式</span>
                 <div className="relative">
                   <button
                     type="button"
                     onClick={() => setPaymentOpen((prev) => !prev)}
-                    className="flex w-full items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-left text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
+                    className="flex w-full max-w-full items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-left text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
                   >
                     <span className="truncate">{paymentLabel}</span>
                     <span className="text-xs text-slate-500">⌕</span>
                   </button>
                   {paymentOpen && (
                     <div
-                      className="absolute z-20 mt-2 w-full rounded-lg border border-slate-200 bg-white shadow-lg"
+                      className="absolute inset-x-0 z-20 mt-2 w-full max-w-full rounded-lg border border-slate-200 bg-white shadow-lg"
                       onMouseLeave={() => setPaymentOpen(false)}
                     >
                       <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2 text-xs text-slate-600">
@@ -952,21 +985,21 @@ export default function FinancePage() {
               </label>
             </div>
 
-            <div className="md:col-span-3">
+            <div className="min-w-0 md:col-span-3">
               <label className="space-y-1 text-sm">
                 <span className="text-slate-700">经办人</span>
                 <div className="relative">
                   <button
                     type="button"
                     onClick={() => setHandlerOpen((prev) => !prev)}
-                    className="flex w-full items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-left text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
+                    className="flex w-full max-w-full items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-left text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
                   >
                     <span className="truncate">{handlerLabel}</span>
                     <span className="text-xs text-slate-500">⌕</span>
                   </button>
                   {handlerOpen && (
                     <div
-                      className="absolute z-20 mt-2 w-full rounded-lg border border-slate-200 bg-white shadow-lg"
+                      className="absolute inset-x-0 z-20 mt-2 w-full max-w-full rounded-lg border border-slate-200 bg-white shadow-lg"
                       onMouseLeave={() => setHandlerOpen(false)}
                     >
                       <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2 text-xs text-slate-600">
@@ -1018,14 +1051,14 @@ export default function FinancePage() {
               </label>
             </div>
 
-            <div className="md:col-span-3">
+            <div className="min-w-0 md:col-span-3">
               <div className="relative space-y-1 text-sm">
                 <span className="text-slate-700">显示列</span>
                 <div>
                   <button
                     type="button"
                     onClick={() => setShowColumnChooser((prev) => !prev)}
-                    className="flex w-full items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-sm text-slate-800 shadow-sm hover:bg-slate-50"
+                    className="flex w-full max-w-full items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-sm text-slate-800 shadow-sm hover:bg-slate-50"
                   >
                     <span className="truncate">
                       {visibleColumns.length ? `已选 ${visibleColumns.length} 列` : '未选择列'}
@@ -1034,26 +1067,26 @@ export default function FinancePage() {
                   </button>
                   {showColumnChooser && (
                     <div
-                      className="absolute z-30 mt-2 w-full rounded-lg border border-slate-200 bg-white shadow-lg"
+                      className="absolute inset-x-0 z-30 mt-2 w-full max-w-full rounded-lg border border-slate-200 bg-white shadow-lg"
                       onMouseLeave={() => setShowColumnChooser(false)}
                     >
                       <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2 text-xs text-slate-600">
                         <button
                           className="text-emerald-700 hover:underline"
-                          onClick={() => setVisibleColumns(columnOptions.map((opt) => opt.key))}
+                          onClick={() => persistColumns(columnOptions.map((opt) => opt.key))}
                         >
                           全选
                         </button>
                         <div className="flex gap-2">
                           <button
                             className="text-slate-600 hover:underline"
-                            onClick={() => setVisibleColumns([...defaultVisibleColumns])}
+                            onClick={() => persistColumns([...defaultVisibleColumns])}
                           >
                             恢复默认
                           </button>
                           <button
                             className="text-slate-600 hover:underline"
-                            onClick={() => setVisibleColumns([])}
+                            onClick={() => persistColumns([])}
                           >
                             清空
                           </button>
@@ -1081,21 +1114,21 @@ export default function FinancePage() {
               </div>
             </div>
 
-            <div className="md:col-span-8">
-              <label className="space-y-1 text-sm">
-                <span className="text-slate-700">分类</span>
-                <div className="relative">
+            <div className="min-w-0 md:col-span-7 flex items-center">
+              <div className="flex w-full items-center gap-3 text-sm">
+                <span className="shrink-0 text-slate-700">分类</span>
+                <div className="relative w-full">
                   <button
                     type="button"
                     onClick={() => setCategoryOpen((prev) => !prev)}
                     className="flex w-full items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-left text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
                   >
-                    <span className="truncate">{categoryLabel}</span>
+                    <span className="line-clamp-2 break-words">{categoryLabel}</span>
                     <span className="text-xs text-slate-500">⌕</span>
                   </button>
                   {categoryOpen && (
                     <div
-                      className="absolute z-20 mt-2 w-full rounded-lg border border-slate-200 bg-white shadow-lg"
+                      className="absolute inset-x-0 z-20 mt-2 w-full rounded-lg border border-slate-200 bg-white shadow-lg"
                       onMouseLeave={() => setCategoryOpen(false)}
                     >
                       <div className="border-b border-slate-100 p-2">
@@ -1151,17 +1184,17 @@ export default function FinancePage() {
                                 }))
                               }
                             />
-                            <span className="truncate">{cat.label}</span>
+                            <span className="break-words">{cat.label}</span>
                           </label>
                         ))}
                       </div>
                     </div>
                   )}
                 </div>
-              </label>
+              </div>
             </div>
 
-            <div className="md:col-span-4 flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 p-3 shadow-sm">
+            <div className="min-w-0 md:col-span-5 flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 p-3 shadow-sm">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium text-slate-700">金额范围</span>
                 <div className="flex items-center gap-2">
@@ -1232,7 +1265,7 @@ export default function FinancePage() {
               </div>
             </div>
 
-            <div className="md:col-span-12 flex flex-col gap-3 rounded-lg border border-slate-200 p-3 shadow-sm md:flex-row md:items-center md:justify-between">
+            <div className="md:col-span-12 flex flex-col gap-3 rounded-lg border border-slate-200 p-3 shadow-sm md:flex-row md:items-center md:justify-between md:gap-4">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-sm font-medium text-slate-700">日期范围</span>
                 <div className="flex items-center gap-2">
@@ -1251,7 +1284,7 @@ export default function FinancePage() {
                   />
                 </div>
               </div>
-              <div className="flex flex-1 flex-wrap items-center gap-2">
+              <div className="flex flex-1 flex-wrap items-center gap-2 md:flex-[1.4]">
                 <div className="flex w-full items-center gap-2 text-sm">
                   <span className="shrink-0 text-slate-700">事由</span>
                   <input
@@ -1330,7 +1363,7 @@ export default function FinancePage() {
           </div>
           {loading && <p className="text-sm text-slate-600">加载中...</p>}
           {viewMode === 'table' ? (
-            <div className="overflow-auto">
+            <div className="overflow-auto rounded-xl border border-slate-200">
               <table className="min-w-full text-sm">
                 <thead>
                   <tr className="border-b text-left">
@@ -1383,8 +1416,24 @@ export default function FinancePage() {
                       </th>
                     )}
                     {visibleColumns.includes('handler') && <th className="px-3 py-2">经办人</th>}
+                    {visibleColumns.includes('createdBy') && <th className="px-3 py-2">创建人</th>}
+                    {visibleColumns.includes('updatedBy') && <th className="px-3 py-2">更新人</th>}
                     {visibleColumns.includes('remark') && <th className="px-3 py-2">备注</th>}
                     {visibleColumns.includes('tax') && <th className="px-3 py-2">税费</th>}
+                    {visibleColumns.includes('updatedAt') && (
+                      <th
+                        className="px-3 py-2 cursor-pointer select-none"
+                        onClick={() =>
+                          setListFilters((prev) => {
+                            const dir = prev.sortField === 'updatedAt' && prev.sortDir === 'asc' ? 'desc' : 'asc'
+                            setListDraft((draft) => ({ ...draft, sortField: 'updatedAt', sortDir: dir }))
+                            return { ...prev, sortField: 'updatedAt', sortDir: dir }
+                          })
+                        }
+                      >
+                        最近更新 {listFilters.sortField === 'updatedAt' ? (listFilters.sortDir === 'asc' ? '↑' : '↓') : ''}
+                      </th>
+                    )}
                     {visibleColumns.includes('action') && <th className="w-36 px-3 py-2">操作</th>}
                   </tr>
                 </thead>
@@ -1414,8 +1463,23 @@ export default function FinancePage() {
                       {visibleColumns.includes('handler') && (
                         <td className="px-3 py-2">{entry.handlerName || entry.handlerUsername || '—'}</td>
                       )}
+                      {visibleColumns.includes('createdBy') && (
+                        <td className="px-3 py-2">
+                          {entry.createdByName || entry.createdByUsername || '—'}
+                        </td>
+                      )}
+                      {visibleColumns.includes('updatedBy') && (
+                        <td className="px-3 py-2">
+                          {entry.updatedByName || entry.updatedByUsername || '—'}
+                        </td>
+                      )}
                       {visibleColumns.includes('remark') && <td className="px-3 py-2">{entry.remark ?? '—'}</td>}
                       {visibleColumns.includes('tax') && <td className="px-3 py-2">{entry.tva ?? '—'}</td>}
+                      {visibleColumns.includes('updatedAt') && (
+                        <td className="px-3 py-2">
+                          {new Date(entry.updatedAt).toLocaleString('zh-CN')}
+                        </td>
+                      )}
                       {visibleColumns.includes('action') && (
                         <td className="px-3 py-2">
                           <div className="flex flex-wrap gap-2">
@@ -1721,19 +1785,19 @@ export default function FinancePage() {
                 </div>
               </div>
 
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-semibold text-slate-900">支付方式分布</p>
-                      <p className="text-xs text-slate-500">按金额排序，可快速筛选</p>
-                    </div>
-                    <span className="rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-700">
-                      {insights?.paymentBreakdown.length ?? 0} 种
-                    </span>
-                  </div>
-                  {insights?.paymentBreakdown?.length ? (
-                    <div className="mt-3 space-y-2">
+          <div className="grid gap-4 min-w-0 md:grid-cols-2">
+            <div className="w-full min-w-0 rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-slate-900">支付方式分布</p>
+                  <p className="text-xs text-slate-500">按金额排序，可快速筛选</p>
+                </div>
+                <span className="rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-700">
+                  {insights?.paymentBreakdown.length ?? 0} 种
+                </span>
+              </div>
+              {insights?.paymentBreakdown?.length ? (
+                    <div className="mt-3 space-y-2 w-full max-w-full">
                       {insights.paymentBreakdown.map((item, idx) => (
                         <button
                           key={item.id}
@@ -1743,17 +1807,17 @@ export default function FinancePage() {
                             setViewMode('table')
                             setRefreshKey((prev) => prev + 1)
                           }}
-                          className="w-full rounded-lg border border-slate-100 px-3 py-2 text-left transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-sm"
+                          className="w-full max-w-full rounded-lg border border-slate-100 px-3 py-2 text-left transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-sm"
                         >
-                          <div className="flex items-center justify-between gap-2 text-sm">
-                            <span className="flex items-center gap-2 font-medium text-slate-900">
+                          <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                            <span className="flex min-w-0 items-center gap-2 font-medium text-slate-900 break-words">
                               <span
                                 className="h-2 w-2 rounded-full"
                                 style={{ backgroundColor: ['#0ea5e9', '#10b981', '#f97316', '#6366f1', '#f43f5e'][idx % 5] }}
                               />
                               {item.name}
                             </span>
-                            <span className="text-xs text-slate-600">
+                            <span className="min-w-[120px] text-xs text-slate-600 text-right">
                               {item.amount.toLocaleString('zh-CN', { minimumFractionDigits: 2 })} · {item.share}%
                             </span>
                           </div>
@@ -1775,7 +1839,7 @@ export default function FinancePage() {
                   )}
                 </div>
 
-                <div className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
+                <div className="w-full min-w-0 rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm font-semibold text-slate-900">近期待办</p>
@@ -1784,7 +1848,7 @@ export default function FinancePage() {
                     <span className="rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-700">Top 5</span>
                   </div>
                   {filteredEntries.length ? (
-                    <div className="mt-3 space-y-2">
+                    <div className="mt-3 space-y-2 w-full max-w-full">
                       {[...filteredEntries]
                         .sort((a, b) => b.amount - a.amount)
                         .slice(0, 5)
@@ -1797,8 +1861,10 @@ export default function FinancePage() {
                               <div className="truncate font-semibold">{entry.reason}</div>
                               <div className="text-xs text-slate-500">{formatDateInput(entry.paymentDate)}</div>
                             </div>
-                            <div className="mt-1 flex items-center justify-between text-xs text-slate-600">
-                              <span>{entry.categoryPath.map((c) => c.label).join(' / ')}</span>
+                            <div className="mt-1 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600">
+                              <span className="min-w-0 break-words">
+                                {entry.categoryPath.map((c) => c.label).join(' / ')}
+                              </span>
                               <span className="font-semibold text-emerald-700">
                                 {entry.amount.toLocaleString('zh-CN', { minimumFractionDigits: 2 })} {entry.unitName}
                               </span>
@@ -1818,7 +1884,7 @@ export default function FinancePage() {
 
       {canEdit && showEntryModal && (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 px-4 py-6 backdrop-blur-sm sm:py-8">
-          <div className="flex h-full w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-slate-900/10 max-h-[90vh]">
+          <div className="flex w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-slate-900/10 max-h-[80vh]">
             <div className="flex items-center justify-between bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-500 px-6 py-4 text-white">
               <div>
                 <span className="rounded-full bg-white/20 px-3 py-1 text-xs font-semibold tracking-wide">
@@ -1998,7 +2064,7 @@ export default function FinancePage() {
 
       {viewingEntry && (
         <div className="fixed inset-0 z-40 flex items-start justify-center overflow-y-auto bg-black/50 px-4 py-6 backdrop-blur-sm sm:py-8">
-          <div className="flex w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-slate-900/10">
+          <div className="flex w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-slate-900/10 max-h-[85vh]">
             <div className="flex items-center justify-between bg-slate-900 px-6 py-4 text-white">
               <div>
                 <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-semibold tracking-wide">查看详情</span>
@@ -2049,6 +2115,30 @@ export default function FinancePage() {
                     {viewingEntry.entry.handlerName || viewingEntry.entry.handlerUsername || '—'}
                   </p>
                   <p className="mt-2 text-xs text-slate-500">编号：{viewingEntry.entry.id}</p>
+                </div>
+              </div>
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+                  <p className="text-xs font-semibold text-slate-500">创建</p>
+                  <p className="mt-1 text-sm font-medium text-slate-900">
+                    {viewingEntry.entry.createdByName || viewingEntry.entry.createdByUsername || '—'}
+                  </p>
+                  <p className="mt-2 text-xs text-slate-500">
+                    时间：{new Date(viewingEntry.entry.createdAt).toLocaleString('zh-CN')}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+                  <p className="text-xs font-semibold text-slate-500">最近更新</p>
+                  <p className="mt-1 text-sm font-medium text-slate-900">
+                    {viewingEntry.entry.updatedByName ||
+                      viewingEntry.entry.updatedByUsername ||
+                      viewingEntry.entry.createdByName ||
+                      viewingEntry.entry.createdByUsername ||
+                      '—'}
+                  </p>
+                  <p className="mt-2 text-xs text-slate-500">
+                    时间：{new Date(viewingEntry.entry.updatedAt).toLocaleString('zh-CN')}
+                  </p>
                 </div>
               </div>
             </div>

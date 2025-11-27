@@ -35,7 +35,8 @@ export async function PUT(request: Request, { params }: RouteParams) {
   }
 
   try {
-    const entry = await updateFinanceEntry(id, payload)
+    const session = getSessionUser()
+    const entry = await updateFinanceEntry(id, payload, session?.id)
     return NextResponse.json({ entry })
   } catch (error) {
     return NextResponse.json({ message: (error as Error).message }, { status: 400 })

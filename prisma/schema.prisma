@@ -210,6 +210,7 @@ model User {
   createdFinances FinanceEntry[] @relation("FinanceEntryCreator")
   deletedFinances FinanceEntry[] @relation("FinanceEntryDeleter")
   handledFinances FinanceEntry[] @relation("FinanceEntryHandler")
+  updatedFinances FinanceEntry[] @relation("FinanceEntryUpdater")
   chineseProfile UserChineseProfile?
   expatProfile UserExpatProfile?
   createdById  Int?
@@ -332,6 +333,7 @@ model FinanceEntry {
   isDeleted     Boolean        @default(false)
   deletedAt     DateTime?
   deletedBy     Int?
+  updatedBy     Int?
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
   createdBy     Int?
@@ -340,6 +342,7 @@ model FinanceEntry {
   unit          FinanceUnit    @relation(fields: [unitId], references: [id])
   paymentType   PaymentType    @relation(fields: [paymentTypeId], references: [id])
   creator       User?          @relation("FinanceEntryCreator", fields: [createdBy], references: [id])
+  updater       User?          @relation("FinanceEntryUpdater", fields: [updatedBy], references: [id])
   deleter       User?          @relation("FinanceEntryDeleter", fields: [deletedBy], references: [id])
   handler       User?          @relation("FinanceEntryHandler", fields: [handlerId], references: [id])
 
