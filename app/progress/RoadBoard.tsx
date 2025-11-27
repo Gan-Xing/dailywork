@@ -4,14 +4,18 @@ import Link from 'next/link'
 import type { FormEvent } from 'react'
 import { useEffect, useRef, useState, useTransition } from 'react'
 
-import type { RoadSectionDTO } from '@/lib/progressTypes'
+import type {
+  PhaseDTO,
+  RoadPhaseProgressDTO,
+  RoadSectionProgressDTO,
+} from '@/lib/progressTypes'
 import { resolveRoadName } from '@/lib/i18n/roadDictionary'
 import { getProgressCopy, formatProgressCopy } from '@/lib/i18n/progress'
 import { locales, type Locale } from '@/lib/i18n'
 import { usePreferredLocale } from '@/lib/usePreferredLocale'
 
 interface Props {
-  initialRoads: RoadSectionDTO[]
+  initialRoads: RoadSectionProgressDTO[]
   canManage: boolean
 }
 
@@ -40,7 +44,7 @@ const sortRoads = (roads: RoadSectionDTO[], locale: Locale) =>
 export function RoadBoard({ initialRoads, canManage }: Props) {
   const { locale } = usePreferredLocale('zh', locales)
   const t = getProgressCopy(locale)
-  const [roads, setRoads] = useState<RoadSectionDTO[]>(sortRoads(initialRoads, locale))
+  const [roads, setRoads] = useState<RoadSectionProgressDTO[]>(sortRoads(initialRoads, locale))
   const [form, setForm] = useState<FormState>(emptyForm)
   const [editingId, setEditingId] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -81,7 +85,7 @@ export function RoadBoard({ initialRoads, canManage }: Props) {
         return
       }
 
-      const data = (await response.json()) as { road?: RoadSectionDTO }
+      const data = (await response.json()) as { road?: RoadSectionProgressDTO }
       if (!data.road) {
         setError(t.errors.saveMissing)
         return
@@ -89,9 +93,10 @@ export function RoadBoard({ initialRoads, canManage }: Props) {
 
       const road = data.road
       setRoads((prev) => {
+        const existing = prev.find((item) => item.id === road.id)
         const next = editingId
-          ? prev.map((item) => (item.id === road.id ? road : item))
-          : [...prev, road]
+          ? prev.map((item) => (item.id === road.id ? { ...road, phases: existing?.phases ?? [] } : item))
+          : [...prev, { ...road, phases: [] }]
         return sortRoads(next, locale)
       })
       resetForm()
@@ -262,17 +267,31 @@ export function RoadBoard({ initialRoads, canManage }: Props) {
 }
 
 interface RoadCardProps {
-  road: RoadSectionDTO
-  onEdit: (road: RoadSectionDTO) => void
+  road: RoadSectionProgressDTO
+  onEdit: (road: RoadSectionProgressDTO) => void
   onDelete: (id: number) => void
   canManage: boolean
   locale: Locale
 }
 
 const chipTone = 'rounded-full bg-white/10 px-3 py-1 text-[11px] font-semibold text-slate-100 shadow-inner shadow-slate-900/30'
+const formatDesignLength = (phase: { designLength: number; measure: string }) => {
+  const value = Number.isFinite(phase.designLength) ? phase.designLength : 0
+  const rounded = Math.round(value * 100) / 100
+  return phase.measure === 'POINT' ? `${rounded} 个` : `${rounded} m`
+}
+const calcPhaseProgress = (_phase: PhaseDTO) => {
+  // 验收进度暂未接入，当前返回 0，后续接入验收数据后可替换
+  return 0
+}
 
 const RoadCard = ({ road, onEdit, onDelete, canManage, locale }: RoadCardProps) => {
   const copy = getProgressCopy(locale)
+  const phases = road.phases ?? []
+  const sortedByRecent = [...phases].sort(
+    (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+  )
+  const topRecent = sortedByRecent.slice(0, 4)
   return (
     <Link
       href={`/progress/${road.slug}`}
@@ -317,8 +336,41 @@ const RoadCard = ({ road, onEdit, onDelete, canManage, locale }: RoadCardProps) 
             </div>
           ) : null}
         </div>
-        <div className="mt-4 space-y-2 text-sm text-slate-200/90">
-          <p>{copy.card.workNote}</p>
+        <div className="mt-4 space-y-2">
+          {topRecent.length ? (
+            <div className="space-y-2">
+              {topRecent.map((phase) => {
+                const progressWidth = Math.max(0, Math.min(100, phase.completedPercent))
+                const tone =
+                  progressWidth >= 80
+                    ? 'from-emerald-300 via-emerald-400 to-emerald-300'
+                    : progressWidth >= 50
+                      ? 'from-lime-300 via-emerald-300 to-cyan-200'
+                      : progressWidth > 0
+                        ? 'from-amber-300 via-orange-200 to-amber-200'
+                        : 'from-slate-500 via-slate-600 to-slate-500'
+                return (
+                  <div key={phase.phaseId} className="flex flex-wrap items-center gap-2 rounded-2xl border border-white/10 bg-slate-900/40 p-3 shadow-inner shadow-slate-900/30">
+                    <div className="relative flex-1 overflow-hidden rounded-xl bg-white/5">
+                      <div
+                        className={`absolute inset-y-0 left-0 rounded-xl bg-gradient-to-r ${tone} transition-all`}
+                        style={{ width: `${progressWidth}%` }}
+                      />
+                      <div className="relative flex items-center justify-between px-3 py-2 text-[13px] font-semibold text-slate-50">
+                        <span className="truncate">{phase.phaseName}</span>
+                        <span className="text-xs font-bold">{progressWidth}%</span>
+                      </div>
+                    </div>
+                    <span className="rounded-full bg-white/10 px-3 py-1 text-[11px] font-semibold text-slate-200">
+                      {formatDesignLength(phase)}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          ) : (
+            <p className="text-sm text-slate-300">尚未添加分项工程，点击进入详情新增。</p>
+          )}
           <p className="text-xs text-slate-400">
             {copy.card.updated}
             {new Date(road.updatedAt).toLocaleString(locale === 'fr' ? 'fr-FR' : 'zh-CN', {

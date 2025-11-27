@@ -96,6 +96,7 @@ export default function MembersPage() {
     name: '',
     permissionIds: [],
   })
+  const [editingRoleId, setEditingRoleId] = useState<number | null>(null)
   const [session, setSession] = useState<SessionUser | null>(null)
   const [authLoaded, setAuthLoaded] = useState(false)
   const canViewMembers = session?.permissions.includes('member:view') ?? false
@@ -240,6 +241,7 @@ export default function MembersPage() {
   const resetRoleForm = () => {
     setRoleFormState({ name: '', permissionIds: [] })
     setRoleError(null)
+    setEditingRoleId(null)
   }
 
   const openCreateRoleModal = () => {
@@ -409,6 +411,28 @@ export default function MembersPage() {
     }
   }
 
+  const handleDeleteRole = async (roleId: number) => {
+    if (!canManageRole) {
+      setRoleError(locale === 'fr' ? '权限不足：role:manage' : '缺少角色管理权限')
+      return
+    }
+    if (!window.confirm(locale === 'fr' ? 'Confirmer la suppression du rôle ?' : '确定删除该角色？')) return
+    setRoleSubmitting(true)
+    setRoleError(null)
+    try {
+      const res = await fetch(`/api/roles/${roleId}`, { method: 'DELETE' })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error ?? t.feedback.submitError)
+      }
+      await loadData()
+    } catch (err) {
+      setRoleError(err instanceof Error ? err.message : t.feedback.submitError)
+    } finally {
+      setRoleSubmitting(false)
+    }
+  }
+
   const togglePermission = (permissionId: number) => {
     setRoleFormState((prev) => ({
       ...prev,
@@ -430,8 +454,10 @@ export default function MembersPage() {
       if (!roleFormState.name.trim()) {
         throw new Error(locale === 'fr' ? 'Nom du rôle requis' : '角色名称必填')
       }
-      const res = await fetch('/api/roles', {
-        method: 'POST',
+      const target = editingRoleId ? `/api/roles/${editingRoleId}` : '/api/roles'
+      const method = editingRoleId ? 'PUT' : 'POST'
+      const res = await fetch(target, {
+        method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: roleFormState.name.trim(),
@@ -730,6 +756,32 @@ export default function MembersPage() {
                                 {locale === 'fr' ? 'Permissions' : '权限数'}：{role.permissions.length}
                               </p>
                             </div>
+                            {canManageRole ? (
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  className="rounded-full border border-slate-200 px-2 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-100"
+                                  onClick={() => {
+                                    setEditingRoleId(role.id)
+                                    setRoleFormState({
+                                      name: role.name,
+                                      permissionIds: role.permissions.map((p) => p.id),
+                                    })
+                                    setRoleError(null)
+                                    setShowRoleModal(true)
+                                  }}
+                                >
+                                  {t.actions.edit}
+                                </button>
+                                <button
+                                  type="button"
+                                  className="rounded-full border border-rose-200 px-2 py-1 text-[11px] font-semibold text-rose-700 hover:bg-rose-50"
+                                  onClick={() => handleDeleteRole(role.id)}
+                                >
+                                  {t.actions.delete}
+                                </button>
+                              </div>
+                            ) : null}
                           </div>
                           <div className="mt-3 flex flex-wrap gap-2">
                             {role.permissions.map((permission) => (
@@ -813,17 +865,19 @@ export default function MembersPage() {
       </section>
 
       {showRoleModal ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 px-4">
-          <div className="w-full max-w-xl rounded-2xl bg-white p-6 shadow-2xl shadow-slate-900/30">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-lg font-semibold text-slate-900">{t.rolePanel.title}</p>
-                <p className="text-sm text-slate-500">
-                  {locale === 'fr'
-                    ? 'Ajoutez un rôle et associez les permissions nécessaires.'
-                    : '新增角色并绑定需要的权限。'}
-                </p>
-              </div>
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 px-4">
+              <div className="w-full max-w-xl rounded-2xl bg-white p-6 shadow-2xl shadow-slate-900/30">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-lg font-semibold text-slate-900">
+                      {editingRoleId ? (locale === 'fr' ? '编辑角色' : '编辑角色') : t.rolePanel.title}
+                    </p>
+                    <p className="text-sm text-slate-500">
+                      {locale === 'fr'
+                        ? 'Ajoutez un rôle et associez les permissions nécessaires.'
+                        : '新增角色并绑定需要的权限。'}
+                    </p>
+                  </div>
               <button
                 type="button"
                 onClick={() => setShowRoleModal(false)}

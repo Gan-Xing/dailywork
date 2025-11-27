@@ -14,6 +14,67 @@ export interface RoadSectionDTO extends RoadSectionPayload {
   updatedAt: string
 }
 
+export interface RoadSectionWithPhasesDTO extends RoadSectionDTO {
+  phases: PhaseDTO[]
+}
+
+export interface RoadPhaseProgressDTO {
+  phaseId: number
+  phaseName: string
+  phaseMeasure: PhaseMeasure
+  designLength: number
+  completedLength: number
+  completedPercent: number
+  updatedAt: string
+}
+
+export interface RoadSectionProgressDTO extends RoadSectionDTO {
+  phases: RoadPhaseProgressDTO[]
+}
+
+export type InspectionStatus = 'PENDING' | 'IN_PROGRESS' | 'APPROVED'
+export interface InspectionFilter {
+  roadSlug?: string
+  phaseId?: number
+  status?: InspectionStatus[]
+  side?: IntervalSide
+  type?: string
+  keyword?: string
+  startDate?: string
+  endDate?: string
+  sortField?: 'createdAt' | 'updatedAt'
+  sortOrder?: 'asc' | 'desc'
+  page?: number
+  pageSize?: number
+}
+
+export interface InspectionListItem {
+  id: number
+  roadId: number
+  roadName: string
+  roadSlug: string
+  phaseId: number
+  phaseName: string
+  side: IntervalSide
+  startPk: number
+  endPk: number
+  layers: string[]
+  checks: string[]
+  types: string[]
+  status: InspectionStatus
+  remark?: string
+  createdBy?: { id: number; username: string } | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface InspectionListResponse {
+  items: InspectionListItem[]
+  total: number
+  page: number
+  pageSize: number
+}
+
 export type PhaseMeasure = 'LINEAR' | 'POINT'
 export type IntervalSide = 'BOTH' | 'LEFT' | 'RIGHT'
 
@@ -72,7 +133,6 @@ export interface CheckDefinitionDTO {
   isActive: boolean
 }
 
-export type InspectionStatus = 'PENDING' | 'IN_PROGRESS' | 'APPROVED'
 export interface InspectionPayload {
   phaseId: number
   startPk: number

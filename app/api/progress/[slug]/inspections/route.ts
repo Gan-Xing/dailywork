@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 
 import { getSessionUser, hasPermission } from '@/lib/server/authSession'
-import { createInspection } from '@/lib/server/inspectionStore'
+import { createInspection, listInspections } from '@/lib/server/inspectionStore'
 import { prisma } from '@/lib/prisma'
 import { getRoadBySlug } from '@/lib/server/roadStore'
 
@@ -69,6 +69,34 @@ export async function POST(request: Request, { params }: RouteParams) {
       sessionUser.id,
     )
     return NextResponse.json({ inspection })
+  } catch (error) {
+    return NextResponse.json({ message: (error as Error).message }, { status: 400 })
+  }
+}
+
+export async function GET(request: Request) {
+  if (!hasPermission('inspection:view')) {
+    return NextResponse.json({ message: '缺少报检查看权限' }, { status: 403 })
+  }
+  const { searchParams } = new URL(request.url)
+  const filter = {
+    roadSlug: searchParams.get('roadSlug') ?? undefined,
+    phaseId: searchParams.get('phaseId') ? Number(searchParams.get('phaseId')) : undefined,
+    status: searchParams.getAll('status').filter(Boolean),
+    side: (searchParams.get('side') as 'LEFT' | 'RIGHT' | 'BOTH' | null) ?? undefined,
+    type: searchParams.get('type') ?? undefined,
+    keyword: searchParams.get('keyword') ?? undefined,
+    startDate: searchParams.get('startDate') ?? undefined,
+    endDate: searchParams.get('endDate') ?? undefined,
+    sortField: (searchParams.get('sortField') as 'createdAt' | 'updatedAt' | null) ?? undefined,
+    sortOrder: (searchParams.get('sortOrder') as 'asc' | 'desc' | null) ?? undefined,
+    page: searchParams.get('page') ? Number(searchParams.get('page')) : undefined,
+    pageSize: searchParams.get('pageSize') ? Number(searchParams.get('pageSize')) : undefined,
+  }
+
+  try {
+    const result = await listInspections(filter)
+    return NextResponse.json(result)
   } catch (error) {
     return NextResponse.json({ message: (error as Error).message }, { status: 400 })
   }

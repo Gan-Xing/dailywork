@@ -3,18 +3,19 @@
 import Link from 'next/link'
 
 import { RoadBoard } from './RoadBoard'
-import type { RoadSectionDTO } from '@/lib/progressTypes'
+import type { RoadSectionProgressDTO } from '@/lib/progressTypes'
 import { getProgressCopy, formatProgressCopy } from '@/lib/i18n/progress'
 import { locales } from '@/lib/i18n'
 import { usePreferredLocale } from '@/lib/usePreferredLocale'
 
 interface Props {
-  roads: RoadSectionDTO[]
+  roads: RoadSectionProgressDTO[]
   loadError: string | null
   canManage: boolean
+  canViewInspections: boolean
 }
 
-export function ProgressShell({ roads, loadError, canManage }: Props) {
+export function ProgressShell({ roads, loadError, canManage, canViewInspections }: Props) {
   const { locale } = usePreferredLocale('zh', locales)
   const t = getProgressCopy(locale)
 
@@ -41,6 +42,14 @@ export function ProgressShell({ roads, loadError, canManage }: Props) {
             >
               {t.hero.reports}
             </Link>
+            {canViewInspections ? (
+              <Link
+                href="/progress/inspections"
+                className="inline-flex items-center gap-2 rounded-full border border-emerald-200/60 px-4 py-2 text-xs font-semibold text-emerald-50 shadow-[0_0_0_1px_rgba(255,255,255,0.08)] transition hover:-translate-y-0.5 hover:border-white/80 hover:bg-white/10"
+              >
+                报检记录
+              </Link>
+            ) : null}
           </div>
           {loadError ? (
             <p className="text-sm text-amber-200">

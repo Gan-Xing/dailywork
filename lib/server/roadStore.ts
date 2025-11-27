@@ -1,8 +1,15 @@
 import { Prisma } from '@prisma/client'
-
 import { prisma } from '@/lib/prisma'
-import type { RoadSectionDTO, RoadSectionPayload } from '@/lib/progressTypes'
+import type {
+  PhaseDTO,
+  RoadPhaseProgressDTO,
+  RoadSectionDTO,
+  RoadSectionPayload,
+  RoadSectionProgressDTO,
+  RoadSectionWithPhasesDTO,
+} from '@/lib/progressTypes'
 import { resolveRoadLabels } from '@/lib/i18n/roadDictionary'
+import { listPhases } from './progressStore'
 
 const normalizeValue = (value: string) => value.trim()
 
@@ -58,6 +65,76 @@ export const listRoadSections = async () => {
     orderBy: { createdAt: 'asc' },
   })
   return rows.map(mapToDTO)
+}
+
+export const listRoadSectionsWithPhases = async (): Promise<RoadSectionWithPhasesDTO[]> => {
+  const roads = await listRoadSections()
+  const phasesByRoad = await Promise.all(
+    roads.map(async (road) => {
+      const phases = (await listPhases(road.id)) as PhaseDTO[]
+      return { ...road, phases }
+    }),
+  )
+  return phasesByRoad
+}
+
+const calcCompletedLength = (inspections: { startPk: number; endPk: number; side: string }[]) => {
+  return inspections.reduce((sum, item) => {
+    const start = Number(item.startPk) || 0
+    const end = Number(item.endPk) || 0
+    const base = Math.max(end - start, 0) || 1
+    const factor = item.side === 'BOTH' ? 2 : 1
+    return sum + base * factor
+  }, 0)
+}
+
+export const listRoadSectionsWithProgress = async (): Promise<RoadSectionProgressDTO[]> => {
+  const roads = await prisma.roadSection.findMany({
+    orderBy: { createdAt: 'asc' },
+    include: {
+      phases: {
+        include: {
+          intervals: true,
+          inspections: {
+            where: { status: 'APPROVED' },
+            orderBy: { updatedAt: 'desc' },
+            select: { startPk: true, endPk: true, side: true, updatedAt: true },
+          },
+        },
+      },
+    },
+  })
+
+  return roads.map((road) => {
+    const phases: RoadPhaseProgressDTO[] = road.phases.map((phase) => {
+      const designLength = phase.designLength || 0
+      const completedLength = calcCompletedLength(phase.inspections)
+      const completedPercent = designLength > 0 ? Math.min(100, Math.round((completedLength / designLength) * 100)) : 0
+      const updatedAt =
+        phase.inspections[0]?.updatedAt?.toISOString() ?? phase.updatedAt.toISOString()
+      return {
+        phaseId: phase.id,
+        phaseName: phase.name,
+        phaseMeasure: phase.measure,
+        designLength,
+        completedLength,
+        completedPercent,
+        updatedAt,
+      }
+    })
+
+    return {
+      id: road.id,
+      slug: road.slug,
+      name: road.name,
+      labels: resolveRoadLabels({ slug: road.slug, name: road.name }),
+      startPk: road.startPk,
+      endPk: road.endPk,
+      createdAt: road.createdAt.toISOString(),
+      updatedAt: road.updatedAt.toISOString(),
+      phases,
+    }
+  })
 }
 
 export const createRoadSection = async (payload: RoadSectionPayload) => {

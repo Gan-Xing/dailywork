@@ -634,11 +634,28 @@ const submitInspection = async () => {
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [submitPending, setSubmitPending] = useState(false)
   const [inspectionCheckInput, setInspectionCheckInput] = useState('')
+  const latestChecksByDefinition = useMemo(() => {
+    const latest = new Map<number, { updatedAt: number; checks: string[] }>()
+    phases.forEach((phase) => {
+      const updatedAt = new Date(phase.updatedAt || phase.createdAt).getTime()
+      const current = latest.get(phase.definitionId)
+      if (!current || updatedAt > current.updatedAt) {
+        latest.set(phase.definitionId, { updatedAt, checks: phase.resolvedChecks })
+      }
+    })
+    const result = new Map<number, string[]>()
+    latest.forEach((item, key) => {
+      result.set(key, item.checks)
+    })
+    return result
+  }, [phases])
 
   useEffect(() => {
     if (selectedSegment) {
       setSelectedLayers([])
-      setSelectedChecks([])
+      setSelectedChecks(
+        selectedSegment.checks.length === 1 ? [selectedSegment.checks[0]] : [],
+      )
       setSelectedTypes([])
       setRemark('')
       setSubmitError(null)
@@ -705,8 +722,9 @@ const submitInspection = async () => {
               type="button"
               className="absolute right-4 top-4 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/20"
               onClick={closeFormModal}
+              aria-label="关闭"
             >
-              关闭
+              ×
             </button>
             <div className="max-h-[90vh] overflow-y-auto p-5 sm:p-8">
               <div className="flex flex-wrap items-center gap-3">
@@ -751,7 +769,8 @@ const submitInspection = async () => {
                           setName(found.name)
                           setMeasure(found.measure)
                           setLayerTokens(found.defaultLayers)
-                          setCheckTokens(found.defaultChecks)
+                          const rememberedChecks = latestChecksByDefinition.get(found.id) ?? []
+                          setCheckTokens(rememberedChecks.length ? rememberedChecks : found.defaultChecks)
                         }
                       }}
                     >
@@ -1252,31 +1271,28 @@ const submitInspection = async () => {
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/80 px-4 py-6 backdrop-blur sm:items-center sm:py-10">
           <div className="relative flex w-full max-w-3xl flex-col overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-b from-slate-900 to-slate-950 shadow-2xl shadow-slate-900/70 max-h-[calc(100vh-2rem)] sm:max-h-[calc(100vh-4rem)]">
             <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-300 via-cyan-300 to-blue-400" />
-            <div className="flex flex-wrap items-start justify-between gap-3 px-6 pt-5">
-              <div className="space-y-2">
-                <div className="flex items-center gap-3">
-                  <span className="inline-flex items-center rounded-full bg-emerald-300/15 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-200 ring-1 ring-emerald-300/40">
-                    预约报检
-                  </span>
-                  <span className="rounded-full bg-white/5 px-3 py-1 text-xs font-semibold text-slate-100 ring-1 ring-white/10">
-                    {selectedSegment.phase}
-                  </span>
-                </div>
-                <div className="flex flex-wrap items-center gap-2 text-xs text-slate-300">
-                  <span className="rounded-full bg-white/5 px-2.5 py-1 font-semibold text-slate-100 ring-1 ring-white/10">
-                    {selectedSegment.sideLabel}
-                  </span>
-                  <span className="rounded-full bg-white/5 px-2.5 py-1 font-semibold text-slate-100 ring-1 ring-white/10">
-                    {formatPK(selectedSegment.start)} → {formatPK(selectedSegment.end)}
-                  </span>
-                </div>
+            <div className="flex flex-wrap items-center justify-between gap-3 px-6 pt-5">
+              <div className="flex flex-wrap items-center gap-2 text-sm text-slate-100">
+                <span className="inline-flex items-center rounded-full bg-emerald-300/15 px-3 py-1.5 text-base font-semibold uppercase tracking-[0.2em] text-emerald-100 ring-1 ring-emerald-300/40">
+                  预约报检
+                </span>
+                <span className="rounded-full bg-white/5 px-3 py-1 text-xs font-semibold text-slate-100 ring-1 ring-white/10">
+                  {selectedSegment.phase}
+                </span>
+                <span className="rounded-full bg-white/5 px-2.5 py-1 text-xs font-semibold text-slate-100 ring-1 ring-white/10">
+                  {selectedSegment.sideLabel}
+                </span>
+                <span className="rounded-full bg-white/5 px-2.5 py-1 text-xs font-semibold text-slate-100 ring-1 ring-white/10">
+                  {formatPK(selectedSegment.start)} → {formatPK(selectedSegment.end)}
+                </span>
               </div>
               <button
                 type="button"
                 className="rounded-full border border-white/20 px-3 py-1 text-xs font-semibold text-slate-200 transition hover:border-white/40 hover:bg-white/5"
                 onClick={() => setSelectedSegment(null)}
+                aria-label="关闭"
               >
-                关闭
+                ×
               </button>
             </div>
 
@@ -1366,14 +1382,14 @@ const submitInspection = async () => {
                     )}
                     <div className="flex items-center gap-2">
                       <input
-                        className="w-full rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-200/60 shadow-inner shadow-slate-900/40 focus:border-emerald-300 focus:outline-none"
+                        className="flex-1 min-w-0 rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-200/60 shadow-inner shadow-slate-900/40 focus:border-emerald-300 focus:outline-none"
                         placeholder="临时新增验收内容"
                         value={inspectionCheckInput}
                         onChange={(e) => setInspectionCheckInput(e.target.value)}
                       />
                       <button
                         type="button"
-                        className="rounded-xl border border-white/20 px-3 py-2 text-[11px] font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/10"
+                        className="rounded-xl border border-white/20 px-4 py-2 text-[11px] font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/10 whitespace-nowrap"
                         onClick={() => {
                           if (inspectionCheckInput.trim()) {
                             const value = inspectionCheckInput.trim()

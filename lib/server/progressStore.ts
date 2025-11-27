@@ -180,6 +180,36 @@ const ensurePhaseDefinition = async (
   return created
 }
 
+const syncPhaseDefinitionDefaults = async (
+  tx: Prisma.TransactionClient,
+  params: { definitionId: number; layerIds: number[]; checkIds: number[] },
+) => {
+  await tx.phaseDefinitionLayer.deleteMany({ where: { phaseDefinitionId: params.definitionId } })
+  if (params.layerIds.length) {
+    await tx.phaseDefinitionLayer.createMany({
+      data: params.layerIds.map((id) => ({
+        phaseDefinitionId: params.definitionId,
+        layerDefinitionId: id,
+      })),
+    })
+  }
+
+  await tx.phaseDefinitionCheck.deleteMany({ where: { phaseDefinitionId: params.definitionId } })
+  if (params.checkIds.length) {
+    await tx.phaseDefinitionCheck.createMany({
+      data: params.checkIds.map((id) => ({
+        phaseDefinitionId: params.definitionId,
+        checkDefinitionId: id,
+      })),
+    })
+  }
+
+  await tx.phaseDefinition.update({
+    where: { id: params.definitionId },
+    data: { updatedAt: new Date() },
+  })
+}
+
 export const listPhases = async (roadId: number) => {
   const phases = await prisma.roadPhase.findMany({
     where: { roadId },
@@ -258,6 +288,11 @@ export const createPhase = async (roadId: number, payload: PhasePayload) => {
       const newCheckDefs = await ensureCheckDefinitions(payload.newChecks ?? [], tx)
       const resolvedLayerIds = Array.from(new Set([...layerIds, ...newLayerDefs.map((l) => l.id)]))
       const resolvedCheckIds = Array.from(new Set([...checkIds, ...newCheckDefs.map((c) => c.id)]))
+      await syncPhaseDefinitionDefaults(tx, {
+        definitionId: definition.id,
+        layerIds: resolvedLayerIds,
+        checkIds: resolvedCheckIds,
+      })
 
       const created = await tx.roadPhase.create({
         data: {
@@ -350,6 +385,11 @@ export const updatePhase = async (roadId: number, phaseId: number, payload: Phas
       const newCheckDefs = await ensureCheckDefinitions(payload.newChecks ?? [], tx)
       const resolvedLayerIds = Array.from(new Set([...layerIds, ...newLayerDefs.map((l) => l.id)]))
       const resolvedCheckIds = Array.from(new Set([...checkIds, ...newCheckDefs.map((c) => c.id)]))
+      await syncPhaseDefinitionDefaults(tx, {
+        definitionId: definition.id,
+        layerIds: resolvedLayerIds,
+        checkIds: resolvedCheckIds,
+      })
 
       const updated = await tx.roadPhase.update({
         where: { id: phaseId, roadId },
