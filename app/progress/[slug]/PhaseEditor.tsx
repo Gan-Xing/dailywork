@@ -227,6 +227,8 @@ export function PhaseEditor({
   const [editingId, setEditingId] = useState<number | null>(null)
   const [deletingId, setDeletingId] = useState<number | null>(null)
   const [showFormModal, setShowFormModal] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<PhaseDTO | null>(null)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
   const nameInputRef = useRef<HTMLInputElement | null>(null)
 
   const designLength = useMemo(() => computeDesign(measure, intervals), [measure, intervals])
@@ -271,6 +273,12 @@ export function PhaseEditor({
     setCheckInput('')
     setEditingId(null)
     setError(null)
+  }
+
+  const resetDeleteState = () => {
+    setDeleteTarget(null)
+    setDeleteError(null)
+    setDeletingId(null)
   }
 
   const openCreateModal = () => {
@@ -444,31 +452,38 @@ export function PhaseEditor({
 
   const handleDelete = (phase: PhaseDTO) => {
     if (!canManage) return
-    const confirmDelete = window.confirm(`确定删除分项「${phase.name}」吗？相关区间与报检记录也会被一并移除。`)
-    if (!confirmDelete) return
-    setError(null)
-    setDeletingId(phase.id)
-    fetch(`/api/progress/${road.slug}/phases/${phase.id}`, {
-      method: 'DELETE',
-      credentials: 'include',
-    })
-      .then((res) => res.json().then((data) => ({ ok: res.ok, data })).catch(() => ({ ok: res.ok, data: {} })))
-      .then(({ ok, data }) => {
-        if (!ok) {
-          setError((data as { message?: string }).message ?? '删除失败')
-          return
-        }
-        setPhases((prev) => prev.filter((item) => item.id !== phase.id))
-        if (editingId === phase.id) {
-          resetForm()
-        }
-        if (selectedSegment?.phaseId === phase.id) {
-          setSelectedSegment(null)
-          resetInspectionForm()
-        }
+    setDeleteError(null)
+    setDeleteTarget(phase)
+  }
+
+  const confirmDelete = async () => {
+    if (!canManage || !deleteTarget) return
+    setDeleteError(null)
+    setDeletingId(deleteTarget.id)
+    try {
+      const res = await fetch(`/api/progress/${road.slug}/phases/${deleteTarget.id}`, {
+        method: 'DELETE',
+        credentials: 'include',
       })
-      .catch(() => setError('删除失败'))
-      .finally(() => setDeletingId(null))
+      const data = (await res.json().catch(() => ({}))) as { message?: string }
+      if (!res.ok) {
+        setDeleteError(data.message ?? '删除失败')
+        return
+      }
+      setPhases((prev) => prev.filter((item) => item.id !== deleteTarget.id))
+      if (editingId === deleteTarget.id) {
+        resetForm()
+      }
+      if (selectedSegment?.phaseId === deleteTarget.id) {
+        setSelectedSegment(null)
+        resetInspectionForm()
+      }
+      resetDeleteState()
+    } catch {
+      setDeleteError('删除失败')
+    } finally {
+      setDeletingId(null)
+    }
   }
 
   const linearViews = useMemo(() => {
@@ -985,6 +1000,67 @@ const submitInspection = async () => {
                   说明：显示方式决定进度展示形态；设计量自动按区间或单体数量统计，延米类双侧会叠加左右长度。
                 </p>
               </form>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {deleteTarget && canManage ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 px-4 py-6"
+          onClick={(event) => {
+            if (event.target === event.currentTarget && !deletingId) {
+              resetDeleteState()
+            }
+          }}
+        >
+          <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-slate-900/95 p-6 shadow-2xl shadow-slate-950/40 backdrop-blur">
+            <div className="flex items-start justify-between gap-4">
+              <div className="space-y-1">
+                <p className="text-lg font-semibold text-slate-50">删除分项</p>
+                <p className="text-sm font-semibold text-slate-100">确定删除「{deleteTarget.name}」？</p>
+              </div>
+              <button
+                type="button"
+                className="rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[11px] font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/20"
+                onClick={() => {
+                  if (deletingId) return
+                  resetDeleteState()
+                }}
+                aria-label="关闭删除确认"
+              >
+                ×
+              </button>
+            </div>
+            <div className="mt-4 space-y-2 rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-slate-200">
+              <p>删除后会产生以下影响：</p>
+              <ul className="space-y-1">
+                <li>• 关联的区间与报检记录一并移除，无法恢复。</li>
+                <li>• 仅影响当前分项，不改动其他分项。</li>
+                <li>• 请确认已导出或备份必要数据。</li>
+              </ul>
+            </div>
+            {deleteError ? <p className="mt-3 text-sm text-amber-200">{deleteError}</p> : null}
+            <div className="mt-5 flex items-center justify-end gap-3">
+              <button
+                type="button"
+                className="rounded-xl border border-white/20 px-4 py-2 text-sm font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-70"
+                onClick={() => {
+                  if (deletingId) return
+                  resetDeleteState()
+                }}
+                disabled={Boolean(deletingId)}
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                className="inline-flex items-center justify-center rounded-xl border border-red-300/80 bg-red-500/10 px-5 py-2 text-sm font-semibold text-red-100 shadow-lg shadow-red-500/20 transition hover:-translate-y-0.5 hover:bg-red-500/20 hover:border-red-200 disabled:cursor-not-allowed disabled:opacity-70"
+                onClick={confirmDelete}
+                disabled={deletingId === deleteTarget.id}
+              >
+                {deletingId === deleteTarget.id ? '正在删除...' : '确认删除'}
+              </button>
             </div>
           </div>
         </div>
