@@ -11,6 +11,8 @@ import { usePreferredLocale } from '@/lib/usePreferredLocale'
 export function ProgressDetailHeader({ road }: { road: RoadSectionDTO }) {
   const { locale } = usePreferredLocale('zh', locales)
   const t = getProgressCopy(locale)
+  const breadcrumbHome = locale === 'fr' ? 'Accueil' : '首页'
+  const breadcrumbProgress = locale === 'fr' ? '进度管理' : '进度管理'
 
   return (
     <>
@@ -21,14 +23,25 @@ export function ProgressDetailHeader({ road }: { road: RoadSectionDTO }) {
       <p className="text-sm text-slate-200/80">
         {formatProgressCopy(t.detail.slugLine, { slug: road.slug, start: road.startPk, end: road.endPk })}
       </p>
-      <div className="flex gap-3">
+      <nav className="flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-200/80">
+        <Link
+          href="/"
+          className="rounded-full border border-white/10 bg-white/5 px-3 py-1 transition hover:border-white/25 hover:bg-white/10"
+        >
+          {breadcrumbHome}
+        </Link>
+        <span className="text-slate-500">/</span>
         <Link
           href="/progress"
-          className="inline-flex items-center gap-2 rounded-full border border-white/20 px-4 py-2 text-xs font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/10"
+          className="rounded-full border border-white/10 bg-white/5 px-3 py-1 transition hover:border-white/25 hover:bg-white/10"
         >
-          {t.detail.back}
+          {breadcrumbProgress}
         </Link>
-      </div>
+        <span className="text-slate-500">/</span>
+        <span className="rounded-full border border-white/5 bg-white/5 px-3 py-1 text-slate-100">
+          <LocalizedRoadName road={road} />
+        </span>
+      </nav>
     </>
   )
 }

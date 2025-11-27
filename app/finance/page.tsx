@@ -123,6 +123,9 @@ const findCategoryNode = (nodes: FinanceCategoryDTO[], key: string): FinanceCate
 const toggleValue = <T,>(list: T[], value: T) =>
   list.includes(value) ? list.filter((item) => item !== value) : [...list, value]
 
+const COLUMN_STORAGE_KEY = 'finance-visible-columns'
+const defaultVisibleColumns = ['sequence', 'project', 'reason', 'amount', 'unit', 'handler', 'action'] as const
+
 export default function FinancePage() {
   const [session, setSession] = useState<SessionUser | null>(null)
   const [authLoaded, setAuthLoaded] = useState(false)
@@ -165,6 +168,7 @@ export default function FinancePage() {
   const [viewMode, setViewMode] = useState<'table' | 'charts'>('table')
   const [insights, setInsights] = useState<FinanceInsights | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
+  const [visibleColumns, setVisibleColumns] = useState<string[]>([...defaultVisibleColumns])
   const [form, setForm] = useState<EntryForm>({
     projectId: '',
     reason: '',
@@ -189,6 +193,8 @@ export default function FinancePage() {
     sortOrder: '',
   })
   const [showManage, setShowManage] = useState(false)
+  const [showColumnChooser, setShowColumnChooser] = useState(false)
+  const [viewingEntry, setViewingEntry] = useState<{ entry: FinanceEntry; displayIndex: number } | null>(null)
 
   const canView = session?.permissions.includes('finance:view') ?? false
   const canEdit = session?.permissions.includes('finance:edit') ?? false
@@ -315,6 +321,25 @@ export default function FinancePage() {
     () => filteredEntries.map((entry, index) => ({ entry, displayIndex: index + 1 })),
     [filteredEntries],
   )
+
+  const columnOptions: { key: string; label: string }[] = [
+    { key: 'sequence', label: '序号' },
+    { key: 'project', label: '项目' },
+    { key: 'category', label: '分类' },
+    { key: 'reason', label: '事由' },
+    { key: 'amount', label: '金额' },
+    { key: 'unit', label: '单位' },
+    { key: 'paymentType', label: '支付方式' },
+    { key: 'paymentDate', label: '支付日期' },
+    { key: 'handler', label: '经办人' },
+    { key: 'remark', label: '备注' },
+    { key: 'tax', label: '税费' },
+    { key: 'action', label: '操作' },
+  ]
+
+  const toggleColumn = (key: string) => {
+    setVisibleColumns((prev) => (prev.includes(key) ? prev.filter((item) => item !== key) : [...prev, key]))
+  }
 
   const buildFilterParams = (filtersInput: ListFilters) => {
     const params = new URLSearchParams()
@@ -447,6 +472,28 @@ export default function FinancePage() {
   useEffect(() => {
     void loadSession()
   }, [])
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(COLUMN_STORAGE_KEY)
+      if (stored) {
+        const parsed = JSON.parse(stored) as string[]
+        if (Array.isArray(parsed)) {
+          setVisibleColumns(parsed)
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load visible columns', error)
+    }
+  }, [])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(COLUMN_STORAGE_KEY, JSON.stringify(visibleColumns))
+    } catch (error) {
+      console.error('Failed to persist visible columns', error)
+    }
+  }, [visibleColumns])
 
   useEffect(() => {
     if (canView) {
@@ -972,15 +1019,66 @@ export default function FinancePage() {
             </div>
 
             <div className="md:col-span-3">
-              <label className="space-y-1 text-sm">
-                <span className="text-slate-700">事由</span>
-                <input
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
-                  placeholder="模糊搜索事由"
-                  value={listDraft.reasonKeyword}
-                  onChange={(e) => setListDraft((prev) => ({ ...prev, reasonKeyword: e.target.value }))}
-                />
-              </label>
+              <div className="relative space-y-1 text-sm">
+                <span className="text-slate-700">显示列</span>
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => setShowColumnChooser((prev) => !prev)}
+                    className="flex w-full items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-sm text-slate-800 shadow-sm hover:bg-slate-50"
+                  >
+                    <span className="truncate">
+                      {visibleColumns.length ? `已选 ${visibleColumns.length} 列` : '未选择列'}
+                    </span>
+                    <span className="text-xs text-slate-500">⌕</span>
+                  </button>
+                  {showColumnChooser && (
+                    <div
+                      className="absolute z-30 mt-2 w-full rounded-lg border border-slate-200 bg-white shadow-lg"
+                      onMouseLeave={() => setShowColumnChooser(false)}
+                    >
+                      <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2 text-xs text-slate-600">
+                        <button
+                          className="text-emerald-700 hover:underline"
+                          onClick={() => setVisibleColumns(columnOptions.map((opt) => opt.key))}
+                        >
+                          全选
+                        </button>
+                        <div className="flex gap-2">
+                          <button
+                            className="text-slate-600 hover:underline"
+                            onClick={() => setVisibleColumns([...defaultVisibleColumns])}
+                          >
+                            恢复默认
+                          </button>
+                          <button
+                            className="text-slate-600 hover:underline"
+                            onClick={() => setVisibleColumns([])}
+                          >
+                            清空
+                          </button>
+                        </div>
+                      </div>
+                      <div className="max-h-64 space-y-1 overflow-y-auto p-2 text-sm">
+                        {columnOptions.map((opt) => (
+                          <label
+                            key={opt.key}
+                            className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 hover:bg-slate-50"
+                          >
+                            <input
+                              type="checkbox"
+                              className="h-4 w-4"
+                              checked={visibleColumns.includes(opt.key)}
+                              onChange={() => toggleColumn(opt.key)}
+                            />
+                            <span className="truncate">{opt.label}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
 
             <div className="md:col-span-8">
@@ -1153,6 +1251,17 @@ export default function FinancePage() {
                   />
                 </div>
               </div>
+              <div className="flex flex-1 flex-wrap items-center gap-2">
+                <div className="flex w-full items-center gap-2 text-sm">
+                  <span className="shrink-0 text-slate-700">事由</span>
+                  <input
+                    className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
+                    placeholder="模糊搜索事由"
+                    value={listDraft.reasonKeyword}
+                    onChange={(e) => setListDraft((prev) => ({ ...prev, reasonKeyword: e.target.value }))}
+                  />
+                </div>
+              </div>
               <div className="flex flex-wrap items-center gap-2">
                 <button
                   onClick={() => {
@@ -1161,6 +1270,7 @@ export default function FinancePage() {
                     setPaymentOpen(false)
                     setHandlerOpen(false)
                     setCategoryOpen(false)
+                    setShowColumnChooser(false)
                     setRefreshKey((prev) => prev + 1)
                   }}
                   className="rounded bg-slate-900 px-4 py-2 text-sm text-white hover:bg-slate-800"
@@ -1188,6 +1298,7 @@ export default function FinancePage() {
                     setPaymentOpen(false)
                     setHandlerOpen(false)
                     setCategoryOpen(false)
+                    setShowColumnChooser(false)
                     setRefreshKey((prev) => prev + 1)
                   }}
                   className="rounded border px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
@@ -1223,92 +1334,121 @@ export default function FinancePage() {
               <table className="min-w-full text-sm">
                 <thead>
                   <tr className="border-b text-left">
-                    <th className="px-3 py-2">序号</th>
-                    <th className="px-3 py-2">项目</th>
-                    <th
-                      className="px-3 py-2 cursor-pointer select-none"
-                      onClick={() =>
-                        setListFilters((prev) => {
-                          const dir = prev.sortField === 'category' && prev.sortDir === 'asc' ? 'desc' : 'asc'
-                          setListDraft((draft) => ({ ...draft, sortField: 'category', sortDir: dir }))
-                          return { ...prev, sortField: 'category', sortDir: dir }
-                        })
-                      }
-                    >
-                      分类 {listFilters.sortField === 'category' ? (listFilters.sortDir === 'asc' ? '↑' : '↓') : ''}
-                    </th>
-                    <th className="px-3 py-2">事由</th>
-                    <th
-                      className="px-3 py-2 cursor-pointer select-none"
-                      onClick={() =>
-                        setListFilters((prev) => {
-                          const dir = prev.sortField === 'amount' && prev.sortDir === 'asc' ? 'desc' : 'asc'
-                          setListDraft((draft) => ({ ...draft, sortField: 'amount', sortDir: dir }))
-                          return { ...prev, sortField: 'amount', sortDir: dir }
-                        })
-                      }
-                    >
-                      金额 {listFilters.sortField === 'amount' ? (listFilters.sortDir === 'asc' ? '↑' : '↓') : ''}
-                    </th>
-                    <th className="px-3 py-2">支付方式</th>
-                    <th
-                      className="px-3 py-2 cursor-pointer select-none"
-                      onClick={() =>
-                        setListFilters((prev) => {
-                          const dir = prev.sortField === 'paymentDate' && prev.sortDir === 'asc' ? 'desc' : 'asc'
-                          setListDraft((draft) => ({ ...draft, sortField: 'paymentDate', sortDir: dir }))
-                          return { ...prev, sortField: 'paymentDate', sortDir: dir }
-                        })
-                      }
-                    >
-                      支付日期 {listFilters.sortField === 'paymentDate' ? (listFilters.sortDir === 'asc' ? '↑' : '↓') : ''}
-                    </th>
-                    <th className="px-3 py-2">经办人</th>
-                    <th className="px-3 py-2 w-36">操作</th>
-                    <th className="px-3 py-2">备注</th>
+                    {visibleColumns.includes('sequence') && <th className="px-3 py-2">序号</th>}
+                    {visibleColumns.includes('project') && <th className="px-3 py-2">项目</th>}
+                    {visibleColumns.includes('category') && (
+                      <th
+                        className="px-3 py-2 cursor-pointer select-none"
+                        onClick={() =>
+                          setListFilters((prev) => {
+                            const dir = prev.sortField === 'category' && prev.sortDir === 'asc' ? 'desc' : 'asc'
+                            setListDraft((draft) => ({ ...draft, sortField: 'category', sortDir: dir }))
+                            return { ...prev, sortField: 'category', sortDir: dir }
+                          })
+                        }
+                      >
+                        分类 {listFilters.sortField === 'category' ? (listFilters.sortDir === 'asc' ? '↑' : '↓') : ''}
+                      </th>
+                    )}
+                    {visibleColumns.includes('reason') && <th className="px-3 py-2">事由</th>}
+                    {visibleColumns.includes('amount') && (
+                      <th
+                        className="px-3 py-2 cursor-pointer select-none"
+                        onClick={() =>
+                          setListFilters((prev) => {
+                            const dir = prev.sortField === 'amount' && prev.sortDir === 'asc' ? 'desc' : 'asc'
+                            setListDraft((draft) => ({ ...draft, sortField: 'amount', sortDir: dir }))
+                            return { ...prev, sortField: 'amount', sortDir: dir }
+                          })
+                        }
+                      >
+                        金额 {listFilters.sortField === 'amount' ? (listFilters.sortDir === 'asc' ? '↑' : '↓') : ''}
+                      </th>
+                    )}
+                    {visibleColumns.includes('unit') && <th className="px-3 py-2">单位</th>}
+                    {visibleColumns.includes('paymentType') && <th className="px-3 py-2">支付方式</th>}
+                    {visibleColumns.includes('paymentDate') && (
+                      <th
+                        className="px-3 py-2 cursor-pointer select-none"
+                        onClick={() =>
+                          setListFilters((prev) => {
+                            const dir = prev.sortField === 'paymentDate' && prev.sortDir === 'asc' ? 'desc' : 'asc'
+                            setListDraft((draft) => ({ ...draft, sortField: 'paymentDate', sortDir: dir }))
+                            return { ...prev, sortField: 'paymentDate', sortDir: dir }
+                          })
+                        }
+                      >
+                        支付日期{' '}
+                        {listFilters.sortField === 'paymentDate' ? (listFilters.sortDir === 'asc' ? '↑' : '↓') : ''}
+                      </th>
+                    )}
+                    {visibleColumns.includes('handler') && <th className="px-3 py-2">经办人</th>}
+                    {visibleColumns.includes('remark') && <th className="px-3 py-2">备注</th>}
+                    {visibleColumns.includes('tax') && <th className="px-3 py-2">税费</th>}
+                    {visibleColumns.includes('action') && <th className="w-36 px-3 py-2">操作</th>}
                   </tr>
                 </thead>
                 <tbody>
                   {tableRows.map(({ entry, displayIndex }) => (
                     <tr key={entry.id} className={`border-b ${entry.isDeleted ? 'text-slate-400 line-through' : ''}`}>
-                      <td className="px-3 py-2">{displayIndex}</td>
-                      <td className="px-3 py-2">{entry.projectName}</td>
-                      <td className="px-3 py-2">
-                        {entry.categoryPath.map((c) => c.label).join(' / ')}
-                      </td>
-                      <td className="px-3 py-2">{entry.reason}</td>
-                      <td className="px-3 py-2">
-                        {entry.amount} {entry.unitName}
-                      </td>
-                      <td className="px-3 py-2">{entry.paymentTypeName}</td>
-                      <td className="px-3 py-2">{formatDateInput(entry.paymentDate)}</td>
-                      <td className="px-3 py-2">{entry.handlerName || entry.handlerUsername || '—'}</td>
-                      <td className="px-3 py-2">
-                        <div className="flex flex-wrap gap-2">
-                          {canEdit && !entry.isDeleted && (
+                      {visibleColumns.includes('sequence') && <td className="px-3 py-2">{displayIndex}</td>}
+                      {visibleColumns.includes('project') && <td className="px-3 py-2">{entry.projectName}</td>}
+                      {visibleColumns.includes('category') && (
+                        <td className="px-3 py-2">
+                          {entry.categoryPath.map((c) => c.label).join(' / ')}
+                        </td>
+                      )}
+                      {visibleColumns.includes('reason') && <td className="px-3 py-2">{entry.reason}</td>}
+                      {visibleColumns.includes('amount') && (
+                        <td className="px-3 py-2">
+                          {entry.amount}
+                        </td>
+                      )}
+                      {visibleColumns.includes('unit') && <td className="px-3 py-2">{entry.unitName}</td>}
+                      {visibleColumns.includes('paymentType') && (
+                        <td className="px-3 py-2">{entry.paymentTypeName}</td>
+                      )}
+                      {visibleColumns.includes('paymentDate') && (
+                        <td className="px-3 py-2">{formatDateInput(entry.paymentDate)}</td>
+                      )}
+                      {visibleColumns.includes('handler') && (
+                        <td className="px-3 py-2">{entry.handlerName || entry.handlerUsername || '—'}</td>
+                      )}
+                      {visibleColumns.includes('remark') && <td className="px-3 py-2">{entry.remark ?? '—'}</td>}
+                      {visibleColumns.includes('tax') && <td className="px-3 py-2">{entry.tva ?? '—'}</td>}
+                      {visibleColumns.includes('action') && (
+                        <td className="px-3 py-2">
+                          <div className="flex flex-wrap gap-2">
                             <button
-                              className="rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700 ring-1 ring-blue-100 hover:bg-blue-100"
-                              onClick={() => handleEdit(entry)}
+                              className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-800 ring-1 ring-slate-200 hover:bg-slate-200"
+                              onClick={() => setViewingEntry({ entry, displayIndex })}
                             >
-                              编辑
+                              查看
                             </button>
-                          )}
-                          {canEdit && (
-                            <button
-                              className="rounded-full bg-red-50 px-3 py-1 text-xs font-medium text-red-700 ring-1 ring-red-100 hover:bg-red-100"
-                              onClick={() => handleDelete(entry.id)}
-                            >
-                              删除
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-3 py-2">{entry.remark}</td>
+                            {canEdit && !entry.isDeleted && (
+                              <button
+                                className="rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700 ring-1 ring-blue-100 hover:bg-blue-100"
+                                onClick={() => handleEdit(entry)}
+                              >
+                                编辑
+                              </button>
+                            )}
+                            {canEdit && (
+                              <button
+                                className="rounded-full bg-red-50 px-3 py-1 text-xs font-medium text-red-700 ring-1 ring-red-100 hover:bg-red-100"
+                                onClick={() => handleDelete(entry.id)}
+                              >
+                                删除
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      )}
                     </tr>
                   ))}
                   {!tableRows.length && (
                     <tr>
-                      <td colSpan={8} className="px-3 py-6 text-center text-slate-500">
+                      <td colSpan={visibleColumns.length || 1} className="px-3 py-6 text-center text-slate-500">
                         暂无数据，调整筛选试试。
                       </td>
                     </tr>
@@ -1850,6 +1990,66 @@ export default function FinancePage() {
                 >
                   确认保存
                 </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {viewingEntry && (
+        <div className="fixed inset-0 z-40 flex items-start justify-center overflow-y-auto bg-black/50 px-4 py-6 backdrop-blur-sm sm:py-8">
+          <div className="flex w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-slate-900/10">
+            <div className="flex items-center justify-between bg-slate-900 px-6 py-4 text-white">
+              <div>
+                <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-semibold tracking-wide">查看详情</span>
+                <h2 className="mt-2 text-xl font-semibold">财务记录 #{viewingEntry.displayIndex}</h2>
+              </div>
+              <button
+                onClick={() => setViewingEntry(null)}
+                className="rounded-full border border-white/30 px-3 py-1 text-sm font-medium text-white hover:bg-white/15"
+              >
+                关闭
+              </button>
+            </div>
+            <div className="space-y-3 p-6 text-sm text-slate-800">
+              <div className="flex flex-wrap items-center gap-3 text-xs text-slate-600">
+                <span className="rounded-full bg-slate-100 px-2 py-1">项目：{viewingEntry.entry.projectName}</span>
+                <span className="rounded-full bg-slate-100 px-2 py-1">
+                  分类：{viewingEntry.entry.categoryPath.map((c) => c.label).join(' / ')}
+                </span>
+                {viewingEntry.entry.isDeleted && (
+                  <span className="rounded-full bg-red-50 px-2 py-1 text-red-700 ring-1 ring-red-100">已软删除</span>
+                )}
+              </div>
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+                  <p className="text-xs font-semibold text-slate-500">事由</p>
+                  <p className="mt-1 text-base font-semibold text-slate-900">{viewingEntry.entry.reason}</p>
+                  <p className="mt-2 text-xs text-slate-500">
+                    备注：{viewingEntry.entry.remark ? viewingEntry.entry.remark : '—'}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+                  <p className="text-xs font-semibold text-slate-500">金额</p>
+                  <p className="mt-1 text-2xl font-semibold text-emerald-700">
+                    {viewingEntry.entry.amount} {viewingEntry.entry.unitName}
+                  </p>
+                  <p className="mt-2 text-xs text-slate-500">税费：{viewingEntry.entry.tva ?? '—'}</p>
+                </div>
+              </div>
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+                  <p className="text-xs font-semibold text-slate-500">支付方式</p>
+                  <p className="mt-1 text-sm font-medium text-slate-900">{viewingEntry.entry.paymentTypeName}</p>
+                  <p className="mt-2 text-xs text-slate-500">支付日期：{formatDateInput(viewingEntry.entry.paymentDate)}</p>
+                </div>
+                <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+                  <p className="text-xs font-semibold text-slate-500">经办人</p>
+                  <p className="mt-1 text-sm font-medium text-slate-900">
+                    {viewingEntry.entry.handlerName || viewingEntry.entry.handlerUsername || '—'}
+                  </p>
+                  <p className="mt-2 text-xs text-slate-500">编号：{viewingEntry.entry.id}</p>
+                </div>
               </div>
             </div>
           </div>

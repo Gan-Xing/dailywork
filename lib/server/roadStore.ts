@@ -91,10 +91,21 @@ const calcCompletedLength = (inspections: { startPk: number; endPk: number; side
 export const listRoadSectionsWithProgress = async (): Promise<RoadSectionProgressDTO[]> => {
   const roads = await prisma.roadSection.findMany({
     orderBy: { createdAt: 'asc' },
-    include: {
+    select: {
+      id: true,
+      slug: true,
+      name: true,
+      startPk: true,
+      endPk: true,
+      createdAt: true,
+      updatedAt: true,
       phases: {
-        include: {
-          intervals: true,
+        select: {
+          id: true,
+          name: true,
+          measure: true,
+          designLength: true,
+          updatedAt: true,
           inspections: {
             where: { status: 'APPROVED' },
             orderBy: { updatedAt: 'desc' },
@@ -110,8 +121,7 @@ export const listRoadSectionsWithProgress = async (): Promise<RoadSectionProgres
       const designLength = phase.designLength || 0
       const completedLength = calcCompletedLength(phase.inspections)
       const completedPercent = designLength > 0 ? Math.min(100, Math.round((completedLength / designLength) * 100)) : 0
-      const updatedAt =
-        phase.inspections[0]?.updatedAt?.toISOString() ?? phase.updatedAt.toISOString()
+      const latestUpdate = phase.inspections[0]?.updatedAt ?? phase.updatedAt
       return {
         phaseId: phase.id,
         phaseName: phase.name,
@@ -119,7 +129,7 @@ export const listRoadSectionsWithProgress = async (): Promise<RoadSectionProgres
         designLength,
         completedLength,
         completedPercent,
-        updatedAt,
+        updatedAt: latestUpdate.toISOString(),
       }
     })
 

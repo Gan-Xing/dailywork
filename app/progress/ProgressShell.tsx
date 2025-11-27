@@ -18,6 +18,9 @@ interface Props {
 export function ProgressShell({ roads, loadError, canManage, canViewInspections }: Props) {
   const { locale } = usePreferredLocale('zh', locales)
   const t = getProgressCopy(locale)
+  const breadcrumbHome = locale === 'fr' ? 'Accueil' : '首页'
+  const breadcrumbProgress = locale === 'fr' ? 'Avancement' : '进度管理'
+  const inspectionLabel = locale === 'fr' ? '报检记录' : '报检记录'
 
   return (
     <main className="min-h-screen bg-slate-950 text-slate-50">
@@ -29,25 +32,25 @@ export function ProgressShell({ roads, loadError, canManage, canViewInspections 
           </p>
           <h1 className="text-4xl font-semibold leading-tight text-slate-50">{t.hero.title}</h1>
           <p className="max-w-2xl text-sm text-slate-200/80">{t.hero.description}</p>
-          <div className="flex gap-3">
-            <Link
-              href="/"
-              className="inline-flex items-center gap-2 rounded-full border border-white/20 px-4 py-2 text-xs font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/10"
-            >
-              {t.hero.home}
-            </Link>
-            <Link
-              href="/reports"
-              className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-xs font-semibold text-slate-900 shadow-lg shadow-emerald-400/25 transition hover:-translate-y-0.5"
-            >
-              {t.hero.reports}
-            </Link>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <nav className="flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-200/80">
+              <Link
+                href="/"
+                className="rounded-full border border-white/10 bg-white/5 px-3 py-1 transition hover:border-white/25 hover:bg-white/10"
+              >
+                {breadcrumbHome}
+              </Link>
+              <span className="text-slate-500">/</span>
+              <span className="rounded-full border border-white/5 bg-white/5 px-3 py-1 text-slate-100">
+                {breadcrumbProgress}
+              </span>
+            </nav>
             {canViewInspections ? (
               <Link
                 href="/progress/inspections"
                 className="inline-flex items-center gap-2 rounded-full border border-emerald-200/60 px-4 py-2 text-xs font-semibold text-emerald-50 shadow-[0_0_0_1px_rgba(255,255,255,0.08)] transition hover:-translate-y-0.5 hover:border-white/80 hover:bg-white/10"
               >
-                报检记录
+                {inspectionLabel}
               </Link>
             ) : null}
           </div>

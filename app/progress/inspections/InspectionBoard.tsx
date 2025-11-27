@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 
 import type {
@@ -160,6 +161,25 @@ export function InspectionBoard({ roads, loadError }: Props) {
           <p className="max-w-2xl text-sm text-slate-200/80">
             可按道路、分项、状态、侧别、时间等条件筛选，点击表头可排序，点击行查看详情。
           </p>
+          <nav className="flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-200/80">
+            <Link
+              href="/"
+              className="rounded-full border border-white/10 bg-white/5 px-3 py-1 transition hover:border-white/25 hover:bg-white/10"
+            >
+              首页
+            </Link>
+            <span className="text-slate-500">/</span>
+            <Link
+              href="/progress"
+              className="rounded-full border border-white/10 bg-white/5 px-3 py-1 transition hover:border-white/25 hover:bg-white/10"
+            >
+              进度管理
+            </Link>
+            <span className="text-slate-500">/</span>
+            <span className="rounded-full border border-white/5 bg-white/5 px-3 py-1 text-slate-100">
+              报检记录
+            </span>
+          </nav>
           {error ? <p className="text-sm text-amber-200">加载提示：{error}</p> : null}
         </header>
 
