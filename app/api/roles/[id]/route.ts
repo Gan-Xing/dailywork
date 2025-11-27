@@ -16,7 +16,9 @@ export async function PUT(request: Request, { params }: { params: { id: string }
   const body = await request.json().catch(() => ({}))
   const name = typeof body.name === 'string' ? body.name.trim() : ''
   const permissionIds: number[] = Array.isArray(body.permissionIds)
-    ? body.permissionIds.map((v: unknown) => Number(v)).filter((v) => Number.isInteger(v) && v > 0)
+    ? body.permissionIds
+        .map((value: unknown) => Number(value))
+        .filter((value: number) => Number.isInteger(value) && value > 0)
     : []
 
   if (!name) {

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 
+import type { InspectionStatus } from '@/lib/progressTypes'
 import { hasPermission } from '@/lib/server/authSession'
 import { listInspections } from '@/lib/server/inspectionStore'
 
@@ -8,10 +9,11 @@ export async function GET(request: Request) {
     return NextResponse.json({ message: '缺少报检查看权限' }, { status: 403 })
   }
   const { searchParams } = new URL(request.url)
+  const statusParams = searchParams.getAll('status').filter(Boolean) as InspectionStatus[]
   const filter = {
     roadSlug: searchParams.get('roadSlug') ?? undefined,
     phaseId: searchParams.get('phaseId') ? Number(searchParams.get('phaseId')) : undefined,
-    status: searchParams.getAll('status').filter(Boolean),
+    status: statusParams.length ? statusParams : undefined,
     side: (searchParams.get('side') as 'LEFT' | 'RIGHT' | 'BOTH' | null) ?? undefined,
     type: searchParams.get('type') ?? undefined,
     keyword: searchParams.get('keyword') ?? undefined,

@@ -33,7 +33,7 @@ const emptyForm: FormState = {
   endPk: '',
 }
 
-const sortRoads = (roads: RoadSectionDTO[], locale: Locale) =>
+const sortRoads = (roads: RoadSectionProgressDTO[], locale: Locale) =>
   [...roads].sort((a, b) =>
     resolveRoadName(a, locale).localeCompare(
       resolveRoadName(b, locale),
@@ -124,7 +124,7 @@ export function RoadBoard({ initialRoads, canManage }: Props) {
     })
   }
 
-  const startEdit = (road: RoadSectionDTO) => {
+  const startEdit = (road: RoadSectionProgressDTO) => {
     setForm({
       slug: road.slug,
       name: road.name,
@@ -275,10 +275,10 @@ interface RoadCardProps {
 }
 
 const chipTone = 'rounded-full bg-white/10 px-3 py-1 text-[11px] font-semibold text-slate-100 shadow-inner shadow-slate-900/30'
-const formatDesignLength = (phase: { designLength: number; measure: string }) => {
+const formatDesignLength = (phase: RoadPhaseProgressDTO) => {
   const value = Number.isFinite(phase.designLength) ? phase.designLength : 0
   const rounded = Math.round(value * 100) / 100
-  return phase.measure === 'POINT' ? `${rounded} 个` : `${rounded} m`
+  return phase.phaseMeasure === 'POINT' ? `${rounded} 个` : `${rounded} m`
 }
 const calcPhaseProgress = (_phase: PhaseDTO) => {
   // 验收进度暂未接入，当前返回 0，后续接入验收数据后可替换

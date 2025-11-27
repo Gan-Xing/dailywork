@@ -5,6 +5,7 @@ import { hashPassword } from '@/lib/auth/password'
 import { prisma } from '@/lib/prisma'
 
 export interface AuthPermission {
+  id?: number
   code: string
   name: string
 }
@@ -46,6 +47,7 @@ const mapUser = (user: Prisma.UserGetPayload<{ select: typeof userSelection }>):
     id: userRole.role.id,
     name: userRole.role.name,
     permissions: userRole.role.permissions.map((rp) => ({
+      id: rp.permission.id,
       code: rp.permission.code,
       name: rp.permission.name,
     })),

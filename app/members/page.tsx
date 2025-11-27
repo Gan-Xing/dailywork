@@ -35,7 +35,7 @@ type Member = {
 type Role = {
   id: number
   name: string
-  permissions: { code: string; name: string }[]
+  permissions: { id: number; code: string; name: string }[]
 }
 
 type Permission = {
