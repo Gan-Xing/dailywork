@@ -12,7 +12,7 @@ export function ProgressDetailHeader({ road }: { road: RoadSectionDTO }) {
   const { locale } = usePreferredLocale('zh', locales)
   const t = getProgressCopy(locale)
   const breadcrumbHome = locale === 'fr' ? 'Accueil' : '首页'
-  const breadcrumbProgress = locale === 'fr' ? '进度管理' : '进度管理'
+  const breadcrumbProgress = t.detail.breadcrumbProgress
 
   return (
     <>

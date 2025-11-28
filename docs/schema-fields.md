@@ -175,6 +175,7 @@
      0. `id`：唯一标识（自增或 UUID）。
      1. `name`：分项名称（如“土方”），唯一，必填。
      2. `measure`：枚举 `LINEAR` / `POINT`，必填。
+     3. `pointHasSides`：布尔，仅对 `POINT` 有意义；为 `true` 时单体分项在展示/报检时按左右侧分别呈现，默认 `false`（单行展示）。
      3. `defaultLayers`：字符串数组，模板级默认层次列表，可为空。
      4. `defaultChecks`：字符串数组，模板级默认验收内容列表，可为空。
      5. `isActive`：布尔，控制是否可被新实例选择，默认 `true`。
@@ -199,6 +200,7 @@
      3. `name`：显示名称，默认继承模板，可在实例层重命名。
      4. `measure`：枚举，默认继承模板；如与模板不同则以实例为准。
      5. `intervals`：区间列表 `{ startPk, endPk, side }`，实例必填（设计量由此计算）。
+     6. `pointHasSides`：布尔，仅当 `measure=POINT` 时生效；为 `true` 时单体分项前端按左右侧分开展示点位，默认 `false`。
      6. `layerIds`：引用 `LayerDefinition` 的 ID 列表，实例可选；为空时使用模板默认层次。
      7. `checkIds`：引用 `CheckDefinition` 的 ID 列表，实例可选；为空时使用模板默认验收内容。
      8. `resolvedLayers` / `resolvedChecks`：派生字段（API/视图用），规则为“若实例有绑定则使用实例列表，否则使用模板默认值”。
@@ -206,6 +208,19 @@
     10. `createdAt` / `updatedAt`：系统时间戳。
 
 > 继承与覆盖规则：路段下新建分项实例时选择一个模板，初始层次/验收内容取模板默认值；实例可新增/删除候选，保存后 `layerIds`/`checkIds` 记录实例实际选中的定义集合。报检弹窗展示与提交时使用 `resolvedLayers`/`resolvedChecks`。
+
+## 报检记录（InspectionRequest）
+- **用途**：记录分项的报检预约与提交信息。
+- **字段**
+     0. `roadId` / `phaseId`：关联路段与分项。
+     1. `side`：枚举 `BOTH` / `LEFT` / `RIGHT`。
+     2. `startPk` / `endPk`：起讫桩号。
+     3. `appointmentDate`：预约报检日期（日期粒度）。
+     4. `submittedAt` / `submittedBy`：报检提交时间与提交人。
+     5. `status`：枚举 `PENDING` / `IN_PROGRESS` / `APPROVED`。
+     6. `updatedAt` / `updatedBy`：最近更新时间与更新人。
+     7. `layers` / `checks` / `types`：数组字段，记录层次、验收内容、报检类型。
+     8. `remark`：多行备注。
 
 ## 财务记账字段（FinanceEntry）
 

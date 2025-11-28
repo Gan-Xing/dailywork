@@ -22,6 +22,7 @@ export default async function RoadDetailPage({ params }: Params) {
     !sessionUser || sessionUser?.permissions.includes('progress:view') || false
   const canManage = sessionUser?.permissions.includes('progress:edit') || false
   const canInspect = sessionUser?.permissions.includes('inspection:create') || false
+  const canViewInspection = sessionUser?.permissions.includes('inspection:view') || false
 
   if (!canView) {
     return (
@@ -60,6 +61,7 @@ export default async function RoadDetailPage({ params }: Params) {
             checkOptions={checkOptions as CheckDefinitionDTO[]}
             canManage={canManage}
             canInspect={canInspect}
+            canViewInspection={canViewInspection}
           />
         </div>
       </div>

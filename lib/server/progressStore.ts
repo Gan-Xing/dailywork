@@ -50,6 +50,7 @@ const mapDefinitionToDTO = (
   id: definition.id,
   name: definition.name,
   measure: definition.measure,
+  pointHasSides: definition.pointHasSides,
   defaultLayers: definition.defaultLayers.map((l) => l.layerDefinition.name),
   defaultChecks: definition.defaultChecks.map((c) => c.checkDefinition.name),
   isActive: definition.isActive,
@@ -96,6 +97,7 @@ const mapPhaseToDTO = (
     id: phase.id,
     name: phase.name,
     measure: phase.measure,
+    pointHasSides: phase.pointHasSides,
     designLength: phase.designLength,
     resolvedLayers: resolvedLayers.map((l) => l.name),
     resolvedChecks: resolvedChecks.map((c) => c.name),
@@ -147,7 +149,14 @@ const ensureCheckDefinitions = async (names: string[], tx: Prisma.TransactionCli
 
 const ensurePhaseDefinition = async (
   tx: Prisma.TransactionClient,
-  payload: { phaseDefinitionId?: number; name: string; measure: PhaseMeasure; defaultLayers?: string[]; defaultChecks?: string[] },
+  payload: {
+    phaseDefinitionId?: number
+    name: string
+    measure: PhaseMeasure
+    pointHasSides?: boolean
+    defaultLayers?: string[]
+    defaultChecks?: string[]
+  },
 ) => {
   if (payload.phaseDefinitionId) {
     const definition = await tx.phaseDefinition.findUnique({ where: { id: payload.phaseDefinitionId } })
@@ -169,6 +178,7 @@ const ensurePhaseDefinition = async (
     data: {
       name: payload.name,
       measure: payload.measure,
+      pointHasSides: payload.pointHasSides ?? false,
       defaultLayers: {
         create: layerDefs.map((layer) => ({ layerDefinitionId: layer.id })),
       },
@@ -278,6 +288,7 @@ export const createPhase = async (roadId: number, payload: PhasePayload) => {
         phaseDefinitionId: payload.phaseDefinitionId,
         name: payload.name,
         measure: payload.measure === 'POINT' ? PhaseMeasure.POINT : PhaseMeasure.LINEAR,
+        pointHasSides: payload.measure === 'POINT' ? payload.pointHasSides : false,
         defaultLayers: payload.newLayers,
         defaultChecks: payload.newChecks,
       })
@@ -300,6 +311,7 @@ export const createPhase = async (roadId: number, payload: PhasePayload) => {
           phaseDefinitionId: definition.id,
           name: payload.name,
           measure: payload.measure === 'POINT' ? PhaseMeasure.POINT : PhaseMeasure.LINEAR,
+          pointHasSides: payload.measure === 'POINT' ? Boolean(payload.pointHasSides) : false,
           designLength,
           intervals: {
             create: normalizedIntervals.map((item) => ({
@@ -375,6 +387,7 @@ export const updatePhase = async (roadId: number, phaseId: number, payload: Phas
         phaseDefinitionId: payload.phaseDefinitionId ?? existing.phaseDefinitionId,
         name: payload.name,
         measure: payload.measure === 'POINT' ? PhaseMeasure.POINT : PhaseMeasure.LINEAR,
+        pointHasSides: payload.measure === 'POINT' ? payload.pointHasSides : false,
         defaultLayers: payload.newLayers,
         defaultChecks: payload.newChecks,
       })
@@ -397,6 +410,7 @@ export const updatePhase = async (roadId: number, phaseId: number, payload: Phas
           phaseDefinitionId: definition.id,
           name: payload.name,
           measure: payload.measure === 'POINT' ? PhaseMeasure.POINT : PhaseMeasure.LINEAR,
+          pointHasSides: payload.measure === 'POINT' ? Boolean(payload.pointHasSides) : false,
           designLength,
         },
       })

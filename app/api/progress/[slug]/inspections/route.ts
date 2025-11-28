@@ -35,6 +35,7 @@ export async function POST(request: Request, { params }: RouteParams) {
     checks?: string[]
     types?: string[]
     remark?: string
+    appointmentDate?: string
   }
   try {
     payload = (await request.json()) as typeof payload
@@ -66,6 +67,7 @@ export async function POST(request: Request, { params }: RouteParams) {
         checks: payload.checks ?? [],
         types: payload.types ?? [],
         remark: payload.remark,
+        appointmentDate: payload.appointmentDate,
       },
       sessionUser.id,
     )

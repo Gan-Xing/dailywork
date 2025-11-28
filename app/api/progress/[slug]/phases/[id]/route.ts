@@ -30,6 +30,7 @@ export async function PUT(request: Request, { params }: RouteParams) {
     phaseDefinitionId?: number
     name?: string
     measure?: string
+    pointHasSides?: boolean
     intervals?: { startPk?: number; endPk?: number; side?: string }[]
     layerIds?: number[]
     checkIds?: number[]
@@ -51,6 +52,7 @@ export async function PUT(request: Request, { params }: RouteParams) {
       phaseDefinitionId: payload.phaseDefinitionId,
       name: payload.name,
       measure: payload.measure as 'LINEAR' | 'POINT',
+      pointHasSides: payload.pointHasSides ?? false,
       layerIds: payload.layerIds ?? [],
       checkIds: payload.checkIds ?? [],
       newLayers: payload.newLayers ?? [],

@@ -14,6 +14,9 @@ import type {
   RoadSectionDTO,
 } from '@/lib/progressTypes'
 import type { PhaseMeasure } from '@/lib/progressTypes'
+import { getProgressCopy, formatProgressCopy } from '@/lib/i18n/progress'
+import { locales } from '@/lib/i18n'
+import { usePreferredLocale } from '@/lib/usePreferredLocale'
 
 interface Props {
   road: RoadSectionDTO
@@ -23,15 +26,10 @@ interface Props {
   checkOptions: CheckDefinitionDTO[]
   canManage: boolean
   canInspect: boolean
+  canViewInspection: boolean
 }
 
-const sideOptions: { value: IntervalSide; label: string }[] = [
-  { value: 'BOTH', label: '双侧' },
-  { value: 'LEFT', label: '左侧' },
-  { value: 'RIGHT', label: '右侧' },
-]
-
-type Status = '未验收' | '验收中' | '已验收' | '非设计'
+type Status = 'pending' | 'inProgress' | 'approved' | 'nonDesign'
 
 interface Segment {
   start: number
@@ -40,7 +38,7 @@ interface Segment {
 }
 
 interface Side {
-  label: '左侧' | '右侧'
+  label: string
   segments: Segment[]
 }
 
@@ -55,17 +53,16 @@ interface PointView {
   points: { startPk: number; endPk: number; side: IntervalSide }[]
 }
 
-const inspectionTypes = ['现场验收', '测量验收', '试验验收', '其他']
-
 const statusTone: Record<Status, string> = {
-  未验收: 'bg-gradient-to-r from-white via-slate-100 to-white text-slate-900 shadow-sm shadow-slate-900/10',
-  验收中: 'bg-gradient-to-r from-amber-300 via-orange-200 to-amber-200 text-slate-900 shadow-md shadow-amber-400/30',
-  已验收: 'bg-gradient-to-r from-emerald-300 via-lime-200 to-emerald-200 text-slate-900 shadow-md shadow-emerald-400/30',
-  非设计: 'bg-slate-800 text-slate-100 shadow-inner shadow-slate-900/30',
+  pending: 'bg-gradient-to-r from-white via-slate-100 to-white text-slate-900 shadow-sm shadow-slate-900/10',
+  inProgress: 'bg-gradient-to-r from-amber-300 via-orange-200 to-amber-200 text-slate-900 shadow-md shadow-amber-400/30',
+  approved: 'bg-gradient-to-r from-emerald-300 via-lime-200 to-emerald-200 text-slate-900 shadow-md shadow-emerald-400/30',
+  nonDesign: 'bg-slate-800 text-slate-100 shadow-inner shadow-slate-900/30',
 }
 
 const normalizePhaseDTO = (phase: PhaseDTO): PhaseDTO => ({
   ...phase,
+  pointHasSides: Boolean(phase.pointHasSides),
   resolvedLayers: Array.isArray(phase.resolvedLayers) ? [...phase.resolvedLayers] : [],
   resolvedChecks: Array.isArray(phase.resolvedChecks) ? [...phase.resolvedChecks] : [],
   definitionLayerIds: Array.isArray(phase.definitionLayerIds) ? [...phase.definitionLayerIds] : [],
@@ -84,6 +81,10 @@ const formatPK = (value: number) => {
   const m = Math.round(value % 1000)
   return `PK${km}+${String(m).padStart(3, '0')}`
 }
+
+const todayISODate = () => new Date().toISOString().slice(0, 10)
+
+const buildPointKey = (phaseId: number, startPk: number) => `${phaseId}-${Math.round(Number(startPk || 0) * 1000)}`
 
 const computeDesign = (measure: PhaseMeasure, intervals: PhaseIntervalPayload[]) =>
   measure === 'POINT'
@@ -119,23 +120,27 @@ const fillNonDesignGaps = (segments: Segment[], start: number, end: number) => {
   let cursor = start
   sorted.forEach((seg) => {
     if (seg.start > cursor) {
-      result.push({ start: cursor, end: seg.start, status: '非设计' })
+      result.push({ start: cursor, end: seg.start, status: 'nonDesign' })
     }
     result.push(seg)
     cursor = Math.max(cursor, seg.end)
   })
   if (cursor < end) {
-    result.push({ start: cursor, end, status: '非设计' })
+    result.push({ start: cursor, end, status: 'nonDesign' })
   }
   return result
 }
 
-const buildLinearView = (phase: PhaseDTO, roadLength: number): LinearView => {
+const buildLinearView = (
+  phase: PhaseDTO,
+  roadLength: number,
+  sideLabels: { left: string; right: string },
+): LinearView => {
   const normalized = phase.intervals.map((i) => normalizeInterval(i, 'LINEAR'))
   const left: Segment[] = []
   const right: Segment[] = []
   normalized.forEach((interval) => {
-    const seg = { start: interval.startPk, end: interval.endPk, status: '未验收' as Status }
+    const seg = { start: interval.startPk, end: interval.endPk, status: 'pending' as Status }
     if (interval.side === 'LEFT') left.push(seg)
     if (interval.side === 'RIGHT') right.push(seg)
     if (interval.side === 'BOTH') {
@@ -153,8 +158,8 @@ const buildLinearView = (phase: PhaseDTO, roadLength: number): LinearView => {
   const total = Math.max(maxEnd, roadLength || 0, 1)
 
   return {
-    left: { label: '左侧', segments: fillNonDesignGaps(left, 0, total) },
-    right: { label: '右侧', segments: fillNonDesignGaps(right, 0, total) },
+    left: { label: sideLabels.left, segments: fillNonDesignGaps(left, 0, total) },
+    right: { label: sideLabels.right, segments: fillNonDesignGaps(right, 0, total) },
     total,
   }
 }
@@ -175,13 +180,13 @@ const buildPointView = (phase: PhaseDTO, roadLength: number): PointView => {
 }
 
 const calcDesignBySide = (segments: Segment[]) =>
-  segments.reduce((acc, seg) => (seg.status === '非设计' ? acc : acc + Math.max(0, seg.end - seg.start)), 0)
+  segments.reduce((acc, seg) => (seg.status === 'nonDesign' ? acc : acc + Math.max(0, seg.end - seg.start)), 0)
 
 const calcCombinedPercent = (left: Segment[], right: Segment[]) => {
   const leftLen = calcDesignBySide(left)
   const rightLen = calcDesignBySide(right)
   const total = leftLen + rightLen || 1
-  const completed = 0 // 未来接入验收状态，目前全部未施工
+  const completed = 0 // Future: plug in real acceptance status; currently treated as uninspected
   return Math.round((completed / total) * 100)
 }
 
@@ -193,7 +198,40 @@ export function PhaseEditor({
   checkOptions,
   canManage,
   canInspect,
+  canViewInspection,
 }: Props) {
+  const { locale } = usePreferredLocale('zh', locales)
+  const t = getProgressCopy(locale).phase
+  const sideOptions: { value: IntervalSide; label: string }[] = useMemo(
+    () => [
+      { value: 'BOTH', label: t.form.sideBoth },
+      { value: 'LEFT', label: t.form.sideLeft },
+      { value: 'RIGHT', label: t.form.sideRight },
+    ],
+    [t.form.sideBoth, t.form.sideLeft, t.form.sideRight],
+  )
+  const sideLabelMap = useMemo(
+    () => ({
+      BOTH: t.form.sideBoth,
+      LEFT: t.form.sideLeft,
+      RIGHT: t.form.sideRight,
+    }),
+    [t.form.sideBoth, t.form.sideLeft, t.form.sideRight],
+  )
+  const inspectionTypes = t.inspection.types
+  const statusLabel = (status: Status) => {
+    switch (status) {
+      case 'pending':
+        return t.status.pending
+      case 'inProgress':
+        return t.status.inProgress
+      case 'approved':
+        return t.status.approved
+      default:
+        return t.status.nonDesign
+    }
+  }
+
   const roadStart = useMemo(() => {
     const start = Number(road.startPk)
     return Number.isFinite(start) ? start : 0
@@ -215,6 +253,7 @@ export function PhaseEditor({
   const [checkOptionsState, setCheckOptionsState] = useState<CheckDefinitionDTO[]>(checkOptions)
   const [name, setName] = useState('')
   const [measure, setMeasure] = useState<PhaseMeasure>('LINEAR')
+  const [pointHasSides, setPointHasSides] = useState(false)
   const [intervals, setIntervals] = useState<PhaseIntervalPayload[]>([defaultInterval])
   const [definitionId, setDefinitionId] = useState<number | null>(null)
   const [layerTokens, setLayerTokens] = useState<string[]>([])
@@ -265,6 +304,7 @@ export function PhaseEditor({
   const resetForm = () => {
     setName('')
     setMeasure('LINEAR')
+    setPointHasSides(false)
     setIntervals([defaultInterval])
     setDefinitionId(null)
     setLayerTokens([])
@@ -310,6 +350,7 @@ export function PhaseEditor({
         side: i.side,
       })),
     )
+    setPointHasSides(Boolean(normalized.pointHasSides))
     setEditingId(normalized.id)
     setError(null)
     requestAnimationFrame(() => {
@@ -330,7 +371,7 @@ export function PhaseEditor({
         return !Number.isFinite(start) || !Number.isFinite(end)
       })
       if (intervalInvalid) {
-        setError('请填写有效的起点/终点')
+        setError(t.errors.invalidRange)
         return
       }
       const { ids: layerIds, newNames: newLayers } = splitTokensToIds(layerTokens, layerOptionsState)
@@ -339,6 +380,7 @@ export function PhaseEditor({
         phaseDefinitionId: definitionId ?? undefined,
         name,
         measure,
+        pointHasSides: measure === 'POINT' ? pointHasSides : false,
         layerIds,
         checkIds,
         newLayers,
@@ -367,7 +409,7 @@ export function PhaseEditor({
       })
       const data = (await res.json().catch(() => ({}))) as { phase?: PhaseDTO; message?: string }
       if (!res.ok || !data.phase) {
-        setError(data.message ?? '保存失败')
+        setError(data.message ?? t.errors.saveFailed)
         return
       }
       const phase = normalizePhaseDTO(data.phase)
@@ -444,7 +486,11 @@ export function PhaseEditor({
       setPhases((prev) =>
         editingId ? prev.map((item) => (item.id === editingId ? phase : item)) : [...prev, phase],
       )
-      setSuccessMessage(editingId ? `分项「${phase.name}」已更新` : `分项「${phase.name}」已创建`)
+      setSuccessMessage(
+        editingId
+          ? formatProgressCopy(t.success.updated, { name: phase.name })
+          : formatProgressCopy(t.success.created, { name: phase.name }),
+      )
       setShowFormModal(false)
       resetForm()
     })
@@ -467,7 +513,7 @@ export function PhaseEditor({
       })
       const data = (await res.json().catch(() => ({}))) as { message?: string }
       if (!res.ok) {
-        setDeleteError(data.message ?? '删除失败')
+        setDeleteError(data.message ?? t.errors.deleteFailed)
         return
       }
       setPhases((prev) => prev.filter((item) => item.id !== deleteTarget.id))
@@ -480,7 +526,7 @@ export function PhaseEditor({
       }
       resetDeleteState()
     } catch {
-      setDeleteError('删除失败')
+      setDeleteError(t.errors.deleteFailed)
     } finally {
       setDeletingId(null)
     }
@@ -491,9 +537,9 @@ export function PhaseEditor({
       .filter((phase) => phase.measure === 'LINEAR')
       .map((phase) => ({
         phase,
-        view: buildLinearView(phase, roadLength),
+        view: buildLinearView(phase, roadLength, { left: sideLabelMap.LEFT, right: sideLabelMap.RIGHT }),
       }))
-  }, [phases, roadLength])
+  }, [phases, roadLength, sideLabelMap.LEFT, sideLabelMap.RIGHT])
 
   const pointViews = useMemo(() => {
     return phases
@@ -560,28 +606,33 @@ const addCheckToken = () => {
     setSelectedTypes([])
     setRemark('')
     setSubmitError(null)
+    setAppointmentDateInput('')
   }
 
-const submitInspection = async () => {
-  if (!selectedSegment) return
-  const hasStart = startPkInput.trim() !== ''
-  const hasEnd = endPkInput.trim() !== ''
-  const startPk = Number(startPkInput)
-  const endPk = Number(endPkInput)
-  if (!hasStart || !hasEnd || !Number.isFinite(startPk) || !Number.isFinite(endPk)) {
-    setSubmitError('请输入有效的起点和终点')
-    return
-  }
-  if (!selectedLayers.length) {
-    setSubmitError('请选择至少一个层次')
-    return
-  }
-  if (!selectedChecks.length) {
-    setSubmitError('请选择至少一个验收内容')
-    return
-  }
+  const submitInspection = async () => {
+    if (!selectedSegment) return
+    const hasStart = startPkInput.trim() !== ''
+    const hasEnd = endPkInput.trim() !== ''
+    const startPk = Number(startPkInput)
+    const endPk = Number(endPkInput)
+    if (!hasStart || !hasEnd || !Number.isFinite(startPk) || !Number.isFinite(endPk)) {
+      setSubmitError(t.errors.submitRangeInvalid)
+      return
+    }
+    if (!selectedLayers.length) {
+      setSubmitError(t.errors.submitLayerMissing)
+      return
+    }
+    if (!selectedChecks.length) {
+      setSubmitError(t.errors.submitCheckMissing)
+      return
+    }
   if (!selectedTypes.length) {
-    setSubmitError('请选择至少一个验收类型')
+    setSubmitError(t.errors.submitTypeMissing)
+    return
+  }
+  if (!appointmentDateInput) {
+    setSubmitError(t.errors.submitAppointmentMissing)
     return
   }
   setSubmitPending(true)
@@ -595,6 +646,7 @@ const submitInspection = async () => {
     checks: selectedChecks,
     types: selectedTypes,
     remark,
+    appointmentDate: appointmentDateInput,
   }
 
   const res = await fetch(`/api/progress/${road.slug}/inspections`, {
@@ -606,7 +658,7 @@ const submitInspection = async () => {
   const data = (await res.json().catch(() => ({}))) as { message?: string }
   setSubmitPending(false)
   if (!res.ok) {
-    setSubmitError(data.message ?? '提交失败')
+    setSubmitError(data.message ?? t.errors.submitFailed)
     return
   }
   setSelectedSegment(null)
@@ -627,6 +679,7 @@ const submitInspection = async () => {
   const [selectedSide, setSelectedSide] = useState<IntervalSide>('BOTH')
   const [startPkInput, setStartPkInput] = useState<string>('')
   const [endPkInput, setEndPkInput] = useState<string>('')
+  const [appointmentDateInput, setAppointmentDateInput] = useState<string>('')
   const [selectedLayers, setSelectedLayers] = useState<string[]>([])
   const [selectedChecks, setSelectedChecks] = useState<string[]>([])
   const [selectedTypes, setSelectedTypes] = useState<string[]>([])
@@ -634,6 +687,9 @@ const submitInspection = async () => {
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [submitPending, setSubmitPending] = useState(false)
   const [inspectionCheckInput, setInspectionCheckInput] = useState('')
+  const [latestPointInspections, setLatestPointInspections] = useState<
+    Map<string, { layers: string[]; updatedAt: number }>
+  >(() => new Map())
   const latestChecksByDefinition = useMemo(() => {
     const latest = new Map<number, { updatedAt: number; checks: string[] }>()
     phases.forEach((phase) => {
@@ -650,6 +706,14 @@ const submitInspection = async () => {
     return result
   }, [phases])
 
+  const resolvePointBadge = (phaseId: number, startPk: number) => {
+    const latest = latestPointInspections.get(buildPointKey(phaseId, startPk))
+    if (latest && latest.layers?.length) {
+      return latest.layers.slice(0, 2).join(' / ')
+    }
+    return t.pointBadge.none
+  }
+
   useEffect(() => {
     if (selectedSegment) {
       setSelectedLayers([])
@@ -663,8 +727,47 @@ const submitInspection = async () => {
       setSelectedSide(selectedSegment.side)
       setStartPkInput(String(selectedSegment.start ?? ''))
       setEndPkInput(String(selectedSegment.end ?? ''))
+      setAppointmentDateInput(todayISODate())
     }
   }, [selectedSegment])
+
+  useEffect(() => {
+    if (!canViewInspection) return
+    let cancelled = false
+    const fetchLatestInspections = async () => {
+      try {
+        const res = await fetch(
+          `/api/progress/${road.slug}/inspections?roadSlug=${road.slug}&sortField=updatedAt&sortOrder=desc&pageSize=500`,
+          { credentials: 'include' },
+        )
+        if (!res.ok) return
+        const data = (await res.json()) as {
+          items?: Array<{ phaseId: number; startPk: number; layers: string[]; updatedAt: string }>
+        }
+        if (!data.items || cancelled) return
+        const map = new Map<string, { layers: string[]; updatedAt: number }>()
+        data.items.forEach((item) => {
+          const ts = new Date(item.updatedAt).getTime()
+          const key = buildPointKey(item.phaseId, item.startPk)
+          const existing = map.get(key)
+          if (!existing || ts > existing.updatedAt) {
+            map.set(key, { layers: item.layers || [], updatedAt: ts })
+          }
+        })
+        if (!cancelled) {
+          setLatestPointInspections(map)
+        }
+      } catch (err) {
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn(t.alerts.fetchInspectionFailed, err)
+        }
+      }
+    }
+    fetchLatestInspections()
+    return () => {
+      cancelled = true
+    }
+  }, [road.slug, canViewInspection])
 
   useEffect(() => {
     if (!successMessage) return
@@ -682,9 +785,11 @@ const submitInspection = async () => {
       <section className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-3">
-            <h2 className="text-xl font-semibold text-slate-50">分项工程</h2>
+            <h2 className="text-xl font-semibold text-slate-50">{t.title}</h2>
             <span className="rounded-full bg-white/10 px-3 py-1 text-[11px] font-semibold text-slate-100">
-              道路长度（估算）：{roadLength || '未填写'} m
+              {formatProgressCopy(t.roadLengthLabel, {
+                length: roadLength || t.roadLengthUnknown,
+              })}
             </span>
           </div>
           {canManage ? (
@@ -693,14 +798,12 @@ const submitInspection = async () => {
               className="inline-flex items-center gap-2 rounded-2xl bg-emerald-300 px-4 py-2 text-xs font-semibold text-slate-900 shadow-lg shadow-emerald-400/30 transition hover:-translate-y-0.5"
               onClick={openCreateModal}
             >
-              新增分项
+              {t.addButton}
             </button>
           ) : null}
         </div>
         <p className="mt-3 text-sm text-slate-200/80">
-          {canManage
-            ? '新增/编辑分项会在弹窗中完成，便于手机端查看。'
-            : '当前账号缺少编辑权限，仅可查看已有分项。'}
+          {canManage ? t.manageTip : t.viewOnlyTip}
         </p>
       </section>
 
@@ -722,7 +825,7 @@ const submitInspection = async () => {
               type="button"
               className="absolute right-4 top-4 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/20"
               onClick={closeFormModal}
-              aria-label="关闭"
+              aria-label={t.delete.close}
             >
               ×
             </button>
@@ -730,11 +833,11 @@ const submitInspection = async () => {
               <div className="flex flex-wrap items-center gap-3">
                 {editingId ? (
                   <span className="rounded-full bg-amber-200/80 px-3 py-1 text-xs font-semibold text-slate-900">
-                    编辑分项 · ID {editingId}
+                    {formatProgressCopy(t.form.editingBadge, { id: editingId })}
                   </span>
                 ) : (
                   <span className="rounded-full bg-emerald-200/80 px-3 py-1 text-xs font-semibold text-slate-900">
-                    新增分项
+                    {t.form.creatingBadge}
                   </span>
                 )}
                 <button
@@ -742,18 +845,23 @@ const submitInspection = async () => {
                   className="rounded-full border border-white/20 px-3 py-1 text-[11px] font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/10"
                   onClick={resetForm}
                 >
-                  {editingId ? '退出编辑' : '重置表单'}
+                  {editingId ? t.form.resetEdit : t.form.resetNew}
                 </button>
                 <span className="text-xs text-slate-300">
-                  道路长度（估算）：{roadLength || '未填写'} m · 设计量自动计算：
-                  {measure === 'POINT' ? `${designLength} 个` : `${designLength} m`}
+                  {formatProgressCopy(t.form.designSummary, {
+                    length: roadLength || t.roadLengthUnknown,
+                    design:
+                      measure === 'POINT'
+                        ? formatProgressCopy(t.form.designHintPoint, { design: designLength })
+                        : formatProgressCopy(t.form.designHintLinear, { design: designLength }),
+                  })}
                 </span>
               </div>
 
               <form className="mt-5 space-y-4" onSubmit={handleSubmit}>
                 <div className="grid gap-4 md:grid-cols-4">
                   <label className="flex flex-col gap-2 text-sm text-slate-100">
-                    分项模板
+                    {t.form.templateLabel}
                     <select
                       className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
                       value={definitionId ?? ''}
@@ -768,61 +876,80 @@ const submitInspection = async () => {
                           setDefinitionId(found.id)
                           setName(found.name)
                           setMeasure(found.measure)
+                          setPointHasSides(Boolean(found.pointHasSides))
                           setLayerTokens(found.defaultLayers)
                           const rememberedChecks = latestChecksByDefinition.get(found.id) ?? []
                           setCheckTokens(rememberedChecks.length ? rememberedChecks : found.defaultChecks)
                         }
                       }}
                     >
-                      <option value="">自定义/新建</option>
+                      <option value="">{t.form.templateCustom}</option>
                       {definitions.map((item) => (
                         <option key={item.id} value={item.id}>
-                          {item.name} · {item.measure === 'POINT' ? '单体' : '延米'}
+                          {item.name} · {item.measure === 'POINT' ? t.form.measureOptionPoint : t.form.measureOptionLinear}
                         </option>
                       ))}
                     </select>
                   </label>
                   <label className="flex flex-col gap-2 text-sm text-slate-100">
-                    名称
+                    {t.form.nameLabel}
                     <input
                       ref={nameInputRef}
                       className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-slate-50 placeholder:text-slate-200/60 focus:border-emerald-300 focus:outline-none"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
-                      placeholder="如：土方"
+                      placeholder={t.form.namePlaceholder}
                       required
                     />
                   </label>
                   <label className="flex flex-col gap-2 text-sm text-slate-100">
-                    显示方式
+                    {t.form.measureLabel}
                     <select
                       className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
                       value={measure}
-                      onChange={(e) => setMeasure(e.target.value as PhaseMeasure)}
+                      onChange={(e) => {
+                        const nextMeasure = e.target.value as PhaseMeasure
+                        setMeasure(nextMeasure)
+                        if (nextMeasure === 'LINEAR') {
+                          setPointHasSides(false)
+                        }
+                      }}
                     >
-                      <option value="LINEAR">延米（按起终点展示进度）</option>
-                      <option value="POINT">单体（按点位/条目展示）</option>
+                      <option value="LINEAR">{t.form.measureOptionLinear}</option>
+                      <option value="POINT">{t.form.measureOptionPoint}</option>
                     </select>
                   </label>
                   <div className="flex flex-col justify-end text-sm text-slate-100">
                     <span className="text-xs text-slate-300">
-                      设计量自动计算：
+                      {t.form.designHintPrefix}
                       {measure === 'POINT'
-                        ? `${designLength} 个（按条目数）`
-                        : `${designLength} m（双侧区间按左右叠加）`}
+                        ? formatProgressCopy(t.form.designHintPoint, { design: designLength })
+                        : formatProgressCopy(t.form.designHintLinear, { design: designLength })}
                     </span>
+                    {measure === 'POINT' ? (
+                      <label className="mt-2 flex items-center gap-2 text-[12px] text-slate-200">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 accent-emerald-300"
+                          checked={pointHasSides}
+                          onChange={(e) => setPointHasSides(e.target.checked)}
+                        />
+                        <span className="font-semibold">{t.form.pointSidesLabel}</span>
+                        <span className="text-[11px] text-slate-400">{t.form.pointSidesHint}</span>
+                      </label>
+                    ) : null}
                   </div>
                 </div>
 
                 <div className="space-y-3 rounded-2xl border border-white/10 bg-white/5 p-4">
                   <div className="flex items-center justify-between text-sm text-slate-100">
-                    <p>起点-终点列表（起点=终点可表示一个点）</p>
+                    <p>{t.form.intervalTitle}</p>
                     <button
                       type="button"
                       onClick={addInterval}
                       className="rounded-xl border border-white/20 px-3 py-2 text-xs font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/10"
                     >
-                      添加区间
+                      {t.form.intervalAdd}
                     </button>
                   </div>
 
@@ -833,7 +960,7 @@ const submitInspection = async () => {
                         className="grid grid-cols-1 gap-3 rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-slate-100 md:grid-cols-4 md:items-center"
                       >
                         <label className="flex flex-col gap-1">
-                          起点
+                          {t.form.intervalStart}
                           <input
                             type="number"
                             className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
@@ -846,7 +973,7 @@ const submitInspection = async () => {
                           />
                         </label>
                         <label className="flex flex-col gap-1">
-                          终点
+                          {t.form.intervalEnd}
                           <input
                             type="number"
                             className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
@@ -857,7 +984,7 @@ const submitInspection = async () => {
                           />
                         </label>
                         <label className="flex flex-col gap-1">
-                          侧别
+                          {t.form.intervalSide}
                           <select
                             className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
                             value={item.side}
@@ -877,7 +1004,7 @@ const submitInspection = async () => {
                               className="rounded-xl border border-white/20 px-3 py-2 text-xs font-semibold text-rose-100 transition hover:border-rose-200/60 hover:bg-rose-200/10"
                               onClick={() => removeInterval(index)}
                             >
-                              删除
+                              {t.form.intervalDelete}
                             </button>
                           ) : null}
                         </div>
@@ -889,19 +1016,19 @@ const submitInspection = async () => {
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2 rounded-2xl border border-white/10 bg-white/5 p-4">
                     <div className="flex items-center justify-between text-sm text-slate-100">
-                      <p>层次（当前分项使用的候选）</p>
+                      <p>{t.form.layersTitle}</p>
                       <button
                         type="button"
                         onClick={addLayerToken}
                         className="rounded-xl border border-white/20 px-3 py-2 text-xs font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/10"
                       >
-                        添加
+                        {t.form.layersAdd}
                       </button>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
                       <input
                         className="w-full rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-200/60 focus:border-emerald-300 focus:outline-none"
-                        placeholder="选择或新增层次，如：第一层上土"
+                        placeholder={t.form.layersPlaceholder}
                         value={layerInput}
                         onChange={(e) => setLayerInput(e.target.value)}
                       />
@@ -922,7 +1049,7 @@ const submitInspection = async () => {
                         ))}
                       </div>
                       {layerTokens.length === 0 ? (
-                        <p className="text-xs text-slate-300">暂无已选层次，输入后点击添加，或从上方候选中选择。</p>
+                        <p className="text-xs text-slate-300">{t.form.layersEmpty}</p>
                       ) : (
                         <div className="flex flex-wrap gap-2">
                           {layerTokens.map((item) => (
@@ -947,19 +1074,19 @@ const submitInspection = async () => {
 
                   <div className="space-y-2 rounded-2xl border border-white/10 bg-white/5 p-4">
                     <div className="flex items-center justify-between text-sm text-slate-100">
-                      <p>验收内容（当前分项使用的候选）</p>
+                      <p>{t.form.checksTitle}</p>
                       <button
                         type="button"
                         onClick={addCheckToken}
                         className="rounded-xl border border-white/20 px-3 py-2 text-xs font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/10"
                       >
-                        添加
+                        {t.form.checksAdd}
                       </button>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
                       <input
                         className="w-full rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-200/60 focus:border-emerald-300 focus:outline-none"
-                        placeholder="如：压实度/平整度"
+                        placeholder={t.form.checksPlaceholder}
                         value={checkInput}
                         onChange={(e) => setCheckInput(e.target.value)}
                       />
@@ -980,7 +1107,7 @@ const submitInspection = async () => {
                         ))}
                       </div>
                       {checkTokens.length === 0 ? (
-                        <p className="text-xs text-slate-300">暂无已选验收内容，输入后点击添加，或从上方候选中选择。</p>
+                        <p className="text-xs text-slate-300">{t.form.checksEmpty}</p>
                       ) : (
                         <div className="flex flex-wrap gap-2">
                           {checkTokens.map((item) => (
@@ -1010,13 +1137,13 @@ const submitInspection = async () => {
                     disabled={isPending}
                     className="inline-flex items-center justify-center rounded-2xl bg-emerald-300 px-5 py-3 text-sm font-semibold text-slate-900 shadow-lg shadow-emerald-400/30 transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-70"
                   >
-                    保存分项
+                    {t.form.save}
                   </button>
                   {error ? <span className="text-sm text-amber-200">{error}</span> : null}
-                  {isPending ? <span className="text-xs text-slate-200/70">正在保存...</span> : null}
+                  {isPending ? <span className="text-xs text-slate-200/70">{t.form.saving}</span> : null}
                 </div>
                 <p className="text-xs text-slate-300">
-                  说明：显示方式决定进度展示形态；设计量自动按区间或单体数量统计，延米类双侧会叠加左右长度。
+                  {t.note.measure}
                 </p>
               </form>
             </div>
@@ -1036,8 +1163,10 @@ const submitInspection = async () => {
           <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-slate-900/95 p-6 shadow-2xl shadow-slate-950/40 backdrop-blur">
             <div className="flex items-start justify-between gap-4">
               <div className="space-y-1">
-                <p className="text-lg font-semibold text-slate-50">删除分项</p>
-                <p className="text-sm font-semibold text-slate-100">确定删除「{deleteTarget.name}」？</p>
+                <p className="text-lg font-semibold text-slate-50">{t.delete.title}</p>
+                <p className="text-sm font-semibold text-slate-100">
+                  {formatProgressCopy(t.delete.confirm, { name: deleteTarget.name })}
+                </p>
               </div>
               <button
                 type="button"
@@ -1046,17 +1175,17 @@ const submitInspection = async () => {
                   if (deletingId) return
                   resetDeleteState()
                 }}
-                aria-label="关闭删除确认"
+                aria-label={t.delete.close}
               >
                 ×
               </button>
             </div>
             <div className="mt-4 space-y-2 rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-slate-200">
-              <p>删除后会产生以下影响：</p>
+              <p>{t.delete.impactTitle}</p>
               <ul className="space-y-1">
-                <li>• 关联的区间与报检记录一并移除，无法恢复。</li>
-                <li>• 仅影响当前分项，不改动其他分项。</li>
-                <li>• 请确认已导出或备份必要数据。</li>
+                {t.delete.impactList.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
               </ul>
             </div>
             {deleteError ? <p className="mt-3 text-sm text-amber-200">{deleteError}</p> : null}
@@ -1070,7 +1199,7 @@ const submitInspection = async () => {
                 }}
                 disabled={Boolean(deletingId)}
               >
-                取消
+                {t.delete.cancel}
               </button>
               <button
                 type="button"
@@ -1078,7 +1207,7 @@ const submitInspection = async () => {
                 onClick={confirmDelete}
                 disabled={deletingId === deleteTarget.id}
               >
-                {deletingId === deleteTarget.id ? '正在删除...' : '确认删除'}
+                {deletingId === deleteTarget.id ? t.delete.confirming : t.delete.confirm}
               </button>
             </div>
           </div>
@@ -1087,14 +1216,14 @@ const submitInspection = async () => {
 
       <section className="space-y-6 rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur">
         <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-200">
-          已有分项（白色=未验收，可点击预约报检）
+          {t.list.legend}
           <span className="h-px w-12 bg-white/30" />
-          灰=非设计 白=未验收
+          {t.list.legendNote}
         </div>
 
         {phases.length === 0 ? (
           <div className="rounded-3xl border border-dashed border-white/15 bg-white/5 p-6 text-sm text-slate-200/80">
-            暂无分项，添加后将显示在此处。
+            {t.list.empty}
           </div>
         ) : (
           <div className="space-y-6">
@@ -1112,14 +1241,16 @@ const submitInspection = async () => {
                       <h3 className="text-xl font-semibold text-slate-50">{phase.name}</h3>
                       <span className="rounded-full bg-white/10 px-3 py-1 text-[11px] font-semibold text-slate-100">
                         {phase.measure === 'POINT'
-                          ? `单体 · 设计量 ${phase.designLength} 个`
-                          : `延米 · 设计量 ${phase.designLength} m`}
+                          ? formatProgressCopy(t.card.measurePoint, { value: phase.designLength })
+                          : formatProgressCopy(t.card.measureLinear, { value: phase.designLength })}
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
                       {phase.measure === 'LINEAR' && linear ? (
                         <span className="text-sm font-semibold text-emerald-200">
-                          已完成 {calcCombinedPercent(linear.view.left.segments, linear.view.right.segments)}%
+                          {formatProgressCopy(t.card.completed, {
+                            percent: calcCombinedPercent(linear.view.left.segments, linear.view.right.segments),
+                          })}
                         </span>
                       ) : null}
                       {canManage ? (
@@ -1129,7 +1260,7 @@ const submitInspection = async () => {
                             className="rounded-xl border border-white/15 px-3 py-2 text-[11px] font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/10"
                             onClick={() => startEdit(phase)}
                           >
-                            编辑分项
+                            {t.card.edit}
                           </button>
                           <button
                             type="button"
@@ -1137,7 +1268,7 @@ const submitInspection = async () => {
                             onClick={() => handleDelete(phase)}
                             disabled={deletingId === phase.id}
                           >
-                            {deletingId === phase.id ? '删除中...' : '删除分项'}
+                            {deletingId === phase.id ? t.card.deleting : t.card.delete}
                           </button>
                         </>
                       ) : null}
@@ -1166,21 +1297,22 @@ const submitInspection = async () => {
                                     type="button"
                                     className={`${statusTone[seg.status]} flex h-full items-center justify-center text-[10px] font-semibold transition hover:opacity-90`}
                                     style={{ width: `${width}%` }}
-                                    title={`${side.label} ${formatPK(seg.start)} ~ ${formatPK(seg.end)} · ${seg.status}`}
+                                    title={`${side.label} ${formatPK(seg.start)} ~ ${formatPK(seg.end)} · ${statusLabel(seg.status)}`}
                                     onClick={() => {
-                                      if (seg.status === '未验收') {
+                                      if (seg.status === 'pending') {
                                         if (!canInspect) {
-                                          alert('缺少报检权限')
+                                          alert(t.alerts.noInspectPermission)
                                           return
                                         }
                                         const sideLabel = side.label
+                                        const sideValue = sideLabel === sideLabelMap.LEFT ? 'LEFT' : 'RIGHT'
                                         setSelectedSegment({
                                           phase: phase.name,
                                           phaseId: phase.id,
                                           measure: phase.measure,
                                           layers: phase.resolvedLayers,
                                           checks: phase.resolvedChecks,
-                                          side: sideLabel === '左侧' ? 'LEFT' : 'RIGHT',
+                                          side: sideValue,
                                           sideLabel,
                                           start: seg.start,
                                           end: seg.end,
@@ -1203,61 +1335,150 @@ const submitInspection = async () => {
 
                   {phase.measure === 'POINT' && point ? (
                     <div className="mt-4 space-y-3">
-                      <div className="relative mt-2 h-28 rounded-2xl border border-white/10 bg-slate-900/60 px-4 py-5 shadow-inner shadow-slate-900/40">
-                        <div className="absolute left-6 right-6 top-1/2 h-1 -translate-y-1/2 rounded-full bg-gradient-to-r from-slate-800 via-slate-900 to-slate-800" />
-                        <div className="relative flex h-full items-center justify-between">
-                          {point.view.points.map((item, idx) => {
-                            const position = Math.min(
-                              100,
-                              Math.max(0, Math.round((item.startPk / point.view.total) * 100)),
-                            )
-                            return (
-                              <button
-                                key={`${item.startPk}-${idx}`}
-                                type="button"
-                                className="absolute top-1/2 flex -translate-y-1/2 flex-col items-center gap-1 text-center transition hover:scale-105"
-                                style={{ left: `${position}%`, transform: 'translate(-50%, -50%)' }}
-                                onClick={() => {
-                                  if (!canInspect) {
-                                    alert('缺少报检权限')
-                                    return
-                                  }
-                                  const sideLabel =
-                                    item.side === 'LEFT'
-                                      ? '左侧'
-                                      : item.side === 'RIGHT'
-                                        ? '右侧'
-                                        : '双侧'
-                                  setSelectedSegment({
-                                    phase: phase.name,
-                                    phaseId: phase.id,
-                                    measure: phase.measure,
-                                    layers: phase.resolvedLayers,
-                                    checks: phase.resolvedChecks,
-                                    side: item.side,
-                                    sideLabel,
-                                    start: item.startPk,
-                                    end: item.endPk,
-                                  })
-                                }}
-                              >
-                                <div
-                                  className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-950 text-xs font-semibold text-white shadow-lg shadow-emerald-400/25 ring-2 ring-white/20"
-                                  title={`${formatPK(item.startPk)} · ${item.side === 'LEFT' ? '左侧' : item.side === 'RIGHT' ? '右侧' : '双侧'}`}
-                                >
-                                  {item.side === 'BOTH' ? '双侧' : item.side === 'LEFT' ? '左侧' : '右侧'}
+                      {phase.pointHasSides ? (
+                        <div className="space-y-3">
+                          {[{ side: 'LEFT' as const, label: sideLabelMap.LEFT }, { side: 'RIGHT' as const, label: sideLabelMap.RIGHT }].map(
+                            (row) => {
+                              const rowPoints = point.view.points.filter(
+                                (p) => p.side === row.side || p.side === 'BOTH',
+                              )
+                              return (
+                                <div key={row.side} className="space-y-2">
+                                  <div className="flex items-center justify-between text-xs text-slate-200/80">
+                                    <span className="rounded-full bg-white/10 px-2 py-1 text-[11px] font-semibold">
+                                      {row.label}
+                                    </span>
+                                    <span className="text-slate-300">
+                                      {formatPK(0)} – {formatPK(point.view.total)}
+                                    </span>
+                                  </div>
+                                  <div className="relative h-24 rounded-2xl border border-white/10 bg-slate-900/60 px-4 py-5 shadow-inner shadow-slate-900/40">
+                                    <div className="absolute left-6 right-6 top-1/2 h-1 -translate-y-1/2 rounded-full bg-gradient-to-r from-slate-800 via-slate-900 to-slate-800" />
+                                    <div className="relative flex h-full items-center justify-between">
+                                      {rowPoints.map((item, idx) => {
+                                        const position = Math.min(
+                                          100,
+                                          Math.max(0, Math.round((item.startPk / point.view.total) * 100)),
+                                        )
+                                        return (
+                                          <button
+                                            key={`${item.startPk}-${idx}-${row.side}`}
+                                            type="button"
+                                            className="absolute top-1/2 flex -translate-y-1/2 flex-col items-center gap-1 text-center transition hover:scale-105"
+                                            style={{ left: `${position}%`, transform: 'translate(-50%, -50%)' }}
+                                            onClick={() => {
+                                              if (!canInspect) {
+                                                alert(t.alerts.noInspectPermission)
+                                                return
+                                              }
+                                              const sideLabel = sideLabelMap[item.side]
+                                              setSelectedSegment({
+                                                phase: phase.name,
+                                                phaseId: phase.id,
+                                                measure: phase.measure,
+                                                layers: phase.resolvedLayers,
+                                                checks: phase.resolvedChecks,
+                                                side: item.side,
+                                                sideLabel,
+                                                start: item.startPk,
+                                                end: item.endPk,
+                                              })
+                                            }}
+                                          >
+                                            <div
+                                              className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-950 text-xs font-semibold text-white shadow-lg shadow-emerald-400/25 ring-2 ring-white/20"
+                                              title={`${formatPK(item.startPk)} · ${
+                                                item.side === 'LEFT'
+                                                  ? sideLabelMap.LEFT
+                                                  : item.side === 'RIGHT'
+                                                    ? sideLabelMap.RIGHT
+                                                    : sideLabelMap.BOTH
+                                              }`}
+                                            >
+                                              {resolvePointBadge(phase.id, item.startPk)}
+                                            </div>
+                                            <div className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-semibold text-slate-200">
+                                              {formatPK(item.startPk)}
+                                            </div>
+                                            <p className="text-[10px] text-slate-300">
+                                              {item.side === 'BOTH'
+                                                ? sideLabelMap.BOTH
+                                                : item.side === 'LEFT'
+                                                  ? sideLabelMap.LEFT
+                                                  : sideLabelMap.RIGHT}
+                                            </p>
+                                          </button>
+                                        )
+                                      })}
+                                    </div>
+                                  </div>
                                 </div>
-                                <div className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-semibold text-slate-200">
-                                  {formatPK(item.startPk)}
+                              )
+                            },
+                          )}
+                        </div>
+                      ) : (
+                        <div className="relative mt-2 h-28 rounded-2xl border border-white/10 bg-slate-900/60 px-4 py-5 shadow-inner shadow-slate-900/40">
+                          <div className="absolute left-6 right-6 top-1/2 h-1 -translate-y-1/2 rounded-full bg-gradient-to-r from-slate-800 via-slate-900 to-slate-800" />
+                          <div className="relative flex h-full items-center justify-between">
+                            {point.view.points.map((item, idx) => {
+                              const position = Math.min(
+                                100,
+                                Math.max(0, Math.round((item.startPk / point.view.total) * 100)),
+                              )
+                              return (
+                                <button
+                                  key={`${item.startPk}-${idx}`}
+                                  type="button"
+                                  className="absolute top-1/2 flex -translate-y-1/2 flex-col items-center gap-1 text-center transition hover:scale-105"
+                                  style={{ left: `${position}%`, transform: 'translate(-50%, -50%)' }}
+                                  onClick={() => {
+                                    if (!canInspect) {
+                                      alert(t.alerts.noInspectPermission)
+                                      return
+                                    }
+                                    const sideLabel = sideLabelMap[item.side]
+                                    setSelectedSegment({
+                                      phase: phase.name,
+                                      phaseId: phase.id,
+                                      measure: phase.measure,
+                                      layers: phase.resolvedLayers,
+                                      checks: phase.resolvedChecks,
+                                      side: item.side,
+                                      sideLabel,
+                                      start: item.startPk,
+                                      end: item.endPk,
+                                    })
+                                  }}
+                                >
+                                  <div
+                                    className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-950 text-xs font-semibold text-white shadow-lg shadow-emerald-400/25 ring-2 ring-white/20"
+                                    title={`${formatPK(item.startPk)} · ${
+                                      item.side === 'LEFT'
+                                        ? sideLabelMap.LEFT
+                                        : item.side === 'RIGHT'
+                                          ? sideLabelMap.RIGHT
+                                          : sideLabelMap.BOTH
+                                    }`}
+                                  >
+                                    {resolvePointBadge(phase.id, item.startPk)}
+                                  </div>
+                                  <div className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-semibold text-slate-200">
+                                    {formatPK(item.startPk)}
                                   </div>
                                   <p className="text-[10px] text-slate-300">
-                                    {item.side === 'BOTH' ? '双侧' : item.side === 'LEFT' ? '左侧' : '右侧'}
+                                    {item.side === 'BOTH'
+                                      ? sideLabelMap.BOTH
+                                      : item.side === 'LEFT'
+                                        ? sideLabelMap.LEFT
+                                        : sideLabelMap.RIGHT}
                                   </p>
                                 </button>
                               )
                             })}
                           </div>
                         </div>
+                      )}
                     </div>
                   ) : null}
                 </div>
@@ -1271,11 +1492,11 @@ const submitInspection = async () => {
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/80 px-4 py-6 backdrop-blur sm:items-center sm:py-10">
           <div className="relative flex w-full max-w-3xl flex-col overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-b from-slate-900 to-slate-950 shadow-2xl shadow-slate-900/70 max-h-[calc(100vh-2rem)] sm:max-h-[calc(100vh-4rem)]">
             <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-300 via-cyan-300 to-blue-400" />
-            <div className="flex flex-wrap items-center justify-between gap-3 px-6 pt-5">
-              <div className="flex flex-wrap items-center gap-2 text-sm text-slate-100">
-                <span className="inline-flex items-center rounded-full bg-emerald-300/15 px-3 py-1.5 text-base font-semibold uppercase tracking-[0.2em] text-emerald-100 ring-1 ring-emerald-300/40">
-                  预约报检
-                </span>
+              <div className="flex flex-wrap items-center justify-between gap-3 px-6 pt-5">
+                <div className="flex flex-wrap items-center gap-2 text-sm text-slate-100">
+                  <span className="inline-flex items-center rounded-full bg-emerald-300/15 px-3 py-1.5 text-base font-semibold uppercase tracking-[0.2em] text-emerald-100 ring-1 ring-emerald-300/40">
+                    {t.inspection.title}
+                  </span>
                 <span className="rounded-full bg-white/5 px-3 py-1 text-xs font-semibold text-slate-100 ring-1 ring-white/10">
                   {selectedSegment.phase}
                 </span>
@@ -1290,7 +1511,7 @@ const submitInspection = async () => {
                 type="button"
                 className="rounded-full border border-white/20 px-3 py-1 text-xs font-semibold text-slate-200 transition hover:border-white/40 hover:bg-white/5"
                 onClick={() => setSelectedSegment(null)}
-                aria-label="关闭"
+                aria-label={t.delete.close}
               >
                 ×
               </button>
@@ -1301,43 +1522,53 @@ const submitInspection = async () => {
                 <div className="lg:col-span-5 space-y-4">
                   <div className="grid gap-3 md:grid-cols-3">
                     <label className="flex flex-col gap-1 text-xs text-slate-200">
-                      <span className="font-semibold">侧别</span>
+                      <span className="font-semibold">{t.inspection.sideLabel}</span>
                       <select
                         className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 shadow-inner shadow-slate-900/40 focus:border-emerald-300 focus:outline-none"
                         value={selectedSide}
                         onChange={(e) => setSelectedSide(e.target.value as IntervalSide)}
                       >
-                        <option value="LEFT">左侧</option>
-                        <option value="RIGHT">右侧</option>
-                        <option value="BOTH">双侧</option>
+                        <option value="LEFT">{t.inspection.sideLeft}</option>
+                        <option value="RIGHT">{t.inspection.sideRight}</option>
+                        <option value="BOTH">{t.inspection.sideBoth}</option>
                       </select>
                     </label>
                     <label className="flex flex-col gap-1 text-xs text-slate-200">
-                      <span className="font-semibold">起点</span>
+                      <span className="font-semibold">{t.inspection.startLabel}</span>
                     <input
                       type="number"
                       className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 shadow-inner shadow-slate-900/40 focus:border-emerald-300 focus:outline-none"
                       value={startPkInput}
                       onChange={(e) => setStartPkInput(e.target.value)}
-                      placeholder="输入起点 PK"
+                      placeholder={t.inspection.startPlaceholder}
                     />
                   </label>
                   <label className="flex flex-col gap-1 text-xs text-slate-200">
-                    <span className="font-semibold">终点</span>
+                    <span className="font-semibold">{t.inspection.endLabel}</span>
                     <input
                       type="number"
                       className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 shadow-inner shadow-slate-900/40 focus:border-emerald-300 focus:outline-none"
                       value={endPkInput}
                       onChange={(e) => setEndPkInput(e.target.value)}
-                      placeholder="输入终点 PK"
+                      placeholder={t.inspection.endPlaceholder}
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1 text-xs text-slate-200">
+                    <span className="font-semibold">{t.inspection.appointmentLabel}</span>
+                    <input
+                      type="date"
+                      className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 shadow-inner shadow-slate-900/40 focus:border-emerald-300 focus:outline-none"
+                      value={appointmentDateInput}
+                      onChange={(e) => setAppointmentDateInput(e.target.value)}
+                      placeholder={t.inspection.appointmentPlaceholder}
                     />
                   </label>
                   </div>
 
                   <div className="space-y-2 rounded-2xl border border-white/10 bg-white/5 p-4 shadow-inner shadow-slate-900/30">
-                    <p className="text-xs font-semibold text-slate-200">层次（多选）</p>
+                    <p className="text-xs font-semibold text-slate-200">{t.inspection.layersLabel}</p>
                     {selectedSegment.layers.length === 0 ? (
-                      <p className="text-[11px] text-amber-200">暂无层次，请先在分项维护中添加。</p>
+                      <p className="text-[11px] text-amber-200">{t.inspection.layersEmpty}</p>
                     ) : (
                       <div className="flex flex-wrap gap-2">
                         {selectedSegment.layers.map((item) => (
@@ -1359,9 +1590,9 @@ const submitInspection = async () => {
                   </div>
 
                   <div className="space-y-2 rounded-2xl border border-white/10 bg-white/5 p-4 shadow-inner shadow-slate-900/30">
-                    <p className="text-xs font-semibold text-slate-200">验收内容（多选，可临时添加）</p>
+                    <p className="text-xs font-semibold text-slate-200">{t.inspection.checksLabel}</p>
                     {selectedSegment.checks.length === 0 ? (
-                      <p className="text-[11px] text-amber-200">暂无验收内容，请在分项维护中添加或临时新增。</p>
+                      <p className="text-[11px] text-amber-200">{t.inspection.checksEmpty}</p>
                     ) : (
                       <div className="flex flex-wrap gap-2">
                         {selectedSegment.checks.map((item) => (
@@ -1383,7 +1614,7 @@ const submitInspection = async () => {
                     <div className="flex items-center gap-2">
                       <input
                         className="flex-1 min-w-0 rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-200/60 shadow-inner shadow-slate-900/40 focus:border-emerald-300 focus:outline-none"
-                        placeholder="临时新增验收内容"
+                        placeholder={t.inspection.checkPlaceholder}
                         value={inspectionCheckInput}
                         onChange={(e) => setInspectionCheckInput(e.target.value)}
                       />
@@ -1400,13 +1631,13 @@ const submitInspection = async () => {
                           }
                         }}
                       >
-                        添加
+                        {t.form.checksAdd}
                       </button>
                     </div>
                   </div>
 
                   <div className="space-y-2 rounded-2xl border border-white/10 bg-white/5 p-4 shadow-inner shadow-slate-900/30">
-                    <p className="text-xs font-semibold text-slate-200">验收类型（多选）</p>
+                    <p className="text-xs font-semibold text-slate-200">{t.inspection.typesLabel}</p>
                     <div className="flex flex-wrap gap-2">
                       {inspectionTypes.map((item) => (
                         <button
@@ -1424,6 +1655,16 @@ const submitInspection = async () => {
                       ))}
                     </div>
                   </div>
+
+                  <div className="space-y-2 rounded-2xl border border-white/10 bg-white/5 p-4 shadow-inner shadow-slate-900/30">
+                    <p className="text-xs font-semibold text-slate-200">{t.inspection.remarkLabel}</p>
+                    <textarea
+                      className="h-20 w-full rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 shadow-inner shadow-slate-900/40 placeholder:text-slate-200/60 focus:border-emerald-300 focus:outline-none"
+                      value={remark}
+                      onChange={(e) => setRemark(e.target.value)}
+                      placeholder={t.inspection.remarkPlaceholder}
+                    />
+                  </div>
                 </div>
               </div>
             </div>
@@ -1431,9 +1672,7 @@ const submitInspection = async () => {
             <div className="border-t border-white/10 bg-slate-900/60 px-6 py-5">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-[11px] text-slate-300">
-                  {submitError
-                    ? submitError
-                    : '提示：若区间与侧别与上方段落一致，可直接提交；否则请修改起讫点或侧别。'}
+                  {submitError ? submitError : t.inspection.typesHint}
                 </p>
                 <div className="grid w-full gap-3 sm:w-auto sm:min-w-[320px] sm:grid-cols-2">
                   <button
@@ -1444,7 +1683,7 @@ const submitInspection = async () => {
                       resetInspectionForm()
                     }}
                   >
-                    取消
+                    {t.inspection.cancel}
                   </button>
                   <button
                     type="button"
@@ -1452,7 +1691,7 @@ const submitInspection = async () => {
                     disabled={submitPending}
                     onClick={submitInspection}
                   >
-                    {submitPending ? '提交中...' : '提交报检'}
+                    {submitPending ? t.inspection.submitting : t.inspection.submit}
                   </button>
                 </div>
               </div>

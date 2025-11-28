@@ -1,5 +1,4 @@
-import type { Prisma } from '@prisma/client'
-import { InspectionStatus, IntervalSide } from '@prisma/client'
+import { InspectionStatus, IntervalSide, Prisma } from '@prisma/client'
 
 import type {
   InspectionDTO,
@@ -21,7 +20,9 @@ const normalizeRange = (start: number, end: number) => {
 }
 
 const mapInspection = (
-  row: Prisma.InspectionRequestGetPayload<{ include: { creator: true } }>,
+  row: Prisma.InspectionRequestGetPayload<{
+    include: { creator: true; submitter: true; updater: true }
+  }>,
 ): InspectionDTO => ({
   id: row.id,
   roadId: row.roadId,
@@ -34,14 +35,18 @@ const mapInspection = (
   types: row.types,
   remark: row.remark ?? undefined,
   status: row.status,
+  appointmentDate: row.appointmentDate?.toISOString(),
+  submittedAt: row.submittedAt.toISOString(),
+  submittedBy: row.submitter ? { id: row.submitter.id, username: row.submitter.username } : null,
   createdAt: row.createdAt.toISOString(),
   updatedAt: row.updatedAt.toISOString(),
   createdBy: row.creator ? { id: row.creator.id, username: row.creator.username } : null,
+  updatedBy: row.updater ? { id: row.updater.id, username: row.updater.username } : null,
 })
 
 const mapInspectionListItem = (
   row: Prisma.InspectionRequestGetPayload<{
-    include: { road: true; phase: true; creator: true }
+    include: { road: true; phase: true; creator: true; submitter: true; updater: true }
   }>,
 ): InspectionListItem => ({
   id: row.id,
@@ -58,9 +63,13 @@ const mapInspectionListItem = (
   types: row.types,
   status: row.status,
   remark: row.remark ?? undefined,
+  appointmentDate: row.appointmentDate?.toISOString(),
+  submittedAt: row.submittedAt.toISOString(),
+  submittedBy: row.submitter ? { id: row.submitter.id, username: row.submitter.username } : null,
   createdBy: row.creator ? { id: row.creator.id, username: row.creator.username } : null,
   createdAt: row.createdAt.toISOString(),
   updatedAt: row.updatedAt.toISOString(),
+  updatedBy: row.updater ? { id: row.updater.id, username: row.updater.username } : null,
 })
 
 export const listInspections = async (filter: InspectionFilter): Promise<InspectionListResponse> => {
@@ -106,7 +115,7 @@ export const listInspections = async (filter: InspectionFilter): Promise<Inspect
     prisma.inspectionRequest.count({ where }),
     prisma.inspectionRequest.findMany({
       where,
-      include: { road: true, phase: true, creator: true },
+      include: { road: true, phase: true, creator: true, submitter: true, updater: true },
       orderBy: { [sortField]: sortOrder },
       skip,
       take: pageSize,
@@ -139,6 +148,7 @@ export const createInspection = async (
 
   const side = normalizeSide(payload.side)
   const range = normalizeRange(payload.startPk, payload.endPk)
+  const appointmentDate = payload.appointmentDate ? new Date(payload.appointmentDate) : null
 
   const inspection = await prisma.inspectionRequest.create({
     data: {
@@ -152,10 +162,105 @@ export const createInspection = async (
       types: payload.types,
       remark: payload.remark,
       status: InspectionStatus.IN_PROGRESS,
+      appointmentDate: appointmentDate ?? undefined,
+      submittedAt: new Date(),
+      submittedBy: userId ?? undefined,
       createdBy: userId ?? undefined,
+      updatedBy: userId ?? undefined,
     },
-    include: { creator: true },
+    include: { creator: true, submitter: true, updater: true },
   })
 
   return mapInspection(inspection)
+}
+
+export const updateInspection = async (
+  id: number,
+  payload: InspectionPayload,
+  userId: number | null,
+): Promise<InspectionListItem> => {
+  if (!payload.layers || payload.layers.length === 0) {
+    throw new Error('请选择至少一个层次')
+  }
+  if (!payload.checks || payload.checks.length === 0) {
+    throw new Error('请选择至少一个验收内容')
+  }
+  if (!payload.types || payload.types.length === 0) {
+    throw new Error('请选择至少一个验收类型')
+  }
+
+  const existing = await prisma.inspectionRequest.findUnique({
+    where: { id },
+    include: { road: true },
+  })
+  if (!existing) {
+    throw new Error('报检记录不存在或已删除')
+  }
+
+  const phase = await prisma.roadPhase.findFirst({
+    where: { id: payload.phaseId, roadId: existing.roadId },
+  })
+  if (!phase) {
+    throw new Error('分项不存在或不属于当前路段')
+  }
+
+  const side = normalizeSide(payload.side)
+  const range = normalizeRange(payload.startPk, payload.endPk)
+  const appointmentDate = payload.appointmentDate ? new Date(payload.appointmentDate) : null
+
+  const inspection = await prisma.inspectionRequest.update({
+    where: { id },
+    data: {
+      phaseId: phase.id,
+      side: side as IntervalSide,
+      startPk: range.startPk,
+      endPk: range.endPk,
+      layers: payload.layers,
+      checks: payload.checks,
+      types: payload.types,
+      remark: payload.remark,
+      appointmentDate: appointmentDate ?? undefined,
+      updatedBy: userId ?? undefined,
+    },
+    include: { road: true, phase: true, creator: true, submitter: true, updater: true },
+  })
+
+  return mapInspectionListItem(inspection)
+}
+
+export const deleteInspection = async (id: number) => {
+  const existing = await prisma.inspectionRequest.findUnique({ where: { id } })
+  if (!existing) {
+    throw new Error('报检记录不存在或已删除')
+  }
+  await prisma.inspectionRequest.delete({ where: { id } })
+}
+
+export const updateInspectionStatuses = async (
+  ids: Array<number | string>,
+  status: InspectionStatus,
+  userId: number | null,
+): Promise<InspectionListItem[]> => {
+  const uniqueIds = Array.from(new Set(ids.map((id) => Number(id)).filter((id) => Number.isFinite(id) && id > 0)))
+  if (uniqueIds.length === 0) {
+    throw new Error('请选择需要更新的报检记录')
+  }
+
+  try {
+    const updates = await prisma.$transaction(
+      uniqueIds.map((id) =>
+        prisma.inspectionRequest.update({
+          where: { id },
+          data: { status, updatedBy: userId ?? undefined },
+          include: { road: true, phase: true, creator: true, submitter: true, updater: true },
+        }),
+      ),
+    )
+    return updates.map(mapInspectionListItem)
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+      throw new Error('部分报检记录不存在或已删除')
+    }
+    throw error
+  }
 }
