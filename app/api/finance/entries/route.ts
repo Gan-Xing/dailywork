@@ -12,8 +12,13 @@ export async function GET(request: Request) {
   const filters = parseFinanceFilters(searchParams)
 
   try {
-    const entries = await listFinanceEntries(filters)
-    return NextResponse.json({ entries })
+    const result = await listFinanceEntries(filters)
+    return NextResponse.json({
+      entries: result.items,
+      total: result.total,
+      page: result.page,
+      pageSize: result.pageSize,
+    })
   } catch (error) {
     return NextResponse.json({ message: (error as Error).message }, { status: 500 })
   }

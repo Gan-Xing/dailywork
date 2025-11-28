@@ -17,6 +17,8 @@ export const parseFinanceFilters = (searchParams: URLSearchParams): FinanceEntry
   const handlerIds = toNumberArray(searchParams.getAll('handlerId'))
   const amountMin = toNumber(searchParams.get('amountMin'))
   const amountMax = toNumber(searchParams.get('amountMax'))
+  const page = toNumber(searchParams.get('page'))
+  const pageSize = toNumber(searchParams.get('pageSize'))
   const dateFrom = searchParams.get('dateFrom') || undefined
   const dateTo = searchParams.get('dateTo') || undefined
   const categoryKeys = searchParams
@@ -25,6 +27,8 @@ export const parseFinanceFilters = (searchParams: URLSearchParams): FinanceEntry
     .filter(Boolean)
   const reasonKeyword = searchParams.get('reasonKeyword')?.trim() || undefined
   const includeDeleted = searchParams.get('includeDeleted') === 'true'
+  const sortField = (searchParams.get('sortField') as FinanceEntryFilterOptions['sortField']) || undefined
+  const sortDir = (searchParams.get('sortDir') as FinanceEntryFilterOptions['sortDir']) || undefined
 
   return {
     projectIds: projectIds.length ? projectIds : undefined,
@@ -32,10 +36,14 @@ export const parseFinanceFilters = (searchParams: URLSearchParams): FinanceEntry
     handlerIds: handlerIds.length ? handlerIds : undefined,
     amountMin,
     amountMax,
+    page: page && page > 0 ? page : undefined,
+    pageSize: pageSize && pageSize > 0 ? pageSize : undefined,
     dateFrom,
     dateTo,
     categoryKeys: categoryKeys.length ? categoryKeys : undefined,
     reasonKeyword,
     includeDeleted,
+    sortField,
+    sortDir,
   }
 }

@@ -86,6 +86,10 @@ export type FinanceEntryFilterOptions = {
   amountMax?: number
   dateFrom?: string
   dateTo?: string
+  page?: number
+  pageSize?: number
+  sortField?: 'paymentDate' | 'amount' | 'category' | 'updatedAt'
+  sortDir?: 'asc' | 'desc'
   includeDeleted?: boolean
 }
 
@@ -336,14 +340,43 @@ const buildEntryWhere = (options: FinanceEntryFilterOptions): Prisma.FinanceEntr
   return where
 }
 
-export const listFinanceEntries = async (options: FinanceEntryFilterOptions) => {
+const buildEntryOrderBy = (options: FinanceEntryFilterOptions) => {
+  const direction = options.sortDir === 'asc' ? 'asc' : 'desc'
+  switch (options.sortField) {
+    case 'amount':
+      return [{ amount: direction }, { paymentDate: 'desc' as const }, { id: 'desc' as const }]
+    case 'category':
+      return [{ categoryKey: direction }, { paymentDate: 'desc' as const }, { id: 'desc' as const }]
+    case 'updatedAt':
+      return [{ updatedAt: direction }, { id: 'desc' as const }]
+    case 'paymentDate':
+    default:
+      return [{ paymentDate: direction }, { id: 'desc' as const }]
+  }
+}
+
+export type FinanceEntryListResult = {
+  items: FinanceEntryDTO[]
+  total: number
+  page: number
+  pageSize: number
+}
+
+export const listFinanceEntries = async (options: FinanceEntryFilterOptions): Promise<FinanceEntryListResult> => {
   assertFinanceModels()
   const where = buildEntryWhere(options)
+  const page = Math.max(1, options.page ?? 1)
+  const pageSize = Math.max(1, Math.min(options.pageSize ?? 50, 200))
+  const skip = (page - 1) * pageSize
+  const orderBy = buildEntryOrderBy(options)
 
-  const [entries, categories] = await Promise.all([
+  const [total, entries, categories] = await prisma.$transaction([
+    prisma.financeEntry.count({ where }),
     prisma.financeEntry.findMany({
       where,
-      orderBy: [{ paymentDate: 'desc' }, { id: 'desc' }],
+      orderBy,
+      skip,
+      take: pageSize,
       include: {
         project: true,
         unit: true,
@@ -372,35 +405,40 @@ export const listFinanceEntries = async (options: FinanceEntryFilterOptions) => 
       .filter((item): item is { key: string; label: string } => Boolean(item))
   }
 
-  return entries.map<FinanceEntryDTO>((entry) => ({
-    id: entry.id,
-    sequence: entry.sequence,
-    projectId: entry.projectId,
-    projectName: entry.project.name,
-    reason: entry.reason,
-    categoryKey: entry.categoryKey,
-    categoryPath: buildPath(entry.categoryKey),
-    amount: new Prisma.Decimal(entry.amount).toNumber(),
-    unitId: entry.unitId,
-    unitName: entry.unit.name,
-    paymentTypeId: entry.paymentTypeId,
-    paymentTypeName: entry.paymentType.name,
-    paymentDate: entry.paymentDate.toISOString(),
-    handlerId: entry.handlerId ?? null,
-    handlerName: entry.handler?.name ?? null,
-    handlerUsername: entry.handler?.username ?? null,
-    tva: toNumber(entry.tva),
-    remark: entry.remark,
-    isDeleted: entry.isDeleted,
-    createdAt: entry.createdAt.toISOString(),
-    updatedAt: entry.updatedAt.toISOString(),
-    createdById: entry.createdBy ?? null,
-    createdByName: entry.creator?.name ?? null,
-    createdByUsername: entry.creator?.username ?? null,
-    updatedById: entry.updatedBy ?? null,
-    updatedByName: entry.updater?.name ?? null,
-    updatedByUsername: entry.updater?.username ?? null,
-  }))
+  return {
+    items: entries.map<FinanceEntryDTO>((entry) => ({
+      id: entry.id,
+      sequence: entry.sequence,
+      projectId: entry.projectId,
+      projectName: entry.project.name,
+      reason: entry.reason,
+      categoryKey: entry.categoryKey,
+      categoryPath: buildPath(entry.categoryKey),
+      amount: new Prisma.Decimal(entry.amount).toNumber(),
+      unitId: entry.unitId,
+      unitName: entry.unit.name,
+      paymentTypeId: entry.paymentTypeId,
+      paymentTypeName: entry.paymentType.name,
+      paymentDate: entry.paymentDate.toISOString(),
+      handlerId: entry.handlerId ?? null,
+      handlerName: entry.handler?.name ?? null,
+      handlerUsername: entry.handler?.username ?? null,
+      tva: toNumber(entry.tva),
+      remark: entry.remark,
+      isDeleted: entry.isDeleted,
+      createdAt: entry.createdAt.toISOString(),
+      updatedAt: entry.updatedAt.toISOString(),
+      createdById: entry.createdBy ?? null,
+      createdByName: entry.creator?.name ?? null,
+      createdByUsername: entry.creator?.username ?? null,
+      updatedById: entry.updatedBy ?? null,
+      updatedByName: entry.updater?.name ?? null,
+      updatedByUsername: entry.updater?.username ?? null,
+    })),
+    total,
+    page,
+    pageSize,
+  }
 }
 
 const assertCategoryExists = async (categoryKey: string) => {
@@ -447,25 +485,96 @@ export type FinanceInsights = {
   topCategories: { key: string; label: string; amount: number; count: number; share: number }[]
   paymentBreakdown: { id: number; name: string; amount: number; count: number; share: number }[]
   monthlyTrend: { month: string; amount: number; count: number }[]
+  categoryBreakdown: {
+    key: string
+    label: string
+    parentKey: string | null
+    parentKeys: string[]
+    amount: number
+    count: number
+    share: number
+  }[]
 }
 
 export const getFinanceInsights = async (options: FinanceEntryFilterOptions) => {
-  const entries = await listFinanceEntries(options)
-  const totalAmount = entries.reduce((sum, entry) => sum + entry.amount, 0)
-  const entryCount = entries.length
-  const averageAmount = entryCount ? Math.round((totalAmount / entryCount) * 100) / 100 : 0
-  const latestPaymentDate =
-    entries.length > 0 ? entries.reduce((latest, entry) => (entry.paymentDate > latest ? entry.paymentDate : latest), '') : null
+  const where = buildEntryWhere(options)
+  const [aggregate, categories, paymentTypes, entriesForTrend] = await Promise.all([
+    prisma.financeEntry.aggregate({
+      where,
+      _sum: { amount: true },
+      _count: true,
+      _max: { paymentDate: true },
+    }),
+    prisma.financeCategory.findMany(),
+    prisma.paymentType.findMany(),
+    prisma.financeEntry.findMany({
+      where,
+      select: { amount: true, categoryKey: true, parentKeys: true, paymentTypeId: true, paymentDate: true },
+    }),
+  ])
 
-  const topCategoryMap = new Map<string, { label: string; amount: number; count: number }>()
-  entries.forEach((entry) => {
-    const root = entry.categoryPath[0] ?? { key: entry.categoryKey, label: entry.categoryKey }
-    const existing = topCategoryMap.get(root.key)
+  const totalAmount = aggregate._sum.amount ? new Prisma.Decimal(aggregate._sum.amount).toNumber() : 0
+  const entryCount = aggregate._count || 0
+  const averageAmount = entryCount ? Math.round((totalAmount / entryCount) * 100) / 100 : 0
+  const latestPaymentDate = aggregate._max.paymentDate?.toISOString() ?? null
+
+  const categoryMap = buildCategoryMap(categories)
+  const paymentTypeMap = new Map(paymentTypes.map((pt) => [pt.id, pt.name]))
+
+  const categoryAgg = new Map<
+    string,
+    {
+      amount: number
+      count: number
+      parentKey: string | null
+      parentKeys: string[]
+      label: string
+    }
+  >()
+
+  entriesForTrend.forEach((entry) => {
+    const amount = new Prisma.Decimal(entry.amount).toNumber()
+    const catMeta = categoryMap.get(entry.categoryKey) ?? {
+      key: entry.categoryKey,
+      parentKey: null,
+      labelZh: entry.categoryKey,
+      parentKeys: entry.parentKeys ?? [],
+    }
+    const existing = categoryAgg.get(entry.categoryKey)
     if (existing) {
-      existing.amount += entry.amount
+      existing.amount += amount
       existing.count += 1
     } else {
-      topCategoryMap.set(root.key, { label: root.label, amount: entry.amount, count: 1 })
+      categoryAgg.set(entry.categoryKey, {
+        amount,
+        count: 1,
+        parentKey: catMeta.parentKey ?? null,
+        parentKeys: resolveParentKeys(categoryMap, entry.categoryKey),
+        label: catMeta.labelZh ?? entry.categoryKey,
+      })
+    }
+  })
+
+  const categoryBreakdown = Array.from(categoryAgg.entries()).map(([key, value]) => ({
+    key,
+    label: value.label,
+    parentKey: value.parentKey,
+    parentKeys: value.parentKeys,
+    amount: Math.round(value.amount * 100) / 100,
+    count: value.count,
+    share: totalAmount ? Math.round((value.amount / totalAmount) * 1000) / 10 : 0,
+  }))
+
+  const topCategoryMap = new Map<string, { label: string; amount: number; count: number }>()
+  categoryBreakdown.forEach((item) => {
+    const rootKey = item.parentKeys.length ? item.parentKeys[0] : item.key
+    const rootLabel = categoryMap.get(rootKey)?.labelZh ?? rootKey
+    const existing = topCategoryMap.get(rootKey)
+    if (existing) {
+      existing.amount += item.amount
+      existing.count += item.count
+    } else {
+      topCategoryMap.set(rootKey, { label: rootLabel, amount: item.amount, count: item.count })
     }
   })
   const topCategories = Array.from(topCategoryMap.entries())
@@ -479,17 +588,15 @@ export const getFinanceInsights = async (options: FinanceEntryFilterOptions) => 
     .sort((a, b) => b.amount - a.amount)
 
   const paymentMap = new Map<number, { name: string; amount: number; count: number }>()
-  entries.forEach((entry) => {
+  entriesForTrend.forEach((entry) => {
+    const amount = new Prisma.Decimal(entry.amount).toNumber()
+    const name = paymentTypeMap.get(entry.paymentTypeId) ?? `支付方式 ${entry.paymentTypeId}`
     const existing = paymentMap.get(entry.paymentTypeId)
     if (existing) {
-      existing.amount += entry.amount
+      existing.amount += amount
       existing.count += 1
     } else {
-      paymentMap.set(entry.paymentTypeId, {
-        name: entry.paymentTypeName,
-        amount: entry.amount,
-        count: 1,
-      })
+      paymentMap.set(entry.paymentTypeId, { name, amount, count: 1 })
     }
   })
   const paymentBreakdown = Array.from(paymentMap.entries())
@@ -503,15 +610,16 @@ export const getFinanceInsights = async (options: FinanceEntryFilterOptions) => 
     .sort((a, b) => b.amount - a.amount)
 
   const monthlyMap = new Map<string, { amount: number; count: number }>()
-  entries.forEach((entry) => {
+  entriesForTrend.forEach((entry) => {
+    const amount = new Prisma.Decimal(entry.amount).toNumber()
     const date = new Date(entry.paymentDate)
     const month = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
     const existing = monthlyMap.get(month)
     if (existing) {
-      existing.amount += entry.amount
+      existing.amount += amount
       existing.count += 1
     } else {
-      monthlyMap.set(month, { amount: entry.amount, count: 1 })
+      monthlyMap.set(month, { amount, count: 1 })
     }
   })
   const monthlyTrend = Array.from(monthlyMap.entries())
@@ -530,6 +638,7 @@ export const getFinanceInsights = async (options: FinanceEntryFilterOptions) => 
     topCategories,
     paymentBreakdown,
     monthlyTrend,
+    categoryBreakdown,
   } satisfies FinanceInsights
 }
 

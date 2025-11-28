@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
+import Link from 'next/link'
+
 import { AccessDenied } from '@/components/AccessDenied'
 
 type SessionUser = {
@@ -73,6 +75,15 @@ type FinanceInsights = {
   topCategories: { key: string; label: string; amount: number; count: number; share: number }[]
   paymentBreakdown: { id: number; name: string; amount: number; count: number; share: number }[]
   monthlyTrend: { month: string; amount: number; count: number }[]
+  categoryBreakdown: {
+    key: string
+    label: string
+    parentKey: string | null
+    parentKeys: string[]
+    amount: number
+    count: number
+    share: number
+  }[]
 }
 
 type EntryForm = {
@@ -136,6 +147,43 @@ const toggleValue = <T,>(list: T[], value: T) =>
 
 const COLUMN_STORAGE_KEY = 'finance-visible-columns'
 const defaultVisibleColumns = ['sequence', 'project', 'reason', 'amount', 'handler', 'action'] as const
+
+const SkeletonBar = ({ className }: { className?: string }) => (
+  <div className={`h-3 animate-pulse rounded-full bg-slate-200 ${className ?? ''}`} />
+)
+
+const SkeletonBlock = ({ className }: { className?: string }) => (
+  <div className={`animate-pulse rounded-xl bg-slate-100 ${className ?? ''}`} />
+)
+
+const FinanceSkeleton = () => (
+  <div className="space-y-3 rounded-lg bg-white p-4 shadow sm:p-5">
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <div>
+        <SkeletonBar className="h-4 w-32" />
+        <SkeletonBar className="mt-2 h-5 w-48" />
+      </div>
+      <SkeletonBar className="h-4 w-24" />
+    </div>
+    <div className="grid gap-3 md:grid-cols-12">
+      {[...Array(4)].map((_, idx) => (
+        <SkeletonBlock key={idx} className="h-14 rounded-lg border border-slate-100 md:col-span-3" />
+      ))}
+      <SkeletonBlock className="h-20 md:col-span-7" />
+      <SkeletonBlock className="h-20 md:col-span-5" />
+      <SkeletonBlock className="h-16 md:col-span-12" />
+    </div>
+    <div className="space-y-2 rounded-xl border border-slate-100 bg-slate-50 p-3">
+      {[...Array(6)].map((_, idx) => (
+        <div key={idx} className="grid grid-cols-12 items-center gap-3">
+          <SkeletonBar className="col-span-2 h-4" />
+          <SkeletonBar className="col-span-7 h-4" />
+          <SkeletonBar className="col-span-3 h-3" />
+        </div>
+      ))}
+    </div>
+  </div>
+)
 
 export default function FinancePage() {
   const [session, setSession] = useState<SessionUser | null>(null)
@@ -235,6 +283,8 @@ export default function FinancePage() {
   const canEdit = session?.permissions.includes('finance:edit') ?? false
   const canManage = session?.permissions.includes('finance:manage') ?? false
   const shouldShowAccessDenied = authLoaded && !canView
+  const breadcrumbHome = '首页'
+  const breadcrumbFinance = '财务记账'
 
   const categoryOptions = useMemo(
     () => (metadata ? buildCategoryOptions(metadata.categories, '') : []),
@@ -334,8 +384,8 @@ export default function FinancePage() {
     return list.sort((a, b) => a.sortOrder - b.sortOrder || a.label.localeCompare(b.label, 'zh-CN'))
   }, [metadata?.categories])
 
-const filteredEntries = useMemo(() => {
-  let result = [...entries]
+  const filteredEntries = useMemo(() => {
+    let result = [...entries]
     if (listFilters.categoryKeys.length) {
       result = result.filter((e) => e.categoryPath.some((c) => listFilters.categoryKeys.includes(c.key)))
     }
@@ -369,13 +419,16 @@ const filteredEntries = useMemo(() => {
       result = result.filter((e) => new Date(e.paymentDate).getTime() <= to)
     }
 
-  const sorters: Record<ListFilters['sortField'], (a: FinanceEntry, b: FinanceEntry) => number> = {
-    paymentDate: (a, b) => new Date(a.paymentDate).getTime() - new Date(b.paymentDate).getTime(),
-    amount: (a, b) => a.amount - b.amount,
-    category: (a, b) =>
-      a.categoryPath.map((c) => c.label).join(' / ').localeCompare(b.categoryPath.map((c) => c.label).join(' / ')),
-    updatedAt: (a, b) => new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime(),
-  }
+    const sorters: Record<ListFilters['sortField'], (a: FinanceEntry, b: FinanceEntry) => number> = {
+      paymentDate: (a, b) => new Date(a.paymentDate).getTime() - new Date(b.paymentDate).getTime(),
+      amount: (a, b) => a.amount - b.amount,
+      category: (a, b) =>
+        a.categoryPath
+          .map((c) => c.label)
+          .join(' / ')
+          .localeCompare(b.categoryPath.map((c) => c.label).join(' / ')),
+      updatedAt: (a, b) => new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime(),
+    }
     const sortFn = sorters[listFilters.sortField]
     result.sort((a, b) => {
       const val = sortFn(a, b)
@@ -430,6 +483,8 @@ const filteredEntries = useMemo(() => {
     if (filtersInput.amountMax !== '') params.set('amountMax', filtersInput.amountMax)
     if (filtersInput.dateFrom) params.set('dateFrom', filtersInput.dateFrom)
     if (filtersInput.dateTo) params.set('dateTo', filtersInput.dateTo)
+    params.set('sortField', filtersInput.sortField)
+    params.set('sortDir', filtersInput.sortDir)
     return params
   }
 
@@ -629,7 +684,6 @@ const filteredEntries = useMemo(() => {
       sortDir,
     }
     void loadEntries(currentFilters)
-    void loadInsights(currentFilters)
   }, [
     canView,
     refreshKey,
@@ -645,6 +699,38 @@ const filteredEntries = useMemo(() => {
     sortField,
     sortDir,
     loadEntries,
+  ])
+
+  useEffect(() => {
+    if (!canView) return
+    const currentFilters: ListFilters = {
+      projectIds: filtersProjectIds,
+      categoryKeys: filtersCategoryKeys,
+      paymentTypeIds: filtersPaymentTypeIds,
+      handlerIds: filtersHandlerIds,
+      reasonKeyword: filtersReasonKeyword,
+      amountMin: filtersAmountMin,
+      amountMax: filtersAmountMax,
+      dateFrom: filtersDateFrom,
+      dateTo: filtersDateTo,
+      sortField,
+      sortDir,
+    }
+    void loadInsights(currentFilters)
+  }, [
+    canView,
+    refreshKey,
+    filtersProjectIds,
+    filtersCategoryKeys,
+    filtersPaymentTypeIds,
+    filtersHandlerIds,
+    filtersReasonKeyword,
+    filtersAmountMin,
+    filtersAmountMax,
+    filtersDateFrom,
+    filtersDateTo,
+    sortField,
+    sortDir,
     loadInsights,
   ])
 
@@ -994,6 +1080,8 @@ const filteredEntries = useMemo(() => {
     }
   }
 
+  const isPriming = !authLoaded || !metadata || (!entries.length && loading) || (!insights && insightsLoading)
+
   if (shouldShowAccessDenied) {
     return (
       <AccessDenied
@@ -1005,6 +1093,18 @@ const filteredEntries = useMemo(() => {
 
   return (
     <div className="mx-auto max-w-6xl overflow-x-hidden p-4 space-y-6 sm:p-6">
+      <nav className="flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-600">
+        <Link
+          href="/"
+          className="rounded-full border border-slate-200 bg-white px-3 py-1 transition hover:bg-slate-50"
+        >
+          {breadcrumbHome}
+        </Link>
+        <span className="text-slate-400">/</span>
+        <span className="rounded-full border border-slate-100 bg-slate-50 px-3 py-1 text-slate-800">
+          {breadcrumbFinance}
+        </span>
+      </nav>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold">财务记账</h1>
@@ -1015,41 +1115,47 @@ const filteredEntries = useMemo(() => {
         </div>
       </div>
 
-      {!canView && <p className="text-red-600">缺少 finance:view 权限，无法查看财务数据。</p>}
+      {!canView && authLoaded && (
+        <p className="text-red-600">缺少 finance:view 权限，无法查看财务数据。</p>
+      )}
       {message && <p className="rounded bg-yellow-100 px-3 py-2 text-sm text-yellow-800">{message}</p>}
 
-      {canView && (
-        <div className="space-y-3 rounded-lg bg-white p-4 shadow sm:p-5 overflow-hidden">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <h2 className="text-lg font-semibold">筛选与操作</h2>
-              <p className="text-sm text-slate-600">选择范围后应用筛选并刷新列表。</p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {canManage && (
-                <button
-                  onClick={() => {
-                    resetManageForms()
-                    setShowManage(true)
-                  }}
-                  className="rounded border border-slate-300 px-3 py-2 text-sm text-slate-800 hover:bg-slate-50"
-                >
-                  主数据管理
-                </button>
-              )}
-              {canEdit && (
-                <button
-                  onClick={() => {
-                    resetForm()
-                    setShowEntryModal(true)
-                  }}
-                  className="rounded bg-emerald-600 px-3 py-2 text-sm text-white hover:bg-emerald-500"
-                >
-                  新增记录
-                </button>
-              )}
-            </div>
-          </div>
+      {canView ? (
+        isPriming ? (
+          <FinanceSkeleton />
+        ) : (
+          <>
+            <div className="space-y-3 rounded-lg bg-white p-4 shadow sm:p-5 overflow-hidden">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-semibold">筛选与操作</h2>
+                  <p className="text-sm text-slate-600">选择范围后应用筛选并刷新列表。</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {canManage && (
+                    <button
+                      onClick={() => {
+                        resetManageForms()
+                        setShowManage(true)
+                      }}
+                      className="rounded border border-slate-300 px-3 py-2 text-sm text-slate-800 hover:bg-slate-50"
+                    >
+                      主数据管理
+                    </button>
+                  )}
+                  {canEdit && (
+                    <button
+                      onClick={() => {
+                        resetForm()
+                        setShowEntryModal(true)
+                      }}
+                      className="rounded bg-emerald-600 px-3 py-2 text-sm text-white hover:bg-emerald-500"
+                    >
+                      新增记录
+                    </button>
+                  )}
+                </div>
+              </div>
           <div className="grid min-w-0 gap-3 md:grid-cols-12">
             <div className="min-w-0 md:col-span-3">
               <label className="space-y-1 text-sm">
@@ -1561,163 +1667,164 @@ const filteredEntries = useMemo(() => {
           </div>
           {loading && <p className="text-sm text-slate-600">加载中...</p>}
           {viewMode === 'table' ? (
-            <div className="overflow-auto rounded-xl border border-slate-200">
-              <table className="min-w-full text-sm">
-                <thead>
-                  <tr className="border-b text-left">
-                    {visibleColumns.includes('sequence') && <th className="px-3 py-2">序号</th>}
-                    {visibleColumns.includes('project') && <th className="px-3 py-2">项目</th>}
-                    {visibleColumns.includes('category') && (
-                      <th
-                        className="px-3 py-2 cursor-pointer select-none"
-                        onClick={() =>
-                          setListFilters((prev) => {
-                            const dir = prev.sortField === 'category' && prev.sortDir === 'asc' ? 'desc' : 'asc'
-                            setListDraft((draft) => ({ ...draft, sortField: 'category', sortDir: dir }))
-                            return { ...prev, sortField: 'category', sortDir: dir }
-                          })
-                        }
-                      >
-                        分类 {listFilters.sortField === 'category' ? (listFilters.sortDir === 'asc' ? '↑' : '↓') : ''}
-                      </th>
-                    )}
-                    {visibleColumns.includes('reason') && <th className="px-3 py-2">事由</th>}
-                    {visibleColumns.includes('amount') && (
-                      <th
-                        className="px-3 py-2 cursor-pointer select-none"
-                        onClick={() =>
-                          setListFilters((prev) => {
-                            const dir = prev.sortField === 'amount' && prev.sortDir === 'asc' ? 'desc' : 'asc'
-                            setListDraft((draft) => ({ ...draft, sortField: 'amount', sortDir: dir }))
-                            return { ...prev, sortField: 'amount', sortDir: dir }
-                          })
-                        }
-                      >
-                        金额 {listFilters.sortField === 'amount' ? (listFilters.sortDir === 'asc' ? '↑' : '↓') : ''}
-                      </th>
-                    )}
-                    {visibleColumns.includes('unit') && <th className="px-3 py-2">单位</th>}
-                    {visibleColumns.includes('paymentType') && <th className="px-3 py-2">支付方式</th>}
-                    {visibleColumns.includes('paymentDate') && (
-                      <th
-                        className="px-3 py-2 cursor-pointer select-none"
-                        onClick={() =>
-                          setListFilters((prev) => {
-                            const dir = prev.sortField === 'paymentDate' && prev.sortDir === 'asc' ? 'desc' : 'asc'
-                            setListDraft((draft) => ({ ...draft, sortField: 'paymentDate', sortDir: dir }))
-                            return { ...prev, sortField: 'paymentDate', sortDir: dir }
-                          })
-                        }
-                      >
-                        支付日期{' '}
-                        {listFilters.sortField === 'paymentDate' ? (listFilters.sortDir === 'asc' ? '↑' : '↓') : ''}
-                      </th>
-                    )}
-                    {visibleColumns.includes('handler') && <th className="px-3 py-2">经办人</th>}
-                    {visibleColumns.includes('createdBy') && <th className="px-3 py-2">创建人</th>}
-                    {visibleColumns.includes('updatedBy') && <th className="px-3 py-2">更新人</th>}
-                    {visibleColumns.includes('remark') && <th className="px-3 py-2">备注</th>}
-                    {visibleColumns.includes('tax') && <th className="px-3 py-2">税费</th>}
-                    {visibleColumns.includes('updatedAt') && (
-                      <th
-                        className="px-3 py-2 cursor-pointer select-none"
-                        onClick={() =>
-                          setListFilters((prev) => {
-                            const dir = prev.sortField === 'updatedAt' && prev.sortDir === 'asc' ? 'desc' : 'asc'
-                            setListDraft((draft) => ({ ...draft, sortField: 'updatedAt', sortDir: dir }))
-                            return { ...prev, sortField: 'updatedAt', sortDir: dir }
-                          })
-                        }
-                      >
-                        最近更新 {listFilters.sortField === 'updatedAt' ? (listFilters.sortDir === 'asc' ? '↑' : '↓') : ''}
-                      </th>
-                    )}
-                    {visibleColumns.includes('action') && <th className="w-36 px-3 py-2">操作</th>}
-                  </tr>
-                </thead>
-                <tbody>
-                  {tableRows.map(({ entry, displayIndex }) => (
-                    <tr key={entry.id} className={`border-b ${entry.isDeleted ? 'text-slate-400 line-through' : ''}`}>
-                      {visibleColumns.includes('sequence') && <td className="px-3 py-2">{displayIndex}</td>}
-                      {visibleColumns.includes('project') && <td className="px-3 py-2">{entry.projectName}</td>}
+            <>
+              <div className="overflow-auto rounded-xl border border-slate-200">
+                <table className="min-w-full text-sm">
+                  <thead>
+                    <tr className="border-b text-left">
+                      {visibleColumns.includes('sequence') && <th className="px-3 py-2">序号</th>}
+                      {visibleColumns.includes('project') && <th className="px-3 py-2">项目</th>}
                       {visibleColumns.includes('category') && (
-                        <td className="px-3 py-2">
-                          {entry.categoryPath.map((c) => c.label).join(' / ')}
-                        </td>
+                        <th
+                          className="px-3 py-2 cursor-pointer select-none"
+                          onClick={() =>
+                            setListFilters((prev) => {
+                              const dir = prev.sortField === 'category' && prev.sortDir === 'asc' ? 'desc' : 'asc'
+                              setListDraft((draft) => ({ ...draft, sortField: 'category', sortDir: dir }))
+                              return { ...prev, sortField: 'category', sortDir: dir }
+                            })
+                          }
+                        >
+                          分类 {listFilters.sortField === 'category' ? (listFilters.sortDir === 'asc' ? '↑' : '↓') : ''}
+                        </th>
                       )}
-                      {visibleColumns.includes('reason') && <td className="px-3 py-2">{entry.reason}</td>}
+                      {visibleColumns.includes('reason') && <th className="px-3 py-2">事由</th>}
                       {visibleColumns.includes('amount') && (
-                        <td className="px-3 py-2">
-                          {entry.amount}
-                        </td>
+                        <th
+                          className="px-3 py-2 cursor-pointer select-none"
+                          onClick={() =>
+                            setListFilters((prev) => {
+                              const dir = prev.sortField === 'amount' && prev.sortDir === 'asc' ? 'desc' : 'asc'
+                              setListDraft((draft) => ({ ...draft, sortField: 'amount', sortDir: dir }))
+                              return { ...prev, sortField: 'amount', sortDir: dir }
+                            })
+                          }
+                        >
+                          金额 {listFilters.sortField === 'amount' ? (listFilters.sortDir === 'asc' ? '↑' : '↓') : ''}
+                        </th>
                       )}
-                      {visibleColumns.includes('unit') && <td className="px-3 py-2">{entry.unitName}</td>}
-                      {visibleColumns.includes('paymentType') && (
-                        <td className="px-3 py-2">{entry.paymentTypeName}</td>
-                      )}
+                      {visibleColumns.includes('unit') && <th className="px-3 py-2">单位</th>}
+                      {visibleColumns.includes('paymentType') && <th className="px-3 py-2">支付方式</th>}
                       {visibleColumns.includes('paymentDate') && (
-                        <td className="px-3 py-2">{formatDateInput(entry.paymentDate)}</td>
+                        <th
+                          className="px-3 py-2 cursor-pointer select-none"
+                          onClick={() =>
+                            setListFilters((prev) => {
+                              const dir = prev.sortField === 'paymentDate' && prev.sortDir === 'asc' ? 'desc' : 'asc'
+                              setListDraft((draft) => ({ ...draft, sortField: 'paymentDate', sortDir: dir }))
+                              return { ...prev, sortField: 'paymentDate', sortDir: dir }
+                            })
+                          }
+                        >
+                          支付日期 {listFilters.sortField === 'paymentDate' ? (listFilters.sortDir === 'asc' ? '↑' : '↓') : ''}
+                        </th>
                       )}
-                      {visibleColumns.includes('handler') && (
-                        <td className="px-3 py-2">{entry.handlerName || entry.handlerUsername || '—'}</td>
-                      )}
-                      {visibleColumns.includes('createdBy') && (
-                        <td className="px-3 py-2">
-                          {entry.createdByName || entry.createdByUsername || '—'}
-                        </td>
-                      )}
-                      {visibleColumns.includes('updatedBy') && (
-                        <td className="px-3 py-2">
-                          {entry.updatedByName || entry.updatedByUsername || '—'}
-                        </td>
-                      )}
-                      {visibleColumns.includes('remark') && <td className="px-3 py-2">{entry.remark ?? '—'}</td>}
-                      {visibleColumns.includes('tax') && <td className="px-3 py-2">{entry.tva ?? '—'}</td>}
+                      {visibleColumns.includes('handler') && <th className="px-3 py-2">经办人</th>}
+                      {visibleColumns.includes('createdBy') && <th className="px-3 py-2">创建人</th>}
+                      {visibleColumns.includes('updatedBy') && <th className="px-3 py-2">更新人</th>}
+                      {visibleColumns.includes('remark') && <th className="px-3 py-2">备注</th>}
+                      {visibleColumns.includes('tax') && <th className="px-3 py-2">税费</th>}
                       {visibleColumns.includes('updatedAt') && (
-                        <td className="px-3 py-2">
-                          {new Date(entry.updatedAt).toLocaleString('zh-CN')}
-                        </td>
+                        <th
+                          className="px-3 py-2 cursor-pointer select-none"
+                          onClick={() =>
+                            setListFilters((prev) => {
+                              const dir = prev.sortField === 'updatedAt' && prev.sortDir === 'asc' ? 'desc' : 'asc'
+                              setListDraft((draft) => ({ ...draft, sortField: 'updatedAt', sortDir: dir }))
+                              return { ...prev, sortField: 'updatedAt', sortDir: dir }
+                            })
+                          }
+                        >
+                          最近更新 {listFilters.sortField === 'updatedAt' ? (listFilters.sortDir === 'asc' ? '↑' : '↓') : ''}
+                        </th>
                       )}
-                      {visibleColumns.includes('action') && (
-                        <td className="px-3 py-2">
-                          <div className="flex flex-wrap gap-2">
-                            <button
-                              className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-800 ring-1 ring-slate-200 hover:bg-slate-200"
-                              onClick={() => setViewingEntry({ entry, displayIndex })}
-                            >
-                              查看
-                            </button>
-                            {canEdit && !entry.isDeleted && (
+                      {visibleColumns.includes('action') && <th className="w-36 px-3 py-2">操作</th>}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {tableRows.map(({ entry, displayIndex }) => (
+                      <tr key={entry.id} className={`border-b ${entry.isDeleted ? 'text-slate-400 line-through' : ''}`}>
+                        {visibleColumns.includes('sequence') && <td className="px-3 py-2">{displayIndex}</td>}
+                        {visibleColumns.includes('project') && <td className="px-3 py-2">{entry.projectName}</td>}
+                        {visibleColumns.includes('category') && (
+                          <td className="px-3 py-2">
+                            {entry.categoryPath.map((c) => c.label).join(' / ')}
+                          </td>
+                        )}
+                        {visibleColumns.includes('reason') && <td className="px-3 py-2">{entry.reason}</td>}
+                        {visibleColumns.includes('amount') && (
+                          <td className="px-3 py-2">
+                            {entry.amount}
+                          </td>
+                        )}
+                        {visibleColumns.includes('unit') && <td className="px-3 py-2">{entry.unitName}</td>}
+                        {visibleColumns.includes('paymentType') && (
+                          <td className="px-3 py-2">{entry.paymentTypeName}</td>
+                        )}
+                        {visibleColumns.includes('paymentDate') && (
+                          <td className="px-3 py-2">{formatDateInput(entry.paymentDate)}</td>
+                        )}
+                        {visibleColumns.includes('handler') && (
+                          <td className="px-3 py-2">{entry.handlerName || entry.handlerUsername || '—'}</td>
+                        )}
+                        {visibleColumns.includes('createdBy') && (
+                          <td className="px-3 py-2">
+                            {entry.createdByName || entry.createdByUsername || '—'}
+                          </td>
+                        )}
+                        {visibleColumns.includes('updatedBy') && (
+                          <td className="px-3 py-2">
+                            {entry.updatedByName || entry.updatedByUsername || '—'}
+                          </td>
+                        )}
+                        {visibleColumns.includes('remark') && <td className="px-3 py-2">{entry.remark ?? '—'}</td>}
+                        {visibleColumns.includes('tax') && <td className="px-3 py-2">{entry.tva ?? '—'}</td>}
+                        {visibleColumns.includes('updatedAt') && (
+                          <td className="px-3 py-2">
+                            {new Date(entry.updatedAt).toLocaleString('zh-CN')}
+                          </td>
+                        )}
+                        {visibleColumns.includes('action') && (
+                          <td className="px-3 py-2">
+                            <div className="flex flex-wrap gap-2">
                               <button
-                                className="rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700 ring-1 ring-blue-100 hover:bg-blue-100"
-                                onClick={() => handleEdit(entry)}
+                                className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-800 ring-1 ring-slate-200 hover:bg-slate-200"
+                                onClick={() => setViewingEntry({ entry, displayIndex })}
                               >
-                                编辑
+                                查看
                               </button>
-                            )}
-                            {canEdit && (
-                              <button
-                                className="rounded-full bg-red-50 px-3 py-1 text-xs font-medium text-red-700 ring-1 ring-red-100 hover:bg-red-100"
-                                onClick={() => setDeleteTarget(entry)}
-                              >
-                                删除
-                              </button>
-                            )}
-                          </div>
+                              {canEdit && !entry.isDeleted && (
+                                <button
+                                  className="rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700 ring-1 ring-blue-100 hover:bg-blue-100"
+                                  onClick={() => handleEdit(entry)}
+                                >
+                                  编辑
+                                </button>
+                              )}
+                              {canEdit && (
+                                <button
+                                  className="rounded-full bg-red-50 px-3 py-1 text-xs font-medium text-red-700 ring-1 ring-red-100 hover:bg-red-100"
+                                  onClick={() => setDeleteTarget(entry)}
+                                >
+                                  删除
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        )}
+                      </tr>
+                    ))}
+                    {!tableRows.length && (
+                      <tr>
+                        <td colSpan={visibleColumns.length || 1} className="px-3 py-6 text-center text-slate-500">
+                          暂无数据，调整筛选试试。
                         </td>
-                      )}
-                    </tr>
-                  ))}
-                  {!tableRows.length && (
-                    <tr>
-                      <td colSpan={visibleColumns.length || 1} className="px-3 py-6 text-center text-slate-500">
-                        暂无数据，调整筛选试试。
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
             </div>
+            </>
           ) : (
             <div className="space-y-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
               <div className="grid gap-3 md:grid-cols-3">
@@ -1918,11 +2025,11 @@ const filteredEntries = useMemo(() => {
                       (() => {
                         const trend = insights.monthlyTrend
                         const maxVal = Math.max(...trend.map((item) => item.amount), 1)
-                          const points = trend.map((item, idx) => {
-                            const x = (idx / Math.max(trend.length - 1, 1)) * 100
-                            const y = 100 - (item.amount / maxVal) * 90
-                            return `${x},${y}`
-                          })
+                        const points = trend.map((item, idx) => {
+                          const x = (idx / Math.max(trend.length - 1, 1)) * 100
+                          const y = 100 - (item.amount / maxVal) * 90
+                          return `${x},${y}`
+                        })
                         return (
                           <svg viewBox="0 0 100 100" className="h-full w-full text-emerald-600">
                             <defs>
@@ -1983,19 +2090,19 @@ const filteredEntries = useMemo(() => {
                 </div>
               </div>
 
-          <div className="grid gap-4 min-w-0 md:grid-cols-2">
-            <div className="w-full min-w-0 rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-semibold text-slate-900">支付方式分布</p>
-                  <p className="text-xs text-slate-500">按金额排序，可快速筛选</p>
-                </div>
-                <span className="rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-700">
-                  {insights?.paymentBreakdown.length ?? 0} 种
-                </span>
-              </div>
-              {insights?.paymentBreakdown?.length ? (
-                    <div className="mt-3 space-y-2 w-full max-w-full">
+              <div className="grid gap-4 min-w-0 md:grid-cols-2">
+                <div className="w-full min-w-0 rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900">支付方式分布</p>
+                      <p className="text-xs text-slate-500">按金额排序，可快速筛选</p>
+                    </div>
+                    <span className="rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-700">
+                      {insights?.paymentBreakdown.length ?? 0} 种
+                    </span>
+                  </div>
+                  {insights?.paymentBreakdown?.length ? (
+                    <div className="mt-3 w-full max-w-full space-y-2">
                       {insights.paymentBreakdown.map((item, idx) => (
                         <button
                           key={item.id}
@@ -2008,14 +2115,14 @@ const filteredEntries = useMemo(() => {
                           className="w-full max-w-full rounded-lg border border-slate-100 px-3 py-2 text-left transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-sm"
                         >
                           <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
-                            <span className="flex min-w-0 items-center gap-2 font-medium text-slate-900 break-words">
+                            <span className="flex min-w-0 items-center gap-2 break-words font-medium text-slate-900">
                               <span
                                 className="h-2 w-2 rounded-full"
                                 style={{ backgroundColor: ['#0ea5e9', '#10b981', '#f97316', '#6366f1', '#f43f5e'][idx % 5] }}
                               />
                               {item.name}
                             </span>
-                            <span className="min-w-[120px] text-xs text-slate-600 text-right">
+                            <span className="min-w-[120px] text-right text-xs text-slate-600">
                               {item.amount.toLocaleString('zh-CN', { minimumFractionDigits: 2 })} · {item.share}%
                             </span>
                           </div>
@@ -2046,7 +2153,7 @@ const filteredEntries = useMemo(() => {
                     <span className="rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-700">Top 5</span>
                   </div>
                   {filteredEntries.length ? (
-                    <div className="mt-3 space-y-2 w-full max-w-full">
+                    <div className="mt-3 w-full max-w-full space-y-2">
                       {[...filteredEntries]
                         .sort((a, b) => b.amount - a.amount)
                         .slice(0, 5)
@@ -2078,7 +2185,6 @@ const filteredEntries = useMemo(() => {
             </div>
           )}
         </div>
-      )}
 
       {canEdit && showEntryModal && (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 px-4 py-6 backdrop-blur-sm sm:py-8">
@@ -2782,6 +2888,9 @@ const filteredEntries = useMemo(() => {
           </div>
         </div>
       )}
+    </>
+        )
+      ) : null}
     </div>
   )
 }
