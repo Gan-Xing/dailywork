@@ -256,9 +256,12 @@ export default function FinancePage() {
   }, [categoryOptionsWithParents, categorySearch])
 
   const defaultHandlerId = useMemo(() => {
-    const match = metadata?.handlers.find((handler) => handler.name === '何柳琴' || handler.username === '何柳琴')
-    return match?.id ?? ''
-  }, [metadata?.handlers])
+    if (!metadata?.handlers?.length || !session) return ''
+    const byId = metadata.handlers.find((handler) => handler.id === session.id)
+    if (byId) return byId.id
+    const byUsername = metadata.handlers.find((handler) => handler.username === session.username)
+    return byUsername?.id ?? ''
+  }, [metadata?.handlers, session])
 
   const projectLabel = useMemo(() => {
     if (!metadata?.projects?.length || !listDraft.projectIds.length) return '全部项目'
@@ -461,8 +464,11 @@ const filteredEntries = useMemo(() => {
       const defaultPayment = data.paymentTypes.find((p) => p.name === '现金支票') ?? data.paymentTypes[0]
       const defaultUnit = data.units.find((u) => u.name === '西法')
       const defaultCategory = buildCategoryOptions(data.categories, '')[0]?.key
-      const defaultHandler =
-        data.handlers?.find((handler) => handler.name === '何柳琴' || handler.username === '何柳琴')
+      const defaultHandler = session
+        ? data.handlers?.find(
+            (handler) => handler.id === session.id || handler.username === session.username,
+          )
+        : undefined
       setForm((prev) => ({
         ...prev,
         projectId: defaultProject?.id ?? prev.projectId,
@@ -491,7 +497,7 @@ const filteredEntries = useMemo(() => {
     } catch (error) {
       setMessage((error as Error).message)
     }
-  }, [])
+  }, [session])
 
   const loadEntries = useCallback(
     async (filtersInput: ListFilters) => {
