@@ -217,7 +217,7 @@
      2. `startPk` / `endPk`：起讫桩号。
      3. `appointmentDate`：预约报检日期（日期粒度）。
      4. `submittedAt` / `submittedBy`：报检提交时间与提交人。
-     5. `status`：枚举 `PENDING` / `IN_PROGRESS` / `APPROVED`。
+     5. `status`：枚举 `PENDING` / `SCHEDULED` / `SUBMITTED` / `IN_PROGRESS` / `APPROVED`。
      6. `updatedAt` / `updatedBy`：最近更新时间与更新人。
      7. `layers` / `checks` / `types`：数组字段，记录层次、验收内容、报检类型。
      8. `remark`：多行备注。

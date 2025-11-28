@@ -29,14 +29,18 @@ type ColumnKey =
   | 'createdAt'
   | 'updatedAt'
 
-const statusCopy: Record<string, string> = {
+const statusCopy: Record<InspectionStatus, string> = {
   PENDING: '待处理',
+  SCHEDULED: '已预约',
+  SUBMITTED: '已报检',
   IN_PROGRESS: '验收中',
-  APPROVED: '已通过',
+  APPROVED: '已验收',
 }
 
-const statusTone: Record<string, string> = {
+const statusTone: Record<InspectionStatus, string> = {
   PENDING: 'bg-slate-800 text-slate-100 ring-1 ring-white/10',
+  SCHEDULED: 'bg-sky-900/60 text-sky-100 ring-1 ring-sky-300/40',
+  SUBMITTED: 'bg-indigo-700/40 text-indigo-100 ring-1 ring-indigo-300/40',
   IN_PROGRESS: 'bg-amber-200/30 text-amber-100 ring-1 ring-amber-200/50',
   APPROVED: 'bg-emerald-300/20 text-emerald-100 ring-1 ring-emerald-300/40',
 }
@@ -90,7 +94,7 @@ type EditFormState = {
 export function InspectionBoard({ roads, loadError }: Props) {
   const [roadSlug, setRoadSlug] = useState('')
   const [phaseId, setPhaseId] = useState<number | ''>('')
-  const [status, setStatus] = useState<string[]>([])
+  const [status, setStatus] = useState<InspectionStatus[]>([])
   const [side, setSide] = useState('')
   const [type, setType] = useState('')
   const [keyword, setKeyword] = useState('')
@@ -206,6 +210,8 @@ export function InspectionBoard({ roads, loadError }: Props) {
     setBulkError(null)
   }, [selectedIds, bulkStatus])
 
+  const statusOptions: InspectionStatus[] = ['PENDING', 'SCHEDULED', 'SUBMITTED', 'IN_PROGRESS', 'APPROVED']
+
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (columnSelectorRef.current && !columnSelectorRef.current.contains(event.target as Node)) {
@@ -216,7 +222,7 @@ export function InspectionBoard({ roads, loadError }: Props) {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  const toggleStatus = (value: string) => {
+  const toggleStatus = (value: InspectionStatus) => {
     setPage(1)
     setStatus((prev) => (prev.includes(value) ? prev.filter((item) => item !== value) : [...prev, value]))
   }
@@ -505,7 +511,7 @@ export function InspectionBoard({ roads, loadError }: Props) {
             <div className="flex items-center gap-2 text-xs text-slate-200">
               <span className="whitespace-nowrap">状态</span>
               <div className="flex flex-wrap gap-2">
-                {(['PENDING', 'IN_PROGRESS', 'APPROVED'] as const).map((item) => (
+                {statusOptions.map((item) => (
                   <button
                     key={item}
                     type="button"
@@ -622,7 +628,7 @@ export function InspectionBoard({ roads, loadError }: Props) {
                 onChange={(e) => setBulkStatus(e.target.value as InspectionStatus)}
               >
                 <option value="">选择要更新的状态</option>
-                {(['PENDING', 'IN_PROGRESS', 'APPROVED'] as InspectionStatus[]).map((item) => (
+                {statusOptions.map((item) => (
                   <option key={item} value={item}>
                     {statusCopy[item] ?? item}
                   </option>

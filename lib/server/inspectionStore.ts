@@ -161,7 +161,7 @@ export const createInspection = async (
       checks: payload.checks,
       types: payload.types,
       remark: payload.remark,
-      status: InspectionStatus.IN_PROGRESS,
+      status: InspectionStatus.SCHEDULED,
       appointmentDate: appointmentDate ?? undefined,
       submittedAt: new Date(),
       submittedBy: userId ?? undefined,

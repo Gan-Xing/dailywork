@@ -22,6 +22,8 @@ enum PhaseMeasure {
 
 enum InspectionStatus {
   PENDING
+  SCHEDULED
+  SUBMITTED
   IN_PROGRESS
   APPROVED
 }

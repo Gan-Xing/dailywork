@@ -10,10 +10,11 @@ import type {
   PhaseDTO,
   PhaseDefinitionDTO,
   PhaseIntervalPayload,
+  PhaseMeasure,
   PhasePayload,
   RoadSectionDTO,
+  InspectionStatus,
 } from '@/lib/progressTypes'
-import type { PhaseMeasure } from '@/lib/progressTypes'
 import { getProgressCopy, formatProgressCopy } from '@/lib/i18n/progress'
 import { locales } from '@/lib/i18n'
 import { usePreferredLocale } from '@/lib/usePreferredLocale'
@@ -30,6 +31,15 @@ interface Props {
 }
 
 type Status = 'pending' | 'inProgress' | 'approved' | 'nonDesign'
+
+type InspectionSlice = {
+  phaseId: number
+  side: IntervalSide
+  startPk: number
+  endPk: number
+  status: InspectionStatus
+  updatedAt: number
+}
 
 interface Segment {
   start: number
@@ -131,10 +141,83 @@ const fillNonDesignGaps = (segments: Segment[], start: number, end: number) => {
   return result
 }
 
+const statusPriority: Record<InspectionStatus, number> = {
+  APPROVED: 5,
+  IN_PROGRESS: 4,
+  SUBMITTED: 3,
+  SCHEDULED: 2,
+  PENDING: 1,
+}
+
+const mapInspectionStatus = (status: InspectionStatus): Status => {
+  if (status === 'APPROVED') return 'approved'
+  if (status === 'IN_PROGRESS' || status === 'SUBMITTED') return 'inProgress'
+  return 'pending'
+}
+
+const mergeAdjacentSegments = (segments: Segment[]) => {
+  const merged: Segment[] = []
+  segments.forEach((seg) => {
+    const last = merged[merged.length - 1]
+    if (last && last.status === seg.status && Math.abs(last.end - seg.start) < 1e-6) {
+      merged[merged.length - 1] = { ...last, end: seg.end }
+    } else {
+      merged.push(seg)
+    }
+  })
+  return merged
+}
+
+const applyInspectionStatuses = (segments: Segment[], inspections: InspectionSlice[]) => {
+  if (!inspections.length) return segments
+  const boundaries = new Set<number>()
+  segments.forEach((seg) => {
+    boundaries.add(seg.start)
+    boundaries.add(seg.end)
+  })
+  inspections.forEach((insp) => {
+    boundaries.add(insp.startPk)
+    boundaries.add(insp.endPk)
+  })
+  const sorted = Array.from(boundaries).sort((a, b) => a - b)
+  const result: Segment[] = []
+  for (let i = 0; i < sorted.length - 1; i += 1) {
+    const start = sorted[i]
+    const end = sorted[i + 1]
+    if (end <= start) continue
+    const design = segments.find((seg) => start >= seg.start && end <= seg.end)
+    if (!design) continue
+    let status = design.status
+    if (design.status !== 'nonDesign') {
+      const overlaps = inspections.filter(
+        (insp) => Math.max(start, insp.startPk) < Math.min(end, insp.endPk),
+      )
+      if (overlaps.length) {
+        const best = overlaps.reduce<InspectionSlice | null>((prev, current) => {
+          if (!prev) return current
+          const prevPriority = statusPriority[prev.status] ?? 0
+          const currentPriority = statusPriority[current.status] ?? 0
+          if (currentPriority > prevPriority) return current
+          if (currentPriority === prevPriority && current.updatedAt > prev.updatedAt) {
+            return current
+          }
+          return prev
+        }, null)
+        if (best) {
+          status = mapInspectionStatus(best.status)
+        }
+      }
+    }
+    result.push({ start, end, status })
+  }
+  return mergeAdjacentSegments(result)
+}
+
 const buildLinearView = (
   phase: PhaseDTO,
   roadLength: number,
   sideLabels: { left: string; right: string },
+  inspections: InspectionSlice[] = [],
 ): LinearView => {
   const normalized = phase.intervals.map((i) => normalizeInterval(i, 'LINEAR'))
   const left: Segment[] = []
@@ -156,10 +239,28 @@ const buildLinearView = (
     0,
   )
   const total = Math.max(maxEnd, roadLength || 0, 1)
+  const orderedInspections = inspections.map((insp) => {
+    const start = Number(insp.startPk)
+    const end = Number(insp.endPk)
+    const [orderedStart, orderedEnd] = start <= end ? [start, end] : [end, start]
+    return { ...insp, startPk: orderedStart, endPk: orderedEnd }
+  })
+  const leftInspections = orderedInspections.filter(
+    (insp) => insp.side === 'LEFT' || insp.side === 'BOTH',
+  )
+  const rightInspections = orderedInspections.filter(
+    (insp) => insp.side === 'RIGHT' || insp.side === 'BOTH',
+  )
 
   return {
-    left: { label: sideLabels.left, segments: fillNonDesignGaps(left, 0, total) },
-    right: { label: sideLabels.right, segments: fillNonDesignGaps(right, 0, total) },
+    left: {
+      label: sideLabels.left,
+      segments: applyInspectionStatuses(fillNonDesignGaps(left, 0, total), leftInspections),
+    },
+    right: {
+      label: sideLabels.right,
+      segments: applyInspectionStatuses(fillNonDesignGaps(right, 0, total), rightInspections),
+    },
     total,
   }
 }
@@ -182,11 +283,18 @@ const buildPointView = (phase: PhaseDTO, roadLength: number): PointView => {
 const calcDesignBySide = (segments: Segment[]) =>
   segments.reduce((acc, seg) => (seg.status === 'nonDesign' ? acc : acc + Math.max(0, seg.end - seg.start)), 0)
 
+const calcCompletedBySide = (segments: Segment[]) =>
+  segments.reduce(
+    (acc, seg) => (seg.status === 'approved' ? acc + Math.max(0, seg.end - seg.start) : acc),
+    0,
+  )
+
 const calcCombinedPercent = (left: Segment[], right: Segment[]) => {
   const leftLen = calcDesignBySide(left)
   const rightLen = calcDesignBySide(right)
-  const total = leftLen + rightLen || 1
-  const completed = 0 // Future: plug in real acceptance status; currently treated as uninspected
+  const total = leftLen + rightLen
+  if (total <= 0) return 0
+  const completed = calcCompletedBySide(left) + calcCompletedBySide(right)
   return Math.round((completed / total) * 100)
 }
 
@@ -251,6 +359,7 @@ export function PhaseEditor({
   const [definitions, setDefinitions] = useState<PhaseDefinitionDTO[]>(phaseDefinitions)
   const [layerOptionsState, setLayerOptionsState] = useState<LayerDefinitionDTO[]>(layerOptions)
   const [checkOptionsState, setCheckOptionsState] = useState<CheckDefinitionDTO[]>(checkOptions)
+  const [inspectionSlices, setInspectionSlices] = useState<InspectionSlice[]>([])
   const [name, setName] = useState('')
   const [measure, setMeasure] = useState<PhaseMeasure>('LINEAR')
   const [pointHasSides, setPointHasSides] = useState(false)
@@ -538,9 +647,14 @@ export function PhaseEditor({
       .filter((phase) => phase.measure === 'LINEAR')
       .map((phase) => ({
         phase,
-        view: buildLinearView(phase, roadLength, { left: sideLabelMap.LEFT, right: sideLabelMap.RIGHT }),
+        view: buildLinearView(
+          phase,
+          roadLength,
+          { left: sideLabelMap.LEFT, right: sideLabelMap.RIGHT },
+          inspectionSlices.filter((insp) => insp.phaseId === phase.id),
+        ),
       }))
-  }, [phases, roadLength, sideLabelMap.LEFT, sideLabelMap.RIGHT])
+  }, [phases, roadLength, sideLabelMap.LEFT, sideLabelMap.RIGHT, inspectionSlices])
 
   const pointViews = useMemo(() => {
     return phases
@@ -733,7 +847,11 @@ const addCheckToken = () => {
   }, [selectedSegment])
 
   useEffect(() => {
-    if (!canViewInspection) return
+    if (!canViewInspection) {
+      setInspectionSlices([])
+      setLatestPointInspections(new Map())
+      return
+    }
     let cancelled = false
     const fetchLatestInspections = async () => {
       try {
@@ -741,24 +859,57 @@ const addCheckToken = () => {
           `/api/progress/${road.slug}/inspections?roadSlug=${road.slug}&sortField=updatedAt&sortOrder=desc&pageSize=500`,
           { credentials: 'include' },
         )
-        if (!res.ok) return
+        if (!res.ok) {
+          if (!cancelled) {
+            setInspectionSlices([])
+            setLatestPointInspections(new Map())
+          }
+          return
+        }
         const data = (await res.json()) as {
-          items?: Array<{ phaseId: number; startPk: number; layers: string[]; updatedAt: string }>
+          items?: Array<{
+            phaseId: number
+            startPk: number
+            endPk: number
+            side: IntervalSide
+            status: InspectionStatus
+            layers: string[]
+            updatedAt: string
+          }>
         }
         if (!data.items || cancelled) return
         const map = new Map<string, { layers: string[]; updatedAt: number }>()
+        const slices: InspectionSlice[] = []
         data.items.forEach((item) => {
           const ts = new Date(item.updatedAt).getTime()
-          const key = buildPointKey(item.phaseId, item.startPk)
+          const start = Number(item.startPk)
+          const end = Number(item.endPk)
+          const safeStart = Number.isFinite(start) ? start : 0
+          const safeEnd = Number.isFinite(end) ? end : safeStart
+          const [orderedStart, orderedEnd] = safeStart <= safeEnd ? [safeStart, safeEnd] : [safeEnd, safeStart]
+          const key = buildPointKey(item.phaseId, orderedStart)
           const existing = map.get(key)
           if (!existing || ts > existing.updatedAt) {
-            map.set(key, { layers: item.layers || [], updatedAt: ts })
+            map.set(key, { layers: item.layers || [], updatedAt: ts || 0 })
           }
+          slices.push({
+            phaseId: Number(item.phaseId),
+            side: item.side ?? 'BOTH',
+            startPk: orderedStart,
+            endPk: orderedEnd,
+            status: item.status ?? 'PENDING',
+            updatedAt: ts || 0,
+          })
         })
         if (!cancelled) {
           setLatestPointInspections(map)
+          setInspectionSlices(slices)
         }
       } catch (err) {
+        if (!cancelled) {
+          setInspectionSlices([])
+          setLatestPointInspections(new Map())
+        }
         if (process.env.NODE_ENV !== 'production') {
           console.warn(t.alerts.fetchInspectionFailed, err)
         }
@@ -1296,7 +1447,7 @@ const addCheckToken = () => {
                                   <button
                                     key={`${seg.start}-${seg.end}-${idx}`}
                                     type="button"
-                                    className={`${statusTone[seg.status]} flex h-full items-center justify-center text-[10px] font-semibold transition hover:opacity-90`}
+                                    className={`${statusTone[seg.status]} group flex h-full items-center justify-center text-[10px] font-semibold transition hover:opacity-90`}
                                     style={{ width: `${width}%` }}
                                     title={`${side.label} ${formatPK(seg.start)} ~ ${formatPK(seg.end)} · ${statusLabel(seg.status)}`}
                                     onClick={() => {
@@ -1321,7 +1472,7 @@ const addCheckToken = () => {
                                       }
                                     }}
                                   >
-                                    <span className="px-1">
+                                    <span className="px-1 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100">
                                       {formatPK(seg.start)}–{formatPK(seg.end)}
                                     </span>
                                   </button>
