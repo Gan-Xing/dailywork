@@ -150,6 +150,8 @@ export default function ReportsLandingPage() {
   const router = useRouter()
   const { locale, setLocale } = usePreferredLocale('zh', locales)
   const t = landingCopy[locale]
+  const breadcrumbHome = locale === 'fr' ? 'Accueil' : '首页'
+  const breadcrumbReports = locale === 'fr' ? 'Rapports journaliers' : '日报管理'
   const [selectedDate, setSelectedDate] = useState(() => formatDateInput(new Date()))
   const [recentReports, setRecentReports] = useState<ReportSummary[]>([])
   const [monthReports, setMonthReports] = useState<ReportSummary[]>([])
@@ -296,7 +298,19 @@ export default function ReportsLandingPage() {
 
   return (
     <main className="relative mx-auto flex max-w-5xl flex-col gap-8 px-4 py-10 lg:px-0">
-      <div className="flex justify-end">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <nav className="flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-600">
+          <Link
+            href="/"
+            className="rounded-full border border-slate-200 bg-white/80 px-3 py-1 transition hover:bg-white"
+          >
+            {breadcrumbHome}
+          </Link>
+          <span className="text-slate-400">/</span>
+          <span className="rounded-full border border-slate-100 bg-slate-50 px-3 py-1 text-slate-800">
+            {breadcrumbReports}
+          </span>
+        </nav>
         <LocaleSwitcher locale={locale} onChange={setLocale} variant="light" />
       </div>
       <section className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-sm shadow-slate-100">

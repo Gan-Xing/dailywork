@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
 
+import Link from 'next/link'
+
 import { LocaleSwitcher } from '@/components/LocaleSwitcher'
 import { AccessDenied } from '@/components/AccessDenied'
 import {
@@ -63,6 +65,8 @@ type TabKey = 'members' | 'roles' | 'permissions'
 export default function MembersPage() {
   const { locale, setLocale } = usePreferredLocale()
   const t = memberCopy[locale]
+  const breadcrumbHome = locale === 'fr' ? 'Accueil' : '首页'
+  const breadcrumbMembers = locale === 'fr' ? 'Gestion des membres' : '成员管理'
 
   const getTodayString = useCallback(() => new Date().toISOString().slice(0, 10), [])
   const [activeTab, setActiveTab] = useState<TabKey>('members')
@@ -518,10 +522,24 @@ export default function MembersPage() {
         <div className="absolute inset-0 opacity-60" style={{ backgroundImage: 'radial-gradient(circle at 20% 20%, rgba(14,165,233,0.2), transparent 40%), radial-gradient(circle at 80% 0%, rgba(94,234,212,0.18), transparent 36%)' }} />
         <div className="relative mx-auto flex max-w-6xl flex-col gap-8 px-6">
           <div className="flex flex-col justify-between gap-6 sm:flex-row sm:items-center">
-            <div>
-              <p className="text-sm uppercase tracking-[0.35em] text-slate-200">RBAC · MEMBER</p>
-              <h1 className="mt-2 text-3xl font-bold sm:text-4xl">{t.title}</h1>
-              <p className="mt-3 max-w-3xl text-sm text-slate-200 sm:text-base">{t.subtitle}</p>
+            <div className="flex flex-col gap-4">
+              <div>
+                <p className="text-sm uppercase tracking-[0.35em] text-slate-200">RBAC · MEMBER</p>
+                <h1 className="mt-2 text-3xl font-bold sm:text-4xl">{t.title}</h1>
+                <p className="mt-3 max-w-3xl text-sm text-slate-200 sm:text-base">{t.subtitle}</p>
+              </div>
+              <nav className="flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-100">
+                <Link
+                  href="/"
+                  className="rounded-full border border-white/20 bg-white/10 px-3 py-1 transition hover:border-white/40 hover:bg-white/20"
+                >
+                  {breadcrumbHome}
+                </Link>
+                <span className="text-slate-300">/</span>
+                <span className="rounded-full border border-white/10 bg-white/10 px-3 py-1">
+                  {breadcrumbMembers}
+                </span>
+              </nav>
             </div>
             <LocaleSwitcher locale={locale} onChange={setLocale} />
           </div>

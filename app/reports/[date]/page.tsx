@@ -2,6 +2,7 @@
 
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 
+import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 
 import Image from 'next/image';
@@ -382,6 +383,9 @@ export default function ReportEditorPage() {
 	const reportDateLabel = reportDateLabelMap[locale];
 	const saveButtonLabel = saveLabelMap[locale];
 	const savingButtonLabel = savingLabelMap[locale];
+	const breadcrumbHome = locale === 'fr' ? 'Accueil' : '首页';
+	const breadcrumbReports = locale === 'fr' ? 'Rapports journaliers' : '日报管理';
+	const breadcrumbDate = report.metadata.date || activeDate || '--';
 
 	const handlePreviewNavigate = () => {
 		if (!activeDate || !DATE_KEY_REGEX.test(activeDate)) {
@@ -744,6 +748,23 @@ export default function ReportEditorPage() {
 	return (
 		<>
 			<main className='mx-auto flex max-w-6xl flex-col gap-8 px-4 py-10 lg:px-8 lg:py-12'>
+				<nav className='flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-600'>
+					<Link
+						href='/'
+						className='rounded-full border border-slate-200 bg-white/80 px-3 py-1 transition hover:bg-white'>
+						{breadcrumbHome}
+					</Link>
+					<span className='text-slate-400'>/</span>
+					<Link
+						href='/reports'
+						className='rounded-full border border-slate-200 bg-white/80 px-3 py-1 transition hover:bg-white'>
+						{breadcrumbReports}
+					</Link>
+					<span className='text-slate-400'>/</span>
+					<span className='rounded-full border border-slate-100 bg-slate-50 px-3 py-1 text-slate-800'>
+						{breadcrumbDate}
+					</span>
+				</nav>
 				<div className='rounded-3xl border border-slate-200 bg-white/80 p-5 shadow-sm'>
 					<div className='flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'>
 						<button
