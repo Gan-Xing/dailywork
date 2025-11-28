@@ -420,6 +420,7 @@ export function PhaseEditor({
             id: phase.definitionId,
             name: phase.definitionName,
             measure: phase.measure,
+            pointHasSides: phase.pointHasSides,
             defaultLayers: phase.resolvedLayers,
             defaultChecks: phase.resolvedChecks,
             isActive: true,
@@ -767,7 +768,7 @@ const addCheckToken = () => {
     return () => {
       cancelled = true
     }
-  }, [road.slug, canViewInspection])
+  }, [road.slug, canViewInspection, t.alerts.fetchInspectionFailed])
 
   useEffect(() => {
     if (!successMessage) return
@@ -1165,7 +1166,7 @@ const addCheckToken = () => {
               <div className="space-y-1">
                 <p className="text-lg font-semibold text-slate-50">{t.delete.title}</p>
                 <p className="text-sm font-semibold text-slate-100">
-                  {formatProgressCopy(t.delete.confirm, { name: deleteTarget.name })}
+                  {formatProgressCopy(t.delete.confirmPrompt, { name: deleteTarget.name })}
                 </p>
               </div>
               <button
@@ -1207,7 +1208,7 @@ const addCheckToken = () => {
                 onClick={confirmDelete}
                 disabled={deletingId === deleteTarget.id}
               >
-                {deletingId === deleteTarget.id ? t.delete.confirming : t.delete.confirm}
+                {deletingId === deleteTarget.id ? t.delete.confirming : t.delete.confirmLabel}
               </button>
             </div>
           </div>

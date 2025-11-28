@@ -333,7 +333,8 @@ export function InspectionBoard({ roads, loadError }: Props) {
       if (!res.ok || !data.inspection) {
         throw new Error(data.message ?? '更新失败')
       }
-      setItems((prev) => prev.map((item) => (item.id === editing.id ? data.inspection : item)))
+      const updatedInspection = data.inspection!
+      setItems((prev) => prev.map((item) => (item.id === editing.id ? updatedInspection : item)))
       setEditing(null)
     } catch (err) {
       setEditError((err as Error).message)

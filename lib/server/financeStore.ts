@@ -340,8 +340,8 @@ const buildEntryWhere = (options: FinanceEntryFilterOptions): Prisma.FinanceEntr
   return where
 }
 
-const buildEntryOrderBy = (options: FinanceEntryFilterOptions) => {
-  const direction = options.sortDir === 'asc' ? 'asc' : 'desc'
+const buildEntryOrderBy = (options: FinanceEntryFilterOptions): Prisma.FinanceEntryOrderByWithRelationInput[] => {
+  const direction: Prisma.SortOrder = options.sortDir === 'asc' ? 'asc' : 'desc'
   switch (options.sortField) {
     case 'amount':
       return [{ amount: direction }, { paymentDate: 'desc' as const }, { id: 'desc' as const }]

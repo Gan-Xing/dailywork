@@ -133,11 +133,11 @@ type PhaseCopy = {
   }
   delete: {
     title: string
-    confirm: string
+    confirmPrompt: string
     impactTitle: string
     impactList: string[]
     cancel: string
-    confirm: string
+    confirmLabel: string
     confirming: string
     close: string
   }
@@ -330,7 +330,7 @@ const progressCopy: Record<Locale, ProgressCopy> = {
       },
       delete: {
         title: '删除分项',
-        confirm: '确定删除「{name}」？',
+        confirmPrompt: '确定删除「{name}」？',
         impactTitle: '删除后会产生以下影响：',
         impactList: [
           '• 关联的区间与报检记录一并移除，无法恢复。',
@@ -338,7 +338,7 @@ const progressCopy: Record<Locale, ProgressCopy> = {
           '• 请确认已导出或备份必要数据。',
         ],
         cancel: '取消',
-        confirm: '确认删除',
+        confirmLabel: '确认删除',
         confirming: '正在删除...',
         close: '关闭删除确认',
       },
@@ -533,7 +533,7 @@ const progressCopy: Record<Locale, ProgressCopy> = {
       },
       delete: {
         title: 'Supprimer la phase',
-        confirm: 'Supprimer « {name} » ?',
+        confirmPrompt: 'Supprimer « {name} » ?',
         impactTitle: 'Conséquences :',
         impactList: [
           '• Intervalles et demandes de contrôle associés seront supprimés (irréversible).',
@@ -541,7 +541,7 @@ const progressCopy: Record<Locale, ProgressCopy> = {
           '• Assurez-vous d’avoir exporté ou sauvegardé les données nécessaires.',
         ],
         cancel: 'Annuler',
-        confirm: 'Confirmer',
+        confirmLabel: 'Confirmer',
         confirming: 'Suppression...',
         close: 'Fermer',
       },
