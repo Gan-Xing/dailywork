@@ -99,6 +99,8 @@ type PhaseCopy = {
     intervalStart: string
     intervalEnd: string
     intervalSide: string
+    intervalSpec: string
+    intervalBillQuantity: string
     sideBoth: string
     sideLeft: string
     sideRight: string
@@ -296,6 +298,8 @@ const progressCopy: Record<Locale, ProgressCopy> = {
         intervalStart: '起点',
         intervalEnd: '终点',
         intervalSide: '侧别',
+        intervalSpec: '规格（可选）',
+        intervalBillQuantity: '计量工程量（可选）',
         sideBoth: '双侧',
         sideLeft: '左侧',
         sideRight: '右侧',
@@ -498,6 +502,8 @@ const progressCopy: Record<Locale, ProgressCopy> = {
         intervalStart: 'Début',
         intervalEnd: 'Fin',
         intervalSide: 'Côté',
+        intervalSpec: 'Spécification (optionnel)',
+        intervalBillQuantity: 'Quantité métrée (optionnel)',
         sideBoth: 'Deux côtés',
         sideLeft: 'Gauche',
         sideRight: 'Droite',

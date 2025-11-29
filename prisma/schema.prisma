@@ -136,6 +136,8 @@ model PhaseInterval {
   startPk   Float
   endPk     Float
   side      IntervalSide
+  spec      String?
+  billQuantity Float?
   createdAt DateTime      @default(now())
   updatedAt DateTime      @updatedAt
 }

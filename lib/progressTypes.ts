@@ -86,6 +86,8 @@ export interface PhaseIntervalPayload {
   startPk: number
   endPk: number
   side: IntervalSide
+  spec?: string | null
+  billQuantity?: number | null
 }
 
 export interface PhasePayload {

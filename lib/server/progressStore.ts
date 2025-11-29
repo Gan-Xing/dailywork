@@ -15,6 +15,10 @@ const normalizeInterval = (interval: PhasePayload['intervals'][number], measure:
   const safeStart = Number.isFinite(start) ? start : 0
   const safeEnd = measure === 'POINT' ? safeStart : Number.isFinite(end) ? end : safeStart
   const ordered = safeStart <= safeEnd ? [safeStart, safeEnd] : [safeEnd, safeStart]
+  const spec = typeof interval.spec === 'string' ? interval.spec.trim() : ''
+  const billValue = (interval as { billQuantity?: unknown }).billQuantity
+  const rawBillQuantity =
+    billValue === null || billValue === undefined ? null : Number(billValue)
 
   const side = interval.side ?? 'BOTH'
   const normalizedSide =
@@ -24,6 +28,9 @@ const normalizeInterval = (interval: PhasePayload['intervals'][number], measure:
     startPk: ordered[0],
     endPk: ordered[1],
     side: normalizedSide as IntervalSide,
+    spec: spec || null,
+    billQuantity:
+      rawBillQuantity === null || !Number.isFinite(rawBillQuantity) ? null : rawBillQuantity,
   }
 }
 
@@ -111,6 +118,8 @@ const mapPhaseToDTO = (
       startPk: i.startPk,
       endPk: i.endPk,
       side: i.side,
+      spec: i.spec,
+      billQuantity: i.billQuantity,
     })),
     createdAt: phase.createdAt.toISOString(),
     updatedAt: phase.updatedAt.toISOString(),
@@ -318,6 +327,8 @@ export const createPhase = async (roadId: number, payload: PhasePayload) => {
               startPk: item.startPk,
               endPk: item.endPk,
               side: item.side,
+              spec: item.spec || undefined,
+              billQuantity: item.billQuantity ?? undefined,
             })),
           },
           layerLinks: resolvedLayerIds.length
@@ -422,6 +433,8 @@ export const updatePhase = async (roadId: number, phaseId: number, payload: Phas
           startPk: item.startPk,
           endPk: item.endPk,
           side: item.side,
+          spec: item.spec || undefined,
+          billQuantity: item.billQuantity ?? undefined,
         })),
       })
 
@@ -460,6 +473,29 @@ export const updatePhase = async (roadId: number, phaseId: number, payload: Phas
   return mapPhaseToDTO(phase)
 }
 
+const cleanupOrphanDefinitions = async (
+  tx: Prisma.TransactionClient,
+  params: { layerIds: number[]; checkIds: number[] },
+) => {
+  const uniqueLayerIds = Array.from(new Set(params.layerIds))
+  for (const id of uniqueLayerIds) {
+    const linkedPhaseLayers = await tx.roadPhaseLayer.count({ where: { layerDefinitionId: id } })
+    const linkedDefinitionLayers = await tx.phaseDefinitionLayer.count({ where: { layerDefinitionId: id } })
+    if (linkedPhaseLayers === 0 && linkedDefinitionLayers === 0) {
+      await tx.layerDefinition.delete({ where: { id } })
+    }
+  }
+
+  const uniqueCheckIds = Array.from(new Set(params.checkIds))
+  for (const id of uniqueCheckIds) {
+    const linkedPhaseChecks = await tx.roadPhaseCheck.count({ where: { checkDefinitionId: id } })
+    const linkedDefinitionChecks = await tx.phaseDefinitionCheck.count({ where: { checkDefinitionId: id } })
+    if (linkedPhaseChecks === 0 && linkedDefinitionChecks === 0) {
+      await tx.checkDefinition.delete({ where: { id } })
+    }
+  }
+}
+
 export const deletePhase = async (roadId: number, phaseId: number) => {
   if (!Number.isInteger(phaseId) || phaseId <= 0) {
     throw new Error('无效的分项 ID')
@@ -467,12 +503,43 @@ export const deletePhase = async (roadId: number, phaseId: number) => {
 
   const removed = await prisma.$transaction(
     async (tx) => {
-      const phase = await tx.roadPhase.findFirst({ where: { id: phaseId, roadId } })
+      const phase = await tx.roadPhase.findFirst({
+        where: { id: phaseId, roadId },
+        include: {
+          phaseDefinition: {
+            include: {
+              defaultLayers: { include: { layerDefinition: true } },
+              defaultChecks: { include: { checkDefinition: true } },
+            },
+          },
+          layerLinks: { include: { layerDefinition: true } },
+          checkLinks: { include: { checkDefinition: true } },
+        },
+      })
       if (!phase) {
         throw new Error('分项不存在或不属于当前路段')
       }
 
       await tx.roadPhase.delete({ where: { id: phaseId } })
+
+      const remaining = await tx.roadPhase.count({ where: { phaseDefinitionId: phase.phaseDefinitionId } })
+      if (remaining === 0) {
+        await tx.phaseDefinition.delete({ where: { id: phase.phaseDefinitionId } })
+      }
+
+      const candidateLayerIds = [
+        ...phase.phaseDefinition.defaultLayers.map((item) => item.layerDefinitionId),
+        ...phase.layerLinks.map((item) => item.layerDefinitionId),
+      ]
+      const candidateCheckIds = [
+        ...phase.phaseDefinition.defaultChecks.map((item) => item.checkDefinitionId),
+        ...phase.checkLinks.map((item) => item.checkDefinitionId),
+      ]
+
+      await cleanupOrphanDefinitions(tx, {
+        layerIds: candidateLayerIds,
+        checkIds: candidateCheckIds,
+      })
       return phase
     },
     { timeout: TRANSACTION_TIMEOUT_MS },

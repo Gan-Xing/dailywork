@@ -199,13 +199,15 @@
      2. `phaseDefinitionId`：关联 `PhaseDefinition`（必填）。
      3. `name`：显示名称，默认继承模板，可在实例层重命名。
      4. `measure`：枚举，默认继承模板；如与模板不同则以实例为准。
-     5. `intervals`：区间列表 `{ startPk, endPk, side }`，实例必填（设计量由此计算）。
+     5. `intervals`：区间列表 `{ startPk, endPk, side, spec?, billQuantity? }`，实例必填（设计量由此计算）。
+        - `spec`：规格，针对边沟、路缘石、过道涵等同一路段存在多种规格的结构物，选填；与层次/验收内容一样绑定在分项上，并在报检弹窗展示。
+        - `billQuantity`：计量工程量，选填，无单位。用于结算口径，独立于现场延米/单体展示量。
      6. `pointHasSides`：布尔，仅当 `measure=POINT` 时生效；为 `true` 时单体分项前端按左右侧分开展示点位，默认 `false`。
-     6. `layerIds`：引用 `LayerDefinition` 的 ID 列表，实例可选；为空时使用模板默认层次。
-     7. `checkIds`：引用 `CheckDefinition` 的 ID 列表，实例可选；为空时使用模板默认验收内容。
-     8. `resolvedLayers` / `resolvedChecks`：派生字段（API/视图用），规则为“若实例有绑定则使用实例列表，否则使用模板默认值”。
-     9. `designLength`：数值，按区间与侧别计算。
-    10. `createdAt` / `updatedAt`：系统时间戳。
+     7. `layerIds`：引用 `LayerDefinition` 的 ID 列表，实例可选；为空时使用模板默认层次。
+     8. `checkIds`：引用 `CheckDefinition` 的 ID 列表，实例可选；为空时使用模板默认验收内容。
+     9. `resolvedLayers` / `resolvedChecks`：派生字段（API/视图用），规则为“若实例有绑定则使用实例列表，否则使用模板默认值”。
+    10. `designLength`：数值，按区间与侧别计算。
+    11. `createdAt` / `updatedAt`：系统时间戳。
 
 > 继承与覆盖规则：路段下新建分项实例时选择一个模板，初始层次/验收内容取模板默认值；实例可新增/删除候选，保存后 `layerIds`/`checkIds` 记录实例实际选中的定义集合。报检弹窗展示与提交时使用 `resolvedLayers`/`resolvedChecks`。
 

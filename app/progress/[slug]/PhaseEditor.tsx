@@ -45,6 +45,8 @@ interface Segment {
   start: number
   end: number
   status: Status
+  spec?: string | null
+  billQuantity?: number | null
 }
 
 interface Side {
@@ -60,7 +62,7 @@ interface LinearView {
 
 interface PointView {
   total: number
-  points: { startPk: number; endPk: number; side: IntervalSide }[]
+  points: { startPk: number; endPk: number; side: IntervalSide; spec?: string | null; billQuantity?: number | null }[]
 }
 
 const statusTone: Record<Status, string> = {
@@ -83,6 +85,8 @@ const normalizePhaseDTO = (phase: PhaseDTO): PhaseDTO => ({
     startPk: Number(interval.startPk) || 0,
     endPk: Number(interval.endPk) || 0,
     side: interval.side,
+    spec: interval.spec ?? null,
+    billQuantity: interval.billQuantity ?? null,
   })),
 })
 
@@ -121,6 +125,13 @@ const normalizeInterval = (interval: PhaseIntervalPayload, measure: PhaseMeasure
     startPk: orderedStart,
     endPk: orderedEnd,
     side: interval.side,
+    spec: typeof interval.spec === 'string' && interval.spec.trim() ? interval.spec.trim() : null,
+    billQuantity:
+      interval.billQuantity === null || interval.billQuantity === undefined
+        ? null
+        : Number.isFinite(Number(interval.billQuantity))
+          ? Number(interval.billQuantity)
+          : null,
   }
 }
 
@@ -159,7 +170,10 @@ const mergeAdjacentSegments = (segments: Segment[]) => {
   const merged: Segment[] = []
   segments.forEach((seg) => {
     const last = merged[merged.length - 1]
-    if (last && last.status === seg.status && Math.abs(last.end - seg.start) < 1e-6) {
+    const sameSpec =
+      (last?.spec ?? null) === (seg.spec ?? null) &&
+      (last?.billQuantity ?? null) === (seg.billQuantity ?? null)
+    if (last && last.status === seg.status && sameSpec && Math.abs(last.end - seg.start) < 1e-6) {
       merged[merged.length - 1] = { ...last, end: seg.end }
     } else {
       merged.push(seg)
@@ -208,7 +222,13 @@ const applyInspectionStatuses = (segments: Segment[], inspections: InspectionSli
         }
       }
     }
-    result.push({ start, end, status })
+    result.push({
+      start,
+      end,
+      status,
+      spec: design.spec,
+      billQuantity: design.billQuantity,
+    })
   }
   return mergeAdjacentSegments(result)
 }
@@ -223,12 +243,18 @@ const buildLinearView = (
   const left: Segment[] = []
   const right: Segment[] = []
   normalized.forEach((interval) => {
-    const seg = { start: interval.startPk, end: interval.endPk, status: 'pending' as Status }
-    if (interval.side === 'LEFT') left.push(seg)
-    if (interval.side === 'RIGHT') right.push(seg)
+    const baseSegment = {
+      start: interval.startPk,
+      end: interval.endPk,
+      status: 'pending' as Status,
+      spec: interval.spec,
+      billQuantity: interval.billQuantity,
+    }
+    if (interval.side === 'LEFT') left.push(baseSegment)
+    if (interval.side === 'RIGHT') right.push(baseSegment)
     if (interval.side === 'BOTH') {
-      left.push(seg)
-      right.push(seg)
+      left.push({ ...baseSegment })
+      right.push({ ...baseSegment })
     }
   })
 
@@ -351,7 +377,7 @@ export function PhaseEditor({
   }, [road.endPk, roadStart])
 
   const defaultInterval = useMemo<PhaseIntervalPayload>(
-    () => ({ startPk: roadStart, endPk: roadEnd, side: 'BOTH' }),
+    () => ({ startPk: roadStart, endPk: roadEnd, side: 'BOTH', spec: '', billQuantity: null }),
     [roadStart, roadEnd],
   )
 
@@ -395,6 +421,54 @@ export function PhaseEditor({
     )
     return maxPhaseEnd || 0
   }, [road.endPk, road.startPk, phases])
+
+  const optionsByDefinition = useMemo(() => {
+    const map = new Map<number, { layers: Set<string>; checks: Set<string> }>()
+    definitions.forEach((def) => {
+      map.set(def.id, {
+        layers: new Set(def.defaultLayers),
+        checks: new Set(def.defaultChecks),
+      })
+    })
+    phases.forEach((phase) => {
+      const existing = map.get(phase.definitionId) ?? { layers: new Set<string>(), checks: new Set<string>() }
+      phase.resolvedLayers.forEach((name) => existing.layers.add(name))
+      phase.resolvedChecks.forEach((name) => existing.checks.add(name))
+      map.set(phase.definitionId, existing)
+    })
+    const normalized = new Map<number, { layers: string[]; checks: string[] }>()
+    map.forEach((value, key) => {
+      normalized.set(key, {
+        layers: Array.from(value.layers),
+        checks: Array.from(value.checks),
+      })
+    })
+    return normalized
+  }, [definitions, phases])
+
+  const scopedLayerOptions = useMemo<LayerDefinitionDTO[]>(() => {
+    if (!definitionId) return []
+    const scoped = optionsByDefinition.get(definitionId)
+    if (!scoped) return []
+    return scoped.layers
+      .map((name, idx) => {
+        const matched = layerOptionsState.find((opt) => opt.name === name)
+        return matched ?? { id: -(idx + 1), name, isActive: true }
+      })
+      .sort((a, b) => a.name.localeCompare(b.name, 'zh-Hans'))
+  }, [definitionId, optionsByDefinition, layerOptionsState])
+
+  const scopedCheckOptions = useMemo<CheckDefinitionDTO[]>(() => {
+    if (!definitionId) return []
+    const scoped = optionsByDefinition.get(definitionId)
+    if (!scoped) return []
+    return scoped.checks
+      .map((name, idx) => {
+        const matched = checkOptionsState.find((opt) => opt.name === name)
+        return matched ?? { id: -(idx + 1), name, isActive: true }
+      })
+      .sort((a, b) => a.name.localeCompare(b.name, 'zh-Hans'))
+  }, [definitionId, optionsByDefinition, checkOptionsState])
 
   const updateInterval = (index: number, patch: Partial<PhaseIntervalPayload>) => {
     setIntervals((prev) =>
@@ -457,6 +531,8 @@ export function PhaseEditor({
         startPk: i.startPk,
         endPk: i.endPk,
         side: i.side,
+        spec: i.spec ?? '',
+        billQuantity: i.billQuantity ?? null,
       })),
     )
     setPointHasSides(Boolean(normalized.pointHasSides))
@@ -483,8 +559,8 @@ export function PhaseEditor({
         setError(t.errors.invalidRange)
         return
       }
-      const { ids: layerIds, newNames: newLayers } = splitTokensToIds(layerTokens, layerOptionsState)
-      const { ids: checkIds, newNames: newChecks } = splitTokensToIds(checkTokens, checkOptionsState)
+      const { ids: layerIds, newNames: newLayers } = splitTokensToIds(layerTokens, scopedLayerOptions)
+      const { ids: checkIds, newNames: newChecks } = splitTokensToIds(checkTokens, scopedCheckOptions)
       const payload: PhasePayload = {
         phaseDefinitionId: definitionId ?? undefined,
         name,
@@ -497,10 +573,21 @@ export function PhaseEditor({
         intervals: intervals.map((item) => {
           const startPk = Number(item.startPk)
           const endPk = measure === 'POINT' ? startPk : Number(item.endPk)
+          const spec = typeof item.spec === 'string' ? item.spec.trim() : ''
+          const billQuantityInput = item.billQuantity
+          const numericBillQuantity =
+            billQuantityInput === null || billQuantityInput === undefined
+              ? null
+              : Number(billQuantityInput)
           return {
             startPk,
             endPk,
             side: item.side,
+            spec: spec || undefined,
+            billQuantity:
+              numericBillQuantity === null || !Number.isFinite(numericBillQuantity)
+                ? undefined
+                : numericBillQuantity,
           }
         }),
       }
@@ -522,22 +609,37 @@ export function PhaseEditor({
         return
       }
       const phase = normalizePhaseDTO(data.phase)
-      if (!definitions.find((d) => d.id === phase.definitionId)) {
-        setDefinitions((prev) => [
-          ...prev,
-          {
-            id: phase.definitionId,
-            name: phase.definitionName,
-            measure: phase.measure,
-            pointHasSides: phase.pointHasSides,
-            defaultLayers: phase.resolvedLayers,
-            defaultChecks: phase.resolvedChecks,
-            isActive: true,
-            createdAt: phase.createdAt,
-            updatedAt: phase.updatedAt,
-          },
-        ])
-      }
+      setDefinitions((prev) => {
+        const existing = prev.find((d) => d.id === phase.definitionId)
+        if (!existing) {
+          return [
+            ...prev,
+            {
+              id: phase.definitionId,
+              name: phase.definitionName,
+              measure: phase.measure,
+              pointHasSides: phase.pointHasSides,
+              defaultLayers: phase.resolvedLayers,
+              defaultChecks: phase.resolvedChecks,
+              isActive: true,
+              createdAt: phase.createdAt,
+              updatedAt: phase.updatedAt,
+            },
+          ]
+        }
+        return prev.map((item) =>
+          item.id === phase.definitionId
+            ? {
+                ...item,
+                measure: phase.measure,
+                pointHasSides: phase.pointHasSides,
+                defaultLayers: phase.resolvedLayers,
+                defaultChecks: phase.resolvedChecks,
+                updatedAt: phase.updatedAt,
+              }
+            : item,
+        )
+      })
       const layerPairs =
         phase.layerIds.length && phase.resolvedLayers.length === phase.layerIds.length
           ? phase.layerIds.map((id, idx) => ({ id, name: phase.resolvedLayers[idx] }))
@@ -790,6 +892,8 @@ const addCheckToken = () => {
     sideLabel: string
     start: number
     end: number
+    spec?: string | null
+    billQuantity?: number | null
   } | null>(null)
   const [selectedSide, setSelectedSide] = useState<IntervalSide>('BOTH')
   const [startPkInput, setStartPkInput] = useState<string>('')
@@ -1021,6 +1125,8 @@ const addCheckToken = () => {
                         const value = e.target.value
                         if (!value) {
                           setDefinitionId(null)
+                          setLayerTokens([])
+                          setCheckTokens([])
                           return
                         }
                         const found = definitions.find((item) => item.id === Number(value))
@@ -1109,7 +1215,7 @@ const addCheckToken = () => {
                     {intervals.map((item, index) => (
                       <div
                         key={index}
-                        className="grid grid-cols-1 gap-3 rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-slate-100 md:grid-cols-4 md:items-center"
+                        className="grid grid-cols-1 gap-3 rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-slate-100 md:grid-cols-6 md:items-center"
                       >
                         <label className="flex flex-col gap-1">
                           {t.form.intervalStart}
@@ -1149,11 +1255,36 @@ const addCheckToken = () => {
                             ))}
                           </select>
                         </label>
+                        <label className="flex flex-col gap-1">
+                          {t.form.intervalSpec}
+                          <input
+                            type="text"
+                            className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
+                            value={item.spec ?? ''}
+                            onChange={(e) => updateInterval(index, { spec: e.target.value })}
+                            placeholder={t.form.intervalSpec}
+                          />
+                        </label>
+                        <label className="flex flex-col gap-1">
+                          {t.form.intervalBillQuantity}
+                          <input
+                            type="number"
+                            className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
+                            value={
+                              Number.isFinite(item.billQuantity ?? Number.NaN) ? item.billQuantity ?? '' : ''
+                            }
+                            onChange={(e) =>
+                              updateInterval(index, {
+                                billQuantity: e.target.value === '' ? null : Number(e.target.value),
+                              })
+                            }
+                          />
+                        </label>
                         <div className="flex items-end justify-end">
                           {intervals.length > 1 ? (
                             <button
                               type="button"
-                              className="rounded-xl border border-white/20 px-3 py-2 text-xs font-semibold text-rose-100 transition hover:border-rose-200/60 hover:bg-rose-200/10"
+                              className="rounded-xl border border-rose-200/60 px-3 py-2 text-xs font-semibold text-rose-100 transition hover:border-rose-200/60 hover:bg-rose-200/10"
                               onClick={() => removeInterval(index)}
                             >
                               {t.form.intervalDelete}
@@ -1185,7 +1316,7 @@ const addCheckToken = () => {
                         onChange={(e) => setLayerInput(e.target.value)}
                       />
                       <div className="flex flex-wrap gap-2">
-                        {layerOptionsState.map((option) => (
+                        {scopedLayerOptions.map((option) => (
                           <button
                             key={option.id}
                             type="button"
@@ -1243,7 +1374,7 @@ const addCheckToken = () => {
                         onChange={(e) => setCheckInput(e.target.value)}
                       />
                       <div className="flex flex-wrap gap-2">
-                        {checkOptionsState.map((option) => (
+                        {scopedCheckOptions.map((option) => (
                           <button
                             key={option.id}
                             type="button"
@@ -1468,6 +1599,8 @@ const addCheckToken = () => {
                                           sideLabel,
                                           start: seg.start,
                                           end: seg.end,
+                                          spec: seg.spec ?? null,
+                                          billQuantity: seg.billQuantity ?? null,
                                         })
                                       }
                                     }}
@@ -1534,6 +1667,8 @@ const addCheckToken = () => {
                                                 sideLabel,
                                                 start: item.startPk,
                                                 end: item.endPk,
+                                                spec: item.spec ?? null,
+                                                billQuantity: item.billQuantity ?? null,
                                               })
                                             }}
                                           >
@@ -1600,6 +1735,8 @@ const addCheckToken = () => {
                                       sideLabel,
                                       start: item.startPk,
                                       end: item.endPk,
+                                      spec: item.spec ?? null,
+                                      billQuantity: item.billQuantity ?? null,
                                     })
                                   }}
                                 >
@@ -1658,6 +1795,11 @@ const addCheckToken = () => {
                 <span className="rounded-full bg-white/5 px-2.5 py-1 text-xs font-semibold text-slate-100 ring-1 ring-white/10">
                   {formatPK(selectedSegment.start)} → {formatPK(selectedSegment.end)}
                 </span>
+                {selectedSegment.spec ? (
+                  <span className="rounded-full bg-white/5 px-2.5 py-1 text-xs font-semibold text-slate-100 ring-1 ring-white/10">
+                    {t.form.intervalSpec}：{selectedSegment.spec}
+                  </span>
+                ) : null}
               </div>
               <button
                 type="button"

@@ -10,6 +10,14 @@ import type {
   RoadSectionWithPhasesDTO,
 } from '@/lib/progressTypes'
 import { resolveRoadName } from '@/lib/i18n/roadDictionary'
+import {
+  PREFAB_ROAD_NAME,
+  PREFAB_ROAD_SLUG,
+  prefabCheckOptions,
+  prefabPhaseOptions,
+  prefabTypeOptions,
+  type PrefabPhaseKey,
+} from '@/lib/prefabInspection'
 
 interface Props {
   roads: RoadSectionWithPhasesDTO[]
@@ -112,6 +120,24 @@ export function InspectionBoard({ roads, loadError }: Props) {
   const [bulkStatus, setBulkStatus] = useState<InspectionStatus | ''>('')
   const [bulkPending, setBulkPending] = useState(false)
   const [bulkError, setBulkError] = useState<string | null>(null)
+  const [showPrefabModal, setShowPrefabModal] = useState(false)
+  const [prefabPending, setPrefabPending] = useState(false)
+  const [prefabError, setPrefabError] = useState<string | null>(null)
+  const [prefabForm, setPrefabForm] = useState<{
+    phaseKey: PrefabPhaseKey
+    layers: string[]
+    checks: string[]
+    types: string[]
+    appointmentDate: string
+    remark: string
+  }>({
+    phaseKey: 'ditch',
+    layers: ['预制边沟'],
+    checks: prefabCheckOptions,
+    types: prefabTypeOptions,
+    appointmentDate: '',
+    remark: '',
+  })
   const columnOptions: { key: ColumnKey; label: string }[] = useMemo(
     () => [
       { key: 'road', label: '道路' },
@@ -248,6 +274,26 @@ export function InspectionBoard({ roads, loadError }: Props) {
     }
   }
 
+  const togglePrefabArrayValue = (field: 'layers' | 'checks' | 'types', value: string) => {
+    setPrefabForm((prev) => {
+      const next = prev[field].includes(value)
+        ? prev[field].filter((item) => item !== value)
+        : [...prev[field], value]
+      return { ...prev, [field]: next }
+    })
+  }
+
+  const handlePrefabPhaseChange = (value: PrefabPhaseKey) => {
+    const matched = prefabPhaseOptions.find((item) => item.key === value)
+    setPrefabForm((prev) => ({
+      ...prev,
+      phaseKey: value,
+      layers: matched ? [matched.layer] : prev.layers,
+    }))
+  }
+
+  const isPrefabItem = (item: InspectionListItem) => item.roadSlug === PREFAB_ROAD_SLUG
+
   const handleSort = (field: SortField) => {
     setPage(1)
     if (sortField === field) {
@@ -270,6 +316,49 @@ export function InspectionBoard({ roads, loadError }: Props) {
     setSortField('updatedAt')
     setSortOrder('desc')
     setPage(1)
+  }
+
+  const submitPrefab = async () => {
+    if (!prefabForm.layers.length || !prefabForm.checks.length || !prefabForm.types.length) {
+      setPrefabError('层次、验收内容、验收类型均不能为空')
+      return
+    }
+    if (!prefabForm.appointmentDate) {
+      setPrefabError('请选择预约报检日期')
+      return
+    }
+    setPrefabPending(true)
+    setPrefabError(null)
+    try {
+      const res = await fetch('/api/inspections/prefab', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phaseKey: prefabForm.phaseKey,
+          layers: prefabForm.layers,
+          checks: prefabForm.checks,
+          types: prefabForm.types,
+          appointmentDate: prefabForm.appointmentDate,
+          remark: prefabForm.remark || undefined,
+        }),
+      })
+      const data = (await res.json().catch(() => ({}))) as { inspection?: InspectionListItem; message?: string }
+      if (!res.ok || !data.inspection) {
+        throw new Error(data.message ?? '创建失败')
+      }
+      setShowPrefabModal(false)
+      setPrefabForm((prev) => ({
+        ...prev,
+        appointmentDate: '',
+        remark: '',
+      }))
+      await fetchData()
+    } catch (err) {
+      setPrefabError((err as Error).message)
+    } finally {
+      setPrefabPending(false)
+    }
   }
 
   const formatDate = (value: string) =>
@@ -581,6 +670,16 @@ export function InspectionBoard({ roads, loadError }: Props) {
               >
                 立即查询
               </button>
+              <button
+                type="button"
+                className="rounded-xl bg-sky-200 px-4 py-2 text-xs font-semibold text-slate-900 shadow-lg shadow-sky-300/30 transition hover:-translate-y-0.5"
+                onClick={() => {
+                  setShowPrefabModal(true)
+                  setPrefabError(null)
+                }}
+              >
+                新增预制报检
+              </button>
               {loading ? <span className="text-xs text-slate-200">加载中...</span> : null}
             </div>
           </div>
@@ -726,6 +825,10 @@ export function InspectionBoard({ roads, loadError }: Props) {
                 ) : (
                   items.map((item, index) => {
                     const displayIndex = (page - 1) * pageSize + index + 1
+                    const isPrefab = isPrefabItem(item)
+                    const roadText = isPrefab ? PREFAB_ROAD_NAME : item.roadName
+                    const sideText = isPrefab ? '—' : sideCopy[item.side] ?? item.side
+                    const rangeText = isPrefab ? '—' : `${formatPK(item.startPk)} → ${formatPK(item.endPk)}`
                     return (
                       <tr
                         key={item.id}
@@ -748,12 +851,12 @@ export function InspectionBoard({ roads, loadError }: Props) {
                           <span>{displayIndex}</span>
                         </div>
                       </td>
-                      {isVisible('road') ? <td className="px-4 py-3">{item.roadName}</td> : null}
+                      {isVisible('road') ? <td className="px-4 py-3">{roadText}</td> : null}
                       {isVisible('phase') ? <td className="px-4 py-3">{item.phaseName}</td> : null}
-                      {isVisible('side') ? <td className="px-4 py-3">{sideCopy[item.side] ?? item.side}</td> : null}
+                      {isVisible('side') ? <td className="px-4 py-3">{sideText}</td> : null}
                       {isVisible('range') ? (
                         <td className="px-4 py-3">
-                          {formatPK(item.startPk)} → {formatPK(item.endPk)}
+                          {rangeText}
                         </td>
                       ) : null}
                       {isVisible('checks') ? (
@@ -838,6 +941,147 @@ export function InspectionBoard({ roads, loadError }: Props) {
           </div>
         </section>
 
+        {showPrefabModal ? (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 px-4 py-6"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setShowPrefabModal(false)
+            }}
+          >
+            <div className="w-full max-w-3xl rounded-3xl border border-white/10 bg-slate-900/95 p-6 shadow-2xl shadow-sky-400/20 backdrop-blur">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.2em] text-sky-100">新增预制报检</p>
+                  <h2 className="text-xl font-semibold text-slate-50">预制 · 报检记录</h2>
+                  <p className="text-sm text-slate-300">道路固定为“预制”，无侧别与区间。</p>
+                </div>
+                <button
+                  type="button"
+                  className="rounded-full border border-white/20 px-3 py-1 text-xs font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/20"
+                  onClick={() => setShowPrefabModal(false)}
+                  aria-label="关闭预制报检"
+                >
+                  ×
+                </button>
+              </div>
+              <div className="mt-4 space-y-4 text-sm text-slate-200">
+                <div className="grid gap-3 md:grid-cols-2">
+                  <label className="flex flex-col gap-1">
+                    分项
+                    <select
+                      className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
+                      value={prefabForm.phaseKey}
+                      onChange={(e) => handlePrefabPhaseChange(e.target.value as PrefabPhaseKey)}
+                    >
+                      {prefabPhaseOptions.map((option) => (
+                        <option key={option.key} value={option.key}>
+                          {option.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="flex flex-col gap-1">
+                    预约报检日期
+                    <input
+                      type="date"
+                      className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
+                      value={prefabForm.appointmentDate}
+                      onChange={(e) => setPrefabForm((prev) => ({ ...prev, appointmentDate: e.target.value }))}
+                    />
+                  </label>
+                </div>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <p className="text-xs text-slate-300">验收层次</p>
+                    <div className="flex flex-wrap gap-2">
+                      {prefabPhaseOptions.map((option) => (
+                        <button
+                          key={option.layer}
+                          type="button"
+                          className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                            prefabForm.layers.includes(option.layer)
+                              ? 'bg-emerald-300 text-slate-900 shadow shadow-emerald-300/30'
+                              : 'border border-white/20 bg-white/5 text-slate-100'
+                          }`}
+                          onClick={() => togglePrefabArrayValue('layers', option.layer)}
+                        >
+                          {option.layer}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-xs text-slate-300">验收类型</p>
+                    <div className="flex flex-wrap gap-2">
+                      {prefabTypeOptions.map((option) => (
+                        <button
+                          key={option}
+                          type="button"
+                          className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                            prefabForm.types.includes(option)
+                              ? 'bg-emerald-300 text-slate-900 shadow shadow-emerald-300/30'
+                              : 'border border-white/20 bg-white/5 text-slate-100'
+                          }`}
+                          onClick={() => togglePrefabArrayValue('types', option)}
+                        >
+                          {option}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <p className="text-xs text-slate-300">验收内容</p>
+                  <div className="flex flex-wrap gap-2">
+                    {prefabCheckOptions.map((option) => (
+                      <button
+                        key={option}
+                        type="button"
+                        className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                          prefabForm.checks.includes(option)
+                            ? 'bg-emerald-300 text-slate-900 shadow shadow-emerald-300/30'
+                            : 'border border-white/20 bg-white/5 text-slate-100'
+                        }`}
+                        onClick={() => togglePrefabArrayValue('checks', option)}
+                      >
+                        {option}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <label className="flex flex-col gap-1">
+                  备注
+                  <textarea
+                    className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-200/60 focus:border-emerald-300 focus:outline-none"
+                    rows={3}
+                    value={prefabForm.remark}
+                    onChange={(e) => setPrefabForm((prev) => ({ ...prev, remark: e.target.value }))}
+                    placeholder="可填写批次、模台号等"
+                  />
+                </label>
+                {prefabError ? <p className="text-xs text-amber-200">{prefabError}</p> : null}
+                <div className="flex items-center justify-end gap-3">
+                  <button
+                    type="button"
+                    className="rounded-xl border border-white/20 px-4 py-2 text-xs font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/10"
+                    onClick={() => setShowPrefabModal(false)}
+                  >
+                    取消
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded-xl bg-sky-200 px-4 py-2 text-xs font-semibold text-slate-900 shadow-lg shadow-sky-300/30 transition hover:-translate-y-0.5 disabled:opacity-60"
+                    onClick={submitPrefab}
+                    disabled={prefabPending}
+                  >
+                    {prefabPending ? '创建中...' : '提交预制报检'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
         {selected ? (
           <div
             className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 px-4 py-6"
@@ -845,15 +1089,21 @@ export function InspectionBoard({ roads, loadError }: Props) {
               if (e.target === e.currentTarget) setSelected(null)
             }}
           >
+            {(() => {
+              const isPrefab = isPrefabItem(selected)
+              const sideText = isPrefab ? '—' : sideCopy[selected.side] ?? selected.side
+              const rangeText = isPrefab ? '—' : `${formatPK(selected.startPk)} → ${formatPK(selected.endPk)}`
+              const roadText = isPrefab ? PREFAB_ROAD_NAME : selected.roadName
+              return (
             <div className="w-full max-w-3xl rounded-3xl border border-white/10 bg-slate-900/95 p-6 shadow-2xl shadow-slate-900/50 backdrop-blur">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="text-xs uppercase tracking-[0.2em] text-emerald-100">报检详情</p>
                   <h2 className="text-xl font-semibold text-slate-50">
-                    {selected.phaseName} · {sideCopy[selected.side] ?? selected.side}
+                    {selected.phaseName} · {sideText}
                   </h2>
                   <p className="text-sm text-slate-300">
-                    {selected.roadName} · {formatPK(selected.startPk)} → {formatPK(selected.endPk)}
+                    {roadText} · {rangeText}
                   </p>
                 </div>
                 <button
@@ -902,6 +1152,8 @@ export function InspectionBoard({ roads, loadError }: Props) {
                 </div>
               </div>
             </div>
+              )
+            })()}
           </div>
         ) : null}
 
@@ -912,15 +1164,20 @@ export function InspectionBoard({ roads, loadError }: Props) {
               if (e.target === e.currentTarget) setEditing(null)
             }}
           >
+            {(() => {
+              const isPrefab = isPrefabItem(editing)
+              const roadText = isPrefab ? PREFAB_ROAD_NAME : editing.roadName
+              const rangeText = isPrefab ? '—' : `${formatPK(editing.startPk)} → ${formatPK(editing.endPk)}`
+              return (
             <div className="w-full max-w-4xl rounded-3xl border border-white/10 bg-slate-900/95 p-6 shadow-2xl shadow-emerald-500/20 backdrop-blur">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="text-xs uppercase tracking-[0.2em] text-emerald-100">编辑报检</p>
                   <h2 className="text-xl font-semibold text-slate-50">
-                    {editing.roadName} · {editing.phaseName}
+                    {roadText} · {editing.phaseName}
                   </h2>
                   <p className="text-sm text-slate-300">
-                    {formatPK(editing.startPk)} → {formatPK(editing.endPk)}
+                    {rangeText}
                   </p>
                 </div>
                 <button
@@ -946,43 +1203,59 @@ export function InspectionBoard({ roads, loadError }: Props) {
                         <option key={phase.id} value={phase.id}>
                           {phase.name}
                         </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="flex flex-col gap-1">
-                    侧别
-                    <select
-                      className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
-                      value={editForm.side}
-                      onChange={(e) => setEditForm((prev) => ({ ...prev, side: e.target.value as IntervalSide }))}
-                    >
-                      <option value="">选择侧别</option>
-                      <option value="LEFT">左侧</option>
-                      <option value="RIGHT">右侧</option>
-                      <option value="BOTH">双侧</option>
-                    </select>
-                  </label>
+                        ))}
+                      </select>
+                    </label>
+                  {isPrefab ? (
+                    <div className="flex flex-col gap-1 rounded-xl border border-white/10 bg-white/5 px-3 py-2">
+                      <span className="text-xs text-slate-300">侧别</span>
+                      <span>—（预制无需侧别）</span>
+                    </div>
+                  ) : (
+                    <label className="flex flex-col gap-1">
+                      侧别
+                      <select
+                        className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
+                        value={editForm.side}
+                        onChange={(e) => setEditForm((prev) => ({ ...prev, side: e.target.value as IntervalSide }))}
+                      >
+                        <option value="">选择侧别</option>
+                        <option value="LEFT">左侧</option>
+                        <option value="RIGHT">右侧</option>
+                        <option value="BOTH">双侧</option>
+                      </select>
+                    </label>
+                  )}
                 </div>
-                <div className="grid gap-3 md:grid-cols-2">
-                  <label className="flex flex-col gap-1">
-                    起点 PK
-                    <input
-                      type="number"
-                      className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
-                      value={editForm.startPk}
-                      onChange={(e) => setEditForm((prev) => ({ ...prev, startPk: e.target.value }))}
-                    />
-                  </label>
-                  <label className="flex flex-col gap-1">
-                    终点 PK
-                    <input
-                      type="number"
-                      className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
-                      value={editForm.endPk}
-                      onChange={(e) => setEditForm((prev) => ({ ...prev, endPk: e.target.value }))}
-                    />
-                  </label>
-                </div>
+                {isPrefab ? (
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div className="flex flex-col gap-1 rounded-xl border border-white/10 bg-white/5 px-3 py-2">
+                      <span className="text-xs text-slate-300">起止 PK</span>
+                      <span>—（预制报检无需区间）</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <label className="flex flex-col gap-1">
+                      起点 PK
+                      <input
+                        type="number"
+                        className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
+                        value={editForm.startPk}
+                        onChange={(e) => setEditForm((prev) => ({ ...prev, startPk: e.target.value }))}
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1">
+                      终点 PK
+                      <input
+                        type="number"
+                        className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
+                        value={editForm.endPk}
+                        onChange={(e) => setEditForm((prev) => ({ ...prev, endPk: e.target.value }))}
+                      />
+                    </label>
+                  </div>
+                )}
                 <div className="grid gap-3 md:grid-cols-2">
                   <label className="flex flex-col gap-1">
                     验收层次（逗号分隔）
@@ -1053,6 +1326,8 @@ export function InspectionBoard({ roads, loadError }: Props) {
                 </div>
               </div>
             </div>
+              )
+            })()}
           </div>
         ) : null}
 

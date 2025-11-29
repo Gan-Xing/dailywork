@@ -264,3 +264,14 @@ export const updateInspectionStatuses = async (
     throw error
   }
 }
+
+export const getInspectionListItem = async (id: number): Promise<InspectionListItem> => {
+  const row = await prisma.inspectionRequest.findUnique({
+    where: { id },
+    include: { road: true, phase: true, creator: true, submitter: true, updater: true },
+  })
+  if (!row) {
+    throw new Error('报检记录不存在或已删除')
+  }
+  return mapInspectionListItem(row)
+}
