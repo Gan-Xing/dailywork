@@ -2,7 +2,15 @@
 
 import Link from 'next/link'
 import type { FormEvent } from 'react'
-import { useEffect, useRef, useState, useTransition } from 'react'
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+  useTransition,
+} from 'react'
 
 import type {
   PhaseDTO,
@@ -17,6 +25,10 @@ import { usePreferredLocale } from '@/lib/usePreferredLocale'
 interface Props {
   initialRoads: RoadSectionProgressDTO[]
   canManage: boolean
+}
+
+export interface RoadBoardHandle {
+  openFormModal: () => void
 }
 
 interface FormState {
@@ -41,7 +53,10 @@ const sortRoads = (roads: RoadSectionProgressDTO[], locale: Locale) =>
     ),
   )
 
-export function RoadBoard({ initialRoads, canManage }: Props) {
+const RoadBoard = forwardRef<RoadBoardHandle, Props>(function RoadBoard(
+  { initialRoads, canManage }: Props,
+  ref,
+) {
   const { locale } = usePreferredLocale('zh', locales)
   const t = getProgressCopy(locale)
   const [roads, setRoads] = useState<RoadSectionProgressDTO[]>(sortRoads(initialRoads, locale))
@@ -49,8 +64,8 @@ export function RoadBoard({ initialRoads, canManage }: Props) {
   const [editingId, setEditingId] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
-  const formRef = useRef<HTMLFormElement | null>(null)
   const nameInputRef = useRef<HTMLInputElement | null>(null)
+  const [showFormModal, setShowFormModal] = useState(false)
 
   useEffect(() => {
     setRoads((prev) => sortRoads(prev, locale))
@@ -60,6 +75,27 @@ export function RoadBoard({ initialRoads, canManage }: Props) {
     setForm(emptyForm)
     setEditingId(null)
   }
+
+  const openFormModal = useCallback(() => {
+    if (!canManage) return
+    setShowFormModal(true)
+  }, [canManage])
+
+  const closeFormModal = () => {
+    setShowFormModal(false)
+    resetForm()
+    setError(null)
+  }
+
+  useImperativeHandle(ref, () => ({ openFormModal }), [openFormModal])
+
+  useEffect(() => {
+    if (!showFormModal) return
+    const frame = requestAnimationFrame(() => {
+      nameInputRef.current?.focus()
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [showFormModal])
 
   const upsertRoad = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -100,6 +136,7 @@ export function RoadBoard({ initialRoads, canManage }: Props) {
         return sortRoads(next, locale)
       })
       resetForm()
+      setShowFormModal(false)
     })
   }
 
@@ -133,107 +170,11 @@ export function RoadBoard({ initialRoads, canManage }: Props) {
     })
     setEditingId(road.id)
     setError(null)
-    requestAnimationFrame(() => {
-      formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      nameInputRef.current?.focus()
-    })
+    setShowFormModal(true)
   }
 
   return (
     <div className="space-y-8">
-      {canManage ? (
-        <section className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur">
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-100">
-                {t.admin.badge}
-              </p>
-              <h2 className="text-xl font-semibold text-slate-50">{t.admin.title}</h2>
-              <p className="text-sm text-slate-200/80">{t.admin.description}</p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              {editingId ? (
-                <span className="rounded-full bg-amber-200/80 px-3 py-1 text-xs font-semibold text-slate-900">
-                  {formatProgressCopy(t.admin.editMode, { id: editingId })}
-                </span>
-              ) : null}
-            </div>
-          </div>
-
-          <form ref={formRef} className="mt-5 grid gap-4 md:grid-cols-3" onSubmit={upsertRoad}>
-            <label className="flex flex-col gap-2 text-sm text-slate-100">
-              {t.form.slugLabel}
-              <input
-                className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-slate-50 placeholder:text-slate-200/60 focus:border-emerald-300 focus:outline-none"
-                value={form.slug}
-                onChange={(event) =>
-                  setForm((prev) => ({ ...prev, slug: event.target.value.toLowerCase() }))
-                }
-                placeholder={t.form.slugPlaceholder}
-                pattern="[a-z0-9-]+"
-                title={t.form.slugTitle}
-                required
-              />
-            </label>
-            <label className="flex flex-col gap-2 text-sm text-slate-100">
-              {t.form.nameLabel}
-              <input
-                ref={nameInputRef}
-                className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-slate-50 placeholder:text-slate-200/60 focus:border-emerald-300 focus:outline-none"
-                value={form.name}
-                onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
-                placeholder={t.form.namePlaceholder}
-                required
-              />
-            </label>
-            <label className="flex flex-col gap-2 text-sm text-slate-100">
-              {t.form.startLabel}
-              <input
-                className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-slate-50 placeholder:text-slate-200/60 focus:border-emerald-300 focus:outline-none"
-                value={form.startPk}
-                onChange={(event) => setForm((prev) => ({ ...prev, startPk: event.target.value }))}
-                placeholder={t.form.startPlaceholder}
-                required
-              />
-            </label>
-            <label className="flex flex-col gap-2 text-sm text-slate-100">
-              {t.form.endLabel}
-              <div className="flex items-center gap-2">
-                <input
-                  className="w-full rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-slate-50 placeholder:text-slate-200/60 focus:border-emerald-300 focus:outline-none"
-                  value={form.endPk}
-                  onChange={(event) =>
-                    setForm((prev) => ({ ...prev, endPk: event.target.value }))
-                  }
-                  placeholder={t.form.endPlaceholder}
-                  required
-                />
-                {editingId ? (
-                  <button
-                    type="button"
-                    className="rounded-xl border border-white/20 px-3 py-2 text-xs font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/10"
-                    onClick={resetForm}
-                  >
-                    {t.form.exitEdit}
-                  </button>
-                ) : null}
-              </div>
-            </label>
-            <div className="flex flex-wrap items-center gap-3 md:col-span-3">
-              <button
-                type="submit"
-                disabled={isPending}
-                className="inline-flex items-center justify-center rounded-2xl bg-emerald-300 px-5 py-3 text-sm font-semibold text-slate-900 shadow-lg shadow-emerald-400/30 transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-70"
-              >
-                {editingId ? t.actions.save : t.actions.add}
-              </button>
-              {error ? <span className="text-sm text-amber-200">{error}</span> : null}
-              {isPending ? <span className="text-xs text-slate-200/70">{t.admin.saving}</span> : null}
-            </div>
-          </form>
-        </section>
-      ) : null}
-
       <section className="space-y-4">
         <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-200">
           {t.list.overview}
@@ -262,9 +203,119 @@ export function RoadBoard({ initialRoads, canManage }: Props) {
           </div>
         )}
       </section>
+
+      {showFormModal && (
+        <div
+          className="fixed inset-0 z-40 flex items-start justify-center overflow-y-auto bg-slate-950/80 px-4 py-6 backdrop-blur sm:items-center sm:py-10"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="relative w-full max-w-4xl overflow-hidden rounded-3xl border border-white/10 bg-slate-900/95 p-5 shadow-2xl shadow-emerald-500/20">
+            <div className="flex flex-col gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-100">
+                  {t.admin.badge}
+                </p>
+                <h2 className="text-xl font-semibold text-slate-50">{t.admin.title}</h2>
+                <p className="text-sm text-slate-200/80">{t.admin.description}</p>
+              </div>
+              {editingId ? (
+                <span className="rounded-full bg-amber-200/80 px-3 py-1 text-xs font-semibold text-slate-900">
+                  {formatProgressCopy(t.admin.editMode, { id: editingId })}
+                </span>
+              ) : null}
+            </div>
+            <button
+              type="button"
+              className="absolute right-4 top-4 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/20"
+              onClick={closeFormModal}
+              aria-label="关闭"
+            >
+              ×
+            </button>
+            <form className="mt-5 space-y-4" onSubmit={upsertRoad}>
+              <div className="grid gap-4 md:grid-cols-3">
+                <label className="flex flex-col gap-2 text-sm text-slate-100">
+                  {t.form.slugLabel}
+                  <input
+                    className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-slate-50 placeholder:text-slate-200/60 focus:border-emerald-300 focus:outline-none"
+                    value={form.slug}
+                    onChange={(event) =>
+                      setForm((prev) => ({ ...prev, slug: event.target.value.toLowerCase() }))
+                    }
+                    placeholder={t.form.slugPlaceholder}
+                    pattern="[a-z0-9-]+"
+                    title={t.form.slugTitle}
+                    required
+                  />
+                </label>
+                <label className="flex flex-col gap-2 text-sm text-slate-100">
+                  {t.form.nameLabel}
+                  <input
+                    ref={nameInputRef}
+                    className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-slate-50 placeholder:text-slate-200/60 focus:border-emerald-300 focus:outline-none"
+                    value={form.name}
+                    onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
+                    placeholder={t.form.namePlaceholder}
+                    required
+                  />
+                </label>
+                <label className="flex flex-col gap-2 text-sm text-slate-100">
+                  {t.form.startLabel}
+                  <input
+                    className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-slate-50 placeholder:text-slate-200/60 focus:border-emerald-300 focus:outline-none"
+                    value={form.startPk}
+                    onChange={(event) => setForm((prev) => ({ ...prev, startPk: event.target.value }))}
+                    placeholder={t.form.startPlaceholder}
+                    required
+                  />
+                </label>
+                <label className="flex flex-col gap-2 text-sm text-slate-100">
+                  {t.form.endLabel}
+                  <div className="flex items-center gap-2">
+                    <input
+                      className="w-full rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-slate-50 placeholder:text-slate-200/60 focus:border-emerald-300 focus:outline-none"
+                      value={form.endPk}
+                      onChange={(event) =>
+                        setForm((prev) => ({ ...prev, endPk: event.target.value }))
+                      }
+                      placeholder={t.form.endPlaceholder}
+                      required
+                    />
+                    {editingId ? (
+                      <button
+                        type="button"
+                        className="rounded-xl border border-white/20 px-3 py-2 text-xs font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/10"
+                        onClick={resetForm}
+                      >
+                        {t.form.exitEdit}
+                      </button>
+                    ) : null}
+                  </div>
+                </label>
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="submit"
+                  disabled={isPending}
+                  className="inline-flex items-center justify-center rounded-2xl bg-emerald-300 px-5 py-3 text-sm font-semibold text-slate-900 shadow-lg shadow-emerald-400/30 transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {editingId ? t.actions.save : t.actions.add}
+                </button>
+                {error ? <span className="text-sm text-amber-200">{error}</span> : null}
+                {isPending ? <span className="text-xs text-slate-200/70">{t.admin.saving}</span> : null}
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
-}
+})
+
+RoadBoard.displayName = 'RoadBoard'
+
+export { RoadBoard }
 
 interface RoadCardProps {
   road: RoadSectionProgressDTO
@@ -281,7 +332,6 @@ const formatDesignLength = (phase: RoadPhaseProgressDTO) => {
   return phase.phaseMeasure === 'POINT' ? `${rounded} 个` : `${rounded} m`
 }
 const calcPhaseProgress = (_phase: PhaseDTO) => {
-  // 验收进度暂未接入，当前返回 0，后续接入验收数据后可替换
   return 0
 }
 

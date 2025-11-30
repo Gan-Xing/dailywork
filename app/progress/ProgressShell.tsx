@@ -1,10 +1,10 @@
 'use client'
 
 import Link from 'next/link'
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 
 import { PhaseAggregateBoard } from './PhaseAggregateBoard'
-import { RoadBoard } from './RoadBoard'
+import { RoadBoard, type RoadBoardHandle } from './RoadBoard'
 import type {
   AggregatedPhaseProgress,
   PhaseMeasure,
@@ -28,6 +28,7 @@ export function ProgressShell({ roads, loadError, canManage, canViewInspections 
   const breadcrumbProgress = locale === 'fr' ? 'Avancement' : '进度管理'
   const inspectionLabel = locale === 'fr' ? '报检记录' : '报检记录'
   const [viewMode, setViewMode] = useState<'road' | 'phase'>('road')
+  const roadBoardRef = useRef<RoadBoardHandle | null>(null)
 
   const aggregatedPhases = useMemo<Array<AggregatedPhaseProgress>>(() => {
     const map = new Map<
@@ -120,14 +121,25 @@ export function ProgressShell({ roads, loadError, canManage, canViewInspections 
                 {breadcrumbProgress}
               </span>
             </nav>
-            {canViewInspections ? (
-              <Link
-                href="/progress/inspections"
-                className="inline-flex items-center gap-2 rounded-full border border-emerald-200/60 px-4 py-2 text-xs font-semibold text-emerald-50 shadow-[0_0_0_1px_rgba(255,255,255,0.08)] transition hover:-translate-y-0.5 hover:border-white/80 hover:bg-white/10"
-              >
-                {inspectionLabel}
-              </Link>
-            ) : null}
+            <div className="flex items-center gap-2">
+              {canViewInspections ? (
+                <Link
+                  href="/progress/inspections"
+                  className="inline-flex items-center gap-2 rounded-full border border-emerald-200/60 px-4 py-2 text-xs font-semibold text-emerald-50 shadow-[0_0_0_1px_rgba(255,255,255,0.08)] transition hover:-translate-y-0.5 hover:border-white/80 hover:bg-white/10"
+                >
+                  {inspectionLabel}
+                </Link>
+              ) : null}
+              {canManage ? (
+                <button
+                  type="button"
+                  onClick={() => roadBoardRef.current?.openFormModal()}
+                  className="inline-flex items-center gap-2 rounded-full border border-transparent bg-emerald-300 px-4 py-2 text-xs font-semibold text-slate-950 shadow-lg shadow-emerald-400/30 transition hover:-translate-y-0.5 hover:bg-emerald-400"
+                >
+                  {t.actions.add}
+                </button>
+              ) : null}
+            </div>
           </div>
           {loadError ? (
             <p className="text-sm text-amber-200">
@@ -164,7 +176,7 @@ export function ProgressShell({ roads, loadError, canManage, canViewInspections 
 
         <div className="mt-10">
           {viewMode === 'road' ? (
-            <RoadBoard initialRoads={roads} canManage={canManage} />
+            <RoadBoard ref={roadBoardRef} initialRoads={roads} canManage={canManage} />
           ) : (
             <PhaseAggregateBoard
               phases={aggregatedPhases}
