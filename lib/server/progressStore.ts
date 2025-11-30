@@ -13,7 +13,7 @@ const normalizeInterval = (interval: PhasePayload['intervals'][number], measure:
   const start = Number(interval.startPk)
   const end = Number(interval.endPk)
   const safeStart = Number.isFinite(start) ? start : 0
-  const safeEnd = measure === 'POINT' ? safeStart : Number.isFinite(end) ? end : safeStart
+  const safeEnd = Number.isFinite(end) ? end : safeStart
   const ordered = safeStart <= safeEnd ? [safeStart, safeEnd] : [safeEnd, safeStart]
   const spec = typeof interval.spec === 'string' ? interval.spec.trim() : ''
   const billValue = (interval as { billQuantity?: unknown }).billQuantity

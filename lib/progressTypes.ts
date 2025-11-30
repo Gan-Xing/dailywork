@@ -42,7 +42,7 @@ export interface InspectionFilter {
   keyword?: string
   startDate?: string
   endDate?: string
-  sortField?: 'createdAt' | 'updatedAt'
+  sortField?: 'appointmentDate' | 'road' | 'phase' | 'side' | 'createdAt' | 'updatedAt'
   sortOrder?: 'asc' | 'desc'
   page?: number
   pageSize?: number

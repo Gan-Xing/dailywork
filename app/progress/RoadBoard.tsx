@@ -343,11 +343,11 @@ const RoadCard = ({ road, onEdit, onDelete, canManage, locale }: RoadCardProps) 
                 const progressWidth = Math.max(0, Math.min(100, phase.completedPercent))
                 const tone =
                   progressWidth >= 80
-                    ? 'from-emerald-300 via-emerald-400 to-emerald-300'
+                    ? 'from-cyan-500 via-sky-500 to-indigo-500'
                     : progressWidth >= 50
-                      ? 'from-lime-300 via-emerald-300 to-cyan-200'
+                      ? 'from-sky-500 via-blue-500 to-violet-500'
                       : progressWidth > 0
-                        ? 'from-amber-300 via-orange-200 to-amber-200'
+                        ? 'from-sky-400 via-cyan-400 to-blue-500'
                         : 'from-slate-500 via-slate-600 to-slate-500'
                 return (
                   <div key={phase.phaseId} className="flex flex-wrap items-center gap-2 rounded-2xl border border-white/10 bg-slate-900/40 p-3 shadow-inner shadow-slate-900/30">

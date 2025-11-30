@@ -54,9 +54,15 @@ interface Side {
   segments: Segment[]
 }
 
+interface LinearSide {
+  label: string
+  segments: Segment[]
+  designTotal: number
+}
+
 interface LinearView {
-  left: Side
-  right: Side
+  left: LinearSide
+  right: LinearSide
   total: number
 }
 
@@ -98,7 +104,8 @@ const formatPK = (value: number) => {
 
 const todayISODate = () => new Date().toISOString().slice(0, 10)
 
-const buildPointKey = (phaseId: number, startPk: number) => `${phaseId}-${Math.round(Number(startPk || 0) * 1000)}`
+const buildPointKey = (phaseId: number, startPk: number, endPk: number) =>
+  `${phaseId}-${Math.round(Number(startPk || 0) * 1000)}-${Math.round(Number(endPk || 0) * 1000)}`
 
 const computeDesign = (measure: PhaseMeasure, intervals: PhaseIntervalPayload[]) =>
   measure === 'POINT'
@@ -119,7 +126,7 @@ const normalizeInterval = (interval: PhaseIntervalPayload, measure: PhaseMeasure
   const start = Number(interval.startPk)
   const end = Number(interval.endPk)
   const safeStart = Number.isFinite(start) ? start : 0
-  const safeEnd = measure === 'POINT' ? safeStart : Number.isFinite(end) ? end : safeStart
+  const safeEnd = Number.isFinite(end) ? end : safeStart
   const [orderedStart, orderedEnd] = safeStart <= safeEnd ? [safeStart, safeEnd] : [safeEnd, safeStart]
   return {
     startPk: orderedStart,
@@ -134,6 +141,8 @@ const normalizeInterval = (interval: PhaseIntervalPayload, measure: PhaseMeasure
           : null,
   }
 }
+
+const getPointCenter = (startPk: number, endPk: number) => (startPk + endPk) / 2
 
 const fillNonDesignGaps = (segments: Segment[], start: number, end: number) => {
   const sorted = [...segments].sort((a, b) => a.start - b.start)
@@ -233,6 +242,15 @@ const applyInspectionStatuses = (segments: Segment[], inspections: InspectionSli
   return mergeAdjacentSegments(result)
 }
 
+const calcDesignBySide = (segments: Segment[]) =>
+  segments.reduce((acc, seg) => (seg.status === 'nonDesign' ? acc : acc + Math.max(0, seg.end - seg.start)), 0)
+
+const calcCompletedBySide = (segments: Segment[]) =>
+  segments.reduce(
+    (acc, seg) => (seg.status === 'approved' ? acc + Math.max(0, seg.end - seg.start) : acc),
+    0,
+  )
+
 const buildLinearView = (
   phase: PhaseDTO,
   roadLength: number,
@@ -278,14 +296,18 @@ const buildLinearView = (
     (insp) => insp.side === 'RIGHT' || insp.side === 'BOTH',
   )
 
+  const leftSegments = applyInspectionStatuses(fillNonDesignGaps(left, 0, total), leftInspections)
+  const rightSegments = applyInspectionStatuses(fillNonDesignGaps(right, 0, total), rightInspections)
   return {
     left: {
       label: sideLabels.left,
-      segments: applyInspectionStatuses(fillNonDesignGaps(left, 0, total), leftInspections),
+      segments: leftSegments,
+      designTotal: calcDesignBySide(leftSegments),
     },
     right: {
       label: sideLabels.right,
-      segments: applyInspectionStatuses(fillNonDesignGaps(right, 0, total), rightInspections),
+      segments: rightSegments,
+      designTotal: calcDesignBySide(rightSegments),
     },
     total,
   }
@@ -305,15 +327,6 @@ const buildPointView = (phase: PhaseDTO, roadLength: number): PointView => {
     points: normalized,
   }
 }
-
-const calcDesignBySide = (segments: Segment[]) =>
-  segments.reduce((acc, seg) => (seg.status === 'nonDesign' ? acc : acc + Math.max(0, seg.end - seg.start)), 0)
-
-const calcCompletedBySide = (segments: Segment[]) =>
-  segments.reduce(
-    (acc, seg) => (seg.status === 'approved' ? acc + Math.max(0, seg.end - seg.start) : acc),
-    0,
-  )
 
 const calcCombinedPercent = (left: Segment[], right: Segment[]) => {
   const leftLen = calcDesignBySide(left)
@@ -552,7 +565,7 @@ export function PhaseEditor({
     startTransition(async () => {
       const intervalInvalid = intervals.some((item) => {
         const start = Number(item.startPk)
-        const end = measure === 'POINT' ? start : Number(item.endPk)
+        const end = Number(item.endPk)
         return !Number.isFinite(start) || !Number.isFinite(end)
       })
       if (intervalInvalid) {
@@ -572,7 +585,7 @@ export function PhaseEditor({
         newChecks,
         intervals: intervals.map((item) => {
           const startPk = Number(item.startPk)
-          const endPk = measure === 'POINT' ? startPk : Number(item.endPk)
+          const endPk = Number(item.endPk)
           const spec = typeof item.spec === 'string' ? item.spec.trim() : ''
           const billQuantityInput = item.billQuantity
           const numericBillQuantity =
@@ -925,8 +938,35 @@ const addCheckToken = () => {
     return result
   }, [phases])
 
-  const resolvePointBadge = (phaseId: number, startPk: number) => {
-    const latest = latestPointInspections.get(buildPointKey(phaseId, startPk))
+  const latestInspectionByPhase = useMemo(() => {
+    const map = new Map<number, number>()
+    inspectionSlices.forEach((item) => {
+      const existing = map.get(item.phaseId) ?? 0
+      if (item.updatedAt > existing) {
+        map.set(item.phaseId, item.updatedAt)
+      }
+    })
+    return map
+  }, [inspectionSlices])
+
+  const sortedPhases = useMemo(() => {
+    if (!phases.length) return phases
+    const order = new Map(phases.map((phase, index) => [phase.id, index]))
+    return [...phases].sort((a, b) => {
+      const aInspection = latestInspectionByPhase.get(a.id) ?? 0
+      const bInspection = latestInspectionByPhase.get(b.id) ?? 0
+      if (aInspection !== bInspection) return bInspection - aInspection
+      const aUpdatedRaw = new Date(a.updatedAt).getTime()
+      const bUpdatedRaw = new Date(b.updatedAt).getTime()
+      const aUpdated = Number.isFinite(aUpdatedRaw) ? aUpdatedRaw : 0
+      const bUpdated = Number.isFinite(bUpdatedRaw) ? bUpdatedRaw : 0
+      if (aUpdated !== bUpdated) return bUpdated - aUpdated
+      return (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0)
+    })
+  }, [phases, latestInspectionByPhase])
+
+  const resolvePointBadge = (phaseId: number, startPk: number, endPk: number) => {
+    const latest = latestPointInspections.get(buildPointKey(phaseId, startPk, endPk))
     if (latest && latest.layers?.length) {
       return latest.layers.slice(0, 2).join(' / ')
     }
@@ -991,7 +1031,7 @@ const addCheckToken = () => {
           const safeStart = Number.isFinite(start) ? start : 0
           const safeEnd = Number.isFinite(end) ? end : safeStart
           const [orderedStart, orderedEnd] = safeStart <= safeEnd ? [safeStart, safeEnd] : [safeEnd, safeStart]
-          const key = buildPointKey(item.phaseId, orderedStart)
+          const key = buildPointKey(item.phaseId, orderedStart, orderedEnd)
           const existing = map.get(key)
           if (!existing || ts > existing.updatedAt) {
             map.set(key, { layers: item.layers || [], updatedAt: ts || 0 })
@@ -1199,10 +1239,10 @@ const addCheckToken = () => {
                   </div>
                 </div>
 
-                <div className="space-y-3 rounded-2xl border border-white/10 bg-white/5 p-4">
-                  <div className="flex items-center justify-between text-sm text-slate-100">
-                    <p>{t.form.intervalTitle}</p>
-                    <button
+                  <div className="space-y-3 rounded-2xl border border-white/10 bg-white/5 p-4">
+                    <div className="flex items-center justify-between text-sm text-slate-100">
+                      <p>{t.form.intervalTitle}</p>
+                      <button
                       type="button"
                       onClick={addInterval}
                       className="rounded-xl border border-white/20 px-3 py-2 text-xs font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/10"
@@ -1217,11 +1257,11 @@ const addCheckToken = () => {
                         key={index}
                         className="grid grid-cols-1 gap-3 rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-slate-100 md:grid-cols-6 md:items-center"
                       >
-                        <label className="flex flex-col gap-1">
+                        <label className="flex flex-col items-center gap-1 text-center">
                           {t.form.intervalStart}
                           <input
                             type="number"
-                            className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
+                            className="w-full rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
                             value={Number.isFinite(item.startPk) ? item.startPk : ''}
                             onChange={(e) =>
                               updateInterval(index, {
@@ -1230,21 +1270,21 @@ const addCheckToken = () => {
                             }
                           />
                         </label>
-                        <label className="flex flex-col gap-1">
+                        <label className="flex flex-col items-center gap-1 text-center">
                           {t.form.intervalEnd}
                           <input
                             type="number"
-                            className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
+                            className="w-full rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
                             value={Number.isFinite(item.endPk) ? item.endPk : ''}
                             onChange={(e) =>
                               updateInterval(index, { endPk: e.target.value === '' ? Number.NaN : Number(e.target.value) })
                             }
                           />
                         </label>
-                        <label className="flex flex-col gap-1">
+                        <label className="flex flex-col items-center gap-1 text-center">
                           {t.form.intervalSide}
                           <select
-                            className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
+                            className="w-full rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
                             value={item.side}
                             onChange={(e) => updateInterval(index, { side: e.target.value as IntervalSide })}
                           >
@@ -1255,21 +1295,21 @@ const addCheckToken = () => {
                             ))}
                           </select>
                         </label>
-                        <label className="flex flex-col gap-1">
+                        <label className="flex flex-col items-center gap-1 text-center">
                           {t.form.intervalSpec}
                           <input
                             type="text"
-                            className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
+                            className="w-full rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
                             value={item.spec ?? ''}
                             onChange={(e) => updateInterval(index, { spec: e.target.value })}
                             placeholder={t.form.intervalSpec}
                           />
                         </label>
-                        <label className="flex flex-col gap-1">
+                        <label className="flex flex-col items-center gap-1 text-center">
                           {t.form.intervalBillQuantity}
                           <input
                             type="number"
-                            className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
+                            className="w-full rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
                             value={
                               Number.isFinite(item.billQuantity ?? Number.NaN) ? item.billQuantity ?? '' : ''
                             }
@@ -1280,7 +1320,7 @@ const addCheckToken = () => {
                             }
                           />
                         </label>
-                        <div className="flex items-end justify-end">
+                        <div className="flex items-center justify-center">
                           {intervals.length > 1 ? (
                             <button
                               type="button"
@@ -1510,7 +1550,7 @@ const addCheckToken = () => {
           </div>
         ) : (
           <div className="space-y-6">
-            {phases.map((phase) => {
+            {sortedPhases.map((phase) => {
               const linear = phase.measure === 'LINEAR' ? linearViews.find((item) => item.phase.id === phase.id) : null
               const point = phase.measure === 'POINT' ? pointViews.find((item) => item.phase.id === phase.id) : null
 
@@ -1558,65 +1598,70 @@ const addCheckToken = () => {
                     </div>
                   </div>
 
-                  {phase.measure === 'LINEAR' && linear ? (
-                    <div className="mt-4 space-y-4">
-                      {[linear.view.left, linear.view.right].map((side) => (
-                        <div key={side.label} className="space-y-2">
-                          <div className="flex items-center justify-between text-xs text-slate-200/80">
-                            <span className="rounded-full bg-white/10 px-2 py-1 text-[11px] font-semibold">
-                              {side.label}
-                            </span>
-                            <span className="text-slate-300">
-                              {formatPK(0)} – {formatPK(linear.view.total)}
-                            </span>
-                          </div>
-                          <div className="rounded-full bg-slate-900/70 p-1 shadow-inner shadow-slate-900/50">
-                            <div className="flex h-8 overflow-hidden rounded-full bg-slate-800/60">
-                              {side.segments.map((seg, idx) => {
-                                const width = Math.max(0, seg.end - seg.start) / linear.view.total * 100
-                                return (
-                                  <button
-                                    key={`${seg.start}-${seg.end}-${idx}`}
-                                    type="button"
-                                    className={`${statusTone[seg.status]} group flex h-full items-center justify-center text-[10px] font-semibold transition hover:opacity-90`}
-                                    style={{ width: `${width}%` }}
-                                    title={`${side.label} ${formatPK(seg.start)} ~ ${formatPK(seg.end)} · ${statusLabel(seg.status)}`}
-                                    onClick={() => {
-                                      if (seg.status === 'pending') {
-                                        if (!canInspect) {
-                                          alert(t.alerts.noInspectPermission)
-                                          return
-                                        }
-                                        const sideLabel = side.label
-                                        const sideValue = sideLabel === sideLabelMap.LEFT ? 'LEFT' : 'RIGHT'
-                                        setSelectedSegment({
-                                          phase: phase.name,
-                                          phaseId: phase.id,
-                                          measure: phase.measure,
-                                          layers: phase.resolvedLayers,
-                                          checks: phase.resolvedChecks,
-                                          side: sideValue,
-                                          sideLabel,
-                                          start: seg.start,
-                                          end: seg.end,
-                                          spec: seg.spec ?? null,
-                                          billQuantity: seg.billQuantity ?? null,
-                                        })
-                                      }
-                                    }}
-                                  >
-                                    <span className="px-1 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100">
-                                      {formatPK(seg.start)}–{formatPK(seg.end)}
-                                    </span>
-                                  </button>
-                                )
-                              })}
+                    {phase.measure === 'LINEAR' && linear ? (
+                      <div className="mt-4 space-y-4">
+                        {[linear.view.left, linear.view.right]
+                          .filter((side) => side.designTotal > 0)
+                          .map((side) => (
+                            <div key={side.label} className="space-y-2">
+                              <div className="flex items-center justify-between text-xs text-slate-200/80">
+                                <span className="rounded-full bg-white/10 px-2 py-1 text-[11px] font-semibold">
+                                  {side.label}
+                                </span>
+                                <span className="text-slate-300">
+                                  {formatPK(0)} – {formatPK(linear.view.total)}
+                                </span>
+                              </div>
+                              <div className="rounded-full bg-slate-900/70 p-1 shadow-inner shadow-slate-900/50">
+                                <div className="flex h-8 overflow-hidden rounded-full bg-slate-800/60">
+                                  {side.segments
+                                    .filter((seg) => seg.status !== 'nonDesign')
+                                    .map((seg, idx) => {
+                                      const base = Math.max(side.designTotal, 1)
+                                      const width = (Math.max(0, seg.end - seg.start) / base) * 100
+                                      return (
+                                        <button
+                                          key={`${seg.start}-${seg.end}-${idx}`}
+                                          type="button"
+                                          className={`${statusTone[seg.status]} group flex h-full items-center justify-center text-[10px] font-semibold transition hover:opacity-90`}
+                                          style={{ width: `${width}%` }}
+                                          title={`${side.label} ${formatPK(seg.start)} ~ ${formatPK(seg.end)} · ${statusLabel(seg.status)}`}
+                                          onClick={() => {
+                                            if (seg.status === 'pending') {
+                                              if (!canInspect) {
+                                                alert(t.alerts.noInspectPermission)
+                                                return
+                                              }
+                                              const sideLabel = side.label
+                                              const sideValue = sideLabel === sideLabelMap.LEFT ? 'LEFT' : 'RIGHT'
+                                              setSelectedSegment({
+                                                phase: phase.name,
+                                                phaseId: phase.id,
+                                                measure: phase.measure,
+                                                layers: phase.resolvedLayers,
+                                                checks: phase.resolvedChecks,
+                                                side: sideValue,
+                                                sideLabel,
+                                                start: seg.start,
+                                                end: seg.end,
+                                                spec: seg.spec ?? null,
+                                                billQuantity: seg.billQuantity ?? null,
+                                              })
+                                            }
+                                          }}
+                                        >
+                                          <span className="px-1 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100">
+                                            {formatPK(seg.start)}–{formatPK(seg.end)}
+                                          </span>
+                                        </button>
+                                      )
+                                    })}
+                                </div>
+                              </div>
                             </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : null}
+                          ))}
+                      </div>
+                    ) : null}
 
                   {phase.measure === 'POINT' && point ? (
                     <div className="mt-4 space-y-3">
@@ -1641,22 +1686,24 @@ const addCheckToken = () => {
                                     <div className="absolute left-6 right-6 top-1/2 h-1 -translate-y-1/2 rounded-full bg-gradient-to-r from-slate-800 via-slate-900 to-slate-800" />
                                     <div className="relative flex h-full items-center justify-between">
                                       {rowPoints.map((item, idx) => {
+                                        const centerPk = getPointCenter(item.startPk, item.endPk)
                                         const position = Math.min(
                                           100,
-                                          Math.max(0, Math.round((item.startPk / point.view.total) * 100)),
+                                          Math.max(0, Math.round((centerPk / point.view.total) * 100)),
                                         )
+                                        const rangeLabel = `${formatPK(item.startPk)} – ${formatPK(item.endPk)}`
                                         return (
                                           <button
-                                            key={`${item.startPk}-${idx}-${row.side}`}
+                                            key={`${item.startPk}-${item.endPk}-${idx}-${row.side}`}
                                             type="button"
                                             className="absolute top-1/2 flex -translate-y-1/2 flex-col items-center gap-1 text-center transition hover:scale-105"
                                             style={{ left: `${position}%`, transform: 'translate(-50%, -50%)' }}
                                             onClick={() => {
-                                              if (!canInspect) {
-                                                alert(t.alerts.noInspectPermission)
-                                                return
-                                              }
-                                              const sideLabel = sideLabelMap[item.side]
+                                            if (!canInspect) {
+                                              alert(t.alerts.noInspectPermission)
+                                              return
+                                            }
+                                            const sideLabel = sideLabelMap[item.side]
                                               setSelectedSegment({
                                                 phase: phase.name,
                                                 phaseId: phase.id,
@@ -1674,7 +1721,7 @@ const addCheckToken = () => {
                                           >
                                             <div
                                               className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-950 text-xs font-semibold text-white shadow-lg shadow-emerald-400/25 ring-2 ring-white/20"
-                                              title={`${formatPK(item.startPk)} · ${
+                                              title={`${rangeLabel} · ${
                                                 item.side === 'LEFT'
                                                   ? sideLabelMap.LEFT
                                                   : item.side === 'RIGHT'
@@ -1682,10 +1729,10 @@ const addCheckToken = () => {
                                                     : sideLabelMap.BOTH
                                               }`}
                                             >
-                                              {resolvePointBadge(phase.id, item.startPk)}
+                                              {resolvePointBadge(phase.id, item.startPk, item.endPk)}
                                             </div>
                                             <div className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-semibold text-slate-200">
-                                              {formatPK(item.startPk)}
+                                              {formatPK(centerPk)}
                                             </div>
                                             <p className="text-[10px] text-slate-300">
                                               {item.side === 'BOTH'
@@ -1709,13 +1756,15 @@ const addCheckToken = () => {
                           <div className="absolute left-6 right-6 top-1/2 h-1 -translate-y-1/2 rounded-full bg-gradient-to-r from-slate-800 via-slate-900 to-slate-800" />
                           <div className="relative flex h-full items-center justify-between">
                             {point.view.points.map((item, idx) => {
+                              const centerPk = getPointCenter(item.startPk, item.endPk)
                               const position = Math.min(
                                 100,
-                                Math.max(0, Math.round((item.startPk / point.view.total) * 100)),
+                                Math.max(0, Math.round((centerPk / point.view.total) * 100)),
                               )
+                              const rangeLabel = `${formatPK(item.startPk)} – ${formatPK(item.endPk)}`
                               return (
                                 <button
-                                  key={`${item.startPk}-${idx}`}
+                                  key={`${item.startPk}-${item.endPk}-${idx}`}
                                   type="button"
                                   className="absolute top-1/2 flex -translate-y-1/2 flex-col items-center gap-1 text-center transition hover:scale-105"
                                   style={{ left: `${position}%`, transform: 'translate(-50%, -50%)' }}
@@ -1740,21 +1789,21 @@ const addCheckToken = () => {
                                     })
                                   }}
                                 >
-                                  <div
-                                    className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-950 text-xs font-semibold text-white shadow-lg shadow-emerald-400/25 ring-2 ring-white/20"
-                                    title={`${formatPK(item.startPk)} · ${
-                                      item.side === 'LEFT'
-                                        ? sideLabelMap.LEFT
-                                        : item.side === 'RIGHT'
-                                          ? sideLabelMap.RIGHT
-                                          : sideLabelMap.BOTH
-                                    }`}
-                                  >
-                                    {resolvePointBadge(phase.id, item.startPk)}
-                                  </div>
-                                  <div className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-semibold text-slate-200">
-                                    {formatPK(item.startPk)}
-                                  </div>
+                                        <div
+                                          className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-950 text-xs font-semibold text-white shadow-lg shadow-emerald-400/25 ring-2 ring-white/20"
+                                          title={`${rangeLabel} · ${
+                                            item.side === 'LEFT'
+                                              ? sideLabelMap.LEFT
+                                              : item.side === 'RIGHT'
+                                                ? sideLabelMap.RIGHT
+                                                : sideLabelMap.BOTH
+                                          }`}
+                                        >
+                                          {resolvePointBadge(phase.id, item.startPk, item.endPk)}
+                                        </div>
+                                        <div className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-semibold text-slate-200">
+                                          {formatPK(centerPk)}
+                                        </div>
                                   <p className="text-[10px] text-slate-300">
                                     {item.side === 'BOTH'
                                       ? sideLabelMap.BOTH

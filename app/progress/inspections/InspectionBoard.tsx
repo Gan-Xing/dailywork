@@ -18,6 +18,8 @@ import {
   prefabTypeOptions,
   type PrefabPhaseKey,
 } from '@/lib/prefabInspection'
+import { locales } from '@/lib/i18n'
+import { usePreferredLocale } from '@/lib/usePreferredLocale'
 
 interface Props {
   roads: RoadSectionWithPhasesDTO[]
@@ -27,15 +29,26 @@ interface Props {
 type SortField = 'createdAt' | 'updatedAt'
 type SortOrder = 'asc' | 'desc'
 type ColumnKey =
+  | 'sequence'
   | 'road'
   | 'phase'
   | 'side'
   | 'range'
+  | 'layers'
   | 'checks'
   | 'types'
   | 'status'
+  | 'appointmentDate'
+  | 'submittedAt'
+  | 'submittedBy'
+  | 'remark'
+  | 'createdBy'
   | 'createdAt'
+  | 'updatedBy'
   | 'updatedAt'
+
+const INSPECTION_COLUMN_STORAGE_KEY = 'inspection-visible-columns'
+const defaultVisibleColumns: ColumnKey[] = ['sequence', 'road', 'phase', 'range', 'status']
 
 const statusCopy: Record<InspectionStatus, string> = {
   PENDING: '待处理',
@@ -100,6 +113,7 @@ type EditFormState = {
 }
 
 export function InspectionBoard({ roads, loadError }: Props) {
+  const { locale } = usePreferredLocale('zh', locales)
   const [roadSlug, setRoadSlug] = useState('')
   const [phaseId, setPhaseId] = useState<number | ''>('')
   const [status, setStatus] = useState<InspectionStatus[]>([])
@@ -140,21 +154,44 @@ export function InspectionBoard({ roads, loadError }: Props) {
   })
   const columnOptions: { key: ColumnKey; label: string }[] = useMemo(
     () => [
+      { key: 'sequence', label: '序号' },
       { key: 'road', label: '道路' },
       { key: 'phase', label: '分项' },
       { key: 'side', label: '侧别' },
       { key: 'range', label: '区间' },
+      { key: 'layers', label: '层次' },
       { key: 'checks', label: '验收内容' },
       { key: 'types', label: '验收类型' },
       { key: 'status', label: '状态' },
-      { key: 'createdAt', label: '提交时间' },
+      { key: 'appointmentDate', label: '预约报检时间' },
+      { key: 'submittedAt', label: '提交时间' },
+      { key: 'submittedBy', label: '提交人' },
+      { key: 'remark', label: '备注' },
+      { key: 'createdBy', label: '创建人' },
+      { key: 'createdAt', label: '创建时间' },
+      { key: 'updatedBy', label: '更新人' },
       { key: 'updatedAt', label: '更新时间' },
     ],
     [],
   )
-  const [visibleColumns, setVisibleColumns] = useState<ColumnKey[]>(() => columnOptions.map((item) => item.key))
+  const [visibleColumns, setVisibleColumns] = useState<ColumnKey[]>(() => defaultVisibleColumns)
   const [showColumnSelector, setShowColumnSelector] = useState(false)
   const columnSelectorRef = useRef<HTMLDivElement | null>(null)
+
+  const persistVisibleColumns = (next: ColumnKey[]) => {
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(INSPECTION_COLUMN_STORAGE_KEY, JSON.stringify(next))
+      } catch (error) {
+        console.error('Failed to persist visible columns', error)
+      }
+    }
+    setVisibleColumns(next)
+  }
+
+  const handleSelectAllColumns = () => persistVisibleColumns(columnOptions.map((option) => option.key))
+  const handleRestoreDefaultColumns = () => persistVisibleColumns([...defaultVisibleColumns])
+  const handleClearColumns = () => persistVisibleColumns([])
   const [selected, setSelected] = useState<InspectionListItem | null>(null)
   const [editing, setEditing] = useState<InspectionListItem | null>(null)
   const [editForm, setEditForm] = useState<EditFormState>({
@@ -173,6 +210,7 @@ export function InspectionBoard({ roads, loadError }: Props) {
   const [deleteTarget, setDeleteTarget] = useState<InspectionListItem | null>(null)
   const [deleteError, setDeleteError] = useState<string | null>(null)
   const [deletePending, setDeletePending] = useState(false)
+  const dateLocaleTag = locale === 'fr' ? 'fr-FR' : 'zh-CN'
 
   const phases = useMemo(() => {
     const found = roads.find((road) => road.slug === roadSlug)
@@ -248,18 +286,37 @@ export function InspectionBoard({ roads, loadError }: Props) {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      const stored = localStorage.getItem(INSPECTION_COLUMN_STORAGE_KEY)
+      if (!stored) return
+      const parsed = JSON.parse(stored)
+      if (!Array.isArray(parsed)) return
+      const filtered = parsed.filter((item) =>
+        typeof item === 'string' && columnOptions.some((option) => option.key === item),
+      ) as ColumnKey[]
+      const trimmed = stored.trim()
+      if (filtered.length || trimmed === '[]') {
+        setVisibleColumns(filtered)
+        return
+      }
+      setVisibleColumns(defaultVisibleColumns)
+    } catch (error) {
+      console.error('Failed to load visible columns', error)
+    }
+  }, [columnOptions])
+
   const toggleStatus = (value: InspectionStatus) => {
     setPage(1)
     setStatus((prev) => (prev.includes(value) ? prev.filter((item) => item !== value) : [...prev, value]))
   }
 
   const toggleColumnVisibility = (key: ColumnKey) => {
-    setVisibleColumns((prev) => {
-      if (prev.includes(key)) {
-        return prev.length === 1 ? prev : prev.filter((item) => item !== key)
-      }
-      return [...prev, key]
-    })
+    const next = visibleColumns.includes(key)
+      ? visibleColumns.filter((item) => item !== key)
+      : [...visibleColumns, key]
+    persistVisibleColumns(next)
   }
 
   const toggleSelect = (id: number) => {
@@ -362,13 +419,24 @@ export function InspectionBoard({ roads, loadError }: Props) {
   }
 
   const formatDate = (value: string) =>
-    new Date(value).toLocaleString('zh-CN', {
+    new Date(value).toLocaleString(dateLocaleTag, {
       hour12: false,
       month: '2-digit',
       day: '2-digit',
       hour: '2-digit',
       minute: '2-digit',
     })
+
+  const formatAppointmentDate = (value?: string | null) => {
+    if (!value) return '—'
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return '—'
+    return date.toLocaleDateString(dateLocaleTag, {
+      year: '2-digit',
+      month: '2-digit',
+      day: '2-digit',
+    })
+  }
 
   useEffect(() => {
     if (!editing) return
@@ -697,24 +765,42 @@ export function InspectionBoard({ roads, loadError }: Props) {
               <div className="relative" ref={columnSelectorRef}>
                 <button
                   type="button"
-                  className="rounded-xl border border-white/20 px-3 py-2 text-xs font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/10"
+                  className="flex min-w-[140px] items-center justify-between rounded-xl border border-white/20 px-3 py-2 text-left text-xs font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/10"
                   onClick={() => setShowColumnSelector((prev) => !prev)}
                 >
-                  选择显示列
+                  <span className="truncate">
+                    {visibleColumns.length ? `已选 ${visibleColumns.length} 列` : '未选择列'}
+                  </span>
+                  <span className="text-xs text-slate-400">⌕</span>
                 </button>
                 {showColumnSelector ? (
-                  <div className="absolute right-0 z-10 mt-2 w-56 rounded-xl border border-white/15 bg-slate-900/95 p-3 text-xs text-slate-100 shadow-lg shadow-slate-900/40 backdrop-blur">
-                    <p className="mb-2 text-[11px] text-slate-300">选择需要展示的字段</p>
-                    <div className="flex max-h-48 flex-col gap-2 overflow-auto">
+                  <div className="absolute right-0 z-10 mt-2 w-64 max-w-full rounded-xl border border-white/15 bg-slate-900/95 p-3 text-xs text-slate-100 shadow-lg shadow-slate-900/40 backdrop-blur">
+                    <div className="flex items-center justify-between border-b border-white/10 pb-2 text-[11px] text-slate-300">
+                      <button className="text-emerald-300 hover:underline" onClick={handleSelectAllColumns}>
+                        全选
+                      </button>
+                      <div className="flex gap-2">
+                        <button className="text-slate-400 hover:underline" onClick={handleRestoreDefaultColumns}>
+                          恢复默认
+                        </button>
+                        <button className="text-slate-400 hover:underline" onClick={handleClearColumns}>
+                          清空
+                        </button>
+                      </div>
+                    </div>
+                    <div className="max-h-56 space-y-1 overflow-y-auto p-2 text-xs text-slate-100">
                       {columnOptions.map((option) => (
-                        <label key={option.key} className="flex items-center gap-2">
+                        <label
+                          key={option.key}
+                          className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 hover:bg-white/5"
+                        >
                           <input
                             type="checkbox"
                             className="h-4 w-4 rounded border-white/30 bg-slate-900/60 accent-emerald-300"
                             checked={visibleColumns.includes(option.key)}
                             onChange={() => toggleColumnVisibility(option.key)}
                           />
-                          <span>{option.label}</span>
+                          <span className="truncate">{option.label}</span>
                         </label>
                       ))}
                     </div>
@@ -756,27 +842,41 @@ export function InspectionBoard({ roads, loadError }: Props) {
                         onChange={toggleSelectAll}
                         aria-label="全选当页报检记录"
                       />
-                      <span className="whitespace-nowrap">序号</span>
                     </div>
                   </th>
+                  {isVisible('sequence') ? <th className="px-4 py-3">序号</th> : null}
                   {isVisible('road') ? (
-                    <th className="px-4 py-3">
-                      道路
+                    <th
+                      className="px-4 py-3 cursor-pointer select-none"
+                      onClick={() => handleSort('road')}
+                    >
+                      道路 {sortField === 'road' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
                     </th>
                   ) : null}
                   {isVisible('phase') ? (
-                    <th className="px-4 py-3">
-                      分项
+                    <th
+                      className="px-4 py-3 cursor-pointer select-none"
+                      onClick={() => handleSort('phase')}
+                    >
+                      分项 {sortField === 'phase' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
                     </th>
                   ) : null}
                   {isVisible('side') ? (
-                    <th className="px-4 py-3">
-                      侧别
+                    <th
+                      className="px-4 py-3 cursor-pointer select-none"
+                      onClick={() => handleSort('side')}
+                    >
+                      侧别 {sortField === 'side' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
                     </th>
                   ) : null}
                   {isVisible('range') ? (
                     <th className="px-4 py-3">
                       区间
+                    </th>
+                  ) : null}
+                  {isVisible('layers') ? (
+                    <th className="px-4 py-3">
+                      层次
                     </th>
                   ) : null}
                   {isVisible('checks') ? (
@@ -794,13 +894,38 @@ export function InspectionBoard({ roads, loadError }: Props) {
                       状态
                     </th>
                   ) : null}
+                  {isVisible('appointmentDate') ? (
+                    <th
+                      className="px-4 py-3 cursor-pointer select-none"
+                      onClick={() => handleSort('appointmentDate')}
+                    >
+                      预约报检时间 {sortField === 'appointmentDate' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
+                    </th>
+                  ) : null}
+                  {isVisible('submittedAt') ? (
+                    <th className="px-4 py-3">
+                      提交时间
+                    </th>
+                  ) : null}
+                  {isVisible('submittedBy') ? (
+                    <th className="px-4 py-3">提交人</th>
+                  ) : null}
+                  {isVisible('remark') ? (
+                    <th className="px-4 py-3">备注</th>
+                  ) : null}
+                  {isVisible('createdBy') ? (
+                    <th className="px-4 py-3">创建人</th>
+                  ) : null}
                   {isVisible('createdAt') ? (
                     <th
                       className="px-4 py-3 cursor-pointer select-none"
                       onClick={() => handleSort('createdAt')}
                     >
-                      提交时间 {sortField === 'createdAt' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
+                      创建时间 {sortField === 'createdAt' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
                     </th>
+                  ) : null}
+                  {isVisible('updatedBy') ? (
+                    <th className="px-4 py-3">更新人</th>
                   ) : null}
                   {isVisible('updatedAt') ? (
                     <th
@@ -829,6 +954,12 @@ export function InspectionBoard({ roads, loadError }: Props) {
                     const roadText = isPrefab ? PREFAB_ROAD_NAME : item.roadName
                     const sideText = isPrefab ? '—' : sideCopy[item.side] ?? item.side
                     const rangeText = isPrefab ? '—' : `${formatPK(item.startPk)} → ${formatPK(item.endPk)}`
+                    const layersText = item.layers.join(' / ')
+                    const appointmentText = formatAppointmentDate(item.appointmentDate)
+                    const submittedByText = item.submittedBy?.username ?? '—'
+                    const createdByText = item.createdBy?.username ?? '—'
+                    const updatedByText = item.updatedBy?.username ?? '—'
+                    const remarkText = item.remark ?? '—'
                     return (
                       <tr
                         key={item.id}
@@ -848,15 +979,22 @@ export function InspectionBoard({ roads, loadError }: Props) {
                             onClick={(event) => event.stopPropagation()}
                             aria-label={`选择报检 ${displayIndex}`}
                           />
-                          <span>{displayIndex}</span>
                         </div>
                       </td>
+                      {isVisible('sequence') ? (
+                        <td className="px-4 py-3 text-xs text-slate-300">{displayIndex}</td>
+                      ) : null}
                       {isVisible('road') ? <td className="px-4 py-3">{roadText}</td> : null}
                       {isVisible('phase') ? <td className="px-4 py-3">{item.phaseName}</td> : null}
                       {isVisible('side') ? <td className="px-4 py-3">{sideText}</td> : null}
                       {isVisible('range') ? (
                         <td className="px-4 py-3">
                           {rangeText}
+                        </td>
+                      ) : null}
+                      {isVisible('layers') ? (
+                        <td className="px-4 py-3 max-w-xs truncate" title={layersText}>
+                          {layersText}
                         </td>
                       ) : null}
                       {isVisible('checks') ? (
@@ -876,8 +1014,26 @@ export function InspectionBoard({ roads, loadError }: Props) {
                           </span>
                         </td>
                       ) : null}
+                      {isVisible('appointmentDate') ? (
+                        <td className="px-4 py-3 text-xs text-slate-300">{appointmentText}</td>
+                      ) : null}
+                      {isVisible('submittedAt') ? (
+                        <td className="px-4 py-3 text-xs text-slate-300">{formatDate(item.submittedAt)}</td>
+                      ) : null}
+                      {isVisible('submittedBy') ? (
+                        <td className="px-4 py-3 text-xs text-slate-300">{submittedByText}</td>
+                      ) : null}
+                      {isVisible('remark') ? (
+                        <td className="px-4 py-3 text-xs text-slate-300">{remarkText}</td>
+                      ) : null}
+                      {isVisible('createdBy') ? (
+                        <td className="px-4 py-3 text-xs text-slate-300">{createdByText}</td>
+                      ) : null}
                       {isVisible('createdAt') ? (
                         <td className="px-4 py-3 text-xs text-slate-300">{formatDate(item.createdAt)}</td>
+                      ) : null}
+                      {isVisible('updatedBy') ? (
+                        <td className="px-4 py-3 text-xs text-slate-300">{updatedByText}</td>
                       ) : null}
                       {isVisible('updatedAt') ? (
                         <td className="px-4 py-3 text-xs text-slate-300">{formatDate(item.updatedAt)}</td>

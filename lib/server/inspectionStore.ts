@@ -78,6 +78,23 @@ export const listInspections = async (filter: InspectionFilter): Promise<Inspect
   const skip = (page - 1) * pageSize
   const sortField = filter.sortField ?? 'updatedAt'
   const sortOrder = filter.sortOrder ?? 'desc'
+  const orderBy: Prisma.InspectionRequestOrderByWithRelationInput = (() => {
+    switch (sortField) {
+      case 'road':
+        return { road: { name: sortOrder } }
+      case 'phase':
+        return { phase: { name: sortOrder } }
+      case 'side':
+        return { side: sortOrder }
+      case 'appointmentDate':
+        return { appointmentDate: sortOrder }
+      case 'createdAt':
+        return { createdAt: sortOrder }
+      case 'updatedAt':
+      default:
+        return { updatedAt: sortOrder }
+    }
+  })()
 
   const where: Prisma.InspectionRequestWhereInput = {}
   if (filter.roadSlug) {
@@ -116,7 +133,7 @@ export const listInspections = async (filter: InspectionFilter): Promise<Inspect
     prisma.inspectionRequest.findMany({
       where,
       include: { road: true, phase: true, creator: true, submitter: true, updater: true },
-      orderBy: { [sortField]: sortOrder },
+      orderBy,
       skip,
       take: pageSize,
     }),
