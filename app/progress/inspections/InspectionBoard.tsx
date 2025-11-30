@@ -26,7 +26,7 @@ interface Props {
   loadError: string | null
 }
 
-type SortField = 'createdAt' | 'updatedAt'
+type SortField = 'road' | 'phase' | 'side' | 'appointmentDate' | 'createdAt' | 'updatedAt'
 type SortOrder = 'asc' | 'desc'
 type ColumnKey =
   | 'sequence'
