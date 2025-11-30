@@ -47,6 +47,16 @@ const roadNameEntries: RoadDictionaryEntry[] = [
     zh: '丹达5B路',
     fr: 'Danda 5B',
   },
+  {
+    slug: 'level-crossing',
+    zh: '平交路口',
+    fr: 'Amorce',
+  },
+  {
+    slug: 'prefabricated-structure',
+    zh: '结构物预制',
+    fr: 'Structure préfabriquée',
+  },
 ]
 
 const labelsBySlug: Record<string, LocalizedString> = {}
