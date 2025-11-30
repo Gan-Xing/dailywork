@@ -1,9 +1,15 @@
 'use client'
 
 import Link from 'next/link'
+import { useMemo, useState } from 'react'
 
+import { PhaseAggregateBoard } from './PhaseAggregateBoard'
 import { RoadBoard } from './RoadBoard'
-import type { RoadSectionProgressDTO } from '@/lib/progressTypes'
+import type {
+  AggregatedPhaseProgress,
+  PhaseMeasure,
+  RoadSectionProgressDTO,
+} from '@/lib/progressTypes'
 import { getProgressCopy, formatProgressCopy } from '@/lib/i18n/progress'
 import { locales } from '@/lib/i18n'
 import { usePreferredLocale } from '@/lib/usePreferredLocale'
@@ -21,6 +27,75 @@ export function ProgressShell({ roads, loadError, canManage, canViewInspections 
   const breadcrumbHome = locale === 'fr' ? 'Accueil' : '首页'
   const breadcrumbProgress = locale === 'fr' ? 'Avancement' : '进度管理'
   const inspectionLabel = locale === 'fr' ? '报检记录' : '报检记录'
+  const [viewMode, setViewMode] = useState<'road' | 'phase'>('road')
+
+  const aggregatedPhases = useMemo<Array<AggregatedPhaseProgress>>(() => {
+    const map = new Map<
+      string,
+      {
+        id: string
+        name: string
+        measure: PhaseMeasure
+        totalDesignLength: number
+        totalCompletedLength: number
+        latestUpdatedAt: number
+        roadNames: Set<string>
+      }
+    >()
+
+    roads.forEach((road) => {
+      road.phases.forEach((phase) => {
+        const key = `${phase.phaseName}::${phase.phaseMeasure}`
+        const designLen = Number.isFinite(phase.designLength) ? phase.designLength : 0
+        const completedLen = Number.isFinite(phase.completedLength) ? phase.completedLength : 0
+        const updatedAtRaw = new Date(phase.updatedAt).getTime()
+        const updatedAt = Number.isFinite(updatedAtRaw) ? updatedAtRaw : 0
+        const existing = map.get(key)
+        if (existing) {
+          existing.totalDesignLength += designLen
+          existing.totalCompletedLength += completedLen
+          existing.latestUpdatedAt = Math.max(existing.latestUpdatedAt, updatedAt)
+          existing.roadNames.add(road.name)
+        } else {
+          map.set(key, {
+            id: key,
+            name: phase.phaseName,
+            measure: phase.phaseMeasure,
+            totalDesignLength: designLen,
+            totalCompletedLength: completedLen,
+            latestUpdatedAt: updatedAt,
+            roadNames: new Set([road.name]),
+          })
+        }
+      })
+    })
+
+    const sorted = Array.from(map.values())
+      .map((item) => {
+        const designTotal = Math.max(0, item.totalDesignLength)
+        const completedTotal = Math.max(0, item.totalCompletedLength)
+        const percent =
+          designTotal <= 0 ? 0 : Math.min(100, Math.round((completedTotal / designTotal) * 100))
+        return {
+          id: item.id,
+          name: item.name,
+          measure: item.measure,
+          totalDesignLength: Math.round(designTotal * 100) / 100,
+          totalCompletedLength: Math.round(completedTotal * 100) / 100,
+          completedPercent: percent,
+          latestUpdatedAt: item.latestUpdatedAt,
+          roadNames: Array.from(item.roadNames),
+        }
+      })
+      .sort((a, b) => {
+        if (b.latestUpdatedAt !== a.latestUpdatedAt) {
+          return b.latestUpdatedAt - a.latestUpdatedAt
+        }
+        return a.name.localeCompare(b.name, locale === 'fr' ? 'fr-FR' : 'zh-CN')
+      })
+
+    return sorted
+  }, [roads, locale])
 
   return (
     <main className="min-h-screen bg-slate-950 text-slate-50">
@@ -61,8 +136,42 @@ export function ProgressShell({ roads, loadError, canManage, canViewInspections 
           ) : null}
         </header>
 
+        <div className="mt-6 flex flex-wrap items-center gap-3 text-xs font-semibold">
+          <span className="uppercase tracking-[0.2em] text-slate-400">{t.phase.view.label}</span>
+          <button
+            type="button"
+            onClick={() => setViewMode('road')}
+            className={`rounded-full border px-4 py-1 transition ${
+              viewMode === 'road'
+                ? 'border-transparent bg-emerald-300 text-slate-950 shadow-lg shadow-emerald-400/30'
+                : 'border-white/15 bg-white/5 text-slate-100 hover:border-white/40 hover:bg-white/10'
+            }`}
+          >
+            {t.phase.view.road}
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode('phase')}
+            className={`rounded-full border px-4 py-1 transition ${
+              viewMode === 'phase'
+                ? 'border-transparent bg-emerald-300 text-slate-950 shadow-lg shadow-emerald-400/30'
+                : 'border-white/15 bg-white/5 text-slate-100 hover:border-white/40 hover:bg-white/10'
+            }`}
+          >
+            {t.phase.view.phase}
+          </button>
+        </div>
+
         <div className="mt-10">
-          <RoadBoard initialRoads={roads} canManage={canManage} />
+          {viewMode === 'road' ? (
+            <RoadBoard initialRoads={roads} canManage={canManage} />
+          ) : (
+            <PhaseAggregateBoard
+              phases={aggregatedPhases}
+              aggregateCopy={t.phase.aggregate}
+              locale={locale}
+            />
+          )}
         </div>
       </div>
     </main>

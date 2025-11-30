@@ -119,6 +119,18 @@ type PhaseCopy = {
   note: {
     measure: string
   }
+  view: {
+    label: string
+    road: string
+    phase: string
+  }
+  aggregate: {
+    empty: string
+    roadsLabel: string
+    linearSummary: string
+    pointSummary: string
+    moreUnits: string
+  }
   list: {
     title: string
     legend: string
@@ -317,6 +329,18 @@ const progressCopy: Record<Locale, ProgressCopy> = {
       },
       note: {
         measure: '说明：显示方式决定进度展示形态；设计量自动按区间或单体数量统计，延米类双侧会叠加左右长度。',
+      },
+      view: {
+        label: '查看方式',
+        road: '按路段',
+        phase: '按分项工程',
+      },
+      aggregate: {
+        empty: '暂无分项工程数据',
+        roadsLabel: '涵盖路段：{roads}',
+        linearSummary: '延米 · 设计量 {design} m · 已验收 {completed} m · 完成 {percent}%',
+        pointSummary: '单体 · 总数 {design} 个 · 已完成 {completed} 个 · 完成 {percent}%',
+        moreUnits: '+{count} 个更多',
       },
       list: {
         title: '已有分项',
@@ -522,6 +546,18 @@ const progressCopy: Record<Locale, ProgressCopy> = {
       note: {
         measure:
           "Le mode d'affichage pilote la visualisation ; la quantité est calculée par intervalle ou point. En linéaire, le double côté double la longueur.",
+      },
+      view: {
+        label: 'Mode de vue',
+        road: 'Par tronçon',
+        phase: 'Par phase',
+      },
+      aggregate: {
+        empty: 'Aucune donnée de phase disponible',
+        roadsLabel: 'Tronçons : {roads}',
+        linearSummary: 'Linéaire · Conçu {design} m · Reçu {completed} m · {percent}%',
+        pointSummary: 'Unités · Total {design} · Réalisées {completed} · {percent}%',
+        moreUnits: '+{count} supplémentaires',
       },
       list: {
         title: 'Phases existantes',

@@ -166,3 +166,14 @@ export interface InspectionDTO extends InspectionPayload {
   createdBy: { id: number; username: string } | null
   updatedBy?: { id: number; username: string } | null
 }
+
+export interface AggregatedPhaseProgress {
+  id: string
+  name: string
+  measure: PhaseMeasure
+  totalDesignLength: number
+  totalCompletedLength: number
+  completedPercent: number
+  latestUpdatedAt: number
+  roadNames: string[]
+}
