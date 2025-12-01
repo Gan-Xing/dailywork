@@ -78,14 +78,86 @@ export const listRoadSectionsWithPhases = async (): Promise<RoadSectionWithPhase
   return phasesByRoad
 }
 
-const calcCompletedLength = (inspections: { startPk: number; endPk: number; side: string }[]) => {
+const normalizeSegment = (startPk: number, endPk: number) => {
+  const start = Number.isFinite(startPk) ? startPk : 0
+  const end = Number.isFinite(endPk) ? endPk : start
+  return start <= end ? [start, end] : [end, start]
+}
+
+const calcCompletedLinearLength = (
+  inspections: { startPk: number; endPk: number; side: string }[],
+) => {
   return inspections.reduce((sum, item) => {
-    const start = Number(item.startPk) || 0
-    const end = Number(item.endPk) || 0
-    const base = Math.max(end - start, 0) || 1
+    const [start, end] = normalizeSegment(item.startPk, item.endPk)
+    const raw = end - start
+    const base = raw === 0 ? 1 : Math.max(raw, 0)
     const factor = item.side === 'BOTH' ? 2 : 1
     return sum + base * factor
   }, 0)
+}
+
+const buildPointStructureKey = (startPk: number, endPk: number, side: string) => {
+  const [start, end] = normalizeSegment(startPk, endPk)
+  const startKey = Math.round(start * 1000)
+  const endKey = Math.round(end * 1000)
+  return `${startKey}-${endKey}-${side ?? 'BOTH'}`
+}
+
+const resolvePhaseLayers = (phase: {
+  layerLinks: { layerDefinition: { name: string } }[]
+  phaseDefinition?: {
+    defaultLayers: { layerDefinition: { name: string } }[]
+  } | null
+}) => {
+  const instanceLayers = phase.layerLinks
+    .map((link) => link.layerDefinition?.name)
+    .filter(Boolean)
+  if (instanceLayers.length) {
+    return Array.from(new Set(instanceLayers))
+  }
+  const defaultLayers = phase.phaseDefinition?.defaultLayers
+    ?.map((item) => item.layerDefinition?.name)
+    .filter(Boolean) ?? []
+  return Array.from(new Set(defaultLayers))
+}
+
+const calcCompletedPointStructures = (
+  inspections: { startPk: number; endPk: number; side: string; layers: string[] }[],
+  resolvedLayers: string[],
+) => {
+  if (!inspections.length) return 0
+  const resolvedSet = new Set(resolvedLayers.filter(Boolean))
+  const structureLayers = new Map<string, Set<string>>()
+  const fallbackLayers = new Set<string>()
+
+  inspections.forEach((inspection) => {
+    const key = buildPointStructureKey(inspection.startPk, inspection.endPk, inspection.side)
+    if (!key) return
+    const layers = Array.isArray(inspection.layers) ? inspection.layers : []
+    const layerSet = structureLayers.get(key) ?? new Set<string>()
+    layers.forEach((layer) => {
+      const normalized = `${layer}`.trim()
+      if (!normalized) return
+      if (resolvedSet.size && !resolvedSet.has(normalized)) return
+      layerSet.add(normalized)
+      if (resolvedSet.size === 0) {
+        fallbackLayers.add(normalized)
+      }
+    })
+    structureLayers.set(key, layerSet)
+  })
+
+  const layerCount = resolvedSet.size || fallbackLayers.size
+  if (layerCount <= 0) {
+    return structureLayers.size
+  }
+
+  let total = 0
+  structureLayers.forEach((layers) => {
+    if (!layers.size) return
+    total += Math.min(1, layers.size / layerCount)
+  })
+  return total
 }
 
 export const listRoadSectionsWithProgress = async (): Promise<RoadSectionProgressDTO[]> => {
@@ -109,7 +181,29 @@ export const listRoadSectionsWithProgress = async (): Promise<RoadSectionProgres
           inspections: {
             where: { status: 'APPROVED' },
             orderBy: { updatedAt: 'desc' },
-            select: { startPk: true, endPk: true, side: true, updatedAt: true },
+            select: { startPk: true, endPk: true, side: true, layers: true, updatedAt: true },
+          },
+          layerLinks: {
+            select: {
+              layerDefinition: {
+                select: {
+                  name: true,
+                },
+              },
+            },
+          },
+          phaseDefinition: {
+            select: {
+              defaultLayers: {
+                select: {
+                  layerDefinition: {
+                    select: {
+                      name: true,
+                    },
+                  },
+                },
+              },
+            },
           },
         },
       },
@@ -118,16 +212,23 @@ export const listRoadSectionsWithProgress = async (): Promise<RoadSectionProgres
 
   return roads.map((road) => {
     const phases: RoadPhaseProgressDTO[] = road.phases.map((phase) => {
-      const designLength = phase.designLength || 0
-      const completedLength = calcCompletedLength(phase.inspections)
-      const completedPercent = designLength > 0 ? Math.min(100, Math.round((completedLength / designLength) * 100)) : 0
+      const designLength = Math.max(0, phase.designLength || 0)
+      const resolvedLayers = phase.measure === 'POINT' ? resolvePhaseLayers(phase) : []
+      const rawCompletedLength =
+        phase.measure === 'POINT'
+          ? calcCompletedPointStructures(phase.inspections, resolvedLayers)
+          : calcCompletedLinearLength(phase.inspections)
+      const cappedCompletedLength =
+        designLength > 0 ? Math.min(designLength, rawCompletedLength) : rawCompletedLength
+      const completedPercent =
+        designLength > 0 ? Math.min(100, Math.round((cappedCompletedLength / designLength) * 100)) : 0
       const latestUpdate = phase.inspections[0]?.updatedAt ?? phase.updatedAt
       return {
         phaseId: phase.id,
         phaseName: phase.name,
         phaseMeasure: phase.measure,
         designLength,
-        completedLength,
+        completedLength: cappedCompletedLength,
         completedPercent,
         updatedAt: latestUpdate.toISOString(),
       }
