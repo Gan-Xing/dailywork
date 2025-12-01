@@ -153,8 +153,9 @@ const getPointPosition = (centerPk: number, view: PointView) => {
     return 50
   }
   const ratio = (centerPk - view.displayMin) / view.displayRange
-  return Math.min(100, Math.max(0, Math.round(ratio * 100)))
+  return Math.min(100, Math.max(0, ratio * 100))
 }
+
 
 const fillNonDesignGaps = (segments: Segment[], start: number, end: number) => {
   const sorted = [...segments].sort((a, b) => a.start - b.start)
@@ -1717,11 +1718,11 @@ const addCheckToken = () => {
                                             className="absolute top-1/2 flex -translate-y-1/2 flex-col items-center gap-1 text-center transition hover:scale-105"
                                             style={{ left: `${position}%`, transform: 'translate(-50%, -50%)' }}
                                             onClick={() => {
-                                            if (!canInspect) {
-                                              alert(t.alerts.noInspectPermission)
-                                              return
-                                            }
-                                            const sideLabel = sideLabelMap[item.side]
+                                              if (!canInspect) {
+                                                alert(t.alerts.noInspectPermission)
+                                                return
+                                              }
+                                              const sideLabel = sideLabelMap[item.side]
                                               setSelectedSegment({
                                                 phase: phase.name,
                                                 phaseId: phase.id,
@@ -1804,21 +1805,21 @@ const addCheckToken = () => {
                                     })
                                   }}
                                 >
-                                        <div
-                                          className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-950 text-xs font-semibold text-white shadow-lg shadow-emerald-400/25 ring-2 ring-white/20"
-                                          title={`${rangeLabel} · ${
-                                            item.side === 'LEFT'
-                                              ? sideLabelMap.LEFT
-                                              : item.side === 'RIGHT'
-                                                ? sideLabelMap.RIGHT
-                                                : sideLabelMap.BOTH
-                                          }`}
-                                        >
-                                          {resolvePointBadge(phase.id, item.startPk, item.endPk)}
-                                        </div>
-                                        <div className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-semibold text-slate-200">
-                                          {formatPK(centerPk)}
-                                        </div>
+                                  <div
+                                    className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-950 text-xs font-semibold text-white shadow-lg shadow-emerald-400/25 ring-2 ring-white/20"
+                                    title={`${rangeLabel} · ${
+                                      item.side === 'LEFT'
+                                        ? sideLabelMap.LEFT
+                                        : item.side === 'RIGHT'
+                                          ? sideLabelMap.RIGHT
+                                          : sideLabelMap.BOTH
+                                    }`}
+                                  >
+                                    {resolvePointBadge(phase.id, item.startPk, item.endPk)}
+                                  </div>
+                                  <div className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-semibold text-slate-200">
+                                    {formatPK(centerPk)}
+                                  </div>
                                   <p className="text-[10px] text-slate-300">
                                     {item.side === 'BOTH'
                                       ? sideLabelMap.BOTH
