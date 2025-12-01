@@ -67,7 +67,11 @@ interface LinearView {
 }
 
 interface PointView {
-  total: number
+  min: number
+  max: number
+  displayMin: number
+  displayMax: number
+  displayRange: number
   points: { startPk: number; endPk: number; side: IntervalSide; spec?: string | null; billQuantity?: number | null }[]
 }
 
@@ -143,6 +147,14 @@ const normalizeInterval = (interval: PhaseIntervalPayload, measure: PhaseMeasure
 }
 
 const getPointCenter = (startPk: number, endPk: number) => (startPk + endPk) / 2
+
+const getPointPosition = (centerPk: number, view: PointView) => {
+  if (!Number.isFinite(view.displayRange) || view.displayRange <= 0) {
+    return 50
+  }
+  const ratio = (centerPk - view.displayMin) / view.displayRange
+  return Math.min(100, Math.max(0, Math.round(ratio * 100)))
+}
 
 const fillNonDesignGaps = (segments: Segment[], start: number, end: number) => {
   const sorted = [...segments].sort((a, b) => a.start - b.start)
@@ -313,17 +325,26 @@ const buildLinearView = (
   }
 }
 
-const buildPointView = (phase: PhaseDTO, roadLength: number): PointView => {
+const buildPointView = (phase: PhaseDTO, fallbackStart: number, fallbackEnd: number): PointView => {
   const normalized = phase.intervals.map((i) => normalizeInterval(i, 'POINT'))
-  const maxEnd = Math.max(
-    roadLength,
-    ...normalized.map((i) => i.startPk),
-    ...normalized.map((i) => i.endPk),
-    0,
-  )
-  const total = Math.max(maxEnd, 1)
+  const manualBoundaries = normalized.flatMap((item) => [item.startPk, item.endPk])
+  const fallbackBoundaries = [fallbackStart, fallbackEnd].filter(Number.isFinite)
+  const boundaries = manualBoundaries.length ? manualBoundaries : fallbackBoundaries
+  const rawMin = boundaries.length ? Math.min(...boundaries) : fallbackStart
+  const rawMax = boundaries.length ? Math.max(...boundaries) : fallbackEnd
+  const safeMin = Number.isFinite(rawMin) ? rawMin : 0
+  const safeMax = Number.isFinite(rawMax) ? rawMax : safeMin + 1
+  let span = safeMax - safeMin
+  if (!Number.isFinite(span) || span <= 0) span = 1
+  const margin = Math.max(span * 0.05, 1)
+  const displayMin = safeMin - margin
+  const displayMax = safeMax + margin
   return {
-    total,
+    min: safeMin,
+    max: safeMax,
+    displayMin,
+    displayMax,
+    displayRange: Math.max(displayMax - displayMin, 0.01),
     points: normalized,
   }
 }
@@ -776,9 +797,9 @@ export function PhaseEditor({
       .filter((phase) => phase.measure === 'POINT')
       .map((phase) => ({
         phase,
-        view: buildPointView(phase, roadLength),
+        view: buildPointView(phase, roadStart, roadEnd),
       }))
-  }, [phases, roadLength])
+  }, [phases, roadStart, roadEnd])
 
 const toggleToken = (value: string, list: string[], setter: (next: string[]) => void) => {
   const exists = list.includes(value)
@@ -1679,7 +1700,7 @@ const addCheckToken = () => {
                                       {row.label}
                                     </span>
                                     <span className="text-slate-300">
-                                      {formatPK(0)} – {formatPK(point.view.total)}
+                                      {formatPK(point.view.min)} – {formatPK(point.view.max)}
                                     </span>
                                   </div>
                                   <div className="relative h-24 rounded-2xl border border-white/10 bg-slate-900/60 px-4 py-5 shadow-inner shadow-slate-900/40">
@@ -1687,10 +1708,7 @@ const addCheckToken = () => {
                                     <div className="relative flex h-full items-center justify-between">
                                       {rowPoints.map((item, idx) => {
                                         const centerPk = getPointCenter(item.startPk, item.endPk)
-                                        const position = Math.min(
-                                          100,
-                                          Math.max(0, Math.round((centerPk / point.view.total) * 100)),
-                                        )
+                                        const position = getPointPosition(centerPk, point.view)
                                         const rangeLabel = `${formatPK(item.startPk)} – ${formatPK(item.endPk)}`
                                         return (
                                           <button
@@ -1757,10 +1775,7 @@ const addCheckToken = () => {
                           <div className="relative flex h-full items-center justify-between">
                             {point.view.points.map((item, idx) => {
                               const centerPk = getPointCenter(item.startPk, item.endPk)
-                              const position = Math.min(
-                                100,
-                                Math.max(0, Math.round((centerPk / point.view.total) * 100)),
-                              )
+                              const position = getPointPosition(centerPk, point.view)
                               const rangeLabel = `${formatPK(item.startPk)} – ${formatPK(item.endPk)}`
                               return (
                                 <button
