@@ -1,7 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 'use client'
 
-import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
+import { RefObject, useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition } from 'react'
 
 import type {
   CheckDefinitionDTO,
@@ -69,10 +69,21 @@ interface LinearView {
 interface PointView {
   min: number
   max: number
-  displayMin: number
-  displayMax: number
-  displayRange: number
   points: { startPk: number; endPk: number; side: IntervalSide; spec?: string | null; billQuantity?: number | null }[]
+}
+
+interface SelectedSegment {
+  phase: string
+  phaseId: number
+  measure: PhaseMeasure
+  layers: string[]
+  checks: string[]
+  side: IntervalSide
+  sideLabel: string
+  start: number
+  end: number
+  spec?: string | null
+  billQuantity?: number | null
 }
 
 const statusTone: Record<Status, string> = {
@@ -147,14 +158,6 @@ const normalizeInterval = (interval: PhaseIntervalPayload, measure: PhaseMeasure
 }
 
 const getPointCenter = (startPk: number, endPk: number) => (startPk + endPk) / 2
-
-const getPointPosition = (centerPk: number, view: PointView) => {
-  if (!Number.isFinite(view.displayRange) || view.displayRange <= 0) {
-    return 50
-  }
-  const ratio = (centerPk - view.displayMin) / view.displayRange
-  return Math.min(100, Math.max(0, ratio * 100))
-}
 
 
 const fillNonDesignGaps = (segments: Segment[], start: number, end: number) => {
@@ -335,19 +338,43 @@ const buildPointView = (phase: PhaseDTO, fallbackStart: number, fallbackEnd: num
   const rawMax = boundaries.length ? Math.max(...boundaries) : fallbackEnd
   const safeMin = Number.isFinite(rawMin) ? rawMin : 0
   const safeMax = Number.isFinite(rawMax) ? rawMax : safeMin + 1
-  let span = safeMax - safeMin
-  if (!Number.isFinite(span) || span <= 0) span = 1
-  const margin = Math.max(span * 0.05, 1)
-  const displayMin = safeMin - margin
-  const displayMax = safeMax + margin
   return {
     min: safeMin,
     max: safeMax,
-    displayMin,
-    displayMax,
-    displayRange: Math.max(displayMax - displayMin, 0.01),
     points: normalized,
   }
+}
+
+const useElementWidth = (ref: RefObject<HTMLElement>) => {
+  const [width, setWidth] = useState(0)
+
+  useLayoutEffect(() => {
+    const node = ref.current
+    if (!node) {
+      setWidth(0)
+      return
+    }
+    const updateWidth = () => {
+      setWidth(node.clientWidth || 0)
+    }
+    updateWidth()
+
+    if (typeof window === 'undefined') {
+      return
+    }
+
+    if (typeof ResizeObserver !== 'undefined') {
+      const observer = new ResizeObserver(() => updateWidth())
+      observer.observe(node)
+      return () => observer.disconnect()
+    }
+
+    const handleResize = () => updateWidth()
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [ref])
+
+  return width
 }
 
 const calcCombinedPercent = (left: Segment[], right: Segment[]) => {
@@ -358,6 +385,130 @@ const calcCombinedPercent = (left: Segment[], right: Segment[]) => {
   const completed = calcCompletedBySide(left) + calcCompletedBySide(right)
   return Math.round((completed / total) * 100)
 }
+
+interface PointLaneProps {
+  phase: PhaseDTO
+  points: PointView['points']
+  containerClassName: string
+  rangeLabel?: string
+  label?: string
+  showHeader?: boolean
+  wrapperClassName?: string
+  sideLabelMap: Record<IntervalSide, string>
+  resolvePointBadge: (phaseId: number, startPk: number, endPk: number) => string
+  onPointSelect: (segment: SelectedSegment) => void
+}
+
+function PointLane({
+  phase,
+  points,
+  containerClassName,
+  rangeLabel,
+  label,
+  showHeader = false,
+  wrapperClassName = 'space-y-2',
+  sideLabelMap,
+  resolvePointBadge,
+  onPointSelect,
+}: PointLaneProps) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const containerWidth = useElementWidth(containerRef)
+  const columns = Math.max(1, Math.floor(containerWidth / 64))
+
+  const rows = useMemo(() => {
+    if (!points.length) return []
+    const normalized = [...points]
+      .map((point) => ({ point, centerPk: getPointCenter(point.startPk, point.endPk) }))
+      .sort((a, b) => a.centerPk - b.centerPk)
+
+    const rowCount = Math.max(1, Math.ceil(normalized.length / columns))
+    const chunked: typeof normalized[] = []
+    let cursor = 0
+    for (let rowIndex = 0; rowIndex < rowCount; rowIndex++) {
+      const remaining = normalized.length - cursor
+      const remainingRows = rowCount - rowIndex
+      const take = Math.max(1, Math.ceil(remaining / remainingRows))
+      chunked.push(normalized.slice(cursor, cursor + take))
+      cursor += take
+    }
+    return chunked
+  }, [points, columns])
+
+  const handlePointClick = (item: PointView['points'][number]) => {
+    const sideLabel = sideLabelMap[item.side]
+    onPointSelect({
+      phase: phase.name,
+      phaseId: phase.id,
+      measure: phase.measure,
+      layers: phase.resolvedLayers,
+      checks: phase.resolvedChecks,
+      side: item.side,
+      sideLabel,
+      start: item.startPk,
+      end: item.endPk,
+      spec: item.spec ?? null,
+      billQuantity: item.billQuantity ?? null,
+    })
+  }
+
+  return (
+    <div className={wrapperClassName}>
+      {showHeader ? (
+        <div className="flex items-center justify-between text-xs text-slate-200/80">
+          {label ? (
+            <span className="rounded-full bg-white/10 px-2 py-1 text-[11px] font-semibold">
+              {label}
+            </span>
+          ) : null}
+          {rangeLabel ? <span className="text-slate-300">{rangeLabel}</span> : null}
+        </div>
+      ) : null}
+      <div className="space-y-3" ref={containerRef}>
+        {rows.map((row, rowIndex) => (
+          <div
+            key={`${phase.id}-${rowIndex}`}
+            className={containerClassName}
+          >
+            <div className="absolute left-6 right-6 top-1/2 h-1 -translate-y-1/2 rounded-full bg-gradient-to-r from-slate-800 via-slate-900 to-slate-800" />
+            <div
+              className="relative grid items-center gap-4"
+              style={{ gridTemplateColumns: `repeat(${row.length}, minmax(0, 1fr))` }}
+            >
+              {row.map((entry, idx) => {
+                const item = entry.point
+                const rangeText = `${formatPK(item.startPk)} – ${formatPK(item.endPk)}`
+                const sideLabelText =
+                  item.side === 'LEFT'
+                    ? sideLabelMap.LEFT
+                    : item.side === 'RIGHT'
+                      ? sideLabelMap.RIGHT
+                      : sideLabelMap.BOTH
+                return (
+                  <button
+                    key={`${item.startPk}-${item.endPk}-${idx}`}
+                    type="button"
+                    className="flex flex-col items-center gap-1 text-center transition hover:scale-105"
+                    onClick={() => handlePointClick(item)}
+                    title={`${rangeText} · ${sideLabelText}`}
+                  >
+                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-950 text-xs font-semibold text-white shadow-lg shadow-emerald-400/25 ring-2 ring-white/20">
+                      {resolvePointBadge(phase.id, item.startPk, item.endPk)}
+                    </div>
+                    <div className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-semibold text-slate-200">
+                      {formatPK(entry.centerPk)}
+                    </div>
+                    <p className="text-[10px] text-slate-300">{sideLabelText}</p>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 
 export function PhaseEditor({
   road,
@@ -802,6 +953,14 @@ export function PhaseEditor({
       }))
   }, [phases, roadStart, roadEnd])
 
+  const handlePointSelect = (segment: SelectedSegment) => {
+    if (!canInspect) {
+      alert(t.alerts.noInspectPermission)
+      return
+    }
+    setSelectedSegment(segment)
+  }
+
 const toggleToken = (value: string, list: string[], setter: (next: string[]) => void) => {
   const exists = list.includes(value)
   setter(exists ? list.filter((item) => item !== value) : [...list, value])
@@ -917,19 +1076,7 @@ const addCheckToken = () => {
   resetInspectionForm()
 }
 
-  const [selectedSegment, setSelectedSegment] = useState<{
-    phase: string
-    phaseId: number
-    measure: PhaseMeasure
-    layers: string[]
-    checks: string[]
-    side: IntervalSide
-    sideLabel: string
-    start: number
-    end: number
-    spec?: string | null
-    billQuantity?: number | null
-  } | null>(null)
+  const [selectedSegment, setSelectedSegment] = useState<SelectedSegment | null>(null)
   const [selectedSide, setSelectedSide] = useState<IntervalSide>('BOTH')
   const [startPkInput, setStartPkInput] = useState<string>('')
   const [endPkInput, setEndPkInput] = useState<string>('')
@@ -1575,6 +1722,7 @@ const addCheckToken = () => {
             {sortedPhases.map((phase) => {
               const linear = phase.measure === 'LINEAR' ? linearViews.find((item) => item.phase.id === phase.id) : null
               const point = phase.measure === 'POINT' ? pointViews.find((item) => item.phase.id === phase.id) : null
+              const pointRangeLabel = point ? `${formatPK(point.view.min)} – ${formatPK(point.view.max)}` : ''
 
               return (
                 <div
@@ -1689,149 +1837,39 @@ const addCheckToken = () => {
                     <div className="mt-4 space-y-3">
                       {phase.pointHasSides ? (
                         <div className="space-y-3">
-                          {[{ side: 'LEFT' as const, label: sideLabelMap.LEFT }, { side: 'RIGHT' as const, label: sideLabelMap.RIGHT }].map(
-                            (row) => {
-                              const rowPoints = point.view.points.filter(
-                                (p) => p.side === row.side || p.side === 'BOTH',
-                              )
-                              return (
-                                <div key={row.side} className="space-y-2">
-                                  <div className="flex items-center justify-between text-xs text-slate-200/80">
-                                    <span className="rounded-full bg-white/10 px-2 py-1 text-[11px] font-semibold">
-                                      {row.label}
-                                    </span>
-                                    <span className="text-slate-300">
-                                      {formatPK(point.view.min)} – {formatPK(point.view.max)}
-                                    </span>
-                                  </div>
-                                  <div className="relative h-24 rounded-2xl border border-white/10 bg-slate-900/60 px-4 py-5 shadow-inner shadow-slate-900/40">
-                                    <div className="absolute left-6 right-6 top-1/2 h-1 -translate-y-1/2 rounded-full bg-gradient-to-r from-slate-800 via-slate-900 to-slate-800" />
-                                    <div className="relative flex h-full items-center justify-between">
-                                      {rowPoints.map((item, idx) => {
-                                        const centerPk = getPointCenter(item.startPk, item.endPk)
-                                        const position = getPointPosition(centerPk, point.view)
-                                        const rangeLabel = `${formatPK(item.startPk)} – ${formatPK(item.endPk)}`
-                                        return (
-                                          <button
-                                            key={`${item.startPk}-${item.endPk}-${idx}-${row.side}`}
-                                            type="button"
-                                            className="absolute top-1/2 flex -translate-y-1/2 flex-col items-center gap-1 text-center transition hover:scale-105"
-                                            style={{ left: `${position}%`, transform: 'translate(-50%, -50%)' }}
-                                            onClick={() => {
-                                              if (!canInspect) {
-                                                alert(t.alerts.noInspectPermission)
-                                                return
-                                              }
-                                              const sideLabel = sideLabelMap[item.side]
-                                              setSelectedSegment({
-                                                phase: phase.name,
-                                                phaseId: phase.id,
-                                                measure: phase.measure,
-                                                layers: phase.resolvedLayers,
-                                                checks: phase.resolvedChecks,
-                                                side: item.side,
-                                                sideLabel,
-                                                start: item.startPk,
-                                                end: item.endPk,
-                                                spec: item.spec ?? null,
-                                                billQuantity: item.billQuantity ?? null,
-                                              })
-                                            }}
-                                          >
-                                            <div
-                                              className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-950 text-xs font-semibold text-white shadow-lg shadow-emerald-400/25 ring-2 ring-white/20"
-                                              title={`${rangeLabel} · ${
-                                                item.side === 'LEFT'
-                                                  ? sideLabelMap.LEFT
-                                                  : item.side === 'RIGHT'
-                                                    ? sideLabelMap.RIGHT
-                                                    : sideLabelMap.BOTH
-                                              }`}
-                                            >
-                                              {resolvePointBadge(phase.id, item.startPk, item.endPk)}
-                                            </div>
-                                            <div className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-semibold text-slate-200">
-                                              {formatPK(centerPk)}
-                                            </div>
-                                            <p className="text-[10px] text-slate-300">
-                                              {item.side === 'BOTH'
-                                                ? sideLabelMap.BOTH
-                                                : item.side === 'LEFT'
-                                                  ? sideLabelMap.LEFT
-                                                  : sideLabelMap.RIGHT}
-                                            </p>
-                                          </button>
-                                        )
-                                      })}
-                                    </div>
-                                  </div>
-                                </div>
-                              )
-                            },
-                          )}
+                          {[
+                            { side: 'LEFT' as const, label: sideLabelMap.LEFT },
+                            { side: 'RIGHT' as const, label: sideLabelMap.RIGHT },
+                          ].map((row) => {
+                            const rowPoints = point.view.points.filter(
+                              (p) => p.side === row.side || p.side === 'BOTH',
+                            )
+                            return (
+                              <PointLane
+                                key={row.side}
+                                phase={phase}
+                                points={rowPoints}
+                                label={row.label}
+                                showHeader
+                                rangeLabel={pointRangeLabel}
+                                containerClassName="relative h-24 rounded-2xl border border-white/10 bg-slate-900/60 px-4 py-5 shadow-inner shadow-slate-900/40"
+                                sideLabelMap={sideLabelMap}
+                                resolvePointBadge={resolvePointBadge}
+                                onPointSelect={handlePointSelect}
+                              />
+                            )
+                          })}
                         </div>
                       ) : (
-                        <div className="relative mt-2 h-28 rounded-2xl border border-white/10 bg-slate-900/60 px-4 py-5 shadow-inner shadow-slate-900/40">
-                          <div className="absolute left-6 right-6 top-1/2 h-1 -translate-y-1/2 rounded-full bg-gradient-to-r from-slate-800 via-slate-900 to-slate-800" />
-                          <div className="relative flex h-full items-center justify-between">
-                            {point.view.points.map((item, idx) => {
-                              const centerPk = getPointCenter(item.startPk, item.endPk)
-                              const position = getPointPosition(centerPk, point.view)
-                              const rangeLabel = `${formatPK(item.startPk)} – ${formatPK(item.endPk)}`
-                              return (
-                                <button
-                                  key={`${item.startPk}-${item.endPk}-${idx}`}
-                                  type="button"
-                                  className="absolute top-1/2 flex -translate-y-1/2 flex-col items-center gap-1 text-center transition hover:scale-105"
-                                  style={{ left: `${position}%`, transform: 'translate(-50%, -50%)' }}
-                                  onClick={() => {
-                                    if (!canInspect) {
-                                      alert(t.alerts.noInspectPermission)
-                                      return
-                                    }
-                                    const sideLabel = sideLabelMap[item.side]
-                                    setSelectedSegment({
-                                      phase: phase.name,
-                                      phaseId: phase.id,
-                                      measure: phase.measure,
-                                      layers: phase.resolvedLayers,
-                                      checks: phase.resolvedChecks,
-                                      side: item.side,
-                                      sideLabel,
-                                      start: item.startPk,
-                                      end: item.endPk,
-                                      spec: item.spec ?? null,
-                                      billQuantity: item.billQuantity ?? null,
-                                    })
-                                  }}
-                                >
-                                  <div
-                                    className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-950 text-xs font-semibold text-white shadow-lg shadow-emerald-400/25 ring-2 ring-white/20"
-                                    title={`${rangeLabel} · ${
-                                      item.side === 'LEFT'
-                                        ? sideLabelMap.LEFT
-                                        : item.side === 'RIGHT'
-                                          ? sideLabelMap.RIGHT
-                                          : sideLabelMap.BOTH
-                                    }`}
-                                  >
-                                    {resolvePointBadge(phase.id, item.startPk, item.endPk)}
-                                  </div>
-                                  <div className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-semibold text-slate-200">
-                                    {formatPK(centerPk)}
-                                  </div>
-                                  <p className="text-[10px] text-slate-300">
-                                    {item.side === 'BOTH'
-                                      ? sideLabelMap.BOTH
-                                      : item.side === 'LEFT'
-                                        ? sideLabelMap.LEFT
-                                        : sideLabelMap.RIGHT}
-                                  </p>
-                                </button>
-                              )
-                            })}
-                          </div>
-                        </div>
+                        <PointLane
+                          phase={phase}
+                          points={point.view.points}
+                          rangeLabel={pointRangeLabel}
+                          containerClassName="relative mt-2 h-28 rounded-2xl border border-white/10 bg-slate-900/60 px-4 py-5 shadow-inner shadow-slate-900/40"
+                          sideLabelMap={sideLabelMap}
+                          resolvePointBadge={resolvePointBadge}
+                          onPointSelect={handlePointSelect}
+                        />
                       )}
                     </div>
                   ) : null}
