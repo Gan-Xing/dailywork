@@ -21,10 +21,13 @@ export interface RoadSectionWithPhasesDTO extends RoadSectionDTO {
 export interface RoadPhaseProgressDTO {
   phaseId: number
   phaseName: string
+  phaseDefinitionId: number
   phaseMeasure: PhaseMeasure
   designLength: number
   completedLength: number
   completedPercent: number
+  intervals: PhaseIntervalProgress[]
+  inspections: { startPk: number; endPk: number; side: IntervalSide }[]
   updatedAt: string
 }
 
@@ -90,6 +93,13 @@ export interface PhaseIntervalPayload {
   billQuantity?: number | null
 }
 
+export interface PhaseIntervalProgress {
+  startPk: number
+  endPk: number
+  side: IntervalSide
+  spec: string | null
+}
+
 export interface PhasePayload {
   phaseDefinitionId?: number
   name: string
@@ -126,6 +136,7 @@ export interface PhaseDefinitionDTO {
   defaultLayers: string[]
   defaultChecks: string[]
   isActive: boolean
+  unitPrice: number | null
   createdAt: string
   updatedAt: string
 }
@@ -176,4 +187,6 @@ export interface AggregatedPhaseProgress {
   completedPercent: number
   latestUpdatedAt: number
   roadNames: string[]
+  spec?: string | null
+  phaseDefinitionId?: number
 }

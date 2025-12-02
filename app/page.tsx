@@ -54,8 +54,8 @@ const copy: Record<Locale, Copy> = {
 			connector: '与',
 			progress: '进度',
 			suffix: '。',
-			description:
-				'把一线更新、项目里程碑放在同一块操作面板，保持团队节奏一致。当前开放 4 个核心入口（含成员管理与财务记账），后续模块可随时接入。',
+		description:
+			'把一线更新、项目里程碑放在同一块操作面板，保持团队节奏一致。当前开放 5 个核心入口（含成员管理、产值计量与财务记账），后续模块可随时接入。',
 			primaryCta: '立即填写日报',
 			secondaryCta: '查看项目进度'
 		},
@@ -94,13 +94,21 @@ const copy: Record<Locale, Copy> = {
 				description: '按项目录入财务流水，支持序号自动生成、分类与税费字段，方便后续统计。',
 				tags: ['项目选择', '分类/支付方式', '含税金额'],
 				cta: '进入财务'
+			},
+			{
+				title: '产值计量',
+				href: '/value',
+				tone: 'from-indigo-300/80 via-purple-300/80 to-fuchsia-300/80',
+				description: '按分项统计设计/完成量与单价，实时跟踪产值进度与完成率。',
+				tags: ['单价/产值', '完成率', '工程汇总'],
+				cta: '查看产值详情'
 			}
 		],
 		stats: {
 			entriesLabel: '当前入口',
-			entriesValue: '4',
+			entriesValue: '5',
 			recentLabel: '最近更新',
-			recentValue: '新增成员管理入口，日报/进度/财务持续维护',
+			recentValue: '新增成员管理与产值计量入口，日报/进度/财务持续维护',
 			upcomingTitle: '即将推出',
 			upcomingBody: '支持更多入口：质量巡检、物资追踪、风险复盘。'
 		},
@@ -117,8 +125,8 @@ const copy: Record<Locale, Copy> = {
 			connector: 'et le',
 			progress: "suivi d'avancement",
 			suffix: '.',
-			description:
-				'Regroupez les mises à jour terrain et les jalons projet sur le même tableau de bord. Quatre accès clés (dont la comptabilité et la gestion des membres) sont prêts, les suivants se brancheront facilement.',
+		description:
+				'Regroupez les mises à jour terrain et les jalons projet sur le même tableau de bord. Cinq accès clés (dont la gestion des membres, le calcul des valeurs et la comptabilité) sont prêts, les suivants se brancheront facilement.',
 			primaryCta: 'Remplir un rapport',
 			secondaryCta: "Voir l'avancement"
 		},
@@ -161,13 +169,21 @@ const copy: Record<Locale, Copy> = {
 				description: 'Saisir les écritures par projet avec numéro auto, catégorie, mode de paiement et TVA pour préparer les états financiers.',
 				tags: ['Projet', 'Catégorie/paiement', 'Montant TTC'],
 				cta: 'Ouvrir la compta'
+			},
+			{
+				title: 'Calcul des valeurs',
+				href: '/value',
+				tone: 'from-indigo-300/80 via-purple-300/80 to-fuchsia-300/80',
+				description: 'Regroupe quantités prévues/réalisées et prix unitaires par sous-ouvrage pour suivre la valeur validée.',
+				tags: ['Prix unitaires', 'Valeurs réalisées', 'Progression'],
+				cta: 'Voir les valeurs'
 			}
 		],
 		stats: {
 			entriesLabel: 'Entrées actives',
-			entriesValue: '4',
+			entriesValue: '5',
 			recentLabel: 'Mise à jour',
-			recentValue: 'Entrée membres ajoutée, rapport/avancement/compta synchronisés',
+			recentValue: 'Entrées membres et valeurs ajoutées, rapport/avancement/compta synchronisés',
 			upcomingTitle: 'Prochainement',
 			upcomingBody: 'Inspection qualité, flux matériaux, revues de risques.'
 		},
@@ -224,7 +240,8 @@ export default function HomePage() {
 			'/reports': ['report:view', 'report:edit'],
 			'/progress': ['progress:view'],
 			'/members': ['member:view'],
-			'/finance': ['finance:view']
+			'/finance': ['finance:view'],
+			'/value': ['progress:view']
 		}),
 		[]
 	);

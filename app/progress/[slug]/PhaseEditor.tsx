@@ -808,6 +808,7 @@ export function PhaseEditor({
               defaultLayers: phase.resolvedLayers,
               defaultChecks: phase.resolvedChecks,
               isActive: true,
+              unitPrice: null,
               createdAt: phase.createdAt,
               updatedAt: phase.updatedAt,
             },

@@ -179,7 +179,24 @@
      3. `defaultLayers`：字符串数组，模板级默认层次列表，可为空。
      4. `defaultChecks`：字符串数组，模板级默认验收内容列表，可为空。
      5. `isActive`：布尔，控制是否可被新实例选择，默认 `true`。
-     6. `createdAt` / `updatedAt`：系统时间戳。
+   6. `createdAt` / `updatedAt`：系统时间戳。
+
+## 可报价分项名称（PhasePriceItem）
+
+- **用途**：为每个分项模板维护一个或多个“可计价的分项名称”（如涵洞的混凝土、模板、钢筋部分），每条记录包含独立单价与计价说明，供产值/财务模块直接使用。管理界面支持新增/修改/删除操作，方便按规范或构成拆分价格。
+- **字段**
+     1. `id`：唯一标识。
+     2. `phaseDefinitionId`：关联 `PhaseDefinition`（必填）。
+     3. `name`：分项名称（如 “涵洞混凝土”），便于界面展示，必填。
+     4. `spec?`：可选规格，用于与进度中 `spec` 字段匹配，默认留空表示面向整个分项。
+     5. `measure`：枚举 `LINEAR` / `POINT`，默认继承分项的计量方式，也可重新指定。
+     6. `unitString?`：计价单位（如 `m³`、`m²`），仅在 UI 上展示。
+     7. `description?`：可填写计价依据、构成组件等说明文字。
+     8. `unitPrice?`：金额（decimal，西非法郎），可空表示使用分项定义自身 `unitPrice` 作为回退值。
+     9. `isActive`：布尔，控制此条是否参与列表与产值计算，默认 `true`。
+    10. `createdAt` / `updatedAt`：时间戳。
+
+> 说明：产值页面会优先尝试匹配 `phaseDefinitionId + spec` 的可报价条目，再使用分项默认价格；管理页面通过 `/value/prices` 提供增删改查入口，确保每个可报价名称与对应价格一一对应。
 
 ## 层次与验收内容定义（LayerDefinition / CheckDefinition）
 
@@ -310,3 +327,4 @@
 - 中非：喀麦隆 / Cameroun、乍得 / Tchad、刚果（布）/ Congo、刚果（金）/ RDC、中非共和国 / Centrafrique、加蓬 / Gabon、赤道几内亚 / Guinée équatoriale、卢旺达 / Rwanda
 - 东非：吉布提 / Djibouti、科摩罗 / Comores、塞舌尔 / Seychelles、马达加斯加 / Madagascar、毛里求斯 / Maurice
 - 南部非洲：刚果（金） / RDC、刚果（布） / Congo、布隆迪 / Burundi、莫桑比克 / Mozambique
+> 说明：`spec` 可选，当多个规格共享一个单价时留空即可，系统会将该价格视为默认；若某个规格或构件需要独立价格（如边沟的特定规格或涵洞的各组成），需新增一条记录并在 `spec` 中写明规格/构件名。页面会根据 `phaseDefinitionId + spec` 匹配价格，没找到时再退回到分项默认价值。

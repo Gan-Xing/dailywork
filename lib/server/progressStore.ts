@@ -49,6 +49,11 @@ const calcDesignLength = (
   }, 0)
 }
 
+const toOptionalNumber = (value: number | Prisma.Decimal | null | undefined) => {
+  if (value == null) return null
+  return Number(value)
+}
+
 const mapDefinitionToDTO = (
   definition: Prisma.PhaseDefinitionGetPayload<{
     include: { defaultLayers: { include: { layerDefinition: true } }; defaultChecks: { include: { checkDefinition: true } } }
@@ -60,6 +65,7 @@ const mapDefinitionToDTO = (
   pointHasSides: definition.pointHasSides,
   defaultLayers: definition.defaultLayers.map((l) => l.layerDefinition.name),
   defaultChecks: definition.defaultChecks.map((c) => c.checkDefinition.name),
+  unitPrice: toOptionalNumber(definition.unitPrice),
   isActive: definition.isActive,
   createdAt: definition.createdAt.toISOString(),
   updatedAt: definition.updatedAt.toISOString(),

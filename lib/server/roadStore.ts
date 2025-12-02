@@ -171,17 +171,26 @@ export const listRoadSectionsWithProgress = async (): Promise<RoadSectionProgres
       endPk: true,
       createdAt: true,
       updatedAt: true,
-      phases: {
-        select: {
-          id: true,
-          name: true,
-          measure: true,
-          designLength: true,
+          phases: {
+            select: {
+              id: true,
+              name: true,
+              measure: true,
+              phaseDefinitionId: true,
+              designLength: true,
           updatedAt: true,
           inspections: {
             where: { status: 'APPROVED' },
             orderBy: { updatedAt: 'desc' },
             select: { startPk: true, endPk: true, side: true, layers: true, updatedAt: true },
+          },
+          intervals: {
+            select: {
+              startPk: true,
+              endPk: true,
+              side: true,
+              spec: true,
+            },
           },
           layerLinks: {
             select: {
@@ -211,9 +220,9 @@ export const listRoadSectionsWithProgress = async (): Promise<RoadSectionProgres
   })
 
   return roads.map((road) => {
-    const phases: RoadPhaseProgressDTO[] = road.phases.map((phase) => {
-      const designLength = Math.max(0, phase.designLength || 0)
-      const resolvedLayers = phase.measure === 'POINT' ? resolvePhaseLayers(phase) : []
+      const phases: RoadPhaseProgressDTO[] = road.phases.map((phase) => {
+        const designLength = Math.max(0, phase.designLength || 0)
+        const resolvedLayers = phase.measure === 'POINT' ? resolvePhaseLayers(phase) : []
       const rawCompletedLength =
         phase.measure === 'POINT'
           ? calcCompletedPointStructures(phase.inspections, resolvedLayers)
@@ -223,14 +232,28 @@ export const listRoadSectionsWithProgress = async (): Promise<RoadSectionProgres
       const completedPercent =
         designLength > 0 ? Math.min(100, Math.round((cappedCompletedLength / designLength) * 100)) : 0
       const latestUpdate = phase.inspections[0]?.updatedAt ?? phase.updatedAt
+      const intervalSpecs = phase.intervals?.map((interval) => ({
+        startPk: interval.startPk,
+        endPk: interval.endPk,
+        side: interval.side,
+        spec: interval.spec ?? null,
+      })) ?? []
+      const inspectionRanges = phase.inspections.map((inspection) => ({
+        startPk: inspection.startPk,
+        endPk: inspection.endPk,
+        side: inspection.side,
+      }))
       return {
         phaseId: phase.id,
         phaseName: phase.name,
         phaseMeasure: phase.measure,
+        phaseDefinitionId: phase.phaseDefinitionId,
         designLength,
         completedLength: cappedCompletedLength,
         completedPercent,
         updatedAt: latestUpdate.toISOString(),
+        intervals: intervalSpecs,
+        inspections: inspectionRanges,
       }
     })
 
