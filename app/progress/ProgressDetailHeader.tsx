@@ -11,7 +11,7 @@ import { usePreferredLocale } from '@/lib/usePreferredLocale'
 export function ProgressDetailHeader({ road }: { road: RoadSectionDTO }) {
   const { locale } = usePreferredLocale('zh', locales)
   const t = getProgressCopy(locale)
-  const breadcrumbHome = locale === 'fr' ? 'Accueil' : '首页'
+  const breadcrumbHome = t.nav.home
   const breadcrumbProgress = t.detail.breadcrumbProgress
 
   return (

@@ -19,6 +19,7 @@ import type {
 } from '@/lib/progressTypes'
 import { resolveRoadName } from '@/lib/i18n/roadDictionary'
 import { getProgressCopy, formatProgressCopy } from '@/lib/i18n/progress'
+import { localizeProgressTerm } from '@/lib/i18n/progressDictionary'
 import { locales, type Locale } from '@/lib/i18n'
 import { usePreferredLocale } from '@/lib/usePreferredLocale'
 
@@ -229,7 +230,7 @@ const RoadBoard = forwardRef<RoadBoardHandle, Props>(function RoadBoard(
               type="button"
               className="absolute right-4 top-4 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/20"
               onClick={closeFormModal}
-              aria-label="关闭"
+              aria-label={t.actions.close}
             >
               ×
             </button>
@@ -326,11 +327,6 @@ interface RoadCardProps {
 }
 
 const chipTone = 'rounded-full bg-white/10 px-3 py-1 text-[11px] font-semibold text-slate-100 shadow-inner shadow-slate-900/30'
-const formatDesignLength = (phase: RoadPhaseProgressDTO) => {
-  const value = Number.isFinite(phase.designLength) ? phase.designLength : 0
-  const rounded = Math.round(value * 100) / 100
-  return phase.phaseMeasure === 'POINT' ? `${rounded} 个` : `${rounded} m`
-}
 const calcPhaseProgress = (_phase: PhaseDTO) => {
   return 0
 }
@@ -338,6 +334,12 @@ const calcPhaseProgress = (_phase: PhaseDTO) => {
 const RoadCard = ({ road, onEdit, onDelete, canManage, locale }: RoadCardProps) => {
   const copy = getProgressCopy(locale)
   const phases = road.phases ?? []
+  const formatDesignLength = (phase: RoadPhaseProgressDTO) => {
+    const value = Number.isFinite(phase.designLength) ? phase.designLength : 0
+    const rounded = Math.round(value * 100) / 100
+    const unit = phase.phaseMeasure === 'POINT' ? copy.phase.units.point : copy.phase.units.linear
+    return `${rounded} ${unit}`
+  }
   const sortedByRecent = [...phases].sort(
     (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
   )
@@ -407,7 +409,9 @@ const RoadCard = ({ road, onEdit, onDelete, canManage, locale }: RoadCardProps) 
                         style={{ width: `${progressWidth}%` }}
                       />
                       <div className="relative flex items-center justify-between px-3 py-2 text-[13px] font-semibold text-slate-50">
-                        <span className="truncate">{phase.phaseName}</span>
+                        <span className="truncate">
+                          {localizeProgressTerm('phase', phase.phaseName, locale)}
+                        </span>
                         <span className="text-xs font-bold">{progressWidth}%</span>
                       </div>
                     </div>
@@ -419,7 +423,7 @@ const RoadCard = ({ road, onEdit, onDelete, canManage, locale }: RoadCardProps) 
               })}
             </div>
           ) : (
-            <p className="text-sm text-slate-300">尚未添加分项工程，点击进入详情新增。</p>
+            <p className="text-sm text-slate-300">{copy.phase.list.emptyHint}</p>
           )}
           <p className="text-xs text-slate-400">
             {copy.card.updated}

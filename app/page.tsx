@@ -44,6 +44,23 @@ type Copy = {
 		items: string[];
 		description: string;
 	};
+	auth: {
+		login: string;
+		loggingIn: string;
+		logout: string;
+		loggingOut: string;
+		title: string;
+		username: string;
+		password: string;
+		hint: string;
+		loggedInPrefix: string;
+		needLogin: string;
+		noPermission: string;
+		loginSuccess: string;
+		loginFail: string;
+		loginRequired: string;
+		close: string;
+	};
 };
 
 const copy: Record<Locale, Copy> = {
@@ -116,6 +133,23 @@ const copy: Record<Locale, Copy> = {
 			label: '扩展空间',
 			items: ['质量巡检', '物资进出', '风险复盘', 'AI 总结', '导出中心'],
 			description: '未来的入口会延续同一视觉规范：清晰分区、带状态标识、可快速跳转到具体场景。需要新增模块时直接在此卡片组追加即可。'
+		},
+		auth: {
+			login: '登录',
+			loggingIn: '登录中...',
+			logout: '退出登录',
+			loggingOut: '正在退出...',
+			title: '登录',
+			username: '用户名',
+			password: '密码',
+			hint: '如无账号，请联系管理员开通。',
+			loggedInPrefix: '已登录',
+			needLogin: '需登录',
+			noPermission: '权限不足',
+			loginSuccess: '登录成功，权限已更新',
+			loginFail: '登录失败',
+			loginRequired: '请先登录后再访问该模块',
+			close: '关闭'
 		}
 	},
 	fr: {
@@ -197,6 +231,23 @@ const copy: Record<Locale, Copy> = {
 				"Centre d'export"
 			],
 			description: 'Les futurs modules suivront la même grille visuelle : zones claires, statut visible et navigation rapide vers chaque scénario. Ajoutez simplement une carte ici quand un nouveau module arrive.'
+		},
+		auth: {
+			login: 'Connexion',
+			loggingIn: 'Connexion...',
+			logout: 'Déconnexion',
+			loggingOut: 'Déconnexion...',
+			title: 'Connexion',
+			username: 'Identifiant',
+			password: 'Mot de passe',
+			hint: 'Si vous n’avez pas de compte, contactez un administrateur.',
+			loggedInPrefix: 'Connecté',
+			needLogin: 'Connexion requise',
+			noPermission: 'Droit insuffisant',
+			loginSuccess: 'Connecté, droits mis à jour',
+			loginFail: 'Échec de connexion',
+			loginRequired: 'Connectez-vous pour accéder à ce module',
+			close: 'Fermer'
 		}
 	}
 };
@@ -212,8 +263,8 @@ export default function HomePage() {
 	const t = copy[locale];
 	const [session, setSession] = useState<SessionUser | null>(null);
 	const [loginOpen, setLoginOpen] = useState(false);
-	const [username, setUsername] = useState('GanXing');
-	const [password, setPassword] = useState('Admin888');
+	const [username, setUsername] = useState('');
+	const [password, setPassword] = useState('');
 	const [loginMessage, setLoginMessage] = useState<string | null>(null);
 	const [isSubmitting, setSubmitting] = useState(false);
 	const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -312,12 +363,12 @@ export default function HomePage() {
 				message?: string;
 			};
 			if (!res.ok || !data.user) {
-				setLoginMessage(data.message ?? '登录失败');
+				setLoginMessage(data.message ?? t.auth.loginFail);
 			} else {
 				setSession(data.user);
 				setLoginOpen(false);
 				setMenuOpen(false);
-				setLoginMessage('登录成功，权限已更新');
+				setLoginMessage(t.auth.loginSuccess);
 			}
 		} catch (error) {
 			setLoginMessage((error as Error).message);
@@ -352,13 +403,13 @@ export default function HomePage() {
 		event.preventDefault();
 		if (!session) {
 			setLoginOpen(true);
-			setLoginMessage('请先登录后再访问该模块');
+			setLoginMessage(t.auth.loginRequired);
 			return;
 		}
 		const codes = requiredPermissions.length
 			? requiredPermissions.join(' / ')
-			: '权限不足';
-		alert(`缺少访问权限：${codes}`);
+			: t.auth.noPermission;
+		alert(`${t.auth.noPermission}：${codes}`);
 	};
 
 	const handleChangePassword = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -414,7 +465,7 @@ export default function HomePage() {
 									)
 								}
 								className='inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-emerald-100 transition hover:bg-white/20'>
-								已登录 · {session.username}
+								{t.auth.loggedInPrefix} · {session.username}
 								<span aria-hidden>
 									▾
 								</span>
@@ -444,8 +495,8 @@ export default function HomePage() {
 											isLoggingOut
 										}>
 										{isLoggingOut
-											? '正在退出...'
-											: '退出登录'}
+											? t.auth.loggingOut
+											: t.auth.logout}
 										<span aria-hidden>
 											⎋
 										</span>
@@ -460,7 +511,7 @@ export default function HomePage() {
 								setLoginOpen(true)
 							}
 							className='rounded-full border border-white/20 px-3 py-1 text-xs font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/10'>
-							登录
+							{t.auth.login}
 						</button>
 					)}
 					<LocaleSwitcher
@@ -557,11 +608,11 @@ export default function HomePage() {
 								) : null}
 								<div className='mt-3 flex items-center justify-between gap-3'>
 									<h2 className='text-xl font-semibold leading-tight text-slate-950 sm:text-2xl'>
-										{module.title}
-									</h2>
-									{locked ? (
-										<span className='shrink-0 rounded-full bg-white/10 px-3 py-1.5 text-[11px] font-semibold leading-none text-amber-100'>
-											{session ? '权限不足' : '需登录'}
+									{module.title}
+								</h2>
+								{locked ? (
+									<span className='shrink-0 rounded-full bg-white/10 px-3 py-1.5 text-[11px] font-semibold leading-none text-amber-100'>
+											{session ? t.auth.noPermission : t.auth.needLogin}
 										</span>
 									) : null}
 								</div>
@@ -613,7 +664,7 @@ export default function HomePage() {
 					<div className='w-full max-w-md rounded-3xl border border-white/10 bg-slate-900 p-6 shadow-2xl shadow-emerald-500/20'>
 						<div className='flex items-center justify-between'>
 							<h2 className='text-lg font-semibold text-slate-50'>
-								登录
+								{t.auth.title}
 							</h2>
 							<button
 								type='button'
@@ -622,15 +673,16 @@ export default function HomePage() {
 										false
 									)
 								}
-								className='rounded-full border border-white/20 px-3 py-1 text-xs text-slate-200 transition hover:border-white/40 hover:bg-white/10'>
-								关闭
+								className='rounded-full border border-white/20 px-3 py-1 text-xs text-slate-200 transition hover:border-white/40 hover:bg-white/10'
+								aria-label={t.auth.close}>
+								×
 							</button>
 						</div>
 						<form
 							className='mt-4 space-y-3'
 							onSubmit={handleLogin}>
 							<label className='flex flex-col gap-2 text-sm text-slate-100'>
-								用户名
+								{t.auth.username}
 								<input
 									className='rounded-2xl border border-white/15 bg-white/5 px-4 py-3 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none'
 									value={
@@ -650,7 +702,7 @@ export default function HomePage() {
 								/>
 							</label>
 							<label className='flex flex-col gap-2 text-sm text-slate-100'>
-								密码
+								{t.auth.password}
 								<input
 									type='password'
 									className='rounded-2xl border border-white/15 bg-white/5 px-4 py-3 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none'
@@ -678,8 +730,8 @@ export default function HomePage() {
 									}
 									className='inline-flex items-center justify-center rounded-2xl bg-emerald-300 px-5 py-3 text-sm font-semibold text-slate-900 shadow-lg shadow-emerald-400/30 transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-70'>
 									{isSubmitting
-										? '登录中...'
-										: '登录'}
+										? t.auth.loggingIn
+										: t.auth.login}
 								</button>
 								{loginMessage ? (
 									<span className='text-xs text-amber-200'>
@@ -689,13 +741,7 @@ export default function HomePage() {
 									</span>
 								) : (
 									<span className='text-xs text-slate-300'>
-										默认账号：GanXing
-										/
-										Admin888
-										或
-										User1
-										/
-										use1
+										{t.auth.hint}
 									</span>
 								)}
 							</div>
@@ -714,8 +760,9 @@ export default function HomePage() {
 							<button
 								type='button'
 								onClick={() => setChangeOpen(false)}
-								className='rounded-full border border-white/20 px-3 py-1 text-xs text-slate-200 transition hover:border-white/40 hover:bg-white/10'>
-								关闭
+								className='rounded-full border border-white/20 px-3 py-1 text-xs text-slate-200 transition hover:border-white/40 hover:bg-white/10'
+								aria-label={locale === 'fr' ? 'Fermer' : '关闭'}>
+								×
 							</button>
 						</div>
 						<form className='mt-4 space-y-3' onSubmit={handleChangePassword}>

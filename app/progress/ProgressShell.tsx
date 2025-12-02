@@ -11,6 +11,7 @@ import type {
   RoadSectionProgressDTO,
 } from '@/lib/progressTypes'
 import { getProgressCopy, formatProgressCopy } from '@/lib/i18n/progress'
+import { resolveRoadName } from '@/lib/i18n/roadDictionary'
 import { locales } from '@/lib/i18n'
 import { usePreferredLocale } from '@/lib/usePreferredLocale'
 
@@ -24,9 +25,9 @@ interface Props {
 export function ProgressShell({ roads, loadError, canManage, canViewInspections }: Props) {
   const { locale } = usePreferredLocale('zh', locales)
   const t = getProgressCopy(locale)
-  const breadcrumbHome = locale === 'fr' ? 'Accueil' : '首页'
-  const breadcrumbProgress = locale === 'fr' ? 'Avancement' : '进度管理'
-  const inspectionLabel = locale === 'fr' ? '报检记录' : '报检记录'
+  const breadcrumbHome = t.nav.home
+  const breadcrumbProgress = t.nav.progress
+  const inspectionLabel = t.nav.inspections
   const [viewMode, setViewMode] = useState<'road' | 'phase'>('road')
   const roadBoardRef = useRef<RoadBoardHandle | null>(null)
 
@@ -51,12 +52,13 @@ export function ProgressShell({ roads, loadError, canManage, canViewInspections 
         const completedLen = Number.isFinite(phase.completedLength) ? phase.completedLength : 0
         const updatedAtRaw = new Date(phase.updatedAt).getTime()
         const updatedAt = Number.isFinite(updatedAtRaw) ? updatedAtRaw : 0
+        const localizedRoadName = resolveRoadName(road, locale)
         const existing = map.get(key)
         if (existing) {
           existing.totalDesignLength += designLen
           existing.totalCompletedLength += completedLen
           existing.latestUpdatedAt = Math.max(existing.latestUpdatedAt, updatedAt)
-          existing.roadNames.add(road.name)
+          existing.roadNames.add(localizedRoadName)
         } else {
           map.set(key, {
             id: key,
@@ -65,7 +67,7 @@ export function ProgressShell({ roads, loadError, canManage, canViewInspections 
             totalDesignLength: designLen,
             totalCompletedLength: completedLen,
             latestUpdatedAt: updatedAt,
-            roadNames: new Set([road.name]),
+            roadNames: new Set([localizedRoadName]),
           })
         }
       })

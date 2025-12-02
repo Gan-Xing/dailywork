@@ -1,6 +1,7 @@
 import { ProgressShell } from './ProgressShell'
 import { AccessDenied } from '@/components/AccessDenied'
 import type { RoadSectionProgressDTO } from '@/lib/progressTypes'
+import { getProgressCopy } from '@/lib/i18n/progress'
 import { getSessionUser } from '@/lib/server/authSession'
 import { listRoadSectionsWithProgress } from '@/lib/server/roadStore'
 
@@ -17,7 +18,8 @@ export default async function ProgressPage() {
   const canViewInspections = sessionUser?.permissions.includes('inspection:view') || false
 
   if (!canView) {
-    return <AccessDenied permissions={['progress:view']} hint="开通查看权限后可使用甘特与里程碑视图。" />
+    const t = getProgressCopy('zh')
+    return <AccessDenied permissions={['progress:view']} hint={t.access.progressViewHint} />
   }
 
   try {

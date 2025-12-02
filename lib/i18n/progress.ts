@@ -10,6 +10,16 @@ type ProgressCopy = {
     reports: string
     loadError: string
   }
+  nav: {
+    home: string
+    progress: string
+    inspections: string
+  }
+  access: {
+    progressViewHint: string
+    progressDetailHint: string
+    inspectionViewHint: string
+  }
   admin: {
     badge: string
     title: string
@@ -33,6 +43,7 @@ type ProgressCopy = {
     add: string
     save: string
     reset: string
+    close: string
   }
   errors: {
     noPermission: string
@@ -67,6 +78,7 @@ type ProgressCopy = {
     breadcrumbProgress: string
   }
   phase: PhaseCopy
+  inspectionBoard: InspectionBoardCopy
 }
 
 type PhaseCopy = {
@@ -130,12 +142,14 @@ type PhaseCopy = {
     linearSummary: string
     pointSummary: string
     moreUnits: string
+    updatedLabel: string
   }
   list: {
     title: string
     legend: string
     legendNote: string
     empty: string
+    emptyHint: string
   }
   card: {
     measurePoint: string
@@ -210,6 +224,174 @@ type PhaseCopy = {
   pointBadge: {
     none: string
   }
+  units: {
+    point: string
+    linear: string
+  }
+}
+
+type InspectionBoardCopy = {
+  badge: string
+  title: string
+  description: string
+  breadcrumb: {
+    home: string
+    progress: string
+    current: string
+  }
+  prefabRoadName: string
+  errorHint: string
+  filters: {
+    road: string
+    all: string
+    phase: string
+    side: string
+    sideLeft: string
+    sideRight: string
+    sideBoth: string
+    type: string
+    typePlaceholder: string
+    status: string
+    startDate: string
+    endDate: string
+    keyword: string
+    keywordPlaceholder: string
+    reset: string
+    search: string
+    addPrefab: string
+    loading: string
+  }
+  status: Record<string, string>
+  columns: {
+    sequence: string
+    road: string
+    phase: string
+    side: string
+    range: string
+    layers: string
+    checks: string
+    types: string
+    status: string
+    appointmentDate: string
+    submittedAt: string
+    submittedBy: string
+    remark: string
+    createdBy: string
+    createdAt: string
+    updatedBy: string
+    updatedAt: string
+    actions: string
+  }
+  columnSelector: {
+    selectedCount: string
+    noneSelected: string
+    selectAll: string
+    restore: string
+    clear: string
+  }
+  bulk: {
+    selectedCount: string
+    statusPlaceholder: string
+    apply: string
+    applying: string
+    missingSelection: string
+    missingStatus: string
+  }
+  table: {
+    loading: string
+    empty: string
+    selectPage: string
+    selectRow: string
+    edit: string
+    delete: string
+  }
+  pagination: {
+    summary: string
+    prev: string
+    next: string
+  }
+  prefabModal: {
+    badge: string
+    title: string
+    subtitle: string
+    closeAria: string
+    phaseLabel: string
+    phaseOptions: Record<string, string>
+    layerOptions: Record<string, string>
+    checkOptions: Record<string, string>
+    typeOptions: Record<string, string>
+    appointmentLabel: string
+    layersLabel: string
+    typesLabel: string
+    checksLabel: string
+    remarkLabel: string
+    remarkPlaceholder: string
+    cancel: string
+    submit: string
+    submitting: string
+  }
+  detailModal: {
+    badge: string
+    closeAria: string
+    contentsLabel: string
+    typesLabel: string
+    statusLabel: string
+    submittedAt: string
+    updatedAt: string
+    submittedBy: string
+    remarkLabel: string
+    remarkEmpty: string
+    unknownUser: string
+  }
+  editModal: {
+    badge: string
+    closeAria: string
+    phaseLabel: string
+    phasePlaceholder: string
+    sideLabel: string
+    sidePlaceholder: string
+    sideLeft: string
+    sideRight: string
+    sideBoth: string
+    sidePrefabNote: string
+    rangeLabel: string
+    rangePrefabNote: string
+    startLabel: string
+    endLabel: string
+    layersLabel: string
+    layersPlaceholder: string
+    checksLabel: string
+    checksPlaceholder: string
+    typesLabel: string
+    typesPlaceholder: string
+    appointmentLabel: string
+    remarkLabel: string
+    remarkPlaceholder: string
+    cancel: string
+    save: string
+    saving: string
+    invalidRange: string
+    missingPhase: string
+    missingRequired: string
+    appointmentMissing: string
+    saveFailed: string
+  }
+  deleteModal: {
+    badge: string
+    closeAria: string
+    confirmText: string
+    cancel: string
+    confirm: string
+    confirming: string
+    failed: string
+  }
+  errors: {
+    loadFailed: string
+    createFailed: string
+    updateFailed: string
+    deleteFailed: string
+    bulkFailed: string
+  }
 }
 
 const progressCopy: Record<Locale, ProgressCopy> = {
@@ -222,6 +404,16 @@ const progressCopy: Record<Locale, ProgressCopy> = {
       home: '返回首页',
       reports: '去填写日报',
       loadError: '加载路段列表失败：{message}。仍可尝试直接新增，保存后会刷新列表。',
+    },
+    nav: {
+      home: '首页',
+      progress: '进度管理',
+      inspections: '报检记录',
+    },
+    access: {
+      progressViewHint: '开通查看权限后可使用甘特与里程碑视图。',
+      progressDetailHint: '开通查看权限后可使用甘特、风险与节点详情。',
+      inspectionViewHint: '需要查看报检权限才能浏览此列表。',
     },
     admin: {
       badge: 'Admin',
@@ -246,6 +438,7 @@ const progressCopy: Record<Locale, ProgressCopy> = {
       add: '添加路段',
       save: '保存修改',
       reset: '重置表单',
+      close: '关闭',
     },
     errors: {
       noPermission: '暂无路段管理权限',
@@ -341,12 +534,14 @@ const progressCopy: Record<Locale, ProgressCopy> = {
         linearSummary: '延米 · 设计量 {design} m · 已验收 {completed} m · 完成 {percent}%',
         pointSummary: '单体 · 总数 {design} 个 · 已完成 {completed} 个 · 完成 {percent}%',
         moreUnits: '+{count} 个更多',
+        updatedLabel: '更新：',
       },
       list: {
         title: '已有分项',
         legend: '已有分项（白色=未验收，可点击预约报检）',
         legendNote: '灰=非设计 白=未验收',
         empty: '暂无分项，添加后将显示在此处。',
+        emptyHint: '尚未添加分项工程，点击进入详情新增。',
       },
       card: {
         measurePoint: '单体 · 设计量 {value} 个',
@@ -425,6 +620,194 @@ const progressCopy: Record<Locale, ProgressCopy> = {
       pointBadge: {
         none: '未报检',
       },
+      units: {
+        point: '个',
+        linear: 'm',
+      },
+    },
+    inspectionBoard: {
+      badge: '报检列表',
+      title: '所有报检记录',
+      description: '可按道路、分项、状态、侧别、时间等条件筛选，点击表头可排序，点击行查看详情。',
+      breadcrumb: {
+        home: '首页',
+        progress: '进度管理',
+        current: '报检记录',
+      },
+      prefabRoadName: '预制',
+      errorHint: '加载提示：{message}',
+      filters: {
+        road: '道路',
+        all: '全部',
+        phase: '分项',
+        side: '侧别',
+        sideLeft: '左侧',
+        sideRight: '右侧',
+        sideBoth: '双侧',
+        type: '验收类型',
+        typePlaceholder: '试验验收',
+        status: '状态',
+        startDate: '开始日期',
+        endDate: '结束日期',
+        keyword: '关键字（分项/备注/验收内容）',
+        keywordPlaceholder: '输入关键字后自动过滤',
+        reset: '重置筛选',
+        search: '立即查询',
+        addPrefab: '新增预制报检',
+        loading: '加载中...',
+      },
+      status: {
+        PENDING: '待处理',
+        SCHEDULED: '已预约',
+        SUBMITTED: '已报检',
+        IN_PROGRESS: '验收中',
+        APPROVED: '已验收',
+      },
+      columns: {
+        sequence: '序号',
+        road: '道路',
+        phase: '分项',
+        side: '侧别',
+        range: '区间',
+        layers: '层次',
+        checks: '验收内容',
+        types: '验收类型',
+        status: '状态',
+        appointmentDate: '预约报检时间',
+        submittedAt: '提交时间',
+        submittedBy: '提交人',
+        remark: '备注',
+        createdBy: '创建人',
+        createdAt: '创建时间',
+        updatedBy: '更新人',
+        updatedAt: '更新时间',
+        actions: '操作',
+      },
+      columnSelector: {
+        selectedCount: '已选 {count} 列',
+        noneSelected: '未选择列',
+        selectAll: '全选',
+        restore: '恢复默认',
+        clear: '清空',
+      },
+      bulk: {
+        selectedCount: '已选 {count} 条',
+        statusPlaceholder: '选择要更新的状态',
+        apply: '批量修改状态',
+        applying: '批量更新中...',
+        missingSelection: '请选择至少一条报检记录',
+        missingStatus: '请选择要更新的状态',
+      },
+      table: {
+        loading: '加载中...',
+        empty: '暂无记录',
+        selectPage: '全选当页报检记录',
+        selectRow: '选择报检 {index}',
+        edit: '编辑',
+        delete: '删除',
+      },
+      pagination: {
+        summary: '共 {total} 条 · 第 {page}/{totalPages} 页',
+        prev: '上一页',
+        next: '下一页',
+      },
+      prefabModal: {
+        badge: '新增预制报检',
+        title: '预制 · 报检记录',
+        subtitle: '道路固定为“预制”，无侧别与区间。',
+        closeAria: '关闭预制报检',
+        phaseOptions: {
+          ditch: '边沟',
+          curb: '路缘石',
+          pipe: '圆管涵',
+        },
+        layerOptions: {
+          ditch: '预制边沟',
+          curb: '预制路缘石',
+          pipe: '预制圆管涵',
+        },
+        checkOptions: {
+          钢筋绑扎验收: '钢筋绑扎验收',
+          模版验收: '模版验收',
+          混凝土浇筑验收: '混凝土浇筑验收',
+        },
+        typeOptions: {
+          现场验收: '现场验收',
+          试验验收: '试验验收',
+        },
+        phaseLabel: '分项',
+        appointmentLabel: '预约报检日期',
+        layersLabel: '验收层次',
+        typesLabel: '验收类型',
+        checksLabel: '验收内容',
+        remarkLabel: '备注',
+        remarkPlaceholder: '可填写批次、模台号等',
+        cancel: '取消',
+        submit: '提交预制报检',
+        submitting: '创建中...',
+      },
+      detailModal: {
+        badge: '报检详情',
+        closeAria: '关闭',
+        contentsLabel: '验收内容',
+        typesLabel: '验收类型',
+        statusLabel: '状态',
+        submittedAt: '提交时间',
+        updatedAt: '更新时间',
+        submittedBy: '提交人',
+        remarkLabel: '备注',
+        remarkEmpty: '无备注',
+        unknownUser: '未知',
+      },
+      editModal: {
+        badge: '编辑报检',
+        closeAria: '关闭编辑',
+        phaseLabel: '分项',
+        phasePlaceholder: '选择分项',
+        sideLabel: '侧别',
+        sidePlaceholder: '选择侧别',
+        sideLeft: '左侧',
+        sideRight: '右侧',
+        sideBoth: '双侧',
+        sidePrefabNote: '—（预制无需侧别）',
+        rangeLabel: '起止 PK',
+        rangePrefabNote: '—（预制报检无需区间）',
+        startLabel: '起点 PK',
+        endLabel: '终点 PK',
+        layersLabel: '验收层次（逗号分隔）',
+        layersPlaceholder: '如：基层，面层',
+        checksLabel: '验收内容（逗号分隔）',
+        checksPlaceholder: '如：厚度，密实度',
+        typesLabel: '验收类型（逗号分隔）',
+        typesPlaceholder: '如：试验验收',
+        appointmentLabel: '预约日期',
+        remarkLabel: '备注',
+        remarkPlaceholder: '补充说明',
+        cancel: '取消',
+        save: '保存修改',
+        saving: '保存中...',
+        invalidRange: '请输入有效的起止里程',
+        missingPhase: '请选择分项',
+        missingRequired: '层次、验收内容、验收类型均不能为空',
+        appointmentMissing: '请选择预约报检日期',
+        saveFailed: '更新失败',
+      },
+      deleteModal: {
+        badge: '删除确认',
+        closeAria: '关闭删除确认',
+        confirmText: '确定删除该报检记录吗？此操作不可恢复。',
+        cancel: '取消',
+        confirm: '确认删除',
+        confirming: '删除中...',
+        failed: '删除失败',
+      },
+      errors: {
+        loadFailed: '加载失败',
+        createFailed: '创建失败',
+        updateFailed: '更新失败',
+        deleteFailed: '删除失败',
+        bulkFailed: '批量更新失败',
+      },
     },
   },
   fr: {
@@ -437,6 +820,16 @@ const progressCopy: Record<Locale, ProgressCopy> = {
       reports: 'Ouvrir un rapport',
       loadError:
         'Impossible de charger la liste des routes : {message}. Vous pouvez quand même en créer une, la liste se rafraîchira ensuite.',
+    },
+    nav: {
+      home: 'Accueil',
+      progress: "Suivi d'avancement",
+      inspections: 'Contrôles',
+    },
+    access: {
+      progressViewHint: "Obtenez le droit progress:view pour accéder au Gantt et aux jalons.",
+      progressDetailHint: "Obtenez progress:view pour accéder au Gantt, aux risques et aux détails.",
+      inspectionViewHint: "Le droit inspection:view est requis pour voir cette liste.",
     },
     admin: {
       badge: 'Admin',
@@ -461,6 +854,7 @@ const progressCopy: Record<Locale, ProgressCopy> = {
       add: 'Ajouter un tronçon',
       save: 'Enregistrer',
       reset: 'Réinitialiser le formulaire',
+      close: 'Fermer',
     },
     errors: {
       noPermission: 'Pas de droit pour gérer les tronçons',
@@ -558,12 +952,14 @@ const progressCopy: Record<Locale, ProgressCopy> = {
         linearSummary: 'Linéaire · Conçu {design} m · Reçu {completed} m · {percent}%',
         pointSummary: 'Unités · Total {design} · Réalisées {completed} · {percent}%',
         moreUnits: '+{count} supplémentaires',
+        updatedLabel: 'MàJ : ',
       },
       list: {
         title: 'Phases existantes',
         legend: 'Phases existantes (blanc = à contrôler, cliquable)',
         legendNote: 'Gris = hors design · Blanc = à contrôler',
         empty: 'Aucune phase pour le moment.',
+        emptyHint: 'Aucune phase, ouvrez le détail pour en créer.',
       },
       card: {
         measurePoint: 'Ponctuel · Qté {value}',
@@ -609,7 +1005,7 @@ const progressCopy: Record<Locale, ProgressCopy> = {
         updated: 'Phase « {name} » mise à jour',
       },
       inspection: {
-        title: 'Demande de contrôle',
+        title: 'Demande de réception',
         sideLabel: 'Côté',
         sideBoth: 'Deux côtés',
         sideLeft: 'Gauche',
@@ -633,7 +1029,7 @@ const progressCopy: Record<Locale, ProgressCopy> = {
         submit: 'Envoyer',
         submitting: 'Envoi...',
         permissionMissing: 'Droit de contrôle requis',
-        types: ['Contrôle terrain', 'Contrôle mesure', 'Contrôle labo', 'Autre'],
+        types: ['GENIE CIVIL', 'TOPOGRAPHIQUE', 'GEOTECHNIQUE', 'Autre'],
       },
       alerts: {
         noInspectPermission: 'Droit de contrôle manquant',
@@ -641,6 +1037,195 @@ const progressCopy: Record<Locale, ProgressCopy> = {
       },
       pointBadge: {
         none: 'Non contrôlé',
+      },
+      units: {
+        point: 'u.',
+        linear: 'm',
+      },
+    },
+    inspectionBoard: {
+      badge: 'Contrôles',
+      title: 'Toutes les demandes',
+      description:
+        'Filtrez par route, phase, statut, côté ou dates; tri possible via les entêtes, cliquez sur une ligne pour le détail.',
+      breadcrumb: {
+        home: 'Accueil',
+        progress: "Suivi d'avancement",
+        current: 'Contrôles',
+      },
+      prefabRoadName: 'Préfab',
+      errorHint: 'Alerte chargement : {message}',
+      filters: {
+        road: 'Route',
+        all: 'Tout',
+        phase: 'Phase',
+        side: 'Côté',
+        sideLeft: 'Gauche',
+        sideRight: 'Droite',
+        sideBoth: 'Deux côtés',
+        type: 'Type de contrôle',
+        typePlaceholder: 'ex : Contrôle labo',
+        status: 'Statut',
+        startDate: 'Début',
+        endDate: 'Fin',
+        keyword: 'Mot-clé (phase / remarques / contenu)',
+        keywordPlaceholder: 'Filtre auto après saisie',
+        reset: 'Réinitialiser',
+        search: 'Rechercher',
+        addPrefab: 'Ajouter contrôle préfab',
+        loading: 'Chargement...',
+      },
+      status: {
+        PENDING: 'À traiter',
+        SCHEDULED: 'Planifié',
+        SUBMITTED: 'Envoyé',
+        IN_PROGRESS: 'En contrôle',
+        APPROVED: 'Validé',
+      },
+      columns: {
+        sequence: 'N°',
+        road: 'Route',
+        phase: 'Phase',
+        side: 'Côté',
+        range: 'Intervalle',
+        layers: 'Couches',
+        checks: 'Contenus',
+        types: 'Types',
+        status: 'Statut',
+        appointmentDate: 'Rendez-vous',
+        submittedAt: 'Soumis',
+        submittedBy: 'Soumis par',
+        remark: 'Remarques',
+        createdBy: 'Créé par',
+        createdAt: 'Créé le',
+        updatedBy: 'Mis à jour par',
+        updatedAt: 'Mis à jour le',
+        actions: 'Actions',
+      },
+      columnSelector: {
+        selectedCount: 'Colonnes : {count}',
+        noneSelected: 'Aucune colonne',
+        selectAll: 'Tout',
+        restore: 'Défaut',
+        clear: 'Vider',
+      },
+      bulk: {
+        selectedCount: '{count} sélection',
+        statusPlaceholder: 'Choisir un statut',
+        apply: 'Mettre à jour',
+        applying: 'Mise à jour...',
+        missingSelection: 'Sélectionnez au moins un contrôle',
+        missingStatus: 'Choisissez un statut',
+      },
+      table: {
+        loading: 'Chargement...',
+        empty: 'Aucune donnée',
+        selectPage: 'Tout sélectionner sur cette page',
+        selectRow: 'Sélectionner le contrôle {index}',
+        edit: 'Éditer',
+        delete: 'Supprimer',
+      },
+      pagination: {
+        summary: '{total} au total · Page {page}/{totalPages}',
+        prev: 'Précédent',
+        next: 'Suivant',
+      },
+      prefabModal: {
+        badge: 'Nouveau contrôle préfab',
+        title: 'Préfab · Contrôles',
+        subtitle: 'Route fixée sur « Préfab », pas de côté ni d’intervalle.',
+        closeAria: 'Fermer la fenêtre préfab',
+        phaseOptions: {
+          ditch: 'Caniveau préfabriqué',
+          curb: 'Bordure préfabriquée',
+          pipe: 'Buse circulaire préfab',
+        },
+        layerOptions: {
+          ditch: 'Caniveau préfab',
+          curb: 'Bordure préfab',
+          pipe: 'Buse préfab',
+        },
+        checkOptions: {
+          钢筋绑扎验收: 'Réception armatures',
+          模版验收: 'Réception coffrage',
+          混凝土浇筑验收: 'Réception bétonnage',
+        },
+        typeOptions: {
+          现场验收: 'Contrôle terrain',
+          试验验收: 'Contrôle labo',
+        },
+        phaseLabel: 'Phase',
+        appointmentLabel: 'Date de contrôle',
+        layersLabel: 'Couches',
+        typesLabel: 'Types',
+        checksLabel: 'Contenus',
+        remarkLabel: 'Remarques',
+        remarkPlaceholder: 'Lot, moule, etc.',
+        cancel: 'Annuler',
+        submit: 'Envoyer',
+        submitting: 'Création...',
+      },
+      detailModal: {
+        badge: 'Détail contrôle',
+        closeAria: 'Fermer',
+        contentsLabel: 'Contenus',
+        typesLabel: 'Types',
+        statusLabel: 'Statut',
+        submittedAt: 'Soumis le',
+        updatedAt: 'Mise à jour',
+        submittedBy: 'Soumis par',
+        remarkLabel: 'Remarques',
+        remarkEmpty: 'Aucune remarque',
+        unknownUser: 'Inconnu',
+      },
+      editModal: {
+        badge: 'Éditer contrôle',
+        closeAria: "Fermer l’édition",
+        phaseLabel: 'Phase',
+        phasePlaceholder: 'Choisir une phase',
+        sideLabel: 'Côté',
+        sidePlaceholder: 'Choisir un côté',
+        sideLeft: 'Gauche',
+        sideRight: 'Droite',
+        sideBoth: 'Deux côtés',
+        sidePrefabNote: '— (Préfab : pas de côté)',
+        rangeLabel: 'PK début/fin',
+        rangePrefabNote: '— (Préfab : pas d’intervalle)',
+        startLabel: 'PK début',
+        endLabel: 'PK fin',
+        layersLabel: 'Couches (séparées par des virgules)',
+        layersPlaceholder: 'ex : couche base, couche finie',
+        checksLabel: 'Contenus (séparées par des virgules)',
+        checksPlaceholder: 'ex : épaisseur, densité',
+        typesLabel: 'Types (séparés par des virgules)',
+        typesPlaceholder: 'ex : Contrôle labo',
+        appointmentLabel: 'Date de rendez-vous',
+        remarkLabel: 'Remarques',
+        remarkPlaceholder: 'Compléments',
+        cancel: 'Annuler',
+        save: 'Enregistrer',
+        saving: 'Enregistrement...',
+        invalidRange: 'PK début/fin invalides',
+        missingPhase: 'Choisissez une phase',
+        missingRequired: 'Couches, contenus et types ne peuvent pas être vides',
+        appointmentMissing: 'Choisissez une date',
+        saveFailed: 'Échec de la mise à jour',
+      },
+      deleteModal: {
+        badge: 'Confirmation de suppression',
+        closeAria: 'Fermer la confirmation',
+        confirmText: 'Supprimer ce contrôle ? Action irréversible.',
+        cancel: 'Annuler',
+        confirm: 'Confirmer',
+        confirming: 'Suppression...',
+        failed: 'Échec de la suppression',
+      },
+      errors: {
+        loadFailed: 'Chargement impossible',
+        createFailed: 'Échec de création',
+        updateFailed: 'Échec de mise à jour',
+        deleteFailed: 'Échec de suppression',
+        bulkFailed: 'Échec de la mise à jour groupée',
       },
     },
   },

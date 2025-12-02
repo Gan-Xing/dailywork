@@ -15,37 +15,37 @@ const roadNameEntries: RoadDictionaryEntry[] = [
   {
     slug: 'tanda-traversee',
     zh: '丹达穿城路',
-    fr: 'Danda TC',
+    fr: 'Tanda TC',
   },
   {
     slug: 'tanda-voie1',
     zh: '丹达1号路',
-    fr: 'Danda 1',
+    fr: 'Tanda 1',
   },
   {
     slug: 'tanda-voie2',
     zh: '丹达2号路',
-    fr: 'Danda 2',
+    fr: 'Tanda 2',
   },
   {
     slug: 'tanda-voie3a',
     zh: '丹达3A路',
-    fr: 'Danda 3A',
+    fr: 'Tanda 3A',
   },
   {
     slug: 'tanda-voie3bc',
     zh: '丹达3BC路',
-    fr: 'Danda 3BC',
+    fr: 'Tanda 3BC',
   },
   {
     slug: 'tanda-voie5a',
     zh: '丹达5A路',
-    fr: 'Danda 5A',
+    fr: 'Tanda 5A',
   },
   {
     slug: 'tanda-voie5b',
     zh: '丹达5B路',
-    fr: 'Danda 5B',
+    fr: 'Tanda 5B',
   },
   {
     slug: 'level-crossing',

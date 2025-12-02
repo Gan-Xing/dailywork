@@ -16,6 +16,7 @@ import type {
   InspectionStatus,
 } from '@/lib/progressTypes'
 import { getProgressCopy, formatProgressCopy } from '@/lib/i18n/progress'
+import { localizeProgressList, localizeProgressTerm } from '@/lib/i18n/progressDictionary'
 import { locales } from '@/lib/i18n'
 import { usePreferredLocale } from '@/lib/usePreferredLocale'
 
@@ -885,10 +886,11 @@ export function PhaseEditor({
       setPhases((prev) =>
         editingId ? prev.map((item) => (item.id === editingId ? phase : item)) : [...prev, phase],
       )
+      const localizedName = localizeProgressTerm('phase', phase.name, locale)
       setSuccessMessage(
         editingId
-          ? formatProgressCopy(t.success.updated, { name: phase.name })
-          : formatProgressCopy(t.success.created, { name: phase.name }),
+          ? formatProgressCopy(t.success.updated, { name: localizedName })
+          : formatProgressCopy(t.success.created, { name: localizedName }),
       )
       setShowFormModal(false)
       resetForm()
@@ -959,7 +961,12 @@ export function PhaseEditor({
       alert(t.alerts.noInspectPermission)
       return
     }
-    setSelectedSegment(segment)
+    setSelectedSegment({
+      ...segment,
+      phase: localizeProgressTerm('phase', segment.phase, locale),
+      layers: localizeProgressList('layer', segment.layers, locale, { phaseName: segment.phase }),
+      checks: localizeProgressList('check', segment.checks, locale),
+    })
   }
 
 const toggleToken = (value: string, list: string[], setter: (next: string[]) => void) => {
@@ -1138,7 +1145,10 @@ const addCheckToken = () => {
   const resolvePointBadge = (phaseId: number, startPk: number, endPk: number) => {
     const latest = latestPointInspections.get(buildPointKey(phaseId, startPk, endPk))
     if (latest && latest.layers?.length) {
-      return latest.layers.slice(0, 2).join(' / ')
+      const phaseName = phases.find((item) => item.id === phaseId)?.name
+      const localized = localizeProgressList('layer', latest.layers, locale, { phaseName })
+      const joined = localized.slice(0, 2).join(' / ')
+      return joined || t.pointBadge.none
     }
     return t.pointBadge.none
   }
@@ -1289,7 +1299,7 @@ const addCheckToken = () => {
           >
             <button
               type="button"
-              className="absolute right-4 top-4 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/20"
+              className="absolute right-3 top-3 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/20 sm:right-4 sm:top-4"
               onClick={closeFormModal}
               aria-label={t.delete.close}
             >
@@ -1724,6 +1734,7 @@ const addCheckToken = () => {
               const linear = phase.measure === 'LINEAR' ? linearViews.find((item) => item.phase.id === phase.id) : null
               const point = phase.measure === 'POINT' ? pointViews.find((item) => item.phase.id === phase.id) : null
               const pointRangeLabel = point ? `${formatPK(point.view.min)} – ${formatPK(point.view.max)}` : ''
+              const localizedPhaseName = localizeProgressTerm('phase', phase.name, locale)
 
               return (
                 <div
@@ -1732,7 +1743,7 @@ const addCheckToken = () => {
                 >
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="flex flex-wrap items-center gap-3">
-                      <h3 className="text-xl font-semibold text-slate-50">{phase.name}</h3>
+                      <h3 className="text-xl font-semibold text-slate-50">{localizedPhaseName}</h3>
                       <span className="rounded-full bg-white/10 px-3 py-1 text-[11px] font-semibold text-slate-100">
                         {phase.measure === 'POINT'
                           ? formatProgressCopy(t.card.measurePoint, { value: phase.designLength })
@@ -1806,11 +1817,13 @@ const addCheckToken = () => {
                                               const sideLabel = side.label
                                               const sideValue = sideLabel === sideLabelMap.LEFT ? 'LEFT' : 'RIGHT'
                                               setSelectedSegment({
-                                                phase: phase.name,
+                                                phase: localizeProgressTerm('phase', phase.name, locale),
                                                 phaseId: phase.id,
                                                 measure: phase.measure,
-                                                layers: phase.resolvedLayers,
-                                                checks: phase.resolvedChecks,
+                                                layers: localizeProgressList('layer', phase.resolvedLayers, locale, {
+                                                  phaseName: phase.name,
+                                                }),
+                                                checks: localizeProgressList('check', phase.resolvedChecks, locale),
                                                 side: sideValue,
                                                 sideLabel,
                                                 start: seg.start,
@@ -1885,7 +1898,7 @@ const addCheckToken = () => {
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/80 px-4 py-6 backdrop-blur sm:items-center sm:py-10">
           <div className="relative flex w-full max-w-3xl flex-col overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-b from-slate-900 to-slate-950 shadow-2xl shadow-slate-900/70 max-h-[calc(100vh-2rem)] sm:max-h-[calc(100vh-4rem)]">
             <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-300 via-cyan-300 to-blue-400" />
-              <div className="flex flex-wrap items-center justify-between gap-3 px-6 pt-5">
+              <div className="relative flex flex-wrap items-center gap-3 px-6 pt-5 pr-12 sm:pr-16">
                 <div className="flex flex-wrap items-center gap-2 text-sm text-slate-100">
                   <span className="inline-flex items-center rounded-full bg-emerald-300/15 px-3 py-1.5 text-base font-semibold uppercase tracking-[0.2em] text-emerald-100 ring-1 ring-emerald-300/40">
                     {t.inspection.title}
@@ -1907,7 +1920,7 @@ const addCheckToken = () => {
               </div>
               <button
                 type="button"
-                className="rounded-full border border-white/20 px-3 py-1 text-xs font-semibold text-slate-200 transition hover:border-white/40 hover:bg-white/5"
+                className="absolute right-4 top-4 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold text-slate-200 transition hover:border-white/40 hover:bg-white/20"
                 onClick={() => setSelectedSegment(null)}
                 aria-label={t.delete.close}
               >

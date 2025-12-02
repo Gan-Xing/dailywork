@@ -3,6 +3,7 @@
 import { formatProgressCopy } from '@/lib/i18n/progress'
 import type { Locale } from '@/lib/i18n'
 import type { AggregatedPhaseProgress } from '@/lib/progressTypes'
+import { localizeProgressTerm } from '@/lib/i18n/progressDictionary'
 
 interface PhaseAggregateCopy {
   empty: string
@@ -10,6 +11,7 @@ interface PhaseAggregateCopy {
   linearSummary: string
   pointSummary: string
   moreUnits: string
+  updatedLabel: string
 }
 
 interface Props {
@@ -25,7 +27,7 @@ const formatUnits = (value: number) => Math.round(Math.max(0, value))
 const createRoadSummary = (roads: string[]) => {
   if (!roads.length) return ''
   const unique = Array.from(new Set(roads))
-  return unique.slice(0, 3).join(' · ') + (unique.length > 3 ? ` · ...` : '')
+  return unique.join(' · ')
 }
 
 export function PhaseAggregateBoard({ phases, aggregateCopy, locale }: Props) {
@@ -42,6 +44,7 @@ export function PhaseAggregateBoard({ phases, aggregateCopy, locale }: Props) {
   return (
     <div className="space-y-4">
       {phases.map((phase) => {
+        const localizedName = localizeProgressTerm('phase', phase.name, locale)
         const roadSummary = createRoadSummary(phase.roadNames)
         const totalDesign = Math.max(0, phase.totalDesignLength)
         const totalCompleted = Math.max(0, phase.totalCompletedLength)
@@ -63,7 +66,7 @@ export function PhaseAggregateBoard({ phases, aggregateCopy, locale }: Props) {
           >
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <h3 className="text-lg font-semibold text-slate-50">{phase.name}</h3>
+                <h3 className="text-lg font-semibold text-slate-50">{localizedName}</h3>
                 {roadSummary ? (
                   <p className="text-xs text-slate-400">
                     {formatProgressCopy(aggregateCopy.roadsLabel, {
@@ -75,7 +78,7 @@ export function PhaseAggregateBoard({ phases, aggregateCopy, locale }: Props) {
               <div className="space-y-1 text-right">
                 <p className="text-sm font-semibold text-emerald-200">{percentLabel}%</p>
                 {updatedAt ? (
-                  <p className="text-[11px] text-slate-400">更新：{updatedAt}</p>
+                  <p className="text-[11px] text-slate-400">{aggregateCopy.updatedLabel}{updatedAt}</p>
                 ) : null}
               </div>
             </div>

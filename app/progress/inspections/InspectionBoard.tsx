@@ -18,6 +18,8 @@ import {
   prefabTypeOptions,
   type PrefabPhaseKey,
 } from '@/lib/prefabInspection'
+import { getProgressCopy, formatProgressCopy } from '@/lib/i18n/progress'
+import { localizeProgressList, localizeProgressTerm } from '@/lib/i18n/progressDictionary'
 import { locales } from '@/lib/i18n'
 import { usePreferredLocale } from '@/lib/usePreferredLocale'
 
@@ -50,14 +52,6 @@ type ColumnKey =
 const INSPECTION_COLUMN_STORAGE_KEY = 'inspection-visible-columns'
 const defaultVisibleColumns: ColumnKey[] = ['sequence', 'road', 'phase', 'range', 'status']
 
-const statusCopy: Record<InspectionStatus, string> = {
-  PENDING: '待处理',
-  SCHEDULED: '已预约',
-  SUBMITTED: '已报检',
-  IN_PROGRESS: '验收中',
-  APPROVED: '已验收',
-}
-
 const statusTone: Record<InspectionStatus, string> = {
   PENDING: 'bg-slate-800 text-slate-100 ring-1 ring-white/10',
   SCHEDULED: 'bg-sky-900/60 text-sky-100 ring-1 ring-sky-300/40',
@@ -65,8 +59,6 @@ const statusTone: Record<InspectionStatus, string> = {
   IN_PROGRESS: 'bg-amber-200/30 text-amber-100 ring-1 ring-amber-200/50',
   APPROVED: 'bg-emerald-300/20 text-emerald-100 ring-1 ring-emerald-300/40',
 }
-
-const sideCopy: Record<string, string> = { LEFT: '左侧', RIGHT: '右侧', BOTH: '双侧' }
 
 const formatPK = (value: number) => {
   const km = Math.floor(value / 1000)
@@ -114,6 +106,20 @@ type EditFormState = {
 
 export function InspectionBoard({ roads, loadError }: Props) {
   const { locale } = usePreferredLocale('zh', locales)
+  const t = getProgressCopy(locale)
+  const copy = t.inspectionBoard
+  const statusCopy = copy.status as Record<InspectionStatus, string>
+  const sideCopy: Record<string, string> = {
+    LEFT: copy.filters.sideLeft,
+    RIGHT: copy.filters.sideRight,
+    BOTH: copy.filters.sideBoth,
+  }
+  const prefabRoadLabel = copy.prefabRoadName
+  const getPrefabPhaseLabel = (key: PrefabPhaseKey) => copy.prefabModal.phaseOptions[key] ?? key
+  const getPrefabLayerLabel = (key: PrefabPhaseKey, fallback: string) =>
+    copy.prefabModal.layerOptions[key] ?? fallback
+  const getPrefabCheckLabel = (value: string) => copy.prefabModal.checkOptions[value] ?? value
+  const getPrefabTypeLabel = (value: string) => copy.prefabModal.typeOptions[value] ?? value
   const [roadSlug, setRoadSlug] = useState('')
   const [phaseId, setPhaseId] = useState<number | ''>('')
   const [status, setStatus] = useState<InspectionStatus[]>([])
@@ -146,7 +152,7 @@ export function InspectionBoard({ roads, loadError }: Props) {
     remark: string
   }>({
     phaseKey: 'ditch',
-    layers: ['预制边沟'],
+    layers: [prefabPhaseOptions[0]?.layer ?? ''],
     checks: prefabCheckOptions,
     types: prefabTypeOptions,
     appointmentDate: '',
@@ -154,25 +160,25 @@ export function InspectionBoard({ roads, loadError }: Props) {
   })
   const columnOptions: { key: ColumnKey; label: string }[] = useMemo(
     () => [
-      { key: 'sequence', label: '序号' },
-      { key: 'road', label: '道路' },
-      { key: 'phase', label: '分项' },
-      { key: 'side', label: '侧别' },
-      { key: 'range', label: '区间' },
-      { key: 'layers', label: '层次' },
-      { key: 'checks', label: '验收内容' },
-      { key: 'types', label: '验收类型' },
-      { key: 'status', label: '状态' },
-      { key: 'appointmentDate', label: '预约报检时间' },
-      { key: 'submittedAt', label: '提交时间' },
-      { key: 'submittedBy', label: '提交人' },
-      { key: 'remark', label: '备注' },
-      { key: 'createdBy', label: '创建人' },
-      { key: 'createdAt', label: '创建时间' },
-      { key: 'updatedBy', label: '更新人' },
-      { key: 'updatedAt', label: '更新时间' },
+      { key: 'sequence', label: copy.columns.sequence },
+      { key: 'road', label: copy.columns.road },
+      { key: 'phase', label: copy.columns.phase },
+      { key: 'side', label: copy.columns.side },
+      { key: 'range', label: copy.columns.range },
+      { key: 'layers', label: copy.columns.layers },
+      { key: 'checks', label: copy.columns.checks },
+      { key: 'types', label: copy.columns.types },
+      { key: 'status', label: copy.columns.status },
+      { key: 'appointmentDate', label: copy.columns.appointmentDate },
+      { key: 'submittedAt', label: copy.columns.submittedAt },
+      { key: 'submittedBy', label: copy.columns.submittedBy },
+      { key: 'remark', label: copy.columns.remark },
+      { key: 'createdBy', label: copy.columns.createdBy },
+      { key: 'createdAt', label: copy.columns.createdAt },
+      { key: 'updatedBy', label: copy.columns.updatedBy },
+      { key: 'updatedAt', label: copy.columns.updatedAt },
     ],
-    [],
+    [copy.columns],
   )
   const [visibleColumns, setVisibleColumns] = useState<ColumnKey[]>(() => defaultVisibleColumns)
   const [showColumnSelector, setShowColumnSelector] = useState(false)
@@ -250,7 +256,7 @@ export function InspectionBoard({ roads, loadError }: Props) {
       const res = await fetch(`/api/inspections?${query}`)
       const data = (await res.json()) as { message?: string; items?: InspectionListItem[]; total?: number; page?: number }
       if (!res.ok) {
-        throw new Error(data.message ?? '加载失败')
+        throw new Error(data.message ?? copy.errors.loadFailed)
       }
       setItems(data.items ?? [])
       setTotal(data.total ?? 0)
@@ -377,11 +383,11 @@ export function InspectionBoard({ roads, loadError }: Props) {
 
   const submitPrefab = async () => {
     if (!prefabForm.layers.length || !prefabForm.checks.length || !prefabForm.types.length) {
-      setPrefabError('层次、验收内容、验收类型均不能为空')
+      setPrefabError(copy.editModal.missingRequired)
       return
     }
     if (!prefabForm.appointmentDate) {
-      setPrefabError('请选择预约报检日期')
+      setPrefabError(copy.editModal.appointmentMissing)
       return
     }
     setPrefabPending(true)
@@ -402,7 +408,7 @@ export function InspectionBoard({ roads, loadError }: Props) {
       })
       const data = (await res.json().catch(() => ({}))) as { inspection?: InspectionListItem; message?: string }
       if (!res.ok || !data.inspection) {
-        throw new Error(data.message ?? '创建失败')
+        throw new Error(data.message ?? copy.errors.createFailed)
       }
       setShowPrefabModal(false)
       setPrefabForm((prev) => ({
@@ -440,37 +446,38 @@ export function InspectionBoard({ roads, loadError }: Props) {
 
   useEffect(() => {
     if (!editing) return
+    const joiner = locale === 'fr' ? ', ' : '，'
     setEditForm({
       phaseId: editing.phaseId,
       side: editing.side,
       startPk: String(editing.startPk),
       endPk: String(editing.endPk),
-      layers: editing.layers.join('，'),
-      checks: editing.checks.join('，'),
-      types: editing.types.join('，'),
+      layers: editing.layers.join(joiner),
+      checks: editing.checks.join(joiner),
+      types: editing.types.join(joiner),
       remark: editing.remark ?? '',
       appointmentDate: formatDateInputValue(editing.appointmentDate),
     })
     setEditError(null)
-  }, [editing])
+  }, [editing, locale])
 
   const submitEdit = async () => {
     if (!editing) return
     const startPk = Number(editForm.startPk)
     const endPk = Number(editForm.endPk)
     if (!editForm.phaseId) {
-      setEditError('请选择分项')
+      setEditError(copy.editModal.missingPhase)
       return
     }
     if (!Number.isFinite(startPk) || !Number.isFinite(endPk)) {
-      setEditError('请输入有效的起止里程')
+      setEditError(copy.editModal.invalidRange)
       return
     }
     const layers = splitTokens(editForm.layers)
     const checks = splitTokens(editForm.checks)
     const types = splitTokens(editForm.types)
     if (!layers.length || !checks.length || !types.length) {
-      setEditError('层次、验收内容、验收类型均不能为空')
+      setEditError(copy.editModal.missingRequired)
       return
     }
     setEditPending(true)
@@ -494,7 +501,7 @@ export function InspectionBoard({ roads, loadError }: Props) {
       })
       const data = (await res.json().catch(() => ({}))) as { inspection?: InspectionListItem; message?: string }
       if (!res.ok || !data.inspection) {
-        throw new Error(data.message ?? '更新失败')
+        throw new Error(data.message ?? copy.errors.updateFailed)
       }
       const updatedInspection = data.inspection!
       setItems((prev) => prev.map((item) => (item.id === editing.id ? updatedInspection : item)))
@@ -517,7 +524,7 @@ export function InspectionBoard({ roads, loadError }: Props) {
       })
       const data = (await res.json().catch(() => ({}))) as { message?: string }
       if (!res.ok) {
-        throw new Error(data.message ?? '删除失败')
+        throw new Error(data.message ?? copy.errors.deleteFailed)
       }
       setItems((prev) => prev.filter((item) => item.id !== deleteTarget.id))
       setTotal((prev) => Math.max(0, prev - 1))
@@ -534,11 +541,11 @@ export function InspectionBoard({ roads, loadError }: Props) {
 
   const applyBulkStatus = async () => {
     if (selectedIds.length === 0) {
-      setBulkError('请选择至少一条报检记录')
+      setBulkError(copy.bulk.missingSelection)
       return
     }
     if (!bulkStatus) {
-      setBulkError('请选择要更新的状态')
+      setBulkError(copy.bulk.missingStatus)
       return
     }
     setBulkPending(true)
@@ -552,7 +559,7 @@ export function InspectionBoard({ roads, loadError }: Props) {
       })
       const data = (await res.json().catch(() => ({}))) as { items?: InspectionListItem[]; message?: string }
       if (!res.ok || !data.items) {
-        throw new Error(data.message ?? '批量更新失败')
+        throw new Error(data.message ?? copy.errors.bulkFailed)
       }
       const updatedMap = new Map(data.items.map((item) => [item.id, item]))
       setItems((prev) => prev.map((item) => updatedMap.get(item.id) ?? item))
@@ -570,37 +577,39 @@ export function InspectionBoard({ roads, loadError }: Props) {
       <div className="relative mx-auto max-w-6xl px-6 py-12 sm:px-8">
         <div className="absolute inset-x-0 top-10 -z-10 h-48 bg-gradient-to-r from-emerald-300/15 via-blue-300/10 to-amber-200/10 blur-3xl" />
         <header className="space-y-3">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-100">报检列表</p>
-          <h1 className="text-3xl font-semibold leading-tight text-slate-50">所有报检记录</h1>
-          <p className="max-w-2xl text-sm text-slate-200/80">
-            可按道路、分项、状态、侧别、时间等条件筛选，点击表头可排序，点击行查看详情。
-          </p>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-100">{copy.badge}</p>
+          <h1 className="text-3xl font-semibold leading-tight text-slate-50">{copy.title}</h1>
+          <p className="max-w-2xl text-sm text-slate-200/80">{copy.description}</p>
           <nav className="flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-200/80">
             <Link
               href="/"
               className="rounded-full border border-white/10 bg-white/5 px-3 py-1 transition hover:border-white/25 hover:bg-white/10"
             >
-              首页
+              {copy.breadcrumb.home}
             </Link>
             <span className="text-slate-500">/</span>
             <Link
               href="/progress"
               className="rounded-full border border-white/10 bg-white/5 px-3 py-1 transition hover:border-white/25 hover:bg-white/10"
             >
-              进度管理
+              {copy.breadcrumb.progress}
             </Link>
             <span className="text-slate-500">/</span>
             <span className="rounded-full border border-white/5 bg-white/5 px-3 py-1 text-slate-100">
-              报检记录
+              {copy.breadcrumb.current}
             </span>
           </nav>
-          {error ? <p className="text-sm text-amber-200">加载提示：{error}</p> : null}
+          {error ? (
+            <p className="text-sm text-amber-200">
+              {formatProgressCopy(copy.errorHint, { message: error })}
+            </p>
+          ) : null}
         </header>
 
         <section className="mt-6 space-y-4 rounded-3xl border border-white/10 bg-white/5 p-5 shadow-xl shadow-slate-900/30 backdrop-blur">
           <div className="grid gap-3 md:grid-cols-4">
             <label className="flex flex-col gap-1 text-xs text-slate-200">
-              道路
+              {copy.filters.road}
               <select
                 className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
                 value={roadSlug}
@@ -610,16 +619,16 @@ export function InspectionBoard({ roads, loadError }: Props) {
                   setPage(1)
                 }}
               >
-                <option value="">全部</option>
+                <option value="">{copy.filters.all}</option>
                 {roads.map((road) => (
                   <option key={road.id} value={road.slug}>
-                    {resolveRoadName(road, 'zh')}
+                    {resolveRoadName(road, locale)}
                   </option>
                 ))}
               </select>
             </label>
             <label className="flex flex-col gap-1 text-xs text-slate-200">
-              分项
+              {copy.filters.phase}
               <select
                 className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
                 value={phaseId}
@@ -629,7 +638,7 @@ export function InspectionBoard({ roads, loadError }: Props) {
                   setPage(1)
                 }}
               >
-                <option value="">全部</option>
+                <option value="">{copy.filters.all}</option>
                 {phases.map((phase) => (
                   <option key={phase.id} value={phase.id}>
                     {phase.name}
@@ -638,7 +647,7 @@ export function InspectionBoard({ roads, loadError }: Props) {
               </select>
             </label>
             <label className="flex flex-col gap-1 text-xs text-slate-200">
-              侧别
+              {copy.filters.side}
               <select
                 className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
                 value={side}
@@ -647,14 +656,14 @@ export function InspectionBoard({ roads, loadError }: Props) {
                   setPage(1)
                 }}
               >
-                <option value="">全部</option>
-                <option value="LEFT">左侧</option>
-                <option value="RIGHT">右侧</option>
-                <option value="BOTH">双侧</option>
+                <option value="">{copy.filters.all}</option>
+                <option value="LEFT">{copy.filters.sideLeft}</option>
+                <option value="RIGHT">{copy.filters.sideRight}</option>
+                <option value="BOTH">{copy.filters.sideBoth}</option>
               </select>
             </label>
             <label className="flex flex-col gap-1 text-xs text-slate-200">
-              验收类型
+              {copy.filters.type}
               <input
                 className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-200/60 focus:border-emerald-300 focus:outline-none"
                 value={type}
@@ -662,11 +671,11 @@ export function InspectionBoard({ roads, loadError }: Props) {
                   setType(e.target.value)
                   setPage(1)
                 }}
-                placeholder="试验验收"
+                placeholder={copy.filters.typePlaceholder}
               />
             </label>
             <div className="flex items-center gap-2 text-xs text-slate-200">
-              <span className="whitespace-nowrap">状态</span>
+              <span className="whitespace-nowrap">{copy.filters.status}</span>
               <div className="flex flex-wrap gap-2">
                 {statusOptions.map((item) => (
                   <button
@@ -685,7 +694,7 @@ export function InspectionBoard({ roads, loadError }: Props) {
               </div>
             </div>
             <label className="flex flex-col gap-1 text-xs text-slate-200">
-              开始日期
+              {copy.filters.startDate}
               <input
                 type="date"
                 className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
@@ -697,7 +706,7 @@ export function InspectionBoard({ roads, loadError }: Props) {
               />
             </label>
             <label className="flex flex-col gap-1 text-xs text-slate-200">
-              结束日期
+              {copy.filters.endDate}
               <input
                 type="date"
                 className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
@@ -709,7 +718,7 @@ export function InspectionBoard({ roads, loadError }: Props) {
               />
             </label>
             <label className="flex flex-col gap-1 text-xs text-slate-200 md:col-span-2">
-              关键字（分项/备注/验收内容）
+              {copy.filters.keyword}
               <input
                 className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-200/60 focus:border-emerald-300 focus:outline-none"
                 value={keyword}
@@ -717,7 +726,7 @@ export function InspectionBoard({ roads, loadError }: Props) {
                   setKeyword(e.target.value)
                   setPage(1)
                 }}
-                placeholder="输入关键字后自动过滤"
+                placeholder={copy.filters.keywordPlaceholder}
               />
             </label>
             <div className="flex items-center gap-3 md:col-span-2">
@@ -726,7 +735,7 @@ export function InspectionBoard({ roads, loadError }: Props) {
                 className="rounded-xl border border-white/20 px-4 py-2 text-xs font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/10"
                 onClick={resetFilters}
               >
-                重置筛选
+                {copy.filters.reset}
               </button>
               <button
                 type="button"
@@ -736,7 +745,7 @@ export function InspectionBoard({ roads, loadError }: Props) {
                   fetchData()
                 }}
               >
-                立即查询
+                {copy.filters.search}
               </button>
               <button
                 type="button"
@@ -746,9 +755,9 @@ export function InspectionBoard({ roads, loadError }: Props) {
                   setPrefabError(null)
                 }}
               >
-                新增预制报检
+                {copy.filters.addPrefab}
               </button>
-              {loading ? <span className="text-xs text-slate-200">加载中...</span> : null}
+              {loading ? <span className="text-xs text-slate-200">{copy.filters.loading}</span> : null}
             </div>
           </div>
         </section>
@@ -757,7 +766,7 @@ export function InspectionBoard({ roads, loadError }: Props) {
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-5 py-3 text-sm text-slate-200">
             <div className="flex items-center gap-3">
               <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-50">
-                已选 {selectedIds.length} 条
+                {formatProgressCopy(copy.bulk.selectedCount, { count: selectedIds.length })}
               </span>
               {bulkError ? <span className="text-xs text-amber-200">{bulkError}</span> : null}
             </div>
@@ -769,7 +778,9 @@ export function InspectionBoard({ roads, loadError }: Props) {
                   onClick={() => setShowColumnSelector((prev) => !prev)}
                 >
                   <span className="truncate">
-                    {visibleColumns.length ? `已选 ${visibleColumns.length} 列` : '未选择列'}
+                    {visibleColumns.length
+                      ? formatProgressCopy(copy.columnSelector.selectedCount, { count: visibleColumns.length })
+                      : copy.columnSelector.noneSelected}
                   </span>
                   <span className="text-xs text-slate-400">⌕</span>
                 </button>
@@ -777,14 +788,14 @@ export function InspectionBoard({ roads, loadError }: Props) {
                   <div className="absolute right-0 z-10 mt-2 w-64 max-w-full rounded-xl border border-white/15 bg-slate-900/95 p-3 text-xs text-slate-100 shadow-lg shadow-slate-900/40 backdrop-blur">
                     <div className="flex items-center justify-between border-b border-white/10 pb-2 text-[11px] text-slate-300">
                       <button className="text-emerald-300 hover:underline" onClick={handleSelectAllColumns}>
-                        全选
+                        {copy.columnSelector.selectAll}
                       </button>
                       <div className="flex gap-2">
                         <button className="text-slate-400 hover:underline" onClick={handleRestoreDefaultColumns}>
-                          恢复默认
+                          {copy.columnSelector.restore}
                         </button>
                         <button className="text-slate-400 hover:underline" onClick={handleClearColumns}>
-                          清空
+                          {copy.columnSelector.clear}
                         </button>
                       </div>
                     </div>
@@ -812,7 +823,7 @@ export function InspectionBoard({ roads, loadError }: Props) {
                 value={bulkStatus}
                 onChange={(e) => setBulkStatus(e.target.value as InspectionStatus)}
               >
-                <option value="">选择要更新的状态</option>
+                <option value="">{copy.bulk.statusPlaceholder}</option>
                 {statusOptions.map((item) => (
                   <option key={item} value={item}>
                     {statusCopy[item] ?? item}
@@ -825,7 +836,7 @@ export function InspectionBoard({ roads, loadError }: Props) {
                 onClick={applyBulkStatus}
                 disabled={bulkPending || selectedIds.length === 0}
               >
-                {bulkPending ? '批量更新中...' : '批量修改状态'}
+                {bulkPending ? copy.bulk.applying : copy.bulk.apply}
               </button>
             </div>
           </div>
@@ -840,17 +851,17 @@ export function InspectionBoard({ roads, loadError }: Props) {
                         className="h-4 w-4 rounded border-white/30 bg-slate-900/60 accent-emerald-300"
                         checked={allSelected}
                         onChange={toggleSelectAll}
-                        aria-label="全选当页报检记录"
+                        aria-label={copy.table.selectPage}
                       />
                     </div>
                   </th>
-                  {isVisible('sequence') ? <th className="px-4 py-3">序号</th> : null}
+                  {isVisible('sequence') ? <th className="px-4 py-3">{copy.columns.sequence}</th> : null}
                   {isVisible('road') ? (
                     <th
                       className="px-4 py-3 cursor-pointer select-none"
                       onClick={() => handleSort('road')}
                     >
-                      道路 {sortField === 'road' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
+                      {copy.columns.road} {sortField === 'road' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
                     </th>
                   ) : null}
                   {isVisible('phase') ? (
@@ -858,7 +869,7 @@ export function InspectionBoard({ roads, loadError }: Props) {
                       className="px-4 py-3 cursor-pointer select-none"
                       onClick={() => handleSort('phase')}
                     >
-                      分项 {sortField === 'phase' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
+                      {copy.columns.phase} {sortField === 'phase' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
                     </th>
                   ) : null}
                   {isVisible('side') ? (
@@ -866,32 +877,32 @@ export function InspectionBoard({ roads, loadError }: Props) {
                       className="px-4 py-3 cursor-pointer select-none"
                       onClick={() => handleSort('side')}
                     >
-                      侧别 {sortField === 'side' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
+                      {copy.columns.side} {sortField === 'side' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
                     </th>
                   ) : null}
                   {isVisible('range') ? (
                     <th className="px-4 py-3">
-                      区间
+                      {copy.columns.range}
                     </th>
                   ) : null}
                   {isVisible('layers') ? (
                     <th className="px-4 py-3">
-                      层次
+                      {copy.columns.layers}
                     </th>
                   ) : null}
                   {isVisible('checks') ? (
                     <th className="px-4 py-3">
-                      验收内容
+                      {copy.columns.checks}
                     </th>
                   ) : null}
                   {isVisible('types') ? (
                     <th className="px-4 py-3">
-                      验收类型
+                      {copy.columns.types}
                     </th>
                   ) : null}
                   {isVisible('status') ? (
                     <th className="px-4 py-3 min-w-[120px]">
-                      状态
+                      {copy.columns.status}
                     </th>
                   ) : null}
                   {isVisible('appointmentDate') ? (
@@ -899,44 +910,47 @@ export function InspectionBoard({ roads, loadError }: Props) {
                       className="px-4 py-3 cursor-pointer select-none"
                       onClick={() => handleSort('appointmentDate')}
                     >
-                      预约报检时间 {sortField === 'appointmentDate' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
+                      {copy.columns.appointmentDate}{' '}
+                      {sortField === 'appointmentDate' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
                     </th>
                   ) : null}
                   {isVisible('submittedAt') ? (
                     <th className="px-4 py-3">
-                      提交时间
+                      {copy.columns.submittedAt}
                     </th>
                   ) : null}
                   {isVisible('submittedBy') ? (
-                    <th className="px-4 py-3">提交人</th>
+                    <th className="px-4 py-3">{copy.columns.submittedBy}</th>
                   ) : null}
                   {isVisible('remark') ? (
-                    <th className="px-4 py-3">备注</th>
+                    <th className="px-4 py-3">{copy.columns.remark}</th>
                   ) : null}
                   {isVisible('createdBy') ? (
-                    <th className="px-4 py-3">创建人</th>
+                    <th className="px-4 py-3">{copy.columns.createdBy}</th>
                   ) : null}
                   {isVisible('createdAt') ? (
                     <th
                       className="px-4 py-3 cursor-pointer select-none"
                       onClick={() => handleSort('createdAt')}
                     >
-                      创建时间 {sortField === 'createdAt' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
+                      {copy.columns.createdAt}{' '}
+                      {sortField === 'createdAt' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
                     </th>
                   ) : null}
                   {isVisible('updatedBy') ? (
-                    <th className="px-4 py-3">更新人</th>
+                    <th className="px-4 py-3">{copy.columns.updatedBy}</th>
                   ) : null}
                   {isVisible('updatedAt') ? (
                     <th
                       className="px-4 py-3 cursor-pointer select-none"
                       onClick={() => handleSort('updatedAt')}
                     >
-                      更新时间 {sortField === 'updatedAt' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
+                      {copy.columns.updatedAt}{' '}
+                      {sortField === 'updatedAt' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
                     </th>
                   ) : null}
                   <th className="px-4 py-3 text-center">
-                    操作
+                    {copy.columns.actions}
                   </th>
                 </tr>
               </thead>
@@ -944,17 +958,19 @@ export function InspectionBoard({ roads, loadError }: Props) {
                 {items.length === 0 ? (
                   <tr>
                     <td colSpan={columnCount} className="px-4 py-6 text-center text-sm text-slate-300">
-                      {loading ? '加载中...' : '暂无记录'}
+                      {loading ? copy.table.loading : copy.table.empty}
                     </td>
                   </tr>
                 ) : (
                   items.map((item, index) => {
                     const displayIndex = (page - 1) * pageSize + index + 1
-                    const isPrefab = isPrefabItem(item)
-                    const roadText = isPrefab ? PREFAB_ROAD_NAME : item.roadName
+                  const isPrefab = isPrefabItem(item)
+                    const roadText = isPrefab ? prefabRoadLabel : item.roadName
                     const sideText = isPrefab ? '—' : sideCopy[item.side] ?? item.side
                     const rangeText = isPrefab ? '—' : `${formatPK(item.startPk)} → ${formatPK(item.endPk)}`
-                    const layersText = item.layers.join(' / ')
+                    const layersText = localizeProgressList('layer', item.layers, locale, {
+                      phaseName: item.phaseName,
+                    }).join(' / ')
                     const appointmentText = formatAppointmentDate(item.appointmentDate)
                     const submittedByText = item.submittedBy?.username ?? '—'
                     const createdByText = item.createdBy?.username ?? '—'
@@ -977,7 +993,7 @@ export function InspectionBoard({ roads, loadError }: Props) {
                               toggleSelect(item.id)
                             }}
                             onClick={(event) => event.stopPropagation()}
-                            aria-label={`选择报检 ${displayIndex}`}
+                            aria-label={formatProgressCopy(copy.table.selectRow, { index: displayIndex })}
                           />
                         </div>
                       </td>
@@ -985,7 +1001,9 @@ export function InspectionBoard({ roads, loadError }: Props) {
                         <td className="px-4 py-3 text-xs text-slate-300">{displayIndex}</td>
                       ) : null}
                       {isVisible('road') ? <td className="px-4 py-3">{roadText}</td> : null}
-                      {isVisible('phase') ? <td className="px-4 py-3">{item.phaseName}</td> : null}
+                      {isVisible('phase') ? (
+                        <td className="px-4 py-3">{localizeProgressTerm('phase', item.phaseName, locale)}</td>
+                      ) : null}
                       {isVisible('side') ? <td className="px-4 py-3">{sideText}</td> : null}
                       {isVisible('range') ? (
                         <td className="px-4 py-3">
@@ -998,13 +1016,19 @@ export function InspectionBoard({ roads, loadError }: Props) {
                         </td>
                       ) : null}
                       {isVisible('checks') ? (
-                        <td className="px-4 py-3 max-w-xs truncate" title={item.checks.join(' / ')}>
-                          {item.checks.join(' / ')}
+                        <td
+                          className="px-4 py-3 max-w-xs truncate"
+                          title={localizeProgressList('check', item.checks, locale).join(' / ')}
+                        >
+                          {localizeProgressList('check', item.checks, locale).join(' / ')}
                         </td>
                       ) : null}
                       {isVisible('types') ? (
-                        <td className="px-4 py-3 max-w-xs truncate" title={item.types.join(' / ')}>
-                          {item.types.join(' / ')}
+                        <td
+                          className="px-4 py-3 max-w-xs truncate"
+                          title={localizeProgressList('type', item.types, locale).join(' / ')}
+                        >
+                          {localizeProgressList('type', item.types, locale).join(' / ')}
                         </td>
                       ) : null}
                       {isVisible('status') ? (
@@ -1049,7 +1073,7 @@ export function InspectionBoard({ roads, loadError }: Props) {
                               setEditing(item)
                             }}
                           >
-                            编辑
+                            {copy.table.edit}
                           </button>
                           <button
                             type="button"
@@ -1061,7 +1085,7 @@ export function InspectionBoard({ roads, loadError }: Props) {
                               setDeleteTarget(item)
                             }}
                           >
-                            删除
+                            {copy.table.delete}
                           </button>
                         </div>
                       </td>
@@ -1073,9 +1097,7 @@ export function InspectionBoard({ roads, loadError }: Props) {
             </table>
           </div>
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/10 px-5 py-3 text-sm text-slate-200">
-            <span>
-              共 {total} 条 · 第 {page}/{totalPages} 页
-            </span>
+            <span>{formatProgressCopy(copy.pagination.summary, { total, page, totalPages })}</span>
             <div className="flex items-center gap-2">
               <button
                 type="button"
@@ -1083,7 +1105,7 @@ export function InspectionBoard({ roads, loadError }: Props) {
                 disabled={page <= 1}
                 onClick={() => setPage((prev) => Math.max(1, prev - 1))}
               >
-                上一页
+                {copy.pagination.prev}
               </button>
               <button
                 type="button"
@@ -1091,7 +1113,7 @@ export function InspectionBoard({ roads, loadError }: Props) {
                 disabled={page >= totalPages}
                 onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
               >
-                下一页
+                {copy.pagination.next}
               </button>
             </div>
           </div>
@@ -1107,15 +1129,15 @@ export function InspectionBoard({ roads, loadError }: Props) {
             <div className="w-full max-w-3xl rounded-3xl border border-white/10 bg-slate-900/95 p-6 shadow-2xl shadow-sky-400/20 backdrop-blur">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-xs uppercase tracking-[0.2em] text-sky-100">新增预制报检</p>
-                  <h2 className="text-xl font-semibold text-slate-50">预制 · 报检记录</h2>
-                  <p className="text-sm text-slate-300">道路固定为“预制”，无侧别与区间。</p>
+                  <p className="text-xs uppercase tracking-[0.2em] text-sky-100">{copy.prefabModal.badge}</p>
+                  <h2 className="text-xl font-semibold text-slate-50">{copy.prefabModal.title}</h2>
+                  <p className="text-sm text-slate-300">{copy.prefabModal.subtitle}</p>
                 </div>
                 <button
                   type="button"
                   className="rounded-full border border-white/20 px-3 py-1 text-xs font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/20"
                   onClick={() => setShowPrefabModal(false)}
-                  aria-label="关闭预制报检"
+                  aria-label={copy.prefabModal.closeAria}
                 >
                   ×
                 </button>
@@ -1123,21 +1145,21 @@ export function InspectionBoard({ roads, loadError }: Props) {
               <div className="mt-4 space-y-4 text-sm text-slate-200">
                 <div className="grid gap-3 md:grid-cols-2">
                   <label className="flex flex-col gap-1">
-                    分项
+                    {copy.prefabModal.phaseLabel}
                     <select
                       className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
-                      value={prefabForm.phaseKey}
-                      onChange={(e) => handlePrefabPhaseChange(e.target.value as PrefabPhaseKey)}
-                    >
-                      {prefabPhaseOptions.map((option) => (
-                        <option key={option.key} value={option.key}>
-                          {option.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                        value={prefabForm.phaseKey}
+                        onChange={(e) => handlePrefabPhaseChange(e.target.value as PrefabPhaseKey)}
+                      >
+                        {prefabPhaseOptions.map((option) => (
+                          <option key={option.key} value={option.key}>
+                            {getPrefabPhaseLabel(option.key)}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
                   <label className="flex flex-col gap-1">
-                    预约报检日期
+                    {copy.prefabModal.appointmentLabel}
                     <input
                       type="date"
                       className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
@@ -1148,7 +1170,7 @@ export function InspectionBoard({ roads, loadError }: Props) {
                 </div>
                 <div className="grid gap-3 md:grid-cols-2">
                   <div className="space-y-2">
-                    <p className="text-xs text-slate-300">验收层次</p>
+                    <p className="text-xs text-slate-300">{copy.prefabModal.layersLabel}</p>
                     <div className="flex flex-wrap gap-2">
                       {prefabPhaseOptions.map((option) => (
                         <button
@@ -1161,13 +1183,13 @@ export function InspectionBoard({ roads, loadError }: Props) {
                           }`}
                           onClick={() => togglePrefabArrayValue('layers', option.layer)}
                         >
-                          {option.layer}
+                          {getPrefabLayerLabel(option.key, option.layer)}
                         </button>
                       ))}
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <p className="text-xs text-slate-300">验收类型</p>
+                    <p className="text-xs text-slate-300">{copy.prefabModal.typesLabel}</p>
                     <div className="flex flex-wrap gap-2">
                       {prefabTypeOptions.map((option) => (
                         <button
@@ -1180,14 +1202,14 @@ export function InspectionBoard({ roads, loadError }: Props) {
                           }`}
                           onClick={() => togglePrefabArrayValue('types', option)}
                         >
-                          {option}
+                          {getPrefabTypeLabel(option)}
                         </button>
                       ))}
                     </div>
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <p className="text-xs text-slate-300">验收内容</p>
+                  <p className="text-xs text-slate-300">{copy.prefabModal.checksLabel}</p>
                   <div className="flex flex-wrap gap-2">
                     {prefabCheckOptions.map((option) => (
                       <button
@@ -1200,19 +1222,19 @@ export function InspectionBoard({ roads, loadError }: Props) {
                         }`}
                         onClick={() => togglePrefabArrayValue('checks', option)}
                       >
-                        {option}
+                          {getPrefabCheckLabel(option)}
                       </button>
                     ))}
                   </div>
                 </div>
                 <label className="flex flex-col gap-1">
-                  备注
+                  {copy.prefabModal.remarkLabel}
                   <textarea
                     className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-200/60 focus:border-emerald-300 focus:outline-none"
                     rows={3}
                     value={prefabForm.remark}
                     onChange={(e) => setPrefabForm((prev) => ({ ...prev, remark: e.target.value }))}
-                    placeholder="可填写批次、模台号等"
+                    placeholder={copy.prefabModal.remarkPlaceholder}
                   />
                 </label>
                 {prefabError ? <p className="text-xs text-amber-200">{prefabError}</p> : null}
@@ -1222,7 +1244,7 @@ export function InspectionBoard({ roads, loadError }: Props) {
                     className="rounded-xl border border-white/20 px-4 py-2 text-xs font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/10"
                     onClick={() => setShowPrefabModal(false)}
                   >
-                    取消
+                    {copy.prefabModal.cancel}
                   </button>
                   <button
                     type="button"
@@ -1230,7 +1252,7 @@ export function InspectionBoard({ roads, loadError }: Props) {
                     onClick={submitPrefab}
                     disabled={prefabPending}
                   >
-                    {prefabPending ? '创建中...' : '提交预制报检'}
+                    {prefabPending ? copy.prefabModal.submitting : copy.prefabModal.submit}
                   </button>
                 </div>
               </div>
@@ -1249,14 +1271,14 @@ export function InspectionBoard({ roads, loadError }: Props) {
               const isPrefab = isPrefabItem(selected)
               const sideText = isPrefab ? '—' : sideCopy[selected.side] ?? selected.side
               const rangeText = isPrefab ? '—' : `${formatPK(selected.startPk)} → ${formatPK(selected.endPk)}`
-              const roadText = isPrefab ? PREFAB_ROAD_NAME : selected.roadName
+              const roadText = isPrefab ? prefabRoadLabel : selected.roadName
               return (
             <div className="w-full max-w-3xl rounded-3xl border border-white/10 bg-slate-900/95 p-6 shadow-2xl shadow-slate-900/50 backdrop-blur">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-xs uppercase tracking-[0.2em] text-emerald-100">报检详情</p>
+                  <p className="text-xs uppercase tracking-[0.2em] text-emerald-100">{copy.detailModal.badge}</p>
                   <h2 className="text-xl font-semibold text-slate-50">
-                    {selected.phaseName} · {sideText}
+                    {localizeProgressTerm('phase', selected.phaseName, locale)} · {sideText}
                   </h2>
                   <p className="text-sm text-slate-300">
                     {roadText} · {rangeText}
@@ -1266,22 +1288,26 @@ export function InspectionBoard({ roads, loadError }: Props) {
                   type="button"
                   className="rounded-full border border-white/20 px-3 py-1 text-xs font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/20"
                   onClick={() => setSelected(null)}
-                  aria-label="关闭"
+                  aria-label={copy.detailModal.closeAria}
                 >
                   ×
                 </button>
               </div>
               <div className="mt-4 grid gap-3 text-sm text-slate-200 md:grid-cols-2">
                 <div className="space-y-1">
-                  <p className="text-xs text-slate-400">验收内容</p>
-                  <p className="rounded-xl bg-white/5 px-3 py-2 text-sm">{selected.checks.join('，')}</p>
+                  <p className="text-xs text-slate-400">{copy.detailModal.contentsLabel}</p>
+                  <p className="rounded-xl bg-white/5 px-3 py-2 text-sm">
+                    {localizeProgressList('check', selected.checks, locale).join(locale === 'fr' ? ', ' : '，')}
+                  </p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-xs text-slate-400">验收类型</p>
-                  <p className="rounded-xl bg-white/5 px-3 py-2 text-sm">{selected.types.join('，')}</p>
+                  <p className="text-xs text-slate-400">{copy.detailModal.typesLabel}</p>
+                  <p className="rounded-xl bg-white/5 px-3 py-2 text-sm">
+                    {localizeProgressList('type', selected.types, locale).join(locale === 'fr' ? ', ' : '，')}
+                  </p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-xs text-slate-400">状态</p>
+                  <p className="text-xs text-slate-400">{copy.detailModal.statusLabel}</p>
                   <p>
                     <span className={`rounded-full px-3 py-1 text-[11px] font-semibold ${statusTone[selected.status] ?? 'bg-white/10 text-slate-100'}`}>
                       {statusCopy[selected.status] ?? selected.status}
@@ -1289,21 +1315,21 @@ export function InspectionBoard({ roads, loadError }: Props) {
                   </p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-xs text-slate-400">提交时间</p>
+                  <p className="text-xs text-slate-400">{copy.detailModal.submittedAt}</p>
                   <p>{formatDate(selected.createdAt)}</p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-xs text-slate-400">更新时间</p>
+                  <p className="text-xs text-slate-400">{copy.detailModal.updatedAt}</p>
                   <p>{formatDate(selected.updatedAt)}</p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-xs text-slate-400">提交人</p>
-                  <p>{selected.createdBy?.username ?? '未知'}</p>
+                  <p className="text-xs text-slate-400">{copy.detailModal.submittedBy}</p>
+                  <p>{selected.createdBy?.username ?? copy.detailModal.unknownUser}</p>
                 </div>
                 <div className="space-y-1 md:col-span-2">
-                  <p className="text-xs text-slate-400">备注</p>
+                  <p className="text-xs text-slate-400">{copy.detailModal.remarkLabel}</p>
                   <p className="rounded-xl bg-white/5 px-3 py-2 text-sm">
-                    {selected.remark || '无备注'}
+                    {selected.remark || copy.detailModal.remarkEmpty}
                   </p>
                 </div>
               </div>
@@ -1322,15 +1348,15 @@ export function InspectionBoard({ roads, loadError }: Props) {
           >
             {(() => {
               const isPrefab = isPrefabItem(editing)
-              const roadText = isPrefab ? PREFAB_ROAD_NAME : editing.roadName
+              const roadText = isPrefab ? prefabRoadLabel : editing.roadName
               const rangeText = isPrefab ? '—' : `${formatPK(editing.startPk)} → ${formatPK(editing.endPk)}`
               return (
             <div className="w-full max-w-4xl rounded-3xl border border-white/10 bg-slate-900/95 p-6 shadow-2xl shadow-emerald-500/20 backdrop-blur">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-xs uppercase tracking-[0.2em] text-emerald-100">编辑报检</p>
+                  <p className="text-xs uppercase tracking-[0.2em] text-emerald-100">{copy.editModal.badge}</p>
                   <h2 className="text-xl font-semibold text-slate-50">
-                    {roadText} · {editing.phaseName}
+                    {roadText} · {localizeProgressTerm('phase', editing.phaseName, locale)}
                   </h2>
                   <p className="text-sm text-slate-300">
                     {rangeText}
@@ -1340,7 +1366,7 @@ export function InspectionBoard({ roads, loadError }: Props) {
                   type="button"
                   className="rounded-full border border-white/20 px-3 py-1 text-xs font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/20"
                   onClick={() => setEditing(null)}
-                  aria-label="关闭编辑"
+                  aria-label={copy.editModal.closeAria}
                 >
                   ×
                 </button>
@@ -1348,37 +1374,37 @@ export function InspectionBoard({ roads, loadError }: Props) {
               <div className="mt-4 space-y-4 text-sm text-slate-200">
                 <div className="grid gap-3 md:grid-cols-2">
                   <label className="flex flex-col gap-1">
-                    分项
+                    {copy.editModal.phaseLabel}
                     <select
                       className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
                       value={editForm.phaseId}
                       onChange={(e) => setEditForm((prev) => ({ ...prev, phaseId: e.target.value ? Number(e.target.value) : '' }))}
                     >
-                      <option value="">选择分项</option>
+                      <option value="">{copy.editModal.phasePlaceholder}</option>
                       {editingPhases.map((phase) => (
                         <option key={phase.id} value={phase.id}>
-                          {phase.name}
+                          {localizeProgressTerm('phase', phase.name, locale)}
                         </option>
                         ))}
                       </select>
                     </label>
                   {isPrefab ? (
                     <div className="flex flex-col gap-1 rounded-xl border border-white/10 bg-white/5 px-3 py-2">
-                      <span className="text-xs text-slate-300">侧别</span>
-                      <span>—（预制无需侧别）</span>
+                      <span className="text-xs text-slate-300">{copy.editModal.sideLabel}</span>
+                      <span>{copy.editModal.sidePrefabNote}</span>
                     </div>
                   ) : (
                     <label className="flex flex-col gap-1">
-                      侧别
+                      {copy.editModal.sideLabel}
                       <select
                         className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
                         value={editForm.side}
                         onChange={(e) => setEditForm((prev) => ({ ...prev, side: e.target.value as IntervalSide }))}
                       >
-                        <option value="">选择侧别</option>
-                        <option value="LEFT">左侧</option>
-                        <option value="RIGHT">右侧</option>
-                        <option value="BOTH">双侧</option>
+                        <option value="">{copy.editModal.sidePlaceholder}</option>
+                        <option value="LEFT">{copy.editModal.sideLeft}</option>
+                        <option value="RIGHT">{copy.editModal.sideRight}</option>
+                        <option value="BOTH">{copy.editModal.sideBoth}</option>
                       </select>
                     </label>
                   )}
@@ -1386,14 +1412,14 @@ export function InspectionBoard({ roads, loadError }: Props) {
                 {isPrefab ? (
                   <div className="grid gap-3 md:grid-cols-2">
                     <div className="flex flex-col gap-1 rounded-xl border border-white/10 bg-white/5 px-3 py-2">
-                      <span className="text-xs text-slate-300">起止 PK</span>
-                      <span>—（预制报检无需区间）</span>
+                      <span className="text-xs text-slate-300">{copy.editModal.rangeLabel}</span>
+                      <span>{copy.editModal.rangePrefabNote}</span>
                     </div>
                   </div>
                 ) : (
                   <div className="grid gap-3 md:grid-cols-2">
                     <label className="flex flex-col gap-1">
-                      起点 PK
+                      {copy.editModal.startLabel}
                       <input
                         type="number"
                         className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
@@ -1402,7 +1428,7 @@ export function InspectionBoard({ roads, loadError }: Props) {
                       />
                     </label>
                     <label className="flex flex-col gap-1">
-                      终点 PK
+                      {copy.editModal.endLabel}
                       <input
                         type="number"
                         className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
@@ -1414,36 +1440,36 @@ export function InspectionBoard({ roads, loadError }: Props) {
                 )}
                 <div className="grid gap-3 md:grid-cols-2">
                   <label className="flex flex-col gap-1">
-                    验收层次（逗号分隔）
+                    {copy.editModal.layersLabel}
                     <input
                       className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-200/60 focus:border-emerald-300 focus:outline-none"
                       value={editForm.layers}
                       onChange={(e) => setEditForm((prev) => ({ ...prev, layers: e.target.value }))}
-                      placeholder="如：基层，面层"
+                      placeholder={copy.editModal.layersPlaceholder}
                     />
                   </label>
                   <label className="flex flex-col gap-1">
-                    验收内容（逗号分隔）
+                    {copy.editModal.checksLabel}
                     <input
                       className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-200/60 focus:border-emerald-300 focus:outline-none"
                       value={editForm.checks}
                       onChange={(e) => setEditForm((prev) => ({ ...prev, checks: e.target.value }))}
-                      placeholder="如：厚度，密实度"
+                      placeholder={copy.editModal.checksPlaceholder}
                     />
                   </label>
                 </div>
                 <div className="grid gap-3 md:grid-cols-2">
                   <label className="flex flex-col gap-1">
-                    验收类型（逗号分隔）
+                    {copy.editModal.typesLabel}
                     <input
                       className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-200/60 focus:border-emerald-300 focus:outline-none"
                       value={editForm.types}
                       onChange={(e) => setEditForm((prev) => ({ ...prev, types: e.target.value }))}
-                      placeholder="如：试验验收"
+                      placeholder={copy.editModal.typesPlaceholder}
                     />
                   </label>
                   <label className="flex flex-col gap-1">
-                    预约日期
+                    {copy.editModal.appointmentLabel}
                     <input
                       type="date"
                       className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
@@ -1453,13 +1479,13 @@ export function InspectionBoard({ roads, loadError }: Props) {
                   </label>
                 </div>
                 <label className="flex flex-col gap-1">
-                  备注
+                  {copy.editModal.remarkLabel}
                   <textarea
                     className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-200/60 focus:border-emerald-300 focus:outline-none"
                     rows={3}
                     value={editForm.remark}
                     onChange={(e) => setEditForm((prev) => ({ ...prev, remark: e.target.value }))}
-                    placeholder="补充说明"
+                    placeholder={copy.editModal.remarkPlaceholder}
                   />
                 </label>
                 {editError ? <p className="text-xs text-amber-200">{editError}</p> : null}
@@ -1469,7 +1495,7 @@ export function InspectionBoard({ roads, loadError }: Props) {
                     className="rounded-xl border border-white/20 px-4 py-2 text-xs font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/10"
                     onClick={() => setEditing(null)}
                   >
-                    取消
+                    {copy.editModal.cancel}
                   </button>
                   <button
                     type="button"
@@ -1477,7 +1503,7 @@ export function InspectionBoard({ roads, loadError }: Props) {
                     onClick={submitEdit}
                     disabled={editPending}
                   >
-                    {editPending ? '保存中...' : '保存修改'}
+                    {editPending ? copy.editModal.saving : copy.editModal.save}
                   </button>
                 </div>
               </div>
@@ -1497,7 +1523,7 @@ export function InspectionBoard({ roads, loadError }: Props) {
             <div className="w-full max-w-xl rounded-3xl border border-white/10 bg-slate-900/95 p-6 text-sm text-slate-100 shadow-2xl shadow-rose-500/20 backdrop-blur">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-xs uppercase tracking-[0.2em] text-amber-100">删除确认</p>
+                  <p className="text-xs uppercase tracking-[0.2em] text-amber-100">{copy.deleteModal.badge}</p>
                   <h3 className="text-lg font-semibold text-slate-50">{deleteTarget.phaseName}</h3>
                   <p className="text-sm text-slate-300">
                     {deleteTarget.roadName} · {formatPK(deleteTarget.startPk)} → {formatPK(deleteTarget.endPk)}
@@ -1507,12 +1533,12 @@ export function InspectionBoard({ roads, loadError }: Props) {
                   type="button"
                   className="rounded-full border border-white/20 px-3 py-1 text-xs font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/20"
                   onClick={() => setDeleteTarget(null)}
-                  aria-label="关闭删除确认"
+                  aria-label={copy.deleteModal.closeAria}
                 >
                   ×
                 </button>
               </div>
-              <p className="mt-4 text-sm text-slate-200">确定删除该报检记录吗？此操作不可恢复。</p>
+              <p className="mt-4 text-sm text-slate-200">{copy.deleteModal.confirmText}</p>
               {deleteError ? <p className="mt-2 text-xs text-amber-200">{deleteError}</p> : null}
               <div className="mt-4 flex items-center justify-end gap-3">
                 <button
@@ -1520,7 +1546,7 @@ export function InspectionBoard({ roads, loadError }: Props) {
                   className="rounded-xl border border-white/20 px-4 py-2 text-xs font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/10"
                   onClick={() => setDeleteTarget(null)}
                 >
-                  取消
+                  {copy.deleteModal.cancel}
                 </button>
                 <button
                   type="button"
@@ -1528,7 +1554,7 @@ export function InspectionBoard({ roads, loadError }: Props) {
                   onClick={confirmDelete}
                   disabled={deletePending}
                 >
-                  {deletePending ? '删除中...' : '确认删除'}
+                  {deletePending ? copy.deleteModal.confirming : copy.deleteModal.confirm}
                 </button>
               </div>
             </div>

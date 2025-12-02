@@ -3,6 +3,7 @@ import { ProgressDetailHeader } from '../ProgressDetailHeader'
 import { ProgressNotFound } from '../ProgressNotFound'
 import { AccessDenied } from '@/components/AccessDenied'
 import type { CheckDefinitionDTO, LayerDefinitionDTO, PhaseDefinitionDTO, RoadSectionDTO } from '@/lib/progressTypes'
+import { getProgressCopy } from '@/lib/i18n/progress'
 import { getSessionUser } from '@/lib/server/authSession'
 import { listCheckDefinitions, listLayerDefinitions, listPhaseDefinitions, listPhases } from '@/lib/server/progressStore'
 import { getRoadBySlug } from '@/lib/server/roadStore'
@@ -25,10 +26,11 @@ export default async function RoadDetailPage({ params }: Params) {
   const canViewInspection = sessionUser?.permissions.includes('inspection:view') || false
 
   if (!canView) {
+    const t = getProgressCopy('zh')
     return (
       <AccessDenied
         permissions={['progress:view']}
-        hint="开通查看权限后可使用甘特、风险与节点详情。"
+        hint={t.access.progressDetailHint}
       />
     )
   }

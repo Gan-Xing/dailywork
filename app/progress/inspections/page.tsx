@@ -1,6 +1,7 @@
 import { AccessDenied } from '@/components/AccessDenied'
 import { InspectionBoard } from './InspectionBoard'
 import type { RoadSectionWithPhasesDTO } from '@/lib/progressTypes'
+import { getProgressCopy } from '@/lib/i18n/progress'
 import { getSessionUser } from '@/lib/server/authSession'
 import { listRoadSectionsWithPhases } from '@/lib/server/roadStore'
 
@@ -11,7 +12,8 @@ export default async function InspectionListPage() {
   const canView = sessionUser?.permissions.includes('inspection:view') ?? false
 
   if (!canView) {
-    return <AccessDenied permissions={['inspection:view']} hint="需要查看报检权限才能浏览此列表。" />
+    const t = getProgressCopy('zh')
+    return <AccessDenied permissions={['inspection:view']} hint={t.access.inspectionViewHint} />
   }
 
   let roads: RoadSectionWithPhasesDTO[] = []
