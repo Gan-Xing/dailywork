@@ -111,6 +111,8 @@ type ListFilters = {
   dateTo: string
   sortField: 'paymentDate' | 'amount' | 'category' | 'updatedAt'
   sortDir: 'asc' | 'desc'
+  page: number
+  pageSize: number
 }
 
 const formatDateInput = (iso: string) => iso.split('T')[0]
@@ -146,7 +148,7 @@ const toggleValue = <T,>(list: T[], value: T) =>
   list.includes(value) ? list.filter((item) => item !== value) : [...list, value]
 
 const COLUMN_STORAGE_KEY = 'finance-visible-columns'
-const defaultVisibleColumns = ['sequence', 'project', 'reason', 'amount', 'handler', 'action'] as const
+const defaultVisibleColumns = ['sequence', 'project', 'paymentDate', 'reason', 'amount', 'handler', 'action'] as const
 
 const SkeletonBar = ({ className }: { className?: string }) => (
   <div className={`h-3 animate-pulse rounded-full bg-slate-200 ${className ?? ''}`} />
@@ -190,6 +192,7 @@ export default function FinancePage() {
   const [authLoaded, setAuthLoaded] = useState(false)
   const [metadata, setMetadata] = useState<Metadata | null>(null)
   const [entries, setEntries] = useState<FinanceEntry[]>([])
+  const [totalEntries, setTotalEntries] = useState(0)
   const [listFilters, setListFilters] = useState<ListFilters>({
     projectIds: [],
     categoryKeys: [],
@@ -202,6 +205,8 @@ export default function FinancePage() {
     dateTo: '',
     sortField: 'paymentDate',
     sortDir: 'desc',
+    page: 1,
+    pageSize: 20,
   })
   const [listDraft, setListDraft] = useState<ListFilters>({
     projectIds: [],
@@ -215,6 +220,8 @@ export default function FinancePage() {
     dateTo: '',
     sortField: 'paymentDate',
     sortDir: 'desc',
+    page: 1,
+    pageSize: 20,
   })
   const [categorySearch, setCategorySearch] = useState('')
   const [projectOpen, setProjectOpen] = useState(false)
@@ -437,9 +444,14 @@ export default function FinancePage() {
     return result
   }, [entries, listFilters])
 
-  const tableRows = useMemo(
-    () => filteredEntries.map((entry, index) => ({ entry, displayIndex: index + 1 })),
-    [filteredEntries],
+  const tableRows = useMemo(() => {
+    const offset = (listFilters.page - 1) * listFilters.pageSize
+    return filteredEntries.map((entry, index) => ({ entry, displayIndex: offset + index + 1 }))
+  }, [filteredEntries, listFilters.page, listFilters.pageSize])
+
+  const totalPages = useMemo(
+    () => Math.max(1, Math.ceil((totalEntries || 0) / Math.max(listFilters.pageSize, 1))),
+    [totalEntries, listFilters.pageSize],
   )
 
   const columnOptions: { key: string; label: string }[] = [
@@ -459,6 +471,19 @@ export default function FinancePage() {
     { key: 'updatedAt', label: '最近更新' },
     { key: 'action', label: '操作' },
   ]
+  const pageSizeOptions = [10, 20, 50, 100, 200]
+
+  const changePage = (nextPage: number) => {
+    const clamped = Math.min(Math.max(1, nextPage), totalPages || 1)
+    setListFilters((prev) => ({ ...prev, page: clamped }))
+    setListDraft((prev) => ({ ...prev, page: clamped }))
+  }
+
+  const changePageSize = (nextSize: number) => {
+    const size = Math.min(Math.max(Math.round(nextSize), 1), 200)
+    setListFilters((prev) => ({ ...prev, pageSize: size, page: 1 }))
+    setListDraft((prev) => ({ ...prev, pageSize: size, page: 1 }))
+  }
 
   const toggleColumn = (key: string) => {
     setVisibleColumns((prev) => {
@@ -485,6 +510,8 @@ export default function FinancePage() {
     if (filtersInput.dateTo) params.set('dateTo', filtersInput.dateTo)
     params.set('sortField', filtersInput.sortField)
     params.set('sortDir', filtersInput.sortDir)
+    params.set('page', String(filtersInput.page))
+    params.set('pageSize', String(filtersInput.pageSize))
     return params
   }
 
@@ -545,6 +572,8 @@ export default function FinancePage() {
         dateTo: '',
         sortField: 'paymentDate',
         sortDir: 'desc',
+        page: 1,
+        pageSize: 20,
       }
       setListDraft(defaults)
       setListFilters(defaults)
@@ -565,14 +594,23 @@ export default function FinancePage() {
         const res = await fetch(query ? `/api/finance/entries?${query}` : '/api/finance/entries', {
           credentials: 'include',
         })
-        const data = (await res.json()) as { entries?: FinanceEntry[]; message?: string }
+        const data = (await res.json()) as {
+          entries?: FinanceEntry[]
+          total?: number
+          page?: number
+          pageSize?: number
+          message?: string
+        }
         if (!res.ok) {
           setMessage(data.message ?? '加载失败')
+          setTotalEntries(0)
           return
         }
         setEntries(data.entries ?? [])
+        setTotalEntries(data.total ?? 0)
       } catch (error) {
         setMessage((error as Error).message)
+        setTotalEntries(0)
       } finally {
         setLoading(false)
       }
@@ -666,6 +704,8 @@ export default function FinancePage() {
     dateTo: filtersDateTo,
     sortField,
     sortDir,
+    page,
+    pageSize,
   } = listFilters
 
   useEffect(() => {
@@ -682,6 +722,8 @@ export default function FinancePage() {
       dateTo: filtersDateTo,
       sortField,
       sortDir,
+      page,
+      pageSize,
     }
     void loadEntries(currentFilters)
   }, [
@@ -698,11 +740,13 @@ export default function FinancePage() {
     filtersDateTo,
     sortField,
     sortDir,
+    page,
+    pageSize,
     loadEntries,
   ])
 
   useEffect(() => {
-    if (!canView) return
+    if (!canView || viewMode !== 'charts') return
     const currentFilters: ListFilters = {
       projectIds: filtersProjectIds,
       categoryKeys: filtersCategoryKeys,
@@ -715,10 +759,13 @@ export default function FinancePage() {
       dateTo: filtersDateTo,
       sortField,
       sortDir,
+      page,
+      pageSize,
     }
     void loadInsights(currentFilters)
   }, [
     canView,
+    viewMode,
     refreshKey,
     filtersProjectIds,
     filtersCategoryKeys,
@@ -731,6 +778,8 @@ export default function FinancePage() {
     filtersDateTo,
     sortField,
     sortDir,
+    page,
+    pageSize,
     loadInsights,
   ])
 
@@ -1602,7 +1651,9 @@ export default function FinancePage() {
               <div className="flex flex-wrap items-center gap-2">
                 <button
                   onClick={() => {
-                    setListFilters({ ...listDraft })
+                    const nextFilters = { ...listDraft, page: 1 }
+                    setListDraft(nextFilters)
+                    setListFilters(nextFilters)
                     setProjectOpen(false)
                     setPaymentOpen(false)
                     setHandlerOpen(false)
@@ -1628,6 +1679,8 @@ export default function FinancePage() {
                       dateTo: '',
                       sortField: 'paymentDate',
                       sortDir: 'desc',
+                      page: 1,
+                      pageSize: 20,
                     } satisfies ListFilters
                     setListDraft(reset)
                     setListFilters(reset)
@@ -1680,8 +1733,8 @@ export default function FinancePage() {
                           onClick={() =>
                             setListFilters((prev) => {
                               const dir = prev.sortField === 'category' && prev.sortDir === 'asc' ? 'desc' : 'asc'
-                              setListDraft((draft) => ({ ...draft, sortField: 'category', sortDir: dir }))
-                              return { ...prev, sortField: 'category', sortDir: dir }
+                              setListDraft((draft) => ({ ...draft, sortField: 'category', sortDir: dir, page: 1 }))
+                              return { ...prev, sortField: 'category', sortDir: dir, page: 1 }
                             })
                           }
                         >
@@ -1695,8 +1748,8 @@ export default function FinancePage() {
                           onClick={() =>
                             setListFilters((prev) => {
                               const dir = prev.sortField === 'amount' && prev.sortDir === 'asc' ? 'desc' : 'asc'
-                              setListDraft((draft) => ({ ...draft, sortField: 'amount', sortDir: dir }))
-                              return { ...prev, sortField: 'amount', sortDir: dir }
+                              setListDraft((draft) => ({ ...draft, sortField: 'amount', sortDir: dir, page: 1 }))
+                              return { ...prev, sortField: 'amount', sortDir: dir, page: 1 }
                             })
                           }
                         >
@@ -1711,8 +1764,8 @@ export default function FinancePage() {
                           onClick={() =>
                             setListFilters((prev) => {
                               const dir = prev.sortField === 'paymentDate' && prev.sortDir === 'asc' ? 'desc' : 'asc'
-                              setListDraft((draft) => ({ ...draft, sortField: 'paymentDate', sortDir: dir }))
-                              return { ...prev, sortField: 'paymentDate', sortDir: dir }
+                              setListDraft((draft) => ({ ...draft, sortField: 'paymentDate', sortDir: dir, page: 1 }))
+                              return { ...prev, sortField: 'paymentDate', sortDir: dir, page: 1 }
                             })
                           }
                         >
@@ -1730,8 +1783,8 @@ export default function FinancePage() {
                           onClick={() =>
                             setListFilters((prev) => {
                               const dir = prev.sortField === 'updatedAt' && prev.sortDir === 'asc' ? 'desc' : 'asc'
-                              setListDraft((draft) => ({ ...draft, sortField: 'updatedAt', sortDir: dir }))
-                              return { ...prev, sortField: 'updatedAt', sortDir: dir }
+                              setListDraft((draft) => ({ ...draft, sortField: 'updatedAt', sortDir: dir, page: 1 }))
+                              return { ...prev, sortField: 'updatedAt', sortDir: dir, page: 1 }
                             })
                           }
                         >
@@ -1823,7 +1876,45 @@ export default function FinancePage() {
                     )}
                   </tbody>
                 </table>
-            </div>
+              </div>
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-slate-50 px-3 py-2">
+                <div className="text-sm text-slate-600">
+                  共 {totalEntries} 条 · 第 {listFilters.page}/{totalPages} 页
+                </div>
+                <div className="flex flex-wrap items-center gap-2 text-sm">
+                  <span className="text-slate-600">每页</span>
+                  <select
+                    className="rounded border border-slate-200 bg-white px-2 py-1 shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
+                    value={listFilters.pageSize}
+                    onChange={(e) => changePageSize(Number(e.target.value))}
+                  >
+                    {pageSizeOptions.map((size) => (
+                      <option key={size} value={size}>
+                        {size} 条
+                      </option>
+                    ))}
+                  </select>
+                  <div className="flex items-center gap-2">
+                    <button
+                      className="rounded border border-slate-200 px-2 py-1 text-slate-700 transition hover:bg-white disabled:cursor-not-allowed disabled:text-slate-400"
+                      onClick={() => changePage(listFilters.page - 1)}
+                      disabled={listFilters.page <= 1}
+                    >
+                      上一页
+                    </button>
+                    <div className="rounded border border-slate-200 bg-white px-3 py-1 text-slate-700 shadow-sm">
+                      {listFilters.page} / {totalPages}
+                    </div>
+                    <button
+                      className="rounded border border-slate-200 px-2 py-1 text-slate-700 transition hover:bg-white disabled:cursor-not-allowed disabled:text-slate-400"
+                      onClick={() => changePage(listFilters.page + 1)}
+                      disabled={listFilters.page >= totalPages}
+                    >
+                      下一页
+                    </button>
+                  </div>
+                </div>
+              </div>
             </>
           ) : (
             <div className="space-y-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
@@ -1899,8 +1990,16 @@ export default function FinancePage() {
                               <button
                                 className="rounded-full border border-slate-200 px-2 py-0.5 text-slate-700 transition hover:border-emerald-300 hover:text-emerald-700"
                                 onClick={() => {
-                                  setListDraft((prev) => ({ ...prev, categoryKeys: node.key ? [node.key] : [] }))
-                                  setListFilters((prev) => ({ ...prev, categoryKeys: node.key ? [node.key] : [] }))
+                                  setListDraft((prev) => ({
+                                    ...prev,
+                                    categoryKeys: node.key ? [node.key] : [],
+                                    page: 1,
+                                  }))
+                                  setListFilters((prev) => ({
+                                    ...prev,
+                                    categoryKeys: node.key ? [node.key] : [],
+                                    page: 1,
+                                  }))
                                   setViewMode('charts')
                                 }}
                               >
@@ -1958,8 +2057,8 @@ export default function FinancePage() {
                             <button
                               key={cat.key}
                               onClick={() => {
-                                setListDraft((prev) => ({ ...prev, categoryKeys: [cat.key] }))
-                                setListFilters((prev) => ({ ...prev, categoryKeys: [cat.key] }))
+                                setListDraft((prev) => ({ ...prev, categoryKeys: [cat.key], page: 1 }))
+                                setListFilters((prev) => ({ ...prev, categoryKeys: [cat.key], page: 1 }))
                                 setViewMode('charts')
                               }}
                               className="w-full rounded-lg border border-slate-100 px-3 py-2 text-left transition hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-sm"
@@ -2107,8 +2206,8 @@ export default function FinancePage() {
                         <button
                           key={item.id}
                           onClick={() => {
-                            setListDraft((prev) => ({ ...prev, paymentTypeIds: [item.id] }))
-                            setListFilters((prev) => ({ ...prev, paymentTypeIds: [item.id] }))
+                            setListDraft((prev) => ({ ...prev, paymentTypeIds: [item.id], page: 1 }))
+                            setListFilters((prev) => ({ ...prev, paymentTypeIds: [item.id], page: 1 }))
                             setViewMode('table')
                             setRefreshKey((prev) => prev + 1)
                           }}
