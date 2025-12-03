@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { PhaseMeasure } from '@/lib/progressTypes'
 import { usePreferredLocale } from '@/lib/usePreferredLocale'
 import { locales, type Locale } from '@/lib/i18n'
-import { priceManagerCopy } from '@/lib/i18n/value'
+import { measureLabels, priceManagerCopy } from '@/lib/i18n/value'
 import type { PhasePriceItem, PhasePricingGroup } from '@/lib/server/phasePricingStore'
 
 type FetchStatus = 'idle' | 'loading' | 'success' | 'error'
@@ -32,17 +32,6 @@ type CreateFields = {
 }
 
 const formatLocaleId = (locale: Locale) => (locale === 'fr' ? 'fr-FR' : 'zh-CN')
-
-const measureLabels: Record<Locale, Record<PhaseMeasure, string>> = {
-  zh: {
-    LINEAR: '线性',
-    POINT: '点'
-  },
-  fr: {
-    LINEAR: 'Linéaire',
-    POINT: 'Ponctuel'
-  }
-}
 
 const formatNumber = (value: number, localeId: string) =>
   new Intl.NumberFormat(localeId, { maximumFractionDigits: 2 }).format(Math.max(0, value))

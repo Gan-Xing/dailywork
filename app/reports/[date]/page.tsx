@@ -40,88 +40,13 @@ import {
 	normalizeReportForDate,
 	recalcMaterialRow
 } from '@/lib/reportUtils';
-
-const participantEntities = [
-	{
-		id: 'meer',
-		label: {
-			fr: "MINISTERE DE L'EQUIPEMENT ET DE L'ENTRETIEN ROUTIER (MEER)",
-			zh: '科特迪瓦设备与道路维护部 (MEER)'
-		},
-		logo: { src: '/meer.png', width: 160, height: 80 }
-	},
-	{
-		id: 'delegue',
-		label: {
-			fr: "Maître d'ouvrage délégué",
-			zh: '业主代表'
-		},
-		logo: { src: '/ageroute.png', width: 160, height: 80 }
-	},
-	{
-		id: 'moe',
-		label: {
-			fr: "Maître d'œuvre",
-			zh: '监理/设计单位'
-		},
-		logo: { src: '/bnetd_logo.svg', width: 160, height: 80 }
-	},
-	{
-		id: 'entrepreneur',
-		label: {
-			fr: 'Entrepreneur',
-			zh: '承包商'
-		},
-		logo: { src: '/logo_porteo_btp.svg', width: 160, height: 80 }
-	}
-] as const;
-
-const [primaryEntity, ...secondaryEntities] = participantEntities;
-
-const monthOptions = [
-	{ value: '01', label: { fr: 'Janvier', zh: '1月' } },
-	{ value: '02', label: { fr: 'Février', zh: '2月' } },
-	{ value: '03', label: { fr: 'Mars', zh: '3月' } },
-	{ value: '04', label: { fr: 'Avril', zh: '4月' } },
-	{ value: '05', label: { fr: 'Mai', zh: '5月' } },
-	{ value: '06', label: { fr: 'Juin', zh: '6月' } },
-	{ value: '07', label: { fr: 'Juillet', zh: '7月' } },
-	{ value: '08', label: { fr: 'Août', zh: '8月' } },
-	{ value: '09', label: { fr: 'Septembre', zh: '9月' } },
-	{ value: '10', label: { fr: 'Octobre', zh: '10月' } },
-	{ value: '11', label: { fr: 'Novembre', zh: '11月' } },
-	{ value: '12', label: { fr: 'Décembre', zh: '12月' } }
-] as const;
-
-const yearOptions = [
-	{ value: '2025', label: { fr: '2025', zh: '2025年' } },
-	{ value: '2026', label: { fr: '2026', zh: '2026年' } }
-] as const;
-
-const selectPlaceholder = {
-	fr: 'Sélectionner',
-	zh: '请选择'
-} as const;
-
-const homeLabelMap = {
-	zh: '返回首页',
-	fr: "Retour à l'accueil"
-} as const;
-
-const reportDateLabelMap = {
-	zh: '日报日期',
-	fr: 'Date du rapport'
-} as const;
-
-const saveLabelMap = {
-	zh: '确认保存',
-	fr: "Confirmer l'enregistrement"
-} as const;
-
-const savingLabelMap = {
-	zh: '保存中...',
-	fr: 'Enregistrement...'
-} as const;
+import {
+	getReportEditorCopy,
+	monthOptions,
+	primaryEntity,
+	secondaryEntities,
+	yearOptions
+} from '@/lib/i18n/reportEditor';
 
 type NarrativeGroup = 'observations' | 'works' | 'additional';
 
@@ -287,6 +212,7 @@ export default function ReportEditorPage() {
 		Record<string, TranslationEntry>
 	>({});
 	const copy = useMemo(() => getCopy(locale), [locale]);
+	const editorCopy = useMemo(() => getReportEditorCopy(locale), [locale]);
 
 	useEffect(() => {
 		if (!activeDate || !DATE_KEY_REGEX.test(activeDate)) {
@@ -378,14 +304,14 @@ export default function ReportEditorPage() {
 	};
 
 	const previewStorageKey = activeDate ? `report-preview-${activeDate}` : null;
-	const homeButtonBase = homeLabelMap[locale];
+	const homeButtonBase = editorCopy.homeLabel;
 	const homeButtonLabel = `← ${homeButtonBase}`;
-	const reportDateLabel = reportDateLabelMap[locale];
-	const saveButtonLabel = saveLabelMap[locale];
-	const savingButtonLabel = savingLabelMap[locale];
-	const breadcrumbHome = locale === 'fr' ? 'Accueil' : '首页';
-	const breadcrumbReports = locale === 'fr' ? 'Rapports journaliers' : '日报管理';
+	const reportDateLabel = editorCopy.reportDateLabel;
+	const saveButtonLabel = editorCopy.saveLabel;
+	const savingButtonLabel = editorCopy.savingLabel;
+	const { home: breadcrumbHome, reports: breadcrumbReports } = editorCopy.breadcrumbs;
 	const breadcrumbDate = report.metadata.date || activeDate || '--';
+	const selectPlaceholder = editorCopy.selectPlaceholder;
 
 	const handlePreviewNavigate = () => {
 		if (!activeDate || !DATE_KEY_REGEX.test(activeDate)) {
@@ -1003,11 +929,7 @@ export default function ReportEditorPage() {
 									)
 								}>
 								<option value=''>
-									{
-										selectPlaceholder[
-											locale
-										]
-									}
+									{selectPlaceholder}
 								</option>
 								{monthOptions.map(
 									(
@@ -1056,11 +978,7 @@ export default function ReportEditorPage() {
 									)
 								}>
 								<option value=''>
-									{
-										selectPlaceholder[
-											locale
-										]
-									}
+									{selectPlaceholder}
 								</option>
 								{yearOptions.map(
 									(

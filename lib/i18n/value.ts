@@ -1,3 +1,4 @@
+import type { PhaseMeasure } from '../progressTypes'
 import type { Locale } from './index'
 
 export type ProductionValueCopy = {
@@ -136,6 +137,17 @@ export type PriceManagerCopy = {
     nameRequired: string
     deleted: string
     deleteConfirm: string
+  }
+}
+
+export const measureLabels: Record<Locale, Record<PhaseMeasure, string>> = {
+  zh: {
+    LINEAR: '线性',
+    POINT: '点'
+  },
+  fr: {
+    LINEAR: 'Linéaire',
+    POINT: 'Ponctuel'
   }
 }
 

@@ -20,9 +20,18 @@ export const memberCopy: Record<
   {
     title: string
     subtitle: string
+    modalSubtitle: string
+    breadcrumbs: {
+      home: string
+      members: string
+    }
     tabs: Record<'members' | 'roles' | 'permissions', string>
     tabDescriptions: Record<'members' | 'roles' | 'permissions', string>
     stats: Record<'headcount' | 'active' | 'roles' | 'coverage', string>
+    helpers: {
+      permissionCoverage: string
+      permissionFormat: string
+    }
     listHeading: string
     status: Record<EmploymentStatus, string>
     table: Record<
@@ -59,8 +68,28 @@ export const memberCopy: Record<
       cancel: string
       createRole: string
     }
+    access: {
+      hint: string
+      needMemberView: string
+      needMemberViewRoles: string
+      needPermissionView: string
+    }
+    errors: {
+      needRoleManage: string
+      needMemberManage: string
+      needMemberEdit: string
+      usernameRequired: string
+      passwordRequired: string
+      roleNameRequired: string
+      roleDeleteConfirm: string
+    }
     rolePanel: {
       title: string
+      editTitle: string
+      subtitle: string
+      namePlaceholder: string
+      countPrefix: string
+      countUnit: string
       members: string
       permissions: string
       primary: string
@@ -70,6 +99,7 @@ export const memberCopy: Record<
       code: string
       description: string
       roles: string
+      helper: string
     }
     form: {
       name: string
@@ -87,6 +117,7 @@ export const memberCopy: Record<
       roles: string
       nationalityPlaceholder: string
       roleName: string
+      positionPlaceholder: string
     }
     feedback: {
       loading: string
@@ -104,6 +135,11 @@ export const memberCopy: Record<
   zh: {
     title: '成员管理',
     subtitle: '集中维护成员信息、角色与权限映射，支持导入/导出与审计记录。',
+    modalSubtitle: '录入共享字段，扩展资料后续在详情页维护。',
+    breadcrumbs: {
+      home: '首页',
+      members: '成员管理',
+    },
     tabs: {
       members: '成员列表',
       roles: '角色管理',
@@ -119,6 +155,10 @@ export const memberCopy: Record<
       active: '在职成员',
       roles: '角色数',
       coverage: '权限覆盖',
+    },
+    helpers: {
+      permissionCoverage: '权限条目',
+      permissionFormat: '权限遵循资源-动作编码，可直接复用到 API 鉴权策略。',
     },
     listHeading: '成员列表',
     status: {
@@ -158,8 +198,28 @@ export const memberCopy: Record<
       cancel: '取消',
       createRole: '新增角色',
     },
+    access: {
+      hint: '请先登录并开通 member:view 权限后再试。',
+      needMemberView: '缺少 member:view 权限，无法查看成员列表。',
+      needMemberViewRoles: '缺少 member:view 权限，无法查看角色列表。',
+      needPermissionView: '缺少 permission:view 权限，无法查看权限列表。',
+    },
+    errors: {
+      needRoleManage: '权限不足：role:manage',
+      needMemberManage: '缺少成员管理权限',
+      needMemberEdit: '缺少成员编辑权限',
+      usernameRequired: '账号必填',
+      passwordRequired: '初始密码必填',
+      roleNameRequired: '角色名称必填',
+      roleDeleteConfirm: '确定删除该角色？',
+    },
     rolePanel: {
       title: '角色管理',
+      editTitle: '编辑角色',
+      subtitle: '新增角色并绑定需要的权限。',
+      namePlaceholder: '请输入角色名称',
+      countPrefix: 'RBAC',
+      countUnit: '角色',
       members: '成员',
       permissions: '权限',
       primary: '核心职责',
@@ -169,6 +229,7 @@ export const memberCopy: Record<
       code: '编码',
       description: '描述',
       roles: '关联角色',
+      helper: '权限遵循资源-动作编码，可直接复用到 API 鉴权策略。',
     },
     form: {
       name: '姓名',
@@ -186,6 +247,7 @@ export const memberCopy: Record<
       roles: '角色',
       nationalityPlaceholder: '请选择国籍',
       roleName: '角色名称',
+      positionPlaceholder: '选择或输入岗位',
     },
     feedback: {
       loading: '正在加载成员...',
@@ -203,6 +265,11 @@ export const memberCopy: Record<
     title: 'Gestion des membres',
     subtitle:
       'Centralisez les profils, rôles et permissions; imports/exports et traces d’audit intégrées.',
+    modalSubtitle: 'Renseignez les champs communs; les détails avancés pourront suivre.',
+    breadcrumbs: {
+      home: 'Accueil',
+      members: 'Gestion des membres',
+    },
     tabs: {
       members: 'Liste des membres',
       roles: 'Gestion des rôles',
@@ -218,6 +285,11 @@ export const memberCopy: Record<
       active: 'Actifs',
       roles: 'Rôles',
       coverage: 'Couverture permissions',
+    },
+    helpers: {
+      permissionCoverage: 'Permissions',
+      permissionFormat:
+        'Les permissions suivent le format ressource:action et peuvent être réutilisées côté API.',
     },
     listHeading: 'Liste des membres',
     status: {
@@ -257,8 +329,28 @@ export const memberCopy: Record<
       cancel: 'Annuler',
       createRole: 'Ajouter un rôle',
     },
+    access: {
+      hint: 'Connectez-vous puis obtenez member:view pour accéder à la liste.',
+      needMemberView: 'Droit insuffisant : member:view',
+      needMemberViewRoles: 'Droit insuffisant : member:view pour afficher les rôles.',
+      needPermissionView: 'Droit insuffisant : permission:view pour afficher les permissions.',
+    },
+    errors: {
+      needRoleManage: 'Droit insuffisant : role:manage',
+      needMemberManage: 'Droit insuffisant : member:manage',
+      needMemberEdit: 'Droit insuffisant : member:edit',
+      usernameRequired: "L'identifiant est obligatoire",
+      passwordRequired: 'Mot de passe requis',
+      roleNameRequired: 'Nom du rôle requis',
+      roleDeleteConfirm: 'Confirmer la suppression du rôle ?',
+    },
     rolePanel: {
       title: 'Gestion des rôles',
+      editTitle: 'Modifier le rôle',
+      subtitle: 'Ajoutez un rôle et associez les permissions nécessaires.',
+      namePlaceholder: 'Saisir le nom du rôle',
+      countPrefix: 'RBAC',
+      countUnit: 'rôles',
       members: 'Membres',
       permissions: 'Permissions',
       primary: 'Responsabilité clé',
@@ -268,6 +360,8 @@ export const memberCopy: Record<
       code: 'Code',
       description: 'Description',
       roles: 'Rôles associés',
+      helper:
+        'Les permissions suivent le format ressource:action et peuvent être réutilisées côté API.',
     },
     form: {
       name: 'Nom',
@@ -285,6 +379,7 @@ export const memberCopy: Record<
       roles: 'Rôles',
       nationalityPlaceholder: 'Choisir une nationalité',
       roleName: 'Nom du rôle',
+      positionPlaceholder: 'Sélectionner ou saisir',
     },
     feedback: {
       loading: 'Chargement des membres...',

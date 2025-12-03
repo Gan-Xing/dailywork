@@ -65,8 +65,7 @@ type TabKey = 'members' | 'roles' | 'permissions'
 export default function MembersPage() {
   const { locale, setLocale } = usePreferredLocale()
   const t = memberCopy[locale]
-  const breadcrumbHome = locale === 'fr' ? 'Accueil' : '首页'
-  const breadcrumbMembers = locale === 'fr' ? 'Gestion des membres' : '成员管理'
+  const { home: breadcrumbHome, members: breadcrumbMembers } = t.breadcrumbs
 
   const getTodayString = useCallback(() => new Date().toISOString().slice(0, 10), [])
   const [activeTab, setActiveTab] = useState<TabKey>('members')
@@ -142,10 +141,7 @@ export default function MembersPage() {
 
   const modalTitle =
     formMode === 'edit' ? t.actions.edit : formMode === 'view' ? t.actions.view : t.actions.create
-  const modalSubtitle =
-    locale === 'fr'
-      ? 'Renseignez les champs communs; les détails avancés pourront suivre.'
-      : '录入共享字段，扩展资料后续在详情页维护。'
+  const modalSubtitle = t.modalSubtitle
 
   useEffect(() => {
     const fetchSession = async () => {
@@ -250,7 +246,7 @@ export default function MembersPage() {
 
   const openCreateRoleModal = () => {
     if (!canManageRole) {
-      setRoleError(locale === 'fr' ? '权限不足：role:manage' : '缺少 role:manage 权限')
+      setRoleError(t.errors.needRoleManage)
       return
     }
     resetRoleForm()
@@ -259,7 +255,7 @@ export default function MembersPage() {
 
   const openCreateModal = () => {
     if (!canManageMember) {
-      setActionError(locale === 'fr' ? '权限不足：member:manage' : '缺少成员管理权限')
+      setActionError(t.errors.needMemberManage)
       return
     }
     setActionError(null)
@@ -270,7 +266,7 @@ export default function MembersPage() {
 
   const openEditModal = (member: Member) => {
     if (!canEditMember) {
-      setActionError(locale === 'fr' ? '权限不足：member:edit' : '缺少成员编辑权限')
+      setActionError(t.errors.needMemberEdit)
       return
     }
     setActionError(null)
@@ -339,11 +335,11 @@ export default function MembersPage() {
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (formMode === 'create' && !canManageMember) {
-      setActionError(locale === 'fr' ? '权限不足：member:manage' : '缺少成员管理权限')
+      setActionError(t.errors.needMemberManage)
       return
     }
     if (formMode === 'edit' && !canEditMember) {
-      setActionError(locale === 'fr' ? '权限不足：member:edit' : '缺少成员编辑权限')
+      setActionError(t.errors.needMemberEdit)
       return
     }
     setSubmitting(true)
@@ -369,10 +365,10 @@ export default function MembersPage() {
 
     try {
       if (!payload.username) {
-        throw new Error(locale === 'fr' ? "L'identifiant est obligatoire" : '账号必填')
+        throw new Error(t.errors.usernameRequired)
       }
       if (formMode === 'create' && !payload.password) {
-        throw new Error(locale === 'fr' ? 'Mot de passe requis' : '初始密码必填')
+        throw new Error(t.errors.passwordRequired)
       }
       const isEdit = formMode === 'edit'
       const res = await fetch(isEdit ? `/api/members/${formState.id}` : '/api/members', {
@@ -395,7 +391,7 @@ export default function MembersPage() {
 
   const handleDelete = async (member: Member) => {
     if (!canManageMember) {
-      setActionError(locale === 'fr' ? '权限不足：member:manage' : '缺少成员管理权限')
+      setActionError(t.errors.needMemberManage)
       return
     }
     if (!window.confirm(t.feedback.deleteConfirm(member.username))) return
@@ -417,10 +413,10 @@ export default function MembersPage() {
 
   const handleDeleteRole = async (roleId: number) => {
     if (!canManageRole) {
-      setRoleError(locale === 'fr' ? '权限不足：role:manage' : '缺少角色管理权限')
+      setRoleError(t.errors.needRoleManage)
       return
     }
-    if (!window.confirm(locale === 'fr' ? 'Confirmer la suppression du rôle ?' : '确定删除该角色？')) return
+    if (!window.confirm(t.errors.roleDeleteConfirm)) return
     setRoleSubmitting(true)
     setRoleError(null)
     try {
@@ -449,14 +445,14 @@ export default function MembersPage() {
   const handleCreateRole = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (!canManageRole) {
-      setRoleError(locale === 'fr' ? '权限不足：role:manage' : '缺少角色管理权限')
+      setRoleError(t.errors.needRoleManage)
       return
     }
     setRoleSubmitting(true)
     setRoleError(null)
     try {
       if (!roleFormState.name.trim()) {
-        throw new Error(locale === 'fr' ? 'Nom du rôle requis' : '角色名称必填')
+        throw new Error(t.errors.roleNameRequired)
       }
       const target = editingRoleId ? `/api/roles/${editingRoleId}` : '/api/roles'
       const method = editingRoleId ? 'PUT' : 'POST'
@@ -511,7 +507,7 @@ export default function MembersPage() {
       <AccessDenied
         locale={locale}
         permissions={['member:view']}
-        hint={locale === 'fr' ? "Connectez-vous puis obtenez member:view pour accéder à la liste." : '请先登录并开通 member:view 权限后再试。'}
+        hint={t.access.hint}
       />
     )
   }
@@ -556,7 +552,7 @@ export default function MembersPage() {
               label={t.stats.coverage}
               value={permissionCoverage}
               accent="from-amber-400 to-orange-300"
-              helper={locale === 'fr' ? 'Permissions' : '权限条目'}
+              helper={t.helpers.permissionCoverage}
             />
           </div>
         </div>
@@ -608,7 +604,7 @@ export default function MembersPage() {
 
                 {!canViewMembers ? (
                   <div className="p-6 text-sm text-rose-600">
-                    {locale === 'fr' ? '权限不足：member:view' : '缺少 member:view 权限，无法查看成员列表。'}
+                    {t.access.needMemberView}
                   </div>
                 ) : (
                   <div className="overflow-x-auto border-t border-slate-100">
@@ -737,7 +733,7 @@ export default function MembersPage() {
               <div className="space-y-4 p-6">
                 {!canViewMembers ? (
                   <div className="text-sm text-rose-600">
-                    {locale === 'fr' ? '权限不足：member:view' : '缺少 member:view 权限，无法查看角色列表。'}
+                    {t.access.needMemberViewRoles}
                   </div>
                 ) : (
                   <>
@@ -746,7 +742,9 @@ export default function MembersPage() {
                         <p className="text-sm font-semibold uppercase tracking-wide text-slate-500">
                           {t.rolePanel.title}
                         </p>
-                        <p className="text-xs text-slate-500">RBAC · {rolesData.length} roles</p>
+                        <p className="text-xs text-slate-500">
+                          {t.rolePanel.countPrefix} · {rolesData.length} {t.rolePanel.countUnit}
+                        </p>
                       </div>
                       <div className="flex flex-wrap gap-2">
                         <button
@@ -771,7 +769,7 @@ export default function MembersPage() {
                             <div>
                               <p className="text-sm font-semibold text-slate-900">{role.name}</p>
                               <p className="text-xs text-slate-600">
-                                {locale === 'fr' ? 'Permissions' : '权限数'}：{role.permissions.length}
+                                {t.rolePanel.permissions}：{role.permissions.length}
                               </p>
                             </div>
                             {canManageRole ? (
@@ -823,7 +821,7 @@ export default function MembersPage() {
               <div className="space-y-4 p-6">
                 {!canViewPermissions ? (
                   <div className="text-sm text-rose-600">
-                    {locale === 'fr' ? '权限不足：permission:view' : '缺少 permission:view 权限，无法查看权限列表。'}
+                    {t.access.needPermissionView}
                   </div>
                 ) : (
                   <>
@@ -833,9 +831,7 @@ export default function MembersPage() {
                           {t.permissionPanel.title}
                         </p>
                         <p className="text-xs text-slate-500">
-                          {locale === 'fr'
-                            ? 'Les permissions suivent le format ressource:action et peuvent être réutilisées côté API.'
-                            : '权限遵循资源-动作编码，可直接复用到 API 鉴权策略。'}
+                          {t.helpers.permissionFormat}
                         </p>
                       </div>
                       <span className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold uppercase text-slate-700 ring-1 ring-slate-200">
@@ -888,13 +884,9 @@ export default function MembersPage() {
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="text-lg font-semibold text-slate-900">
-                      {editingRoleId ? (locale === 'fr' ? '编辑角色' : '编辑角色') : t.rolePanel.title}
+                      {editingRoleId ? t.rolePanel.editTitle : t.rolePanel.title}
                     </p>
-                    <p className="text-sm text-slate-500">
-                      {locale === 'fr'
-                        ? 'Ajoutez un rôle et associez les permissions nécessaires.'
-                        : '新增角色并绑定需要的权限。'}
-                    </p>
+                    <p className="text-sm text-slate-500">{t.rolePanel.subtitle}</p>
                   </div>
               <button
                 type="button"
@@ -917,7 +909,7 @@ export default function MembersPage() {
                     }))
                   }
                   className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
-                  placeholder={locale === 'fr' ? 'Saisir le nom du rôle' : '请输入角色名称'}
+                  placeholder={t.rolePanel.namePlaceholder}
                 />
               </label>
 
@@ -1127,7 +1119,7 @@ export default function MembersPage() {
                     }
                     disabled={formMode === 'view'}
                     className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
-                    placeholder={locale === 'fr' ? 'Sélectionner ou saisir' : '选择或输入岗位'}
+                    placeholder={t.form.positionPlaceholder}
                   />
                   <datalist id="position-options">
                     {positionOptions.map((name) => (
