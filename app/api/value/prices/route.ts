@@ -47,8 +47,8 @@ const parseMeasure = (value: unknown): PhaseMeasure => {
 }
 
 export async function GET() {
-  if (!hasPermission('progress:view')) {
-    return respond('缺少进度查看权限', 403)
+  if (!hasPermission('value:view')) {
+    return respond('缺少产值查看权限', 403)
   }
   try {
     const roads = await listRoadSectionsWithProgress()
@@ -77,8 +77,8 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  if (!hasPermission('progress:edit')) {
-    return respond('缺少进度编辑权限', 403)
+  if (!hasPermission('value:create')) {
+    return respond('缺少产值新增权限', 403)
   }
 
   let payload: unknown
@@ -163,8 +163,8 @@ export async function POST(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  if (!hasPermission('progress:edit')) {
-    return respond('缺少进度编辑权限', 403)
+  if (!hasPermission('value:update')) {
+    return respond('缺少产值更新权限', 403)
   }
 
   let payload: unknown
@@ -251,8 +251,8 @@ export async function PATCH(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  if (!hasPermission('progress:edit')) {
-    return respond('缺少进度编辑权限', 403)
+  if (!hasPermission('value:delete')) {
+    return respond('缺少产值删除权限', 403)
   }
 
   let payload: unknown

@@ -5,8 +5,8 @@ import { listRoadSectionsWithProgress } from '@/lib/server/roadStore'
 import { aggregatePhaseProgress } from '@/lib/progressAggregation'
 
 export async function GET() {
-  if (!hasPermission('progress:view')) {
-    return NextResponse.json({ message: '缺少进度查看权限' }, { status: 403 })
+  if (!hasPermission('value:view')) {
+    return NextResponse.json({ message: '缺少产值查看权限' }, { status: 403 })
   }
 
   try {

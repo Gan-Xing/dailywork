@@ -292,7 +292,7 @@ export default function HomePage() {
 			'/progress': ['progress:view'],
 			'/members': ['member:view'],
 			'/finance': ['finance:view'],
-			'/value': ['progress:view']
+			'/value': ['value:view']
 		}),
 		[]
 	);

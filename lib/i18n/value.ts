@@ -60,7 +60,7 @@ export const productionValueCopy: Record<Locale, ProductionValueCopy> = {
       messages: {
         loading: '正在加载产值数据…',
         empty: '暂无产值数据',
-        unauthorized: '需“进度查看”权限才能查看产值计量',
+        unauthorized: '需“产值查看”权限才能查看产值计量',
         error: '产值数据加载失败，请稍后重试',
         priceLoading: '正在加载价格配置…',
         priceLoadError: '价格配置加载失败，请稍后重试'
@@ -93,7 +93,7 @@ export const productionValueCopy: Record<Locale, ProductionValueCopy> = {
       messages: {
         loading: 'Chargement des valeurs…',
         empty: 'Aucune donnée de valeur disponible',
-        unauthorized: 'Permission « progress:view » requise pour consulter les valeurs',
+        unauthorized: 'Permission « value:view » requise pour consulter les valeurs',
         error: 'Impossible de charger les valeurs, réessayez plus tard',
         priceLoading: 'Chargement des prix unitaires…',
         priceLoadError: 'Impossible de charger les prix unitaires, réessayez plus tard'
@@ -167,7 +167,7 @@ export const priceManagerCopy: Record<Locale, PriceManagerCopy> = {
     messages: {
       loading: '正在加载分项价格…',
       empty: '暂无分项定义',
-      unauthorized: '需“进度查看”权限才能管理分项价格',
+      unauthorized: '需产值查看/维护权限才能管理分项价格',
       error: '分项价格加载失败，请稍后重试',
       saved: '已保存',
       updateError: '更新失败，请检查输入',
@@ -203,7 +203,7 @@ export const priceManagerCopy: Record<Locale, PriceManagerCopy> = {
     messages: {
       loading: 'Chargement des prix…',
       empty: 'Aucun sous-ouvrage défini',
-      unauthorized: 'Permission « progress:view » requise pour gérer les prix',
+      unauthorized: 'Permission « value:view » (ou équivalente) requise pour gérer les prix',
       error: 'Impossible de charger les prix',
       saved: 'Enregistré',
       updateError: 'Échec de la mise à jour, vérifiez la saisie',
