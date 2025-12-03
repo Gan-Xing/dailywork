@@ -36,6 +36,11 @@ export type HomeCopy = {
     items: string[]
     description: string
   }
+  moduleDialog: {
+    title: string
+    description: string
+    close: string
+  }
   changePassword: {
     trigger: string
     title: string
@@ -139,6 +144,11 @@ export const homeCopy: Record<Locale, HomeCopy> = {
       items: ['质量巡检', '物资进出', '风险复盘', 'AI 总结', '导出中心'],
       description:
         '未来的入口会延续同一视觉规范：清晰分区、带状态标识、可快速跳转到具体场景。需要新增模块时直接在此卡片组追加即可。'
+    },
+    moduleDialog: {
+      title: '暂无访问权限',
+      description: '需要开通权限后才能访问该模块，请联系管理员或切换账号。',
+      close: '好的'
     },
     changePassword: {
       trigger: '修改密码',
@@ -250,6 +260,12 @@ export const homeCopy: Record<Locale, HomeCopy> = {
       ],
       description:
         'Les futurs modules suivront la même grille visuelle : zones claires, statut visible et navigation rapide vers chaque scénario. Ajoutez simplement une carte ici quand un nouveau module arrive.'
+    },
+    moduleDialog: {
+      title: 'Accès requis',
+      description:
+        "Vous n'avez pas les droits pour ce module. Contactez un administrateur ou changez de compte.",
+      close: 'Compris'
     },
     changePassword: {
       trigger: 'Modifier le mot de passe',
