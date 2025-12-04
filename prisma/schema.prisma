@@ -51,6 +51,7 @@ model PhaseDefinition {
   defaultChecks  PhaseDefinitionCheck[]
   phases         RoadPhase[]
   priceItems     PhasePriceItem[]
+  workflows      PhaseWorkflowDefinition[]
   createdAt      DateTime                @default(now())
   updatedAt      DateTime                @updatedAt
 }
@@ -91,6 +92,15 @@ model PhaseDefinitionCheck {
   checkDefinition   CheckDefinition @relation(fields: [checkDefinitionId], references: [id], onDelete: Cascade)
 
   @@id([phaseDefinitionId, checkDefinitionId])
+}
+
+model PhaseWorkflowDefinition {
+  id                Int             @id @default(autoincrement())
+  phaseDefinitionId Int             @unique
+  phaseDefinition   PhaseDefinition @relation(fields: [phaseDefinitionId], references: [id], onDelete: Cascade)
+  config            Json
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
 }
 
 model DailyReport {

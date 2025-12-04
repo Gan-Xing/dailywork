@@ -14,7 +14,7 @@ export default async function ProgressPage() {
   const canView =
     !sessionUser || sessionUser?.permissions.includes('progress:view') || false
   const canManage =
-    sessionUser?.permissions.includes('progress:edit') || false
+    sessionUser?.permissions.includes('road:manage') || false
   const canViewInspections = sessionUser?.permissions.includes('inspection:view') || false
 
   if (!canView) {

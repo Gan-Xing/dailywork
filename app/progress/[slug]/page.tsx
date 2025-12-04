@@ -2,11 +2,13 @@ import { PhaseEditor } from './PhaseEditor'
 import { ProgressDetailHeader } from '../ProgressDetailHeader'
 import { ProgressNotFound } from '../ProgressNotFound'
 import { AccessDenied } from '@/components/AccessDenied'
-import type { CheckDefinitionDTO, LayerDefinitionDTO, PhaseDefinitionDTO, RoadSectionDTO } from '@/lib/progressTypes'
+import type { PhaseDefinitionDTO, RoadSectionDTO } from '@/lib/progressTypes'
+import type { WorkflowBinding } from '@/lib/progressWorkflow'
 import { getProgressCopy } from '@/lib/i18n/progress'
 import { getSessionUser } from '@/lib/server/authSession'
-import { listCheckDefinitions, listLayerDefinitions, listPhaseDefinitions, listPhases } from '@/lib/server/progressStore'
+import { listPhaseDefinitions, listPhases } from '@/lib/server/progressStore'
 import { getRoadBySlug } from '@/lib/server/roadStore'
+import { getWorkflowByPhaseDefinitionId } from '@/lib/server/workflowStore'
 
 export const dynamic = 'force-dynamic'
 
@@ -39,12 +41,12 @@ export default async function RoadDetailPage({ params }: Params) {
     return <ProgressNotFound />
   }
 
-  const [phases, phaseDefinitions, layerOptions, checkOptions] = await Promise.all([
-    listPhases(road.id),
-    listPhaseDefinitions(),
-    listLayerDefinitions(),
-    listCheckDefinitions(),
-  ])
+  const [phases, phaseDefinitions] = await Promise.all([listPhases(road.id), listPhaseDefinitions()])
+  const workflows = (
+    await Promise.all(
+      phaseDefinitions.map((definition) => getWorkflowByPhaseDefinitionId(definition.id)),
+    )
+  ).filter(Boolean) as WorkflowBinding[]
 
   return (
     <main className="min-h-screen bg-slate-950 text-slate-50">
@@ -59,8 +61,7 @@ export default async function RoadDetailPage({ params }: Params) {
             road={road}
             initialPhases={phases}
             phaseDefinitions={phaseDefinitions as PhaseDefinitionDTO[]}
-            layerOptions={layerOptions as LayerDefinitionDTO[]}
-            checkOptions={checkOptions as CheckDefinitionDTO[]}
+            workflows={workflows}
             canManage={canManage}
             canInspect={canInspect}
             canViewInspection={canViewInspection}

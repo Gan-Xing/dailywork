@@ -29,6 +29,12 @@ export type ReportsLandingCopy = {
     view: string
     updatedPrefix: string
   }
+  alerts: {
+    title: string
+    createDenied: string
+    viewDenied: string
+    close: string
+  }
   accessHint: string
 }
 
@@ -62,6 +68,12 @@ export const reportsLandingCopy: Record<Locale, ReportsLandingCopy> = {
       view: '查看',
       updatedPrefix: '最近更新：'
     },
+    alerts: {
+      title: '权限提醒',
+      createDenied: '缺少 report:edit 权限，无法创建或修改日报。',
+      viewDenied: '缺少 report:view 权限，无法查看日报。',
+      close: '知道了'
+    },
     accessHint: '需要拥有 report:view 或 report:edit 权限才能创建或查看日报。'
   },
   fr: {
@@ -93,6 +105,12 @@ export const reportsLandingCopy: Record<Locale, ReportsLandingCopy> = {
       empty: 'Aucun rapport pour le moment, créez le premier.',
       view: 'Voir',
       updatedPrefix: 'Dernière mise à jour : '
+    },
+    alerts: {
+      title: 'Alerte de droits',
+      createDenied: "Le droit report:edit est requis pour créer ou modifier un rapport.",
+      viewDenied: "Le droit report:view est requis pour consulter les rapports.",
+      close: 'Compris'
     },
     accessHint: "Contactez l'admin pour obtenir l'accès à la consultation/édition des rapports."
   }

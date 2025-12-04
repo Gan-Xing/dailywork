@@ -3,10 +3,9 @@
 
 import { RefObject, useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition } from 'react'
 
+import { AlertDialog, type AlertTone } from '@/components/AlertDialog'
 import type {
-  CheckDefinitionDTO,
   IntervalSide,
-  LayerDefinitionDTO,
   PhaseDTO,
   PhaseDefinitionDTO,
   PhaseIntervalPayload,
@@ -15,6 +14,7 @@ import type {
   RoadSectionDTO,
   InspectionStatus,
 } from '@/lib/progressTypes'
+import type { WorkflowBinding, WorkflowLayerTemplate } from '@/lib/progressWorkflow'
 import { getProgressCopy, formatProgressCopy } from '@/lib/i18n/progress'
 import { localizeProgressList, localizeProgressTerm } from '@/lib/i18n/progressDictionary'
 import { locales } from '@/lib/i18n'
@@ -24,8 +24,7 @@ interface Props {
   road: RoadSectionDTO
   initialPhases: PhaseDTO[]
   phaseDefinitions: PhaseDefinitionDTO[]
-  layerOptions: LayerDefinitionDTO[]
-  checkOptions: CheckDefinitionDTO[]
+  workflows: WorkflowBinding[]
   canManage: boolean
   canInspect: boolean
   canViewInspection: boolean
@@ -42,12 +41,25 @@ type InspectionSlice = {
   updatedAt: number
 }
 
+type LatestPointInspection = {
+  phaseId: number
+  side: IntervalSide
+  startPk: number
+  endPk: number
+  status: InspectionStatus
+  layers: string[]
+  updatedAt: number
+}
+
 interface Segment {
   start: number
   end: number
   status: Status
   spec?: string | null
   billQuantity?: number | null
+  workflow?: WorkflowBinding
+  workflowLayers?: WorkflowLayerTemplate[]
+  workflowTypeOptions?: string[]
 }
 
 interface Side {
@@ -87,6 +99,28 @@ interface SelectedSegment {
   billQuantity?: number | null
 }
 
+type AlertDialogState = {
+  title: string
+  description?: string
+  tone?: AlertTone
+  actionLabel?: string
+  cancelLabel?: string
+  onAction?: () => void
+  onCancel?: () => void
+}
+
+type InspectionSubmitPayload = {
+  phaseId: number
+  side: IntervalSide
+  startPk: number
+  endPk: number
+  layers: string[]
+  checks: string[]
+  types: string[]
+  remark: string
+  appointmentDate: string
+}
+
 const statusTone: Record<Status, string> = {
   pending: 'bg-gradient-to-r from-white via-slate-100 to-white text-slate-900 shadow-sm shadow-slate-900/10',
   inProgress: 'bg-gradient-to-r from-amber-300 via-orange-200 to-amber-200 text-slate-900 shadow-md shadow-amber-400/30',
@@ -120,8 +154,14 @@ const formatPK = (value: number) => {
 
 const todayISODate = () => new Date().toISOString().slice(0, 10)
 
-const buildPointKey = (phaseId: number, startPk: number, endPk: number) =>
-  `${phaseId}-${Math.round(Number(startPk || 0) * 1000)}-${Math.round(Number(endPk || 0) * 1000)}`
+const buildPointKey = (phaseId: number, side: IntervalSide, startPk: number, endPk: number) =>
+  `${phaseId}-${side}-${Math.round(Number(startPk || 0) * 1000)}-${Math.round(Number(endPk || 0) * 1000)}`
+
+const normalizeRange = (start: number, end: number) => {
+  const safeStart = Number.isFinite(start) ? start : 0
+  const safeEnd = Number.isFinite(end) ? end : safeStart
+  return safeStart <= safeEnd ? [safeStart, safeEnd] : [safeEnd, safeStart]
+}
 
 const computeDesign = (measure: PhaseMeasure, intervals: PhaseIntervalPayload[]) =>
   measure === 'POINT'
@@ -159,6 +199,7 @@ const normalizeInterval = (interval: PhaseIntervalPayload, measure: PhaseMeasure
 }
 
 const getPointCenter = (startPk: number, endPk: number) => (startPk + endPk) / 2
+const normalizeLabel = (value: string) => value.trim().toLowerCase()
 
 
 const fillNonDesignGaps = (segments: Segment[], start: number, end: number) => {
@@ -191,6 +232,8 @@ const mapInspectionStatus = (status: InspectionStatus): Status => {
   if (status === 'IN_PROGRESS' || status === 'SUBMITTED') return 'inProgress'
   return 'pending'
 }
+
+const workflowSatisfiedStatuses: InspectionStatus[] = ['PENDING', 'SCHEDULED', 'SUBMITTED', 'IN_PROGRESS', 'APPROVED']
 
 const mergeAdjacentSegments = (segments: Segment[]) => {
   const merged: Segment[] = []
@@ -396,7 +439,7 @@ interface PointLaneProps {
   showHeader?: boolean
   wrapperClassName?: string
   sideLabelMap: Record<IntervalSide, string>
-  resolvePointBadge: (phaseId: number, startPk: number, endPk: number) => string
+  resolvePointBadge: (phaseId: number, side: IntervalSide, startPk: number, endPk: number) => string
   onPointSelect: (segment: SelectedSegment) => void
 }
 
@@ -493,7 +536,7 @@ function PointLane({
                     title={`${rangeText} · ${sideLabelText}`}
                   >
                     <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-950 text-xs font-semibold text-white shadow-lg shadow-emerald-400/25 ring-2 ring-white/20">
-                      {resolvePointBadge(phase.id, item.startPk, item.endPk)}
+                      {resolvePointBadge(phase.id, item.side, item.startPk, item.endPk)}
                     </div>
                     <div className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-semibold text-slate-200">
                       {formatPK(entry.centerPk)}
@@ -515,14 +558,15 @@ export function PhaseEditor({
   road,
   initialPhases,
   phaseDefinitions,
-  layerOptions,
-  checkOptions,
+  workflows,
   canManage,
   canInspect,
   canViewInspection,
 }: Props) {
   const { locale } = usePreferredLocale('zh', locales)
-  const t = getProgressCopy(locale).phase
+  const progressCopy = getProgressCopy(locale)
+  const t = progressCopy.phase
+  const workflowCopy = progressCopy.workflow
   const sideOptions: { value: IntervalSide; label: string }[] = useMemo(
     () => [
       { value: 'BOTH', label: t.form.sideBoth },
@@ -539,7 +583,7 @@ export function PhaseEditor({
     }),
     [t.form.sideBoth, t.form.sideLeft, t.form.sideRight],
   )
-  const inspectionTypes = t.inspection.types
+  const defaultInspectionTypes = t.inspection.types
   const statusLabel = (status: Status) => {
     switch (status) {
       case 'pending':
@@ -570,18 +614,17 @@ export function PhaseEditor({
 
   const [phases, setPhases] = useState<PhaseDTO[]>(() => initialPhases.map(normalizePhaseDTO))
   const [definitions, setDefinitions] = useState<PhaseDefinitionDTO[]>(phaseDefinitions)
-  const [layerOptionsState, setLayerOptionsState] = useState<LayerDefinitionDTO[]>(layerOptions)
-  const [checkOptionsState, setCheckOptionsState] = useState<CheckDefinitionDTO[]>(checkOptions)
+  const workflowMap = useMemo(() => {
+    const map = new Map<number, WorkflowBinding>()
+    workflows.forEach((item) => map.set(item.phaseDefinitionId, item))
+    return map
+  }, [workflows])
   const [inspectionSlices, setInspectionSlices] = useState<InspectionSlice[]>([])
-  const [name, setName] = useState('')
-  const [measure, setMeasure] = useState<PhaseMeasure>('LINEAR')
-  const [pointHasSides, setPointHasSides] = useState(false)
+  const [name, setName] = useState(() => phaseDefinitions[0]?.name ?? '')
+  const [measure, setMeasure] = useState<PhaseMeasure>(() => phaseDefinitions[0]?.measure ?? 'LINEAR')
+  const [pointHasSides, setPointHasSides] = useState(() => Boolean(phaseDefinitions[0]?.pointHasSides))
   const [intervals, setIntervals] = useState<PhaseIntervalPayload[]>([defaultInterval])
-  const [definitionId, setDefinitionId] = useState<number | null>(null)
-  const [layerTokens, setLayerTokens] = useState<string[]>([])
-  const [checkTokens, setCheckTokens] = useState<string[]>([])
-  const [layerInput, setLayerInput] = useState('')
-  const [checkInput, setCheckInput] = useState('')
+  const [definitionId, setDefinitionId] = useState<number | null>(() => phaseDefinitions[0]?.id ?? null)
   const [error, setError] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
@@ -609,54 +652,6 @@ export function PhaseEditor({
     return maxPhaseEnd || 0
   }, [road.endPk, road.startPk, phases])
 
-  const optionsByDefinition = useMemo(() => {
-    const map = new Map<number, { layers: Set<string>; checks: Set<string> }>()
-    definitions.forEach((def) => {
-      map.set(def.id, {
-        layers: new Set(def.defaultLayers),
-        checks: new Set(def.defaultChecks),
-      })
-    })
-    phases.forEach((phase) => {
-      const existing = map.get(phase.definitionId) ?? { layers: new Set<string>(), checks: new Set<string>() }
-      phase.resolvedLayers.forEach((name) => existing.layers.add(name))
-      phase.resolvedChecks.forEach((name) => existing.checks.add(name))
-      map.set(phase.definitionId, existing)
-    })
-    const normalized = new Map<number, { layers: string[]; checks: string[] }>()
-    map.forEach((value, key) => {
-      normalized.set(key, {
-        layers: Array.from(value.layers),
-        checks: Array.from(value.checks),
-      })
-    })
-    return normalized
-  }, [definitions, phases])
-
-  const scopedLayerOptions = useMemo<LayerDefinitionDTO[]>(() => {
-    if (!definitionId) return []
-    const scoped = optionsByDefinition.get(definitionId)
-    if (!scoped) return []
-    return scoped.layers
-      .map((name, idx) => {
-        const matched = layerOptionsState.find((opt) => opt.name === name)
-        return matched ?? { id: -(idx + 1), name, isActive: true }
-      })
-      .sort((a, b) => a.name.localeCompare(b.name, 'zh-Hans'))
-  }, [definitionId, optionsByDefinition, layerOptionsState])
-
-  const scopedCheckOptions = useMemo<CheckDefinitionDTO[]>(() => {
-    if (!definitionId) return []
-    const scoped = optionsByDefinition.get(definitionId)
-    if (!scoped) return []
-    return scoped.checks
-      .map((name, idx) => {
-        const matched = checkOptionsState.find((opt) => opt.name === name)
-        return matched ?? { id: -(idx + 1), name, isActive: true }
-      })
-      .sort((a, b) => a.name.localeCompare(b.name, 'zh-Hans'))
-  }, [definitionId, optionsByDefinition, checkOptionsState])
-
   const updateInterval = (index: number, patch: Partial<PhaseIntervalPayload>) => {
     setIntervals((prev) =>
       prev.map((item, idx) => (idx === index ? { ...item, ...patch } : item)),
@@ -672,15 +667,12 @@ export function PhaseEditor({
   }
 
   const resetForm = () => {
-    setName('')
-    setMeasure('LINEAR')
-    setPointHasSides(false)
+    const defaultDefinition = definitions[0]
+    setDefinitionId(defaultDefinition?.id ?? null)
+    setName(defaultDefinition?.name ?? '')
+    setMeasure(defaultDefinition?.measure ?? 'LINEAR')
+    setPointHasSides(Boolean(defaultDefinition?.pointHasSides))
     setIntervals([defaultInterval])
-    setDefinitionId(null)
-    setLayerTokens([])
-    setCheckTokens([])
-    setLayerInput('')
-    setCheckInput('')
     setEditingId(null)
     setError(null)
   }
@@ -709,10 +701,6 @@ export function PhaseEditor({
     setName(normalized.name)
     setMeasure(normalized.measure)
     setDefinitionId(normalized.definitionId)
-    setLayerTokens(normalized.resolvedLayers)
-    setCheckTokens(normalized.resolvedChecks)
-    setLayerInput('')
-    setCheckInput('')
     setIntervals(
       normalized.intervals.map((i) => ({
         startPk: i.startPk,
@@ -746,17 +734,15 @@ export function PhaseEditor({
         setError(t.errors.invalidRange)
         return
       }
-      const { ids: layerIds, newNames: newLayers } = splitTokensToIds(layerTokens, scopedLayerOptions)
-      const { ids: checkIds, newNames: newChecks } = splitTokensToIds(checkTokens, scopedCheckOptions)
+      if (!definitionId) {
+        setError('请选择分项模板')
+        return
+      }
       const payload: PhasePayload = {
-        phaseDefinitionId: definitionId ?? undefined,
+        phaseDefinitionId: definitionId,
         name,
         measure,
         pointHasSides: measure === 'POINT' ? pointHasSides : false,
-        layerIds,
-        checkIds,
-        newLayers,
-        newChecks,
         intervals: intervals.map((item) => {
           const startPk = Number(item.startPk)
           const endPk = Number(item.endPk)
@@ -828,61 +814,6 @@ export function PhaseEditor({
             : item,
         )
       })
-      const layerPairs =
-        phase.layerIds.length && phase.resolvedLayers.length === phase.layerIds.length
-          ? phase.layerIds.map((id, idx) => ({ id, name: phase.resolvedLayers[idx] }))
-          : phase.definitionLayerIds.map((id, idx) => ({ id, name: phase.resolvedLayers[idx] }))
-
-      if (layerPairs.length) {
-        setLayerOptionsState((prev) => {
-          let next = [...prev]
-          layerPairs.forEach(({ id, name }) => {
-            if (!name || id <= 0) return
-            const existingIndex = next.findIndex((opt) => opt.name === name)
-            if (existingIndex >= 0) {
-              const existing = next[existingIndex]
-              if (existing.id <= 0) {
-                next = [
-                  ...next.slice(0, existingIndex),
-                  { ...existing, id },
-                  ...next.slice(existingIndex + 1),
-                ]
-              }
-            } else {
-              next = [...next, { id, name, isActive: true }]
-            }
-          })
-          return next
-        })
-      }
-
-      const checkPairs =
-        phase.checkIds.length && phase.resolvedChecks.length === phase.checkIds.length
-          ? phase.checkIds.map((id, idx) => ({ id, name: phase.resolvedChecks[idx] }))
-          : phase.definitionCheckIds.map((id, idx) => ({ id, name: phase.resolvedChecks[idx] }))
-
-      if (checkPairs.length) {
-        setCheckOptionsState((prev) => {
-          let next = [...prev]
-          checkPairs.forEach(({ id, name }) => {
-            if (!name || id <= 0) return
-            const existingIndex = next.findIndex((opt) => opt.name === name)
-            if (existingIndex >= 0) {
-              const existing = next[existingIndex]
-              if (existing.id <= 0) {
-                next = [
-                  ...next.slice(0, existingIndex),
-                  { ...existing, id },
-                  ...next.slice(existingIndex + 1),
-                ]
-              }
-            } else {
-              next = [...next, { id, name, isActive: true }]
-            }
-          })
-          return next
-        })
-      }
       setPhases((prev) =>
         editingId ? prev.map((item) => (item.id === editingId ? phase : item)) : [...prev, phase],
       )
@@ -956,68 +887,61 @@ export function PhaseEditor({
       }))
   }, [phases, roadStart, roadEnd])
 
+  const resolveWorkflowSelection = (phase: PhaseDTO) => {
+    const binding = workflowMap.get(phase.definitionId)
+    if (!binding) return null
+    const sortedLayers = [...binding.layers].sort((a, b) => {
+      if (a.stage !== b.stage) return a.stage - b.stage
+      return a.name.localeCompare(b.name, 'zh-Hans')
+    })
+    const layerNames = sortedLayers.map((layer) => layer.name)
+    const checkNames = sortedLayers.flatMap((layer) => layer.checks.map((check) => check.name))
+    const typeOptions =
+      binding.defaultTypes && binding.defaultTypes.length ? binding.defaultTypes : defaultInspectionTypes
+    return { binding, sortedLayers, layerNames, checkNames, typeOptions }
+  }
+
+  const openInspectionModal = (phase: PhaseDTO, segment: SelectedSegment) => {
+    const workflowSelection = resolveWorkflowSelection(phase)
+    const layers = workflowSelection?.layerNames.length ? workflowSelection.layerNames : segment.layers
+    const checks = workflowSelection?.checkNames.length ? workflowSelection.checkNames : segment.checks
+    const typeOptions = workflowSelection?.typeOptions ?? defaultInspectionTypes
+    setSelectedSegment({
+      ...segment,
+      phase: localizeProgressTerm('phase', phase.name, locale),
+      layers: localizeProgressList('layer', layers, locale, { phaseName: phase.name }),
+      checks: localizeProgressList('check', checks, locale),
+      workflow: workflowSelection?.binding,
+      workflowLayers: workflowSelection?.sortedLayers,
+      workflowTypeOptions: typeOptions,
+    })
+  }
+
   const handlePointSelect = (segment: SelectedSegment) => {
     if (!canInspect) {
       alert(t.alerts.noInspectPermission)
       return
     }
-    setSelectedSegment({
-      ...segment,
-      phase: localizeProgressTerm('phase', segment.phase, locale),
-      layers: localizeProgressList('layer', segment.layers, locale, { phaseName: segment.phase }),
-      checks: localizeProgressList('check', segment.checks, locale),
-    })
+    const phase = phases.find((item) => item.id === segment.phaseId)
+    if (!phase) return
+    openInspectionModal(phase, segment)
   }
 
-const toggleToken = (value: string, list: string[], setter: (next: string[]) => void) => {
-  const exists = list.includes(value)
-  setter(exists ? list.filter((item) => item !== value) : [...list, value])
-}
+  const toggleToken = (value: string, list: string[], setter: (next: string[]) => void) => {
+    const exists = list.includes(value)
+    setter(exists ? list.filter((item) => item !== value) : [...list, value])
+  }
 
-const splitTokensToIds = (
-  tokens: string[],
-  options: { id: number; name: string }[],
-): { ids: number[]; newNames: string[] } => {
-  const normalized = tokens.map((t) => t.trim()).filter(Boolean)
-  const ids: number[] = []
-  const newNames: string[] = []
-  normalized.forEach((token) => {
-    const matched = options.find((opt) => opt.name === token)
-    if (matched && matched.id > 0) {
-      ids.push(matched.id)
+  const toggleCheck = (value: string) => {
+    const exists = selectedChecks.includes(value)
+    if (exists) {
+      setSelectedChecks((prev) => prev.filter((item) => item !== value))
+      setManualCheckExclusions((prev) => (prev.includes(value) ? prev : [...prev, value]))
     } else {
-      newNames.push(token)
+      setSelectedChecks((prev) => [...prev, value])
+      setManualCheckExclusions((prev) => prev.filter((item) => item !== value))
     }
-  })
-  return {
-    ids: Array.from(new Set(ids)),
-    newNames: Array.from(new Set(newNames)),
   }
-}
-
-const addLayerToken = () => {
-  const value = layerInput.trim()
-  if (!value) return
-  if (!layerTokens.includes(value)) {
-    setLayerTokens((prev) => [...prev, value])
-  }
-  if (!selectedLayers.includes(value)) {
-    setSelectedLayers((prev) => [...prev, value])
-  }
-  setLayerInput('')
-}
-
-const addCheckToken = () => {
-  const value = checkInput.trim()
-  if (!value) return
-  if (!checkTokens.includes(value)) {
-    setCheckTokens((prev) => [...prev, value])
-  }
-  if (!selectedChecks.includes(value)) {
-    setSelectedChecks((prev) => [...prev, value])
-  }
-  setCheckInput('')
-}
 
   const resetInspectionForm = () => {
     setSelectedLayers([])
@@ -1026,6 +950,36 @@ const addCheckToken = () => {
     setRemark('')
     setSubmitError(null)
     setAppointmentDateInput('')
+    setAlertDialog(null)
+  }
+
+  const raiseSubmitError = (message: string, tone: AlertTone = 'warning') => {
+    setSubmitError(message)
+    setAlertDialog({
+      title: t.inspection.dialogTitle,
+      description: message,
+      tone,
+    })
+  }
+
+  const performSubmit = async (payload: InspectionSubmitPayload) => {
+    setSubmitPending(true)
+    setSubmitError(null)
+    const res = await fetch(`/api/progress/${road.slug}/inspections`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(payload),
+    })
+    const data = (await res.json().catch(() => ({}))) as { message?: string }
+    setSubmitPending(false)
+    if (!res.ok) {
+      raiseSubmitError(data.message ?? t.errors.submitFailed)
+      return
+    }
+    setSuccessMessage(t.inspection.submitSuccess)
+    setSelectedSegment(null)
+    resetInspectionForm()
   }
 
   const submitInspection = async () => {
@@ -1035,54 +989,67 @@ const addCheckToken = () => {
     const startPk = Number(startPkInput)
     const endPk = Number(endPkInput)
     if (!hasStart || !hasEnd || !Number.isFinite(startPk) || !Number.isFinite(endPk)) {
-      setSubmitError(t.errors.submitRangeInvalid)
+      raiseSubmitError(t.errors.submitRangeInvalid)
       return
     }
     if (!selectedLayers.length) {
-      setSubmitError(t.errors.submitLayerMissing)
+      raiseSubmitError(t.errors.submitLayerMissing)
       return
     }
     if (!selectedChecks.length) {
-      setSubmitError(t.errors.submitCheckMissing)
+      raiseSubmitError(t.errors.submitCheckMissing)
       return
     }
-  if (!selectedTypes.length) {
-    setSubmitError(t.errors.submitTypeMissing)
-    return
+    const allowedTypes = activeInspectionTypes
+    const normalizedTypes = selectedTypes.filter((type) => allowedTypes.includes(type))
+    if (!normalizedTypes.length) {
+      raiseSubmitError(t.errors.submitTypeMissing)
+      return
+    }
+    if (!appointmentDateInput) {
+      raiseSubmitError(t.errors.submitAppointmentMissing)
+      return
+    }
+    const payload: InspectionSubmitPayload = {
+      phaseId: selectedSegment.phaseId,
+      side: selectedSide,
+      startPk,
+      endPk,
+      layers: selectedLayers,
+      checks: selectedChecks,
+      types: normalizedTypes,
+      remark,
+      appointmentDate: appointmentDateInput,
+    }
+    if (selectedSegment?.workflowLayers?.length && workflowLayerByName) {
+      const satisfied = new Set<string>()
+      if (completedWorkflowLayerIds) {
+        completedWorkflowLayerIds.forEach((id) => satisfied.add(id))
+      }
+      const selectedLayerIds = new Set<string>()
+      selectedLayers.forEach((layer) => {
+        const meta = workflowLayerByName.get(normalizeLabel(layer))
+        if (meta) {
+          selectedLayerIds.add(meta.id)
+        }
+      })
+      const missingDeps = new Set<string>()
+      selectedLayers.forEach((layer) => {
+        const meta = workflowLayerByName.get(normalizeLabel(layer))
+        if (!meta || !meta.dependencies?.length) return
+        meta.dependencies.forEach((dep) => {
+          if (satisfied.has(dep) || selectedLayerIds.has(dep)) return
+          const name = workflowLayerNameMap?.get(dep) ?? workflowLayerById?.get(dep)?.name ?? dep
+          missingDeps.add(name)
+        })
+      })
+      if (missingDeps.size) {
+        raiseSubmitError(`缺少前置报检/预约：${Array.from(missingDeps).join(' / ')}`)
+        return
+      }
+    }
+    await performSubmit(payload)
   }
-  if (!appointmentDateInput) {
-    setSubmitError(t.errors.submitAppointmentMissing)
-    return
-  }
-  setSubmitPending(true)
-  setSubmitError(null)
-  const payload = {
-    phaseId: selectedSegment.phaseId,
-    side: selectedSide,
-    startPk,
-    endPk,
-    layers: selectedLayers,
-    checks: selectedChecks,
-    types: selectedTypes,
-    remark,
-    appointmentDate: appointmentDateInput,
-  }
-
-  const res = await fetch(`/api/progress/${road.slug}/inspections`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify(payload),
-  })
-  const data = (await res.json().catch(() => ({}))) as { message?: string }
-  setSubmitPending(false)
-  if (!res.ok) {
-    setSubmitError(data.message ?? t.errors.submitFailed)
-    return
-  }
-  setSelectedSegment(null)
-  resetInspectionForm()
-}
 
   const [selectedSegment, setSelectedSegment] = useState<SelectedSegment | null>(null)
   const [selectedSide, setSelectedSide] = useState<IntervalSide>('BOTH')
@@ -1094,27 +1061,12 @@ const addCheckToken = () => {
   const [selectedTypes, setSelectedTypes] = useState<string[]>([])
   const [remark, setRemark] = useState('')
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const [alertDialog, setAlertDialog] = useState<AlertDialogState | null>(null)
   const [submitPending, setSubmitPending] = useState(false)
-  const [inspectionCheckInput, setInspectionCheckInput] = useState('')
-  const [latestPointInspections, setLatestPointInspections] = useState<
-    Map<string, { layers: string[]; updatedAt: number }>
-  >(() => new Map())
-  const latestChecksByDefinition = useMemo(() => {
-    const latest = new Map<number, { updatedAt: number; checks: string[] }>()
-    phases.forEach((phase) => {
-      const updatedAt = new Date(phase.updatedAt || phase.createdAt).getTime()
-      const current = latest.get(phase.definitionId)
-      if (!current || updatedAt > current.updatedAt) {
-        latest.set(phase.definitionId, { updatedAt, checks: phase.resolvedChecks })
-      }
-    })
-    const result = new Map<number, string[]>()
-    latest.forEach((item, key) => {
-      result.set(key, item.checks)
-    })
-    return result
-  }, [phases])
-
+  const [manualCheckExclusions, setManualCheckExclusions] = useState<string[]>([])
+  const [latestPointInspections, setLatestPointInspections] = useState<Map<string, LatestPointInspection>>(
+    () => new Map(),
+  )
   const latestInspectionByPhase = useMemo(() => {
     const map = new Map<number, number>()
     inspectionSlices.forEach((item) => {
@@ -1142,8 +1094,8 @@ const addCheckToken = () => {
     })
   }, [phases, latestInspectionByPhase])
 
-  const resolvePointBadge = (phaseId: number, startPk: number, endPk: number) => {
-    const latest = latestPointInspections.get(buildPointKey(phaseId, startPk, endPk))
+  const resolvePointBadge = (phaseId: number, side: IntervalSide, startPk: number, endPk: number) => {
+    const latest = latestPointInspections.get(buildPointKey(phaseId, side, startPk, endPk))
     if (latest && latest.layers?.length) {
       const phaseName = phases.find((item) => item.id === phaseId)?.name
       const localized = localizeProgressList('layer', latest.layers, locale, { phaseName })
@@ -1151,6 +1103,191 @@ const addCheckToken = () => {
       return joined || t.pointBadge.none
     }
     return t.pointBadge.none
+  }
+
+  const workflowLayerById = useMemo(() => {
+    if (!selectedSegment?.workflowLayers?.length) return null
+    return new Map(selectedSegment.workflowLayers.map((layer) => [layer.id, layer]))
+  }, [selectedSegment?.workflowLayers])
+
+  const workflowLayerNameMap = useMemo(() => {
+    if (!selectedSegment?.workflowLayers?.length) return null
+    return new Map(selectedSegment.workflowLayers.map((layer) => [layer.id, layer.name]))
+  }, [selectedSegment?.workflowLayers])
+
+  const workflowChecksByLayerName = useMemo(() => {
+    if (!selectedSegment?.workflowLayers?.length) return null
+    const map = new Map<string, string[]>()
+    selectedSegment.workflowLayers.forEach((layer) => {
+      const localizedName = localizeProgressTerm('layer', layer.name, locale, {
+        phaseName: selectedSegment.workflow?.phaseName ?? selectedSegment.phase,
+      })
+      const names = [layer.name, localizedName]
+      names.forEach((name) => {
+        map.set(
+          normalizeLabel(name),
+          layer.checks.map((check) => check.name),
+        )
+      })
+    })
+    return map
+  }, [locale, selectedSegment?.workflow?.phaseName, selectedSegment?.phase, selectedSegment?.workflowLayers])
+
+  const workflowLayerByName = useMemo(() => {
+    if (!selectedSegment?.workflowLayers?.length) return null
+    const map = new Map<string, WorkflowLayerTemplate>()
+    selectedSegment.workflowLayers.forEach((layer) => {
+      const localizedName = localizeProgressTerm('layer', layer.name, locale, {
+        phaseName: selectedSegment.workflow?.phaseName ?? selectedSegment.phase,
+      })
+      const names = [layer.name, localizedName]
+      names.forEach((name) => map.set(normalizeLabel(name), layer))
+    })
+    return map
+  }, [locale, selectedSegment?.workflow?.phaseName, selectedSegment?.phase, selectedSegment?.workflowLayers])
+
+  const workflowTypesByLayerName = useMemo(() => {
+    if (!selectedSegment?.workflowLayers?.length) return null
+    const map = new Map<string, Set<string>>()
+    selectedSegment.workflowLayers.forEach((layer) => {
+      const localizedName = localizeProgressTerm('layer', layer.name, locale, {
+        phaseName: selectedSegment.workflow?.phaseName ?? selectedSegment.phase,
+      })
+      const names = [layer.name, localizedName]
+      const typeSet = new Set<string>()
+      layer.checks.forEach((check) => check.types.forEach((type) => typeSet.add(type)))
+      names.forEach((name) => map.set(normalizeLabel(name), typeSet))
+    })
+    return map
+  }, [locale, selectedSegment?.workflow?.phaseName, selectedSegment?.phase, selectedSegment?.workflowLayers])
+
+  const allowedCheckSet = useMemo(() => {
+    if (!workflowChecksByLayerName) return null
+    const aggregated = new Set<string>()
+    selectedLayers.forEach((layer) => {
+      const checks = workflowChecksByLayerName.get(normalizeLabel(layer))
+      checks?.forEach((check) => aggregated.add(check))
+    })
+    return aggregated
+  }, [selectedLayers, workflowChecksByLayerName])
+
+  const activeInspectionTypes = useMemo(() => {
+    const base =
+      selectedSegment?.workflowTypeOptions && selectedSegment.workflowTypeOptions.length
+        ? selectedSegment.workflowTypeOptions
+        : defaultInspectionTypes
+    const baseSet = new Set(base)
+    if (!workflowTypesByLayerName || !selectedLayers.length) return base
+    const scoped = new Set<string>()
+    selectedLayers.forEach((layer) => {
+      const types = workflowTypesByLayerName.get(normalizeLabel(layer))
+      types?.forEach((type) => {
+        if (baseSet.has(type)) {
+          scoped.add(type)
+        }
+      })
+    })
+    if (!scoped.size) return base
+    return base.filter((type) => scoped.has(type))
+  }, [defaultInspectionTypes, selectedLayers, selectedSegment?.workflowTypeOptions, workflowTypesByLayerName])
+
+  const completedWorkflowLayerIds = useMemo(() => {
+    if (!workflowLayerByName || !selectedSegment) return null
+    if (!startPkInput.trim() || !endPkInput.trim()) return null
+    const startInput = Number(startPkInput)
+    const endInput = Number(endPkInput)
+    if (!Number.isFinite(startInput) || !Number.isFinite(endInput)) return null
+    const [targetStart, targetEnd] = normalizeRange(startInput, endInput)
+    const set = new Set<string>()
+    latestPointInspections.forEach((latest) => {
+      if (latest.phaseId !== selectedSegment.phaseId) return
+      if (latest.side !== 'BOTH' && latest.side !== selectedSide) return
+      if (!workflowSatisfiedStatuses.includes(latest.status ?? 'PENDING')) return
+      const [existingStart, existingEnd] = normalizeRange(latest.startPk, latest.endPk)
+      if (existingStart > targetStart || existingEnd < targetEnd) return
+      latest.layers.forEach((layerName) => {
+        const meta = workflowLayerByName.get(normalizeLabel(layerName))
+        if (meta) set.add(meta.id)
+      })
+    })
+    return set.size ? set : null
+  }, [endPkInput, latestPointInspections, selectedSegment, startPkInput, workflowLayerByName])
+
+  const allowedWorkflowStages = useMemo(() => {
+    if (!workflowLayerByName || !selectedLayers.length) return null
+    let minStage = Infinity
+    selectedLayers.forEach((layer) => {
+      const meta = workflowLayerByName.get(normalizeLabel(layer))
+      if (meta && Number.isFinite(meta.stage)) {
+        minStage = Math.min(minStage, meta.stage)
+      }
+    })
+    if (!Number.isFinite(minStage)) return null
+    return new Set<number>([minStage, minStage + 1])
+  }, [selectedLayers, workflowLayerByName])
+
+  const isLayerDisabled = (layerName: string) => {
+    if (!workflowLayerByName) return false
+    const meta = workflowLayerByName.get(normalizeLabel(layerName))
+    if (!meta) return false
+    if (!allowedWorkflowStages || allowedWorkflowStages.has(meta.stage)) return false
+    if (!selectedLayers.length) return false
+    const targetId = meta.id
+    for (const selected of selectedLayers) {
+      const selectedMeta = workflowLayerByName.get(normalizeLabel(selected))
+      if (!selectedMeta) continue
+      if (
+        selectedMeta.parallelWith?.includes(targetId) ||
+        meta.parallelWith?.includes(selectedMeta.id) ||
+        selectedMeta.lockStepWith?.includes(targetId) ||
+        meta.lockStepWith?.includes(selectedMeta.id)
+      ) {
+        return false
+      }
+    }
+    return true
+  }
+
+  const uniqueLayerOptions = useMemo(
+    () => Array.from(new Set(selectedSegment?.layers ?? [])),
+    [selectedSegment?.layers],
+  )
+
+  const uniqueCheckOptions = useMemo(
+    () => Array.from(new Set(selectedSegment?.checks ?? [])),
+    [selectedSegment?.checks],
+  )
+
+  const findLayerOptionLabel = (layerName: string) => {
+    const normalized = normalizeLabel(layerName)
+    return uniqueLayerOptions.find((item) => normalizeLabel(item) === normalized) ?? layerName
+  }
+
+  const toggleLayerSelection = (layerName: string) => {
+    if (isLayerDisabled(layerName)) return
+    const normalized = normalizeLabel(layerName)
+    const meta = workflowLayerByName?.get(normalized)
+    const group = new Set<string>([findLayerOptionLabel(layerName)])
+    if (meta?.lockStepWith?.length && workflowLayerById) {
+      meta.lockStepWith.forEach((id) => {
+        const targetName = workflowLayerNameMap?.get(id) ?? workflowLayerById.get(id)?.name
+        if (targetName) {
+          group.add(findLayerOptionLabel(targetName))
+        }
+      })
+    }
+    const allSelected = Array.from(group).every((name) => selectedLayers.includes(name))
+    if (allSelected) {
+      setSelectedLayers((prev) => prev.filter((item) => !group.has(item)))
+    } else {
+      setSelectedLayers((prev) => {
+        const next = prev.filter((item) => !group.has(item))
+        group.forEach((item) => {
+          if (!next.includes(item)) next.push(item)
+        })
+        return next
+      })
+    }
   }
 
   useEffect(() => {
@@ -1162,13 +1299,52 @@ const addCheckToken = () => {
       setSelectedTypes([])
       setRemark('')
       setSubmitError(null)
-      setInspectionCheckInput('')
       setSelectedSide(selectedSegment.side)
       setStartPkInput(String(selectedSegment.start ?? ''))
       setEndPkInput(String(selectedSegment.end ?? ''))
       setAppointmentDateInput(todayISODate())
+      setManualCheckExclusions([])
     }
   }, [selectedSegment])
+
+  useEffect(() => {
+    if (!workflowChecksByLayerName) return
+    if (!allowedCheckSet || !allowedCheckSet.size) {
+      if (selectedChecks.length) {
+        setSelectedChecks([])
+      }
+      if (manualCheckExclusions.length) {
+        setManualCheckExclusions([])
+      }
+      return
+    }
+    const manualSet = new Set(manualCheckExclusions)
+    const nextChecks = Array.from(allowedCheckSet).filter((item) => !manualSet.has(item))
+    const cleanedManual = manualCheckExclusions.filter((item) => allowedCheckSet.has(item))
+    if (cleanedManual.length !== manualCheckExclusions.length) {
+      setManualCheckExclusions(cleanedManual)
+    }
+    const prevSet = new Set(selectedChecks)
+    const changed =
+      nextChecks.length !== selectedChecks.length ||
+      nextChecks.some((item) => !prevSet.has(item))
+    if (changed) {
+      setSelectedChecks(nextChecks)
+    }
+  }, [selectedLayers, workflowChecksByLayerName, selectedChecks, manualCheckExclusions])
+
+  useEffect(() => {
+    const allowed = activeInspectionTypes
+    if (!allowed.length) return
+    const filtered = selectedTypes.filter((type) => allowed.includes(type))
+    if (filtered.length) {
+      if (filtered.length !== selectedTypes.length) {
+        setSelectedTypes(filtered)
+      }
+      return
+    }
+    setSelectedTypes(allowed)
+  }, [activeInspectionTypes, selectedTypes])
 
   useEffect(() => {
     if (!canViewInspection) {
@@ -1202,7 +1378,7 @@ const addCheckToken = () => {
           }>
         }
         if (!data.items || cancelled) return
-        const map = new Map<string, { layers: string[]; updatedAt: number }>()
+        const map = new Map<string, LatestPointInspection>()
         const slices: InspectionSlice[] = []
         data.items.forEach((item) => {
           const ts = new Date(item.updatedAt).getTime()
@@ -1211,10 +1387,20 @@ const addCheckToken = () => {
           const safeStart = Number.isFinite(start) ? start : 0
           const safeEnd = Number.isFinite(end) ? end : safeStart
           const [orderedStart, orderedEnd] = safeStart <= safeEnd ? [safeStart, safeEnd] : [safeEnd, safeStart]
-          const key = buildPointKey(item.phaseId, orderedStart, orderedEnd)
+          const side = item.side ?? 'BOTH'
+          const key = buildPointKey(item.phaseId, side, orderedStart, orderedEnd)
           const existing = map.get(key)
+          const snapshot: LatestPointInspection = {
+            phaseId: Number(item.phaseId),
+            side,
+            startPk: orderedStart,
+            endPk: orderedEnd,
+            layers: item.layers || [],
+            updatedAt: ts || 0,
+            status: item.status ?? 'PENDING',
+          }
           if (!existing || ts > existing.updatedAt) {
-            map.set(key, { layers: item.layers || [], updatedAt: ts || 0 })
+            map.set(key, snapshot)
           }
           slices.push({
             phaseId: Number(item.phaseId),
@@ -1253,6 +1439,17 @@ const addCheckToken = () => {
 
   return (
     <div className="space-y-8">
+      <AlertDialog
+        open={Boolean(alertDialog)}
+        title={alertDialog?.title ?? ''}
+        description={alertDialog?.description}
+        tone={alertDialog?.tone ?? 'info'}
+        actionLabel={alertDialog?.actionLabel ?? t.inspection.dialogClose}
+        cancelLabel={alertDialog?.cancelLabel}
+        onAction={alertDialog?.onAction}
+        onCancel={alertDialog?.onCancel}
+        onClose={() => setAlertDialog(null)}
+      />
       {successMessage ? (
         <div className="fixed bottom-6 right-6 z-40 max-w-sm rounded-2xl border border-emerald-200/60 bg-emerald-50/90 px-4 py-3 text-sm font-semibold text-emerald-900 shadow-xl shadow-emerald-400/30">
           {successMessage}
@@ -1340,33 +1537,27 @@ const addCheckToken = () => {
                     {t.form.templateLabel}
                     <select
                       className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
-                      value={definitionId ?? ''}
-                      onChange={(e) => {
-                        const value = e.target.value
-                        if (!value) {
-                          setDefinitionId(null)
-                          setLayerTokens([])
-                          setCheckTokens([])
-                          return
-                        }
-                        const found = definitions.find((item) => item.id === Number(value))
-                        if (found) {
-                          setDefinitionId(found.id)
-                          setName(found.name)
-                          setMeasure(found.measure)
-                          setPointHasSides(Boolean(found.pointHasSides))
-                          setLayerTokens(found.defaultLayers)
-                          const rememberedChecks = latestChecksByDefinition.get(found.id) ?? []
-                          setCheckTokens(rememberedChecks.length ? rememberedChecks : found.defaultChecks)
-                        }
-                      }}
-                    >
-                      <option value="">{t.form.templateCustom}</option>
-                      {definitions.map((item) => (
-                        <option key={item.id} value={item.id}>
-                          {item.name} · {item.measure === 'POINT' ? t.form.measureOptionPoint : t.form.measureOptionLinear}
-                        </option>
-                      ))}
+                  value={definitionId ?? ''}
+                  onChange={(e) => {
+                    const value = e.target.value
+                    if (!value) return
+                    const found = definitions.find((item) => item.id === Number(value))
+                    if (found) {
+                      setDefinitionId(found.id)
+                      setName(found.name)
+                      setMeasure(found.measure)
+                      setPointHasSides(Boolean(found.pointHasSides))
+                      if (found.measure !== 'POINT') {
+                        setPointHasSides(false)
+                      }
+                    }
+                  }}
+                >
+                  {definitions.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.name} · {item.measure === 'POINT' ? t.form.measureOptionPoint : t.form.measureOptionLinear}
+                    </option>
+                  ))}
                     </select>
                   </label>
                   <label className="flex flex-col gap-2 text-sm text-slate-100">
@@ -1513,124 +1704,6 @@ const addCheckToken = () => {
                         </div>
                       </div>
                     ))}
-                  </div>
-                </div>
-
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2 rounded-2xl border border-white/10 bg-white/5 p-4">
-                    <div className="flex items-center justify-between text-sm text-slate-100">
-                      <p>{t.form.layersTitle}</p>
-                      <button
-                        type="button"
-                        onClick={addLayerToken}
-                        className="rounded-xl border border-white/20 px-3 py-2 text-xs font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/10"
-                      >
-                        {t.form.layersAdd}
-                      </button>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <input
-                        className="w-full rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-200/60 focus:border-emerald-300 focus:outline-none"
-                        placeholder={t.form.layersPlaceholder}
-                        value={layerInput}
-                        onChange={(e) => setLayerInput(e.target.value)}
-                      />
-                      <div className="flex flex-wrap gap-2">
-                        {scopedLayerOptions.map((option) => (
-                          <button
-                            key={option.id}
-                            type="button"
-                            className={`rounded-full px-3 py-1 text-[11px] font-semibold ${
-                              layerTokens.includes(option.name)
-                                ? 'bg-emerald-300 text-slate-900'
-                                : 'bg-white/10 text-slate-100'
-                            }`}
-                            onClick={() => toggleToken(option.name, layerTokens, setLayerTokens)}
-                          >
-                            {option.name}
-                          </button>
-                        ))}
-                      </div>
-                      {layerTokens.length === 0 ? (
-                        <p className="text-xs text-slate-300">{t.form.layersEmpty}</p>
-                      ) : (
-                        <div className="flex flex-wrap gap-2">
-                          {layerTokens.map((item) => (
-                            <span
-                              key={item}
-                              className="flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-[11px] font-semibold text-slate-100"
-                            >
-                              {item}
-                              <button
-                                type="button"
-                                className="text-[10px] text-rose-200"
-                                onClick={() => setLayerTokens((prev) => prev.filter((token) => token !== item))}
-                              >
-                                ×
-                              </button>
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="space-y-2 rounded-2xl border border-white/10 bg-white/5 p-4">
-                    <div className="flex items-center justify-between text-sm text-slate-100">
-                      <p>{t.form.checksTitle}</p>
-                      <button
-                        type="button"
-                        onClick={addCheckToken}
-                        className="rounded-xl border border-white/20 px-3 py-2 text-xs font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/10"
-                      >
-                        {t.form.checksAdd}
-                      </button>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <input
-                        className="w-full rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-200/60 focus:border-emerald-300 focus:outline-none"
-                        placeholder={t.form.checksPlaceholder}
-                        value={checkInput}
-                        onChange={(e) => setCheckInput(e.target.value)}
-                      />
-                      <div className="flex flex-wrap gap-2">
-                        {scopedCheckOptions.map((option) => (
-                          <button
-                            key={option.id}
-                            type="button"
-                            className={`rounded-full px-3 py-1 text-[11px] font-semibold ${
-                              checkTokens.includes(option.name)
-                                ? 'bg-emerald-300 text-slate-900'
-                                : 'bg-white/10 text-slate-100'
-                            }`}
-                            onClick={() => toggleToken(option.name, checkTokens, setCheckTokens)}
-                          >
-                            {option.name}
-                          </button>
-                        ))}
-                      </div>
-                      {checkTokens.length === 0 ? (
-                        <p className="text-xs text-slate-300">{t.form.checksEmpty}</p>
-                      ) : (
-                        <div className="flex flex-wrap gap-2">
-                          {checkTokens.map((item) => (
-                            <span
-                              key={item}
-                              className="flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-[11px] font-semibold text-slate-100"
-                            >
-                              {item}
-                              <button
-                                type="button"
-                                className="text-[10px] text-rose-200"
-                                onClick={() => setCheckTokens((prev) => prev.filter((token) => token !== item))}
-                              >
-                                ×
-                              </button>
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
                   </div>
                 </div>
 
@@ -1816,14 +1889,12 @@ const addCheckToken = () => {
                                               }
                                               const sideLabel = side.label
                                               const sideValue = sideLabel === sideLabelMap.LEFT ? 'LEFT' : 'RIGHT'
-                                              setSelectedSegment({
-                                                phase: localizeProgressTerm('phase', phase.name, locale),
+                                              openInspectionModal(phase, {
+                                                phase: phase.name,
                                                 phaseId: phase.id,
                                                 measure: phase.measure,
-                                                layers: localizeProgressList('layer', phase.resolvedLayers, locale, {
-                                                  phaseName: phase.name,
-                                                }),
-                                                checks: localizeProgressList('check', phase.resolvedChecks, locale),
+                                                layers: phase.resolvedLayers,
+                                                checks: phase.resolvedChecks,
                                                 side: sideValue,
                                                 sideLabel,
                                                 start: seg.start,
@@ -1976,22 +2047,97 @@ const addCheckToken = () => {
                   </label>
                   </div>
 
-                  <div className="space-y-2 rounded-2xl border border-white/10 bg-white/5 p-4 shadow-inner shadow-slate-900/30">
+                  {selectedSegment.workflow && selectedSegment.workflowLayers?.length ? (
+                    <div className="space-y-3 rounded-2xl border border-emerald-300/30 bg-emerald-400/5 p-4 shadow-inner shadow-emerald-400/20">
+                      <div className="flex flex-wrap items-center gap-2 text-xs text-emerald-100">
+                        <span className="rounded-full bg-emerald-300/25 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-50">
+                          {workflowCopy.badge}
+                        </span>
+                        <span className="font-semibold text-emerald-50">
+                          {selectedSegment.workflow.phaseName}
+                        </span>
+                        <span className="text-emerald-100/80">{workflowCopy.ruleTitle}</span>
+                        {selectedSegment.workflow.sideRule ? (
+                          <span className="rounded-full bg-emerald-300/15 px-2 py-1 text-[10px] text-emerald-50">
+                            {selectedSegment.workflow.sideRule}
+                          </span>
+                        ) : null}
+                      </div>
+                      <div className="grid gap-2 md:grid-cols-2">
+                        {selectedSegment.workflowLayers.map((layer) => {
+                          const dependsNames = (layer.dependencies ?? []).map(
+                            (id) => workflowLayerNameMap?.get(id) ?? id,
+                          )
+                          const lockNames = (layer.lockStepWith ?? []).map(
+                            (id) => workflowLayerNameMap?.get(id) ?? id,
+                          )
+                          const parallelNames = (layer.parallelWith ?? []).map(
+                            (id) => workflowLayerNameMap?.get(id) ?? id,
+                          )
+      const checkSummary = layer.checks
+        .map((check) => `${check.name}（${check.types.join(' / ')}）`)
+        .join('；')
+                          return (
+                            <div
+                              key={layer.id}
+                              className="rounded-2xl border border-emerald-200/30 bg-white/5 p-3 text-[11px] text-emerald-50 shadow-inner shadow-emerald-500/10"
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="font-semibold">{layer.name}</span>
+                                <span className="rounded-full bg-emerald-300/20 px-2 py-0.5 text-[10px] font-semibold text-emerald-950">
+                                  {formatProgressCopy(workflowCopy.stageName, { value: layer.stage })}
+                                </span>
+                              </div>
+                              <p className="mt-1 text-emerald-100/80">
+                                {dependsNames.length
+                                  ? formatProgressCopy(workflowCopy.timelineDepends, { deps: dependsNames.join(' / ') })
+                                  : workflowCopy.timelineFree}
+                              </p>
+                              {lockNames.length ? (
+                                <p className="text-emerald-100/80">
+                                  {formatProgressCopy(workflowCopy.lockedWith, { peers: lockNames.join(' / ') })}
+                                </p>
+                              ) : null}
+                              {parallelNames.length ? (
+                                <p className="text-emerald-100/80">
+                                  {formatProgressCopy(workflowCopy.parallelWith, {
+                                    peers: parallelNames.join(' / '),
+                                  })}
+                                </p>
+                              ) : null}
+                              {layer.description ? (
+                                <p className="text-emerald-100/80">{layer.description}</p>
+                              ) : null}
+                              {checkSummary ? (
+                                <p className="mt-1 text-emerald-50">{checkSummary}</p>
+                              ) : null}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  ) : null}
+
+                    <div className="space-y-2 rounded-2xl border border-white/10 bg-white/5 p-4 shadow-inner shadow-slate-900/30">
                     <p className="text-xs font-semibold text-slate-200">{t.inspection.layersLabel}</p>
-                    {selectedSegment.layers.length === 0 ? (
+                    {uniqueLayerOptions.length === 0 ? (
                       <p className="text-[11px] text-amber-200">{t.inspection.layersEmpty}</p>
                     ) : (
                       <div className="flex flex-wrap gap-2">
-                        {selectedSegment.layers.map((item) => (
+                        {uniqueLayerOptions.map((item) => (
                           <button
                             key={item}
                             type="button"
                             className={`rounded-full px-3 py-1 text-[11px] font-semibold transition ${
                               selectedLayers.includes(item)
                                 ? 'bg-emerald-300 text-slate-900 shadow shadow-emerald-300/40'
-                                : 'bg-white/10 text-slate-100 hover:bg-white/15'
+                                : isLayerDisabled(item)
+                                  ? 'cursor-not-allowed bg-white/5 text-slate-400 opacity-60'
+                                  : 'bg-white/10 text-slate-100 hover:bg-white/15'
                             }`}
-                            onClick={() => toggleToken(item, selectedLayers, setSelectedLayers)}
+                            onClick={() => {
+                              toggleLayerSelection(item)
+                            }}
                           >
                             {item}
                           </button>
@@ -2002,55 +2148,38 @@ const addCheckToken = () => {
 
                   <div className="space-y-2 rounded-2xl border border-white/10 bg-white/5 p-4 shadow-inner shadow-slate-900/30">
                     <p className="text-xs font-semibold text-slate-200">{t.inspection.checksLabel}</p>
-                    {selectedSegment.checks.length === 0 ? (
+                    {uniqueCheckOptions.length === 0 ? (
                       <p className="text-[11px] text-amber-200">{t.inspection.checksEmpty}</p>
                     ) : (
                       <div className="flex flex-wrap gap-2">
-                        {selectedSegment.checks.map((item) => (
+                        {uniqueCheckOptions.map((item) => (
+                          // 非工作流限定的验收内容置灰不可选
                           <button
                             key={item}
                             type="button"
                             className={`rounded-full px-3 py-1 text-[11px] font-semibold transition ${
                               selectedChecks.includes(item)
                                 ? 'bg-emerald-300 text-slate-900 shadow shadow-emerald-300/40'
-                                : 'bg-white/10 text-slate-100 hover:bg-white/15'
+                                : allowedCheckSet && !allowedCheckSet.has(item)
+                                  ? 'cursor-not-allowed bg-white/5 text-slate-400 opacity-60'
+                                  : 'bg-white/10 text-slate-100 hover:bg-white/15'
                             }`}
-                            onClick={() => toggleToken(item, selectedChecks, setSelectedChecks)}
+                            onClick={() => {
+                              if (allowedCheckSet && !allowedCheckSet.has(item)) return
+                              toggleCheck(item)
+                            }}
                           >
                             {item}
                           </button>
                         ))}
                       </div>
                     )}
-                    <div className="flex items-center gap-2">
-                      <input
-                        className="flex-1 min-w-0 rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-200/60 shadow-inner shadow-slate-900/40 focus:border-emerald-300 focus:outline-none"
-                        placeholder={t.inspection.checkPlaceholder}
-                        value={inspectionCheckInput}
-                        onChange={(e) => setInspectionCheckInput(e.target.value)}
-                      />
-                      <button
-                        type="button"
-                        className="rounded-xl border border-white/20 px-4 py-2 text-[11px] font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/10 whitespace-nowrap"
-                        onClick={() => {
-                          if (inspectionCheckInput.trim()) {
-                            const value = inspectionCheckInput.trim()
-                            if (!selectedChecks.includes(value)) {
-                              setSelectedChecks((prev) => [...prev, value])
-                            }
-                            setInspectionCheckInput('')
-                          }
-                        }}
-                      >
-                        {t.form.checksAdd}
-                      </button>
-                    </div>
                   </div>
 
                   <div className="space-y-2 rounded-2xl border border-white/10 bg-white/5 p-4 shadow-inner shadow-slate-900/30">
                     <p className="text-xs font-semibold text-slate-200">{t.inspection.typesLabel}</p>
                     <div className="flex flex-wrap gap-2">
-                      {inspectionTypes.map((item) => (
+                      {activeInspectionTypes.map((item) => (
                         <button
                           key={item}
                           type="button"
@@ -2082,7 +2211,11 @@ const addCheckToken = () => {
 
             <div className="border-t border-white/10 bg-slate-900/60 px-6 py-5">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <p className="text-[11px] text-slate-300">
+                <p
+                  className={`text-sm ${
+                    submitError ? 'font-semibold text-amber-200' : 'text-slate-200'
+                  }`}
+                >
                   {submitError ? submitError : t.inspection.typesHint}
                 </p>
                 <div className="grid w-full gap-3 sm:w-auto sm:min-w-[320px] sm:grid-cols-2">

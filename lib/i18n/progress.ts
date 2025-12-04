@@ -1,5 +1,6 @@
 import type { Locale } from './index'
 import { formatCopy } from './index'
+import { FIXED_INSPECTION_TYPES } from '../progressWorkflow'
 
 type ProgressCopy = {
   hero: {
@@ -78,7 +79,91 @@ type ProgressCopy = {
     breadcrumbProgress: string
   }
   phase: PhaseCopy
+  workflow: WorkflowCopy
   inspectionBoard: InspectionBoardCopy
+}
+
+type WorkflowCopy = {
+  badge: string
+  title: string
+  description: string
+  localHint: string
+  accessHint: string
+  actions: {
+    save: string
+    reset: string
+    addLayer: string
+    deleteLayer: string
+    addCheck: string
+    deleteCheck: string
+    createTemplate: string
+    deleteTemplate: string
+  }
+  templateBadge: string
+  templateTitle: string
+  templateHint: string
+  templateNote: string
+  templateEmpty: string
+  templateNameLabel: string
+  templateNamePlaceholder: string
+  measureLabel: string
+  measureLinear: string
+  measurePoint: string
+  pointHasSidesLabel: string
+  newTemplateBadge: string
+  newTemplateTitle: string
+  newTemplateHint: string
+  newTemplatePlaceholder: string
+  templateCreated: string
+  deleted: string
+  deleteFailed: string
+  errors: {
+    templateNameRequired: string
+  }
+  ruleBadge: string
+  ruleTitle: string
+  ruleHint: string
+  quick: {
+    layerTitle: string
+    layerHint: string
+    deletePlaceholder: string
+    checkPlaceholder: string
+  }
+  layerNote: string
+  stageLabel: string
+  dependsLabel: string
+  lockLabel: string
+  parallelLabel: string
+  checkTitle: string
+  checkNote: string
+  newLayer: string
+  newCheck: string
+  noPeers: string
+  timelineBadge: string
+  timelineTitle: string
+  timelineHint: string
+  legend: {
+    locked: string
+    parallel: string
+    types: string
+  }
+  stageName: string
+  stageHint: string
+  stageCountPrefix: string
+  timelineDepends: string
+  timelineFree: string
+  lockedWith: string
+  parallelWith: string
+  summaryTitle: string
+  summaryHint: string
+  summaryEmpty: string
+  ruleDepends: string
+  ruleLock: string
+  saved: string
+  reset: string
+  empty: string
+  saveFailed: string
+  saving: string
 }
 
 type PhaseCopy = {
@@ -215,6 +300,12 @@ type PhaseCopy = {
     submit: string
     submitting: string
     permissionMissing: string
+    dialogTitle: string
+    dialogClose: string
+    dialogBundleMessage: string
+    dialogBundleConfirm: string
+    dialogCancel: string
+    submitSuccess: string
     types: string[]
   }
   alerts: {
@@ -611,7 +702,13 @@ const progressCopy: Record<Locale, ProgressCopy> = {
         submit: '提交报检',
         submitting: '提交中...',
         permissionMissing: '缺少报检权限',
-        types: ['现场验收', '测量验收', '试验验收', '其他'],
+        dialogTitle: '提交提醒',
+        dialogClose: '知道了',
+        dialogBundleMessage: '本次报检包含尚未完成的前置层次：{deps}。确认合并预约并一并报检吗？',
+        dialogBundleConfirm: '确认一起报检',
+        dialogCancel: '返回修改',
+        submitSuccess: '报检已提交成功，可在报检记录查看进度。',
+        types: FIXED_INSPECTION_TYPES,
       },
       alerts: {
         noInspectPermission: '缺少报检权限',
@@ -624,6 +721,94 @@ const progressCopy: Record<Locale, ProgressCopy> = {
         point: '个',
         linear: 'm',
       },
+    },
+    workflow: {
+      badge: '分项模板',
+      title: '分项模板管理',
+      description: '集中维护分项模板、层次、验收内容及依赖关系，支持新增/删除模板并同步报检校验。',
+      localHint: '规则保存到后端数据库，默认已为常用分项创建模板；保存后即用于校验逻辑（后续报检校验会接入）。',
+      accessHint: '需要道路管理权限才能维护验收关系。',
+      actions: {
+        save: '保存模板',
+        reset: '恢复默认',
+        addLayer: '新增层次',
+        deleteLayer: '删除层次',
+        addCheck: '新增验收内容',
+        deleteCheck: '删除验收内容',
+        createTemplate: '新增模板',
+        deleteTemplate: '删除模板',
+      },
+      templateBadge: '模板',
+      templateTitle: '选择分项模板',
+      templateHint: '每个分项维护一套层次-验收内容-验收类型的绑定关系。',
+      templateNote: '提示：关系会用于校验报检顺序与可选项，后续可接入接口生效到实际报检流程。',
+      templateEmpty: '暂无模板，请先创建一个分项模板。',
+      templateNameLabel: '模板名称',
+      templateNamePlaceholder: '输入模板名称',
+      templateDescriptionLabel: '模板说明',
+      templateDescriptionPlaceholder: '描述模板适用范围、施工要点或注意事项',
+      templateSideRuleLabel: '报检侧别规则',
+      templateSideRulePlaceholder: '如：单体左右侧可分开报检或必须同步',
+      measureLabel: '显示方式',
+      measureLinear: '延米',
+      measurePoint: '单体',
+      pointHasSidesLabel: '单体分左右侧展示',
+      newTemplateBadge: '新增模板',
+      newTemplateTitle: '创建新的分项模板',
+      newTemplateHint: '填写名称与显示方式即可创建，后续可在右侧补充层次与验收内容。',
+      newTemplatePlaceholder: '如：边沟、路缘石、挡土墙',
+      templateCreated: '模板已创建，可继续编辑层次/验收内容。',
+      deleted: '模板已删除或已停用。',
+      deleteFailed: '删除模板失败',
+      errors: {
+        templateNameRequired: '模板名称不能为空',
+      },
+      bindingLayers: '层次：{count} 个',
+      bindingChecks: '验收内容：{count} 条',
+      ruleBadge: '规则编辑',
+      ruleTitle: '层次依赖与报检限制',
+      ruleHint: '设置前置关系、必须同步的层次，以及允许并行的组合，并按顺序维护验收内容与类型绑定。',
+      quick: {
+        layerTitle: '层次快速操作',
+        layerHint: '填写名称和阶段号即可新增层次，删除时自动清理依赖。',
+        deletePlaceholder: '选择要删除的层次',
+        checkPlaceholder: '输入验收内容名称',
+      },
+      layerNote: '可填写层次说明、施工要点或限制。',
+      stageLabel: '阶段序号',
+      dependsLabel: '前置层次（完成后才能预约）',
+      lockLabel: '锁定并行（必须一起报检）',
+      parallelLabel: '允许并行（可同批预约）',
+      checkTitle: '验收内容顺序',
+      checkNote: '备注：如同一批次浇筑、留置试件要求等。',
+      newLayer: '新层次',
+      newCheck: '新增验收内容',
+      noPeers: '暂无可关联的层次',
+      timelineBadge: '可视化',
+      timelineTitle: '{phase} · 流程视图',
+      timelineHint: '按阶段分列展示前置关系、锁定并行与验收类型绑定，便于现场沟通。',
+      legend: {
+        locked: '必须锁定一起',
+        parallel: '可并行',
+        types: '验收类型',
+      },
+      stageName: '阶段 {value}',
+      stageHint: '必须完成上一阶段后才能进入此阶段',
+      stageCountPrefix: '层次数',
+      timelineDepends: '前置：{deps}',
+      timelineFree: '无前置，可直接预约',
+      lockedWith: '锁定：{peers}',
+      parallelWith: '可并行：{peers}',
+      summaryTitle: '规则摘要',
+      summaryHint: '快速核对：哪些层次是前置，哪些必须同步，验收内容顺序及类型绑定。',
+      summaryEmpty: '尚未设置依赖或锁定关系。',
+      ruleDepends: '{name} 依赖 {deps}',
+      ruleLock: '{name} 必须与 {peers} 同步验收',
+      saved: '已保存到后端，可继续调整或刷新查看。',
+      reset: '已恢复为默认模板（未自动保存）。',
+      empty: '暂无可用模板',
+      saveFailed: '保存失败，请稍后重试',
+      saving: '保存中...',
     },
     inspectionBoard: {
       badge: '报检列表',
@@ -1029,6 +1214,13 @@ const progressCopy: Record<Locale, ProgressCopy> = {
         submit: 'Envoyer',
         submitting: 'Envoi...',
         permissionMissing: 'Droit de contrôle requis',
+        dialogTitle: 'Alerte de soumission',
+        dialogClose: "J'ai compris",
+        dialogBundleMessage:
+          'Cette demande inclut des prérequis encore non planifiés : {deps}. Confirmer un contrôle groupé ?',
+        dialogBundleConfirm: 'Confirmer le groupement',
+        dialogCancel: 'Revenir',
+        submitSuccess: 'Demande de contrôle envoyée. Vous pouvez suivre la progression dans la liste.',
         types: ['GENIE CIVIL', 'TOPOGRAPHIQUE', 'GEOTECHNIQUE', 'Autre'],
       },
       alerts: {
@@ -1042,6 +1234,89 @@ const progressCopy: Record<Locale, ProgressCopy> = {
         point: 'u.',
         linear: 'm',
       },
+    },
+    workflow: {
+      badge: 'Relations',
+      title: 'Gestion des relations d’inspection',
+      description:
+        'Définissez pour chaque phase les couches, contenus et types associés, ainsi que l’ordre à respecter pour éviter les demandes hors séquence.',
+      localHint: 'Les règles sont maintenant stockées en base; un modèle “Culvert” est créé par défaut. La validation côté contrôle utilisera ces règles ensuite.',
+      accessHint: "Le droit road:manage est requis pour gérer ces relations.",
+      actions: {
+        save: 'Enregistrer en local',
+        reset: 'Réinitialiser',
+        addLayer: 'Ajouter une couche',
+        deleteLayer: 'Supprimer la couche',
+        addCheck: 'Ajouter un contrôle',
+        deleteCheck: 'Supprimer le contrôle',
+        createTemplate: 'Créer un modèle',
+        deleteTemplate: 'Supprimer le modèle',
+      },
+      templateBadge: 'Modèle',
+      templateTitle: 'Choisir un modèle de phase',
+      templateHint: 'Chaque phase dispose de sa matrice couches / contenus / types.',
+      templateNote: 'Ces règles pilotent les options et validations lors des demandes de contrôle.',
+      templateEmpty: 'Aucun modèle, créez-en un pour commencer.',
+      templateNameLabel: 'Nom du modèle',
+      templateNamePlaceholder: 'Saisir un nom de modèle',
+      measureLabel: 'Mode d’affichage',
+      measureLinear: 'Linéaire',
+      measurePoint: 'Unitaire',
+      pointHasSidesLabel: 'Séparer les unités par côté',
+      newTemplateBadge: 'Nouveau modèle',
+      newTemplateTitle: 'Créer un modèle',
+      newTemplateHint: 'Renseignez un nom et un mode；ajoutez ensuite les couches/contrôles à droite.',
+      newTemplatePlaceholder: 'ex : Fossé, Bordure, Mur de soutènement',
+      templateCreated: 'Modèle créé, vous pouvez ajouter couches et contenus.',
+      deleted: 'Modèle supprimé ou désactivé.',
+      deleteFailed: 'Échec de suppression du modèle',
+      errors: {
+        templateNameRequired: 'Le nom du modèle est requis',
+      },
+      ruleBadge: 'Règles',
+      ruleTitle: 'Dépendances et verrouillage',
+      ruleHint: 'Définissez les prérequis, les contrôles groupés et l’ordre des contenus.',
+      quick: {
+        layerTitle: 'Actions rapides sur les couches',
+        layerHint: 'Saisissez un nom et un ordre pour ajouter une couche ; suppression avec nettoyage des dépendances.',
+        deletePlaceholder: 'Choisir une couche à supprimer',
+        checkPlaceholder: 'Nom du contenu de contrôle',
+      },
+      layerNote: 'Notes de couche (contraintes, points de vigilance).',
+      stageLabel: 'Ordre',
+      dependsLabel: 'Pré-requis (doivent être validés avant)',
+      lockLabel: 'Verrouiller avec',
+      parallelLabel: 'Peut être en parallèle',
+      checkTitle: 'Ordre des contenus',
+      checkNote: 'Notes du contrôle (bétonnage groupé, éprouvettes, etc.)',
+      newLayer: 'Nouvelle couche',
+      newCheck: 'Nouveau contenu',
+      noPeers: 'Aucune autre couche',
+      timelineBadge: 'Vue',
+      timelineTitle: '{phase} · Vue de flux',
+      timelineHint: 'Colonnes par étape avec prérequis, groupes verrouillés et types liés.',
+      legend: {
+        locked: 'Verrou obligatoire',
+        parallel: 'Parallèle possible',
+        types: 'Types liés',
+      },
+      stageName: 'Étape {value}',
+      stageHint: 'Commence après la fin des étapes précédentes',
+      stageCountPrefix: 'Couches',
+      timelineDepends: 'Pré-requis : {deps}',
+      timelineFree: 'Sans prérequis',
+      lockedWith: 'Verrouillé avec {peers}',
+      parallelWith: 'Parallèle avec {peers}',
+      summaryTitle: 'Résumé des règles',
+      summaryHint: 'À vérifier : prérequis, groupes verrouillés, ordre et types liés.',
+      summaryEmpty: 'Aucune dépendance définie.',
+      ruleDepends: '{name} dépend de {deps}',
+      ruleLock: '{name} doit être contrôlé avec {peers}',
+      saved: 'Enregistré côté serveur.',
+      reset: 'Réinitialisé sur le modèle par défaut (non enregistré).',
+      empty: 'Aucun modèle disponible',
+      saveFailed: 'Échec de sauvegarde, réessayez.',
+      saving: 'Enregistrement...',
     },
     inspectionBoard: {
       badge: 'Contrôles',

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import { AlertDialog } from '@/components/AlertDialog';
 import { LocaleSwitcher } from '@/components/LocaleSwitcher';
 import { locales, type Locale } from '@/lib/i18n';
 import { getHomeCopy } from '@/lib/i18n/home';
@@ -575,27 +576,14 @@ export default function HomePage() {
 				</div>
 			) : null}
 
-			{accessDialogOpen ? (
-				<div className='fixed inset-0 z-40 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur'>
-					<div className='w-full max-w-md overflow-hidden rounded-3xl border border-cyan-200/30 bg-slate-900 shadow-2xl shadow-cyan-400/30 ring-1 ring-white/5'>
-						<div className='bg-gradient-to-r from-cyan-400/20 via-emerald-300/20 to-sky-300/15 p-4'>
-							<p className='text-[11px] font-semibold uppercase tracking-[0.25em] text-emerald-50'>
-								{t.moduleDialog.title}
-							</p>
-							<h3 className='mt-1 text-lg font-semibold text-white'>{t.moduleDialog.description}</h3>
-						</div>
-						<div className='space-y-3 p-5'>
-							<button
-								type='button'
-								onClick={() => setAccessDialogOpen(false)}
-								className='inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-cyan-300 via-emerald-200 to-sky-300 px-5 py-3 text-sm font-semibold text-slate-900 shadow-lg shadow-cyan-400/40 transition hover:-translate-y-0.5'>
-								{t.moduleDialog.close}
-								<span aria-hidden>⎋</span>
-							</button>
-						</div>
-					</div>
-				</div>
-			) : null}
+			<AlertDialog
+				open={accessDialogOpen}
+				title={t.moduleDialog.title}
+				description={t.moduleDialog.description}
+				actionLabel={t.moduleDialog.close}
+				tone='warning'
+				onClose={() => setAccessDialogOpen(false)}
+			/>
 		</main>
 	);
 }

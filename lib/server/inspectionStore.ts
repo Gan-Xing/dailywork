@@ -7,6 +7,7 @@ import type {
   InspectionListResponse,
   InspectionPayload,
 } from '@/lib/progressTypes'
+import { getProgressCopy } from '@/lib/i18n/progress'
 import { prisma } from '@/lib/prisma'
 
 const normalizeSide = (side: string | undefined) =>
@@ -71,6 +72,20 @@ const mapInspectionListItem = (
   updatedAt: row.updatedAt.toISOString(),
   updatedBy: row.updater ? { id: row.updater.id, username: row.updater.username } : null,
 })
+
+const inspectionErrors = getProgressCopy('zh').detail.errors
+
+const assertRequiredFields = (payload: InspectionPayload) => {
+  if (!payload.layers || payload.layers.length === 0) {
+    throw new Error(inspectionErrors.submitLayerMissing)
+  }
+  if (!payload.checks || payload.checks.length === 0) {
+    throw new Error(inspectionErrors.submitCheckMissing)
+  }
+  if (!payload.types || payload.types.length === 0) {
+    throw new Error(inspectionErrors.submitTypeMissing)
+  }
+}
 
 export const listInspections = async (filter: InspectionFilter): Promise<InspectionListResponse> => {
   const page = Math.max(1, filter.page || 1)
@@ -153,15 +168,7 @@ export const createInspection = async (
   payload: InspectionPayload,
   userId: number | null,
 ) => {
-  if (!payload.layers || payload.layers.length === 0) {
-    throw new Error('请选择至少一个层次')
-  }
-  if (!payload.checks || payload.checks.length === 0) {
-    throw new Error('请选择至少一个验收内容')
-  }
-  if (!payload.types || payload.types.length === 0) {
-    throw new Error('请选择至少一个验收类型')
-  }
+  assertRequiredFields(payload)
 
   const side = normalizeSide(payload.side)
   const range = normalizeRange(payload.startPk, payload.endPk)
@@ -196,15 +203,7 @@ export const updateInspection = async (
   payload: InspectionPayload,
   userId: number | null,
 ): Promise<InspectionListItem> => {
-  if (!payload.layers || payload.layers.length === 0) {
-    throw new Error('请选择至少一个层次')
-  }
-  if (!payload.checks || payload.checks.length === 0) {
-    throw new Error('请选择至少一个验收内容')
-  }
-  if (!payload.types || payload.types.length === 0) {
-    throw new Error('请选择至少一个验收类型')
-  }
+  assertRequiredFields(payload)
 
   const existing = await prisma.inspectionRequest.findUnique({
     where: { id },

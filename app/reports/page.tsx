@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
+import { AlertDialog, type AlertTone } from '@/components/AlertDialog'
 import { AccessDenied } from '@/components/AccessDenied'
 import { LocaleSwitcher } from '@/components/LocaleSwitcher'
 import { locales, type Locale } from '@/lib/i18n'
@@ -66,6 +67,9 @@ export default function ReportsLandingPage() {
   const [hasRecentError, setHasRecentError] = useState(false)
   const [session, setSession] = useState<SessionUser | null>(null)
   const [authLoaded, setAuthLoaded] = useState(false)
+  const [alertDialog, setAlertDialog] = useState<{ title: string; description: string; tone?: AlertTone } | null>(
+    null,
+  )
 
   const monthKey = useMemo(() => formatMonthKey(monthCursor), [monthCursor])
   const dateLocale = reportDateLocales[locale]
@@ -155,10 +159,18 @@ export default function ReportsLandingPage() {
 
   const hasReportForSelectedDate = selectedDate ? reportDates.has(selectedDate) : false
 
+  const openAlert = (message: string, tone: AlertTone = 'warning') => {
+    setAlertDialog({
+      title: t.alerts.title,
+      description: message,
+      tone,
+    })
+  }
+
   const handleCreate = () => {
     if (!selectedDate) return
     if (!canEdit) {
-      window.alert('缺少 report:edit 权限，无法创建或修改日报。')
+      openAlert(t.alerts.createDenied)
       return
     }
     router.push(`/reports/${selectedDate}`)
@@ -166,7 +178,7 @@ export default function ReportsLandingPage() {
 
   const handleDayClick = (date: string) => {
     if (!canView) {
-      window.alert('缺少 report:view 权限，无法查看日报。')
+      openAlert(t.alerts.viewDenied)
       return
     }
     router.push(`/reports/${date}`)
@@ -190,18 +202,33 @@ export default function ReportsLandingPage() {
     }
   }
 
+  const alertNode = (
+    <AlertDialog
+      open={Boolean(alertDialog)}
+      title={alertDialog?.title ?? ''}
+      description={alertDialog?.description}
+      tone={alertDialog?.tone ?? 'info'}
+      actionLabel={t.alerts.close}
+      onClose={() => setAlertDialog(null)}
+    />
+  )
+
   if (authLoaded && !canView) {
     return (
-      <AccessDenied
-        locale={locale}
-        permissions={['report:view', 'report:edit']}
-        hint={t.accessHint}
-      />
+      <>
+        {alertNode}
+        <AccessDenied
+          locale={locale}
+          permissions={['report:view', 'report:edit']}
+          hint={t.accessHint}
+        />
+      </>
     )
   }
 
   return (
     <main className="relative mx-auto flex max-w-5xl flex-col gap-8 px-4 py-10 lg:px-0">
+      {alertNode}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <nav className="flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-600">
           <Link
