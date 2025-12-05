@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 
 import type {
+  WorkflowBinding,
   WorkflowCheckTemplate,
   WorkflowLayerTemplate,
   WorkflowTemplate,
@@ -13,7 +14,7 @@ import { locales } from '@/lib/i18n'
 import { getProgressCopy, formatProgressCopy } from '@/lib/i18n/progress'
 import { usePreferredLocale } from '@/lib/usePreferredLocale'
 
-type WorkflowItem = WorkflowTemplate & { phaseDefinitionId: number }
+type WorkflowItem = WorkflowBinding
 
 const uid = (prefix: string) =>
   `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`

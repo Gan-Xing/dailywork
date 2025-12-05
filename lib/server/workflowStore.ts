@@ -11,6 +11,8 @@ import type { PhaseMeasure } from '@/lib/progressTypes'
 import { prisma } from '@/lib/prisma'
 
 type WorkflowItem = WorkflowBinding
+type LayerDefinition = Prisma.LayerDefinitionGetPayload<{}>
+type CheckDefinition = Prisma.CheckDefinitionGetPayload<{}>
 
 const normalizeNames = (value?: string[] | null) =>
   Array.from(new Set((Array.isArray(value) ? value : []).map((item) => `${item}`.trim()).filter(Boolean)))
@@ -35,8 +37,10 @@ const normalizeLayer = (layer: WorkflowLayerTemplate, defaultTypes: string[]): W
 const toPrismaMeasure = (measure: PhaseMeasure) =>
   measure === 'POINT' ? PrismaPhaseMeasure.POINT : PrismaPhaseMeasure.LINEAR
 
-const inferMeasure = (measure: PrismaPhaseMeasure | PhaseMeasure): PhaseMeasure =>
-  measure === 'POINT' || measure === PrismaPhaseMeasure.POINT ? 'POINT' : 'LINEAR'
+const inferMeasure = (measure: PrismaPhaseMeasure | PhaseMeasure): PhaseMeasure => {
+  const normalized = `${measure}`
+  return normalized === 'POINT' ? 'POINT' : 'LINEAR'
+}
 
 const buildTemplateFromDefinition = (
   definition: Prisma.PhaseDefinitionGetPayload<{
@@ -122,7 +126,7 @@ const normalizeWorkflow = (
 
 const ensureLayerDefinitions = async (names: string[], tx: Prisma.TransactionClient) => {
   const unique = normalizeNames(names)
-  if (!unique.length) return [] as { id: number; name: string }[]
+  if (!unique.length) return [] as LayerDefinition[]
   await Promise.all(
     unique.map((name) =>
       tx.layerDefinition.upsert({
@@ -138,7 +142,7 @@ const ensureLayerDefinitions = async (names: string[], tx: Prisma.TransactionCli
 
 const ensureCheckDefinitions = async (names: string[], tx: Prisma.TransactionClient) => {
   const unique = normalizeNames(names)
-  if (!unique.length) return [] as { id: number; name: string }[]
+  if (!unique.length) return [] as CheckDefinition[]
   await Promise.all(
     unique.map((name) =>
       tx.checkDefinition.upsert({
@@ -314,8 +318,16 @@ export const updateWorkflowTemplate = async (params: {
     return {
       definition: {
         ...updated,
-        defaultLayers: layerDefs.map((layer) => ({ layerDefinition: layer })),
-        defaultChecks: checkDefs.map((check) => ({ checkDefinition: check })),
+        defaultLayers: layerDefs.map((layer) => ({
+          phaseDefinitionId: updated.id,
+          layerDefinitionId: layer.id,
+          layerDefinition: layer,
+        })),
+        defaultChecks: checkDefs.map((check) => ({
+          phaseDefinitionId: updated.id,
+          checkDefinitionId: check.id,
+          checkDefinition: check,
+        })),
       },
       workflow: normalizedWorkflow,
     }

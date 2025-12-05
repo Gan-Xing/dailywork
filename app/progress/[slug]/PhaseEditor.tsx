@@ -97,6 +97,9 @@ interface SelectedSegment {
   end: number
   spec?: string | null
   billQuantity?: number | null
+  workflow?: WorkflowBinding
+  workflowLayers?: WorkflowLayerTemplate[]
+  workflowTypeOptions?: string[]
 }
 
 type AlertDialogState = {
@@ -1211,7 +1214,7 @@ export function PhaseEditor({
       })
     })
     return set.size ? set : null
-  }, [endPkInput, latestPointInspections, selectedSegment, startPkInput, workflowLayerByName])
+  }, [endPkInput, latestPointInspections, selectedSegment, selectedSide, startPkInput, workflowLayerByName])
 
   const allowedWorkflowStages = useMemo(() => {
     if (!workflowLayerByName || !selectedLayers.length) return null
@@ -1331,7 +1334,7 @@ export function PhaseEditor({
     if (changed) {
       setSelectedChecks(nextChecks)
     }
-  }, [selectedLayers, workflowChecksByLayerName, selectedChecks, manualCheckExclusions])
+  }, [allowedCheckSet, manualCheckExclusions, selectedChecks, selectedLayers, workflowChecksByLayerName])
 
   useEffect(() => {
     const allowed = activeInspectionTypes

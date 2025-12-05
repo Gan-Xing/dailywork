@@ -106,6 +106,12 @@ type WorkflowCopy = {
   templateEmpty: string
   templateNameLabel: string
   templateNamePlaceholder: string
+  templateDescriptionLabel: string
+  templateDescriptionPlaceholder: string
+  templateSideRuleLabel: string
+  templateSideRulePlaceholder: string
+  bindingLayers: string
+  bindingChecks: string
   measureLabel: string
   measureLinear: string
   measurePoint: string
@@ -1259,6 +1265,10 @@ const progressCopy: Record<Locale, ProgressCopy> = {
       templateEmpty: 'Aucun modèle, créez-en un pour commencer.',
       templateNameLabel: 'Nom du modèle',
       templateNamePlaceholder: 'Saisir un nom de modèle',
+      templateDescriptionLabel: 'Description du modèle',
+      templateDescriptionPlaceholder: 'Décrivez le périmètre, les consignes ou points de vigilance',
+      templateSideRuleLabel: 'Règle par côté',
+      templateSideRulePlaceholder: 'ex : contrôle gauche/droite séparé ou simultané',
       measureLabel: 'Mode d’affichage',
       measureLinear: 'Linéaire',
       measurePoint: 'Unitaire',
@@ -1273,6 +1283,8 @@ const progressCopy: Record<Locale, ProgressCopy> = {
       errors: {
         templateNameRequired: 'Le nom du modèle est requis',
       },
+      bindingLayers: 'Couches : {count}',
+      bindingChecks: 'Contenus : {count}',
       ruleBadge: 'Règles',
       ruleTitle: 'Dépendances et verrouillage',
       ruleHint: 'Définissez les prérequis, les contrôles groupés et l’ordre des contenus.',

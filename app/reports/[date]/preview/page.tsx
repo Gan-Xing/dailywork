@@ -74,7 +74,7 @@ export default function ReportPreviewPage() {
 		return () => {
 			isMounted = false
 		}
-	}, [dateKey])
+	}, [copy.error, copy.invalidDate, dateKey])
 
 	if (isLoading) {
 		return (

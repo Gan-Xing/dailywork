@@ -73,7 +73,7 @@ const mapInspectionListItem = (
   updatedBy: row.updater ? { id: row.updater.id, username: row.updater.username } : null,
 })
 
-const inspectionErrors = getProgressCopy('zh').detail.errors
+const inspectionErrors = getProgressCopy('zh').phase.errors
 
 const assertRequiredFields = (payload: InspectionPayload) => {
   if (!payload.layers || payload.layers.length === 0) {
