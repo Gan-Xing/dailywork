@@ -34,10 +34,19 @@ export type HomeCopy = {
   extension: {
     label: string
     title: string
-    items: string[]
+    previewTitle: string
     description: string
+    previewDescription: string
     helper: string
+    previewHelper: string
     cta: string
+    previewItems: string[]
+    progressTitle: string
+    progressList: string[]
+    ideaTitle: string
+    ideaList: string[]
+    doneTitle: string
+    doneList: string[]
   }
   moduleDialog: {
     title: string
@@ -144,12 +153,33 @@ export const homeCopy: Record<Locale, HomeCopy> = {
     },
     extension: {
       label: '开发路线',
-      title: '扩展空间升级为可进入的开发路线',
-      items: ['质量巡检', '物资进出', '风险复盘', 'AI 总结', '导出中心'],
+      title: '开发路线：展示当前进展',
+      previewTitle: '路线预告',
       description:
-        '这里用于记录和排期新的模块/想法，随时写入并保存在数据库，开发完成后点击完成即可闭环。',
-      helper: '标签代表当前预排的入口方向；更多灵感可以直接在路线中补充并追踪状态。',
-      cta: '进入开发路线'
+        '仅对有权限的账号开放，直接展示最新的开发进展、正在酝酿的想法，以及已完成的路线节点，方便团队对齐。',
+      previewDescription: '',
+      helper: '按列呈现状态：最新进展、已有想法、已完成节点，随时可以进入路线继续跟踪。',
+      previewHelper: '入口开放后会在这里亮起，保持关注即可。',
+      cta: '进入开发路线',
+      previewItems: ['物资管理', '风险管理', '营收管理', 'AI 总结'],
+      progressTitle: '最新开发进展',
+      progressList: [
+        '路线页采用进行中/想法/已完成分栏，梳理状态更清晰。',
+        '首页可以看到最近的路线更新，方便快速同步。',
+        '路由权限已加固，仅 roadmap:view 角色可见。'
+      ],
+      ideaTitle: '已有开发想法',
+      ideaList: [
+        '增加按周的时间线视图，便于排期讨论。',
+        '为每条想法补充负责人和预估周期。',
+        '按标签筛选想法，快速聚合同类需求。'
+      ],
+      doneTitle: '已完成的想法',
+      doneList: [
+        '建立路线基础数据结构与入口。',
+        '完成状态流转与基础录入。',
+        '接入多语言展示与权限校验。'
+      ]
     },
     moduleDialog: {
       title: '暂无访问权限',
@@ -257,19 +287,35 @@ export const homeCopy: Record<Locale, HomeCopy> = {
     },
     extension: {
       label: 'Feuille de route',
-      title: "L'espace d'extension devient une feuille de route actionnable",
-      items: [
-        'Inspection qualité',
-        'Flux de matériaux',
-        'Revue des risques',
-        'Synthèse IA',
-        "Centre d'export"
-      ],
+      title: 'Feuille de route : suivi en direct',
+      previewTitle: 'Aperçu',
       description:
-        'Centralisez les nouvelles idées de modules, stockez-les en base et cochez « terminé » dès que la livraison est faite.',
+        'Réservée aux comptes autorisés : une vue directe sur les derniers progrès, les idées en cours et les sujets déjà terminés.',
+      previewDescription: '',
       helper:
-        'Les tags listent les pistes déjà prévues ; ajoutez d’autres idées dans la feuille de route et suivez leur statut.',
-      cta: 'Ouvrir la feuille de route'
+        'Colonnes dédiées aux progrès récents, idées et livrés ; accédez à la feuille de route pour mettre à jour ou prioriser.',
+      previewHelper:
+        'Les entrées s’allumeront ici dès leur ouverture, restez simplement à l’écoute.',
+      cta: 'Ouvrir la feuille de route',
+      previewItems: ['Gestion des stocks', 'Gestion des risques', 'Gestion des revenus', 'Synthèse IA'],
+      progressTitle: 'Progrès récents',
+      progressList: [
+        'Colonnes En cours / Idées / Terminé actives dans la feuille de route.',
+        'Les dernières mises à jour remontent sur la page d’accueil pour garder tout le monde aligné.',
+        'Contrôles de permission renforcés pour les rôles habilités roadmap:view.'
+      ],
+      ideaTitle: 'Idées en cours',
+      ideaList: [
+        'Ajouter une vue chronologique par semaine pour les jalons.',
+        'Associer un responsable et une estimation à chaque idée.',
+        'Filtrer par tags pour regrouper les sujets par module.'
+      ],
+      doneTitle: 'Déjà livré',
+      doneList: [
+        'Structure de données et entrée feuille de route créées.',
+        'Flux de création et changement de statut opérationnels.',
+        'Affichage multilingue relié aux contrôles de permissions.'
+      ]
     },
     moduleDialog: {
       title: 'Accès requis',

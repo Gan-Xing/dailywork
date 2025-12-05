@@ -14,6 +14,9 @@ export async function PATCH(
   if (!user) {
     return NextResponse.json({ message: '请先登录后再更新路线' }, { status: 401 })
   }
+  if (!user.permissions.includes('roadmap:update')) {
+    return NextResponse.json({ message: '缺少开发路线编辑权限' }, { status: 403 })
+  }
 
   const id = Number(params.id)
   if (!Number.isInteger(id)) {

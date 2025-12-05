@@ -278,6 +278,7 @@
   - 日报：`report:view`、`report:edit`
   - 财务：`finance:view`、`finance:edit`、`finance:manage`
   - 产值计量：`value:view`、`value:create`、`value:update`、`value:delete`
+  - 开发路线：`roadmap:view`、`roadmap:create`、`roadmap:update`、`roadmap:delete`
 - **Role**：`name`（唯一，如 `Admin`、`Employee`）、`permissions`（多对多）、`createdAt`、`updatedAt`。
 - **User**：账号/权限字段包含 `username`（唯一）、`passwordHash`（salt + hash）、`roles`（多对多）、`createdAt`、`updatedAt`；个人资料字段见下方“成员管理字段”。
 - 默认角色与权限：

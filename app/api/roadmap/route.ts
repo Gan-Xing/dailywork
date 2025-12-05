@@ -4,6 +4,14 @@ import { prisma } from '@/lib/prisma'
 import { getSessionUser } from '@/lib/server/authSession'
 
 export async function GET() {
+  const user = getSessionUser()
+  if (!user) {
+    return NextResponse.json({ message: '请先登录后再查看路线' }, { status: 401 })
+  }
+  if (!user.permissions.includes('roadmap:view')) {
+    return NextResponse.json({ message: '缺少开发路线查看权限' }, { status: 403 })
+  }
+
   const items = await prisma.roadmapIdea.findMany({
     orderBy: { createdAt: 'desc' },
   })
@@ -15,6 +23,9 @@ export async function POST(request: Request) {
   const user = getSessionUser()
   if (!user) {
     return NextResponse.json({ message: '请先登录后再记录想法' }, { status: 401 })
+  }
+  if (!user.permissions.includes('roadmap:create')) {
+    return NextResponse.json({ message: '缺少开发路线编辑权限' }, { status: 403 })
   }
 
   let payload: { title?: unknown; details?: unknown }

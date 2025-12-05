@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 
 import { AlertDialog } from '@/components/AlertDialog';
 import { LocaleSwitcher } from '@/components/LocaleSwitcher';
@@ -51,7 +51,8 @@ export default function HomePage() {
 			'/progress': ['progress:view'],
 			'/members': ['member:view'],
 			'/finance': ['finance:view'],
-			'/value': ['value:view']
+			'/value': ['value:view'],
+			'/roadmap': ['roadmap:view'],
 		}),
 		[]
 	);
@@ -60,6 +61,12 @@ export default function HomePage() {
 	const canViewProgress = can(modulePermissions['/progress']);
 	const canViewMembers = can(modulePermissions['/members']);
 	const canViewFinance = can(modulePermissions['/finance']);
+	const canViewRoadmap = can(modulePermissions['/roadmap']);
+	const roadmapTitle = canViewRoadmap ? t.extension.title : t.extension.previewTitle;
+	const roadmapDescription = canViewRoadmap
+		? t.extension.description
+		: t.extension.previewDescription;
+	const roadmapHelper = canViewRoadmap ? t.extension.helper : t.extension.previewHelper;
 
 	useEffect(() => {
 		const loadSession = async () => {
@@ -391,59 +398,130 @@ export default function HomePage() {
 							</Link>
 						);
 					})}
-				</section>
+			</section>
 
-				<section className='mt-12 overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-white/5 via-white/0 to-white/5 p-6 text-sm text-slate-100 shadow-xl shadow-slate-950/20 backdrop-blur'>
-					<div className='flex flex-col gap-6 md:flex-row md:items-center md:justify-between'>
-						<div className='space-y-3'>
-							<div className='flex items-center gap-2'>
-								<div className='h-2 w-2 rounded-full bg-emerald-300' />
-								<p className='text-xs font-semibold uppercase tracking-[0.2em] text-slate-200'>
-									{t.extension.label}
+				{canViewRoadmap ? (
+					<section className='mt-12 overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-white/5 via-white/0 to-white/5 p-6 text-sm text-slate-100 shadow-xl shadow-slate-950/20 backdrop-blur'>
+						<div className='grid gap-6 lg:grid-cols-[1.6fr,1fr]'>
+							<div className='space-y-4'>
+								<div className='flex items-center gap-2'>
+									<div className='h-2 w-2 rounded-full bg-emerald-300' />
+									<p className='text-xs font-semibold uppercase tracking-[0.2em] text-slate-200'>
+										{t.extension.label}
+									</p>
+									<span className='rounded-full bg-white/10 px-2 py-1 text-[11px] font-semibold text-emerald-100'>
+										ROADMAP
+									</span>
+								</div>
+								<h2 className='text-2xl font-semibold text-slate-50 sm:text-3xl'>
+									{roadmapTitle}
+								</h2>
+								<p className='max-w-2xl text-slate-200/80'>
+									{roadmapDescription}
 								</p>
-								<span className='rounded-full bg-white/10 px-2 py-1 text-[11px] font-semibold text-emerald-100'>
-									ROADMAP
-								</span>
+								<div className='grid gap-3 sm:grid-cols-2 lg:grid-cols-3'>
+									{[
+										{
+											title: t.extension.progressTitle,
+											items: t.extension.progressList,
+											dot: 'bg-emerald-300',
+											background: 'from-emerald-400/15 via-emerald-300/5 to-white/10'
+										},
+										{
+											title: t.extension.ideaTitle,
+											items: t.extension.ideaList,
+											dot: 'bg-cyan-300',
+											background: 'from-cyan-400/15 via-cyan-300/5 to-white/10'
+										},
+										{
+											title: t.extension.doneTitle,
+											items: t.extension.doneList,
+											dot: 'bg-amber-300',
+											background: 'from-amber-400/15 via-amber-300/5 to-white/10'
+										}
+									].map((section) => (
+										<div
+											key={section.title}
+											className='relative overflow-hidden rounded-2xl border border-white/10 bg-white/5 p-3 shadow-sm shadow-emerald-500/10'>
+											<div
+												className={`absolute inset-0 -z-10 bg-gradient-to-br ${section.background} opacity-90`}
+											/>
+											<div className='flex items-center gap-2'>
+												<span className={`h-2 w-2 rounded-full ${section.dot}`} />
+												<span className='text-sm font-semibold text-slate-50'>
+													{section.title}
+												</span>
+											</div>
+											<ul className='mt-2 space-y-2 text-xs text-slate-200/85'>
+												{section.items.map((item) => (
+													<li key={item} className='flex items-start gap-2 rounded-xl bg-white/5 px-3 py-2'>
+														<span className={`mt-1 inline-flex h-1.5 w-1.5 rounded-full ${section.dot}`} />
+														<span>{item}</span>
+													</li>
+												))}
+											</ul>
+										</div>
+									))}
+								</div>
+								<p className='text-xs text-slate-300/80'>{roadmapHelper}</p>
 							</div>
-							<h2 className='text-2xl font-semibold text-slate-50 sm:text-3xl'>
-								{t.extension.title}
-							</h2>
-							<p className='max-w-2xl text-slate-200/80'>
-								{t.extension.description}
-							</p>
-							<div className='flex flex-wrap gap-2'>
-								{t.extension.items.map((item) => (
+							<div className='flex w-full max-w-xs flex-col gap-3 rounded-2xl border border-white/10 bg-white/10 p-4 shadow-lg shadow-emerald-500/10'>
+								<div className='flex items-center justify-between gap-3'>
+									<span className='text-sm font-semibold text-slate-50'>
+										ROADMAP
+									</span>
+									<span className='rounded-full bg-emerald-500/20 px-2 py-1 text-[11px] font-semibold text-emerald-100'>
+										✓
+									</span>
+								</div>
+								<p className='text-xs text-slate-200/80'>{t.extension.helper}</p>
+								<div className='grid grid-cols-3 gap-2 text-[11px] font-semibold text-slate-900'>
+									<div className='rounded-xl bg-emerald-100/80 px-2 py-2 text-center shadow-sm shadow-emerald-500/10'>
+										<p className='text-[10px] text-emerald-700'>{t.extension.progressTitle}</p>
+										<p className='text-base text-emerald-900'>{t.extension.progressList.length}</p>
+									</div>
+									<div className='rounded-xl bg-cyan-100/80 px-2 py-2 text-center shadow-sm shadow-cyan-500/10'>
+										<p className='text-[10px] text-cyan-700'>{t.extension.ideaTitle}</p>
+										<p className='text-base text-cyan-900'>{t.extension.ideaList.length}</p>
+									</div>
+									<div className='rounded-xl bg-amber-100/80 px-2 py-2 text-center shadow-sm shadow-amber-500/10'>
+										<p className='text-[10px] text-amber-700'>{t.extension.doneTitle}</p>
+										<p className='text-base text-amber-900'>{t.extension.doneList.length}</p>
+									</div>
+								</div>
+								<Link
+									href='/roadmap'
+									onClick={(event) =>
+										handleModuleClick(event, '/roadmap', modulePermissions['/roadmap'])
+									}
+									aria-disabled={!canViewRoadmap}
+									className='inline-flex items-center justify-center gap-2 rounded-xl bg-white px-4 py-3 text-sm font-semibold text-slate-900 transition hover:-translate-y-0.5 hover:shadow-lg hover:shadow-emerald-400/20'>
+									{t.extension.cta}
+									<span aria-hidden>↗</span>
+								</Link>
+								<p className='text-xs text-slate-200/70'>{t.extension.description}</p>
+							</div>
+						</div>
+					</section>
+				) : (
+					<section className='mt-12 overflow-hidden rounded-3xl border border-white/10 bg-white/5 p-5 text-sm text-slate-100 shadow-xl shadow-slate-950/20 backdrop-blur'>
+						<div className='flex items-center gap-3 overflow-x-auto pb-1'>
+							<span className='inline-flex items-center gap-2 whitespace-nowrap text-base font-semibold text-slate-50'>
+								<span className='h-2 w-2 rounded-full bg-emerald-300 shadow-[0_0_0_4px_rgba(16,185,129,0.16)]' />
+								路线预告
+							</span>
+							<div className='flex items-center gap-2'>
+								{t.extension.previewItems.map((item) => (
 									<span
 										key={item}
-										className='rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-50'>
+										className='whitespace-nowrap rounded-full border border-white/15 bg-white/10 px-4 py-2 text-xs font-semibold text-slate-50 transition duration-150 hover:border-white/25 hover:bg-white/15'>
 										{item}
 									</span>
 								))}
 							</div>
-							<p className='text-xs text-slate-300/80'>{t.extension.helper}</p>
 						</div>
-						<div className='flex w-full max-w-xs flex-col gap-3 rounded-2xl border border-white/10 bg-white/10 p-4 shadow-lg shadow-emerald-500/10'>
-							<div className='flex items-center justify-between gap-3'>
-								<span className='text-sm font-semibold text-slate-50'>
-									{t.extension.label}
-								</span>
-								<span className='rounded-full bg-emerald-500/20 px-2 py-1 text-[11px] font-semibold text-emerald-100'>
-									✓
-								</span>
-							</div>
-							<p className='text-xs text-slate-200/80'>{t.extension.helper}</p>
-							<Link
-								href='/roadmap'
-								className='inline-flex items-center justify-center gap-2 rounded-xl bg-white px-4 py-3 text-sm font-semibold text-slate-900 transition hover:-translate-y-0.5 hover:shadow-lg hover:shadow-emerald-400/20'>
-								{t.extension.cta}
-								<span aria-hidden>↗</span>
-							</Link>
-							<p className='text-xs text-slate-200/70'>
-								{t.extension.description}
-							</p>
-						</div>
-					</div>
-				</section>
+					</section>
+				)}
 			</div>
 
 			{loginOpen ? (
