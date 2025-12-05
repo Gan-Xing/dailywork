@@ -53,26 +53,18 @@ type ColumnKey =
   | 'createdAt'
   | 'updatedBy'
   | 'updatedAt'
+  | 'action'
 
 const INSPECTION_COLUMN_STORAGE_KEY = 'inspection-visible-columns'
 const defaultVisibleColumns: ColumnKey[] = [
   'sequence',
   'road',
   'phase',
-  'side',
   'range',
   'layers',
-  'checks',
-  'types',
   'status',
-  'appointmentDate',
-  'submittedAt',
-  'submittedBy',
-  'remark',
-  'createdBy',
-  'createdAt',
-  'updatedBy',
   'updatedAt',
+  'action',
 ]
 
 const statusTone: Record<InspectionStatus, string> = {
@@ -1104,9 +1096,11 @@ export function InspectionBoard({ roads, loadError }: Props) {
                       {sortField === 'updatedAt' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
                     </th>
                   ) : null}
-                  <th className="px-4 py-3 text-center">
+                  {isVisible('action') ? (
+                    <th className="px-4 py-3 text-center">
                     {copy.columns.actions}
-                  </th>
+                    </th>
+                  ) : null}
                 </tr>
               </thead>
               <tbody>
@@ -1217,33 +1211,35 @@ export function InspectionBoard({ roads, loadError }: Props) {
                       {isVisible('updatedAt') ? (
                         <td className="px-4 py-3 text-xs text-slate-300">{formatDate(item.updatedAt)}</td>
                       ) : null}
-                      <td className="px-4 py-3 text-center">
-                        <div className="flex items-center justify-center gap-2">
-                          <button
-                            type="button"
-                            className="rounded-lg border border-white/20 px-3 py-1 text-xs font-semibold text-slate-50 transition hover:border-emerald-200/70 hover:bg-emerald-200/15"
-                            onClick={(event) => {
-                              event.stopPropagation()
-                              setSelected(null)
-                              setEditing(item)
-                            }}
-                          >
-                            {copy.table.edit}
-                          </button>
-                          <button
-                            type="button"
-                            className="rounded-lg border border-white/20 px-3 py-1 text-xs font-semibold text-amber-100 transition hover:border-amber-200/70 hover:bg-amber-200/15"
-                            onClick={(event) => {
-                              event.stopPropagation()
-                              setSelected(null)
-                              setDeleteError(null)
-                              setDeleteTarget(item)
-                            }}
-                          >
-                            {copy.table.delete}
-                          </button>
-                        </div>
-                      </td>
+                      {isVisible('action') ? (
+                        <td className="px-4 py-3 text-center">
+                          <div className="flex items-center justify-center gap-2">
+                            <button
+                              type="button"
+                              className="rounded-lg border border-white/20 px-3 py-1 text-xs font-semibold text-slate-50 transition hover:border-emerald-200/70 hover:bg-emerald-200/15"
+                              onClick={(event) => {
+                                event.stopPropagation()
+                                setSelected(null)
+                                setEditing(item)
+                              }}
+                            >
+                              {copy.table.edit}
+                            </button>
+                            <button
+                              type="button"
+                              className="rounded-lg border border-white/20 px-3 py-1 text-xs font-semibold text-amber-100 transition hover:border-amber-200/70 hover:bg-amber-200/15"
+                              onClick={(event) => {
+                                event.stopPropagation()
+                                setSelected(null)
+                                setDeleteError(null)
+                                setDeleteTarget(item)
+                              }}
+                            >
+                              {copy.table.delete}
+                            </button>
+                          </div>
+                        </td>
+                      ) : null}
                     </tr>
                     )
                   })
@@ -1427,6 +1423,18 @@ export function InspectionBoard({ roads, loadError }: Props) {
               const sideText = isPrefab ? '—' : sideCopy[selected.side] ?? selected.side
               const rangeText = isPrefab ? '—' : `${formatPK(selected.startPk)} → ${formatPK(selected.endPk)}`
               const roadText = isPrefab ? prefabRoadLabel : selected.roadName
+              const layerText = localizeProgressList('layer', selected.layers, locale, {
+                phaseName: selected.phaseName,
+              }).join(locale === 'fr' ? ', ' : ' / ')
+              const checksText = localizeProgressList('check', selected.checks, locale).join(
+                locale === 'fr' ? ', ' : ' / ',
+              )
+              const typesText = localizeProgressList('type', selected.types, locale).join(
+                locale === 'fr' ? ', ' : ' / ',
+              )
+              const submittedByText = selected.submittedBy?.username ?? copy.detailModal.unknownUser
+              const createdByText = selected.createdBy?.username ?? copy.detailModal.unknownUser
+              const updatedByText = selected.updatedBy?.username ?? copy.detailModal.unknownUser
               return (
             <div className="w-full max-w-3xl rounded-3xl border border-white/10 bg-slate-900/95 p-6 shadow-2xl shadow-slate-900/50 backdrop-blur">
               <div className="flex items-start justify-between gap-3">
@@ -1450,16 +1458,34 @@ export function InspectionBoard({ roads, loadError }: Props) {
               </div>
               <div className="mt-4 grid gap-3 text-sm text-slate-200 md:grid-cols-2">
                 <div className="space-y-1">
-                  <p className="text-xs text-slate-400">{copy.detailModal.contentsLabel}</p>
+                  <p className="text-xs text-slate-400">道路</p>
+                  <p className="rounded-xl bg-white/5 px-3 py-2 text-sm">{roadText}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-slate-400">分项</p>
                   <p className="rounded-xl bg-white/5 px-3 py-2 text-sm">
-                    {localizeProgressList('check', selected.checks, locale).join(locale === 'fr' ? ', ' : '，')}
+                    {localizeProgressTerm('phase', selected.phaseName, locale)}
                   </p>
                 </div>
                 <div className="space-y-1">
+                  <p className="text-xs text-slate-400">侧别</p>
+                  <p className="rounded-xl bg-white/5 px-3 py-2 text-sm">{sideText}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-slate-400">区间</p>
+                  <p className="rounded-xl bg-white/5 px-3 py-2 text-sm">{rangeText}</p>
+                </div>
+                <div className="space-y-1 md:col-span-2">
+                  <p className="text-xs text-slate-400">验收层次</p>
+                  <p className="rounded-xl bg-white/5 px-3 py-2 text-sm">{layerText}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-slate-400">{copy.detailModal.contentsLabel}</p>
+                  <p className="rounded-xl bg-white/5 px-3 py-2 text-sm">{checksText}</p>
+                </div>
+                <div className="space-y-1">
                   <p className="text-xs text-slate-400">{copy.detailModal.typesLabel}</p>
-                  <p className="rounded-xl bg-white/5 px-3 py-2 text-sm">
-                    {localizeProgressList('type', selected.types, locale).join(locale === 'fr' ? ', ' : '，')}
-                  </p>
+                  <p className="rounded-xl bg-white/5 px-3 py-2 text-sm">{typesText}</p>
                 </div>
                 <div className="space-y-1">
                   <p className="text-xs text-slate-400">{copy.detailModal.statusLabel}</p>
@@ -1471,7 +1497,7 @@ export function InspectionBoard({ roads, loadError }: Props) {
                 </div>
                 <div className="space-y-1">
                   <p className="text-xs text-slate-400">{copy.detailModal.submittedAt}</p>
-                  <p>{formatDate(selected.createdAt)}</p>
+                  <p>{formatDate(selected.submittedAt)}</p>
                 </div>
                 <div className="space-y-1">
                   <p className="text-xs text-slate-400">{copy.detailModal.updatedAt}</p>
@@ -1479,7 +1505,19 @@ export function InspectionBoard({ roads, loadError }: Props) {
                 </div>
                 <div className="space-y-1">
                   <p className="text-xs text-slate-400">{copy.detailModal.submittedBy}</p>
-                  <p>{selected.createdBy?.username ?? copy.detailModal.unknownUser}</p>
+                  <p>{submittedByText}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-slate-400">创建人</p>
+                  <p>{createdByText}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-slate-400">创建时间</p>
+                  <p>{formatDate(selected.createdAt)}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-slate-400">更新人</p>
+                  <p>{updatedByText}</p>
                 </div>
                 <div className="space-y-1 md:col-span-2">
                   <p className="text-xs text-slate-400">{copy.detailModal.remarkLabel}</p>
