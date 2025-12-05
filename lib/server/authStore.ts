@@ -66,8 +66,9 @@ const mapUser = (user: Prisma.UserGetPayload<{ select: typeof userSelection }>):
 }
 
 export const login = async (username: string, password: string) => {
-  const user = await prisma.user.findUnique({
-    where: { username },
+  const normalizedUsername = username.trim().toLowerCase()
+  const user = await prisma.user.findFirst({
+    where: { username: { equals: normalizedUsername, mode: 'insensitive' } },
     select: userSelection,
   })
 

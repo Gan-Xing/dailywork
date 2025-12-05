@@ -33,7 +33,10 @@ export async function POST(request: Request) {
     roleIds,
   } = body ?? {}
 
-  if (!username || !password) {
+  const normalizedUsername =
+    typeof username === 'string' ? username.trim().toLowerCase() : ''
+
+  if (!normalizedUsername || !password) {
     return NextResponse.json({ error: '缺少账号或密码' }, { status: 400 })
   }
 
@@ -53,9 +56,17 @@ export async function POST(request: Request) {
     : []
 
   try {
+    const existing = await prisma.user.findFirst({
+      where: { username: { equals: normalizedUsername, mode: 'insensitive' } },
+      select: { id: true },
+    })
+    if (existing) {
+      return NextResponse.json({ error: '账号已存在（不区分大小写）' }, { status: 409 })
+    }
+
     const user = await prisma.user.create({
       data: {
-        username,
+        username: normalizedUsername,
         passwordHash: hashPassword(password),
         name: name ?? '',
         gender: gender ?? null,
