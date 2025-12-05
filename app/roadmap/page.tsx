@@ -205,66 +205,57 @@ export default function RoadmapPage() {
           </div>
         </header>
 
-      {error ? (
-        <p className='mt-6 rounded-2xl border border-amber-400/30 bg-amber-400/10 px-4 py-3 text-sm text-amber-100'>
-          {error}
-        </p>
-      ) : null}
+        {error ? (
+          <p className='mt-6 rounded-2xl border border-amber-400/30 bg-amber-400/10 px-4 py-3 text-sm text-amber-100'>
+            {error}
+          </p>
+        ) : null}
 
-        <section className='mt-10 grid gap-6 lg:grid-cols-[1.1fr_0.9fr]'>
-          {sessionLoaded && canCreateRoadmap ? (
-            <form
-              onSubmit={submitIdea}
-              className='rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl shadow-slate-950/30 backdrop-blur'
-            >
-              <div className='flex items-center justify-between gap-3'>
-                <div className='space-y-1'>
-                  <p className='text-xs font-semibold uppercase tracking-[0.2em] text-slate-200'>
-                    新想法
-                  </p>
-                  <h2 className='text-xl font-semibold text-slate-50'>写下要做的模块</h2>
-                </div>
-                <span className='rounded-full bg-white/10 px-2 py-1 text-[11px] font-semibold text-emerald-100'>
-                  保存到数据库
-                </span>
+        <section className='mt-10 space-y-6'>
+        {sessionLoaded && canCreateRoadmap ? (
+          <form
+            onSubmit={submitIdea}
+            className='w-full rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl shadow-slate-950/30 backdrop-blur'
+          >
+            <div className='flex flex-wrap items-center justify-between gap-3'>
+              <div className='space-y-1'>
+                <p className='text-xs font-semibold uppercase tracking-[0.2em] text-slate-200'>
+                  新想法
+                </p>
+                <h2 className='text-xl font-semibold text-slate-50'>写下要做的模块</h2>
               </div>
-              <div className='mt-6 space-y-4'>
-                <label className='flex flex-col gap-2 text-sm text-slate-100'>
-                  标题
-                  <input
-                    value={title}
-                    onChange={(event) => setTitle(event.target.value)}
-                    className='rounded-2xl border border-white/15 bg-white/5 px-4 py-3 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none'
-                    placeholder='例如：增加质量巡检检查项、导出中心批量模板...'
-                    required
-                  />
-                </label>
-                <label className='flex flex-col gap-2 text-sm text-slate-100'>
-                  细节 / 备注（可选）
-                  <textarea
-                    value={details}
-                    onChange={(event) => setDetails(event.target.value)}
-                    rows={4}
-                    className='rounded-2xl border border-white/15 bg-white/5 px-4 py-3 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none'
-                    placeholder='补充验收标准、接口需求、预期上线时间等'
-                  />
-                </label>
-                <div className='flex items-center gap-3'>
-                  <button
-                    type='submit'
-                    className='inline-flex items-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-semibold text-slate-900 shadow-lg shadow-emerald-400/20 transition hover:-translate-y-0.5 hover:shadow-emerald-400/30 disabled:opacity-60'
-                    disabled={saving}
-                  >
-                    {saving ? '保存中...' : '保存到路线'}
-                  </button>
-                  <span className='text-xs text-slate-300/80'>
-                    支持随时追加想法，完成后可在列表中标记完成。
-                  </span>
-                </div>
+            </div>
+            <div className='mt-6 flex flex-col gap-4'>
+              <div className='flex flex-col gap-3 md:flex-row md:items-start'>
+                <input
+                  value={title}
+                  onChange={(event) => setTitle(event.target.value)}
+                  className='flex-1 rounded-2xl border border-white/15 bg-white/5 px-4 py-3 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none'
+                  placeholder='例如：增加质量巡检检查项、导出中心批量模板...'
+                  required
+                />
+                <button
+                  type='submit'
+                  className='inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-semibold text-slate-900 shadow-lg shadow-emerald-400/20 transition hover:-translate-y-0.5 hover:shadow-emerald-400/30 disabled:opacity-60 md:min-w-[160px]'
+                  disabled={saving}
+                >
+                  {saving ? '保存中...' : '保存到路线'}
+                </button>
               </div>
-            </form>
+              <label className='flex flex-col gap-2 text-sm text-slate-100'>
+                细节 / 备注（可选）
+                <textarea
+                  value={details}
+                  onChange={(event) => setDetails(event.target.value)}
+                  rows={4}
+                  className='rounded-2xl border border-white/15 bg-white/5 px-4 py-3 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none'
+                  placeholder='补充验收标准、接口需求、预期上线时间等'
+                />
+              </label>
+            </div>
+          </form>
           ) : (
-            <div className='flex flex-col justify-center gap-4 rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl shadow-slate-950/30 backdrop-blur'>
+            <div className='w-full rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl shadow-slate-950/30 backdrop-blur'>
               <div className='space-y-2'>
                 <p className='text-xs font-semibold uppercase tracking-[0.2em] text-slate-200'>
                   新想法
@@ -278,25 +269,27 @@ export default function RoadmapPage() {
                     : '正在确认当前登录状态与权限，请稍候或尝试刷新。'}
                 </p>
               </div>
-              <div className='inline-flex items-center gap-2 text-xs text-slate-300/80'>
+              <div className='mt-3 inline-flex items-center gap-2 text-xs text-slate-300/80'>
                 <span className='h-2 w-2 rounded-full bg-amber-300' />
                 {sessionLoaded ? '当前仅可查看待开发和已完成内容' : '正在加载权限...'}
               </div>
             </div>
           )}
+        </section>
 
+        <div className='mt-8 grid gap-6 lg:grid-cols-2'>
           <div className='space-y-4 rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl shadow-slate-950/30 backdrop-blur'>
             <div className='flex items-center justify-between'>
               <div className='space-y-1'>
                 <p className='text-xs font-semibold uppercase tracking-[0.2em] text-slate-200'>
-                  路线进展
+                  在路上
                 </p>
                 <h2 className='text-lg font-semibold text-slate-50'>
-                  待开发（{pendingItems.length}）
+                  需要开发的内容（{pendingItems.length}）
                 </h2>
               </div>
               <span className='rounded-full bg-white/10 px-2 py-1 text-[11px] font-semibold text-emerald-100'>
-                实时状态
+                待交付
               </span>
             </div>
             <div className='space-y-3'>
@@ -338,59 +331,64 @@ export default function RoadmapPage() {
                 ))
               )}
             </div>
+          </div>
 
-            <div className='space-y-2 border-t border-white/10 pt-4'>
-              <div className='flex items-center justify-between'>
-                <h3 className='text-lg font-semibold text-slate-50'>
-                  已完成（{doneItems.length}）
-                </h3>
-                <span className='rounded-full bg-emerald-500/20 px-2 py-1 text-[11px] font-semibold text-emerald-100'>
-                  归档可追溯
-                </span>
+          <div className='space-y-4 rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl shadow-slate-950/30 backdrop-blur'>
+            <div className='flex items-center justify-between'>
+              <div className='space-y-1'>
+                <p className='text-xs font-semibold uppercase tracking-[0.2em] text-slate-200'>
+                  已登场
+                </p>
+                <h2 className='text-lg font-semibold text-slate-50'>
+                  已经实现的内容（{doneItems.length}）
+                </h2>
               </div>
-              <div className='space-y-3'>
-                {loading ? (
-                  <p className='text-sm text-slate-200'>加载中...</p>
-                ) : doneItems.length === 0 ? (
-                  <p className='text-sm text-slate-300/80'>还没有完成的条目。</p>
-                ) : (
-                  doneItems.map((item) => (
-                    <article
-                      key={item.id}
-                      className='rounded-2xl border border-emerald-400/15 bg-emerald-400/5 p-4 shadow-inner shadow-emerald-500/10'
-                    >
-                      <div className='flex items-start justify-between gap-3'>
-                        <div>
-                          <p className='text-xs uppercase tracking-wide text-emerald-100'>
-                            {statusLabels[item.status]}
-                          </p>
-                          <h3 className='text-base font-semibold text-slate-50'>
-                            {item.title}
-                          </h3>
-                        </div>
-                        <button
-                          type='button'
-                          onClick={() => toggleStatus(item)}
-                          className='rounded-full border border-white/20 px-3 py-1 text-[11px] font-semibold text-slate-50 transition hover:border-white/40 disabled:opacity-60'
-                          disabled={updatingId === item.id || !canUpdateRoadmap}
-                        >
-                          {updatingId === item.id ? '更新中...' : '重新打开'}
-                        </button>
+              <span className='rounded-full bg-emerald-500/20 px-2 py-1 text-[11px] font-semibold text-emerald-100'>
+                可回溯
+              </span>
+            </div>
+            <div className='space-y-3'>
+              {loading ? (
+                <p className='text-sm text-slate-200'>加载中...</p>
+              ) : doneItems.length === 0 ? (
+                <p className='text-sm text-slate-300/80'>还没有完成的条目。</p>
+              ) : (
+                doneItems.map((item) => (
+                  <article
+                    key={item.id}
+                    className='rounded-2xl border border-emerald-400/15 bg-emerald-400/5 p-4 shadow-inner shadow-emerald-500/10'
+                  >
+                    <div className='flex items-start justify-between gap-3'>
+                      <div>
+                        <p className='text-xs uppercase tracking-wide text-emerald-100'>
+                          {statusLabels[item.status]}
+                        </p>
+                        <h3 className='text-base font-semibold text-slate-50'>
+                          {item.title}
+                        </h3>
                       </div>
-                      {item.details ? (
-                        <p className='mt-2 text-sm text-slate-100/90'>{item.details}</p>
-                      ) : null}
-                      <div className='mt-3 flex items-center gap-3 text-[11px] text-slate-200/80'>
-                        <span>记录时间 {formatDate(item.createdAt)}</span>
-                        <span>完成 {formatDate(item.completedAt)}</span>
-                      </div>
-                    </article>
-                  ))
-                )}
-              </div>
+                      <button
+                        type='button'
+                        onClick={() => toggleStatus(item)}
+                        className='rounded-full border border-white/20 px-3 py-1 text-[11px] font-semibold text-slate-50 transition hover:border-white/40 disabled:opacity-60'
+                        disabled={updatingId === item.id || !canUpdateRoadmap}
+                      >
+                        {updatingId === item.id ? '更新中...' : '重新打开'}
+                      </button>
+                    </div>
+                    {item.details ? (
+                      <p className='mt-2 text-sm text-slate-100/90'>{item.details}</p>
+                    ) : null}
+                    <div className='mt-3 flex items-center gap-3 text-[11px] text-slate-200/80'>
+                      <span>记录时间 {formatDate(item.createdAt)}</span>
+                      <span>完成 {formatDate(item.completedAt)}</span>
+                    </div>
+                  </article>
+                ))
+              )}
             </div>
           </div>
-        </section>
+        </div>
       </div>
     </main>
   )
