@@ -33,8 +33,11 @@ export type HomeCopy = {
   }
   extension: {
     label: string
+    title: string
     items: string[]
     description: string
+    helper: string
+    cta: string
   }
   moduleDialog: {
     title: string
@@ -140,10 +143,13 @@ export const homeCopy: Record<Locale, HomeCopy> = {
       upcomingBody: '支持更多入口：质量巡检、物资追踪、风险复盘。'
     },
     extension: {
-      label: '扩展空间',
+      label: '开发路线',
+      title: '扩展空间升级为可进入的开发路线',
       items: ['质量巡检', '物资进出', '风险复盘', 'AI 总结', '导出中心'],
       description:
-        '未来的入口会延续同一视觉规范：清晰分区、带状态标识、可快速跳转到具体场景。需要新增模块时直接在此卡片组追加即可。'
+        '这里用于记录和排期新的模块/想法，随时写入并保存在数据库，开发完成后点击完成即可闭环。',
+      helper: '标签代表当前预排的入口方向；更多灵感可以直接在路线中补充并追踪状态。',
+      cta: '进入开发路线'
     },
     moduleDialog: {
       title: '暂无访问权限',
@@ -250,7 +256,8 @@ export const homeCopy: Record<Locale, HomeCopy> = {
       upcomingBody: 'Inspection qualité, flux matériaux, revues de risques.'
     },
     extension: {
-      label: "Espace d'extension",
+      label: 'Feuille de route',
+      title: "L'espace d'extension devient une feuille de route actionnable",
       items: [
         'Inspection qualité',
         'Flux de matériaux',
@@ -259,7 +266,10 @@ export const homeCopy: Record<Locale, HomeCopy> = {
         "Centre d'export"
       ],
       description:
-        'Les futurs modules suivront la même grille visuelle : zones claires, statut visible et navigation rapide vers chaque scénario. Ajoutez simplement une carte ici quand un nouveau module arrive.'
+        'Centralisez les nouvelles idées de modules, stockez-les en base et cochez « terminé » dès que la livraison est faite.',
+      helper:
+        'Les tags listent les pistes déjà prévues ; ajoutez d’autres idées dans la feuille de route et suivez leur statut.',
+      cta: 'Ouvrir la feuille de route'
     },
     moduleDialog: {
       title: 'Accès requis',

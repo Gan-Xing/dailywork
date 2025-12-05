@@ -393,25 +393,56 @@ export default function HomePage() {
 					})}
 				</section>
 
-				<section className='mt-12 grid gap-4 rounded-3xl border border-white/10 bg-white/5 p-6 text-sm text-slate-100 backdrop-blur'>
-					<div className='flex items-center gap-2'>
-						<div className='h-2 w-2 rounded-full bg-emerald-300' />
-						<p className='text-xs font-semibold uppercase tracking-[0.2em] text-slate-200'>
-							{t.extension.label}
-						</p>
+				<section className='mt-12 overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-white/5 via-white/0 to-white/5 p-6 text-sm text-slate-100 shadow-xl shadow-slate-950/20 backdrop-blur'>
+					<div className='flex flex-col gap-6 md:flex-row md:items-center md:justify-between'>
+						<div className='space-y-3'>
+							<div className='flex items-center gap-2'>
+								<div className='h-2 w-2 rounded-full bg-emerald-300' />
+								<p className='text-xs font-semibold uppercase tracking-[0.2em] text-slate-200'>
+									{t.extension.label}
+								</p>
+								<span className='rounded-full bg-white/10 px-2 py-1 text-[11px] font-semibold text-emerald-100'>
+									ROADMAP
+								</span>
+							</div>
+							<h2 className='text-2xl font-semibold text-slate-50 sm:text-3xl'>
+								{t.extension.title}
+							</h2>
+							<p className='max-w-2xl text-slate-200/80'>
+								{t.extension.description}
+							</p>
+							<div className='flex flex-wrap gap-2'>
+								{t.extension.items.map((item) => (
+									<span
+										key={item}
+										className='rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-50'>
+										{item}
+									</span>
+								))}
+							</div>
+							<p className='text-xs text-slate-300/80'>{t.extension.helper}</p>
+						</div>
+						<div className='flex w-full max-w-xs flex-col gap-3 rounded-2xl border border-white/10 bg-white/10 p-4 shadow-lg shadow-emerald-500/10'>
+							<div className='flex items-center justify-between gap-3'>
+								<span className='text-sm font-semibold text-slate-50'>
+									{t.extension.label}
+								</span>
+								<span className='rounded-full bg-emerald-500/20 px-2 py-1 text-[11px] font-semibold text-emerald-100'>
+									✓
+								</span>
+							</div>
+							<p className='text-xs text-slate-200/80'>{t.extension.helper}</p>
+							<Link
+								href='/roadmap'
+								className='inline-flex items-center justify-center gap-2 rounded-xl bg-white px-4 py-3 text-sm font-semibold text-slate-900 transition hover:-translate-y-0.5 hover:shadow-lg hover:shadow-emerald-400/20'>
+								{t.extension.cta}
+								<span aria-hidden>↗</span>
+							</Link>
+							<p className='text-xs text-slate-200/70'>
+								{t.extension.description}
+							</p>
+						</div>
 					</div>
-					<div className='flex flex-wrap gap-3'>
-						{t.extension.items.map((item) => (
-							<span
-								key={item}
-								className='rounded-full border border-white/15 px-3 py-1 text-xs font-semibold text-slate-50'>
-								{item}
-							</span>
-						))}
-					</div>
-					<p className='text-slate-200/80'>
-						{t.extension.description}
-					</p>
 				</section>
 			</div>
 

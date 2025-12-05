@@ -348,6 +348,8 @@ type InspectionBoardCopy = {
     sideBoth: string
     type: string
     typePlaceholder: string
+    check: string
+    checkPlaceholder: string
     status: string
     startDate: string
     endDate: string
@@ -837,6 +839,8 @@ const progressCopy: Record<Locale, ProgressCopy> = {
         sideBoth: '双侧',
         type: '验收类型',
         typePlaceholder: '试验验收',
+        check: '验收内容',
+        checkPlaceholder: '钢筋验收',
         status: '状态',
         startDate: '开始日期',
         endDate: '结束日期',
@@ -1352,6 +1356,8 @@ const progressCopy: Record<Locale, ProgressCopy> = {
         sideBoth: 'Deux côtés',
         type: 'Type de contrôle',
         typePlaceholder: 'ex : Contrôle labo',
+        check: 'Contenu',
+        checkPlaceholder: 'ex : Armatures',
         status: 'Statut',
         startDate: 'Début',
         endDate: 'Fin',

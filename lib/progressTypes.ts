@@ -42,6 +42,7 @@ export interface InspectionFilter {
   status?: InspectionStatus[]
   side?: IntervalSide
   type?: string
+  check?: string
   keyword?: string
   startDate?: string
   endDate?: string

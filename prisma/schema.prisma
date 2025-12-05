@@ -40,6 +40,11 @@ enum EmploymentStatus {
   ON_LEAVE
 }
 
+enum RoadmapStatus {
+  PENDING
+  DONE
+}
+
 model PhaseDefinition {
   id             Int                     @id @default(autoincrement())
   name           String                  @unique
@@ -260,6 +265,8 @@ model User {
   updatedBy    User?      @relation("UserUpdater", fields: [updatedById], references: [id])
   createdUsers User[]     @relation("UserCreator")
   updatedUsers User[]     @relation("UserUpdater")
+  roadmapIdeasCreated RoadmapIdea[] @relation("RoadmapIdeaCreator")
+  roadmapIdeasUpdated RoadmapIdea[] @relation("RoadmapIdeaUpdater")
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 }
@@ -393,4 +400,20 @@ model FinanceEntry {
   @@index([paymentDate])
   @@index([isDeleted])
   @@index([handlerId])
+}
+
+model RoadmapIdea {
+  id           Int            @id @default(autoincrement())
+  title        String
+  details      String?
+  status       RoadmapStatus  @default(PENDING)
+  completedAt  DateTime?
+  createdById  Int?
+  updatedById  Int?
+  createdBy    User?          @relation("RoadmapIdeaCreator", fields: [createdById], references: [id])
+  updatedBy    User?          @relation("RoadmapIdeaUpdater", fields: [updatedById], references: [id])
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  @@index([status, createdAt])
 }

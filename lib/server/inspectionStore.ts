@@ -127,6 +127,9 @@ export const listInspections = async (filter: InspectionFilter): Promise<Inspect
   if (filter.type) {
     where.types = { has: filter.type }
   }
+  if (filter.check) {
+    where.checks = { has: filter.check }
+  }
   if (filter.keyword) {
     where.OR = [
       { remark: { contains: filter.keyword, mode: 'insensitive' } },

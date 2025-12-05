@@ -28,6 +28,11 @@ interface Props {
   loadError: string | null
 }
 
+type PhaseOption = RoadSectionWithPhasesDTO['phases'][number] & {
+  roadSlug?: string
+  roadName?: string
+}
+
 type SortField = 'road' | 'phase' | 'side' | 'appointmentDate' | 'createdAt' | 'updatedAt'
 type SortOrder = 'asc' | 'desc'
 type ColumnKey =
@@ -50,7 +55,25 @@ type ColumnKey =
   | 'updatedAt'
 
 const INSPECTION_COLUMN_STORAGE_KEY = 'inspection-visible-columns'
-const defaultVisibleColumns: ColumnKey[] = ['sequence', 'road', 'phase', 'range', 'status']
+const defaultVisibleColumns: ColumnKey[] = [
+  'sequence',
+  'road',
+  'phase',
+  'side',
+  'range',
+  'layers',
+  'checks',
+  'types',
+  'status',
+  'appointmentDate',
+  'submittedAt',
+  'submittedBy',
+  'remark',
+  'createdBy',
+  'createdAt',
+  'updatedBy',
+  'updatedAt',
+]
 
 const statusTone: Record<InspectionStatus, string> = {
   PENDING: 'bg-slate-800 text-slate-100 ring-1 ring-white/10',
@@ -125,7 +148,11 @@ export function InspectionBoard({ roads, loadError }: Props) {
   const [status, setStatus] = useState<InspectionStatus[]>([])
   const [side, setSide] = useState('')
   const [type, setType] = useState('')
+  const [check, setCheck] = useState('')
   const [keyword, setKeyword] = useState('')
+  const [checkOptions, setCheckOptions] = useState<string[]>([])
+  const [checkOptionsError, setCheckOptionsError] = useState<string | null>(null)
+  const [checkOptionsLoading, setCheckOptionsLoading] = useState(false)
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [sortField, setSortField] = useState<SortField>('updatedAt')
@@ -218,10 +245,52 @@ export function InspectionBoard({ roads, loadError }: Props) {
   const [deletePending, setDeletePending] = useState(false)
   const dateLocaleTag = locale === 'fr' ? 'fr-FR' : 'zh-CN'
 
-  const phases = useMemo(() => {
-    const found = roads.find((road) => road.slug === roadSlug)
-    return found?.phases ?? []
-  }, [roadSlug, roads])
+  const phases = useMemo<PhaseOption[]>(() => {
+    if (roadSlug) {
+      const found = roads.find((road) => road.slug === roadSlug)
+      return found?.phases ?? []
+    }
+    return roads.flatMap((road) =>
+      (road.phases ?? []).map((phase) => ({
+        ...phase,
+        roadSlug: road.slug,
+        roadName: resolveRoadName(road, locale),
+      })),
+    )
+  }, [locale, roadSlug, roads])
+
+  useEffect(() => {
+    let stopped = false
+    const loadCheckOptions = async () => {
+      setCheckOptionsLoading(true)
+      setCheckOptionsError(null)
+      try {
+        const res = await fetch('/api/inspections/check-options')
+        const data = (await res.json().catch(() => ({}))) as {
+          items?: { id: number; name: string }[]
+          message?: string
+        }
+        if (!res.ok || !data.items) {
+          throw new Error(data.message ?? copy.errors.loadFailed)
+        }
+        if (stopped) return
+        const names = data.items.map((item) => item.name).filter(Boolean)
+        setCheckOptions(Array.from(new Set(names)))
+      } catch (err) {
+        if (!stopped) {
+          setCheckOptionsError((err as Error).message)
+        }
+      } finally {
+        if (!stopped) {
+          setCheckOptionsLoading(false)
+        }
+      }
+    }
+    loadCheckOptions()
+    return () => {
+      stopped = true
+    }
+  }, [copy.errors.loadFailed])
 
   const editingPhases = useMemo(() => {
     if (!editing) return []
@@ -245,6 +314,7 @@ export function InspectionBoard({ roads, loadError }: Props) {
         status: status.length ? status : undefined,
         side: side || undefined,
         type: type || undefined,
+        check: check || undefined,
         keyword: keyword || undefined,
         startDate: startDate || undefined,
         endDate: endDate || undefined,
@@ -270,7 +340,7 @@ export function InspectionBoard({ roads, loadError }: Props) {
   useEffect(() => {
     fetchData()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roadSlug, phaseId, status, side, type, keyword, startDate, endDate, sortField, sortOrder, page, pageSize])
+  }, [roadSlug, phaseId, status, side, type, check, keyword, startDate, endDate, sortField, sortOrder, page, pageSize])
 
   useEffect(() => {
     setSelectedIds((prev) => prev.filter((id) => items.some((item) => item.id === id)))
@@ -373,6 +443,7 @@ export function InspectionBoard({ roads, loadError }: Props) {
     setStatus([])
     setSide('')
     setType('')
+    setCheck('')
     setKeyword('')
     setStartDate('')
     setEndDate('')
@@ -641,7 +712,7 @@ export function InspectionBoard({ roads, loadError }: Props) {
                 <option value="">{copy.filters.all}</option>
                 {phases.map((phase) => (
                   <option key={phase.id} value={phase.id}>
-                    {phase.name}
+                    {phase.roadName ? `${phase.roadName} · ${phase.name}` : phase.name}
                   </option>
                 ))}
               </select>
@@ -673,6 +744,30 @@ export function InspectionBoard({ roads, loadError }: Props) {
                 }}
                 placeholder={copy.filters.typePlaceholder}
               />
+            </label>
+            <label className="flex flex-col gap-1 text-xs text-slate-200">
+              {copy.filters.check}
+              <select
+                className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
+                value={check}
+                onChange={(e) => {
+                  setCheck(e.target.value)
+                  setPage(1)
+                }}
+              >
+                <option value="">{copy.filters.all}</option>
+                {checkOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
+              {checkOptionsLoading ? (
+                <span className="text-[11px] text-slate-300">{copy.filters.loading}</span>
+              ) : null}
+              {checkOptionsError ? (
+                <span className="text-[11px] text-amber-200">{checkOptionsError}</span>
+              ) : null}
             </label>
             <div className="flex items-center gap-2 text-xs text-slate-200">
               <span className="whitespace-nowrap">{copy.filters.status}</span>

@@ -265,9 +265,9 @@ export const walkwayCulvertWorkflow: WorkflowTemplate = {
   defaultTypes: defaultWorkflowTypes,
   layers: [
     simpleLayer('excavation', '基坑', 1, ['放样与开挖']),
-    simpleLayer('base-slab', '底板', 2, ['钢筋绑扎验收', '模版安装验收', '混凝土浇筑验收'], ['excavation']),
-    simpleLayer('wall', '墙身', 3, ['钢筋绑扎验收', '模版安装验收', '混凝土浇筑验收'], ['base-slab']),
-    simpleLayer('roof', '顶板', 4, ['钢筋绑扎验收', '模版安装验收', '混凝土浇筑验收'], ['wall']),
+    simpleLayer('base-slab', '底板', 2, ['钢筋绑扎验收', '模板安装验收', '混凝土浇筑验收'], ['excavation']),
+    simpleLayer('wall', '墙身', 3, ['钢筋绑扎验收', '模板安装验收', '混凝土浇筑验收'], ['base-slab']),
+    simpleLayer('roof', '顶板', 4, ['钢筋绑扎验收', '模板安装验收', '混凝土浇筑验收'], ['wall']),
   ],
 }
 

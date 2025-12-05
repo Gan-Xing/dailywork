@@ -16,6 +16,7 @@ export async function GET(request: Request) {
     status: statusParams.length ? statusParams : undefined,
     side: (searchParams.get('side') as 'LEFT' | 'RIGHT' | 'BOTH' | null) ?? undefined,
     type: searchParams.get('type') ?? undefined,
+    check: searchParams.get('check') ?? undefined,
     keyword: searchParams.get('keyword') ?? undefined,
     startDate: searchParams.get('startDate') ?? undefined,
     endDate: searchParams.get('endDate') ?? undefined,

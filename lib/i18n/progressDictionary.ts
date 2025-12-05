@@ -62,12 +62,12 @@ const dictionaries: Record<DictionaryKind, Record<string, Entry>> = {
   check: {
     [normalize('钢筋绑扎验收')]: { zh: '钢筋绑扎验收', fr: 'Ferraillage' },
     [normalize('模版验收')]: { zh: '模版验收', fr: 'Réception coffrage' },
-    [normalize('模版安装验收')]: { zh: '模版安装验收', fr: 'Coffrage' },
+    [normalize('模版安装验收')]: { zh: '模板安装验收', fr: 'Coffrage' },
     [normalize('模板安装验收')]: { zh: '模板安装验收', fr: 'Coffrage' },
     [normalize('混凝土浇筑验收')]: { zh: '混凝土浇筑验收', fr: 'Réception bétonnage' },
     [normalize('放样与开挖')]: { zh: '放样与开挖', fr: 'Implantation et fouille' },
     [normalize('Implatation et fouille')]: { zh: '放样与开挖', fr: 'Implantation et fouille' },
-    [normalize('Coffrage')]: { zh: '模版安装验收', fr: 'Coffrage' },
+    [normalize('Coffrage')]: { zh: '模板安装验收', fr: 'Coffrage' },
     [normalize('起终点桩号及清理完成验收')]: { zh: '起终点桩号及清理完成验收', fr: 'Réception des sections et nettoyage' },
     [normalize('Recption des Section et Netoyer')]: {
       zh: '起终点桩号及清理完成验收',
