@@ -738,7 +738,7 @@ export function PhaseEditor({
         return
       }
       if (!definitionId) {
-        setError('请选择分项模板')
+        setError(t.errors.definitionMissing)
         return
       }
       const payload: PhasePayload = {
@@ -1047,7 +1047,11 @@ export function PhaseEditor({
         })
       })
       if (missingDeps.size) {
-        raiseSubmitError(`缺少前置报检/预约：${Array.from(missingDeps).join(' / ')}`)
+        raiseSubmitError(
+          formatProgressCopy(t.inspection.dialogBundleMessage, {
+            deps: Array.from(missingDeps).join(listJoiner),
+          }),
+        )
         return
       }
     }
@@ -1070,6 +1074,15 @@ export function PhaseEditor({
   const [latestPointInspections, setLatestPointInspections] = useState<Map<string, LatestPointInspection>>(
     () => new Map(),
   )
+  const listJoiner = locale === 'fr' ? ', ' : ' / '
+  const sentenceJoiner = locale === 'fr' ? '; ' : '；'
+  const displayPhaseName = (name?: string) => (name ? localizeProgressTerm('phase', name, locale) : '')
+  const displayLayerName = (name: string) =>
+    localizeProgressTerm('layer', name, locale, {
+      phaseName: selectedSegment?.workflow?.phaseName ?? selectedSegment?.phase,
+    })
+  const displayCheckName = (name: string) => localizeProgressTerm('check', name, locale)
+  const displayTypeName = (name: string) => localizeProgressTerm('type', name, locale)
   const latestInspectionByPhase = useMemo(() => {
     const map = new Map<number, number>()
     inspectionSlices.forEach((item) => {
@@ -1115,8 +1128,15 @@ export function PhaseEditor({
 
   const workflowLayerNameMap = useMemo(() => {
     if (!selectedSegment?.workflowLayers?.length) return null
-    return new Map(selectedSegment.workflowLayers.map((layer) => [layer.id, layer.name]))
-  }, [selectedSegment?.workflowLayers])
+    return new Map(
+      selectedSegment.workflowLayers.map((layer) => [
+        layer.id,
+        localizeProgressTerm('layer', layer.name, locale, {
+          phaseName: selectedSegment.workflow?.phaseName ?? selectedSegment.phase,
+        }),
+      ]),
+    )
+  }, [locale, selectedSegment?.phase, selectedSegment?.workflow?.phaseName, selectedSegment?.workflowLayers])
 
   const workflowChecksByLayerName = useMemo(() => {
     if (!selectedSegment?.workflowLayers?.length) return null
@@ -1978,7 +1998,7 @@ export function PhaseEditor({
                     {t.inspection.title}
                   </span>
                 <span className="rounded-full bg-white/5 px-3 py-1 text-xs font-semibold text-slate-100 ring-1 ring-white/10">
-                  {selectedSegment.phase}
+                  {displayPhaseName(selectedSegment.phase)}
                 </span>
                 <span className="rounded-full bg-white/5 px-2.5 py-1 text-xs font-semibold text-slate-100 ring-1 ring-white/10">
                   {selectedSegment.sideLabel}
@@ -2052,59 +2072,68 @@ export function PhaseEditor({
 
                   {selectedSegment.workflow && selectedSegment.workflowLayers?.length ? (
                     <div className="space-y-3 rounded-2xl border border-emerald-300/30 bg-emerald-400/5 p-4 shadow-inner shadow-emerald-400/20">
-                      <div className="flex flex-wrap items-center gap-2 text-xs text-emerald-100">
-                        <span className="rounded-full bg-emerald-300/25 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-50">
-                          {workflowCopy.badge}
-                        </span>
-                        <span className="font-semibold text-emerald-50">
-                          {selectedSegment.workflow.phaseName}
-                        </span>
-                        <span className="text-emerald-100/80">{workflowCopy.ruleTitle}</span>
-                        {selectedSegment.workflow.sideRule ? (
-                          <span className="rounded-full bg-emerald-300/15 px-2 py-1 text-[10px] text-emerald-50">
-                            {selectedSegment.workflow.sideRule}
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-emerald-100">
+                    <span className="rounded-full bg-emerald-300/25 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-50">
+                      {workflowCopy.badge}
+                    </span>
+                    <span className="font-semibold text-emerald-50">
+                          {displayPhaseName(selectedSegment.workflow.phaseName)}
+                    </span>
+                    <span className="text-emerald-100/80">{workflowCopy.ruleTitle}</span>
+                    {selectedSegment.workflow.sideRule ? (
+                      <span className="rounded-full bg-emerald-300/15 px-2 py-1 text-[10px] text-emerald-50">
+                        {selectedSegment.workflow.sideRule}
                           </span>
                         ) : null}
                       </div>
                       <div className="grid gap-2 md:grid-cols-2">
                         {selectedSegment.workflowLayers.map((layer) => {
                           const dependsNames = (layer.dependencies ?? []).map(
-                            (id) => workflowLayerNameMap?.get(id) ?? id,
+                            (id) => workflowLayerNameMap?.get(id) ?? displayLayerName(id),
                           )
                           const lockNames = (layer.lockStepWith ?? []).map(
-                            (id) => workflowLayerNameMap?.get(id) ?? id,
+                            (id) => workflowLayerNameMap?.get(id) ?? displayLayerName(id),
                           )
                           const parallelNames = (layer.parallelWith ?? []).map(
-                            (id) => workflowLayerNameMap?.get(id) ?? id,
+                            (id) => workflowLayerNameMap?.get(id) ?? displayLayerName(id),
                           )
-      const checkSummary = layer.checks
-        .map((check) => `${check.name}（${check.types.join(' / ')}）`)
-        .join('；')
+                          const checkSummary = layer.checks
+                            .map(
+                              (check) =>
+                                `${displayCheckName(check.name)} (${check.types
+                                  .map((type) => displayTypeName(type))
+                                  .join(listJoiner)})`,
+                            )
+                            .join(sentenceJoiner)
                           return (
                             <div
                               key={layer.id}
                               className="rounded-2xl border border-emerald-200/30 bg-white/5 p-3 text-[11px] text-emerald-50 shadow-inner shadow-emerald-500/10"
                             >
                               <div className="flex items-center justify-between gap-2">
-                                <span className="font-semibold">{layer.name}</span>
+                                <span className="font-semibold">{displayLayerName(layer.name)}</span>
                                 <span className="rounded-full bg-emerald-300/20 px-2 py-0.5 text-[10px] font-semibold text-emerald-950">
                                   {formatProgressCopy(workflowCopy.stageName, { value: layer.stage })}
                                 </span>
                               </div>
                               <p className="mt-1 text-emerald-100/80">
                                 {dependsNames.length
-                                  ? formatProgressCopy(workflowCopy.timelineDepends, { deps: dependsNames.join(' / ') })
+                                  ? formatProgressCopy(workflowCopy.timelineDepends, {
+                                      deps: dependsNames.join(listJoiner),
+                                    })
                                   : workflowCopy.timelineFree}
                               </p>
                               {lockNames.length ? (
                                 <p className="text-emerald-100/80">
-                                  {formatProgressCopy(workflowCopy.lockedWith, { peers: lockNames.join(' / ') })}
+                                  {formatProgressCopy(workflowCopy.lockedWith, {
+                                    peers: lockNames.join(listJoiner),
+                                  })}
                                 </p>
                               ) : null}
                               {parallelNames.length ? (
                                 <p className="text-emerald-100/80">
                                   {formatProgressCopy(workflowCopy.parallelWith, {
-                                    peers: parallelNames.join(' / '),
+                                    peers: parallelNames.join(listJoiner),
                                   })}
                                 </p>
                               ) : null}
@@ -2142,7 +2171,7 @@ export function PhaseEditor({
                               toggleLayerSelection(item)
                             }}
                           >
-                            {item}
+                            {displayLayerName(item)}
                           </button>
                         ))}
                       </div>
@@ -2172,7 +2201,7 @@ export function PhaseEditor({
                               toggleCheck(item)
                             }}
                           >
-                            {item}
+                            {displayCheckName(item)}
                           </button>
                         ))}
                       </div>
@@ -2193,7 +2222,7 @@ export function PhaseEditor({
                           }`}
                           onClick={() => toggleToken(item, selectedTypes, setSelectedTypes)}
                         >
-                          {item}
+                          {displayTypeName(item)}
                         </button>
                       ))}
                     </div>

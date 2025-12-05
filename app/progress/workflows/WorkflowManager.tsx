@@ -12,6 +12,7 @@ import type {
 import { defaultWorkflowTypes } from '@/lib/progressWorkflow'
 import { locales } from '@/lib/i18n'
 import { getProgressCopy, formatProgressCopy } from '@/lib/i18n/progress'
+import { localizeProgressTerm } from '@/lib/i18n/progressDictionary'
 import { usePreferredLocale } from '@/lib/usePreferredLocale'
 
 type WorkflowItem = WorkflowBinding
@@ -27,6 +28,11 @@ export function WorkflowManager({ initialWorkflows }: Props) {
   const { locale } = usePreferredLocale('zh', locales)
   const t = getProgressCopy(locale)
   const copy = t.workflow
+  const listJoiner = locale === 'fr' ? ', ' : '、'
+  const displayLayerName = (name: string) =>
+    localizeProgressTerm('layer', name, locale, { phaseName: selected?.phaseName })
+  const displayCheckName = (name: string) => localizeProgressTerm('check', name, locale)
+  const displayTypeName = (name: string) => localizeProgressTerm('type', name, locale)
 
   const [workflows, setWorkflows] = useState<WorkflowItem[]>(() => initialWorkflows)
   const [selectedId, setSelectedId] = useState<string>(initialWorkflows[0]?.id ?? '')
@@ -378,8 +384,10 @@ export function WorkflowManager({ initialWorkflows }: Props) {
           ? formatProgressCopy(copy.ruleDepends, {
               name: layer.name,
               deps: layer.dependencies
-                .map((id) => selected.layers.find((item) => item.id === id)?.name || id)
-                .join('、'),
+                .map((id) =>
+                  displayLayerName(selected.layers.find((item) => item.id === id)?.name || id),
+                )
+                .join(listJoiner),
             })
           : ''
       const locks =
@@ -387,13 +395,15 @@ export function WorkflowManager({ initialWorkflows }: Props) {
           ? formatProgressCopy(copy.ruleLock, {
               name: layer.name,
               peers: (layer.lockStepWith || [])
-                .map((id) => selected.layers.find((item) => item.id === id)?.name || id)
-                .join('、'),
-            })
+                .map((id) =>
+                  displayLayerName(selected.layers.find((item) => item.id === id)?.name || id),
+                )
+                .join(listJoiner),
+          })
           : ''
       return [deps, locks].filter(Boolean).join(' · ')
     })
-  }, [copy.ruleDepends, copy.ruleLock, selected])
+  }, [copy.ruleDepends, copy.ruleLock, listJoiner, locale, selected])
 
   const checkCount = useMemo(
     () => (selected ? selected.layers.reduce((acc, layer) => acc + layer.checks.length, 0) : 0),
@@ -1001,7 +1011,9 @@ export function WorkflowManager({ initialWorkflows }: Props) {
                     {copy.timelineBadge}
                   </p>
                   <h2 className="text-xl font-semibold text-white">
-                    {formatProgressCopy(copy.timelineTitle, { phase: selected?.phaseName ?? '未选模板' })}
+                    {formatProgressCopy(copy.timelineTitle, {
+                      phase: selected?.phaseName ?? copy.templateEmpty,
+                    })}
                   </h2>
                   <p className="text-xs text-slate-200/80">{copy.timelineHint}</p>
                 </div>
@@ -1043,17 +1055,20 @@ export function WorkflowManager({ initialWorkflows }: Props) {
                         >
                           <div className="flex items-start justify-between gap-2">
                             <div className="space-y-1">
-                              <p className="text-sm font-semibold text-white">{layer.name}</p>
+                              <p className="text-sm font-semibold text-white">
+                                {displayLayerName(layer.name)}
+                              </p>
                               <p className="text-[11px] text-slate-300">
                                 {layer.dependencies.length
                                   ? formatProgressCopy(copy.timelineDepends, {
                                       deps: layer.dependencies
                                         .map(
                                           (id) =>
-                                            selected.layers.find((item) => item.id === id)?.name ||
-                                            id,
+                                            displayLayerName(
+                                              selected.layers.find((item) => item.id === id)?.name || id,
+                                            ),
                                         )
-                                        .join('、'),
+                                        .join(listJoiner),
                                     })
                                   : copy.timelineFree}
                               </p>
@@ -1068,10 +1083,11 @@ export function WorkflowManager({ initialWorkflows }: Props) {
                                     peers: layer.lockStepWith
                                       .map(
                                         (id) =>
-                                          selected.layers.find((item) => item.id === id)?.name ||
-                                          id,
+                                          displayLayerName(
+                                            selected.layers.find((item) => item.id === id)?.name || id,
+                                          ),
                                       )
-                                      .join('、'),
+                                      .join(listJoiner),
                                   })}
                                 </span>
                               ) : null}
@@ -1081,10 +1097,11 @@ export function WorkflowManager({ initialWorkflows }: Props) {
                                     peers: layer.parallelWith
                                       .map(
                                         (id) =>
-                                          selected.layers.find((item) => item.id === id)?.name ||
-                                          id,
+                                          displayLayerName(
+                                            selected.layers.find((item) => item.id === id)?.name || id,
+                                          ),
                                       )
-                                      .join('、'),
+                                      .join(listJoiner),
                                   })}
                                 </span>
                               ) : null}
@@ -1101,7 +1118,9 @@ export function WorkflowManager({ initialWorkflows }: Props) {
                                     <span className="rounded-full bg-white/10 px-2 py-1 text-[11px] text-slate-200">
                                       {idx + 1}
                                     </span>
-                                    <span className="text-sm text-white">{check.name}</span>
+                                    <span className="text-sm text-white">
+                                      {displayCheckName(check.name)}
+                                    </span>
                                   </div>
                                   <div className="flex flex-wrap gap-1">
                                     {check.types.map((type) => (
@@ -1109,7 +1128,7 @@ export function WorkflowManager({ initialWorkflows }: Props) {
                                         key={type}
                                         className="rounded-full bg-amber-300/20 px-2 py-1 text-[11px] text-amber-100"
                                       >
-                                        {type}
+                                        {displayTypeName(type)}
                                       </span>
                                     ))}
                                   </div>
