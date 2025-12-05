@@ -23,9 +23,23 @@ export async function PATCH(
     return NextResponse.json({ message: '无效的路线 ID' }, { status: 400 })
   }
 
-  let payload: { status?: unknown; details?: unknown }
+  let payload: {
+    status?: unknown
+    details?: unknown
+    priority?: unknown
+    importance?: unknown
+    difficulty?: unknown
+    title?: unknown
+  }
   try {
-    payload = (await request.json()) as { status?: unknown; details?: unknown }
+    payload = (await request.json()) as {
+      status?: unknown
+      details?: unknown
+      priority?: unknown
+      importance?: unknown
+      difficulty?: unknown
+      title?: unknown
+    }
   } catch {
     return NextResponse.json({ message: '请求体格式错误' }, { status: 400 })
   }
@@ -35,6 +49,10 @@ export async function PATCH(
     details?: string | null
     completedAt?: Date | null
     updatedById?: number
+    priority?: number
+    importance?: number
+    difficulty?: number
+    title?: string
   } = {}
 
   if (payload.status !== undefined) {
@@ -49,6 +67,44 @@ export async function PATCH(
     const details =
       typeof payload.details === 'string' ? payload.details.trim() : null
     updates.details = details || null
+  }
+
+  if (payload.title !== undefined) {
+    const title =
+      typeof payload.title === 'string' ? payload.title.trim() : ''
+    if (!title) {
+      return NextResponse.json({ message: '标题不能为空' }, { status: 400 })
+    }
+    updates.title = title
+  }
+
+  const validateScore = (value: unknown) => {
+    const parsed = Number(value)
+    return Number.isInteger(parsed) && parsed >= 1 && parsed <= 5 ? parsed : null
+  }
+
+  if (payload.priority !== undefined) {
+    const parsed = validateScore(payload.priority)
+    if (parsed === null) {
+      return NextResponse.json({ message: '优先级需为 1-5 的整数' }, { status: 400 })
+    }
+    updates.priority = parsed
+  }
+
+  if (payload.importance !== undefined) {
+    const parsed = validateScore(payload.importance)
+    if (parsed === null) {
+      return NextResponse.json({ message: '重要度需为 1-5 的整数' }, { status: 400 })
+    }
+    updates.importance = parsed
+  }
+
+  if (payload.difficulty !== undefined) {
+    const parsed = validateScore(payload.difficulty)
+    if (parsed === null) {
+      return NextResponse.json({ message: '难度需为 1-5 的整数' }, { status: 400 })
+    }
+    updates.difficulty = parsed
   }
 
   if (!Object.keys(updates).length) {

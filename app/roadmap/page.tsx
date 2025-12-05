@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { CSSProperties, useCallback, useEffect, useMemo, useState } from 'react'
 
 import { Breadcrumbs } from '@/components/Breadcrumbs'
 
@@ -10,6 +10,9 @@ type RoadmapItem = {
   id: number
   title: string
   details: string | null
+  priority: number
+  importance: number
+  difficulty: number
   status: RoadmapStatus
   createdAt: string
   completedAt: string | null
@@ -40,12 +43,25 @@ export default function RoadmapPage() {
   const [items, setItems] = useState<RoadmapItem[]>([])
   const [title, setTitle] = useState('')
   const [details, setDetails] = useState('')
+  const [priority, setPriority] = useState(3)
+  const [importance, setImportance] = useState(3)
+  const [difficulty, setDifficulty] = useState(3)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [updatingId, setUpdatingId] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [session, setSession] = useState<SessionUser | null>(null)
   const [sessionLoaded, setSessionLoaded] = useState(false)
+  const [sortKey, setSortKey] = useState<'priority' | 'importance' | 'difficulty' | 'createdAt'>('priority')
+  const [pendingWidth, setPendingWidth] = useState(55)
+  const [editingItem, setEditingItem] = useState<{
+    id: number
+    title: string
+    details: string
+    priority: number
+    importance: number
+    difficulty: number
+  } | null>(null)
 
   const canViewRoadmap = session?.permissions.includes('roadmap:view') ?? false
   const canCreateRoadmap = session?.permissions.includes('roadmap:create') ?? false
@@ -98,9 +114,27 @@ export default function RoadmapPage() {
     () => items.filter((item) => item.status === 'PENDING'),
     [items]
   )
+  const sortedPendingItems = useMemo(() => {
+    const list = [...pendingItems]
+    return list.sort((a, b) => {
+      if (sortKey === 'createdAt') {
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      }
+      return b[sortKey] - a[sortKey]
+    })
+  }, [pendingItems, sortKey])
+
   const doneItems = useMemo(
     () => items.filter((item) => item.status === 'DONE'),
     [items]
+  )
+  const columnTemplate = useMemo(
+    () => `${pendingWidth}% ${100 - pendingWidth}%`,
+    [pendingWidth]
+  )
+  const columnStyles = useMemo(
+    () => ({ '--roadmap-columns': columnTemplate } as CSSProperties),
+    [columnTemplate]
   )
 
   const submitIdea = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -120,7 +154,13 @@ export default function RoadmapPage() {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, details }),
+        body: JSON.stringify({
+          title,
+          details,
+          priority,
+          importance,
+          difficulty,
+        }),
       })
       const data = (await res.json()) as { item?: RoadmapItem; message?: string }
       if (!res.ok || !data.item) {
@@ -129,10 +169,68 @@ export default function RoadmapPage() {
       setItems((prev) => [data.item!, ...prev])
       setTitle('')
       setDetails('')
+      setPriority(3)
+      setImportance(3)
+      setDifficulty(3)
     } catch (err) {
       setError((err as Error).message)
     } finally {
       setSaving(false)
+    }
+  }
+
+  const startEdit = (item: RoadmapItem) => {
+    setEditingItem({
+      id: item.id,
+      title: item.title,
+      details: item.details ?? '',
+      priority: item.priority,
+      importance: item.importance,
+      difficulty: item.difficulty,
+    })
+  }
+
+  const cancelEdit = () => {
+    setEditingItem(null)
+  }
+
+  const saveEdit = async () => {
+    if (!editingItem) return
+    if (!canUpdateRoadmap) {
+      setError('缺少开发路线编辑权限')
+      return
+    }
+    if (!editingItem.title.trim()) {
+      setError('请输入标题')
+      return
+    }
+    setUpdatingId(editingItem.id)
+    setError(null)
+    try {
+      const res = await fetch(`/api/roadmap/${editingItem.id}`, {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: editingItem.title,
+          details: editingItem.details,
+          priority: editingItem.priority,
+          importance: editingItem.importance,
+          difficulty: editingItem.difficulty,
+        }),
+      })
+      const data = (await res.json()) as { item?: RoadmapItem; message?: string }
+      if (!res.ok || !data.item) {
+        throw new Error(data.message ?? '更新失败')
+      }
+      setItems((prev) =>
+        prev.map((entry) => (entry.id === data.item!.id ? data.item! : entry))
+      )
+      setEditingItem(null)
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setUpdatingId(null)
     }
   }
 
@@ -242,6 +340,50 @@ export default function RoadmapPage() {
                   {saving ? '保存中...' : '保存到路线'}
                 </button>
               </div>
+              <div className='grid gap-3 sm:grid-cols-3'>
+                <label className='flex flex-col gap-2 text-sm text-slate-100'>
+                  优先级
+                  <select
+                    value={priority}
+                    onChange={(event) => setPriority(Number(event.target.value))}
+                    className='rounded-2xl border border-white/15 bg-white/5 px-4 py-3 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none'
+                  >
+                    {[1, 2, 3, 4, 5].map((value) => (
+                      <option key={value} value={value} className='text-slate-900'>
+                        {value}（{value === 5 ? '最高' : value === 1 ? '最低' : '中'}）
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className='flex flex-col gap-2 text-sm text-slate-100'>
+                  重要度
+                  <select
+                    value={importance}
+                    onChange={(event) => setImportance(Number(event.target.value))}
+                    className='rounded-2xl border border-white/15 bg-white/5 px-4 py-3 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none'
+                  >
+                    {[1, 2, 3, 4, 5].map((value) => (
+                      <option key={value} value={value} className='text-slate-900'>
+                        {value}（{value === 5 ? '最高' : value === 1 ? '最低' : '中'}）
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className='flex flex-col gap-2 text-sm text-slate-100'>
+                  难度
+                  <select
+                    value={difficulty}
+                    onChange={(event) => setDifficulty(Number(event.target.value))}
+                    className='rounded-2xl border border-white/15 bg-white/5 px-4 py-3 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none'
+                  >
+                    {[1, 2, 3, 4, 5].map((value) => (
+                      <option key={value} value={value} className='text-slate-900'>
+                        {value}（{value === 5 ? '最高' : value === 1 ? '最低' : '中'}）
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
               <label className='flex flex-col gap-2 text-sm text-slate-100'>
                 细节 / 备注（可选）
                 <textarea
@@ -277,7 +419,79 @@ export default function RoadmapPage() {
           )}
         </section>
 
-        <div className='mt-8 grid gap-6 lg:grid-cols-2'>
+        <div className='mt-8 space-y-4 rounded-3xl border border-white/10 bg-white/5 p-4 shadow-xl shadow-slate-950/30 backdrop-blur'>
+          <div className='flex flex-wrap items-center justify-between gap-3 text-sm text-slate-200'>
+            <div className='flex flex-wrap items-center gap-3'>
+              <span className='text-xs uppercase tracking-[0.2em] text-slate-300'>
+                排序
+              </span>
+              <div className='flex items-center gap-2'>
+                <label className='flex items-center gap-1 text-xs'>
+                  <input
+                    type='radio'
+                    name='sortKey'
+                    value='priority'
+                    checked={sortKey === 'priority'}
+                    onChange={() => setSortKey('priority')}
+                    className='accent-emerald-400'
+                  />
+                  优先级
+                </label>
+                <label className='flex items-center gap-1 text-xs'>
+                  <input
+                    type='radio'
+                    name='sortKey'
+                    value='importance'
+                    checked={sortKey === 'importance'}
+                    onChange={() => setSortKey('importance')}
+                    className='accent-emerald-400'
+                  />
+                  重要度
+                </label>
+                <label className='flex items-center gap-1 text-xs'>
+                  <input
+                    type='radio'
+                    name='sortKey'
+                    value='difficulty'
+                    checked={sortKey === 'difficulty'}
+                    onChange={() => setSortKey('difficulty')}
+                    className='accent-emerald-400'
+                  />
+                  难度
+                </label>
+                <label className='flex items-center gap-1 text-xs'>
+                  <input
+                    type='radio'
+                    name='sortKey'
+                    value='createdAt'
+                    checked={sortKey === 'createdAt'}
+                    onChange={() => setSortKey('createdAt')}
+                    className='accent-emerald-400'
+                  />
+                  最新时间
+                </label>
+              </div>
+            </div>
+            <div className='flex flex-wrap items-center gap-2 text-xs'>
+              <span>列宽调节（在路上 / 已登场）</span>
+              <input
+                type='range'
+                min={35}
+                max={65}
+                step={1}
+                value={pendingWidth}
+                onChange={(event) => setPendingWidth(Number(event.target.value))}
+                className='h-1 w-32 cursor-pointer accent-emerald-400'
+              />
+              <span className='tabular-nums'>{pendingWidth}% / {100 - pendingWidth}%</span>
+            </div>
+          </div>
+        </div>
+
+        <div
+          className='mt-4 grid gap-6 lg:[grid-template-columns:var(--roadmap-columns)]'
+          style={columnStyles}
+        >
           <div className='space-y-4 rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl shadow-slate-950/30 backdrop-blur'>
             <div className='flex items-center justify-between'>
               <div className='space-y-1'>
@@ -298,37 +512,166 @@ export default function RoadmapPage() {
               ) : pendingItems.length === 0 ? (
                 <p className='text-sm text-slate-300/80'>暂时没有待开发想法。</p>
               ) : (
-                pendingItems.map((item) => (
-                  <article
-                    key={item.id}
-                    className='rounded-2xl border border-white/10 bg-slate-900/60 p-4 shadow-inner shadow-slate-950/40'
-                  >
-                    <div className='flex items-start justify-between gap-3'>
-                      <div>
-                        <p className='text-xs uppercase tracking-wide text-slate-300/80'>
-                          {statusLabels[item.status]}
-                        </p>
-                        <h3 className='text-base font-semibold text-slate-50'>
-                          {item.title}
-                        </h3>
+                sortedPendingItems.map((item) => {
+                  const isEditing = editingItem?.id === item.id
+                  return (
+                    <article
+                      key={item.id}
+                      className='rounded-2xl border border-white/10 bg-slate-900/60 p-4 shadow-inner shadow-slate-950/40'
+                    >
+                      <div className='flex items-start justify-between gap-3'>
+                        <div className='flex-1'>
+                          <p className='text-xs uppercase tracking-wide text-slate-300/80'>
+                            {statusLabels[item.status]}
+                          </p>
+                          {isEditing ? (
+                            <input
+                              value={editingItem.title}
+                              onChange={(event) =>
+                                setEditingItem((prev) =>
+                                  prev ? { ...prev, title: event.target.value } : prev
+                                )
+                              }
+                              className='mt-2 w-full rounded-xl border border-white/15 bg-white/5 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none'
+                              placeholder='请输入标题'
+                            />
+                          ) : (
+                            <h3 className='text-base font-semibold text-slate-50'>
+                              {item.title}
+                            </h3>
+                          )}
+                          <div className='mt-2 flex flex-wrap gap-2 text-[11px] text-slate-300/90'>
+                            {isEditing ? (
+                              <>
+                                <select
+                                  value={editingItem.priority}
+                                  onChange={(event) =>
+                                    setEditingItem((prev) =>
+                                      prev
+                                        ? { ...prev, priority: Number(event.target.value) }
+                                        : prev
+                                    )
+                                  }
+                                  className='rounded-full border border-white/15 bg-white/5 px-2 py-1 text-xs text-slate-50 focus:border-emerald-300 focus:outline-none'
+                                >
+                                  {[1, 2, 3, 4, 5].map((value) => (
+                                    <option key={value} value={value} className='text-slate-900'>
+                                      优先级 {value}
+                                    </option>
+                                  ))}
+                                </select>
+                                <select
+                                  value={editingItem.importance}
+                                  onChange={(event) =>
+                                    setEditingItem((prev) =>
+                                      prev
+                                        ? { ...prev, importance: Number(event.target.value) }
+                                        : prev
+                                    )
+                                  }
+                                  className='rounded-full border border-white/15 bg-white/5 px-2 py-1 text-xs text-slate-50 focus:border-emerald-300 focus:outline-none'
+                                >
+                                  {[1, 2, 3, 4, 5].map((value) => (
+                                    <option key={value} value={value} className='text-slate-900'>
+                                      重要度 {value}
+                                    </option>
+                                  ))}
+                                </select>
+                                <select
+                                  value={editingItem.difficulty}
+                                  onChange={(event) =>
+                                    setEditingItem((prev) =>
+                                      prev
+                                        ? { ...prev, difficulty: Number(event.target.value) }
+                                        : prev
+                                    )
+                                  }
+                                  className='rounded-full border border-white/15 bg-white/5 px-2 py-1 text-xs text-slate-50 focus:border-emerald-300 focus:outline-none'
+                                >
+                                  {[1, 2, 3, 4, 5].map((value) => (
+                                    <option key={value} value={value} className='text-slate-900'>
+                                      难度 {value}
+                                    </option>
+                                  ))}
+                                </select>
+                              </>
+                            ) : (
+                              <>
+                                <span className='rounded-full border border-white/15 px-2 py-1'>
+                                  优先级 {item.priority}
+                                </span>
+                                <span className='rounded-full border border-white/15 px-2 py-1'>
+                                  重要度 {item.importance}
+                                </span>
+                                <span className='rounded-full border border-white/15 px-2 py-1'>
+                                  难度 {item.difficulty}
+                                </span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                        <div className='flex flex-col gap-2'>
+                          {isEditing ? (
+                            <>
+                              <button
+                                type='button'
+                                onClick={saveEdit}
+                                className='rounded-full border border-emerald-300/80 bg-emerald-400/20 px-3 py-1 text-xs font-semibold text-emerald-50 transition hover:border-emerald-200 disabled:opacity-60'
+                                disabled={updatingId === item.id || !canUpdateRoadmap}
+                              >
+                                {updatingId === item.id ? '保存中...' : '保存'}
+                              </button>
+                              <button
+                                type='button'
+                                onClick={cancelEdit}
+                                className='rounded-full border border-white/10 px-3 py-1 text-xs font-semibold text-slate-200 transition hover:border-white/30 disabled:opacity-60'
+                              >
+                                取消
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <button
+                                type='button'
+                                onClick={() => toggleStatus(item)}
+                                className='rounded-full border border-white/15 px-3 py-1 text-xs font-semibold text-emerald-100 transition hover:border-emerald-300 hover:text-emerald-50 disabled:opacity-60'
+                                disabled={updatingId === item.id || !canUpdateRoadmap}
+                              >
+                                {updatingId === item.id ? '更新中...' : '标记完成'}
+                              </button>
+                              <button
+                                type='button'
+                                onClick={() => startEdit(item)}
+                                className='rounded-full border border-white/15 px-3 py-1 text-xs font-semibold text-slate-100 transition hover:border-white/40 disabled:opacity-60'
+                                disabled={!canUpdateRoadmap}
+                              >
+                                编辑
+                              </button>
+                            </>
+                          )}
+                        </div>
                       </div>
-                      <button
-                        type='button'
-                        onClick={() => toggleStatus(item)}
-                        className='rounded-full border border-white/15 px-3 py-1 text-xs font-semibold text-emerald-100 transition hover:border-emerald-300 hover:text-emerald-50 disabled:opacity-60'
-                        disabled={updatingId === item.id || !canUpdateRoadmap}
-                      >
-                        {updatingId === item.id ? '更新中...' : '标记完成'}
-                      </button>
-                    </div>
-                    {item.details ? (
-                      <p className='mt-2 text-sm text-slate-200/80'>{item.details}</p>
-                    ) : null}
-                    <div className='mt-3 flex items-center gap-3 text-[11px] text-slate-400'>
-                      <span>记录时间 {formatDate(item.createdAt)}</span>
-                    </div>
-                  </article>
-                ))
+                      {isEditing ? (
+                        <textarea
+                          value={editingItem.details}
+                          onChange={(event) =>
+                            setEditingItem((prev) =>
+                              prev ? { ...prev, details: event.target.value } : prev
+                            )
+                          }
+                          rows={3}
+                          className='mt-3 w-full rounded-xl border border-white/15 bg-white/5 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none'
+                          placeholder='补充细节'
+                        />
+                      ) : item.details ? (
+                        <p className='mt-2 text-sm text-slate-200/80'>{item.details}</p>
+                      ) : null}
+                      <div className='mt-3 flex items-center gap-3 text-[11px] text-slate-400'>
+                        <span>记录时间 {formatDate(item.createdAt)}</span>
+                      </div>
+                    </article>
+                  )
+                })
               )}
             </div>
           </div>
@@ -345,31 +688,42 @@ export default function RoadmapPage() {
               </div>
               <span className='rounded-full bg-emerald-500/20 px-2 py-1 text-[11px] font-semibold text-emerald-100'>
                 可回溯
-              </span>
-            </div>
-            <div className='space-y-3'>
-              {loading ? (
-                <p className='text-sm text-slate-200'>加载中...</p>
-              ) : doneItems.length === 0 ? (
-                <p className='text-sm text-slate-300/80'>还没有完成的条目。</p>
-              ) : (
-                doneItems.map((item) => (
-                  <article
-                    key={item.id}
-                    className='rounded-2xl border border-emerald-400/15 bg-emerald-400/5 p-4 shadow-inner shadow-emerald-500/10'
-                  >
-                    <div className='flex items-start justify-between gap-3'>
-                      <div>
-                        <p className='text-xs uppercase tracking-wide text-emerald-100'>
-                          {statusLabels[item.status]}
-                        </p>
-                        <h3 className='text-base font-semibold text-slate-50'>
-                          {item.title}
-                        </h3>
-                      </div>
-                      <button
-                        type='button'
-                        onClick={() => toggleStatus(item)}
+                </span>
+              </div>
+              <div className='space-y-3'>
+                {loading ? (
+                  <p className='text-sm text-slate-200'>加载中...</p>
+                ) : doneItems.length === 0 ? (
+                  <p className='text-sm text-slate-300/80'>还没有完成的条目。</p>
+                ) : (
+                  doneItems.map((item) => (
+                    <article
+                      key={item.id}
+                      className='rounded-2xl border border-emerald-400/15 bg-emerald-400/5 p-4 shadow-inner shadow-emerald-500/10'
+                    >
+                      <div className='flex items-start justify-between gap-3'>
+                        <div>
+                          <p className='text-xs uppercase tracking-wide text-emerald-100'>
+                            {statusLabels[item.status]}
+                          </p>
+                          <h3 className='text-base font-semibold text-slate-50'>
+                            {item.title}
+                          </h3>
+                          <div className='mt-2 flex flex-wrap gap-2 text-[11px] text-emerald-50/90'>
+                            <span className='rounded-full border border-emerald-400/40 px-2 py-1'>
+                              优先级 {item.priority}
+                            </span>
+                            <span className='rounded-full border border-emerald-400/40 px-2 py-1'>
+                              重要度 {item.importance}
+                            </span>
+                            <span className='rounded-full border border-emerald-400/40 px-2 py-1'>
+                              难度 {item.difficulty}
+                            </span>
+                          </div>
+                        </div>
+                        <button
+                          type='button'
+                          onClick={() => toggleStatus(item)}
                         className='rounded-full border border-white/20 px-3 py-1 text-[11px] font-semibold text-slate-50 transition hover:border-white/40 disabled:opacity-60'
                         disabled={updatingId === item.id || !canUpdateRoadmap}
                       >

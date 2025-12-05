@@ -337,8 +337,11 @@
 - **字段**
      1. `title`：必填，想法/模块标题。
      2. `details?`：可选，补充验收标准、接口需求、上线时间等备注。
-     3. `status`：枚举，`PENDING`（待开发）、`DONE`（已完成）。切换为 `DONE` 时写入完成时间，重新打开时清空。
-     4. `completedAt?`：完成时间戳。
-     5. `createdBy?` / `updatedBy?`：操作用户（可为空）。
-     6. `createdAt` / `updatedAt`：自动时间戳。
+     3. `priority`：1-5，优先级，默认 3。
+     4. `importance`：1-5，重要度，默认 3。
+     5. `difficulty`：1-5，难度，默认 3。
+     6. `status`：枚举，`PENDING`（待开发）、`DONE`（已完成）。切换为 `DONE` 时写入完成时间，重新打开时清空。
+     7. `completedAt?`：完成时间戳。
+     8. `createdBy?` / `updatedBy?`：操作用户（可为空）。
+     9. `createdAt` / `updatedAt`：自动时间戳。
 - **交互**：首页入口跳转 `/roadmap`，可新增想法、查看待开发与已完成列表，并在列表中直接切换状态。

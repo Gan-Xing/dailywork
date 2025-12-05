@@ -406,6 +406,9 @@ model RoadmapIdea {
   id           Int            @id @default(autoincrement())
   title        String
   details      String?
+  priority     Int            @default(3)
+  importance   Int            @default(3)
+  difficulty   Int            @default(3)
   status       RoadmapStatus  @default(PENDING)
   completedAt  DateTime?
   createdById  Int?
