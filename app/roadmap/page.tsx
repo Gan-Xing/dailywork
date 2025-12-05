@@ -1,7 +1,8 @@
 'use client'
 
-import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useState } from 'react'
+
+import { Breadcrumbs } from '@/components/Breadcrumbs'
 
 type RoadmapStatus = 'PENDING' | 'DONE'
 
@@ -170,16 +171,14 @@ export default function RoadmapPage() {
       <div className='absolute left-1/2 top-0 -z-10 h-80 w-[60vw] -translate-x-1/2 rounded-full bg-gradient-to-br from-white/8 via-blue-400/10 to-transparent blur-3xl' />
 
       <div className='relative mx-auto max-w-5xl px-6 py-16 sm:px-8 lg:px-10'>
-        <header className='flex flex-col gap-3'>
-          <div className='flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-200'>
-            <span className='rounded-full bg-white/10 px-3 py-1 text-[11px] font-semibold text-emerald-100'>
-              Roadmap
-            </span>
-            <span className='h-[1px] w-10 bg-slate-300/40' />
-            <Link href='/' className='transition hover:text-white'>
-              返回首页
-            </Link>
-          </div>
+        <header className='flex flex-col gap-4'>
+          <Breadcrumbs
+            items={[
+              { label: '首页', href: '/' },
+              { label: '开发路线' },
+            ]}
+            variant='dark'
+          />
           <div className='space-y-2'>
             <h1 className='text-3xl font-semibold leading-tight sm:text-4xl'>
               开发路线：记录想法、排定上线、完成收尾
@@ -188,23 +187,23 @@ export default function RoadmapPage() {
               每个灵感都会落库保存，方便后续排期、讨论与跟踪。完成后勾选状态即可留存闭环记录。
             </p>
           </div>
-        <div className='flex flex-wrap gap-3 text-xs text-slate-200'>
-          <span className='rounded-full bg-white/10 px-3 py-1'>
-            待开发：{pendingItems.length}
-          </span>
-          <span className='rounded-full bg-emerald-400/15 px-3 py-1 text-emerald-50'>
-            已完成：{doneItems.length}
-          </span>
-          <button
-            type='button'
-            onClick={() => fetchItems()}
-            className='rounded-full border border-white/20 px-3 py-1 text-xs transition hover:border-white/40 hover:bg-white/10'
-            disabled={loading || !sessionLoaded || !canViewRoadmap}
-          >
-            {loading ? '刷新中...' : '刷新列表'}
-          </button>
-        </div>
-      </header>
+          <div className='flex flex-wrap gap-3 text-xs text-slate-200'>
+            <span className='rounded-full bg-white/10 px-3 py-1'>
+              待开发：{pendingItems.length}
+            </span>
+            <span className='rounded-full bg-emerald-400/15 px-3 py-1 text-emerald-50'>
+              已完成：{doneItems.length}
+            </span>
+            <button
+              type='button'
+              onClick={() => fetchItems()}
+              className='rounded-full border border-white/20 px-3 py-1 text-xs transition hover:border-white/40 hover:bg-white/10'
+              disabled={loading || !sessionLoaded || !canViewRoadmap}
+            >
+              {loading ? '刷新中...' : '刷新列表'}
+            </button>
+          </div>
+        </header>
 
       {error ? (
         <p className='mt-6 rounded-2xl border border-amber-400/30 bg-amber-400/10 px-4 py-3 text-sm text-amber-100'>
