@@ -1,6 +1,8 @@
 import type { Locale } from './index'
-import { formatCopy } from './index'
 import { FIXED_INSPECTION_TYPES } from '../progressWorkflow'
+
+const formatCopy = (template: string, values: Record<string, string | number>): string =>
+  template.replace(/\{(\w+)\}/g, (_, key) => String(values[key] ?? ''))
 
 type ProgressCopy = {
   hero: {
@@ -312,6 +314,8 @@ type PhaseCopy = {
     dialogBundleConfirm: string
     dialogCancel: string
     submitSuccess: string
+    missingDeps: string
+    missingChecks: string
     types: string[]
   }
   alerts: {
@@ -716,6 +720,8 @@ const progressCopy: Record<Locale, ProgressCopy> = {
         dialogBundleConfirm: '确认一起报检',
         dialogCancel: '返回修改',
         submitSuccess: '报检已提交成功，可在报检记录查看进度。',
+        missingDeps: '缺少前置报检/预约：{deps}',
+        missingChecks: '缺少前置验收内容：{checks}',
         types: FIXED_INSPECTION_TYPES,
       },
       alerts: {
@@ -1231,6 +1237,8 @@ const progressCopy: Record<Locale, ProgressCopy> = {
         dialogBundleConfirm: 'Confirmer le groupement',
         dialogCancel: 'Revenir',
         submitSuccess: 'Demande de contrôle envoyée. Vous pouvez suivre la progression dans la liste.',
+        missingDeps: 'Prérequis non planifiés : {deps}',
+        missingChecks: 'Contrôles prérequis manquants : {checks}',
         types: ['GENIE CIVIL', 'TOPOGRAPHIQUE', 'GEOTECHNIQUE', 'Autre'],
       },
       alerts: {

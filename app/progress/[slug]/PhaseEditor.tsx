@@ -1,7 +1,16 @@
 /* eslint-disable @next/next/no-img-element */
 'use client'
 
-import { RefObject, useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition } from 'react'
+import {
+  RefObject,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+} from 'react'
 
 import { AlertDialog, type AlertTone } from '@/components/AlertDialog'
 import type {
@@ -16,7 +25,7 @@ import type {
 } from '@/lib/progressTypes'
 import type { WorkflowBinding, WorkflowLayerTemplate } from '@/lib/progressWorkflow'
 import { getProgressCopy, formatProgressCopy } from '@/lib/i18n/progress'
-import { localizeProgressList, localizeProgressTerm } from '@/lib/i18n/progressDictionary'
+import { localizeProgressList, localizeProgressTerm, localizeProgressText } from '@/lib/i18n/progressDictionary'
 import { locales } from '@/lib/i18n'
 import { usePreferredLocale } from '@/lib/usePreferredLocale'
 
@@ -48,6 +57,7 @@ type LatestPointInspection = {
   endPk: number
   status: InspectionStatus
   layers: string[]
+  checks?: string[]
   updatedAt: number
 }
 
@@ -981,12 +991,15 @@ export function PhaseEditor({
       return
     }
     setSuccessMessage(t.inspection.submitSuccess)
+    await fetchLatestInspections()
     setSelectedSegment(null)
     resetInspectionForm()
   }
 
   const submitInspection = async () => {
     if (!selectedSegment) return
+    // 拉取最新报检数据，确保前置校验使用最新状态
+    await fetchLatestInspections({ phaseId: selectedSegment.phaseId })
     const hasStart = startPkInput.trim() !== ''
     const hasEnd = endPkInput.trim() !== ''
     const startPk = Number(startPkInput)
@@ -1025,6 +1038,8 @@ export function PhaseEditor({
       appointmentDate: appointmentDateInput,
     }
     if (selectedSegment?.workflowLayers?.length && workflowLayerByName) {
+      const completedWorkflowLayerIds = computeCompletedWorkflowLayerIds()
+      const completedWorkflowChecksByLayer = computeCompletedWorkflowChecksByLayer()
       const satisfied = new Set<string>()
       if (completedWorkflowLayerIds) {
         completedWorkflowLayerIds.forEach((id) => satisfied.add(id))
@@ -1047,8 +1062,34 @@ export function PhaseEditor({
         })
       })
       if (missingDeps.size) {
-        raiseSubmitError(`缺少前置报检/预约：${Array.from(missingDeps).join(' / ')}`)
+        raiseSubmitError(formatProgressCopy(t.inspection.missingDeps, { deps: Array.from(missingDeps).join(' / ') }))
         return
+      }
+
+      // 校验同层验收内容的顺序：需满足前置检查已完成或本次一同提交
+      if (workflowCheckOrderByLayerId && workflowCheckMetaByName) {
+        const selectedChecksNormalized = new Set(selectedChecks.map((item) => normalizeLabel(item)))
+        const missingChecks = new Set<string>()
+        selectedChecks.forEach((check) => {
+          const meta = workflowCheckMetaByName.get(normalizeLabel(check))
+          if (!meta) return
+          const orderedChecks = workflowCheckOrderByLayerId.get(meta.layerId) ?? []
+          for (let idx = 0; idx < meta.order; idx += 1) {
+            const requiredName = orderedChecks[idx]
+            const requiredNormalized = normalizeLabel(requiredName)
+            const satisfiedSelected = selectedChecksNormalized.has(requiredNormalized)
+            const satisfiedCompleted = completedWorkflowChecksByLayer
+              ?.get(meta.layerId)
+              ?.has(requiredNormalized)
+            if (!satisfiedSelected && !satisfiedCompleted) {
+              missingChecks.add(requiredName)
+            }
+          }
+        })
+        if (missingChecks.size) {
+          raiseSubmitError(formatProgressCopy(t.inspection.missingChecks, { checks: Array.from(missingChecks).join(' / ') }))
+          return
+        }
       }
     }
     await performSubmit(payload)
@@ -1067,8 +1108,9 @@ export function PhaseEditor({
   const [alertDialog, setAlertDialog] = useState<AlertDialogState | null>(null)
   const [submitPending, setSubmitPending] = useState(false)
   const [manualCheckExclusions, setManualCheckExclusions] = useState<string[]>([])
+  const latestPointInspectionsRef = useRef<Map<string, LatestPointInspection>>(new Map())
   const [latestPointInspections, setLatestPointInspections] = useState<Map<string, LatestPointInspection>>(
-    () => new Map(),
+    () => latestPointInspectionsRef.current,
   )
   const latestInspectionByPhase = useMemo(() => {
     const map = new Map<number, number>()
@@ -1080,6 +1122,17 @@ export function PhaseEditor({
     })
     return map
   }, [inspectionSlices])
+
+  const workflowPhaseNameForContext = useMemo(
+    () => selectedSegment?.workflow?.phaseName ?? selectedSegment?.phase ?? '',
+    [selectedSegment?.phase, selectedSegment?.workflow?.phaseName],
+  )
+
+  const splitLayerTokens = (value: string) =>
+    value
+      .split(/[\\/，,;]/)
+      .map((item) => item.trim())
+      .filter(Boolean)
 
   const sortedPhases = useMemo(() => {
     if (!phases.length) return phases
@@ -1115,54 +1168,198 @@ export function PhaseEditor({
 
   const workflowLayerNameMap = useMemo(() => {
     if (!selectedSegment?.workflowLayers?.length) return null
-    return new Map(selectedSegment.workflowLayers.map((layer) => [layer.id, layer.name]))
-  }, [selectedSegment?.workflowLayers])
+    const zhPhase = workflowPhaseNameForContext
+    return new Map(
+      selectedSegment.workflowLayers.map((layer) => [
+        layer.id,
+        localizeProgressTerm('layer', layer.name, locale, { phaseName: workflowPhaseNameForContext }),
+      ]),
+    )
+  }, [locale, selectedSegment?.workflowLayers, workflowPhaseNameForContext])
 
   const workflowChecksByLayerName = useMemo(() => {
     if (!selectedSegment?.workflowLayers?.length) return null
     const map = new Map<string, string[]>()
     selectedSegment.workflowLayers.forEach((layer) => {
       const localizedName = localizeProgressTerm('layer', layer.name, locale, {
-        phaseName: selectedSegment.workflow?.phaseName ?? selectedSegment.phase,
+        phaseName: workflowPhaseNameForContext,
       })
+      const localizedChecks = layer.checks.map((check) => localizeProgressTerm('check', check.name, locale))
+      const mergedChecks = Array.from(new Set<string>([...layer.checks.map((check) => check.name), ...localizedChecks]))
       const names = [layer.name, localizedName]
       names.forEach((name) => {
         map.set(
           normalizeLabel(name),
-          layer.checks.map((check) => check.name),
+          mergedChecks,
         )
       })
     })
     return map
-  }, [locale, selectedSegment?.workflow?.phaseName, selectedSegment?.phase, selectedSegment?.workflowLayers])
+  }, [locale, selectedSegment?.workflowLayers, workflowPhaseNameForContext])
 
   const workflowLayerByName = useMemo(() => {
     if (!selectedSegment?.workflowLayers?.length) return null
     const map = new Map<string, WorkflowLayerTemplate>()
     selectedSegment.workflowLayers.forEach((layer) => {
-      const localizedName = localizeProgressTerm('layer', layer.name, locale, {
-        phaseName: selectedSegment.workflow?.phaseName ?? selectedSegment.phase,
-      })
-      const names = [layer.name, localizedName]
-      names.forEach((name) => map.set(normalizeLabel(name), layer))
+      const names = [
+        layer.name,
+        localizeProgressTerm('layer', layer.name, locale, { phaseName: workflowPhaseNameForContext }),
+        localizeProgressTerm('layer', layer.name, 'zh', { phaseName: workflowPhaseNameForContext }),
+        localizeProgressTerm('layer', layer.name, 'fr', { phaseName: workflowPhaseNameForContext }),
+      ]
+      names
+        .filter(Boolean)
+        .forEach((name) => map.set(normalizeLabel(name), layer))
     })
     return map
-  }, [locale, selectedSegment?.workflow?.phaseName, selectedSegment?.phase, selectedSegment?.workflowLayers])
+  }, [locale, selectedSegment?.workflowLayers, workflowPhaseNameForContext])
 
   const workflowTypesByLayerName = useMemo(() => {
     if (!selectedSegment?.workflowLayers?.length) return null
     const map = new Map<string, Set<string>>()
     selectedSegment.workflowLayers.forEach((layer) => {
       const localizedName = localizeProgressTerm('layer', layer.name, locale, {
-        phaseName: selectedSegment.workflow?.phaseName ?? selectedSegment.phase,
+        phaseName: workflowPhaseNameForContext,
       })
       const names = [layer.name, localizedName]
       const typeSet = new Set<string>()
-      layer.checks.forEach((check) => check.types.forEach((type) => typeSet.add(type)))
+      layer.checks.forEach((check) =>
+        check.types.forEach((type) => {
+          typeSet.add(type)
+          typeSet.add(localizeProgressTerm('type', type, locale))
+        }),
+      )
       names.forEach((name) => map.set(normalizeLabel(name), typeSet))
     })
     return map
-  }, [locale, selectedSegment?.workflow?.phaseName, selectedSegment?.phase, selectedSegment?.workflowLayers])
+  }, [locale, selectedSegment?.workflowLayers, workflowPhaseNameForContext])
+
+  const localizedWorkflowPhaseName = useMemo(() => {
+    if (!selectedSegment?.workflow?.phaseName) return null
+    return localizeProgressTerm('phase', selectedSegment.workflow.phaseName, locale)
+  }, [locale, selectedSegment?.workflow?.phaseName])
+
+  const localizedWorkflowSideRule = useMemo(() => {
+    if (!selectedSegment?.workflow?.sideRule) return null
+    return localizeProgressText(selectedSegment.workflow.sideRule, locale)
+  }, [locale, selectedSegment?.workflow?.sideRule])
+
+  const workflowCheckOrderByLayerId = useMemo(() => {
+    if (!selectedSegment?.workflowLayers?.length) return null
+    const map = new Map<string, string[]>()
+    selectedSegment.workflowLayers.forEach((layer) => {
+      const localizedNames = layer.checks.map((check) => localizeProgressTerm('check', check.name, locale))
+      map.set(layer.id, localizedNames)
+    })
+    return map
+  }, [locale, selectedSegment?.workflowLayers])
+
+  const workflowCheckTypesByName = useMemo(() => {
+    if (!selectedSegment?.workflowLayers?.length) return null
+    const map = new Map<string, Set<string>>()
+    selectedSegment.workflowLayers.forEach((layer) => {
+      layer.checks.forEach((check) => {
+        const names = [check.name, localizeProgressTerm('check', check.name, locale)]
+        const typeSet = new Set<string>()
+        check.types.forEach((type) => {
+          typeSet.add(type)
+          typeSet.add(localizeProgressTerm('type', type, locale))
+        })
+        names.forEach((name) => map.set(normalizeLabel(name), typeSet))
+      })
+    })
+    return map
+  }, [locale, selectedSegment?.workflowLayers])
+
+  const workflowCheckMetaByName = useMemo(() => {
+    if (!selectedSegment?.workflowLayers?.length) return null
+    const map = new Map<string, { layerId: string; order: number; types: Set<string> }>()
+    selectedSegment.workflowLayers.forEach((layer) => {
+      const localizedNames = layer.checks.map((check) => localizeProgressTerm('check', check.name, locale))
+      layer.checks.forEach((check, idx) => {
+        const meta = { layerId: layer.id, order: idx, types: new Set(check.types) }
+        const names = [check.name, localizedNames[idx]]
+        names.forEach((name) => map.set(normalizeLabel(name), meta))
+      })
+    })
+    return map
+  }, [locale, selectedSegment?.workflowLayers])
+
+  const computeCompletedWorkflowChecksByLayer = () => {
+    if (!workflowCheckOrderByLayerId || !workflowCheckMetaByName || !workflowLayerByName || !selectedSegment) return null
+    if (!startPkInput.trim() || !endPkInput.trim()) return null
+    const startInput = Number(startPkInput)
+    const endInput = Number(endPkInput)
+    if (!Number.isFinite(startInput) || !Number.isFinite(endInput)) return null
+    const [targetStart, targetEnd] = normalizeRange(startInput, endInput)
+    const map = new Map<string, Set<string>>()
+
+    const markLayerCompleted = (layerId: string) => {
+      const checks = workflowCheckOrderByLayerId.get(layerId)
+      if (!checks || !checks.length) return
+      const set = map.get(layerId) ?? new Set<string>()
+      checks.forEach((name) => set.add(normalizeLabel(name)))
+      map.set(layerId, set)
+    }
+
+    latestPointInspectionsRef.current.forEach((latest) => {
+      if (latest.phaseId !== selectedSegment.phaseId) return
+      const sideMatches =
+        selectedSide === 'BOTH'
+          ? true
+          : latest.side === 'BOTH' || latest.side === selectedSide
+      if (!sideMatches) return
+      if (!workflowSatisfiedStatuses.includes(latest.status ?? 'PENDING')) return
+      const [existingStart, existingEnd] = normalizeRange(latest.startPk, latest.endPk)
+      if (existingStart > targetStart || existingEnd < targetEnd) return
+
+      // Mark completed layers -> all checks in该层视为完成
+      latest.layers.forEach((layerName) => {
+        splitLayerTokens(layerName).forEach((token) => {
+          const normalizedLayerName = normalizeLabel(
+            localizeProgressTerm('layer', token, 'zh', { phaseName: workflowPhaseNameForContext }),
+          )
+          const meta = workflowLayerByName.get(normalizedLayerName)
+          if (meta) markLayerCompleted(meta.id)
+        })
+      })
+
+      // Mark explicit completed checks (若后端返回)
+      latest.checks?.forEach((checkName) => {
+        const meta = workflowCheckMetaByName.get(normalizeLabel(checkName))
+        if (!meta) return
+        const set = map.get(meta.layerId) ?? new Set<string>()
+        set.add(normalizeLabel(checkName))
+        set.add(normalizeLabel(localizeProgressTerm('check', checkName, locale)))
+        map.set(meta.layerId, set)
+      })
+    })
+    // 兜底：同分项任意区间的完成记录也视为满足（防止区间匹配误差）
+    if (!map.size) {
+      latestPointInspectionsRef.current.forEach((latest) => {
+        if (latest.phaseId !== selectedSegment.phaseId) return
+        if (!workflowSatisfiedStatuses.includes(latest.status ?? 'PENDING')) return
+        latest.layers.forEach((layerName) => {
+          splitLayerTokens(layerName).forEach((token) => {
+            const normalizedLayerName = normalizeLabel(
+              localizeProgressTerm('layer', token, 'zh', { phaseName: workflowPhaseNameForContext }),
+            )
+            const meta = workflowLayerByName.get(normalizedLayerName)
+            if (meta) markLayerCompleted(meta.id)
+          })
+        })
+        latest.checks?.forEach((checkName) => {
+          const meta = workflowCheckMetaByName.get(normalizeLabel(checkName))
+          if (!meta) return
+          const set = map.get(meta.layerId) ?? new Set<string>()
+          set.add(normalizeLabel(checkName))
+          set.add(normalizeLabel(localizeProgressTerm('check', checkName, locale)))
+          map.set(meta.layerId, set)
+        })
+      })
+    }
+    return map
+  }
 
   const allowedCheckSet = useMemo(() => {
     if (!workflowChecksByLayerName) return null
@@ -1194,7 +1391,7 @@ export function PhaseEditor({
     return base.filter((type) => scoped.has(type))
   }, [defaultInspectionTypes, selectedLayers, selectedSegment?.workflowTypeOptions, workflowTypesByLayerName])
 
-  const completedWorkflowLayerIds = useMemo(() => {
+  const computeCompletedWorkflowLayerIds = () => {
     if (!workflowLayerByName || !selectedSegment) return null
     if (!startPkInput.trim() || !endPkInput.trim()) return null
     const startInput = Number(startPkInput)
@@ -1202,19 +1399,44 @@ export function PhaseEditor({
     if (!Number.isFinite(startInput) || !Number.isFinite(endInput)) return null
     const [targetStart, targetEnd] = normalizeRange(startInput, endInput)
     const set = new Set<string>()
-    latestPointInspections.forEach((latest) => {
+    latestPointInspectionsRef.current.forEach((latest) => {
       if (latest.phaseId !== selectedSegment.phaseId) return
-      if (latest.side !== 'BOTH' && latest.side !== selectedSide) return
+      const sideMatches =
+        selectedSide === 'BOTH'
+          ? true // 任意侧别的既往报检都可视为满足
+          : latest.side === 'BOTH' || latest.side === selectedSide
+      if (!sideMatches) return
       if (!workflowSatisfiedStatuses.includes(latest.status ?? 'PENDING')) return
       const [existingStart, existingEnd] = normalizeRange(latest.startPk, latest.endPk)
       if (existingStart > targetStart || existingEnd < targetEnd) return
       latest.layers.forEach((layerName) => {
-        const meta = workflowLayerByName.get(normalizeLabel(layerName))
-        if (meta) set.add(meta.id)
+        splitLayerTokens(layerName).forEach((token) => {
+          const normalizedLayerName = normalizeLabel(
+            localizeProgressTerm('layer', token, 'zh', { phaseName: workflowPhaseNameForContext }),
+          )
+          const meta = workflowLayerByName.get(normalizedLayerName)
+          if (meta) set.add(meta.id)
+        })
       })
     })
+    // 兜底：同分项任意区间的完成记录也视为满足（防止区间匹配误差）
+    if (!set.size) {
+      latestPointInspectionsRef.current.forEach((latest) => {
+        if (latest.phaseId !== selectedSegment.phaseId) return
+        if (!workflowSatisfiedStatuses.includes(latest.status ?? 'PENDING')) return
+        latest.layers.forEach((layerName) => {
+          splitLayerTokens(layerName).forEach((token) => {
+            const normalizedLayerName = normalizeLabel(
+              localizeProgressTerm('layer', token, 'zh', { phaseName: workflowPhaseNameForContext }),
+            )
+            const meta = workflowLayerByName.get(normalizedLayerName)
+            if (meta) set.add(meta.id)
+          })
+        })
+      })
+    }
     return set.size ? set : null
-  }, [endPkInput, latestPointInspections, selectedSegment, selectedSide, startPkInput, workflowLayerByName])
+  }
 
   const allowedWorkflowStages = useMemo(() => {
     if (!workflowLayerByName || !selectedLayers.length) return null
@@ -1256,14 +1478,16 @@ export function PhaseEditor({
     [selectedSegment?.layers],
   )
 
-  const uniqueCheckOptions = useMemo(
-    () => Array.from(new Set(selectedSegment?.checks ?? [])),
-    [selectedSegment?.checks],
-  )
+  const uniqueCheckOptions = useMemo(() => Array.from(new Set(selectedSegment?.checks ?? [])), [selectedSegment?.checks])
 
   const findLayerOptionLabel = (layerName: string) => {
     const normalized = normalizeLabel(layerName)
     return uniqueLayerOptions.find((item) => normalizeLabel(item) === normalized) ?? layerName
+  }
+
+  const findCheckOptionLabel = (checkName: string) => {
+    const normalized = normalizeLabel(checkName)
+    return uniqueCheckOptions.find((item) => normalizeLabel(item) === normalized) ?? checkName
   }
 
   const toggleLayerSelection = (layerName: string) => {
@@ -1339,31 +1563,44 @@ export function PhaseEditor({
   useEffect(() => {
     const allowed = activeInspectionTypes
     if (!allowed.length) return
-    const filtered = selectedTypes.filter((type) => allowed.includes(type))
-    if (filtered.length) {
-      if (filtered.length !== selectedTypes.length) {
-        setSelectedTypes(filtered)
-      }
-      return
+    const allowedSet = new Set(allowed)
+    const union = new Set<string>()
+    selectedChecks.forEach((check) => {
+      const types = workflowCheckTypesByName?.get(normalizeLabel(check))
+      types?.forEach((type) => {
+        if (allowedSet.has(type)) {
+          union.add(type)
+        }
+      })
+    })
+    const next = union.size ? allowed.filter((type) => union.has(type)) : allowed
+    const changed =
+      next.length !== selectedTypes.length || next.some((type, idx) => type !== selectedTypes[idx])
+    if (changed) {
+      setSelectedTypes(next)
     }
-    setSelectedTypes(allowed)
-  }, [activeInspectionTypes, selectedTypes])
+  }, [activeInspectionTypes, selectedChecks, selectedTypes, workflowCheckTypesByName])
 
-  useEffect(() => {
-    if (!canViewInspection) {
-      setInspectionSlices([])
-      setLatestPointInspections(new Map())
-      return
-    }
-    let cancelled = false
-    const fetchLatestInspections = async () => {
-      try {
-        const res = await fetch(
-          `/api/progress/${road.slug}/inspections?roadSlug=${road.slug}&sortField=updatedAt&sortOrder=desc&pageSize=500`,
-          { credentials: 'include' },
+  const fetchLatestInspections = useCallback(
+    async (options?: { phaseId?: number; signalCancelled?: () => boolean }) => {
+      const isCancelled = options?.signalCancelled ?? (() => false)
+      const search = new URLSearchParams({
+        roadSlug: road.slug,
+        sortField: 'updatedAt',
+        sortOrder: 'desc',
+        pageSize: '500',
+      })
+      if (options?.phaseId) {
+        search.set('phaseId', String(options.phaseId))
+      }
+      const url = `/api/progress/${road.slug}/inspections?${search.toString()}`
+    try {
+      const res = await fetch(
+        `/api/progress/${road.slug}/inspections?roadSlug=${road.slug}&sortField=updatedAt&sortOrder=desc&pageSize=500`,
+        { credentials: 'include' },
         )
         if (!res.ok) {
-          if (!cancelled) {
+          if (!isCancelled()) {
             setInspectionSlices([])
             setLatestPointInspections(new Map())
           }
@@ -1377,49 +1614,64 @@ export function PhaseEditor({
             side: IntervalSide
             status: InspectionStatus
             layers: string[]
+            checks?: string[]
             updatedAt: string
           }>
         }
-        if (!data.items || cancelled) return
+        if (!data.items || isCancelled()) return
         const map = new Map<string, LatestPointInspection>()
         const slices: InspectionSlice[] = []
         data.items.forEach((item) => {
           const ts = new Date(item.updatedAt).getTime()
-          const start = Number(item.startPk)
-          const end = Number(item.endPk)
-          const safeStart = Number.isFinite(start) ? start : 0
-          const safeEnd = Number.isFinite(end) ? end : safeStart
-          const [orderedStart, orderedEnd] = safeStart <= safeEnd ? [safeStart, safeEnd] : [safeEnd, safeStart]
-          const side = item.side ?? 'BOTH'
-          const key = buildPointKey(item.phaseId, side, orderedStart, orderedEnd)
-          const existing = map.get(key)
-          const snapshot: LatestPointInspection = {
-            phaseId: Number(item.phaseId),
-            side,
-            startPk: orderedStart,
-            endPk: orderedEnd,
-            layers: item.layers || [],
-            updatedAt: ts || 0,
-            status: item.status ?? 'PENDING',
+        const start = Number(item.startPk)
+        const end = Number(item.endPk)
+        const safeStart = Number.isFinite(start) ? start : 0
+        const safeEnd = Number.isFinite(end) ? end : safeStart
+        const [orderedStart, orderedEnd] = safeStart <= safeEnd ? [safeStart, safeEnd] : [safeEnd, safeStart]
+        const side = item.side ?? 'BOTH'
+        const key = buildPointKey(item.phaseId, side, orderedStart, orderedEnd)
+        const existing = map.get(key)
+        const snapshot: LatestPointInspection = {
+          phaseId: Number(item.phaseId),
+          side,
+          startPk: orderedStart,
+          endPk: orderedEnd,
+          layers: item.layers || [],
+          checks: item.checks || [],
+          updatedAt: ts || 0,
+          status: item.status ?? 'PENDING',
+        }
+        if (!existing) {
+          map.set(key, snapshot)
+        } else {
+          const mergedLayers = Array.from(new Set([...(existing.layers || []), ...(snapshot.layers || [])]))
+          const mergedChecks = Array.from(new Set([...(existing.checks || []), ...(snapshot.checks || [])]))
+          const merged: LatestPointInspection = {
+            ...snapshot,
+            layers: mergedLayers,
+            checks: mergedChecks,
+            updatedAt: Math.max(existing.updatedAt ?? 0, snapshot.updatedAt ?? 0),
+            status: existing.updatedAt >= snapshot.updatedAt ? existing.status : snapshot.status,
           }
-          if (!existing || ts > existing.updatedAt) {
-            map.set(key, snapshot)
-          }
-          slices.push({
-            phaseId: Number(item.phaseId),
-            side: item.side ?? 'BOTH',
-            startPk: orderedStart,
-            endPk: orderedEnd,
-            status: item.status ?? 'PENDING',
-            updatedAt: ts || 0,
+          map.set(key, merged)
+        }
+        slices.push({
+          phaseId: Number(item.phaseId),
+          side: item.side ?? 'BOTH',
+          startPk: orderedStart,
+          endPk: orderedEnd,
+          status: item.status ?? 'PENDING',
+          updatedAt: ts || 0,
           })
         })
-        if (!cancelled) {
+        if (!isCancelled()) {
+          latestPointInspectionsRef.current = map
           setLatestPointInspections(map)
           setInspectionSlices(slices)
         }
       } catch (err) {
-        if (!cancelled) {
+        if (!isCancelled()) {
+          latestPointInspectionsRef.current = new Map()
           setInspectionSlices([])
           setLatestPointInspections(new Map())
         }
@@ -1427,12 +1679,17 @@ export function PhaseEditor({
           console.warn(t.alerts.fetchInspectionFailed, err)
         }
       }
-    }
-    fetchLatestInspections()
+    },
+    [road.slug, t.alerts.fetchInspectionFailed],
+  )
+
+  useEffect(() => {
+    const controller = { cancelled: false }
+    fetchLatestInspections({ signalCancelled: () => controller.cancelled })
     return () => {
-      cancelled = true
+      controller.cancelled = true
     }
-  }, [road.slug, canViewInspection, t.alerts.fetchInspectionFailed])
+  }, [fetchLatestInspections])
 
   useEffect(() => {
     if (!successMessage) return
@@ -2057,12 +2314,12 @@ export function PhaseEditor({
                           {workflowCopy.badge}
                         </span>
                         <span className="font-semibold text-emerald-50">
-                          {selectedSegment.workflow.phaseName}
+                          {localizedWorkflowPhaseName ?? selectedSegment.workflow.phaseName}
                         </span>
                         <span className="text-emerald-100/80">{workflowCopy.ruleTitle}</span>
-                        {selectedSegment.workflow.sideRule ? (
+                        {localizedWorkflowSideRule ? (
                           <span className="rounded-full bg-emerald-300/15 px-2 py-1 text-[10px] text-emerald-50">
-                            {selectedSegment.workflow.sideRule}
+                            {localizedWorkflowSideRule}
                           </span>
                         ) : null}
                       </div>
@@ -2077,16 +2334,26 @@ export function PhaseEditor({
                           const parallelNames = (layer.parallelWith ?? []).map(
                             (id) => workflowLayerNameMap?.get(id) ?? id,
                           )
-      const checkSummary = layer.checks
-        .map((check) => `${check.name}（${check.types.join(' / ')}）`)
-        .join('；')
+                          const localizedLayerName = localizeProgressTerm('layer', layer.name, locale, {
+                            phaseName: workflowPhaseNameForContext,
+                          })
+                          const checkSummary = layer.checks
+                            .map((check) => {
+                              const checkName = localizeProgressTerm('check', check.name, locale)
+                              const typeText = localizeProgressList('type', check.types, locale).join(' / ')
+                              return `${checkName} (${typeText})`
+                            })
+                            .join('; ')
+                          const localizedDescription = layer.description
+                            ? localizeProgressText(layer.description, locale)
+                            : null
                           return (
                             <div
                               key={layer.id}
                               className="rounded-2xl border border-emerald-200/30 bg-white/5 p-3 text-[11px] text-emerald-50 shadow-inner shadow-emerald-500/10"
                             >
                               <div className="flex items-center justify-between gap-2">
-                                <span className="font-semibold">{layer.name}</span>
+                                <span className="font-semibold">{localizedLayerName}</span>
                                 <span className="rounded-full bg-emerald-300/20 px-2 py-0.5 text-[10px] font-semibold text-emerald-950">
                                   {formatProgressCopy(workflowCopy.stageName, { value: layer.stage })}
                                 </span>
@@ -2108,8 +2375,8 @@ export function PhaseEditor({
                                   })}
                                 </p>
                               ) : null}
-                              {layer.description ? (
-                                <p className="text-emerald-100/80">{layer.description}</p>
+                              {localizedDescription ? (
+                                <p className="text-emerald-100/80">{localizedDescription}</p>
                               ) : null}
                               {checkSummary ? (
                                 <p className="mt-1 text-emerald-50">{checkSummary}</p>
@@ -2193,7 +2460,7 @@ export function PhaseEditor({
                           }`}
                           onClick={() => toggleToken(item, selectedTypes, setSelectedTypes)}
                         >
-                          {item}
+                          {localizeProgressTerm('type', item, locale)}
                         </button>
                       ))}
                     </div>
