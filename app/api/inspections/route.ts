@@ -10,12 +10,13 @@ export async function GET(request: Request) {
   }
   const { searchParams } = new URL(request.url)
   const statusParams = searchParams.getAll('status').filter(Boolean) as InspectionStatus[]
+  const typeParams = searchParams.getAll('type').filter(Boolean)
   const filter = {
     roadSlug: searchParams.get('roadSlug') ?? undefined,
     phaseId: searchParams.get('phaseId') ? Number(searchParams.get('phaseId')) : undefined,
     status: statusParams.length ? statusParams : undefined,
     side: (searchParams.get('side') as 'LEFT' | 'RIGHT' | 'BOTH' | null) ?? undefined,
-    type: searchParams.get('type') ?? undefined,
+    types: typeParams.length ? typeParams : undefined,
     check: searchParams.get('check') ?? undefined,
     keyword: searchParams.get('keyword') ?? undefined,
     startDate: searchParams.get('startDate') ?? undefined,

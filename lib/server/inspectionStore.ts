@@ -124,8 +124,8 @@ export const listInspections = async (filter: InspectionFilter): Promise<Inspect
   if (filter.side) {
     where.side = filter.side as IntervalSide
   }
-  if (filter.type) {
-    where.types = { has: filter.type }
+  if (filter.types && filter.types.length) {
+    where.types = { hasSome: filter.types }
   }
   if (filter.check) {
     where.checks = { has: filter.check }

@@ -143,16 +143,21 @@ export function InspectionBoard({ roads, loadError }: Props) {
     copy.prefabModal.layerOptions[key] ?? fallback
   const getPrefabCheckLabel = (value: string) => copy.prefabModal.checkOptions[value] ?? value
   const getPrefabTypeLabel = (value: string) => copy.prefabModal.typeOptions[value] ?? value
+  const inspectionTypeOptions = useMemo(
+    () => ['现场验收', '试验验收', '测量验收', '其他'],
+    [],
+  )
   const [roadSlug, setRoadSlug] = useState('')
   const [phaseId, setPhaseId] = useState<number | ''>('')
   const [status, setStatus] = useState<InspectionStatus[]>([])
   const [side, setSide] = useState('')
-  const [type, setType] = useState('')
+  const [types, setTypes] = useState<string[]>([])
   const [check, setCheck] = useState('')
   const [keyword, setKeyword] = useState('')
   const [checkOptions, setCheckOptions] = useState<string[]>([])
   const [checkOptionsError, setCheckOptionsError] = useState<string | null>(null)
   const [checkOptionsLoading, setCheckOptionsLoading] = useState(false)
+  const [typeOpen, setTypeOpen] = useState(false)
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [sortField, setSortField] = useState<SortField>('updatedAt')
@@ -210,6 +215,7 @@ export function InspectionBoard({ roads, loadError }: Props) {
   const [visibleColumns, setVisibleColumns] = useState<ColumnKey[]>(() => defaultVisibleColumns)
   const [showColumnSelector, setShowColumnSelector] = useState(false)
   const columnSelectorRef = useRef<HTMLDivElement | null>(null)
+  const typeSelectorRef = useRef<HTMLDivElement | null>(null)
 
   const persistVisibleColumns = (next: ColumnKey[]) => {
     if (typeof window !== 'undefined') {
@@ -313,7 +319,7 @@ export function InspectionBoard({ roads, loadError }: Props) {
         phaseId: phaseId || undefined,
         status: status.length ? status : undefined,
         side: side || undefined,
-        type: type || undefined,
+        type: types.length ? types : undefined,
         check: check || undefined,
         keyword: keyword || undefined,
         startDate: startDate || undefined,
@@ -340,7 +346,7 @@ export function InspectionBoard({ roads, loadError }: Props) {
   useEffect(() => {
     fetchData()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roadSlug, phaseId, status, side, type, check, keyword, startDate, endDate, sortField, sortOrder, page, pageSize])
+  }, [roadSlug, phaseId, status, side, types, check, keyword, startDate, endDate, sortField, sortOrder, page, pageSize])
 
   useEffect(() => {
     setSelectedIds((prev) => prev.filter((id) => items.some((item) => item.id === id)))
@@ -351,11 +357,16 @@ export function InspectionBoard({ roads, loadError }: Props) {
   }, [selectedIds, bulkStatus])
 
   const statusOptions: InspectionStatus[] = ['PENDING', 'SCHEDULED', 'SUBMITTED', 'IN_PROGRESS', 'APPROVED']
+  const toggleValue = <T,>(list: T[], value: T) =>
+    list.includes(value) ? list.filter((item) => item !== value) : [...list, value]
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (columnSelectorRef.current && !columnSelectorRef.current.contains(event.target as Node)) {
         setShowColumnSelector(false)
+      }
+      if (typeSelectorRef.current && !typeSelectorRef.current.contains(event.target as Node)) {
+        setTypeOpen(false)
       }
     }
     document.addEventListener('mousedown', handleClickOutside)
@@ -442,7 +453,7 @@ export function InspectionBoard({ roads, loadError }: Props) {
     setPhaseId('')
     setStatus([])
     setSide('')
-    setType('')
+    setTypes([])
     setCheck('')
     setKeyword('')
     setStartDate('')
@@ -735,15 +746,64 @@ export function InspectionBoard({ roads, loadError }: Props) {
             </label>
             <label className="flex flex-col gap-1 text-xs text-slate-200">
               {copy.filters.type}
-              <input
-                className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-200/60 focus:border-emerald-300 focus:outline-none"
-                value={type}
-                onChange={(e) => {
-                  setType(e.target.value)
-                  setPage(1)
-                }}
-                placeholder={copy.filters.typePlaceholder}
-              />
+              <div className="relative" ref={typeSelectorRef}>
+                <button
+                  type="button"
+                  onClick={() => setTypeOpen((prev) => !prev)}
+                  className="flex w-full items-center justify-between rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-left text-sm text-slate-50 shadow-inner shadow-slate-900/30 focus:border-emerald-300 focus:outline-none"
+                >
+                  <span className="truncate">
+                    {types.length === 0 ? '全部类型' : `已选 ${types.length} 项`}
+                  </span>
+                  <span className="text-xs text-slate-300">⌕</span>
+                </button>
+                {typeOpen ? (
+                  <div className="absolute z-10 mt-2 w-full rounded-xl border border-white/15 bg-slate-900/95 p-3 text-xs text-slate-100 shadow-lg shadow-slate-900/40 backdrop-blur">
+                    <div className="flex items-center justify-between border-b border-white/10 pb-2 text-[11px] text-slate-300">
+                      <span>已选 {types.length || '全部'}</span>
+                      <div className="flex gap-2">
+                        <button
+                          className="text-emerald-300 hover:underline"
+                          onClick={() => {
+                            setTypes(inspectionTypeOptions)
+                            setPage(1)
+                          }}
+                        >
+                          全选
+                        </button>
+                        <button
+                          className="text-slate-400 hover:underline"
+                          onClick={() => {
+                            setTypes([])
+                            setPage(1)
+                          }}
+                        >
+                          清空
+                        </button>
+                      </div>
+                    </div>
+                    <div className="mt-2 max-h-48 space-y-1 overflow-y-auto">
+                      {inspectionTypeOptions.map((option) => (
+                        <label
+                          key={option}
+                          className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 hover:bg-white/5"
+                        >
+                          <input
+                            type="checkbox"
+                            className="h-4 w-4 rounded border-white/30 bg-slate-900/60 accent-emerald-300"
+                            checked={types.includes(option)}
+                            onChange={() => {
+                              setTypes((prev) => toggleValue(prev, option))
+                              setPage(1)
+                            }}
+                          />
+                          <span className="truncate">{option}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
             </label>
             <label className="flex flex-col gap-1 text-xs text-slate-200">
               {copy.filters.check}
