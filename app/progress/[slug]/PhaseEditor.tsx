@@ -1062,15 +1062,7 @@ export function PhaseEditor({
         })
       })
       if (missingDeps.size) {
-<<<<<<< HEAD
         raiseSubmitError(formatProgressCopy(t.inspection.missingDeps, { deps: Array.from(missingDeps).join(' / ') }))
-=======
-        raiseSubmitError(
-          formatProgressCopy(t.inspection.dialogBundleMessage, {
-            deps: Array.from(missingDeps).join(listJoiner),
-          }),
-        )
->>>>>>> ee5a67cbc7e3ade19eb8879f0a94be95de3c8b66
         return
       }
 
@@ -1185,8 +1177,6 @@ export function PhaseEditor({
 
   const workflowLayerNameMap = useMemo(() => {
     if (!selectedSegment?.workflowLayers?.length) return null
-<<<<<<< HEAD
-    const zhPhase = workflowPhaseNameForContext
     return new Map(
       selectedSegment.workflowLayers.map((layer) => [
         layer.id,
@@ -1194,17 +1184,6 @@ export function PhaseEditor({
       ]),
     )
   }, [locale, selectedSegment?.workflowLayers, workflowPhaseNameForContext])
-=======
-    return new Map(
-      selectedSegment.workflowLayers.map((layer) => [
-        layer.id,
-        localizeProgressTerm('layer', layer.name, locale, {
-          phaseName: selectedSegment.workflow?.phaseName ?? selectedSegment.phase,
-        }),
-      ]),
-    )
-  }, [locale, selectedSegment?.phase, selectedSegment?.workflow?.phaseName, selectedSegment?.workflowLayers])
->>>>>>> ee5a67cbc7e3ade19eb8879f0a94be95de3c8b66
 
   const workflowChecksByLayerName = useMemo(() => {
     if (!selectedSegment?.workflowLayers?.length) return null
@@ -2342,7 +2321,6 @@ export function PhaseEditor({
 
                   {selectedSegment.workflow && selectedSegment.workflowLayers?.length ? (
                     <div className="space-y-3 rounded-2xl border border-emerald-300/30 bg-emerald-400/5 p-4 shadow-inner shadow-emerald-400/20">
-<<<<<<< HEAD
                       <div className="flex flex-wrap items-center gap-2 text-xs text-emerald-100">
                         <span className="rounded-full bg-emerald-300/25 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-50">
                           {workflowCopy.badge}
@@ -2354,34 +2332,18 @@ export function PhaseEditor({
                         {localizedWorkflowSideRule ? (
                           <span className="rounded-full bg-emerald-300/15 px-2 py-1 text-[10px] text-emerald-50">
                             {localizedWorkflowSideRule}
-=======
-                  <div className="flex flex-wrap items-center gap-2 text-xs text-emerald-100">
-                    <span className="rounded-full bg-emerald-300/25 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-50">
-                      {workflowCopy.badge}
-                    </span>
-                    <span className="font-semibold text-emerald-50">
-                          {displayPhaseName(selectedSegment.workflow.phaseName)}
-                    </span>
-                    <span className="text-emerald-100/80">{workflowCopy.ruleTitle}</span>
-                    {selectedSegment.workflow.sideRule ? (
-                      <span className="rounded-full bg-emerald-300/15 px-2 py-1 text-[10px] text-emerald-50">
-                        {selectedSegment.workflow.sideRule}
->>>>>>> ee5a67cbc7e3ade19eb8879f0a94be95de3c8b66
                           </span>
                         ) : null}
                       </div>
                       <div className="grid gap-2 md:grid-cols-2">
                         {selectedSegment.workflowLayers.map((layer) => {
                           const dependsNames = (layer.dependencies ?? []).map(
-                            (id) => workflowLayerNameMap?.get(id) ?? displayLayerName(id),
+                            (id) => workflowLayerNameMap?.get(id) ?? id,
                           )
-                          const lockNames = (layer.lockStepWith ?? []).map(
-                            (id) => workflowLayerNameMap?.get(id) ?? displayLayerName(id),
-                          )
+                          const lockNames = (layer.lockStepWith ?? []).map((id) => workflowLayerNameMap?.get(id) ?? id)
                           const parallelNames = (layer.parallelWith ?? []).map(
-                            (id) => workflowLayerNameMap?.get(id) ?? displayLayerName(id),
+                            (id) => workflowLayerNameMap?.get(id) ?? id,
                           )
-<<<<<<< HEAD
                           const localizedLayerName = localizeProgressTerm('layer', layer.name, locale, {
                             phaseName: workflowPhaseNameForContext,
                           })
@@ -2395,27 +2357,13 @@ export function PhaseEditor({
                           const localizedDescription = layer.description
                             ? localizeProgressText(layer.description, locale)
                             : null
-=======
-                          const checkSummary = layer.checks
-                            .map(
-                              (check) =>
-                                `${displayCheckName(check.name)} (${check.types
-                                  .map((type) => displayTypeName(type))
-                                  .join(listJoiner)})`,
-                            )
-                            .join(sentenceJoiner)
->>>>>>> ee5a67cbc7e3ade19eb8879f0a94be95de3c8b66
                           return (
                             <div
                               key={layer.id}
                               className="rounded-2xl border border-emerald-200/30 bg-white/5 p-3 text-[11px] text-emerald-50 shadow-inner shadow-emerald-500/10"
                             >
                               <div className="flex items-center justify-between gap-2">
-<<<<<<< HEAD
                                 <span className="font-semibold">{localizedLayerName}</span>
-=======
-                                <span className="font-semibold">{displayLayerName(layer.name)}</span>
->>>>>>> ee5a67cbc7e3ade19eb8879f0a94be95de3c8b66
                                 <span className="rounded-full bg-emerald-300/20 px-2 py-0.5 text-[10px] font-semibold text-emerald-950">
                                   {formatProgressCopy(workflowCopy.stageName, { value: layer.stage })}
                                 </span>
@@ -2519,22 +2467,18 @@ export function PhaseEditor({
                         <button
                           key={item}
                           type="button"
-                          className={`rounded-full px-3 py-1 text-[11px] font-semibold transition ${
-                            selectedTypes.includes(item)
-                              ? 'bg-emerald-300 text-slate-900 shadow shadow-emerald-300/40'
-                              : 'bg-white/10 text-slate-100 hover:bg-white/15'
-                          }`}
-                          onClick={() => toggleToken(item, selectedTypes, setSelectedTypes)}
-                        >
-<<<<<<< HEAD
-                          {localizeProgressTerm('type', item, locale)}
-=======
-                          {displayTypeName(item)}
->>>>>>> ee5a67cbc7e3ade19eb8879f0a94be95de3c8b66
-                        </button>
-                      ))}
-                    </div>
+                        className={`rounded-full px-3 py-1 text-[11px] font-semibold transition ${
+                          selectedTypes.includes(item)
+                            ? 'bg-emerald-300 text-slate-900 shadow shadow-emerald-300/40'
+                            : 'bg-white/10 text-slate-100 hover:bg-white/15'
+                        }`}
+                        onClick={() => toggleToken(item, selectedTypes, setSelectedTypes)}
+                      >
+                        {localizeProgressTerm('type', item, locale)}
+                      </button>
+                    ))}
                   </div>
+                </div>
 
                   <div className="space-y-2 rounded-2xl border border-white/10 bg-white/5 p-4 shadow-inner shadow-slate-900/30">
                     <p className="text-xs font-semibold text-slate-200">{t.inspection.remarkLabel}</p>
