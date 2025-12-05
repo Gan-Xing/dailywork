@@ -270,6 +270,7 @@ type PhaseCopy = {
   }
   errors: {
     invalidRange: string
+    definitionMissing: string
     saveFailed: string
     deleteFailed: string
     submitRangeInvalid: string
@@ -363,6 +364,14 @@ type InspectionBoardCopy = {
     search: string
     addPrefab: string
     loading: string
+  }
+  typePicker: {
+    placeholder: string
+    selected: string
+    summary: string
+    selectAll: string
+    clear: string
+    all: string
   }
   status: Record<string, string>
   columns: {
@@ -678,17 +687,18 @@ const progressCopy: Record<Locale, ProgressCopy> = {
         invalidRange: '请填写有效的起点/终点',
         saveFailed: '保存失败',
         deleteFailed: '删除失败',
-        submitRangeInvalid: '请输入有效的起点和终点',
-        submitLayerMissing: '请选择至少一个层次',
-        submitCheckMissing: '请选择至少一个验收内容',
-        submitTypeMissing: '请选择至少一个验收类型',
-        submitAppointmentMissing: '请选择预约日期',
-        submitFailed: '提交失败',
-      },
-      success: {
-        created: '分项「{name}」已创建',
-        updated: '分项「{name}」已更新',
-      },
+      submitRangeInvalid: '请输入有效的起点和终点',
+      submitLayerMissing: '请选择至少一个层次',
+      submitCheckMissing: '请选择至少一个验收内容',
+      submitTypeMissing: '请选择至少一个验收类型',
+      submitAppointmentMissing: '请选择预约日期',
+      submitFailed: '提交失败',
+      definitionMissing: '请选择分项模板',
+    },
+    success: {
+      created: '分项「{name}」已创建',
+      updated: '分项「{name}」已更新',
+    },
       inspection: {
         title: '预约报检',
         sideLabel: '侧别',
@@ -856,6 +866,14 @@ const progressCopy: Record<Locale, ProgressCopy> = {
         search: '立即查询',
         addPrefab: '新增预制报检',
         loading: '加载中...',
+      },
+      typePicker: {
+        placeholder: '全部类型',
+        selected: '已选 {count} 项',
+        summary: '已选 {count}',
+        selectAll: '全选',
+        clear: '清空',
+        all: '全部',
       },
       status: {
         PENDING: '待处理',
@@ -1200,6 +1218,7 @@ const progressCopy: Record<Locale, ProgressCopy> = {
         submitTypeMissing: 'Sélectionnez au moins un type',
         submitAppointmentMissing: 'Choisissez une date de rendez-vous',
         submitFailed: "Échec de l'envoi",
+        definitionMissing: 'Choisissez un modèle de phase',
       },
       success: {
         created: 'Phase « {name} » créée',
@@ -1375,6 +1394,14 @@ const progressCopy: Record<Locale, ProgressCopy> = {
         search: 'Rechercher',
         addPrefab: 'Ajouter contrôle préfab',
         loading: 'Chargement...',
+      },
+      typePicker: {
+        placeholder: 'Tous les types',
+        selected: 'Sélection : {count}',
+        summary: 'Sélection : {count}',
+        selectAll: 'Tout sélectionner',
+        clear: 'Effacer',
+        all: 'Tout',
       },
       status: {
         PENDING: 'À traiter',

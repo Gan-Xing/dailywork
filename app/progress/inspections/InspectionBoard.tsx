@@ -135,6 +135,16 @@ export function InspectionBoard({ roads, loadError }: Props) {
     copy.prefabModal.layerOptions[key] ?? fallback
   const getPrefabCheckLabel = (value: string) => copy.prefabModal.checkOptions[value] ?? value
   const getPrefabTypeLabel = (value: string) => copy.prefabModal.typeOptions[value] ?? value
+  const formatPhaseOptionLabel = (phase: PhaseOption) => {
+    const phaseLabel = localizeProgressTerm('phase', phase.name, locale)
+    if (phase.roadSlug || phase.roadName) {
+      const roadLabel = resolveRoadName({ slug: phase.roadSlug, name: phase.roadName }, locale)
+      return `${roadLabel} · ${phaseLabel}`
+    }
+    return phaseLabel
+  }
+  const formatTypeLabel = (value: string) => localizeProgressTerm('type', value, locale)
+  const formatRoadName = (slug?: string, name?: string) => resolveRoadName({ slug, name }, locale)
   const inspectionTypeOptions = useMemo(
     () => ['现场验收', '试验验收', '测量验收', '其他'],
     [],
@@ -707,139 +717,145 @@ export function InspectionBoard({ roads, loadError }: Props) {
                 className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
                 value={phaseId}
                 onChange={(e) => {
-                  const value = e.target.value
-                  setPhaseId(value ? Number(value) : '')
-                  setPage(1)
-                }}
+                const value = e.target.value
+                setPhaseId(value ? Number(value) : '')
+                setPage(1)
+              }}
+            >
+              <option value="">{copy.filters.all}</option>
+              {phases.map((phase) => (
+                <option key={phase.id} value={phase.id}>
+                  {formatPhaseOptionLabel(phase)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex flex-col gap-1 text-xs text-slate-200">
+            {copy.filters.side}
+            <select
+              className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
+              value={side}
+              onChange={(e) => {
+                setSide(e.target.value)
+                setPage(1)
+              }}
+            >
+              <option value="">{copy.filters.all}</option>
+              <option value="LEFT">{copy.filters.sideLeft}</option>
+              <option value="RIGHT">{copy.filters.sideRight}</option>
+              <option value="BOTH">{copy.filters.sideBoth}</option>
+            </select>
+          </label>
+          <label className="flex flex-col gap-1 text-xs text-slate-200">
+            {copy.filters.type}
+            <div className="relative" ref={typeSelectorRef}>
+              <button
+                type="button"
+                onClick={() => setTypeOpen((prev) => !prev)}
+                className="flex w-full items-center justify-between rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-left text-sm text-slate-50 shadow-inner shadow-slate-900/30 focus:border-emerald-300 focus:outline-none"
               >
-                <option value="">{copy.filters.all}</option>
-                {phases.map((phase) => (
-                  <option key={phase.id} value={phase.id}>
-                    {phase.roadName ? `${phase.roadName} · ${phase.name}` : phase.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="flex flex-col gap-1 text-xs text-slate-200">
-              {copy.filters.side}
-              <select
-                className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
-                value={side}
-                onChange={(e) => {
-                  setSide(e.target.value)
-                  setPage(1)
-                }}
-              >
-                <option value="">{copy.filters.all}</option>
-                <option value="LEFT">{copy.filters.sideLeft}</option>
-                <option value="RIGHT">{copy.filters.sideRight}</option>
-                <option value="BOTH">{copy.filters.sideBoth}</option>
-              </select>
-            </label>
-            <label className="flex flex-col gap-1 text-xs text-slate-200">
-              {copy.filters.type}
-              <div className="relative" ref={typeSelectorRef}>
-                <button
-                  type="button"
-                  onClick={() => setTypeOpen((prev) => !prev)}
-                  className="flex w-full items-center justify-between rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-left text-sm text-slate-50 shadow-inner shadow-slate-900/30 focus:border-emerald-300 focus:outline-none"
-                >
-                  <span className="truncate">
-                    {types.length === 0 ? '全部类型' : `已选 ${types.length} 项`}
-                  </span>
-                  <span className="text-xs text-slate-300">⌕</span>
-                </button>
-                {typeOpen ? (
-                  <div className="absolute z-10 mt-2 w-full rounded-xl border border-white/15 bg-slate-900/95 p-3 text-xs text-slate-100 shadow-lg shadow-slate-900/40 backdrop-blur">
-                    <div className="flex items-center justify-between border-b border-white/10 pb-2 text-[11px] text-slate-300">
-                      <span>已选 {types.length || '全部'}</span>
-                      <div className="flex gap-2">
-                        <button
-                          className="text-emerald-300 hover:underline"
-                          onClick={() => {
-                            setTypes(inspectionTypeOptions)
-                            setPage(1)
-                          }}
-                        >
-                          全选
-                        </button>
-                        <button
-                          className="text-slate-400 hover:underline"
-                          onClick={() => {
-                            setTypes([])
-                            setPage(1)
-                          }}
-                        >
-                          清空
-                        </button>
-                      </div>
-                    </div>
-                    <div className="mt-2 max-h-48 space-y-1 overflow-y-auto">
-                      {inspectionTypeOptions.map((option) => (
-                        <label
-                          key={option}
-                          className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 hover:bg-white/5"
-                        >
-                          <input
-                            type="checkbox"
-                            className="h-4 w-4 rounded border-white/30 bg-slate-900/60 accent-emerald-300"
-                            checked={types.includes(option)}
-                            onChange={() => {
-                              setTypes((prev) => toggleValue(prev, option))
-                              setPage(1)
-                            }}
-                          />
-                          <span className="truncate">{option}</span>
-                        </label>
-                      ))}
+                <span className="truncate">
+                  {types.length === 0
+                    ? copy.typePicker.placeholder
+                    : formatProgressCopy(copy.typePicker.selected, { count: types.length })}
+                </span>
+                <span className="text-xs text-slate-300">⌕</span>
+              </button>
+              {typeOpen ? (
+                <div className="absolute z-10 mt-2 w-full rounded-xl border border-white/15 bg-slate-900/95 p-3 text-xs text-slate-100 shadow-lg shadow-slate-900/40 backdrop-blur">
+                  <div className="flex items-center justify-between border-b border-white/10 pb-2 text-[11px] text-slate-300">
+                    <span>
+                      {formatProgressCopy(copy.typePicker.summary, {
+                        count: types.length ? types.length : copy.typePicker.all,
+                      })}
+                    </span>
+                    <div className="flex gap-2">
+                      <button
+                        className="text-emerald-300 hover:underline"
+                        onClick={() => {
+                          setTypes(inspectionTypeOptions)
+                          setPage(1)
+                        }}
+                      >
+                        {copy.typePicker.selectAll}
+                      </button>
+                      <button
+                        className="text-slate-400 hover:underline"
+                        onClick={() => {
+                          setTypes([])
+                          setPage(1)
+                        }}
+                      >
+                        {copy.typePicker.clear}
+                      </button>
                     </div>
                   </div>
-                ) : null}
-              </div>
-            </label>
-            <label className="flex flex-col gap-1 text-xs text-slate-200">
-              {copy.filters.check}
-              <select
-                className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
-                value={check}
-                onChange={(e) => {
-                  setCheck(e.target.value)
-                  setPage(1)
-                }}
-              >
-                <option value="">{copy.filters.all}</option>
-                {checkOptions.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-              {checkOptionsLoading ? (
-                <span className="text-[11px] text-slate-300">{copy.filters.loading}</span>
+                  <div className="mt-2 max-h-48 space-y-1 overflow-y-auto">
+                    {inspectionTypeOptions.map((option) => (
+                      <label
+                        key={option}
+                        className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 hover:bg-white/5"
+                      >
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 rounded border-white/30 bg-slate-900/60 accent-emerald-300"
+                          checked={types.includes(option)}
+                          onChange={() => {
+                            setTypes((prev) => toggleValue(prev, option))
+                            setPage(1)
+                          }}
+                        />
+                        <span className="truncate">{formatTypeLabel(option)}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
               ) : null}
-              {checkOptionsError ? (
-                <span className="text-[11px] text-amber-200">{checkOptionsError}</span>
-              ) : null}
-            </label>
-            <div className="flex items-center gap-2 text-xs text-slate-200">
-              <span className="whitespace-nowrap">{copy.filters.status}</span>
-              <div className="flex flex-wrap gap-2">
-                {statusOptions.map((item) => (
-                  <button
-                    key={item}
-                    type="button"
-                    className={`rounded-full px-3 py-1 text-[11px] font-semibold ${
-                      status.includes(item)
-                        ? 'bg-emerald-300 text-slate-900 shadow shadow-emerald-300/40'
-                        : 'bg-white/10 text-slate-100'
-                    }`}
-                    onClick={() => toggleStatus(item)}
-                  >
-                    {statusCopy[item]}
-                  </button>
-                ))}
-              </div>
             </div>
+          </label>
+          <label className="flex flex-col gap-1 text-xs text-slate-200">
+            {copy.filters.check}
+            <select
+              className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
+              value={check}
+              onChange={(e) => {
+                setCheck(e.target.value)
+                setPage(1)
+              }}
+            >
+              <option value="">{copy.filters.all}</option>
+              {checkOptions.map((option) => (
+                <option key={option} value={option}>
+                  {localizeProgressTerm('check', option, locale)}
+                </option>
+              ))}
+            </select>
+            {checkOptionsLoading ? (
+              <span className="text-[11px] text-slate-300">{copy.filters.loading}</span>
+            ) : null}
+            {checkOptionsError ? (
+              <span className="text-[11px] text-amber-200">{checkOptionsError}</span>
+            ) : null}
+          </label>
+          <div className="flex items-center gap-2 text-xs text-slate-200">
+            <span className="whitespace-nowrap">{copy.filters.status}</span>
+            <div className="flex flex-wrap gap-2">
+              {statusOptions.map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  className={`rounded-full px-3 py-1 text-[11px] font-semibold ${
+                    status.includes(item)
+                      ? 'bg-emerald-300 text-slate-900 shadow shadow-emerald-300/40'
+                      : 'bg-white/10 text-slate-100'
+                  }`}
+                  onClick={() => toggleStatus(item)}
+                >
+                  {statusCopy[item]}
+                </button>
+              ))}
+            </div>
+          </div>
             <label className="flex flex-col gap-1 text-xs text-slate-200">
               {copy.filters.startDate}
               <input
@@ -1113,8 +1129,10 @@ export function InspectionBoard({ roads, loadError }: Props) {
                 ) : (
                   items.map((item, index) => {
                     const displayIndex = (page - 1) * pageSize + index + 1
-                  const isPrefab = isPrefabItem(item)
-                    const roadText = isPrefab ? prefabRoadLabel : item.roadName
+                    const isPrefab = isPrefabItem(item)
+                    const roadText = isPrefab
+                      ? prefabRoadLabel
+                      : formatRoadName(item.roadSlug, item.roadName)
                     const sideText = isPrefab ? '—' : sideCopy[item.side] ?? item.side
                     const rangeText = isPrefab ? '—' : `${formatPK(item.startPk)} → ${formatPK(item.endPk)}`
                     const layersText = localizeProgressList('layer', item.layers, locale, {
@@ -1422,7 +1440,7 @@ export function InspectionBoard({ roads, loadError }: Props) {
               const isPrefab = isPrefabItem(selected)
               const sideText = isPrefab ? '—' : sideCopy[selected.side] ?? selected.side
               const rangeText = isPrefab ? '—' : `${formatPK(selected.startPk)} → ${formatPK(selected.endPk)}`
-              const roadText = isPrefab ? prefabRoadLabel : selected.roadName
+              const roadText = isPrefab ? prefabRoadLabel : formatRoadName(selected.roadSlug, selected.roadName)
               const layerText = localizeProgressList('layer', selected.layers, locale, {
                 phaseName: selected.phaseName,
               }).join(locale === 'fr' ? ', ' : ' / ')
@@ -1458,25 +1476,25 @@ export function InspectionBoard({ roads, loadError }: Props) {
               </div>
               <div className="mt-4 grid gap-3 text-sm text-slate-200 md:grid-cols-2">
                 <div className="space-y-1">
-                  <p className="text-xs text-slate-400">道路</p>
+                  <p className="text-xs text-slate-400">{copy.columns.road}</p>
                   <p className="rounded-xl bg-white/5 px-3 py-2 text-sm">{roadText}</p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-xs text-slate-400">分项</p>
+                  <p className="text-xs text-slate-400">{copy.columns.phase}</p>
                   <p className="rounded-xl bg-white/5 px-3 py-2 text-sm">
                     {localizeProgressTerm('phase', selected.phaseName, locale)}
                   </p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-xs text-slate-400">侧别</p>
+                  <p className="text-xs text-slate-400">{copy.columns.side}</p>
                   <p className="rounded-xl bg-white/5 px-3 py-2 text-sm">{sideText}</p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-xs text-slate-400">区间</p>
+                  <p className="text-xs text-slate-400">{copy.columns.range}</p>
                   <p className="rounded-xl bg-white/5 px-3 py-2 text-sm">{rangeText}</p>
                 </div>
                 <div className="space-y-1 md:col-span-2">
-                  <p className="text-xs text-slate-400">验收层次</p>
+                  <p className="text-xs text-slate-400">{copy.columns.layers}</p>
                   <p className="rounded-xl bg-white/5 px-3 py-2 text-sm">{layerText}</p>
                 </div>
                 <div className="space-y-1">
@@ -1508,15 +1526,15 @@ export function InspectionBoard({ roads, loadError }: Props) {
                   <p>{submittedByText}</p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-xs text-slate-400">创建人</p>
+                  <p className="text-xs text-slate-400">{copy.columns.createdBy}</p>
                   <p>{createdByText}</p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-xs text-slate-400">创建时间</p>
+                  <p className="text-xs text-slate-400">{copy.columns.createdAt}</p>
                   <p>{formatDate(selected.createdAt)}</p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-xs text-slate-400">更新人</p>
+                  <p className="text-xs text-slate-400">{copy.columns.updatedBy}</p>
                   <p>{updatedByText}</p>
                 </div>
                 <div className="space-y-1 md:col-span-2">
@@ -1541,7 +1559,7 @@ export function InspectionBoard({ roads, loadError }: Props) {
           >
             {(() => {
               const isPrefab = isPrefabItem(editing)
-              const roadText = isPrefab ? prefabRoadLabel : editing.roadName
+              const roadText = isPrefab ? prefabRoadLabel : formatRoadName(editing.roadSlug, editing.roadName)
               const rangeText = isPrefab ? '—' : `${formatPK(editing.startPk)} → ${formatPK(editing.endPk)}`
               return (
             <div className="w-full max-w-4xl rounded-3xl border border-white/10 bg-slate-900/95 p-6 shadow-2xl shadow-emerald-500/20 backdrop-blur">
@@ -1717,9 +1735,14 @@ export function InspectionBoard({ roads, loadError }: Props) {
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="text-xs uppercase tracking-[0.2em] text-amber-100">{copy.deleteModal.badge}</p>
-                  <h3 className="text-lg font-semibold text-slate-50">{deleteTarget.phaseName}</h3>
+                  <h3 className="text-lg font-semibold text-slate-50">
+                    {localizeProgressTerm('phase', deleteTarget.phaseName, locale)}
+                  </h3>
                   <p className="text-sm text-slate-300">
-                    {deleteTarget.roadName} · {formatPK(deleteTarget.startPk)} → {formatPK(deleteTarget.endPk)}
+                    {isPrefabItem(deleteTarget)
+                      ? prefabRoadLabel
+                      : formatRoadName(deleteTarget.roadSlug, deleteTarget.roadName)}{' '}
+                    · {formatPK(deleteTarget.startPk)} → {formatPK(deleteTarget.endPk)}
                   </p>
                 </div>
                 <button
