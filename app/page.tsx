@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { AlertDialog } from '@/components/AlertDialog';
 import { LocaleSwitcher } from '@/components/LocaleSwitcher';
