@@ -129,3 +129,36 @@ export async function PATCH(
     return NextResponse.json({ message: (error as Error).message }, { status: 500 })
   }
 }
+
+export async function DELETE(
+  _request: Request,
+  { params }: { params: { id: string } }
+) {
+  const user = getSessionUser()
+  if (!user) {
+    return NextResponse.json({ message: '请先登录后再删除路线' }, { status: 401 })
+  }
+  if (!user.permissions.includes('roadmap:delete')) {
+    return NextResponse.json({ message: '缺少开发路线删除权限' }, { status: 403 })
+  }
+
+  const id = Number(params.id)
+  if (!Number.isInteger(id)) {
+    return NextResponse.json({ message: '无效的路线 ID' }, { status: 400 })
+  }
+
+  try {
+    const existing = await prisma.roadmapIdea.findUnique({ where: { id } })
+    if (!existing) {
+      return NextResponse.json({ message: '未找到对应的路线记录' }, { status: 404 })
+    }
+    if (existing.status !== 'PENDING') {
+      return NextResponse.json({ message: '仅待开发的路线可删除' }, { status: 400 })
+    }
+
+    await prisma.roadmapIdea.delete({ where: { id } })
+    return NextResponse.json({ item: existing })
+  } catch (error) {
+    return NextResponse.json({ message: (error as Error).message }, { status: 500 })
+  }
+}

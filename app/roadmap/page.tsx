@@ -3,6 +3,8 @@
 import { CSSProperties, useCallback, useEffect, useMemo, useState } from 'react'
 
 import { Breadcrumbs } from '@/components/Breadcrumbs'
+import { AlertDialog } from '@/components/AlertDialog'
+import { useToast } from '@/components/ToastProvider'
 
 type RoadmapStatus = 'PENDING' | 'DONE'
 
@@ -40,6 +42,7 @@ const formatDate = (value: string | null) => {
 }
 
 export default function RoadmapPage() {
+  const { addToast } = useToast()
   const [items, setItems] = useState<RoadmapItem[]>([])
   const [title, setTitle] = useState('')
   const [details, setDetails] = useState('')
@@ -49,6 +52,7 @@ export default function RoadmapPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [updatingId, setUpdatingId] = useState<number | null>(null)
+  const [deletingId, setDeletingId] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [session, setSession] = useState<SessionUser | null>(null)
   const [sessionLoaded, setSessionLoaded] = useState(false)
@@ -63,10 +67,12 @@ export default function RoadmapPage() {
     importance: number
     difficulty: number
   } | null>(null)
+  const [pendingDelete, setPendingDelete] = useState<RoadmapItem | null>(null)
 
   const canViewRoadmap = session?.permissions.includes('roadmap:view') ?? false
   const canCreateRoadmap = session?.permissions.includes('roadmap:create') ?? false
   const canUpdateRoadmap = session?.permissions.includes('roadmap:update') ?? false
+  const canDeleteRoadmap = session?.permissions.includes('roadmap:delete') ?? false
 
   const fetchItems = useCallback(async () => {
     if (!sessionLoaded) return
@@ -272,6 +278,31 @@ export default function RoadmapPage() {
       setError((err as Error).message)
     } finally {
       setUpdatingId(null)
+    }
+  }
+
+  const deleteItem = async (item: RoadmapItem) => {
+    if (!canDeleteRoadmap) {
+      setError('缺少开发路线删除权限')
+      return
+    }
+    setDeletingId(item.id)
+    setError(null)
+    try {
+      const res = await fetch(`/api/roadmap/${item.id}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      })
+      const data = (await res.json()) as { item?: RoadmapItem; message?: string }
+      if (!res.ok) {
+        throw new Error(data.message ?? '删除失败')
+      }
+      setItems((prev) => prev.filter((entry) => entry.id !== item.id))
+      addToast('已删除待开发路线', { tone: 'success' })
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setDeletingId(null)
     }
   }
 
@@ -658,7 +689,7 @@ export default function RoadmapPage() {
                                 type='button'
                                 onClick={() => toggleStatus(item)}
                                 className='rounded-full border border-white/15 px-3 py-1 text-xs font-semibold text-emerald-100 transition hover:border-emerald-300 hover:text-emerald-50 disabled:opacity-60'
-                                disabled={updatingId === item.id || !canUpdateRoadmap}
+                                disabled={updatingId === item.id || deletingId === item.id || !canUpdateRoadmap}
                               >
                                 {updatingId === item.id ? '更新中...' : '标记完成'}
                               </button>
@@ -669,6 +700,14 @@ export default function RoadmapPage() {
                                 disabled={!canUpdateRoadmap}
                               >
                                 编辑
+                              </button>
+                              <button
+                                type='button'
+                                onClick={() => setPendingDelete(item)}
+                                className='rounded-full border border-rose-300/60 px-3 py-1 text-xs font-semibold text-rose-100 transition hover:border-rose-200 hover:text-rose-50 disabled:opacity-60'
+                                disabled={deletingId === item.id || updatingId === item.id || !canDeleteRoadmap}
+                              >
+                                {deletingId === item.id ? '删除中...' : '删除'}
                               </button>
                             </>
                           )}
@@ -767,6 +806,23 @@ export default function RoadmapPage() {
           </div>
         </div>
       </div>
+      <AlertDialog
+        open={!!pendingDelete}
+        title='确认删除这条路线吗？'
+        description={
+          pendingDelete ? (
+            <span>
+              确认后将删除待开发项「{pendingDelete.title}」。已完成项需先重新打开才可删除。
+            </span>
+          ) : null
+        }
+        tone='danger'
+        actionLabel='确认删除'
+        cancelLabel='取消'
+        onAction={() => pendingDelete && deleteItem(pendingDelete)}
+        onClose={() => setPendingDelete(null)}
+        onCancel={() => setPendingDelete(null)}
+      />
     </main>
   )
 }
