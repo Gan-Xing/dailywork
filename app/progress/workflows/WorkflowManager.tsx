@@ -29,8 +29,10 @@ export function WorkflowManager({ initialWorkflows }: Props) {
   const t = getProgressCopy(locale)
   const copy = t.workflow
   const listJoiner = locale === 'fr' ? ', ' : '、'
-  const displayLayerName = (name: string) =>
-    localizeProgressTerm('layer', name, locale, { phaseName: selected?.phaseName })
+  const displayLayerName = useCallback(
+    (name: string) => localizeProgressTerm('layer', name, locale, { phaseName: selected?.phaseName }),
+    [locale, selected?.phaseName],
+  )
   const displayCheckName = (name: string) => localizeProgressTerm('check', name, locale)
   const displayTypeName = (name: string) => localizeProgressTerm('type', name, locale)
 
