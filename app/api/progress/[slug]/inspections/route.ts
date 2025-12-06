@@ -86,6 +86,9 @@ export async function GET(request: Request) {
   const filter = {
     roadSlug: searchParams.get('roadSlug') ?? undefined,
     phaseId: searchParams.get('phaseId') ? Number(searchParams.get('phaseId')) : undefined,
+    phaseDefinitionId: searchParams.get('phaseDefinitionId')
+      ? Number(searchParams.get('phaseDefinitionId'))
+      : undefined,
     status: statusParams.length ? statusParams : undefined,
     side: (searchParams.get('side') as 'LEFT' | 'RIGHT' | 'BOTH' | null) ?? undefined,
     type: searchParams.get('type') ?? undefined,

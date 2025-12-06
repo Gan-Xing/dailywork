@@ -33,6 +33,11 @@ type PhaseOption = RoadSectionWithPhasesDTO['phases'][number] & {
   roadName?: string
 }
 
+type PhaseDefinitionOption = {
+  id: number
+  name: string
+}
+
 type SortField = 'road' | 'phase' | 'side' | 'appointmentDate' | 'createdAt' | 'updatedAt'
 type SortOrder = 'asc' | 'desc'
 type ColumnKey =
@@ -135,14 +140,8 @@ export function InspectionBoard({ roads, loadError }: Props) {
     copy.prefabModal.layerOptions[key] ?? fallback
   const getPrefabCheckLabel = (value: string) => copy.prefabModal.checkOptions[value] ?? value
   const getPrefabTypeLabel = (value: string) => copy.prefabModal.typeOptions[value] ?? value
-  const formatPhaseOptionLabel = (phase: PhaseOption) => {
-    const phaseLabel = localizeProgressTerm('phase', phase.name, locale)
-    if (phase.roadSlug || phase.roadName) {
-      const roadLabel = resolveRoadName({ slug: phase.roadSlug, name: phase.roadName }, locale)
-      return `${roadLabel} · ${phaseLabel}`
-    }
-    return phaseLabel
-  }
+  const formatPhaseDefinitionLabel = (definition: PhaseDefinitionOption) =>
+    localizeProgressTerm('phase', definition.name, locale)
   const formatTypeLabel = (value: string) => localizeProgressTerm('type', value, locale)
   const formatRoadName = (slug?: string, name?: string) => resolveRoadName({ slug, name }, locale)
   const inspectionTypeOptions = useMemo(
@@ -150,7 +149,7 @@ export function InspectionBoard({ roads, loadError }: Props) {
     [],
   )
   const [roadSlug, setRoadSlug] = useState('')
-  const [phaseId, setPhaseId] = useState<number | ''>('')
+  const [phaseDefinitionId, setPhaseDefinitionId] = useState<number | ''>('')
   const [status, setStatus] = useState<InspectionStatus[]>([])
   const [side, setSide] = useState('')
   const [types, setTypes] = useState<string[]>([])
@@ -206,12 +205,12 @@ export function InspectionBoard({ roads, loadError }: Props) {
       { key: 'appointmentDate', label: copy.columns.appointmentDate },
       { key: 'submittedAt', label: copy.columns.submittedAt },
       { key: 'submittedBy', label: copy.columns.submittedBy },
-      { key: 'remark', label: copy.columns.remark },
       { key: 'createdBy', label: copy.columns.createdBy },
       { key: 'createdAt', label: copy.columns.createdAt },
       { key: 'updatedBy', label: copy.columns.updatedBy },
       { key: 'updatedAt', label: copy.columns.updatedAt },
       { key: 'action', label: copy.columns.actions },
+      { key: 'remark', label: copy.columns.remark },
     ],
     [copy.columns],
   )
@@ -254,19 +253,24 @@ export function InspectionBoard({ roads, loadError }: Props) {
   const [deletePending, setDeletePending] = useState(false)
   const dateLocaleTag = locale === 'fr' ? 'fr-FR' : 'zh-CN'
 
-  const phases = useMemo<PhaseOption[]>(() => {
-    if (roadSlug) {
-      const found = roads.find((road) => road.slug === roadSlug)
-      return found?.phases ?? []
-    }
-    return roads.flatMap((road) =>
-      (road.phases ?? []).map((phase) => ({
-        ...phase,
-        roadSlug: road.slug,
-        roadName: resolveRoadName(road, locale),
-      })),
+  const phaseDefinitions = useMemo<PhaseDefinitionOption[]>(() => {
+    const map = new Map<number, PhaseDefinitionOption>()
+    roads.forEach((road) => {
+      ;(road.phases ?? []).forEach((phase) => {
+        if (!map.has(phase.definitionId)) {
+          map.set(phase.definitionId, { id: phase.definitionId, name: phase.definitionName })
+        }
+      })
+    })
+    const list = Array.from(map.values())
+    const collator = new Intl.Collator(locale === 'fr' ? 'fr' : 'zh-Hans')
+    return list.sort((a, b) =>
+      collator.compare(
+        localizeProgressTerm('phase', a.name, locale),
+        localizeProgressTerm('phase', b.name, locale),
+      ),
     )
-  }, [locale, roadSlug, roads])
+  }, [locale, roads])
 
   useEffect(() => {
     let stopped = false
@@ -319,7 +323,7 @@ export function InspectionBoard({ roads, loadError }: Props) {
     try {
       const query = buildQuery({
         roadSlug: roadSlug || undefined,
-        phaseId: phaseId || undefined,
+        phaseDefinitionId: phaseDefinitionId || undefined,
         status: status.length ? status : undefined,
         side: side || undefined,
         type: types.length ? types : undefined,
@@ -349,7 +353,21 @@ export function InspectionBoard({ roads, loadError }: Props) {
   useEffect(() => {
     fetchData()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roadSlug, phaseId, status, side, types, check, keyword, startDate, endDate, sortField, sortOrder, page, pageSize])
+  }, [
+    roadSlug,
+    phaseDefinitionId,
+    status,
+    side,
+    types,
+    check,
+    keyword,
+    startDate,
+    endDate,
+    sortField,
+    sortOrder,
+    page,
+    pageSize,
+  ])
 
   useEffect(() => {
     setSelectedIds((prev) => prev.filter((id) => items.some((item) => item.id === id)))
@@ -456,7 +474,7 @@ export function InspectionBoard({ roads, loadError }: Props) {
 
   const resetFilters = () => {
     setRoadSlug('')
-    setPhaseId('')
+    setPhaseDefinitionId('')
     setStatus([])
     setSide('')
     setTypes([])
@@ -703,7 +721,6 @@ export function InspectionBoard({ roads, loadError }: Props) {
                 value={roadSlug}
                 onChange={(e) => {
                   setRoadSlug(e.target.value)
-                  setPhaseId('')
                   setPage(1)
                 }}
               >
@@ -719,17 +736,17 @@ export function InspectionBoard({ roads, loadError }: Props) {
               {copy.filters.phase}
               <select
                 className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
-                value={phaseId}
+                value={phaseDefinitionId}
                 onChange={(e) => {
                 const value = e.target.value
-                setPhaseId(value ? Number(value) : '')
+                setPhaseDefinitionId(value ? Number(value) : '')
                 setPage(1)
               }}
             >
               <option value="">{copy.filters.all}</option>
-              {phases.map((phase) => (
-                <option key={phase.id} value={phase.id}>
-                  {formatPhaseOptionLabel(phase)}
+              {phaseDefinitions.map((definition) => (
+                <option key={definition.id} value={definition.id}>
+                  {formatPhaseDefinitionLabel(definition)}
                 </option>
               ))}
             </select>
@@ -1025,7 +1042,7 @@ export function InspectionBoard({ roads, loadError }: Props) {
                   {isVisible('sequence') ? <th className="px-4 py-3">{copy.columns.sequence}</th> : null}
                   {isVisible('road') ? (
                     <th
-                      className="px-4 py-3 cursor-pointer select-none"
+                      className="px-4 py-3 cursor-pointer select-none whitespace-nowrap"
                       onClick={() => handleSort('road')}
                     >
                       {copy.columns.road} {sortField === 'road' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
@@ -1033,7 +1050,7 @@ export function InspectionBoard({ roads, loadError }: Props) {
                   ) : null}
                   {isVisible('phase') ? (
                     <th
-                      className="px-4 py-3 cursor-pointer select-none"
+                      className="px-4 py-3 cursor-pointer select-none whitespace-nowrap"
                       onClick={() => handleSort('phase')}
                     >
                       {copy.columns.phase} {sortField === 'phase' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
@@ -1041,19 +1058,19 @@ export function InspectionBoard({ roads, loadError }: Props) {
                   ) : null}
                   {isVisible('side') ? (
                     <th
-                      className="px-4 py-3 cursor-pointer select-none"
+                      className="px-4 py-3 min-w-[80px] cursor-pointer select-none whitespace-nowrap"
                       onClick={() => handleSort('side')}
                     >
                       {copy.columns.side} {sortField === 'side' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
                     </th>
                   ) : null}
                   {isVisible('range') ? (
-                    <th className="px-4 py-3">
+                    <th className="px-4 py-3 whitespace-nowrap">
                       {copy.columns.range}
                     </th>
                   ) : null}
                   {isVisible('layers') ? (
-                    <th className="px-4 py-3">
+                    <th className="px-4 py-3 whitespace-nowrap">
                       {copy.columns.layers}
                     </th>
                   ) : null}
@@ -1089,9 +1106,6 @@ export function InspectionBoard({ roads, loadError }: Props) {
                   {isVisible('submittedBy') ? (
                     <th className="px-4 py-3">{copy.columns.submittedBy}</th>
                   ) : null}
-                  {isVisible('remark') ? (
-                    <th className="px-4 py-3">{copy.columns.remark}</th>
-                  ) : null}
                   {isVisible('createdBy') ? (
                     <th className="px-4 py-3">{copy.columns.createdBy}</th>
                   ) : null}
@@ -1120,6 +1134,9 @@ export function InspectionBoard({ roads, loadError }: Props) {
                     <th className="px-4 py-3 text-center">
                     {copy.columns.actions}
                     </th>
+                  ) : null}
+                  {isVisible('remark') ? (
+                    <th className="px-4 py-3">{copy.columns.remark}</th>
                   ) : null}
                 </tr>
               </thead>
@@ -1171,18 +1188,22 @@ export function InspectionBoard({ roads, loadError }: Props) {
                       {isVisible('sequence') ? (
                         <td className="px-4 py-3 text-xs text-slate-300">{displayIndex}</td>
                       ) : null}
-                      {isVisible('road') ? <td className="px-4 py-3">{roadText}</td> : null}
+                      {isVisible('road') ? <td className="px-4 py-3 whitespace-nowrap">{roadText}</td> : null}
                       {isVisible('phase') ? (
-                        <td className="px-4 py-3">{localizeProgressTerm('phase', item.phaseName, locale)}</td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          {localizeProgressTerm('phase', item.phaseName, locale)}
+                        </td>
                       ) : null}
-                      {isVisible('side') ? <td className="px-4 py-3">{sideText}</td> : null}
+                      {isVisible('side') ? (
+                        <td className="px-4 py-3 min-w-[80px] whitespace-nowrap">{sideText}</td>
+                      ) : null}
                       {isVisible('range') ? (
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-3 whitespace-nowrap">
                           {rangeText}
                         </td>
                       ) : null}
                       {isVisible('layers') ? (
-                        <td className="px-4 py-3 max-w-xs truncate" title={layersText}>
+                        <td className="px-4 py-3 whitespace-nowrap" title={layersText}>
                           {layersText}
                         </td>
                       ) : null}
@@ -1217,9 +1238,6 @@ export function InspectionBoard({ roads, loadError }: Props) {
                       ) : null}
                       {isVisible('submittedBy') ? (
                         <td className="px-4 py-3 text-xs text-slate-300">{submittedByText}</td>
-                      ) : null}
-                      {isVisible('remark') ? (
-                        <td className="px-4 py-3 text-xs text-slate-300">{remarkText}</td>
                       ) : null}
                       {isVisible('createdBy') ? (
                         <td className="px-4 py-3 text-xs text-slate-300">{createdByText}</td>
@@ -1261,6 +1279,9 @@ export function InspectionBoard({ roads, loadError }: Props) {
                             </button>
                           </div>
                         </td>
+                      ) : null}
+                      {isVisible('remark') ? (
+                        <td className="px-4 py-3 text-xs text-slate-300">{remarkText}</td>
                       ) : null}
                     </tr>
                     )

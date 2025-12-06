@@ -118,6 +118,13 @@ export const listInspections = async (filter: InspectionFilter): Promise<Inspect
   if (filter.phaseId) {
     where.phaseId = filter.phaseId
   }
+  if (filter.phaseDefinitionId) {
+    where.phase = {
+      is: {
+        phaseDefinitionId: filter.phaseDefinitionId,
+      },
+    }
+  }
   if (filter.status && filter.status.length) {
     where.status = { in: filter.status as InspectionStatus[] }
   }

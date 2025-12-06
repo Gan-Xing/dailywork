@@ -39,6 +39,7 @@ export type InspectionStatus = 'PENDING' | 'SCHEDULED' | 'SUBMITTED' | 'IN_PROGR
 export interface InspectionFilter {
   roadSlug?: string
   phaseId?: number
+  phaseDefinitionId?: number
   status?: InspectionStatus[]
   side?: IntervalSide
   types?: string[]
