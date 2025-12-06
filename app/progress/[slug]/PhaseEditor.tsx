@@ -1015,7 +1015,7 @@ export function PhaseEditor({
     })
   }
 
-  const performSubmit = async (payload: InspectionSubmitPayload) => {
+  const performSubmit = async (payload: InspectionSubmitPayload, options?: { skipReset?: boolean }) => {
     setSubmitPending(true)
     setSubmitError(null)
     const res = await fetch(`/api/progress/${road.slug}/inspections`, {
@@ -1028,12 +1028,15 @@ export function PhaseEditor({
     setSubmitPending(false)
     if (!res.ok) {
       raiseSubmitError(data.message ?? t.errors.submitFailed)
-      return
+      return false
     }
     addToast(t.inspection.submitSuccess, { tone: 'success' })
     await fetchLatestInspections()
-    setSelectedSegment(null)
-    resetInspectionForm()
+    if (!options?.skipReset) {
+      setSelectedSegment(null)
+      resetInspectionForm()
+    }
+    return true
   }
 
   const submitInspection = async () => {
@@ -1066,13 +1069,10 @@ export function PhaseEditor({
       raiseSubmitError(t.errors.submitAppointmentMissing)
       return
     }
-    const payload: InspectionSubmitPayload = {
+    const payloadBase: Omit<InspectionSubmitPayload, 'side' | 'layers' | 'checks'> = {
       phaseId: selectedSegment.phaseId,
-      side: selectedSide,
       startPk,
       endPk,
-      layers: selectedLayers,
-      checks: selectedChecks,
       types: normalizedTypes,
       remark,
       appointmentDate: appointmentDateInput,
@@ -1147,19 +1147,6 @@ export function PhaseEditor({
           }
         })
       })
-      if (process.env.NODE_ENV !== 'production') {
-        console.log('[inspection submit debug] deps check', {
-          satisfied: Array.from(satisfied),
-          satisfiedLeft: Array.from(satisfiedLeft),
-          satisfiedRight: Array.from(satisfiedRight),
-          selectedLayerIds: Array.from(selectedLayerIds),
-          missingDeps: Array.from(missingDeps),
-          selectedLayers,
-          selectedSide,
-          startPk,
-          endPk,
-        })
-      }
       if (missingDeps.size) {
         const depsText = Array.from(missingDeps).join(' / ')
         raiseSubmitError(formatProgressCopy(t.inspection.missingDeps, { deps: depsText }))
@@ -1182,8 +1169,7 @@ export function PhaseEditor({
               ?.get(meta.layerId)
               ?.has(requiredNormalized)
             if (!satisfiedSelected && !satisfiedCompleted) {
-              // 若前置未选且未完成，则视为可跳过（避免对不适用的检查强制提示）
-              continue
+              missingChecks.add(requiredName)
             }
           }
         })
@@ -1193,7 +1179,130 @@ export function PhaseEditor({
         }
       }
     }
-    await performSubmit(payload)
+    const splitLayerSideMap = new Map<string, IntervalSide>()
+    selectedLayers.forEach((layer) => {
+      const meta = workflowLayerByName?.get(normalizeLabel(layer))
+      if (!meta) return
+      const target = shouldSplitLayerBySide(meta) ? resolveSplitTargetSide(meta) : null
+      if (target) {
+        splitLayerSideMap.set(meta.id, target)
+      }
+    })
+
+    const singleLeft = { layers: [] as string[], checks: [] as string[] }
+    const singleRight = { layers: [] as string[], checks: [] as string[] }
+    const bothGroup = { layers: [] as string[], checks: [] as string[] }
+    let hasMissingCheckMeta = false
+
+    selectedLayers.forEach((layer) => {
+      const meta = workflowLayerByName?.get(normalizeLabel(layer))
+      if (meta && splitLayerSideMap.has(meta.id)) {
+        const target = splitLayerSideMap.get(meta.id)
+        if (target === 'LEFT') singleLeft.layers.push(layer)
+        else if (target === 'RIGHT') singleRight.layers.push(layer)
+      } else {
+        bothGroup.layers.push(layer)
+      }
+    })
+
+    const layerGroupById = new Map<string, IntervalSide | 'BOTH'>()
+    singleLeft.layers.forEach((layer) => {
+      const meta = workflowLayerByName?.get(normalizeLabel(layer))
+      if (meta) layerGroupById.set(meta.id, 'LEFT')
+    })
+    singleRight.layers.forEach((layer) => {
+      const meta = workflowLayerByName?.get(normalizeLabel(layer))
+      if (meta) layerGroupById.set(meta.id, 'RIGHT')
+    })
+    bothGroup.layers.forEach((layer) => {
+      const meta = workflowLayerByName?.get(normalizeLabel(layer))
+      if (meta) layerGroupById.set(meta.id, 'BOTH')
+    })
+
+    selectedChecks.forEach((check) => {
+      const normalizedCheck = normalizeLabel(check)
+      let meta = workflowCheckMetaByName?.get(normalizedCheck) ?? null
+      let target: IntervalSide | 'BOTH' | undefined = meta
+        ? splitLayerSideMap.get(meta.layerId) ?? layerGroupById.get(meta.layerId)
+        : undefined
+      let layerId = meta?.layerId ?? null
+
+      if (!target || !layerId) {
+        for (const layer of selectedLayers) {
+          const checks = workflowChecksByLayerName?.get(normalizeLabel(layer))
+          if (checks?.has(normalizedCheck)) {
+            const layerMeta = workflowLayerByName?.get(normalizeLabel(layer))
+            if (layerMeta) {
+              meta = meta ?? { layerId: layerMeta.id, order: 0, types: new Set<string>() }
+              layerId = layerMeta.id
+              target = splitLayerSideMap.get(layerMeta.id) ?? layerGroupById.get(layerMeta.id)
+              break
+            }
+          }
+        }
+      }
+
+      if (!meta) {
+        hasMissingCheckMeta = true
+        bothGroup.checks.push(check)
+        return
+      }
+
+      const finalTarget = target ?? selectedSide
+      if (finalTarget === 'LEFT') {
+        singleLeft.checks.push(check)
+      } else if (finalTarget === 'RIGHT') {
+        singleRight.checks.push(check)
+      } else {
+        bothGroup.checks.push(check)
+      }
+    })
+
+    // 如有无法识别的验收内容，避免误拆分，直接按当前侧别整体提交
+    const payloads: InspectionSubmitPayload[] = []
+    if (hasMissingCheckMeta) {
+      payloads.push({
+        ...payloadBase,
+        side: selectedSide,
+        layers: selectedLayers,
+        checks: selectedChecks,
+      })
+    } else {
+      if (singleLeft.layers.length) {
+        payloads.push({
+          ...payloadBase,
+          side: 'LEFT',
+          layers: singleLeft.layers,
+          checks: singleLeft.checks,
+        })
+      }
+      if (singleRight.layers.length) {
+        payloads.push({
+          ...payloadBase,
+          side: 'RIGHT',
+          layers: singleRight.layers,
+          checks: singleRight.checks,
+        })
+      }
+      if (bothGroup.layers.length) {
+        payloads.push({
+          ...payloadBase,
+          side: selectedSide,
+          layers: bothGroup.layers,
+          checks: bothGroup.checks,
+        })
+      }
+    }
+    if (!payloads.length) {
+      raiseSubmitError(t.errors.submitLayerMissing)
+      return
+    }
+
+    for (let idx = 0; idx < payloads.length; idx += 1) {
+      const isLast = idx === payloads.length - 1
+      const ok = await performSubmit(payloads[idx], { skipReset: !isLast })
+      if (!ok) break
+    }
   }
 
   const [selectedSegment, setSelectedSegment] = useState<SelectedSegment | null>(null)
@@ -1333,19 +1442,19 @@ export function PhaseEditor({
 
   const workflowChecksByLayerName = useMemo(() => {
     if (!selectedSegment?.workflowLayers?.length) return null
-    const map = new Map<string, string[]>()
+    const map = new Map<string, Set<string>>()
     selectedSegment.workflowLayers.forEach((layer) => {
       const localizedName = localizeProgressTerm('layer', layer.name, locale, {
         phaseName: workflowPhaseNameForContext,
       })
       const localizedChecks = layer.checks.map((check) => localizeProgressTerm('check', check.name, locale))
-      const mergedChecks = Array.from(new Set<string>([...layer.checks.map((check) => check.name), ...localizedChecks]))
+      const mergedChecks = new Set<string>([
+        ...layer.checks.map((check) => check.name),
+        ...localizedChecks,
+      ])
       const names = [layer.name, localizedName]
       names.forEach((name) => {
-        map.set(
-          normalizeLabel(name),
-          mergedChecks,
-        )
+        map.set(normalizeLabel(name), mergedChecks)
       })
     })
     return map
@@ -1518,20 +1627,6 @@ export function PhaseEditor({
       if (!matchLeft && !matchRight && !matchCurrentSide) return
       const status = snapshot.status ?? 'PENDING'
       const [snapshotStart, snapshotEnd] = normalizeRange(snapshot.startPk, snapshot.endPk)
-      if (process.env.NODE_ENV !== 'production' && matchCurrentSide) {
-        console.log('[workflow debug] snapshot accepted', {
-          targetStart,
-          targetEnd,
-          targetSide,
-          snapshotStart,
-          snapshotEnd,
-          snapshotSide: snapshot.side,
-          status,
-          layers: snapshot.layers,
-          checks: snapshot.checks,
-        })
-      }
-
       const snapshotLayerIds = new Set<string>()
       snapshot.layers?.forEach((layerName) => {
         splitLayerTokens(layerName).forEach((token) => {
@@ -1549,19 +1644,6 @@ export function PhaseEditor({
           }
           if (layerMeta?.id) {
             snapshotLayerIds.add(layerMeta.id)
-          }
-          if (process.env.NODE_ENV !== 'production') {
-            console.log('[workflow debug] push layer', {
-              targetStart,
-              targetEnd,
-              snapshotStart,
-              snapshotEnd,
-              layerName,
-              token,
-              normalizedLayerName,
-              layerKey,
-              status,
-            })
           }
         })
       })
@@ -1588,11 +1670,14 @@ export function PhaseEditor({
             }
           })
         } else if (layerKey) {
-          normalizedCandidates.forEach((candidate) => {
-            const checkKey = `${layerKey}|${candidate}`
-            if (matchLeft) pushCheckSideStatus(checkKey, 'LEFT', status)
-            if (matchRight) pushCheckSideStatus(checkKey, 'RIGHT', status)
-          })
+          // 仅当该检查对应的层也在快照里时，才记录侧别状态，避免跨层串色
+          if (snapshotLayerIds.has(layerKey)) {
+            normalizedCandidates.forEach((candidate) => {
+              const checkKey = `${layerKey}|${candidate}`
+              if (matchLeft) pushCheckSideStatus(checkKey, 'LEFT', status)
+              if (matchRight) pushCheckSideStatus(checkKey, 'RIGHT', status)
+            })
+          }
         }
       })
     })
@@ -1607,42 +1692,6 @@ export function PhaseEditor({
     workflowCheckMetaByName,
     workflowLayerByName,
     workflowPhaseNameForContext,
-  ])
-
-  useEffect(() => {
-    if (process.env.NODE_ENV === 'production') return
-    if (!selectedSegment?.workflowLayers?.length) return
-    const snapshots = Array.from(latestPointInspections.values()).filter(
-      (item) => item.phaseId === selectedSegment.phaseId,
-    )
-    const layers = Array.from(workflowStatusMaps.layerStatus.entries()).map(([id, status]) => ({
-      id,
-      status,
-    }))
-    const checks = Array.from(workflowStatusMaps.checkStatus.entries()).map(([id, status]) => ({
-      id,
-      status,
-    }))
-    console.log('[workflow debug] status map', {
-      phaseId: selectedSegment.phaseId,
-      phaseName: selectedSegment.phase,
-      targetSide: selectedSide,
-      targetStart: startPkInput,
-      targetEnd: endPkInput,
-      layers,
-      checks,
-      snapshots,
-    })
-  }, [
-    endPkInput,
-    latestPointInspections,
-    selectedSegment?.phase,
-    selectedSegment?.phaseId,
-    selectedSegment?.workflowLayers?.length,
-    selectedSide,
-    startPkInput,
-    workflowStatusMaps.checkStatus,
-    workflowStatusMaps.layerStatus,
   ])
 
   const computeCompletedWorkflowChecksByLayer = () => {
@@ -1732,7 +1781,11 @@ export function PhaseEditor({
     })
     if (selectedSide === 'BOTH') {
       const result = new Map<string, Set<string>>()
-      const layerIds = new Set<string>([...leftMap.keys(), ...rightMap.keys(), ...bothMap.keys()])
+      const layerIds = new Set<string>([
+        ...Array.from(leftMap.keys()),
+        ...Array.from(rightMap.keys()),
+        ...Array.from(bothMap.keys()),
+      ])
       layerIds.forEach((id) => {
         const leftSet = leftMap.get(id)
         const rightSet = rightMap.get(id)
@@ -1981,6 +2034,18 @@ export function PhaseEditor({
     }
   }, [allowedCheckSet, manualCheckExclusions, selectedChecks, selectedLayers, workflowChecksByLayerName])
 
+  // 切换侧别时，避免沿用上一侧的已选层次/验收内容
+  const prevSideRef = useRef<IntervalSide>(selectedSide)
+  useEffect(() => {
+    if (prevSideRef.current !== selectedSide) {
+      setSelectedLayers([])
+      setSelectedChecks([])
+      setSelectedTypes([])
+      setManualCheckExclusions([])
+      prevSideRef.current = selectedSide
+    }
+  }, [selectedSide])
+
   useEffect(() => {
     const allowed = activeInspectionTypes
     if (!allowed.length) return
@@ -2115,6 +2180,56 @@ export function PhaseEditor({
       controller.cancelled = true
     }
   }, [fetchLatestInspections])
+
+  const shouldSplitLayerBySide = useCallback(
+    (layer: WorkflowLayerTemplate) => {
+      if (!selectedSegment || !intervalRange) return false
+      if (selectedSide !== 'BOTH') return false
+      const [rangeStart, rangeEnd] = intervalRange
+      const coversRange = (snapshot: LatestPointInspection) => {
+        const [snapshotStart, snapshotEnd] = normalizeRange(snapshot.startPk, snapshot.endPk)
+        return snapshot.phaseId === selectedSegment.phaseId && snapshotStart <= rangeStart && snapshotEnd >= rangeEnd
+      }
+      let hasBoth = false
+      let hasSingle = false
+      latestPointInspections.forEach((snapshot) => {
+        if (!workflowSatisfiedStatuses.includes(snapshot.status ?? 'PENDING')) return
+        if (!coversRange(snapshot)) return
+        let includesLayer = false
+        snapshot.layers?.forEach((layerName) => {
+          splitLayerTokens(layerName).forEach((token) => {
+            const normalizedLayerName = normalizeLabel(
+              localizeProgressTerm('layer', token, 'zh', { phaseName: workflowPhaseNameForContext }),
+            )
+            const meta = workflowLayerByName?.get(normalizedLayerName)
+            if (meta?.id === layer.id) {
+              includesLayer = true
+            }
+          })
+        })
+        if (!includesLayer) return
+        if (snapshot.side === 'BOTH') {
+          hasBoth = true
+        } else {
+          hasSingle = true
+        }
+      })
+      return hasSingle && !hasBoth
+    },
+    [intervalRange, latestPointInspections, selectedSegment, selectedSide, workflowLayerByName, workflowPhaseNameForContext],
+  )
+
+  const resolveSplitTargetSide = useCallback(
+    (layer: WorkflowLayerTemplate): IntervalSide | null => {
+      const layerSideStatus = workflowStatusMaps.layerStatusBySide?.get(layer.id)
+      const leftBooked = (statusPriority[layerSideStatus?.LEFT ?? 'PENDING'] ?? 0) >= (statusPriority.SCHEDULED ?? 0)
+      const rightBooked = (statusPriority[layerSideStatus?.RIGHT ?? 'PENDING'] ?? 0) >= (statusPriority.SCHEDULED ?? 0)
+      if (leftBooked && !rightBooked) return 'RIGHT'
+      if (rightBooked && !leftBooked) return 'LEFT'
+      return null
+    },
+    [workflowStatusMaps.layerStatusBySide],
+  )
 
   const showLegacySelection = !(
     selectedSegment?.workflow &&
@@ -2690,16 +2805,16 @@ export function PhaseEditor({
                         value={selectedSide}
                         onChange={(e) => setSelectedSide(e.target.value as IntervalSide)}
                       >
-                        <option value="LEFT" disabled={sideBooking.lockedSide && sideBooking.lockedSide !== 'LEFT'}>
+                        <option value="LEFT" disabled={Boolean(sideBooking.lockedSide && sideBooking.lockedSide !== 'LEFT')}>
                           {t.inspection.sideLeft}
                         </option>
-                        <option value="RIGHT" disabled={sideBooking.lockedSide && sideBooking.lockedSide !== 'RIGHT'}>
+                        <option value="RIGHT" disabled={Boolean(sideBooking.lockedSide && sideBooking.lockedSide !== 'RIGHT')}>
                           {t.inspection.sideRight}
                         </option>
                         <option
                           value="BOTH"
                           disabled={
-                            sideBooking.lockedSide !== null ||
+                            Boolean(sideBooking.lockedSide) ||
                             (sideBooking.left && !sideBooking.right) ||
                             (sideBooking.right && !sideBooking.left)
                           }
@@ -2758,13 +2873,19 @@ export function PhaseEditor({
                         </div>
                         <div className="relative space-y-3 border-l border-dashed border-emerald-300/30 pl-4">
                           {selectedSegment.workflowLayers.flatMap((layer) => {
-                            const sideSequence: IntervalSide[] = sideBooking.lockedSide
-                              ? [sideBooking.lockedSide === 'LEFT' ? 'RIGHT' : 'LEFT', sideBooking.lockedSide]
-                              : [selectedSide]
-                            return sideSequence.map((sideKey) => {
-                              const dependsNames = (layer.dependencies ?? []).map(
-                                (id) => workflowLayerNameMap?.get(id) ?? id,
-                              )
+                            let sideSequence: IntervalSide[]
+                            if (shouldSplitLayerBySide(layer)) {
+                              sideSequence = ['LEFT', 'RIGHT']
+                            } else if (sideBooking.lockedSide) {
+                              sideSequence = [sideBooking.lockedSide === 'LEFT' ? 'RIGHT' : 'LEFT', sideBooking.lockedSide]
+                            } else {
+                              sideSequence = [selectedSide]
+                            }
+                          const isSplitView = sideSequence.length > 1
+                          return sideSequence.map((sideKey) => {
+                            const dependsNames = (layer.dependencies ?? []).map(
+                              (id) => workflowLayerNameMap?.get(id) ?? id,
+                            )
                               const lockNames = (layer.lockStepWith ?? []).map((id) => workflowLayerNameMap?.get(id) ?? id)
                               const parallelNames = (layer.parallelWith ?? []).map(
                                 (id) => workflowLayerNameMap?.get(id) ?? id,
@@ -2775,23 +2896,41 @@ export function PhaseEditor({
                               const localizedDescription = layer.description
                                 ? localizeProgressText(layer.description, locale)
                                 : null
-                              const layerStatus = workflowStatusMaps.layerStatus.get(layer.id)
-                              const layerSideStatus = workflowStatusMaps.layerStatusBySide?.get(layer.id)
-                              const currentLayerStatus =
-                                sideKey === 'LEFT'
-                                  ? layerSideStatus?.LEFT ?? layerStatus
-                                  : sideKey === 'RIGHT'
-                                    ? layerSideStatus?.RIGHT ?? layerStatus
-                                    : layerStatus
-                              const splitLayerStatus =
-                                sideBooking.lockedSide !== null &&
-                                layerSideStatus?.LEFT &&
-                                layerSideStatus?.RIGHT &&
-                                layerSideStatus.LEFT !== layerSideStatus.RIGHT
+                            const layerStatus = workflowStatusMaps.layerStatus.get(layer.id)
+                            const layerSideStatus = workflowStatusMaps.layerStatusBySide?.get(layer.id)
+                            const baseLayerStatus = isSplitView ? 'PENDING' : layerStatus
+                            const currentLayerStatus =
+                              sideKey === 'LEFT'
+                                ? layerSideStatus?.LEFT ?? baseLayerStatus
+                                : sideKey === 'RIGHT'
+                                  ? layerSideStatus?.RIGHT ?? baseLayerStatus
+                                  : layerStatus
+                            const effectiveLayerStatus = currentLayerStatus ?? 'PENDING'
+                            if (process.env.NODE_ENV !== 'production') {
+                              console.log('[render debug] layer', {
+                                phase: selectedSegment.workflow?.phaseName ?? selectedSegment.phase,
+                                layerId: layer.id,
+                                layerName: localizedLayerName,
+                                side: sideKey,
+                                isSplitView,
+                                layerStatus,
+                                layerSideStatus,
+                                baseLayerStatus,
+                                currentLayerStatus,
+                                effectiveLayerStatus,
+                              })
+                            }
+                            const splitLayerStatus =
+                              sideBooking.lockedSide !== null &&
+                              layerSideStatus?.LEFT &&
+                              layerSideStatus?.RIGHT &&
+                              layerSideStatus.LEFT !== layerSideStatus.RIGHT
                               const isReadOnly =
                                 sideBooking.lockedSide !== null &&
                                 sideKey !== sideBooking.lockedSide &&
                                 sideBooking.lockedSide !== null
+                              const layerLocked = isStatusLocked(effectiveLayerStatus) || isReadOnly
+                              const layerTone = resolveWorkflowStatusTone(effectiveLayerStatus)
                               const sideLabelInline =
                                 sideKey === 'LEFT' ? t.inspection.sideLeft : sideKey === 'RIGHT' ? t.inspection.sideRight : ''
                               return (
@@ -2809,11 +2948,11 @@ export function PhaseEditor({
                                         <button
                                           type="button"
                                           onClick={() => {
-                                            if (isStatusLocked(layerStatus) || isReadOnly) return
+                                            if (layerLocked) return
                                             toggleLayerSelection(localizedLayerName)
                                           }}
-                                          className={`rounded-full px-2.5 py-1 text-sm font-semibold transition ${isStatusLocked(layerStatus) || isReadOnly
-                                              ? `${resolveWorkflowStatusTone(layerStatus)} cursor-not-allowed opacity-90`
+                                          className={`rounded-full px-2.5 py-1 text-sm font-semibold transition ${layerLocked
+                                              ? `${layerTone} cursor-not-allowed opacity-90`
                                               : isLayerSelected(localizedLayerName)
                                                 ? 'bg-emerald-300 text-slate-900 shadow shadow-emerald-400/30'
                                                 : isLayerDisabled(localizedLayerName)
@@ -2884,29 +3023,49 @@ export function PhaseEditor({
                                   </div>
                                   <div className="mt-3 grid gap-2 md:grid-cols-2">
                                     {layer.checks.map((check, idx) => {
-                                      const normalizedCheckName = normalizeLabel(
-                                        localizeProgressTerm('check', check.name, 'zh'),
-                                      )
-                                      const checkKey = `${layer.id}|${normalizedCheckName}`
-                                      const checkStatus = workflowStatusMaps.checkStatus.get(checkKey) ?? layerStatus
-                                      const checkSideStatus = workflowStatusMaps.checkStatusBySide?.get(checkKey)
-                                      const splitCheckStatus =
-                                        sideBooking.lockedSide !== null &&
-                                        checkSideStatus?.LEFT &&
-                                        checkSideStatus?.RIGHT &&
-                                        checkSideStatus.LEFT !== checkSideStatus.RIGHT
-                                      const currentCheckStatus =
-                                        sideKey === 'LEFT'
-                                          ? checkSideStatus?.LEFT ?? checkStatus
-                                          : sideKey === 'RIGHT'
-                                            ? checkSideStatus?.RIGHT ?? checkStatus
-                                            : checkStatus
-                                      const tone = resolveWorkflowStatusTone(currentCheckStatus)
-                                      const typeLabels = check.types.map((type) => localizeProgressTerm('type', type, locale))
-                                      const checkLocked = isStatusLocked(currentCheckStatus) || isReadOnly
-                                      const localizedCheck = localizeProgressTerm('check', check.name, locale)
-                                      const layerSelected = isLayerSelected(localizedLayerName)
-                                      const checkSelected = isCheckSelected(localizedCheck) && layerSelected
+                                    const normalizedCheckName = normalizeLabel(
+                                      localizeProgressTerm('check', check.name, 'zh'),
+                                    )
+                                    const checkKey = `${layer.id}|${normalizedCheckName}`
+                                    const checkStatus = workflowStatusMaps.checkStatus.get(checkKey) ?? layerStatus
+                                    const checkSideStatus = workflowStatusMaps.checkStatusBySide?.get(checkKey)
+                                    const splitCheckStatus =
+                                      sideBooking.lockedSide !== null &&
+                                      checkSideStatus?.LEFT &&
+                                      checkSideStatus?.RIGHT &&
+                                      checkSideStatus.LEFT !== checkSideStatus.RIGHT
+                                    const sideLayerStatus = sideKey === 'LEFT' ? layerSideStatus?.LEFT : layerSideStatus?.RIGHT
+                                    const baseCheckStatus = isSplitView ? sideLayerStatus ?? checkStatus : checkStatus
+                                    const currentCheckStatus =
+                                      sideKey === 'LEFT'
+                                        ? checkSideStatus?.LEFT ?? baseCheckStatus
+                                        : sideKey === 'RIGHT'
+                                          ? checkSideStatus?.RIGHT ?? baseCheckStatus
+                                          : checkStatus
+                                    const effectiveCheckStatus = currentCheckStatus ?? effectiveLayerStatus
+                                    const tone = resolveWorkflowStatusTone(effectiveCheckStatus)
+                                    const typeLabels = check.types.map((type) => localizeProgressTerm('type', type, locale))
+                                    const checkLocked = layerLocked || isStatusLocked(effectiveCheckStatus)
+                                    const localizedCheck = localizeProgressTerm('check', check.name, locale)
+                                    const layerSelected = isLayerSelected(localizedLayerName)
+                                    const checkSelected = isCheckSelected(localizedCheck) && layerSelected
+                                    if (process.env.NODE_ENV !== 'production') {
+                                      console.log('[render debug] check', {
+                                        phase: selectedSegment.workflow?.phaseName ?? selectedSegment.phase,
+                                        layerId: layer.id,
+                                        layerName: localizedLayerName,
+                                        side: sideKey,
+                                        checkName: localizedCheck,
+                                        checkKey,
+                                        checkStatus,
+                                        checkSideStatus,
+                                        baseCheckStatus,
+                                        currentCheckStatus,
+                                        effectiveCheckStatus,
+                                        layerLocked,
+                                        checkLocked,
+                                      })
+                                    }
                                       return (
                                         <div
                                           key={`${layer.id}-${idx}-${check.name}`}
