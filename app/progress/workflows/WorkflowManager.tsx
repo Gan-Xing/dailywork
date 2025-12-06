@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import type {
   WorkflowBinding,
@@ -29,13 +29,6 @@ export function WorkflowManager({ initialWorkflows }: Props) {
   const t = getProgressCopy(locale)
   const copy = t.workflow
   const listJoiner = locale === 'fr' ? ', ' : '、'
-  const displayLayerName = useCallback(
-    (name: string) => localizeProgressTerm('layer', name, locale, { phaseName: selected?.phaseName }),
-    [locale, selected?.phaseName],
-  )
-  const displayCheckName = (name: string) => localizeProgressTerm('check', name, locale)
-  const displayTypeName = (name: string) => localizeProgressTerm('type', name, locale)
-
   const [workflows, setWorkflows] = useState<WorkflowItem[]>(() => initialWorkflows)
   const [selectedId, setSelectedId] = useState<string>(initialWorkflows[0]?.id ?? '')
   const [saveMessage, setSaveMessage] = useState<string | null>(null)
@@ -53,6 +46,19 @@ export function WorkflowManager({ initialWorkflows }: Props) {
   const selected = useMemo(
     () => workflows.find((item) => item.id === selectedId) ?? workflows[0],
     [selectedId, workflows],
+  )
+
+  const displayLayerName = useCallback(
+    (name: string) => localizeProgressTerm('layer', name, locale, { phaseName: selected?.phaseName }),
+    [locale, selected?.phaseName],
+  )
+  const displayCheckName = useCallback(
+    (name: string) => localizeProgressTerm('check', name, locale),
+    [locale],
+  )
+  const displayTypeName = useCallback(
+    (name: string) => localizeProgressTerm('type', name, locale),
+    [locale],
   )
 
   useEffect(() => {
