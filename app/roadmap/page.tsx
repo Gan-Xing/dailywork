@@ -53,6 +53,7 @@ export default function RoadmapPage() {
   const [session, setSession] = useState<SessionUser | null>(null)
   const [sessionLoaded, setSessionLoaded] = useState(false)
   const [sortKey, setSortKey] = useState<'priority' | 'importance' | 'difficulty' | 'createdAt'>('priority')
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
   const [pendingWidth, setPendingWidth] = useState(55)
   const [editingItem, setEditingItem] = useState<{
     id: number
@@ -116,18 +117,29 @@ export default function RoadmapPage() {
   )
   const sortedPendingItems = useMemo(() => {
     const list = [...pendingItems]
+    const direction = sortOrder === 'asc' ? 1 : -1
     return list.sort((a, b) => {
       if (sortKey === 'createdAt') {
-        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        return (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()) * direction
       }
-      return b[sortKey] - a[sortKey]
+      return (a[sortKey] - b[sortKey]) * direction
     })
-  }, [pendingItems, sortKey])
+  }, [pendingItems, sortKey, sortOrder])
 
   const doneItems = useMemo(
     () => items.filter((item) => item.status === 'DONE'),
     [items]
   )
+  const sortedDoneItems = useMemo(() => {
+    const list = [...doneItems]
+    const direction = sortOrder === 'asc' ? 1 : -1
+    return list.sort((a, b) => {
+      if (sortKey === 'createdAt') {
+        return (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()) * direction
+      }
+      return (a[sortKey] - b[sortKey]) * direction
+    })
+  }, [doneItems, sortKey, sortOrder])
   const columnTemplate = useMemo(
     () => `${pendingWidth}% ${100 - pendingWidth}%`,
     [pendingWidth]
@@ -472,6 +484,17 @@ export default function RoadmapPage() {
                 </label>
               </div>
             </div>
+            <div className='flex items-center gap-2 text-xs text-slate-200'>
+              <span>顺序</span>
+              <button
+                type='button'
+                onClick={() => setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'))}
+                className='inline-flex items-center gap-1 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/10'
+              >
+                {sortOrder === 'desc' ? '降序' : '升序'}
+                <span aria-hidden>{sortOrder === 'desc' ? '↓' : '↑'}</span>
+              </button>
+            </div>
             <div className='flex flex-wrap items-center gap-2 text-xs'>
               <span>列宽调节（在路上 / 已登场）</span>
               <input
@@ -696,7 +719,7 @@ export default function RoadmapPage() {
                 ) : doneItems.length === 0 ? (
                   <p className='text-sm text-slate-300/80'>还没有完成的条目。</p>
                 ) : (
-                  doneItems.map((item) => (
+                  sortedDoneItems.map((item) => (
                     <article
                       key={item.id}
                       className='rounded-2xl border border-emerald-400/15 bg-emerald-400/5 p-4 shadow-inner shadow-emerald-500/10'

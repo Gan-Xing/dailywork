@@ -156,7 +156,7 @@ export const homeCopy: Record<Locale, HomeCopy> = {
       title: '开发路线：展示当前进展',
       previewTitle: '路线预告',
       description:
-        '仅对有权限的账号开放，直接展示最新的开发进展、正在酝酿的想法，以及已完成的路线节点，方便团队对齐。',
+        '直接展示最新的开发进展、正在酝酿的想法，以及已完成的路线节点，方便团队对齐。',
       previewDescription: '',
       helper: '按列呈现状态：最新进展、已有想法、已完成节点，随时可以进入路线继续跟踪。',
       previewHelper: '入口开放后会在这里亮起，保持关注即可。',

@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
 
 import Link from 'next/link'
 
@@ -61,6 +61,35 @@ type FormState = {
 }
 
 type TabKey = 'members' | 'roles' | 'permissions'
+type ColumnKey =
+  | 'sequence'
+  | 'name'
+  | 'username'
+  | 'gender'
+  | 'nationality'
+  | 'phones'
+  | 'joinDate'
+  | 'position'
+  | 'employmentStatus'
+  | 'roles'
+  | 'createdAt'
+  | 'updatedAt'
+  | 'actions'
+
+const MEMBER_COLUMN_STORAGE_KEY = 'member-visible-columns'
+const defaultVisibleColumns: ColumnKey[] = [
+  'sequence',
+  'name',
+  'username',
+  'gender',
+  'nationality',
+  'phones',
+  'joinDate',
+  'position',
+  'employmentStatus',
+  'roles',
+  'actions',
+]
 
 export default function MembersPage() {
   const { locale, setLocale } = usePreferredLocale()
@@ -99,6 +128,11 @@ export default function MembersPage() {
     name: '',
     permissionIds: [],
   })
+  const [visibleColumns, setVisibleColumns] = useState<ColumnKey[]>(() => [...defaultVisibleColumns])
+  const [showColumnSelector, setShowColumnSelector] = useState(false)
+  const columnSelectorRef = useRef<HTMLDivElement | null>(null)
+  const [showPhonePicker, setShowPhonePicker] = useState(false)
+  const phonePickerRef = useRef<HTMLDivElement | null>(null)
   const [editingRoleId, setEditingRoleId] = useState<number | null>(null)
   const [session, setSession] = useState<SessionUser | null>(null)
   const [authLoaded, setAuthLoaded] = useState(false)
@@ -131,6 +165,24 @@ export default function MembersPage() {
     return option ? option.label[locale] : value || t.labels.empty
   }
 
+  const columnOptions: { key: ColumnKey; label: ReactNode }[] = useMemo(
+    () => [
+      { key: 'sequence', label: t.table.sequence },
+      { key: 'name', label: t.table.name },
+      { key: 'username', label: t.table.username },
+      { key: 'gender', label: t.table.gender },
+      { key: 'nationality', label: t.table.nationality },
+      { key: 'phones', label: t.table.phones },
+      { key: 'joinDate', label: t.table.joinDate },
+      { key: 'position', label: t.table.position },
+      { key: 'employmentStatus', label: t.table.employmentStatus },
+      { key: 'roles', label: t.table.roles },
+      { key: 'createdAt', label: t.table.createdAt },
+      { key: 'updatedAt', label: t.table.updatedAt },
+      { key: 'actions', label: t.table.actions },
+    ],
+    [t.table],
+  )
   const positionOptions = useMemo(() => {
     const set = new Set<string>()
     membersData.forEach((member) => {
@@ -244,6 +296,63 @@ export default function MembersPage() {
     setEditingRoleId(null)
   }
 
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (columnSelectorRef.current && !columnSelectorRef.current.contains(event.target as Node)) {
+        setShowColumnSelector(false)
+      }
+      if (phonePickerRef.current && !phonePickerRef.current.contains(event.target as Node)) {
+        setShowPhonePicker(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      const stored = localStorage.getItem(MEMBER_COLUMN_STORAGE_KEY)
+      if (!stored) return
+      const parsed = JSON.parse(stored)
+      if (!Array.isArray(parsed)) return
+      const filtered = parsed.filter((item) =>
+        typeof item === 'string' && columnOptions.some((opt) => opt.key === item),
+      ) as ColumnKey[]
+      if (filtered.length || stored.trim() === '[]') {
+        setVisibleColumns(filtered)
+      } else {
+        setVisibleColumns(defaultVisibleColumns)
+      }
+    } catch (error) {
+      console.error('Failed to load member columns', error)
+    }
+  }, [columnOptions])
+
+  const persistVisibleColumns = (next: ColumnKey[]) => {
+    setVisibleColumns(next)
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(MEMBER_COLUMN_STORAGE_KEY, JSON.stringify(next))
+      } catch (error) {
+        console.error('Failed to persist member columns', error)
+      }
+    }
+  }
+
+  const toggleColumn = (key: ColumnKey) => {
+    persistVisibleColumns(
+      visibleColumns.includes(key)
+        ? visibleColumns.filter((item) => item !== key)
+        : [...visibleColumns, key],
+    )
+  }
+
+  const selectAllColumns = () => persistVisibleColumns(columnOptions.map((item) => item.key))
+  const restoreDefaultColumns = () => persistVisibleColumns([...defaultVisibleColumns])
+  const clearColumns = () => persistVisibleColumns([])
+  const isVisible = (key: ColumnKey) => visibleColumns.includes(key)
+
   const openCreateRoleModal = () => {
     if (!canManageRole) {
       setRoleError(t.errors.needRoleManage)
@@ -320,7 +429,10 @@ export default function MembersPage() {
   const addPhoneFromInput = () => {
     const trimmed = phoneInput.trim()
     if (!trimmed) return
-    setFormState((prev) => ({ ...prev, phones: [...prev.phones.filter(Boolean), trimmed] }))
+    setFormState((prev) => {
+      const next = Array.from(new Set([...prev.phones.filter(Boolean), trimmed]))
+      return { ...prev, phones: next }
+    })
     setPhoneInput('')
   }
 
@@ -514,9 +626,9 @@ export default function MembersPage() {
 
   return (
     <main className="min-h-screen bg-slate-50">
-      <section className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 pb-14 pt-12 text-white">
+      <section className="relative bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 pb-14 pt-12 text-white">
         <div className="absolute inset-0 opacity-60" style={{ backgroundImage: 'radial-gradient(circle at 20% 20%, rgba(14,165,233,0.2), transparent 40%), radial-gradient(circle at 80% 0%, rgba(94,234,212,0.18), transparent 36%)' }} />
-        <div className="relative mx-auto flex max-w-6xl flex-col gap-8 px-6">
+        <div className="relative mx-auto flex max-w-[1600px] flex-col gap-8 px-6 sm:px-8">
           <div className="flex flex-col justify-between gap-6 sm:flex-row sm:items-center">
             <div className="flex flex-col gap-4">
               <div>
@@ -558,9 +670,9 @@ export default function MembersPage() {
         </div>
       </section>
 
-      <section className="mx-auto max-w-6xl px-6 pb-14 pt-6 sm:pt-10">
-        <div className="grid gap-8">
-          <div className="rounded-3xl border border-slate-200 bg-white shadow-xl shadow-slate-900/5">
+      <section className="w-full bg-slate-50">
+        <div className="mx-auto grid max-w-[1600px] gap-8 px-6 pb-14 pt-6 sm:px-8 sm:pt-10 min-w-0">
+          <div className="min-w-0 w-full rounded-3xl border border-slate-200 bg-white shadow-xl shadow-slate-900/5">
             <div className="flex flex-col gap-4 border-b border-slate-100 p-6 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h2 className="text-xl font-semibold text-slate-900">{t.tabs[activeTab]}</h2>
@@ -583,7 +695,7 @@ export default function MembersPage() {
                       {t.listHeading}
                     </p>
                   </div>
-                  <div className="flex flex-wrap gap-3">
+                  <div className="flex flex-wrap items-center gap-3">
                     <button
                       type="button"
                       onClick={openCreateModal}
@@ -595,6 +707,44 @@ export default function MembersPage() {
                     <ActionButton>{t.actions.import}</ActionButton>
                     <ActionButton>{t.actions.export}</ActionButton>
                     <ActionButton>{t.actions.template}</ActionButton>
+                    <div className="relative" ref={columnSelectorRef}>
+                      <button
+                        type="button"
+                        onClick={() => setShowColumnSelector((prev) => !prev)}
+                        className="inline-flex items-center gap-2 rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                      >
+                        {t.columnSelector.label}
+                        <span aria-hidden>⌵</span>
+                      </button>
+                      {showColumnSelector ? (
+                        <div className="absolute right-0 z-10 mt-2 w-60 rounded-2xl border border-slate-200 bg-white p-3 text-xs text-slate-700 shadow-xl shadow-slate-900/10">
+                          <div className="flex items-center justify-between text-[11px] text-slate-500">
+                            <button type="button" className="hover:text-slate-800" onClick={selectAllColumns}>
+                              {t.columnSelector.selectAll}
+                            </button>
+                            <button type="button" className="hover:text-slate-800" onClick={restoreDefaultColumns}>
+                              {t.columnSelector.restore}
+                            </button>
+                            <button type="button" className="text-rose-600 hover:text-rose-700" onClick={clearColumns}>
+                              {t.columnSelector.clear}
+                            </button>
+                          </div>
+                          <div className="mt-2 max-h-64 space-y-1 overflow-y-auto">
+                            {columnOptions.map((option) => (
+                              <label key={option.key} className="flex items-center gap-2 rounded-lg px-2 py-1 hover:bg-slate-50">
+                                <input
+                                  type="checkbox"
+                                  checked={visibleColumns.includes(option.key)}
+                                  onChange={() => toggleColumn(option.key)}
+                                  className="accent-emerald-500"
+                                />
+                                <span className="truncate">{option.label}</span>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
                   </div>
                 </div>
 
@@ -607,7 +757,7 @@ export default function MembersPage() {
                     {t.access.needMemberView}
                   </div>
                 ) : (
-                  <div className="overflow-x-auto border-t border-slate-100">
+                  <div className="w-full min-w-0 overflow-x-auto border-t border-slate-100">
                     {loading ? (
                       <div className="p-6 text-sm text-slate-500">{t.feedback.loading}</div>
                     ) : null}
@@ -621,104 +771,170 @@ export default function MembersPage() {
                         {t.feedback.empty}
                       </div>
                     ) : (
-                      <table className="min-w-full divide-y divide-slate-200 text-sm">
-                        <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                      <table className="w-full table-auto text-left text-base text-slate-900">
+                        <thead className="bg-slate-50 text-sm uppercase tracking-wide text-slate-600">
                           <tr>
-                            <th className="px-4 py-3 text-left">{t.table.name}</th>
-                            <th className="px-4 py-3 text-left">{t.table.username}</th>
-                            <th className="px-4 py-3 text-left">{t.table.gender}</th>
-                            <th className="px-4 py-3 text-left">{t.table.nationality}</th>
-                            <th className="px-4 py-3 text-left">{t.table.phones}</th>
-                            <th className="px-4 py-3 text-left">{t.table.joinDate}</th>
-                            <th className="px-4 py-3 text-left">{t.table.position}</th>
-                            <th className="px-4 py-3 text-left">{t.table.employmentStatus}</th>
-                            <th className="px-4 py-3 text-left">{t.table.roles}</th>
-                            <th className="px-4 py-3 text-left">{t.table.createdAt}</th>
-                            <th className="px-4 py-3 text-left">{t.table.updatedAt}</th>
-                            <th className="px-4 py-3 text-left">{t.table.actions}</th>
+                            {isVisible('sequence') ? (
+                              <th className="px-3 py-3 text-center whitespace-nowrap">{t.table.sequence}</th>
+                            ) : null}
+                            {isVisible('name') ? (
+                              <th className="px-3 py-3 whitespace-nowrap">{t.table.name}</th>
+                            ) : null}
+                            {isVisible('username') ? (
+                              <th className="px-3 py-3 whitespace-nowrap">{t.table.username}</th>
+                            ) : null}
+                            {isVisible('gender') ? (
+                              <th className="px-3 py-3 whitespace-nowrap">{t.table.gender}</th>
+                            ) : null}
+                            {isVisible('nationality') ? (
+                              <th className="px-3 py-3 whitespace-nowrap">{t.table.nationality}</th>
+                            ) : null}
+                            {isVisible('phones') ? (
+                              <th className="px-3 py-3 whitespace-nowrap">{t.table.phones}</th>
+                            ) : null}
+                            {isVisible('joinDate') ? (
+                              <th className="px-3 py-3 whitespace-nowrap">{t.table.joinDate}</th>
+                            ) : null}
+                            {isVisible('position') ? (
+                              <th className="px-3 py-3 whitespace-nowrap">{t.table.position}</th>
+                            ) : null}
+                            {isVisible('employmentStatus') ? (
+                              <th className="px-3 py-3 whitespace-nowrap">{t.table.employmentStatus}</th>
+                            ) : null}
+                            {isVisible('roles') ? (
+                              <th className="min-w-[150px] px-3 py-3 whitespace-nowrap">{t.table.roles}</th>
+                            ) : null}
+                            {isVisible('createdAt') ? (
+                              <th className="px-3 py-3 whitespace-nowrap">{t.table.createdAt}</th>
+                            ) : null}
+                            {isVisible('updatedAt') ? (
+                              <th className="px-3 py-3 whitespace-nowrap">{t.table.updatedAt}</th>
+                            ) : null}
+                            {isVisible('actions') ? (
+                              <th className="px-3 py-3 whitespace-nowrap">{t.table.actions}</th>
+                            ) : null}
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-100">
-                          {filteredMembers.map((member) => (
-                            <tr key={member.id} className="hover:bg-slate-50">
-                              <td className="whitespace-nowrap px-4 py-3">
-                                <p className="font-semibold text-slate-900">
-                                  {member.name?.length ? member.name : t.labels.empty}
-                                </p>
-                              </td>
-                              <td className="whitespace-nowrap px-4 py-3">
-                                <p className="font-semibold text-slate-900">{member.username}</p>
-                              </td>
-                              <td className="whitespace-nowrap px-4 py-3 text-slate-700">
-                                {findGenderLabel(member.gender)}
-                              </td>
-                              <td className="whitespace-nowrap px-4 py-3 text-slate-700">
-                                {findNationalityLabel(member.nationality)}
-                              </td>
-                              <td className="px-4 py-3 text-slate-700">
-                                {member.phones?.length ? member.phones.join(' / ') : t.labels.empty}
-                              </td>
-                              <td className="whitespace-nowrap px-4 py-3 text-slate-700">
-                                {member.joinDate
-                                  ? new Date(member.joinDate).toLocaleDateString(locale)
-                                  : t.labels.empty}
-                              </td>
-                              <td className="whitespace-nowrap px-4 py-3 text-slate-700">
-                                {member.position || t.labels.empty}
-                              </td>
-                              <td className="whitespace-nowrap px-4 py-3">
-                                <span className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-800 ring-1 ring-slate-200">
-                                  {statusLabels[member.employmentStatus] ?? member.employmentStatus}
-                                </span>
-                              </td>
-                              <td className="px-4 py-3 text-slate-700">
-                                <div className="flex flex-wrap gap-2">
-                                  {member.roles.map((roleKey) => {
-                                    const role = rolesData.find((item) => item.id === roleKey.id || item.name === roleKey.name)
-                                    return (
-                                      <span
-                                        key={`${member.id}-${roleKey.id ?? roleKey.name}`}
-                                        className="rounded-full bg-sky-50 px-2.5 py-1 text-[11px] font-semibold text-sky-800 ring-1 ring-sky-100"
-                                      >
-                                        {role?.name ?? roleKey.name}
-                                      </span>
-                                    )
-                                  })}
-                                </div>
-                              </td>
-                              <td className="whitespace-nowrap px-4 py-3 text-slate-700">
-                                {new Date(member.createdAt).toLocaleString(locale)}
-                              </td>
-                              <td className="whitespace-nowrap px-4 py-3 text-slate-700">
-                                {new Date(member.updatedAt).toLocaleString(locale)}
-                              </td>
-                              <td className="whitespace-nowrap px-4 py-3 text-slate-700">
-                                <div className="flex flex-wrap gap-2">
-                                  <button
-                                    type="button"
-                                    onClick={() => openViewModal(member)}
-                                    className="rounded-full border border-slate-200 px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
-                                  >
-                                    {t.actions.view}
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => openEditModal(member)}
-                                    disabled={!canEditMember}
-                                    className="rounded-full border border-slate-200 px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-                                  >
-                                    {t.actions.edit}
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleDelete(member)}
-                                    className="rounded-full border border-rose-200 px-2.5 py-1 text-[11px] font-semibold text-rose-700 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
-                                    disabled={!canManageMember || submitting}
-                                  >
-                                    {t.actions.delete}
-                                  </button>
-                                </div>
-                              </td>
+                        <tbody className="divide-y divide-slate-100 align-middle">
+                          {filteredMembers.map((member, index) => (
+                            <tr key={member.id} className="hover:bg-slate-50 align-middle">
+                              {isVisible('sequence') ? (
+                                <td className="whitespace-nowrap px-4 py-3 text-center text-slate-700 align-middle">
+                                  {index + 1}
+                                </td>
+                              ) : null}
+                            {isVisible('name') ? (
+                                <td className="px-4 py-3 align-middle">
+                                  <p className="max-w-[10rem] text-sm font-semibold text-slate-900 break-words leading-snug">
+                                    {member.name?.length ? member.name : t.labels.empty}
+                                  </p>
+                                </td>
+                              ) : null}
+                              {isVisible('username') ? (
+                                <td className="whitespace-nowrap px-4 py-3 align-middle">
+                                  <p className="font-semibold text-slate-900">{member.username}</p>
+                                </td>
+                              ) : null}
+                              {isVisible('gender') ? (
+                                <td className="whitespace-nowrap px-4 py-3 text-slate-700 min-w-[80px] align-middle">
+                                  {findGenderLabel(member.gender)}
+                                </td>
+                              ) : null}
+                              {isVisible('nationality') ? (
+                                <td className="whitespace-nowrap px-4 py-3 text-slate-700 align-middle">
+                                  {findNationalityLabel(member.nationality)}
+                                </td>
+                              ) : null}
+                              {isVisible('phones') ? (
+                                <td className="px-4 py-3 text-slate-700 align-middle">
+                                  {member.phones?.length ? (
+                                    <div className="space-y-1">
+                                      {member.phones.map((phone, idx) => (
+                                        <div key={`${member.id}-phone-${idx}`} className="whitespace-nowrap">
+                                          {phone}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    t.labels.empty
+                                  )}
+                                </td>
+                              ) : null}
+                              {isVisible('joinDate') ? (
+                                <td className="whitespace-nowrap px-4 py-3 text-slate-700 align-middle">
+                                  {member.joinDate
+                                    ? new Date(member.joinDate).toLocaleDateString(locale)
+                                    : t.labels.empty}
+                                </td>
+                              ) : null}
+                              {isVisible('position') ? (
+                                <td className="whitespace-nowrap px-4 py-3 text-slate-700 align-middle">
+                                  {member.position || t.labels.empty}
+                                </td>
+                              ) : null}
+                              {isVisible('employmentStatus') ? (
+                                <td className="whitespace-nowrap px-4 py-3 align-middle">
+                                  <span className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-800 ring-1 ring-slate-200">
+                                    {statusLabels[member.employmentStatus] ?? member.employmentStatus}
+                                  </span>
+                                </td>
+                              ) : null}
+                              {isVisible('roles') ? (
+                                <td className="px-4 py-3 text-slate-700 align-middle min-w-[150px]">
+                                  <div className="flex flex-col gap-1">
+                                    {member.roles.map((roleKey) => {
+                                      const role = rolesData.find((item) => item.id === roleKey.id || item.name === roleKey.name)
+                                      return (
+                                        <div
+                                          key={`${member.id}-${roleKey.id ?? roleKey.name}`}
+                                          className="inline-flex items-center justify-center rounded-full bg-sky-50 px-2.5 py-1 text-[11px] font-semibold text-sky-800 ring-1 ring-sky-100 whitespace-nowrap"
+                                        >
+                                          {role?.name ?? roleKey.name}
+                                        </div>
+                                      )
+                                    })}
+                                  </div>
+                                </td>
+                              ) : null}
+                              {isVisible('createdAt') ? (
+                                <td className="whitespace-nowrap px-4 py-3 text-slate-700 align-middle">
+                                  {new Date(member.createdAt).toLocaleString(locale)}
+                                </td>
+                              ) : null}
+                              {isVisible('updatedAt') ? (
+                                <td className="whitespace-nowrap px-4 py-3 text-slate-700 align-middle">
+                                  {new Date(member.updatedAt).toLocaleString(locale)}
+                                </td>
+                              ) : null}
+                              {isVisible('actions') ? (
+                                <td className="whitespace-nowrap px-4 py-3 text-slate-700 align-middle">
+                                  <div className="flex flex-nowrap gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => openViewModal(member)}
+                                      className="rounded-full border border-slate-200 px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
+                                    >
+                                      {t.actions.view}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => openEditModal(member)}
+                                      disabled={!canEditMember}
+                                      className="rounded-full border border-slate-200 px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                    >
+                                      {t.actions.edit}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDelete(member)}
+                                      className="rounded-full border border-rose-200 px-2.5 py-1 text-[11px] font-semibold text-rose-700 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                      disabled={!canManageMember || submitting}
+                                    >
+                                      {t.actions.delete}
+                                    </button>
+                                  </div>
+                                </td>
+                              ) : null}
                             </tr>
                           ))}
                         </tbody>
@@ -1040,14 +1256,14 @@ export default function MembersPage() {
                 </label>
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-3">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <label className="space-y-1 text-sm text-slate-700">
                   <span className="block font-semibold">{t.form.nationality}</span>
                   <select
                     value={formState.nationality}
                     onChange={(event) => setFormState((prev) => ({ ...prev, nationality: event.target.value }))}
                     disabled={formMode === 'view'}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
                   >
                     <option value="">{t.form.nationalityPlaceholder}</option>
                     {Array.from(nationalityByRegion.entries()).map(([region, options]) => (
@@ -1061,51 +1277,6 @@ export default function MembersPage() {
                     ))}
                   </select>
                 </label>
-                <label className="space-y-1 text-sm text-slate-700 sm:col-span-2">
-                  <span className="block font-semibold">{t.form.phones}</span>
-                  <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
-                    {formState.phones.map((phone, index) => (
-                      <span
-                        key={`phone-${index}-${phone}`}
-                        className="inline-flex items-center gap-1 rounded-full bg-white px-2 py-1 text-[11px] font-semibold text-slate-800 ring-1 ring-slate-200"
-                      >
-                        {phone}
-                        {formMode !== 'view' ? (
-                          <button
-                            type="button"
-                            onClick={() => removePhone(index)}
-                            className="text-slate-500 hover:text-rose-600"
-                          >
-                            ×
-                          </button>
-                        ) : null}
-                      </span>
-                    ))}
-                    {formMode !== 'view' ? (
-                      <>
-                        <input
-                          value={phoneInput}
-                          onChange={(event) => setPhoneInput(event.target.value)}
-                          onKeyDown={(event) => {
-                            if (event.key === 'Enter' || event.key === ',') {
-                              event.preventDefault()
-                              addPhoneFromInput()
-                            }
-                          }}
-                          className="min-w-[160px] flex-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
-                          placeholder={t.form.phonePlaceholder}
-                        />
-                        <button
-                          type="button"
-                          onClick={addPhoneFromInput}
-                          className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-                        >
-                          {t.form.addPhone}
-                        </button>
-                      </>
-                    ) : null}
-                  </div>
-                </label>
                 <label className="space-y-1 text-sm text-slate-700">
                   <span className="block font-semibold">{t.form.position}</span>
                   <input
@@ -1118,7 +1289,7 @@ export default function MembersPage() {
                       }))
                     }
                     disabled={formMode === 'view'}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
                     placeholder={t.form.positionPlaceholder}
                   />
                   <datalist id="position-options">
@@ -1126,6 +1297,74 @@ export default function MembersPage() {
                       <option key={name} value={name} />
                     ))}
                   </datalist>
+                </label>
+                <label className="space-y-2 text-sm text-slate-700 sm:col-span-2">
+                  <span className="block font-semibold">{t.form.phones}</span>
+                  <div className="relative" ref={phonePickerRef}>
+                    <button
+                      type="button"
+                      disabled={formMode === 'view'}
+                      onClick={() => setShowPhonePicker((prev) => !prev)}
+                      className="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-semibold text-slate-800 shadow-sm transition hover:border-slate-300 hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <span>{formState.phones.length ? `已保存 ${formState.phones.length} 个号码` : t.form.phonePlaceholder}</span>
+                      <span className="text-xs text-slate-500" aria-hidden>
+                        ⌵
+                      </span>
+                    </button>
+                    {showPhonePicker && formMode !== 'view' ? (
+                      <div className="absolute z-20 mt-2 w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-4 text-sm shadow-2xl shadow-slate-900/10">
+                        <div className="flex flex-wrap items-center gap-3">
+                          <input
+                            list="phone-options"
+                            value={phoneInput}
+                            onChange={(event) => setPhoneInput(event.target.value)}
+                            onKeyDown={(event) => {
+                              if (event.key === 'Enter' || event.key === ',') {
+                                event.preventDefault()
+                                addPhoneFromInput()
+                              }
+                            }}
+                            className="min-w-[200px] flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+                            placeholder={t.form.phonePlaceholder}
+                          />
+                          <datalist id="phone-options">
+                            {formState.phones.map((phone) => (
+                              <option key={phone} value={phone} />
+                            ))}
+                          </datalist>
+                          <button
+                            type="button"
+                            onClick={addPhoneFromInput}
+                            className="rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                          >
+                            {t.form.addPhone}
+                          </button>
+                        </div>
+                        <div className="mt-3 max-h-36 space-y-1 overflow-y-auto">
+                          {formState.phones.length === 0 ? (
+                            <p className="text-xs text-slate-500">{t.labels.empty}</p>
+                          ) : (
+                            formState.phones.map((phone, index) => (
+                              <div
+                                key={`phone-${index}-${phone}`}
+                                className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-800 ring-1 ring-slate-200"
+                              >
+                                <span className="truncate">{phone}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => removePhone(index)}
+                                  className="text-xs font-semibold text-rose-600 hover:text-rose-700"
+                                >
+                                  删除
+                                </button>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
                 </label>
               </div>
 

@@ -16,6 +16,18 @@ type SessionUser = {
 	permissions: string[];
 };
 
+type RoadmapItem = {
+	id: number;
+	title: string;
+	details: string | null;
+	priority: number;
+	importance: number;
+	difficulty: number;
+	status: 'PENDING' | 'DONE';
+	createdAt: string;
+	completedAt: string | null;
+};
+
 export default function HomePage() {
 	const { locale, setLocale } = usePreferredLocale('zh', locales);
 	const t = getHomeCopy(locale);
@@ -35,6 +47,10 @@ export default function HomePage() {
 	const [isChanging, setIsChanging] = useState(false);
 	const [accessDialogOpen, setAccessDialogOpen] = useState(false);
 	const menuRef = useRef<HTMLDivElement | null>(null);
+	const [roadmapItems, setRoadmapItems] = useState<RoadmapItem[]>([]);
+	const [roadmapLoading, setRoadmapLoading] = useState(false);
+	const [roadmapError, setRoadmapError] = useState<string | null>(null);
+	const [roadmapIndex, setRoadmapIndex] = useState(0);
 	const searchParams = useSearchParams();
 
 	const can = useCallback(
@@ -67,6 +83,28 @@ export default function HomePage() {
 		? t.extension.description
 		: t.extension.previewDescription;
 	const roadmapHelper = canViewRoadmap ? t.extension.helper : t.extension.previewHelper;
+	const roadmapPending = useMemo(
+		() => roadmapItems.filter((item) => item.status === 'PENDING'),
+		[roadmapItems]
+	);
+	const roadmapDone = useMemo(
+		() => roadmapItems.filter((item) => item.status === 'DONE'),
+		[roadmapItems]
+	);
+	const roadmapPreview = useMemo(() => {
+		return [...roadmapPending].sort(
+			(a, b) => b.priority - a.priority || b.importance - a.importance || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+		);
+	}, [roadmapPending]);
+
+	useEffect(() => {
+		const list = roadmapPreview.length ? roadmapPreview : roadmapPending;
+		if (list.length <= 1) return;
+		const timer = setInterval(() => {
+			setRoadmapIndex((prev) => (prev + 1) % list.length);
+		}, 5200);
+		return () => clearInterval(timer);
+	}, [roadmapPending, roadmapPreview]);
 
 	useEffect(() => {
 		const loadSession = async () => {
@@ -92,6 +130,27 @@ export default function HomePage() {
 			setLoginOpen(true);
 		}
 	}, [searchParams]);
+
+	useEffect(() => {
+		const loadRoadmap = async () => {
+			if (!canViewRoadmap) return;
+			setRoadmapLoading(true);
+			setRoadmapError(null);
+			try {
+				const res = await fetch('/api/roadmap', { credentials: 'include' });
+				const data = (await res.json()) as { items?: RoadmapItem[]; message?: string };
+				if (!res.ok) {
+					throw new Error(data.message ?? '加载失败');
+				}
+				setRoadmapItems(data.items ?? []);
+			} catch (error) {
+				setRoadmapError((error as Error).message);
+			} finally {
+				setRoadmapLoading(false);
+			}
+		};
+		loadRoadmap();
+	}, [canViewRoadmap]);
 
 	useEffect(() => {
 		const handleClickOutside = (event: MouseEvent | TouchEvent) => {
@@ -402,8 +461,8 @@ export default function HomePage() {
 
 				{canViewRoadmap ? (
 					<section className='mt-12 overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-white/5 via-white/0 to-white/5 p-6 text-sm text-slate-100 shadow-xl shadow-slate-950/20 backdrop-blur'>
-						<div className='grid gap-6 lg:grid-cols-[1.6fr,1fr]'>
-							<div className='space-y-4'>
+						<div className='grid gap-6 lg:grid-cols-[1.2fr,1fr] lg:items-stretch'>
+							<div className='flex h-full flex-col gap-4'>
 								<div className='flex items-center gap-2'>
 									<div className='h-2 w-2 rounded-full bg-emerald-300' />
 									<p className='text-xs font-semibold uppercase tracking-[0.2em] text-slate-200'>
@@ -419,87 +478,69 @@ export default function HomePage() {
 								<p className='max-w-2xl text-slate-200/80'>
 									{roadmapDescription}
 								</p>
-								<div className='grid gap-3 sm:grid-cols-2 lg:grid-cols-3'>
-									{[
-										{
-											title: t.extension.progressTitle,
-											items: t.extension.progressList,
-											dot: 'bg-emerald-300',
-											background: 'from-emerald-400/15 via-emerald-300/5 to-white/10'
-										},
-										{
-											title: t.extension.ideaTitle,
-											items: t.extension.ideaList,
-											dot: 'bg-cyan-300',
-											background: 'from-cyan-400/15 via-cyan-300/5 to-white/10'
-										},
-										{
-											title: t.extension.doneTitle,
-											items: t.extension.doneList,
-											dot: 'bg-amber-300',
-											background: 'from-amber-400/15 via-amber-300/5 to-white/10'
+								<div className='mt-auto flex flex-wrap items-center justify-between gap-3 text-[11px] font-semibold text-slate-900'>
+									<div className='flex flex-wrap items-center gap-3'>
+										<span className='inline-flex items-center gap-2 rounded-full bg-emerald-100/80 px-3 py-2 text-emerald-900 shadow shadow-emerald-300/20 ring-1 ring-emerald-200/60'>
+											<span className='h-2 w-2 rounded-full bg-emerald-400' />
+											{t.extension.progressTitle} {roadmapPending.length}
+										</span>
+										<span className='inline-flex items-center gap-2 rounded-full bg-amber-100/80 px-3 py-2 text-amber-900 shadow shadow-amber-300/20 ring-1 ring-amber-200/60'>
+											<span className='h-2 w-2 rounded-full bg-amber-400' />
+											{t.extension.doneTitle} {roadmapDone.length}
+										</span>
+									</div>
+									<Link
+										href='/roadmap'
+										onClick={(event) =>
+											handleModuleClick(event, '/roadmap', modulePermissions['/roadmap'])
 										}
-									].map((section) => (
-										<div
-											key={section.title}
-											className='relative overflow-hidden rounded-2xl border border-white/10 bg-white/5 p-3 shadow-sm shadow-emerald-500/10'>
-											<div
-												className={`absolute inset-0 -z-10 bg-gradient-to-br ${section.background} opacity-90`}
-											/>
-											<div className='flex items-center gap-2'>
-												<span className={`h-2 w-2 rounded-full ${section.dot}`} />
-												<span className='text-sm font-semibold text-slate-50'>
-													{section.title}
-												</span>
-											</div>
-											<ul className='mt-2 space-y-2 text-xs text-slate-200/85'>
-												{section.items.map((item) => (
-													<li key={item} className='flex items-start gap-2 rounded-xl bg-white/5 px-3 py-2'>
-														<span className={`mt-1 inline-flex h-1.5 w-1.5 rounded-full ${section.dot}`} />
-														<span>{item}</span>
-													</li>
-												))}
-											</ul>
-										</div>
-									))}
+										aria-disabled={!canViewRoadmap}
+										className='inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-5 py-2.5 text-sm font-semibold text-slate-900 shadow-lg shadow-emerald-400/15 transition hover:-translate-y-0.5 hover:shadow-emerald-400/25'
+									>
+										{t.extension.cta}
+										<span aria-hidden>↗</span>
+									</Link>
 								</div>
-								<p className='text-xs text-slate-300/80'>{roadmapHelper}</p>
 							</div>
-							<div className='flex w-full max-w-xs flex-col gap-3 rounded-2xl border border-white/10 bg-white/10 p-4 shadow-lg shadow-emerald-500/10'>
-								<div className='flex items-center justify-between gap-3'>
-									<span className='text-sm font-semibold text-slate-50'>
-										ROADMAP
-									</span>
-									<span className='rounded-full bg-emerald-500/20 px-2 py-1 text-[11px] font-semibold text-emerald-100'>
-										✓
-									</span>
+							<div className='flex h-full min-h-[180px] flex-col rounded-2xl border border-white/10 bg-white/5 p-4 shadow-inner shadow-emerald-500/10'>
+								<div className='flex items-center justify-end text-xs text-slate-200/80'>
+									{roadmapLoading ? <span className='text-emerald-200'>加载中...</span> : null}
+									{roadmapError ? <span className='text-amber-200'>{roadmapError}</span> : null}
 								</div>
-								<p className='text-xs text-slate-200/80'>{t.extension.helper}</p>
-								<div className='grid grid-cols-3 gap-2 text-[11px] font-semibold text-slate-900'>
-									<div className='rounded-xl bg-emerald-100/80 px-2 py-2 text-center shadow-sm shadow-emerald-500/10'>
-										<p className='text-[10px] text-emerald-700'>{t.extension.progressTitle}</p>
-										<p className='text-base text-emerald-900'>{t.extension.progressList.length}</p>
-									</div>
-									<div className='rounded-xl bg-cyan-100/80 px-2 py-2 text-center shadow-sm shadow-cyan-500/10'>
-										<p className='text-[10px] text-cyan-700'>{t.extension.ideaTitle}</p>
-										<p className='text-base text-cyan-900'>{t.extension.ideaList.length}</p>
-									</div>
-									<div className='rounded-xl bg-amber-100/80 px-2 py-2 text-center shadow-sm shadow-amber-500/10'>
-										<p className='text-[10px] text-amber-700'>{t.extension.doneTitle}</p>
-										<p className='text-base text-amber-900'>{t.extension.doneList.length}</p>
-									</div>
+								<div className='mt-2 flex-1'>
+									{(roadmapPreview.length ? roadmapPreview : roadmapPending).length === 0 && !roadmapLoading ? (
+										<p className='text-xs text-slate-300/80'>{t.extension.helper}</p>
+									) : (
+										<div className='relative h-full overflow-hidden'>
+											<div className='absolute inset-0 flex items-center'>
+												{(() => {
+													const list = roadmapPreview.length ? roadmapPreview : roadmapPending;
+													const current = list[roadmapIndex % list.length];
+													if (!current) return null;
+													return (
+														<div
+															key={`${current.id}-${roadmapIndex}`}
+															className='w-full min-h-[156px] rounded-xl border border-white/10 bg-white/5 px-3 py-3 text-slate-50 shadow-sm shadow-slate-900/20 animate-roadmap-rise will-change-transform'
+														>
+															<div className='flex items-start justify-between gap-2 text-xs text-slate-200/80'>
+																<span>{new Date(current.createdAt).toLocaleDateString(locale)}</span>
+																<div className='flex gap-1 text-[10px]'>
+																	<span className='rounded-full bg-emerald-300/25 px-2 py-0.5 text-emerald-100 ring-1 ring-emerald-300/50'>P{current.priority}</span>
+																	<span className='rounded-full bg-cyan-300/25 px-2 py-0.5 text-cyan-100 ring-1 ring-cyan-300/50'>I{current.importance}</span>
+																	<span className='rounded-full bg-slate-300/20 px-2 py-0.5 text-slate-100 ring-1 ring-white/30'>D{current.difficulty}</span>
+																</div>
+															</div>
+															<p className='mt-2 text-sm font-semibold text-slate-50'>{current.title}</p>
+															{current.details ? (
+																<p className='text-xs text-slate-200/80 line-clamp-3'>{current.details}</p>
+															) : null}
+														</div>
+													);
+												})()}
+											</div>
+										</div>
+									)}
 								</div>
-								<Link
-									href='/roadmap'
-									onClick={(event) =>
-										handleModuleClick(event, '/roadmap', modulePermissions['/roadmap'])
-									}
-									aria-disabled={!canViewRoadmap}
-									className='inline-flex items-center justify-center gap-2 rounded-xl bg-white px-4 py-3 text-sm font-semibold text-slate-900 transition hover:-translate-y-0.5 hover:shadow-lg hover:shadow-emerald-400/20'>
-									{t.extension.cta}
-									<span aria-hidden>↗</span>
-								</Link>
-								<p className='text-xs text-slate-200/70'>{t.extension.description}</p>
 							</div>
 						</div>
 					</section>

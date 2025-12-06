@@ -32,10 +32,17 @@ export const memberCopy: Record<
       permissionCoverage: string
       permissionFormat: string
     }
+    columnSelector: {
+      label: string
+      selectAll: string
+      restore: string
+      clear: string
+    }
     listHeading: string
     status: Record<EmploymentStatus, string>
     table: Record<
       | 'name'
+      | 'sequence'
       | 'username'
       | 'gender'
       | 'nationality'
@@ -160,6 +167,12 @@ export const memberCopy: Record<
       permissionCoverage: '权限条目',
       permissionFormat: '权限遵循资源-动作编码，可直接复用到 API 鉴权策略。',
     },
+    columnSelector: {
+      label: '列显示',
+      selectAll: '全选',
+      restore: '恢复默认',
+      clear: '清空',
+    },
     listHeading: '成员列表',
     status: {
       ACTIVE: '在职',
@@ -167,6 +180,7 @@ export const memberCopy: Record<
       ON_LEAVE: '休假',
     },
     table: {
+      sequence: '序号',
       name: '姓名',
       username: '账号',
       gender: '性别',
@@ -291,6 +305,12 @@ export const memberCopy: Record<
       permissionFormat:
         'Les permissions suivent le format ressource:action et peuvent être réutilisées côté API.',
     },
+    columnSelector: {
+      label: 'Colonnes',
+      selectAll: 'Tout sélectionner',
+      restore: 'Rétablir par défaut',
+      clear: 'Tout effacer',
+    },
     listHeading: 'Liste des membres',
     status: {
       ACTIVE: 'Actif',
@@ -298,6 +318,7 @@ export const memberCopy: Record<
       ON_LEAVE: 'En congé',
     },
     table: {
+      sequence: 'N°',
       name: 'Nom',
       username: 'Identifiant',
       gender: 'Genre',
