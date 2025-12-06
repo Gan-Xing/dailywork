@@ -520,7 +520,7 @@ export default function HomePage() {
 													return (
 														<div
 															key={`${current.id}-${roadmapIndex}`}
-															className='w-full min-h-[156px] rounded-xl border border-white/10 bg-white/5 px-3 py-3 text-slate-50 shadow-sm shadow-slate-900/20 animate-roadmap-rise will-change-transform'
+															className='w-full min-h-[140px] rounded-xl border border-white/10 bg-white/5 px-3 py-3 text-slate-50 shadow-sm shadow-slate-900/20 animate-roadmap-rise will-change-transform'
 														>
 															<div className='flex items-start justify-between gap-2 text-xs text-slate-200/80'>
 																<span>{new Date(current.createdAt).toLocaleDateString(locale)}</span>
