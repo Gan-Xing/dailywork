@@ -403,7 +403,7 @@ export function WorkflowManager({ initialWorkflows }: Props) {
           : ''
       return [deps, locks].filter(Boolean).join(' · ')
     })
-  }, [copy.ruleDepends, copy.ruleLock, listJoiner, locale, selected])
+  }, [copy.ruleDepends, copy.ruleLock, displayLayerName, listJoiner, selected])
 
   const checkCount = useMemo(
     () => (selected ? selected.layers.reduce((acc, layer) => acc + layer.checks.length, 0) : 0),
