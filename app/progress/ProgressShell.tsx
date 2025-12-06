@@ -1,28 +1,30 @@
 'use client'
 
 import Link from 'next/link'
-import { useMemo, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 
 import { PhaseAggregateBoard } from './PhaseAggregateBoard'
 import { RoadBoard, type RoadBoardHandle } from './RoadBoard'
-import type {
-  AggregatedPhaseProgress,
-  PhaseMeasure,
-  RoadSectionProgressDTO,
-} from '@/lib/progressTypes'
+import type { AggregatedPhaseProgress, RoadSectionProgressSummaryDTO } from '@/lib/progressTypes'
 import { getProgressCopy, formatProgressCopy } from '@/lib/i18n/progress'
-import { resolveRoadName } from '@/lib/i18n/roadDictionary'
 import { locales } from '@/lib/i18n'
 import { usePreferredLocale } from '@/lib/usePreferredLocale'
 
 interface Props {
-  roads: RoadSectionProgressDTO[]
+  roads: RoadSectionProgressSummaryDTO[]
+  aggregatedPhases: AggregatedPhaseProgress[]
   loadError: string | null
   canManage: boolean
   canViewInspections: boolean
 }
 
-export function ProgressShell({ roads, loadError, canManage, canViewInspections }: Props) {
+export function ProgressShell({
+  roads,
+  aggregatedPhases,
+  loadError,
+  canManage,
+  canViewInspections,
+}: Props) {
   const { locale } = usePreferredLocale('zh', locales)
   const t = getProgressCopy(locale)
   const breadcrumbHome = t.nav.home
@@ -30,75 +32,6 @@ export function ProgressShell({ roads, loadError, canManage, canViewInspections 
   const inspectionLabel = t.nav.inspections
   const [viewMode, setViewMode] = useState<'road' | 'phase'>('road')
   const roadBoardRef = useRef<RoadBoardHandle | null>(null)
-
-  const aggregatedPhases = useMemo<Array<AggregatedPhaseProgress>>(() => {
-    const map = new Map<
-      string,
-      {
-        id: string
-        name: string
-        measure: PhaseMeasure
-        totalDesignLength: number
-        totalCompletedLength: number
-        latestUpdatedAt: number
-        roadNames: Set<string>
-      }
-    >()
-
-    roads.forEach((road) => {
-      road.phases.forEach((phase) => {
-        const key = `${phase.phaseName}::${phase.phaseMeasure}`
-        const designLen = Number.isFinite(phase.designLength) ? phase.designLength : 0
-        const completedLen = Number.isFinite(phase.completedLength) ? phase.completedLength : 0
-        const updatedAtRaw = new Date(phase.updatedAt).getTime()
-        const updatedAt = Number.isFinite(updatedAtRaw) ? updatedAtRaw : 0
-        const localizedRoadName = resolveRoadName(road, locale)
-        const existing = map.get(key)
-        if (existing) {
-          existing.totalDesignLength += designLen
-          existing.totalCompletedLength += completedLen
-          existing.latestUpdatedAt = Math.max(existing.latestUpdatedAt, updatedAt)
-          existing.roadNames.add(localizedRoadName)
-        } else {
-          map.set(key, {
-            id: key,
-            name: phase.phaseName,
-            measure: phase.phaseMeasure,
-            totalDesignLength: designLen,
-            totalCompletedLength: completedLen,
-            latestUpdatedAt: updatedAt,
-            roadNames: new Set([localizedRoadName]),
-          })
-        }
-      })
-    })
-
-    const sorted = Array.from(map.values())
-      .map((item) => {
-        const designTotal = Math.max(0, item.totalDesignLength)
-        const completedTotal = Math.max(0, item.totalCompletedLength)
-        const percent =
-          designTotal <= 0 ? 0 : Math.min(100, Math.round((completedTotal / designTotal) * 100))
-        return {
-          id: item.id,
-          name: item.name,
-          measure: item.measure,
-          totalDesignLength: Math.round(designTotal * 100) / 100,
-          totalCompletedLength: Math.round(completedTotal * 100) / 100,
-          completedPercent: percent,
-          latestUpdatedAt: item.latestUpdatedAt,
-          roadNames: Array.from(item.roadNames),
-        }
-      })
-      .sort((a, b) => {
-        if (b.latestUpdatedAt !== a.latestUpdatedAt) {
-          return b.latestUpdatedAt - a.latestUpdatedAt
-        }
-        return a.name.localeCompare(b.name, locale === 'fr' ? 'fr-FR' : 'zh-CN')
-      })
-
-    return sorted
-  }, [roads, locale])
 
   return (
     <main className="min-h-screen bg-slate-950 text-slate-50">
@@ -127,6 +60,7 @@ export function ProgressShell({ roads, loadError, canManage, canViewInspections 
               {canViewInspections ? (
                 <Link
                   href="/progress/inspections"
+                  prefetch={false}
                   className="inline-flex items-center gap-2 rounded-full border border-emerald-200/60 px-4 py-2 text-xs font-semibold text-emerald-50 shadow-[0_0_0_1px_rgba(255,255,255,0.08)] transition hover:-translate-y-0.5 hover:border-white/80 hover:bg-white/10"
                 >
                   {inspectionLabel}
@@ -135,6 +69,7 @@ export function ProgressShell({ roads, loadError, canManage, canViewInspections 
               {canManage ? (
                 <Link
                   href="/progress/workflows"
+                  prefetch={false}
                   className="inline-flex items-center gap-2 rounded-full border px-4 py-2 text-xs font-semibold text-blue-50 shadow-[0_0_0_1px_rgba(59,130,246,0.35)] transition border-blue-200/60 hover:-translate-y-0.5 hover:border-white/80 hover:bg-white/10"
                 >
                   {t.workflow.badge}

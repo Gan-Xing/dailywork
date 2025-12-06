@@ -198,6 +198,8 @@ model InspectionRequest {
   updater         User?        @relation("InspectionUpdater", fields: [updatedBy], references: [id])
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
+
+  @@index([phaseId, status, updatedAt])
 }
 
 model RoadPhaseLayer {

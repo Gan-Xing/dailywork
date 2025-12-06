@@ -46,6 +46,7 @@ type ProgressCopy = {
     add: string
     save: string
     reset: string
+    cancel: string
     close: string
   }
   errors: {
@@ -550,6 +551,7 @@ const progressCopy: Record<Locale, ProgressCopy> = {
       add: '添加路段',
       save: '保存修改',
       reset: '重置表单',
+      cancel: '取消',
       close: '关闭',
     },
     errors: {
@@ -1073,6 +1075,7 @@ const progressCopy: Record<Locale, ProgressCopy> = {
       add: 'Ajouter un tronçon',
       save: 'Enregistrer',
       reset: 'Réinitialiser le formulaire',
+      cancel: 'Annuler',
       close: 'Fermer',
     },
     errors: {

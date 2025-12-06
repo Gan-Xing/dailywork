@@ -35,6 +35,20 @@ export interface RoadSectionProgressDTO extends RoadSectionDTO {
   phases: RoadPhaseProgressDTO[]
 }
 
+export interface RoadPhaseProgressSummaryDTO {
+  phaseId: number
+  phaseName: string
+  phaseMeasure: PhaseMeasure
+  designLength: number
+  completedLength: number
+  completedPercent: number
+  updatedAt: string
+}
+
+export interface RoadSectionProgressSummaryDTO extends RoadSectionDTO {
+  phases: RoadPhaseProgressSummaryDTO[]
+}
+
 export type InspectionStatus = 'PENDING' | 'SCHEDULED' | 'SUBMITTED' | 'IN_PROGRESS' | 'APPROVED'
 export interface InspectionFilter {
   roadSlug?: string
