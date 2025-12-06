@@ -1,6 +1,5 @@
 'use client'
 
-import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import type {
@@ -10,6 +9,8 @@ import type {
   WorkflowTemplate,
 } from '@/lib/progressWorkflow'
 import { defaultWorkflowTypes } from '@/lib/progressWorkflow'
+import { Breadcrumbs } from '@/components/Breadcrumbs'
+import { useToast } from '@/components/ToastProvider'
 import { locales } from '@/lib/i18n'
 import { getProgressCopy, formatProgressCopy } from '@/lib/i18n/progress'
 import { localizeProgressTerm } from '@/lib/i18n/progressDictionary'
@@ -29,9 +30,9 @@ export function WorkflowManager({ initialWorkflows }: Props) {
   const t = getProgressCopy(locale)
   const copy = t.workflow
   const listJoiner = locale === 'fr' ? ', ' : '、'
+  const { addToast } = useToast()
   const [workflows, setWorkflows] = useState<WorkflowItem[]>(() => initialWorkflows)
   const [selectedId, setSelectedId] = useState<string>(initialWorkflows[0]?.id ?? '')
-  const [saveMessage, setSaveMessage] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [layerNameDraft, setLayerNameDraft] = useState('')
@@ -140,8 +141,7 @@ export function WorkflowManager({ initialWorkflows }: Props) {
       setWorkflows((prev) =>
         prev.map((item) => (item.phaseDefinitionId === data.workflow.phaseDefinitionId ? data.workflow : item)),
       )
-      setSaveMessage(copy.saved)
-      setTimeout(() => setSaveMessage(null), 3000)
+      addToast(copy.saved, { tone: 'success' })
     } catch (err) {
       setError((err as Error).message)
     } finally {
@@ -179,13 +179,12 @@ export function WorkflowManager({ initialWorkflows }: Props) {
       if (!res.ok || !data.workflow) {
         throw new Error(data.message || copy.saveFailed)
       }
-      setWorkflows((prev) => [...prev, data.workflow!])
+      setWorkflows((prev) => (data.workflow ? [...prev, data.workflow] : prev))
       setSelectedId(data.workflow.id)
       setNewTemplateName('')
       setNewTemplateMeasure('LINEAR')
       setNewTemplatePointHasSides(false)
-      setSaveMessage(copy.templateCreated)
-      setTimeout(() => setSaveMessage(null), 3000)
+      addToast(copy.templateCreated, { tone: 'success' })
     } catch (err) {
       setError((err as Error).message)
     } finally {
@@ -215,8 +214,7 @@ export function WorkflowManager({ initialWorkflows }: Props) {
         })
         return next
       })
-      setSaveMessage(copy.deleted)
-      setTimeout(() => setSaveMessage(null), 3000)
+      addToast(copy.deleted, { tone: 'success' })
     } catch (err) {
       setError((err as Error).message)
     } finally {
@@ -236,8 +234,7 @@ export function WorkflowManager({ initialWorkflows }: Props) {
       const data = (await res.json()) as { workflows: WorkflowItem[] }
       setWorkflows(data.workflows)
       setSelectedId(data.workflows[0]?.id ?? '')
-      setSaveMessage(copy.reset)
-      setTimeout(() => setSaveMessage(null), 3000)
+      addToast(copy.reset, { tone: 'success' })
     } catch (err) {
       setError((err as Error).message)
     } finally {
@@ -313,7 +310,6 @@ export function WorkflowManager({ initialWorkflows }: Props) {
       ],
     }
     updateSelectedWorkflow((tpl) => ({ ...tpl, layers: [...tpl.layers, newLayer] }))
-    setSaveMessage(null)
   }
 
   const removeLayer = (layerId: string) => {
@@ -418,52 +414,48 @@ export function WorkflowManager({ initialWorkflows }: Props) {
     [selected],
   )
 
+  const breadcrumbItems = useMemo(
+    () => [
+      { label: t.nav.home, href: '/' },
+      { label: t.nav.progress, href: '/progress' },
+      { label: copy.badge },
+    ],
+    [copy.badge, t.nav.home, t.nav.progress],
+  )
+
   return (
     <main className="min-h-screen bg-slate-950 text-slate-50">
       <div className="relative mx-auto max-w-6xl px-6 py-12">
         <div className="absolute inset-x-0 top-10 -z-10 h-48 bg-gradient-to-r from-emerald-400/20 via-blue-400/15 to-amber-300/20 blur-3xl" />
         <header className="flex flex-col gap-3">
-          <div className="flex flex-wrap items-center gap-3">
-            <Link
-              href="/progress"
-              className="rounded-full border border-white/10 px-3 py-1 text-xs text-slate-100 transition hover:border-white/40 hover:bg-white/5"
-            >
-              {t.detail.breadcrumbProgress}
-            </Link>
-            <span className="text-slate-500">/</span>
-            <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-emerald-100">
-              {copy.badge}
-            </span>
-          </div>
-            <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-              <div className="space-y-2">
-                <h1 className="text-3xl font-semibold tracking-tight text-white">{copy.title}</h1>
-                <p className="max-w-3xl text-sm text-slate-200/80">{copy.description}</p>
-                <p className="text-xs text-emerald-200/80">{copy.localHint}</p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={handleManualSave}
-                  disabled={saving}
-                  className={`inline-flex items-center gap-2 rounded-full border border-transparent px-4 py-2 text-xs font-semibold text-slate-950 shadow-lg shadow-emerald-400/30 transition ${
-                    saving
-                      ? 'bg-emerald-200/70 text-slate-800'
-                      : 'bg-emerald-300 hover:-translate-y-0.5 hover:bg-emerald-400'
-                  }`}
-                >
-                  {saving ? copy.saving : copy.actions.save}
-                </button>
-                <button
-                  type="button"
-                  onClick={handleReset}
-                  className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-semibold text-white transition hover:-translate-y-0.5 hover:border-white/40 hover:bg-white/10"
-                >
-                  {copy.actions.reset}
-                </button>
-              </div>
+          <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+            <div className="space-y-2">
+              <h1 className="text-3xl font-semibold tracking-tight text-white">{copy.title}</h1>
+              <p className="max-w-3xl text-sm text-slate-200/80">{copy.description}</p>
+              <Breadcrumbs items={breadcrumbItems} />
             </div>
-          {saveMessage ? <p className="text-sm text-emerald-200">{saveMessage}</p> : null}
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={handleManualSave}
+                disabled={saving}
+                className={`inline-flex items-center gap-2 rounded-full border border-transparent px-4 py-2 text-xs font-semibold text-slate-950 shadow-lg shadow-emerald-400/30 transition ${
+                  saving
+                    ? 'bg-emerald-200/70 text-slate-800'
+                    : 'bg-emerald-300 hover:-translate-y-0.5 hover:bg-emerald-400'
+                }`}
+              >
+                {saving ? copy.saving : copy.actions.save}
+              </button>
+              <button
+                type="button"
+                onClick={handleReset}
+                className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-semibold text-white transition hover:-translate-y-0.5 hover:border-white/40 hover:bg-white/10"
+              >
+                {copy.actions.reset}
+              </button>
+            </div>
+          </div>
           {error ? <p className="text-sm text-amber-200">{error}</p> : null}
         </header>
 
@@ -594,7 +586,7 @@ export function WorkflowManager({ initialWorkflows }: Props) {
                     {formatProgressCopy(copy.bindingChecks, { count: checkCount })}
                   </span>
                 </div>
-                <div className="flex flex-wrap gap-2 text-xs text-slate-200">
+                <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-200">
                   <button
                     type="button"
                     onClick={handleDeleteTemplate}
@@ -607,9 +599,6 @@ export function WorkflowManager({ initialWorkflows }: Props) {
                   >
                     {copy.actions.deleteTemplate}
                   </button>
-                </div>
-                <div className="grid gap-1 text-xs text-slate-200/80">
-                  <p>• {copy.templateNote}</p>
                 </div>
               </div>
             </div>

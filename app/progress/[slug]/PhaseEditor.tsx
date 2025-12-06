@@ -13,6 +13,7 @@ import {
 } from 'react'
 
 import { AlertDialog, type AlertTone } from '@/components/AlertDialog'
+import { useToast } from '@/components/ToastProvider'
 import type {
   IntervalSide,
   PhaseDTO,
@@ -639,7 +640,6 @@ export function PhaseEditor({
   const [intervals, setIntervals] = useState<PhaseIntervalPayload[]>([defaultInterval])
   const [definitionId, setDefinitionId] = useState<number | null>(() => phaseDefinitions[0]?.id ?? null)
   const [error, setError] = useState<string | null>(null)
-  const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const [editingId, setEditingId] = useState<number | null>(null)
   const [deletingId, setDeletingId] = useState<number | null>(null)
@@ -647,6 +647,7 @@ export function PhaseEditor({
   const [deleteTarget, setDeleteTarget] = useState<PhaseDTO | null>(null)
   const [deleteError, setDeleteError] = useState<string | null>(null)
   const nameInputRef = useRef<HTMLInputElement | null>(null)
+  const { addToast } = useToast()
 
   const designLength = useMemo(() => computeDesign(measure, intervals), [measure, intervals])
 
@@ -735,7 +736,6 @@ export function PhaseEditor({
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     setError(null)
-    setSuccessMessage(null)
     if (!canManage) return
     startTransition(async () => {
       const intervalInvalid = intervals.some((item) => {
@@ -831,10 +831,11 @@ export function PhaseEditor({
         editingId ? prev.map((item) => (item.id === editingId ? phase : item)) : [...prev, phase],
       )
       const localizedName = localizeProgressTerm('phase', phase.name, locale)
-      setSuccessMessage(
+      addToast(
         editingId
           ? formatProgressCopy(t.success.updated, { name: localizedName })
           : formatProgressCopy(t.success.created, { name: localizedName }),
+        { tone: 'success' },
       )
       setShowFormModal(false)
       resetForm()
@@ -990,7 +991,7 @@ export function PhaseEditor({
       raiseSubmitError(data.message ?? t.errors.submitFailed)
       return
     }
-    setSuccessMessage(t.inspection.submitSuccess)
+    addToast(t.inspection.submitSuccess, { tone: 'success' })
     await fetchLatestInspections()
     setSelectedSegment(null)
     resetInspectionForm()
@@ -1703,12 +1704,6 @@ export function PhaseEditor({
     }
   }, [fetchLatestInspections])
 
-  useEffect(() => {
-    if (!successMessage) return
-    const timer = setTimeout(() => setSuccessMessage(null), 3200)
-    return () => clearTimeout(timer)
-  }, [successMessage])
-
   return (
     <div className="space-y-8">
       <AlertDialog
@@ -1722,11 +1717,6 @@ export function PhaseEditor({
         onCancel={alertDialog?.onCancel}
         onClose={() => setAlertDialog(null)}
       />
-      {successMessage ? (
-        <div className="fixed bottom-6 right-6 z-40 max-w-sm rounded-2xl border border-emerald-200/60 bg-emerald-50/90 px-4 py-3 text-sm font-semibold text-emerald-900 shadow-xl shadow-emerald-400/30">
-          {successMessage}
-        </div>
-      ) : null}
       <section className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-3">
