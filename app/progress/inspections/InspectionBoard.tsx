@@ -211,6 +211,7 @@ export function InspectionBoard({ roads, loadError }: Props) {
       { key: 'createdAt', label: copy.columns.createdAt },
       { key: 'updatedBy', label: copy.columns.updatedBy },
       { key: 'updatedAt', label: copy.columns.updatedAt },
+      { key: 'action', label: copy.columns.actions },
     ],
     [copy.columns],
   )
@@ -387,7 +388,10 @@ export function InspectionBoard({ roads, loadError }: Props) {
       ) as ColumnKey[]
       const trimmed = stored.trim()
       if (filtered.length || trimmed === '[]') {
-        setVisibleColumns(filtered)
+        const ensured: ColumnKey[] = filtered.includes('action')
+          ? filtered
+          : [...filtered, 'action']
+        setVisibleColumns(ensured)
         return
       }
       setVisibleColumns(defaultVisibleColumns)
