@@ -187,6 +187,7 @@ model InspectionRequest {
   layers     String[]
   checks     String[]
   types      String[]
+  submissionOrder Int?
   remark     String?
   status     InspectionStatus @default(PENDING)
   appointmentDate DateTime?

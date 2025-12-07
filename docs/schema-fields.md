@@ -239,7 +239,8 @@
      5. `status`：枚举 `PENDING` / `SCHEDULED` / `SUBMITTED` / `IN_PROGRESS` / `APPROVED`。
      6. `updatedAt` / `updatedBy`：最近更新时间与更新人。
      7. `layers` / `checks` / `types`：数组字段，记录层次、验收内容、报检类型。
-     8. `remark`：多行备注。
+     8. `submissionOrder`：提交单编号，数字，可空。
+     9. `remark`：多行备注。
 
 ## 财务记账字段（FinanceEntry）
 

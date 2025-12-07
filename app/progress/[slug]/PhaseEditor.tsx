@@ -1591,6 +1591,9 @@ export function PhaseEditor({
     if (!selectedSegment || !intervalRange) {
       return { left: false, right: false, both: false, lockedSide: null as IntervalSide | null }
     }
+    if (selectedSegment.measure === 'LINEAR') {
+      return { left: false, right: false, both: false, lockedSide: null as IntervalSide | null }
+    }
     const [rangeStart, rangeEnd] = intervalRange
     const matchLeft = snapshotMatches(selectedSegment.phaseId, 'LEFT', rangeStart, rangeEnd)
     const matchRight = snapshotMatches(selectedSegment.phaseId, 'RIGHT', rangeStart, rangeEnd)

@@ -80,6 +80,7 @@ export interface InspectionListItem {
   layers: string[]
   checks: string[]
   types: string[]
+  submissionOrder?: number | null
   status: InspectionStatus
   remark?: string
   appointmentDate?: string
@@ -179,6 +180,8 @@ export interface InspectionPayload {
   layers: string[]
   checks: string[]
   types: string[]
+  status?: InspectionStatus
+  submissionOrder?: number | null
   remark?: string
   appointmentDate?: string
 }
@@ -187,6 +190,7 @@ export interface InspectionDTO extends InspectionPayload {
   id: number
   roadId: number
   status: InspectionStatus
+  submissionOrder?: number | null
   appointmentDate?: string
   submittedAt: string
   submittedBy?: { id: number; username: string } | null

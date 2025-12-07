@@ -34,6 +34,14 @@ export async function PUT(request: Request, { params }: RouteParams) {
   }
 
   try {
+    const submissionOrder =
+      payload.submissionOrder === null || payload.submissionOrder === undefined
+        ? undefined
+        : Number(payload.submissionOrder)
+    const status =
+      payload.status && ['PENDING', 'SCHEDULED', 'SUBMITTED', 'IN_PROGRESS', 'APPROVED'].includes(payload.status)
+        ? (payload.status as InspectionPayload['status'])
+        : undefined
     const inspection = await updateInspection(
       id,
       {
@@ -44,6 +52,8 @@ export async function PUT(request: Request, { params }: RouteParams) {
         layers: payload.layers ?? [],
         checks: payload.checks ?? [],
         types: payload.types ?? [],
+        status,
+        submissionOrder,
         remark: payload.remark,
         appointmentDate: payload.appointmentDate,
       },

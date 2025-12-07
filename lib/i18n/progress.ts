@@ -386,6 +386,7 @@ type InspectionBoardCopy = {
     layers: string
     checks: string
     types: string
+    submissionOrder: string
     status: string
     appointmentDate: string
     submittedAt: string
@@ -480,6 +481,10 @@ type InspectionBoardCopy = {
     typesLabel: string
     typesPlaceholder: string
     appointmentLabel: string
+    statusLabel: string
+    statusPlaceholder: string
+    submissionOrderLabel: string
+    submissionOrderPlaceholder: string
     remarkLabel: string
     remarkPlaceholder: string
     cancel: string
@@ -489,6 +494,7 @@ type InspectionBoardCopy = {
     missingPhase: string
     missingRequired: string
     appointmentMissing: string
+    invalidSubmissionOrder: string
     saveFailed: string
   }
   deleteModal: {
@@ -897,6 +903,7 @@ const progressCopy: Record<Locale, ProgressCopy> = {
         layers: '层次',
         checks: '验收内容',
         types: '验收类型',
+        submissionOrder: '提交单',
         status: '状态',
         appointmentDate: '预约报检时间',
         submittedAt: '提交时间',
@@ -1006,6 +1013,10 @@ const progressCopy: Record<Locale, ProgressCopy> = {
         typesLabel: '验收类型（逗号分隔）',
         typesPlaceholder: '如：试验验收',
         appointmentLabel: '预约日期',
+        statusLabel: '状态',
+        statusPlaceholder: '选择状态',
+        submissionOrderLabel: '提交单',
+        submissionOrderPlaceholder: '数字，可留空',
         remarkLabel: '备注',
         remarkPlaceholder: '补充说明',
         cancel: '取消',
@@ -1015,6 +1026,7 @@ const progressCopy: Record<Locale, ProgressCopy> = {
         missingPhase: '请选择分项',
         missingRequired: '层次、验收内容、验收类型均不能为空',
         appointmentMissing: '请选择预约报检日期',
+        invalidSubmissionOrder: '提交单需为数字（可留空）',
         saveFailed: '更新失败',
       },
       deleteModal: {
@@ -1428,6 +1440,7 @@ const progressCopy: Record<Locale, ProgressCopy> = {
         layers: 'Couches',
         checks: 'Contenus',
         types: 'Types',
+        submissionOrder: 'N° de soumission',
         status: 'Statut',
         appointmentDate: 'Rendez-vous',
         submittedAt: 'Soumis',
@@ -1537,6 +1550,10 @@ const progressCopy: Record<Locale, ProgressCopy> = {
         typesLabel: 'Types (séparés par des virgules)',
         typesPlaceholder: 'ex : Contrôle labo',
         appointmentLabel: 'Date de rendez-vous',
+        statusLabel: 'Statut',
+        statusPlaceholder: 'Choisir un statut',
+        submissionOrderLabel: 'N° de soumission',
+        submissionOrderPlaceholder: 'Nombre, optionnel',
         remarkLabel: 'Remarques',
         remarkPlaceholder: 'Compléments',
         cancel: 'Annuler',
@@ -1546,6 +1563,7 @@ const progressCopy: Record<Locale, ProgressCopy> = {
         missingPhase: 'Choisissez une phase',
         missingRequired: 'Couches, contenus et types ne peuvent pas être vides',
         appointmentMissing: 'Choisissez une date',
+        invalidSubmissionOrder: 'Le numéro de soumission doit être un nombre (ou laisser vide)',
         saveFailed: 'Échec de la mise à jour',
       },
       deleteModal: {

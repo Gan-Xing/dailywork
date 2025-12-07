@@ -49,6 +49,7 @@ type ColumnKey =
   | 'layers'
   | 'checks'
   | 'types'
+  | 'submissionOrder'
   | 'status'
   | 'appointmentDate'
   | 'submittedAt'
@@ -120,8 +121,10 @@ type EditFormState = {
   layers: string
   checks: string
   types: string
+  status: InspectionStatus | ''
   remark: string
   appointmentDate: string
+  submissionOrder: string
 }
 
 export function InspectionBoard({ roads, loadError }: Props) {
@@ -201,6 +204,7 @@ export function InspectionBoard({ roads, loadError }: Props) {
       { key: 'layers', label: copy.columns.layers },
       { key: 'checks', label: copy.columns.checks },
       { key: 'types', label: copy.columns.types },
+      { key: 'submissionOrder', label: copy.columns.submissionOrder },
       { key: 'status', label: copy.columns.status },
       { key: 'appointmentDate', label: copy.columns.appointmentDate },
       { key: 'submittedAt', label: copy.columns.submittedAt },
@@ -243,8 +247,10 @@ export function InspectionBoard({ roads, loadError }: Props) {
     layers: '',
     checks: '',
     types: '',
+    status: '',
     remark: '',
     appointmentDate: '',
+    submissionOrder: '',
   })
   const [editError, setEditError] = useState<string | null>(null)
   const [editPending, setEditPending] = useState(false)
@@ -561,8 +567,13 @@ export function InspectionBoard({ roads, loadError }: Props) {
       layers: editing.layers.join(joiner),
       checks: editing.checks.join(joiner),
       types: editing.types.join(joiner),
+      status: editing.status,
       remark: editing.remark ?? '',
       appointmentDate: formatDateInputValue(editing.appointmentDate),
+      submissionOrder:
+        editing.submissionOrder === null || editing.submissionOrder === undefined
+          ? ''
+          : String(editing.submissionOrder),
     })
     setEditError(null)
   }, [editing, locale])
@@ -571,6 +582,9 @@ export function InspectionBoard({ roads, loadError }: Props) {
     if (!editing) return
     const startPk = Number(editForm.startPk)
     const endPk = Number(editForm.endPk)
+    const submissionOrderText = editForm.submissionOrder.trim()
+    const submissionOrder = submissionOrderText === '' ? undefined : Number(submissionOrderText)
+    const nextStatus = (editForm.status || editing.status) as InspectionStatus
     if (!editForm.phaseId) {
       setEditError(copy.editModal.missingPhase)
       return
@@ -584,6 +598,10 @@ export function InspectionBoard({ roads, loadError }: Props) {
     const types = splitTokens(editForm.types)
     if (!layers.length || !checks.length || !types.length) {
       setEditError(copy.editModal.missingRequired)
+      return
+    }
+    if (submissionOrderText && !Number.isFinite(submissionOrder)) {
+      setEditError(copy.editModal.invalidSubmissionOrder)
       return
     }
     setEditPending(true)
@@ -601,6 +619,8 @@ export function InspectionBoard({ roads, loadError }: Props) {
           layers,
           checks,
           types,
+          status: nextStatus,
+          submissionOrder,
           remark: editForm.remark || undefined,
           appointmentDate: editForm.appointmentDate || undefined,
         }),
@@ -1084,6 +1104,9 @@ export function InspectionBoard({ roads, loadError }: Props) {
                       {copy.columns.types}
                     </th>
                   ) : null}
+                  {isVisible('submissionOrder') ? (
+                    <th className="px-4 py-3 whitespace-nowrap">{copy.columns.submissionOrder}</th>
+                  ) : null}
                   {isVisible('status') ? (
                     <th className="px-4 py-3 min-w-[120px]">
                       {copy.columns.status}
@@ -1221,6 +1244,13 @@ export function InspectionBoard({ roads, loadError }: Props) {
                           title={localizeProgressList('type', item.types, locale).join(' / ')}
                         >
                           {localizeProgressList('type', item.types, locale).join(' / ')}
+                        </td>
+                      ) : null}
+                      {isVisible('submissionOrder') ? (
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          {item.submissionOrder === null || item.submissionOrder === undefined
+                            ? '—'
+                            : item.submissionOrder}
                         </td>
                       ) : null}
                       {isVisible('status') ? (
@@ -1478,6 +1508,10 @@ export function InspectionBoard({ roads, loadError }: Props) {
               const submittedByText = selected.submittedBy?.username ?? copy.detailModal.unknownUser
               const createdByText = selected.createdBy?.username ?? copy.detailModal.unknownUser
               const updatedByText = selected.updatedBy?.username ?? copy.detailModal.unknownUser
+              const submissionOrderText =
+                selected.submissionOrder === null || selected.submissionOrder === undefined
+                  ? '—'
+                  : String(selected.submissionOrder)
               return (
             <div className="w-full max-w-3xl rounded-3xl border border-white/10 bg-slate-900/95 p-6 shadow-2xl shadow-slate-900/50 backdrop-blur">
               <div className="flex items-start justify-between gap-3">
@@ -1537,6 +1571,10 @@ export function InspectionBoard({ roads, loadError }: Props) {
                       {statusCopy[selected.status] ?? selected.status}
                     </span>
                   </p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-slate-400">{copy.columns.submissionOrder}</p>
+                  <p className="rounded-xl bg-white/5 px-3 py-2 text-sm">{submissionOrderText}</p>
                 </div>
                 <div className="space-y-1">
                   <p className="text-xs text-slate-400">{copy.detailModal.submittedAt}</p>
@@ -1711,6 +1749,31 @@ export function InspectionBoard({ roads, loadError }: Props) {
                       className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
                       value={editForm.appointmentDate}
                       onChange={(e) => setEditForm((prev) => ({ ...prev, appointmentDate: e.target.value }))}
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1">
+                    {copy.editModal.statusLabel}
+                    <select
+                      className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
+                      value={editForm.status}
+                      onChange={(e) => setEditForm((prev) => ({ ...prev, status: e.target.value as InspectionStatus }))}
+                    >
+                      <option value="">{copy.editModal.statusPlaceholder}</option>
+                      {statusOptions.map((item) => (
+                        <option key={item} value={item}>
+                          {statusCopy[item] ?? item}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="flex flex-col gap-1">
+                    {copy.editModal.submissionOrderLabel}
+                    <input
+                      type="number"
+                      className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
+                      value={editForm.submissionOrder}
+                      onChange={(e) => setEditForm((prev) => ({ ...prev, submissionOrder: e.target.value }))}
+                      placeholder={copy.editModal.submissionOrderPlaceholder}
                     />
                   </label>
                 </div>
