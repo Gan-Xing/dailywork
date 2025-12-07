@@ -41,7 +41,7 @@ interface Props {
   canViewInspection: boolean
 }
 
-type Status = 'pending' | 'inProgress' | 'approved' | 'nonDesign'
+type Status = 'pending' | 'scheduled' | 'submitted' | 'inProgress' | 'approved' | 'nonDesign'
 
 type InspectionSlice = {
   phaseId: number
@@ -144,7 +144,9 @@ type InspectionSubmitPayload = {
 }
 
 const statusTone: Record<Status, string> = {
-  pending: 'bg-gradient-to-r from-white via-slate-100 to-white text-slate-900 shadow-sm shadow-slate-900/10',
+  pending: 'bg-gradient-to-r from-white via-slate-100/70 to-white text-slate-900 shadow-sm shadow-slate-900/10',
+  scheduled: 'bg-gradient-to-r from-sky-400 via-sky-300 to-sky-400 text-slate-900 shadow-md shadow-sky-500/30',
+  submitted: 'bg-gradient-to-r from-fuchsia-400 via-purple-300 to-fuchsia-400 text-slate-900 shadow-md shadow-fuchsia-500/30',
   inProgress: 'bg-gradient-to-r from-amber-300 via-orange-200 to-amber-200 text-slate-900 shadow-md shadow-amber-400/30',
   approved: 'bg-gradient-to-r from-emerald-300 via-lime-200 to-emerald-200 text-slate-900 shadow-md shadow-emerald-400/30',
   nonDesign: 'bg-slate-800 text-slate-100 shadow-inner shadow-slate-900/30',
@@ -265,7 +267,9 @@ const statusPriority: Record<InspectionStatus, number> = {
 
 const mapInspectionStatus = (status: InspectionStatus): Status => {
   if (status === 'APPROVED') return 'approved'
-  if (status === 'IN_PROGRESS' || status === 'SUBMITTED') return 'inProgress'
+  if (status === 'IN_PROGRESS') return 'inProgress'
+  if (status === 'SUBMITTED') return 'submitted'
+  if (status === 'SCHEDULED') return 'scheduled'
   return 'pending'
 }
 
@@ -653,6 +657,10 @@ export function PhaseEditor({
     switch (status) {
       case 'pending':
         return t.status.pending
+      case 'scheduled':
+        return t.status.scheduled ?? t.status.pending
+      case 'submitted':
+        return t.status.submitted ?? t.status.inProgress
       case 'inProgress':
         return t.status.inProgress
       case 'approved':
@@ -701,6 +709,10 @@ export function PhaseEditor({
     return map
   }, [phases, workflowMap])
   const [inspectionSlices, setInspectionSlices] = useState<InspectionSlice[]>([])
+  const latestPointInspectionsRef = useRef<Map<string, LatestPointInspection>>(new Map())
+  const [latestPointInspections, setLatestPointInspections] = useState<Map<string, LatestPointInspection>>(
+    () => latestPointInspectionsRef.current,
+  )
   const [name, setName] = useState(() => phaseDefinitions[0]?.name ?? '')
   const [measure, setMeasure] = useState<PhaseMeasure>(() => phaseDefinitions[0]?.measure ?? 'LINEAR')
   const [pointHasSides, setPointHasSides] = useState(() => Boolean(phaseDefinitions[0]?.pointHasSides))
@@ -1011,19 +1023,144 @@ export function PhaseEditor({
     }
   }
 
+  const linearDependencyMap = useMemo(() => {
+    const map = new Map<string, string>()
+    map.set(normalizeLabel('土方'), normalizeLabel('垫层'))
+    return map
+  }, [])
+
+  const linearParallelNames = useMemo(() => new Set([normalizeLabel('土方')]), [])
+
+  const [linearSnapshotsByPhase, setLinearSnapshotsByPhase] = useState<
+    Map<number, LatestPointInspection[]>
+  >(new Map())
+
+  const findPhaseByNormalizedName = useCallback(
+    (target: string) =>
+      phases.find(
+        (item) =>
+          normalizeLabel(item.name) === target || normalizeLabel(item.definitionName) === target,
+      ) ?? null,
+    [phases],
+  )
+
+  const resolveFinalLayer = useCallback(
+    (phaseId: number) => {
+      const layers = workflowLayersByPhaseId.get(phaseId)?.layers ?? []
+      if (!layers.length) return null
+      return layers.reduce((acc, layer) => (layer.stage > acc.stage ? layer : acc), layers[0])
+    },
+    [workflowLayersByPhaseId],
+  )
+
+  const resolveLinearInspectionSlices = useCallback(
+    (phase: PhaseDTO): InspectionSlice[] => {
+      if (phase.measure !== 'LINEAR') {
+        return inspectionSlices.filter((insp) => insp.phaseId === phase.id)
+      }
+      const normalizedName = normalizeLabel(phase.name)
+      const dependsOnName = linearDependencyMap.get(normalizedName)
+      if (dependsOnName) {
+        const dependencyPhase = findPhaseByNormalizedName(dependsOnName)
+        if (!dependencyPhase) return []
+        return inspectionSlices
+          .filter(
+            (slice) =>
+              slice.phaseId === dependencyPhase.id &&
+              (statusPriority[slice.status] ?? 0) >= (statusPriority.SCHEDULED ?? 0),
+          )
+          .map((slice) => ({
+            ...slice,
+            phaseId: phase.id,
+            status: 'APPROVED' as InspectionStatus,
+          }))
+      }
+
+      const workflowLayers = workflowLayersByPhaseId.get(phase.id)?.layers ?? []
+      const hasMultipleLayers = workflowLayers.length > 1
+      const allowParallel = linearParallelNames.has(normalizedName)
+      if (hasMultipleLayers && !allowParallel) {
+        const finalLayer = resolveFinalLayer(phase.id)
+        if (!finalLayer) return []
+        const phaseNameForContext = workflowLayersByPhaseId.get(phase.id)?.phaseName ?? phase.name
+        const normalizedFinalNames = new Set(
+          [finalLayer.name, localizeProgressTerm('layer', finalLayer.name, 'zh', { phaseName: phaseNameForContext }), localizeProgressTerm('layer', finalLayer.name, 'fr', { phaseName: phaseNameForContext })]
+            .filter(Boolean)
+            .map((item) => normalizeLabel(item as string)),
+        )
+        const matchesFinalLayer = (snapshot: LatestPointInspection) => {
+          if (!snapshot.layers?.length) return false
+          return snapshot.layers.some((layerName) => {
+            const candidates = `${layerName}`
+              .split(/[\\/，,;]/)
+              .map((token) => token.trim())
+              .filter(Boolean)
+              .flatMap((token) => [
+                token,
+                localizeProgressTerm('layer', token, 'zh', { phaseName: phaseNameForContext }),
+                localizeProgressTerm('layer', token, 'fr', { phaseName: phaseNameForContext }),
+              ])
+              .filter(Boolean)
+              .map((token) => normalizeLabel(token))
+            return candidates.some((token) => normalizedFinalNames.has(token))
+          })
+        }
+        const snapshots = linearSnapshotsByPhase.get(phase.id) ?? []
+        const finalSnapshots = snapshots.filter(
+          (snapshot) =>
+            matchesFinalLayer(snapshot) &&
+            (statusPriority[snapshot.status] ?? 0) >= (statusPriority.SCHEDULED ?? 0),
+        )
+        if (!finalSnapshots.length) return []
+        return finalSnapshots.map((snapshot) => ({
+          phaseId: phase.id,
+          side: snapshot.side,
+          startPk: snapshot.startPk,
+          endPk: snapshot.endPk,
+          status: snapshot.status,
+          updatedAt: snapshot.updatedAt,
+        }))
+      }
+
+      return inspectionSlices.filter((insp) => insp.phaseId === phase.id)
+    },
+    [
+      findPhaseByNormalizedName,
+      inspectionSlices,
+      linearSnapshotsByPhase,
+      linearDependencyMap,
+      linearParallelNames,
+      resolveFinalLayer,
+      workflowLayersByPhaseId,
+    ],
+  )
+
   const linearViews = useMemo(() => {
     return phases
       .filter((phase) => phase.measure === 'LINEAR')
-      .map((phase) => ({
-        phase,
-        view: buildLinearView(
+      .map((phase) => {
+        const slices = resolveLinearInspectionSlices(phase)
+        const isDependencyDriven = linearDependencyMap.has(normalizeLabel(phase.name))
+        return {
           phase,
-          roadLength,
-          { left: sideLabelMap.LEFT, right: sideLabelMap.RIGHT },
-          inspectionSlices.filter((insp) => insp.phaseId === phase.id),
-        ),
-      }))
-  }, [phases, roadLength, sideLabelMap.LEFT, sideLabelMap.RIGHT, inspectionSlices])
+          isDependencyDriven,
+          view: buildLinearView(
+            phase,
+            roadLength,
+            { left: sideLabelMap.LEFT, right: sideLabelMap.RIGHT },
+            slices,
+          ),
+        }
+      })
+  }, [
+    linearDependencyMap,
+    linearSnapshotsByPhase,
+    phases,
+    resolveLinearInspectionSlices,
+    roadLength,
+    sideLabelMap.LEFT,
+    sideLabelMap.RIGHT,
+  ])
 
   const pointViews = useMemo(() => {
     return phases
@@ -1443,10 +1580,6 @@ export function PhaseEditor({
   const [alertDialog, setAlertDialog] = useState<AlertDialogState | null>(null)
   const [submitPending, setSubmitPending] = useState(false)
   const [manualCheckExclusions, setManualCheckExclusions] = useState<string[]>([])
-  const latestPointInspectionsRef = useRef<Map<string, LatestPointInspection>>(new Map())
-  const [latestPointInspections, setLatestPointInspections] = useState<Map<string, LatestPointInspection>>(
-    () => latestPointInspectionsRef.current,
-  )
   const intervalRange = useMemo(() => {
     const start = Number(startPkInput || selectedSegment?.start || 0)
     const end = Number(endPkInput || selectedSegment?.end || 0)
@@ -2331,6 +2464,7 @@ export function PhaseEditor({
         latestPointInspectionsRef.current = new Map()
         setInspectionSlices([])
         setLatestPointInspections(new Map())
+        setLinearSnapshotsByPhase(new Map())
         return
       }
       const isCancelled = options?.signalCancelled ?? (() => false)
@@ -2351,6 +2485,7 @@ export function PhaseEditor({
             latestPointInspectionsRef.current = new Map()
             setInspectionSlices([])
             setLatestPointInspections(new Map())
+            setLinearSnapshotsByPhase(new Map())
           }
           return
         }
@@ -2397,7 +2532,6 @@ export function PhaseEditor({
             const isCurrentHigher = currentPriority > existingPriority
             const isExistingHigher = currentPriority < existingPriority
             const isCurrentNewer = (snapshot.updatedAt ?? 0) >= (existing.updatedAt ?? 0)
-            // 选择最终状态
             const mergedStatus = isCurrentHigher
               ? snapshot.status
               : isExistingHigher
@@ -2406,7 +2540,6 @@ export function PhaseEditor({
                   ? snapshot.status
                   : existing.status
 
-            // 只有在使用该状态的来源时才合并层/检查，避免低优先级的层污染已审批记录
             let mergedLayers: string[] = []
             let mergedChecks: string[] = []
             if (mergedStatus === existing.status && mergedStatus !== snapshot.status) {
@@ -2440,15 +2573,33 @@ export function PhaseEditor({
           })
         })
         if (!isCancelled()) {
+          const linearRaw = new Map<number, LatestPointInspection[]>()
+          data.items.forEach((item) => {
+            const snapshot: LatestPointInspection = {
+              phaseId: Number(item.phaseId),
+              side: item.side ?? 'BOTH',
+              startPk: Number(item.startPk),
+              endPk: Number(item.endPk),
+              layers: item.layers || [],
+              checks: item.checks || [],
+              updatedAt: new Date(item.updatedAt).getTime() || 0,
+              status: item.status ?? 'PENDING',
+            }
+            const list = linearRaw.get(snapshot.phaseId) ?? []
+            list.push(snapshot)
+            linearRaw.set(snapshot.phaseId, list)
+          })
           latestPointInspectionsRef.current = map
           setLatestPointInspections(map)
           setInspectionSlices(slices)
+          setLinearSnapshotsByPhase(linearRaw)
         }
       } catch (err) {
         if (!isCancelled()) {
           latestPointInspectionsRef.current = new Map()
           setInspectionSlices([])
           setLatestPointInspections(new Map())
+          setLinearSnapshotsByPhase(new Map())
         }
         if (process.env.NODE_ENV !== 'production') {
           console.warn(t.alerts.fetchInspectionFailed, err)
@@ -2897,10 +3048,23 @@ export function PhaseEditor({
       ) : null}
 
       <section className="space-y-6 rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur">
-        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-200">
+        <div className="flex flex-wrap items-center gap-3 text-xs font-semibold uppercase tracking-[0.2em] text-slate-200">
           {t.list.legend}
           <span className="h-px w-12 bg-white/30" />
-          {t.list.legendNote}
+          <div className="flex flex-wrap items-center gap-3">
+            {[
+              { key: 'pending' as Status, tone: statusTone.pending, label: t.status.pending },
+              { key: 'scheduled' as Status, tone: statusTone.scheduled ?? t.status.pending, label: t.status.scheduled ?? t.status.pending },
+              { key: 'submitted' as Status, tone: statusTone.submitted, label: t.status.submitted ?? t.status.inProgress },
+              { key: 'inProgress' as Status, tone: statusTone.inProgress, label: t.status.inProgress },
+              { key: 'approved' as Status, tone: statusTone.approved, label: t.status.approved },
+            ].map((item) => (
+              <div key={item.key} className="flex items-center gap-1">
+                <span className={`inline-block h-4 w-4 rounded-sm ring-1 ring-white/20 ${item.tone}`} aria-label={item.label} />
+                <span className="text-[11px] font-semibold text-slate-100">{item.label}</span>
+              </div>
+            ))}
+          </div>
         </div>
 
         {phases.length === 0 ? (
@@ -2980,6 +3144,7 @@ export function PhaseEditor({
                                   .map((seg, idx) => {
                                     const base = Math.max(side.designTotal, 1)
                                     const width = (Math.max(0, seg.end - seg.start) / base) * 100
+                                    const isApprovedLock = seg.status === 'approved' && !(linear?.isDependencyDriven ?? false)
                                     return (
                                       <button
                                         key={`${seg.start}-${seg.end}-${idx}`}
@@ -2988,27 +3153,26 @@ export function PhaseEditor({
                                         style={{ width: `${width}%` }}
                                         title={`${side.label} ${formatPK(seg.start)} ~ ${formatPK(seg.end)} · ${statusLabel(seg.status)}`}
                                         onClick={() => {
-                                          if (seg.status === 'pending') {
-                                            if (!canInspect) {
-                                              alert(t.alerts.noInspectPermission)
-                                              return
-                                            }
-                                            const sideLabel = side.label
-                                            const sideValue = sideLabel === sideLabelMap.LEFT ? 'LEFT' : 'RIGHT'
-                                            openInspectionModal(phase, {
-                                              phase: phase.name,
-                                              phaseId: phase.id,
-                                              measure: phase.measure,
-                                              layers: phase.resolvedLayers,
-                                              checks: phase.resolvedChecks,
-                                              side: sideValue,
-                                              sideLabel,
-                                              start: seg.start,
-                                              end: seg.end,
-                                              spec: seg.spec ?? null,
-                                              billQuantity: seg.billQuantity ?? null,
-                                            })
+                                          if (isApprovedLock) return
+                                          if (!canInspect) {
+                                            alert(t.alerts.noInspectPermission)
+                                            return
                                           }
+                                          const sideLabel = side.label
+                                          const sideValue = sideLabel === sideLabelMap.LEFT ? 'LEFT' : 'RIGHT'
+                                          openInspectionModal(phase, {
+                                            phase: phase.name,
+                                            phaseId: phase.id,
+                                            measure: phase.measure,
+                                            layers: phase.resolvedLayers,
+                                            checks: phase.resolvedChecks,
+                                            side: sideValue,
+                                            sideLabel,
+                                            start: seg.start,
+                                            end: seg.end,
+                                            spec: seg.spec ?? null,
+                                            billQuantity: seg.billQuantity ?? null,
+                                          })
                                         }}
                                       >
                                         <span className="px-1 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100">

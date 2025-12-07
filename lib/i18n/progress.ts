@@ -265,6 +265,8 @@ type PhaseCopy = {
   }
   status: {
     pending: string
+    scheduled: string
+    submitted: string
     inProgress: string
     approved: string
     nonDesign: string
@@ -680,7 +682,9 @@ const progressCopy: Record<Locale, ProgressCopy> = {
         close: '关闭删除确认',
       },
       status: {
-        pending: '未验收',
+        pending: '待处理',
+        scheduled: '已预约',
+        submitted: '已报检',
         inProgress: '验收中',
         approved: '已验收',
         nonDesign: '非设计',
@@ -1206,7 +1210,9 @@ const progressCopy: Record<Locale, ProgressCopy> = {
         close: 'Fermer',
       },
       status: {
-        pending: 'À contrôler',
+        pending: 'En attente',
+        scheduled: 'Planifié',
+        submitted: 'Déposé',
         inProgress: 'En cours',
         approved: 'Validé',
         nonDesign: 'Hors design',
