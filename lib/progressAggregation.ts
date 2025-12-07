@@ -151,13 +151,14 @@ const distributeByDesign = (
 
 const createSpecEntries = (
   phase: RoadPhaseProgressDTO,
+  splitBySpec: boolean,
 ): { spec: string | null; designLength: number; completedLength: number }[] => {
   const defaultEntry = {
     spec: null,
     designLength: phase.designLength,
     completedLength: phase.completedLength,
   }
-  if (!SPEC_SPLIT_PHASES.has(phase.phaseName)) {
+  if (!splitBySpec || !SPEC_SPLIT_PHASES.has(phase.phaseName)) {
     return [defaultEntry]
   }
   const segments = buildSegments(phase)
@@ -220,19 +221,20 @@ interface AggregationRecord {
 
 export function aggregatePhaseProgress(
   roads: RoadSectionProgressDTO[],
-  options: { locale?: Locale } = {},
+  options: { locale?: Locale; splitBySpec?: boolean } = {},
 ): AggregatedPhaseProgress[] {
   const locale = options.locale ?? 'zh'
+  const splitBySpec = options.splitBySpec ?? true
   const map = new Map<string, AggregationRecord>()
 
   roads.forEach((road) => {
     road.phases.forEach((phase) => {
-      const specEntries = createSpecEntries(phase)
+      const specEntries = createSpecEntries(phase, splitBySpec)
       const updatedAtRaw = new Date(phase.updatedAt).getTime()
       const updatedAt = Number.isFinite(updatedAtRaw) ? updatedAtRaw : 0
 
       specEntries.forEach((entry) => {
-        const specKey = entry.spec ?? ''
+        const specKey = splitBySpec ? entry.spec ?? '' : ''
         const key = `${phase.phaseName}::${phase.phaseMeasure}::${specKey}`
         const existing = map.get(key)
         if (existing) {
@@ -247,7 +249,7 @@ export function aggregatePhaseProgress(
           name: phase.phaseName,
           measure: phase.phaseMeasure,
           definitionId: phase.phaseDefinitionId,
-          spec: entry.spec ?? null,
+          spec: splitBySpec ? entry.spec ?? null : null,
           totalDesignLength: entry.designLength,
           totalCompletedLength: entry.completedLength,
           latestUpdatedAt: updatedAt,

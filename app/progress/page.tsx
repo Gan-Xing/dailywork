@@ -29,7 +29,7 @@ export default async function ProgressPage() {
     loadError = (error as Error).message
   }
 
-  const aggregatedPhases = aggregatePhaseProgress(roads, { locale: 'zh' })
+  const aggregatedPhases = aggregatePhaseProgress(roads, { locale: 'zh', splitBySpec: false })
   const summaryRoads: RoadSectionProgressSummaryDTO[] = roads.map((road) => ({
     id: road.id,
     slug: road.slug,

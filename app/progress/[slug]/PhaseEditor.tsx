@@ -675,6 +675,7 @@ export function PhaseEditor({
   const [phases, setPhases] = useState<PhaseDTO[]>(() => initialPhases.map(normalizePhaseDTO))
   const [definitions, setDefinitions] = useState<PhaseDefinitionDTO[]>(phaseDefinitions)
   const [definitionId, setDefinitionId] = useState<number | null>(() => phaseDefinitions[0]?.id ?? null)
+  const [editingId, setEditingId] = useState<number | null>(null)
   const workflowMap = useMemo(() => {
     const map = new Map<number, WorkflowBinding>()
     workflows.forEach((item) => map.set(item.phaseDefinitionId, item))
@@ -703,10 +704,32 @@ export function PhaseEditor({
   const [name, setName] = useState(() => phaseDefinitions[0]?.name ?? '')
   const [measure, setMeasure] = useState<PhaseMeasure>(() => phaseDefinitions[0]?.measure ?? 'LINEAR')
   const [pointHasSides, setPointHasSides] = useState(() => Boolean(phaseDefinitions[0]?.pointHasSides))
+  const currentPhaseForForm = useMemo(
+    () => (editingId ? phases.find((item) => item.id === editingId) ?? null : null),
+    [editingId, phases],
+  )
+  const workflowLayersForForm = useMemo(() => {
+    if (currentPhaseForForm) {
+      return workflowLayersByPhaseId.get(currentPhaseForForm.id)?.layers?.map((layer) => layer.name) ?? []
+    }
+    const defId = definitionId ?? null
+    if (defId) {
+      const binding = workflows.find((wf) => wf.phaseDefinitionId === defId)
+      if (binding?.layers?.length) {
+        return binding.layers.map((layer) => layer.name)
+      }
+    }
+    return []
+  }, [currentPhaseForForm, definitionId, workflowLayersByPhaseId, workflows])
+
   const defaultLayers = useMemo(() => {
     const def = definitions.find((item) => item.id === definitionId) ?? definitions[0]
-    return def?.defaultLayers ?? []
-  }, [definitionId, definitions])
+    const definitionLayers = def?.defaultLayers ?? []
+    if (definitionLayers.length) return definitionLayers
+    if (currentPhaseForForm?.resolvedLayers?.length) return currentPhaseForForm.resolvedLayers
+    if (workflowLayersForForm.length) return workflowLayersForForm
+    return []
+  }, [currentPhaseForForm?.resolvedLayers, definitionId, definitions, workflowLayersForForm])
   const defaultInterval = useMemo<PhaseIntervalPayload>(
     () => ({ startPk: roadStart, endPk: roadEnd, side: 'BOTH', spec: '', layers: defaultLayers, billQuantity: null }),
     [defaultLayers, roadEnd, roadStart],
@@ -714,7 +737,6 @@ export function PhaseEditor({
   const [intervals, setIntervals] = useState<PhaseIntervalPayload[]>([defaultInterval])
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
-  const [editingId, setEditingId] = useState<number | null>(null)
   const [deletingId, setDeletingId] = useState<number | null>(null)
   const [showFormModal, setShowFormModal] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<PhaseDTO | null>(null)
@@ -747,11 +769,12 @@ export function PhaseEditor({
 
   const layerOptions = useMemo(() => {
     const set = new Set<string>(defaultLayers)
+    workflowLayersForForm.forEach((layer) => set.add(layer))
     intervals.forEach((interval) => {
       interval.layers?.forEach((layer) => set.add(layer))
     })
     return Array.from(set)
-  }, [defaultLayers, intervals])
+  }, [defaultLayers, intervals, workflowLayersForForm])
 
   const toggleIntervalLayer = (index: number, layerName: string) => {
     setIntervals((prev) =>
@@ -863,7 +886,16 @@ export function PhaseEditor({
               : Number(billQuantityInput)
           const layers =
             measure === 'POINT'
-              ? Array.from(new Set((item.layers ?? defaultLayers).filter(Boolean)))
+              ? Array.from(
+                new Set(
+                  (item.layers?.length
+                    ? item.layers
+                    : layerOptions.length
+                      ? layerOptions
+                      : defaultLayers
+                  ).filter(Boolean),
+                ),
+              )
               : []
           return {
             startPk,
@@ -2741,43 +2773,41 @@ export function PhaseEditor({
                         </label>
                         {measure === 'POINT' && layerOptions.length ? (
                           <div className="md:col-span-6">
-                            <p className="mb-2 text-center text-[11px] font-semibold text-slate-200">
-                              {'适用层次（可取消不做的层次）'}
-                            </p>
-                            <div className="flex flex-wrap justify-center gap-2">
-                              {layerOptions.map((layer) => {
-                                const selected = (item.layers ?? defaultLayers).some(
-                                  (name) => normalizeLabel(name) === normalizeLabel(layer),
-                                )
-                                return (
-                                  <button
-                                    key={`${index}-${layer}`}
-                                    type="button"
-                                    onClick={() => toggleIntervalLayer(index, layer)}
-                                    className={`rounded-full px-3 py-1 text-[11px] font-semibold transition ${
-                                      selected
-                                        ? 'bg-emerald-300 text-slate-900 shadow-lg shadow-emerald-400/30'
-                                        : 'bg-white/10 text-slate-200 hover:bg-white/20'
-                                    }`}
-                                  >
-                                    {layer}
-                                  </button>
-                                )
-                              })}
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="flex flex-wrap gap-2">
+                                {(layerOptions.length ? layerOptions : defaultLayers).map((layer) => {
+                                  const selected =
+                                    (item.layers?.length ? item.layers : defaultLayers).some(
+                                      (name) => normalizeLabel(name) === normalizeLabel(layer),
+                                    )
+                                  return (
+                                    <button
+                                      key={`${index}-${layer}`}
+                                      type="button"
+                                      onClick={() => toggleIntervalLayer(index, layer)}
+                                      className={`rounded-full px-3 py-1 text-[11px] font-semibold transition ${
+                                        selected
+                                          ? 'bg-emerald-300 text-slate-900 shadow-lg shadow-emerald-400/30'
+                                          : 'bg-white/10 text-slate-200 hover:bg-white/20'
+                                      }`}
+                                    >
+                                      {layer}
+                                    </button>
+                                  )
+                                })}
+                              </div>
+                              {intervals.length > 1 ? (
+                                <button
+                                  type="button"
+                                  className="rounded-xl border border-rose-200/60 px-3 py-2 text-xs font-semibold text-rose-100 transition hover:border-rose-200/60 hover:bg-rose-200/10"
+                                  onClick={() => removeInterval(index)}
+                                >
+                                  {t.form.intervalDelete}
+                                </button>
+                              ) : null}
                             </div>
                           </div>
                         ) : null}
-                        <div className="flex items-center justify-center">
-                          {intervals.length > 1 ? (
-                            <button
-                              type="button"
-                              className="rounded-xl border border-rose-200/60 px-3 py-2 text-xs font-semibold text-rose-100 transition hover:border-rose-200/60 hover:bg-rose-200/10"
-                              onClick={() => removeInterval(index)}
-                            >
-                              {t.form.intervalDelete}
-                            </button>
-                          ) : null}
-                        </div>
                       </div>
                     ))}
                   </div>

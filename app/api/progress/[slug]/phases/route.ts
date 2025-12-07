@@ -47,7 +47,14 @@ export async function POST(request: Request, { params }: RouteParams) {
     name?: string
     measure?: string
     pointHasSides?: boolean
-    intervals?: { startPk?: number; endPk?: number; side?: string; spec?: string; billQuantity?: number }[]
+    intervals?: {
+      startPk?: number
+      endPk?: number
+      side?: string
+      spec?: string
+      billQuantity?: number
+      layers?: string[]
+    }[]
     layerIds?: number[]
     checkIds?: number[]
     newLayers?: string[]
@@ -82,6 +89,7 @@ export async function POST(request: Request, { params }: RouteParams) {
               ? i.side
               : 'BOTH',
           spec: typeof i.spec === 'string' ? i.spec : undefined,
+          layers: Array.isArray(i.layers) ? i.layers.filter(Boolean) : undefined,
           billQuantity:
             i.billQuantity === null || i.billQuantity === undefined || !Number.isFinite(Number(i.billQuantity))
               ? undefined
