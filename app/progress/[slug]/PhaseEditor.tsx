@@ -12,6 +12,7 @@ import {
   useTransition,
 } from 'react'
 
+import { PointProgressWave } from './PointProgressWave'
 import { AlertDialog, type AlertTone } from '@/components/AlertDialog'
 import { useToast } from '@/components/ToastProvider'
 import type {
@@ -93,7 +94,14 @@ interface LinearView {
 interface PointView {
   min: number
   max: number
-  points: { startPk: number; endPk: number; side: IntervalSide; spec?: string | null; billQuantity?: number | null }[]
+  points: {
+    startPk: number
+    endPk: number
+    side: IntervalSide
+    spec?: string | null
+    billQuantity?: number | null
+    layers?: string[]
+  }[]
 }
 
 interface SelectedSegment {
@@ -164,6 +172,9 @@ const normalizePhaseDTO = (phase: PhaseDTO): PhaseDTO => ({
     endPk: Number(interval.endPk) || 0,
     side: interval.side,
     spec: interval.spec ?? null,
+    layers: Array.isArray((interval as { layers?: string[] }).layers)
+      ? ((interval as { layers?: string[] }).layers ?? []).filter(Boolean)
+      : [],
     billQuantity: interval.billQuantity ?? null,
   })),
 })
@@ -211,6 +222,9 @@ const normalizeInterval = (interval: PhaseIntervalPayload, measure: PhaseMeasure
     endPk: orderedEnd,
     side: interval.side,
     spec: typeof interval.spec === 'string' && interval.spec.trim() ? interval.spec.trim() : null,
+    layers: Array.isArray((interval as { layers?: string[] }).layers)
+      ? ((interval as { layers?: string[] }).layers ?? []).filter(Boolean)
+      : [],
     billQuantity:
       interval.billQuantity === null || interval.billQuantity === undefined
         ? null
@@ -475,7 +489,11 @@ interface PointLaneProps {
   showHeader?: boolean
   wrapperClassName?: string
   sideLabelMap: Record<IntervalSide, string>
-  resolvePointBadge: (phaseId: number, side: IntervalSide, startPk: number, endPk: number) => string
+  resolvePointProgress: (phaseId: number, side: IntervalSide, startPk: number, endPk: number) => {
+    percent: number
+    completedLayers: number
+    totalLayers: number
+  }
   onPointSelect: (segment: SelectedSegment) => void
 }
 
@@ -488,7 +506,7 @@ function PointLane({
   showHeader = false,
   wrapperClassName = 'space-y-2',
   sideLabelMap,
-  resolvePointBadge,
+  resolvePointProgress,
   onPointSelect,
 }: PointLaneProps) {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -520,7 +538,7 @@ function PointLane({
       phase: phase.name,
       phaseId: phase.id,
       measure: phase.measure,
-      layers: phase.resolvedLayers,
+      layers: item.layers && item.layers.length ? item.layers : phase.resolvedLayers,
       checks: phase.resolvedChecks,
       side: item.side,
       sideLabel,
@@ -563,6 +581,7 @@ function PointLane({
                     : item.side === 'RIGHT'
                       ? sideLabelMap.RIGHT
                       : sideLabelMap.BOTH
+                const progress = resolvePointProgress(phase.id, item.side, item.startPk, item.endPk)
                 return (
                   <button
                     key={`${item.startPk}-${item.endPk}-${idx}`}
@@ -571,8 +590,12 @@ function PointLane({
                     onClick={() => handlePointClick(item)}
                     title={`${rangeText} · ${sideLabelText}`}
                   >
-                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-950 text-xs font-semibold text-white shadow-lg shadow-emerald-400/25 ring-2 ring-white/20">
-                      {resolvePointBadge(phase.id, item.side, item.startPk, item.endPk)}
+                    <div className="flex h-14 w-14 items-center justify-center rounded-full bg-slate-950/80 p-1 shadow-lg shadow-emerald-400/25 ring-2 ring-white/20">
+                      <PointProgressWave
+                        percent={progress.percent}
+                        size={52}
+                        className="h-12 w-12"
+                      />
                     </div>
                     <div className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-semibold text-slate-200">
                       {formatPK(entry.centerPk)}
@@ -649,24 +672,46 @@ export function PhaseEditor({
     return Number.isFinite(end) ? end : roadStart
   }, [road.endPk, roadStart])
 
-  const defaultInterval = useMemo<PhaseIntervalPayload>(
-    () => ({ startPk: roadStart, endPk: roadEnd, side: 'BOTH', spec: '', billQuantity: null }),
-    [roadStart, roadEnd],
-  )
-
   const [phases, setPhases] = useState<PhaseDTO[]>(() => initialPhases.map(normalizePhaseDTO))
   const [definitions, setDefinitions] = useState<PhaseDefinitionDTO[]>(phaseDefinitions)
+  const [definitionId, setDefinitionId] = useState<number | null>(() => phaseDefinitions[0]?.id ?? null)
   const workflowMap = useMemo(() => {
     const map = new Map<number, WorkflowBinding>()
     workflows.forEach((item) => map.set(item.phaseDefinitionId, item))
     return map
   }, [workflows])
+  const workflowLayersByPhaseId = useMemo(() => {
+    const map = new Map<number, { layers: WorkflowLayerTemplate[]; phaseName: string }>()
+    phases.forEach((phase) => {
+      const binding = workflowMap.get(phase.definitionId)
+      if (binding?.layers?.length) {
+        map.set(phase.id, { layers: binding.layers, phaseName: binding.phaseName ?? phase.name })
+      } else if (phase.resolvedLayers?.length) {
+        const fallbackLayers: WorkflowLayerTemplate[] = phase.resolvedLayers.map((name, idx) => ({
+          id: `${phase.id}-layer-${idx + 1}`,
+          name,
+          stage: idx + 1,
+          dependencies: [],
+          checks: [],
+        }))
+        map.set(phase.id, { layers: fallbackLayers, phaseName: phase.name })
+      }
+    })
+    return map
+  }, [phases, workflowMap])
   const [inspectionSlices, setInspectionSlices] = useState<InspectionSlice[]>([])
   const [name, setName] = useState(() => phaseDefinitions[0]?.name ?? '')
   const [measure, setMeasure] = useState<PhaseMeasure>(() => phaseDefinitions[0]?.measure ?? 'LINEAR')
   const [pointHasSides, setPointHasSides] = useState(() => Boolean(phaseDefinitions[0]?.pointHasSides))
+  const defaultLayers = useMemo(() => {
+    const def = definitions.find((item) => item.id === definitionId) ?? definitions[0]
+    return def?.defaultLayers ?? []
+  }, [definitionId, definitions])
+  const defaultInterval = useMemo<PhaseIntervalPayload>(
+    () => ({ startPk: roadStart, endPk: roadEnd, side: 'BOTH', spec: '', layers: defaultLayers, billQuantity: null }),
+    [defaultLayers, roadEnd, roadStart],
+  )
   const [intervals, setIntervals] = useState<PhaseIntervalPayload[]>([defaultInterval])
-  const [definitionId, setDefinitionId] = useState<number | null>(() => phaseDefinitions[0]?.id ?? null)
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const [editingId, setEditingId] = useState<number | null>(null)
@@ -697,6 +742,28 @@ export function PhaseEditor({
   const updateInterval = (index: number, patch: Partial<PhaseIntervalPayload>) => {
     setIntervals((prev) =>
       prev.map((item, idx) => (idx === index ? { ...item, ...patch } : item)),
+    )
+  }
+
+  const layerOptions = useMemo(() => {
+    const set = new Set<string>(defaultLayers)
+    intervals.forEach((interval) => {
+      interval.layers?.forEach((layer) => set.add(layer))
+    })
+    return Array.from(set)
+  }, [defaultLayers, intervals])
+
+  const toggleIntervalLayer = (index: number, layerName: string) => {
+    setIntervals((prev) =>
+      prev.map((item, idx) => {
+        if (idx !== index) return item
+        const layers = Array.isArray(item.layers) ? [...item.layers] : []
+        const exists = layers.some((layer) => normalizeLabel(layer) === normalizeLabel(layerName))
+        const nextLayers = exists
+          ? layers.filter((layer) => normalizeLabel(layer) !== normalizeLabel(layerName))
+          : [...layers, layerName]
+        return { ...item, layers: nextLayers }
+      }),
     )
   }
 
@@ -749,6 +816,7 @@ export function PhaseEditor({
         endPk: i.endPk,
         side: i.side,
         spec: i.spec ?? '',
+        layers: Array.isArray(i.layers) ? i.layers : [],
         billQuantity: i.billQuantity ?? null,
       })),
     )
@@ -793,11 +861,16 @@ export function PhaseEditor({
             billQuantityInput === null || billQuantityInput === undefined
               ? null
               : Number(billQuantityInput)
+          const layers =
+            measure === 'POINT'
+              ? Array.from(new Set((item.layers ?? defaultLayers).filter(Boolean)))
+              : []
           return {
             startPk,
             endPk,
             side: item.side,
             spec: spec || undefined,
+            layers,
             billQuantity:
               numericBillQuantity === null || !Number.isFinite(numericBillQuantity)
                 ? undefined
@@ -1157,8 +1230,28 @@ export function PhaseEditor({
       if (workflowCheckOrderByLayerId && workflowCheckMetaByName) {
         const selectedChecksNormalized = new Set(selectedChecks.map((item) => normalizeLabel(item)))
         const missingChecks = new Set<string>()
+        const resolveCheckMeta = (check: string) => {
+          const normalizedCheck = normalizeLabel(check)
+          for (const layerName of selectedLayers) {
+            const layerMeta = workflowLayerByName?.get(normalizeLabel(layerName))
+            if (!layerMeta) continue
+            const idx = layerMeta.checks.findIndex((item) => {
+              const names = [
+                item.name,
+                localizeProgressTerm('check', item.name, locale),
+                localizeProgressTerm('check', item.name, 'zh'),
+                localizeProgressTerm('check', item.name, 'fr'),
+              ]
+              return names.some((name) => normalizeLabel(name) === normalizedCheck)
+            })
+            if (idx >= 0) {
+              return { layerId: layerMeta.id, order: idx }
+            }
+          }
+          return workflowCheckMetaByName.get(normalizedCheck) ?? null
+        }
         selectedChecks.forEach((check) => {
-          const meta = workflowCheckMetaByName.get(normalizeLabel(check))
+          const meta = resolveCheckMeta(check)
           if (!meta) return
           const orderedChecks = workflowCheckOrderByLayerId.get(meta.layerId) ?? []
           for (let idx = 0; idx < meta.order; idx += 1) {
@@ -1398,6 +1491,32 @@ export function PhaseEditor({
       .map((item) => item.trim())
       .filter(Boolean)
 
+  const normalizeLayerTokens = useCallback(
+    (value: string, phaseName: string) => {
+      const tokens = splitLayerTokens(value)
+      const candidates = tokens.flatMap((token) => [
+        token,
+        localizeProgressTerm('layer', token, 'zh', { phaseName }),
+        localizeProgressTerm('layer', token, 'fr', { phaseName }),
+      ])
+      return candidates
+        .filter(Boolean)
+        .map((item) => normalizeLabel(item))
+    },
+    [],
+  )
+
+  const normalizeCheckTokens = useCallback((value: string) => {
+    const candidates = [
+      value,
+      localizeProgressTerm('check', value, 'zh'),
+      localizeProgressTerm('check', value, 'fr'),
+    ]
+    return candidates
+      .filter(Boolean)
+      .map((item) => normalizeLabel(item))
+  }, [])
+
   const sortedPhases = useMemo(() => {
     if (!phases.length) return phases
     const order = new Map(phases.map((phase, index) => [phase.id, index]))
@@ -1414,16 +1533,123 @@ export function PhaseEditor({
     })
   }, [phases, latestInspectionByPhase])
 
-  const resolvePointBadge = (phaseId: number, side: IntervalSide, startPk: number, endPk: number) => {
-    const latest = latestPointInspections.get(buildPointKey(phaseId, side, startPk, endPk))
-    if (latest && latest.layers?.length) {
-      const phaseName = phases.find((item) => item.id === phaseId)?.name
-      const localized = localizeProgressList('layer', latest.layers, locale, { phaseName })
-      const joined = localized.slice(0, 2).join(' / ')
-      return joined || t.pointBadge.none
-    }
-    return t.pointBadge.none
-  }
+  const resolvePointSnapshots = useCallback(
+    (phaseId: number, side: IntervalSide, startPk: number, endPk: number) => {
+      const [normalizedStart, normalizedEnd] = normalizeRange(startPk, endPk)
+      const snapshots: LatestPointInspection[] = []
+      const exact = latestPointInspections.get(
+        buildPointKey(phaseId, side, normalizedStart, normalizedEnd),
+      )
+      if (exact) snapshots.push(exact)
+      if (side !== 'BOTH') {
+        const bothSide = latestPointInspections.get(
+          buildPointKey(phaseId, 'BOTH', normalizedStart, normalizedEnd),
+        )
+        if (bothSide) snapshots.push(bothSide)
+      }
+      return snapshots
+    },
+    [latestPointInspections],
+  )
+
+  const findIntervalLayers = useCallback(
+    (phaseId: number, side: IntervalSide, startPk: number, endPk: number) => {
+      const phase = phases.find((item) => item.id === phaseId)
+      if (!phase) return null
+      const match = phase.intervals.find(
+        (interval) =>
+          interval.startPk === startPk &&
+          interval.endPk === endPk &&
+          (interval.side === side || interval.side === 'BOTH'),
+      )
+      return Array.isArray(match?.layers) ? match?.layers ?? null : null
+    },
+    [phases],
+  )
+
+  const resolvePointProgress = useCallback(
+    (phaseId: number, side: IntervalSide, startPk: number, endPk: number) => {
+      const workflowLayers = workflowLayersByPhaseId.get(phaseId)
+      const phaseNameFallback = phases.find((item) => item.id === phaseId)?.name ?? ''
+      const phaseNameForContext = workflowLayers?.phaseName ?? phaseNameFallback
+      const overrideLayers = findIntervalLayers(phaseId, side, startPk, endPk)
+      const baseLayers = workflowLayers?.layers ?? []
+      const layerMapByName = new Map<string, WorkflowLayerTemplate>()
+      baseLayers.forEach((layer) => {
+        normalizeLayerTokens(layer.name, phaseNameForContext).forEach((token) => {
+          if (!layerMapByName.has(token)) {
+            layerMapByName.set(token, layer)
+          }
+        })
+      })
+      const targetLayerNames =
+        overrideLayers && overrideLayers.length ? overrideLayers : baseLayers.map((layer) => layer.name)
+      const effectiveLayers =
+        targetLayerNames.length > 0
+          ? targetLayerNames.map((name, idx) => {
+            const tokens = normalizeLayerTokens(name, phaseNameForContext)
+            const matched = tokens.map((token) => layerMapByName.get(token)).find(Boolean)
+            if (matched) return matched
+            return {
+              id: `custom-${phaseId}-${idx}-${normalizeLabel(name)}`,
+              name,
+              stage: idx + 1,
+              dependencies: [],
+              checks: [],
+            } as WorkflowLayerTemplate
+          })
+          : baseLayers
+      const totalLayers = effectiveLayers.length
+      if (!totalLayers) {
+        return { percent: 0, completedLayers: 0, totalLayers: 0 }
+      }
+
+      const snapshots = resolvePointSnapshots(phaseId, side, startPk, endPk)
+      if (!snapshots.length) {
+        return { percent: 0, completedLayers: 0, totalLayers }
+      }
+      let completedLayers = 0
+
+      effectiveLayers.forEach((layer) => {
+        const normalizedLayerNames = new Set(normalizeLayerTokens(layer.name, phaseNameForContext))
+        if (!normalizedLayerNames.size) return
+        const approvedSnapshots = snapshots.filter((snapshot) => snapshot.status === 'APPROVED')
+        if (!approvedSnapshots.length) return
+
+        const layerSnapshots = approvedSnapshots.filter((snapshot) =>
+          (snapshot.layers ?? []).some((layerName) => {
+            const normalizedSnapshotLayer = normalizeLayerTokens(layerName, phaseNameForContext)
+            return normalizedSnapshotLayer.some((token) => normalizedLayerNames.has(token))
+          }),
+        )
+        const requiredChecks = new Set(
+          (layer.checks ?? []).flatMap((check) => normalizeCheckTokens(check.name)),
+        )
+        if (!layerSnapshots.length && !requiredChecks.size) return
+
+        const completedChecks = new Set<string>()
+        layerSnapshots.forEach((snapshot) => {
+          snapshot.checks?.forEach((checkName) => {
+            normalizeCheckTokens(checkName).forEach((token) => completedChecks.add(token))
+          })
+        })
+        if (!requiredChecks.size && layerSnapshots.length) {
+          completedLayers += 1
+          return
+        }
+        const allChecksDone =
+          requiredChecks.size > 0 &&
+          Array.from(requiredChecks).every((token) => completedChecks.has(token))
+        if (allChecksDone) {
+          completedLayers += 1
+        }
+      })
+
+      const percent = totalLayers > 0 ? (completedLayers / totalLayers) * 100 : 0
+      return { percent, completedLayers, totalLayers }
+    },
+    [findIntervalLayers, normalizeCheckTokens, normalizeLayerTokens, phases, resolvePointSnapshots, workflowLayersByPhaseId],
+  )
 
   const workflowLayerById = useMemo(() => {
     if (!selectedSegment?.workflowLayers?.length) return null
@@ -2134,14 +2360,41 @@ export function PhaseEditor({
           if (!existing) {
             map.set(key, snapshot)
           } else {
-            const mergedLayers = Array.from(new Set([...(existing.layers || []), ...(snapshot.layers || [])]))
-            const mergedChecks = Array.from(new Set([...(existing.checks || []), ...(snapshot.checks || [])]))
+            const existingPriority = statusPriority[existing.status] ?? 0
+            const currentPriority = statusPriority[snapshot.status] ?? 0
+            const isCurrentHigher = currentPriority > existingPriority
+            const isExistingHigher = currentPriority < existingPriority
+            const isCurrentNewer = (snapshot.updatedAt ?? 0) >= (existing.updatedAt ?? 0)
+            // 选择最终状态
+            const mergedStatus = isCurrentHigher
+              ? snapshot.status
+              : isExistingHigher
+                ? existing.status
+                : isCurrentNewer
+                  ? snapshot.status
+                  : existing.status
+
+            // 只有在使用该状态的来源时才合并层/检查，避免低优先级的层污染已审批记录
+            let mergedLayers: string[] = []
+            let mergedChecks: string[] = []
+            if (mergedStatus === existing.status && mergedStatus !== snapshot.status) {
+              mergedLayers = existing.layers || []
+              mergedChecks = existing.checks || []
+            } else if (mergedStatus === snapshot.status && mergedStatus !== existing.status) {
+              mergedLayers = snapshot.layers || []
+              mergedChecks = snapshot.checks || []
+            } else {
+              mergedLayers = Array.from(new Set([...(existing.layers || []), ...(snapshot.layers || [])]))
+              mergedChecks = Array.from(new Set([...(existing.checks || []), ...(snapshot.checks || [])]))
+            }
+
+            const mergedUpdatedAt = Math.max(existing.updatedAt ?? 0, snapshot.updatedAt ?? 0)
             const merged: LatestPointInspection = {
               ...snapshot,
               layers: mergedLayers,
               checks: mergedChecks,
-              updatedAt: Math.max(existing.updatedAt ?? 0, snapshot.updatedAt ?? 0),
-              status: existing.updatedAt >= snapshot.updatedAt ? existing.status : snapshot.status,
+              updatedAt: mergedUpdatedAt,
+              status: mergedStatus,
             }
             map.set(key, merged)
           }
@@ -2486,6 +2739,34 @@ export function PhaseEditor({
                             }
                           />
                         </label>
+                        {measure === 'POINT' && layerOptions.length ? (
+                          <div className="md:col-span-6">
+                            <p className="mb-2 text-center text-[11px] font-semibold text-slate-200">
+                              {'适用层次（可取消不做的层次）'}
+                            </p>
+                            <div className="flex flex-wrap justify-center gap-2">
+                              {layerOptions.map((layer) => {
+                                const selected = (item.layers ?? defaultLayers).some(
+                                  (name) => normalizeLabel(name) === normalizeLabel(layer),
+                                )
+                                return (
+                                  <button
+                                    key={`${index}-${layer}`}
+                                    type="button"
+                                    onClick={() => toggleIntervalLayer(index, layer)}
+                                    className={`rounded-full px-3 py-1 text-[11px] font-semibold transition ${
+                                      selected
+                                        ? 'bg-emerald-300 text-slate-900 shadow-lg shadow-emerald-400/30'
+                                        : 'bg-white/10 text-slate-200 hover:bg-white/20'
+                                    }`}
+                                  >
+                                    {layer}
+                                  </button>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        ) : null}
                         <div className="flex items-center justify-center">
                           {intervals.length > 1 ? (
                             <button
@@ -2734,7 +3015,7 @@ export function PhaseEditor({
                                 rangeLabel={pointRangeLabel}
                                 containerClassName="relative h-24 rounded-2xl border border-white/10 bg-slate-900/60 px-4 py-5 shadow-inner shadow-slate-900/40"
                                 sideLabelMap={sideLabelMap}
-                                resolvePointBadge={resolvePointBadge}
+                                resolvePointProgress={resolvePointProgress}
                                 onPointSelect={handlePointSelect}
                               />
                             )
@@ -2747,7 +3028,7 @@ export function PhaseEditor({
                           rangeLabel={pointRangeLabel}
                           containerClassName="relative mt-2 h-28 rounded-2xl border border-white/10 bg-slate-900/60 px-4 py-5 shadow-inner shadow-slate-900/40"
                           sideLabelMap={sideLabelMap}
-                          resolvePointBadge={resolvePointBadge}
+                          resolvePointProgress={resolvePointProgress}
                           onPointSelect={handlePointSelect}
                         />
                       )}

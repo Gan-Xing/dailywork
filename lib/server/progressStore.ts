@@ -23,12 +23,14 @@ const normalizeInterval = (interval: PhasePayload['intervals'][number], measure:
   const side = interval.side ?? 'BOTH'
   const normalizedSide =
     side === 'LEFT' || side === 'RIGHT' || side === 'BOTH' ? side : 'BOTH'
+  const layers = normalizeCommonList((interval as { layers?: string[] }).layers)
 
   return {
     startPk: ordered[0],
     endPk: ordered[1],
     side: normalizedSide as IntervalSide,
     spec: spec || null,
+    layers,
     billQuantity:
       rawBillQuantity === null || !Number.isFinite(rawBillQuantity) ? null : rawBillQuantity,
   }
@@ -125,6 +127,7 @@ const mapPhaseToDTO = (
       endPk: i.endPk,
       side: i.side,
       spec: i.spec,
+      layers: (i as { layers?: string[] }).layers ?? [],
       billQuantity: i.billQuantity,
     })),
     createdAt: phase.createdAt.toISOString(),
@@ -334,6 +337,7 @@ export const createPhase = async (roadId: number, payload: PhasePayload) => {
               endPk: item.endPk,
               side: item.side,
               spec: item.spec || undefined,
+              layers: item.layers,
               billQuantity: item.billQuantity ?? undefined,
             })),
           },
@@ -440,6 +444,7 @@ export const updatePhase = async (roadId: number, phaseId: number, payload: Phas
           endPk: item.endPk,
           side: item.side,
           spec: item.spec || undefined,
+          layers: item.layers,
           billQuantity: item.billQuantity ?? undefined,
         })),
       })

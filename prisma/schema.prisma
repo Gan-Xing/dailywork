@@ -169,6 +169,7 @@ model PhaseInterval {
   endPk     Float
   side      IntervalSide
   spec      String?
+  layers    String[]      @default([])
   billQuantity Float?
   createdAt DateTime      @default(now())
   updatedAt DateTime      @updatedAt

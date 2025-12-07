@@ -106,6 +106,7 @@ export interface PhaseIntervalPayload {
   endPk: number
   side: IntervalSide
   spec?: string | null
+  layers?: string[]
   billQuantity?: number | null
 }
 
@@ -114,6 +115,7 @@ export interface PhaseIntervalProgress {
   endPk: number
   side: IntervalSide
   spec: string | null
+  layers?: string[]
 }
 
 export interface PhasePayload {

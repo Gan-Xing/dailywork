@@ -10,6 +10,7 @@
     "test:deepseek": "tsx tests/deepseekSmoke.ts"
   },
   "dependencies": {
+    "@antv/g2plot": "^2.4.35",
     "next": "13.5.4",
     "react": "^18",
     "react-dom": "^18",
