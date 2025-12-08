@@ -67,7 +67,7 @@ export async function POST(request: Request) {
       const filename = `inspection-export-${new Date().toISOString().slice(0, 10)}.pdf`
       const disposition = mode === 'preview' ? 'inline' : 'attachment'
 
-      return new NextResponse(pdf, {
+      return new NextResponse(pdf as unknown as BodyInit, {
         status: 200,
         headers: {
           'Content-Type': 'application/pdf',
