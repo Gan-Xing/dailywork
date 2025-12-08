@@ -281,7 +281,8 @@ const snapshotMatches =
       if (snapshot.phaseId !== phaseId) return false
       const [snapshotStart, snapshotEnd] = normalizeRange(snapshot.startPk, snapshot.endPk)
       const [targetStartOrdered, targetEndOrdered] = normalizeRange(targetStart, targetEnd)
-      if (snapshotStart > targetStartOrdered || snapshotEnd < targetEndOrdered) return false
+      // 只要与目标区间有重叠即可视为覆盖，支持分段预约累计满足前置
+      if (snapshotEnd < targetStartOrdered || snapshotStart > targetEndOrdered) return false
       if (targetSide === 'BOTH') {
         // BOTH 仅由 BOTH 快照满足；左右分别匹配在后续单侧汇总里处理
         return snapshot.side === 'BOTH'
