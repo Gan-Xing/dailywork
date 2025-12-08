@@ -2397,7 +2397,9 @@ export function PhaseEditor({
       setSelectedSide(selectedSegment.side)
       setStartPkInput(String(selectedSegment.start ?? ''))
       setEndPkInput(String(selectedSegment.end ?? ''))
-      setAppointmentDateInput(todayISODate())
+      const tomorrow = new Date()
+      tomorrow.setDate(tomorrow.getDate() + 1)
+      setAppointmentDateInput(tomorrow.toISOString().slice(0, 10))
       setManualCheckExclusions([])
     }
   }, [selectedSegment])
@@ -2927,39 +2929,39 @@ export function PhaseEditor({
                         </label>
                         {measure === 'POINT' && layerOptions.length ? (
                           <div className="md:col-span-6">
-                            <div className="flex items-center justify-between gap-3">
-                              <div className="flex flex-wrap gap-2">
-                                {(layerOptions.length ? layerOptions : defaultLayers).map((layer) => {
-                                  const selected =
-                                    (item.layers?.length ? item.layers : defaultLayers).some(
-                                      (name) => normalizeLabel(name) === normalizeLabel(layer),
-                                    )
-                                  return (
-                                    <button
-                                      key={`${index}-${layer}`}
-                                      type="button"
-                                      onClick={() => toggleIntervalLayer(index, layer)}
-                                      className={`rounded-full px-3 py-1 text-[11px] font-semibold transition ${
-                                        selected
-                                          ? 'bg-emerald-300 text-slate-900 shadow-lg shadow-emerald-400/30'
-                                          : 'bg-white/10 text-slate-200 hover:bg-white/20'
-                                      }`}
-                                    >
-                                      {layer}
-                                    </button>
+                            <div className="flex flex-wrap gap-2">
+                              {(layerOptions.length ? layerOptions : defaultLayers).map((layer) => {
+                                const selected =
+                                  (item.layers?.length ? item.layers : defaultLayers).some(
+                                    (name) => normalizeLabel(name) === normalizeLabel(layer),
                                   )
-                                })}
-                              </div>
-                              {intervals.length > 1 ? (
-                                <button
-                                  type="button"
-                                  className="rounded-xl border border-rose-200/60 px-3 py-2 text-xs font-semibold text-rose-100 transition hover:border-rose-200/60 hover:bg-rose-200/10"
-                                  onClick={() => removeInterval(index)}
-                                >
-                                  {t.form.intervalDelete}
-                                </button>
-                              ) : null}
+                                return (
+                                  <button
+                                    key={`${index}-${layer}`}
+                                    type="button"
+                                    onClick={() => toggleIntervalLayer(index, layer)}
+                                    className={`rounded-full px-3 py-1 text-[11px] font-semibold transition ${
+                                      selected
+                                        ? 'bg-emerald-300 text-slate-900 shadow-lg shadow-emerald-400/30'
+                                        : 'bg-white/10 text-slate-200 hover:bg-white/20'
+                                    }`}
+                                  >
+                                    {layer}
+                                  </button>
+                                )
+                              })}
                             </div>
+                          </div>
+                        ) : null}
+                        {intervals.length > 1 ? (
+                          <div className="md:col-span-6 flex justify-end">
+                            <button
+                              type="button"
+                              className="rounded-xl border border-rose-200/60 px-3 py-2 text-xs font-semibold text-rose-100 transition hover:border-rose-200/60 hover:bg-rose-200/10"
+                              onClick={() => removeInterval(index)}
+                            >
+                              {t.form.intervalDelete}
+                            </button>
                           </div>
                         ) : null}
                       </div>
