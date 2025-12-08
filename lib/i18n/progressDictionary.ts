@@ -10,6 +10,7 @@ const normalize = (value: string) => value.trim().toLowerCase()
 const dictionaries: Record<DictionaryKind, Record<string, Entry>> = {
   phase: {
     [normalize('边沟')]: { zh: '边沟', fr: 'Caniveau' },
+    [normalize('现浇边沟')]: { zh: '现浇边沟', fr: 'Caniveau coulé en place' },
     [normalize('路缘石')]: { zh: '路缘石', fr: 'Bordure' },
     [normalize('圆管涵')]: { zh: '圆管涵', fr: 'Buse circulaire' },
     [normalize('涵洞')]: { zh: '涵洞', fr: 'Dalot' },
@@ -32,6 +33,7 @@ const dictionaries: Record<DictionaryKind, Record<string, Entry>> = {
   },
   layer: {
     [normalize('预制边沟')]: { zh: '预制边沟', fr: 'Caniveau préfabriqué' },
+    [normalize('现浇边沟')]: { zh: '现浇边沟', fr: 'Caniveau coulé en place' },
     [normalize('预制路缘石')]: { zh: '预制路缘石', fr: 'Bordure préfabriquée' },
     [normalize('路缘石')]: { zh: '路缘石', fr: 'Bordure' },
     [normalize('预制圆管涵')]: { zh: '预制圆管涵', fr: 'Buse préfabriquée' },
