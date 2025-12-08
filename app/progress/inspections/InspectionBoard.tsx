@@ -575,14 +575,21 @@ export function InspectionBoard({ roads, loadError }: Props) {
     if (!editing) return
     const joiner = locale === 'fr' ? ', ' : '，'
     const nowIso = new Date().toISOString()
+    const localizedLayers = localizeProgressList('layer', editing.layers, locale, {
+      phaseName: editing.phaseName,
+    }).join(joiner)
+    const localizedChecks = localizeProgressList('check', editing.checks, locale, {
+      phaseName: editing.phaseName,
+    }).join(joiner)
+    const localizedTypes = localizeProgressList('type', editing.types, locale).join(joiner)
     setEditForm({
       phaseId: editing.phaseId,
       side: editing.side,
       startPk: String(editing.startPk),
       endPk: String(editing.endPk),
-      layers: editing.layers.join(joiner),
-      checks: editing.checks.join(joiner),
-      types: editing.types.join(joiner),
+      layers: localizedLayers,
+      checks: localizedChecks,
+      types: localizedTypes,
       status: editing.status,
       remark: editing.remark ?? '',
       appointmentDate: formatDateInputValue(editing.appointmentDate),
