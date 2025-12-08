@@ -1,0 +1,9 @@
+{
+  "functions": {
+    "api/inspections/pdf.ts": {
+      "runtime": "nodejs18.x",
+      "maxDuration": 60,
+      "includeFiles": "node_modules/@sparticuz/chromium/**/*"
+    }
+  }
+}

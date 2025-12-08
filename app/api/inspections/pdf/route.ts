@@ -46,6 +46,8 @@ export async function POST(request: Request) {
     const html = renderInspectionReportHtml(inspections, { locale })
     const { default: chromium } = await import('@sparticuz/chromium')
     const { default: puppeteer } = await import('puppeteer-core')
+    chromium.setHeadlessMode = true
+    chromium.setGraphicsMode = false
     const executablePath = process.env.CHROMIUM_EXECUTABLE_PATH ?? (await chromium.executablePath())
 
     const browser = await puppeteer.launch({
