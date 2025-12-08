@@ -1,3 +1,10 @@
 {
-  "version": 2
+  "version": 2,
+  "functions": {
+    "app/api/inspections/pdf/route.ts": {
+      "runtime": "nodejs18.x",
+      "maxDuration": 60,
+      "includeFiles": "node_modules/@sparticuz/chromium/**/*"
+    }
+  }
 }

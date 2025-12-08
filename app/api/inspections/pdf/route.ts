@@ -51,7 +51,16 @@ export async function POST(request: Request) {
     const executablePath = process.env.CHROMIUM_EXECUTABLE_PATH ?? (await chromium.executablePath())
 
     const browser = await puppeteer.launch({
-      args: chromium.args,
+      args: [
+        ...chromium.args,
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-accelerated-2d-canvas',
+        '--disable-gpu',
+        '--disable-extensions',
+        '--disable-software-rasterizer',
+      ],
       defaultViewport: chromium.defaultViewport,
       executablePath,
       headless: chromium.headless,
