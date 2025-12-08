@@ -95,7 +95,7 @@ const dictionaries: Record<DictionaryKind, Record<string, Entry>> = {
     [normalize('Deflextion')]: { zh: '弯沉验收', fr: 'Déflexion' },
     [normalize('Nivelement')]: { zh: '标高验收', fr: 'Nivellement' },
     [normalize('埋墙粉刷验收')]: { zh: '埋墙粉刷验收', fr: 'Badigeonnage' },
-    [normalize('badigeonnage')]: { zh: '埋墙粉刷验收', fr: 'Badigeonnage' },
+    [normalize('badigeonnage')]: { zh: '埋墙粉刷', fr: 'Badigeonnage' },
     [normalize('badigeonnage des murs enterrés')]: { zh: '埋墙粉刷', fr: 'Badigeonnage des murs enterrés' },
     [normalize('埋墙粉刷')]: { zh: '埋墙粉刷', fr: 'Badigeonnage des murs enterrés' },
   },
