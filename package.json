@@ -11,7 +11,9 @@
   },
   "dependencies": {
     "@antv/g2plot": "^2.4.35",
+    "@sparticuz/chromium": "^123.0.1",
     "next": "13.5.4",
+    "puppeteer-core": "^23.10.4",
     "react": "^18",
     "react-dom": "^18",
     "server-only": "^0.0.1"

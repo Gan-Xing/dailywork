@@ -405,6 +405,13 @@ type InspectionBoardCopy = {
     restore: string
     clear: string
   }
+  pdf: {
+    export: string
+    preview: string
+    exporting: string
+    previewing: string
+    failed: string
+  }
   bulk: {
     selectedCount: string
     statusPlaceholder: string
@@ -481,6 +488,7 @@ type InspectionBoardCopy = {
     typesLabel: string
     typesPlaceholder: string
     appointmentLabel: string
+    submittedAtLabel: string
     statusLabel: string
     statusPlaceholder: string
     submissionOrderLabel: string
@@ -512,6 +520,7 @@ type InspectionBoardCopy = {
     updateFailed: string
     deleteFailed: string
     bulkFailed: string
+    exportFailed: string
   }
 }
 
@@ -922,6 +931,13 @@ const progressCopy: Record<Locale, ProgressCopy> = {
         restore: '恢复默认',
         clear: '清空',
       },
+      pdf: {
+        export: '导出 PDF',
+        preview: '预览 PDF',
+        exporting: '生成 PDF 中...',
+        previewing: '生成预览中...',
+        failed: '导出失败，请稍后重试',
+      },
       bulk: {
         selectedCount: '已选 {count} 条',
         statusPlaceholder: '选择要更新的状态',
@@ -1013,6 +1029,7 @@ const progressCopy: Record<Locale, ProgressCopy> = {
         typesLabel: '验收类型（逗号分隔）',
         typesPlaceholder: '如：试验验收',
         appointmentLabel: '预约日期',
+        submittedAtLabel: '提交日期',
         statusLabel: '状态',
         statusPlaceholder: '选择状态',
         submissionOrderLabel: '提交单',
@@ -1044,6 +1061,7 @@ const progressCopy: Record<Locale, ProgressCopy> = {
         updateFailed: '更新失败',
         deleteFailed: '删除失败',
         bulkFailed: '批量更新失败',
+        exportFailed: '导出失败，请稍后重试',
       },
     },
   },
@@ -1459,6 +1477,13 @@ const progressCopy: Record<Locale, ProgressCopy> = {
         restore: 'Défaut',
         clear: 'Vider',
       },
+      pdf: {
+        export: 'Exporter en PDF',
+        preview: 'Prévisualiser',
+        exporting: 'Génération du PDF...',
+        previewing: 'Prévisualisation...',
+        failed: "Échec de l'export, réessayez.",
+      },
       bulk: {
         selectedCount: '{count} sélection',
         statusPlaceholder: 'Choisir un statut',
@@ -1550,6 +1575,7 @@ const progressCopy: Record<Locale, ProgressCopy> = {
         typesLabel: 'Types (séparés par des virgules)',
         typesPlaceholder: 'ex : Contrôle labo',
         appointmentLabel: 'Date de rendez-vous',
+        submittedAtLabel: 'Date de soumission',
         statusLabel: 'Statut',
         statusPlaceholder: 'Choisir un statut',
         submissionOrderLabel: 'N° de soumission',
@@ -1581,6 +1607,7 @@ const progressCopy: Record<Locale, ProgressCopy> = {
         updateFailed: 'Échec de mise à jour',
         deleteFailed: 'Échec de suppression',
         bulkFailed: 'Échec de la mise à jour groupée',
+        exportFailed: "Échec de l'export PDF",
       },
     },
   },

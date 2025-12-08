@@ -107,6 +107,13 @@ const formatDateInputValue = (value?: string | null) => {
   return date.toISOString().slice(0, 10)
 }
 
+const formatDateTimeInputValue = (value?: string | null) => {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toISOString().slice(0, 16)
+}
+
 const splitTokens = (value: string) =>
   value
     .split(/[,，\n]/)
@@ -125,6 +132,7 @@ type EditFormState = {
   remark: string
   appointmentDate: string
   submissionOrder: string
+  submittedAt: string
 }
 
 export function InspectionBoard({ roads, loadError }: Props) {
@@ -176,6 +184,8 @@ export function InspectionBoard({ roads, loadError }: Props) {
   const [bulkStatus, setBulkStatus] = useState<InspectionStatus | ''>('')
   const [bulkPending, setBulkPending] = useState(false)
   const [bulkError, setBulkError] = useState<string | null>(null)
+  const [pdfPending, setPdfPending] = useState(false)
+  const [pdfError, setPdfError] = useState<string | null>(null)
   const [showPrefabModal, setShowPrefabModal] = useState(false)
   const [prefabPending, setPrefabPending] = useState(false)
   const [prefabError, setPrefabError] = useState<string | null>(null)
@@ -251,6 +261,7 @@ export function InspectionBoard({ roads, loadError }: Props) {
     remark: '',
     appointmentDate: '',
     submissionOrder: '',
+    submittedAt: '',
   })
   const [editError, setEditError] = useState<string | null>(null)
   const [editPending, setEditPending] = useState(false)
@@ -382,6 +393,10 @@ export function InspectionBoard({ roads, loadError }: Props) {
   useEffect(() => {
     setBulkError(null)
   }, [selectedIds, bulkStatus])
+
+  useEffect(() => {
+    setPdfError(null)
+  }, [selectedIds])
 
   const statusOptions: InspectionStatus[] = ['PENDING', 'SCHEDULED', 'SUBMITTED', 'IN_PROGRESS', 'APPROVED']
   const toggleValue = <T,>(list: T[], value: T) =>
@@ -559,6 +574,7 @@ export function InspectionBoard({ roads, loadError }: Props) {
   useEffect(() => {
     if (!editing) return
     const joiner = locale === 'fr' ? ', ' : '，'
+    const nowIso = new Date().toISOString()
     setEditForm({
       phaseId: editing.phaseId,
       side: editing.side,
@@ -574,6 +590,7 @@ export function InspectionBoard({ roads, loadError }: Props) {
         editing.submissionOrder === null || editing.submissionOrder === undefined
           ? ''
           : String(editing.submissionOrder),
+      submittedAt: formatDateTimeInputValue(editing.submittedAt ?? nowIso) || formatDateTimeInputValue(nowIso),
     })
     setEditError(null)
   }, [editing, locale])
@@ -585,11 +602,16 @@ export function InspectionBoard({ roads, loadError }: Props) {
     const submissionOrderText = editForm.submissionOrder.trim()
     const submissionOrder = submissionOrderText === '' ? undefined : Number(submissionOrderText)
     const nextStatus = (editForm.status || editing.status) as InspectionStatus
+    const submittedAtValue = editForm.submittedAt ? new Date(editForm.submittedAt) : new Date()
     if (!editForm.phaseId) {
       setEditError(copy.editModal.missingPhase)
       return
     }
     if (!Number.isFinite(startPk) || !Number.isFinite(endPk)) {
+      setEditError(copy.editModal.invalidRange)
+      return
+    }
+    if (Number.isNaN(submittedAtValue.getTime())) {
       setEditError(copy.editModal.invalidRange)
       return
     }
@@ -623,6 +645,7 @@ export function InspectionBoard({ roads, loadError }: Props) {
           submissionOrder,
           remark: editForm.remark || undefined,
           appointmentDate: editForm.appointmentDate || undefined,
+          submittedAt: submittedAtValue.toISOString(),
         }),
       })
       const data = (await res.json().catch(() => ({}))) as { inspection?: InspectionListItem; message?: string }
@@ -695,6 +718,47 @@ export function InspectionBoard({ roads, loadError }: Props) {
       setBulkError((err as Error).message)
     } finally {
       setBulkPending(false)
+    }
+  }
+
+  const handleExportPdf = async (mode: 'preview' | 'download') => {
+    if (selectedIds.length === 0) {
+      setPdfError(copy.bulk.missingSelection)
+      return
+    }
+    setPdfPending(true)
+    setPdfError(null)
+    try {
+      const res = await fetch('/api/inspections/pdf', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: selectedIds, locale: 'fr', mode }),
+      })
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { message?: string }
+        throw new Error(data.message ?? copy.errors.exportFailed)
+      }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const filename = `inspection-export-${new Date().toISOString().slice(0, 10)}.pdf`
+
+      if (mode === 'preview') {
+        window.open(url, '_blank', 'noopener,noreferrer')
+      } else {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = filename
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+      }
+
+      window.setTimeout(() => URL.revokeObjectURL(url), 30000)
+    } catch (err) {
+      setPdfError((err as Error).message)
+    } finally {
+      setPdfPending(false)
     }
   }
 
@@ -973,6 +1037,7 @@ export function InspectionBoard({ roads, loadError }: Props) {
                 {formatProgressCopy(copy.bulk.selectedCount, { count: selectedIds.length })}
               </span>
               {bulkError ? <span className="text-xs text-amber-200">{bulkError}</span> : null}
+              {pdfError ? <span className="text-xs text-amber-200">{pdfError}</span> : null}
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <div className="relative" ref={columnSelectorRef}>
@@ -1041,6 +1106,22 @@ export function InspectionBoard({ roads, loadError }: Props) {
                 disabled={bulkPending || selectedIds.length === 0}
               >
                 {bulkPending ? copy.bulk.applying : copy.bulk.apply}
+              </button>
+              <button
+                type="button"
+                className="rounded-xl border border-white/20 px-4 py-2 text-xs font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+                onClick={() => handleExportPdf('preview')}
+                disabled={pdfPending || selectedIds.length === 0}
+              >
+                {pdfPending ? copy.pdf.previewing : copy.pdf.preview}
+              </button>
+              <button
+                type="button"
+                className="rounded-xl bg-sky-200 px-4 py-2 text-xs font-semibold text-slate-900 shadow-lg shadow-sky-300/30 transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+                onClick={() => handleExportPdf('download')}
+                disabled={pdfPending || selectedIds.length === 0}
+              >
+                {pdfPending ? copy.pdf.exporting : copy.pdf.export}
               </button>
             </div>
           </div>
@@ -1749,6 +1830,15 @@ export function InspectionBoard({ roads, loadError }: Props) {
                       className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
                       value={editForm.appointmentDate}
                       onChange={(e) => setEditForm((prev) => ({ ...prev, appointmentDate: e.target.value }))}
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1">
+                    {copy.editModal.submittedAtLabel}
+                    <input
+                      type="datetime-local"
+                      className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
+                      value={editForm.submittedAt}
+                      onChange={(e) => setEditForm((prev) => ({ ...prev, submittedAt: e.target.value }))}
                     />
                   </label>
                   <label className="flex flex-col gap-1">

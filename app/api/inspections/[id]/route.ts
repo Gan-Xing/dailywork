@@ -56,6 +56,7 @@ export async function PUT(request: Request, { params }: RouteParams) {
         submissionOrder,
         remark: payload.remark,
         appointmentDate: payload.appointmentDate,
+        submittedAt: payload.submittedAt,
       },
       sessionUser.id,
     )

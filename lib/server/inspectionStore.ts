@@ -236,6 +236,7 @@ export const updateInspection = async (
   const side = normalizeSide(payload.side)
   const range = normalizeRange(payload.startPk, payload.endPk)
   const appointmentDate = payload.appointmentDate ? new Date(payload.appointmentDate) : null
+  const submittedAt = payload.submittedAt ? new Date(payload.submittedAt) : null
 
   const inspection = await prisma.inspectionRequest.update({
     where: { id },
@@ -251,6 +252,7 @@ export const updateInspection = async (
       submissionOrder: payload.submissionOrder ?? undefined,
       remark: payload.remark,
       appointmentDate: appointmentDate ?? undefined,
+      submittedAt: submittedAt ?? existing.submittedAt,
       updatedBy: userId ?? undefined,
     },
     include: { road: true, phase: true, creator: true, submitter: true, updater: true },
@@ -305,4 +307,19 @@ export const getInspectionListItem = async (id: number): Promise<InspectionListI
     throw new Error('报检记录不存在或已删除')
   }
   return mapInspectionListItem(row)
+}
+
+export const getInspectionsByIds = async (ids: Array<number | string>): Promise<InspectionListItem[]> => {
+  const uniqueIds = Array.from(new Set(ids.map((id) => Number(id)).filter((id) => Number.isFinite(id) && id > 0)))
+  if (uniqueIds.length === 0) {
+    return []
+  }
+
+  const rows = await prisma.inspectionRequest.findMany({
+    where: { id: { in: uniqueIds } },
+    include: { road: true, phase: true, creator: true, submitter: true, updater: true },
+    orderBy: { submittedAt: 'desc' },
+  })
+
+  return rows.map(mapInspectionListItem)
 }

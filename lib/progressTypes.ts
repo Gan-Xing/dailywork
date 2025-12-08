@@ -184,6 +184,7 @@ export interface InspectionPayload {
   submissionOrder?: number | null
   remark?: string
   appointmentDate?: string
+  submittedAt?: string
 }
 
 export interface InspectionDTO extends InspectionPayload {
