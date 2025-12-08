@@ -55,6 +55,10 @@ export async function POST(request: Request) {
       defaultViewport: chromium.defaultViewport,
       executablePath,
       headless: chromium.headless,
+      env: {
+        ...process.env,
+        ...chromium.env,
+      },
     })
 
     try {
