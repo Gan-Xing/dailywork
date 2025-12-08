@@ -37,6 +37,7 @@ const dictionaries: Record<DictionaryKind, Record<string, Entry>> = {
     [normalize('预制路缘石')]: { zh: '预制路缘石', fr: 'Bordure préfabriquée' },
     [normalize('路缘石')]: { zh: '路缘石', fr: 'Bordure' },
     [normalize('预制圆管涵')]: { zh: '预制圆管涵', fr: 'Buse préfabriquée' },
+    [normalize('圆管涵')]: { zh: '圆管涵', fr: 'Buse circulaire' },
     [normalize('旧涵挖除')]: { zh: '旧涵挖除', fr: 'Demolision Dalot' },
     [normalize('旧边沟挖除')]: { zh: '旧边沟挖除', fr: 'Demolistion Caniveaux' },
     [normalize('原有涵洞')]: { zh: '原有涵洞', fr: 'Dalot Exitant' },
