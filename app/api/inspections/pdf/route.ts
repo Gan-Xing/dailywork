@@ -51,8 +51,10 @@ export async function POST(request: Request) {
     chromium.setHeadlessMode = true
     chromium.setGraphicsMode = false
     const executablePath = process.env.CHROMIUM_EXECUTABLE_PATH ?? (await chromium.executablePath())
-    const libPath = path.join(path.dirname(executablePath), '..', 'lib')
-    process.env.LD_LIBRARY_PATH = [libPath, process.env.LD_LIBRARY_PATH].filter(Boolean).join(':')
+    const binDir = path.dirname(executablePath)
+    const libDir = path.join(binDir, '..', 'lib')
+    const ldPathParts = [binDir, libDir, process.env.LD_LIBRARY_PATH].filter(Boolean)
+    process.env.LD_LIBRARY_PATH = ldPathParts.join(':')
 
     const browser = await puppeteer.launch({
       args: [...chromium.args, '--no-sandbox', '--disable-setuid-sandbox'],

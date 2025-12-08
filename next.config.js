@@ -6,8 +6,7 @@ const nextConfig = {
     // 确保无头浏览器依赖被打包进 Vercel 函数，避免缺少 libnss3 等系统库
     outputFileTracingIncludes: {
       '/app/api/inspections/pdf/route': [
-        './node_modules/@sparticuz/chromium/bin/**',
-        './node_modules/@sparticuz/chromium/lib/**',
+        './node_modules/@sparticuz/chromium/**',
       ],
     },
   },
