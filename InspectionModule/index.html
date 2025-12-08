@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Formulaire Qualité</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="page">
+        <!-- Header -->
+        <div class="header-section">
+            <div class="row title-row">
+                <strong>FORMULAIRE QUALITE</strong>
+            </div>
+            <div class="row subtitle-row">
+                REALISATION DE LA STRUCTURE DE CHAUSSEE 5BB+12 GNT+18 GN 3% A TANDA<br>
+                &REALISATION DE LA STRUCTURE DE CHAUSSEE 5BB+12 GNT+18 GN 3% A BONDOUKOU
+            </div>
+            <div class="row section-title">
+                <strong>STRUCTURES PARTICIPANTES</strong>
+            </div>
+        </div>
+
+        <!-- Structures Table -->
+        <table class="structures-table">
+            <tr>
+                <td class="col-role"><strong>MAITRE D'OUVRAGE DELEGUE</strong></td>
+                <td class="col-name">AGEROUTE</td>
+                <td class="col-logo"><img src="logo_ageroute.png" alt="AGEROUTE" class="logo-img"></td>
+                <td class="col-contract" rowspan="3">
+                    <strong>Contrat :</strong><br>
+                    090/2025&091/2025
+                </td>
+            </tr>
+            <tr>
+                <td class="col-role"><strong>MAÎTRE D'ŒUVRE</strong></td>
+                <td class="col-name">PORTEO</td>
+                <td class="col-logo"><img src="logo_porteo.png" alt="PORTEO BTP" class="logo-img"></td>
+            </tr>
+            <tr>
+                <td class="col-role"><strong>ENTREPRISE</strong></td>
+                <td class="col-name">CRBC</td>
+                <td class="col-logo"><img src="logo_rb.png" alt="RB" class="logo-img"></td>
+            </tr>
+        </table>
+
+        <!-- Demande de Reception -->
+        <div class="row section-header-row">
+            <div class="cell-left"><strong>DEMANDE DE RECEPTION</strong></div>
+            <div class="cell-right"><strong>N°:</strong> <span class="variable">{{ NUMERO }}</span></div>
+        </div>
+        <div class="row checkbox-row">
+            <span>X TOPOGRAPHIQUE</span>
+            <span>X GEOTECHNIQUE</span>
+            <span>X GENIE CIVIL</span>
+            <span>☐ AUTRES: ............</span>
+        </div>
+
+        <!-- Localisation -->
+        <table class="localisation-table">
+            <tr>
+                <td class="col-loc-header">
+                    <strong>LOCALISATION</strong><br>
+                    (Partie d'ouvrage ,PK au PK)
+                </td>
+                <td class="col-nature-header">
+                    Nature des Travaux (Type de tâche ou couche)
+                </td>
+            </tr>
+            <tr>
+                <td class="col-loc-content">
+                    <!-- Empty space for content -->
+                    <span class="variable">{{ LOCALISATION }}</span>
+                </td>
+                <td class="col-nature-content">
+                    <!-- Empty space for content -->
+                    <span class="variable">{{ NATURE_TRAVAUX }}</span>
+                </td>
+            </tr>
+        </table>
+
+        <!-- Signatures Section 1 -->
+        <div class="signatures-section-1">
+            <div class="sig-col-left">
+                <div class="sig-row">
+                    <span class="label">Pour le:</span> <span class="variable">{{ DATE_1 }}</span>
+                </div>
+                <div class="sig-row">
+                    <span class="label">Contrôle intérieur effectué par:</span>
+                    <span class="value handwritten">Gan Xing (Franck)</span>
+                </div>
+                <div class="sig-row">
+                    <span class="label">Document joint:</span>
+                    <span class="value">Néant</span>
+                </div>
+                <div class="sig-row">
+                    <span class="label">Date:</span> <span class="variable">{{ DATE_2 }}</span>
+                </div>
+                <div class="sig-row">
+                    <span class="label">Directeur des travaux ou Conducteur des travaux terrassement</span>
+                </div>
+                <div class="sig-row name-row">
+                    <span class="label">NOM:</span>
+                    <span class="value handwritten">Du Qin (Chris)</span>
+                </div>
+                <div class="sig-row visa-row">
+                    <span class="label">Visa:</span>
+                </div>
+            </div>
+            <div class="sig-col-right">
+                <div class="reception-box">
+                    <div class="sig-row reception-check">
+                        <span class="label">La réception par la Mission de Contrôle peut être demandée</span>
+                        <div class="check-options">
+                            <span>Oui X</span>
+                            <span>Non ☐</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="sig-row empty-space"></div>
+                <div class="quality-section">
+                    <div class="sig-row">
+                        <span class="label">Ingénieur Qualité</span>
+                    </div>
+                    <div class="sig-row name-row">
+                        <span class="label">NOM:</span>
+                        <span class="value handwritten">Gan Xing (Franck)</span>
+                    </div>
+                    <div class="sig-row visa-row">
+                        <span class="label">Visa:</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Observations Header -->
+        <div class="row section-title-italic">
+            <strong><em>OBSERVATIONS DU MAÎTRE D'ŒUVRE</em></strong>
+        </div>
+
+        <!-- Observations List -->
+        <div class="observations-list">
+            <!-- Item 1: Topographie -->
+            <div class="obs-item">
+                <div class="obs-label">TOPOGRAPHIE :</div>
+                <div class="obs-accord">Accordée</div>
+                <div class="obs-check">☐ Oui</div>
+                <div class="obs-check">☐ Non</div>
+                <div class="obs-visa">
+                    <div class="visa-box">Visa :</div>
+                </div>
+                <div class="obs-comment">Commentaires :
+                    ....................................................................................................................................
+                </div>
+            </div>
+
+            <!-- Item 2: Geotechnique -->
+            <div class="obs-item">
+                <div class="obs-label">GEOTECHNIQUE :</div>
+                <div class="obs-accord">Accordée</div>
+                <div class="obs-check">☐ Oui</div>
+                <div class="obs-check">☐ Non</div>
+                <div class="obs-visa">
+                    <div class="visa-box">Visa :</div>
+                </div>
+                <div class="obs-comment">Commentaires :
+                    ....................................................................................................................................
+                </div>
+            </div>
+
+            <!-- Item 3: Genie Civil -->
+            <div class="obs-item">
+                <div class="obs-label">GENIE CIVIL :</div>
+                <div class="obs-accord">Accordée</div>
+                <div class="obs-check">☐ Oui</div>
+                <div class="obs-check">☐ Non</div>
+                <div class="obs-visa">
+                    <div class="visa-box">Visa :</div>
+                </div>
+                <div class="obs-comment">Commentaires :
+                    ....................................................................................................................................
+                </div>
+            </div>
+
+            <!-- Item 4: Electricite -->
+            <div class="obs-item">
+                <div class="obs-label">ELECTRICITE :</div>
+                <div class="obs-accord">Accordée</div>
+                <div class="obs-check">☐ Oui</div>
+                <div class="obs-check">☐ Non</div>
+                <div class="obs-visa">
+                    <div class="visa-box">Visa :</div>
+                </div>
+                <div class="obs-comment">Commentaires :
+                    ....................................................................................................................................
+                </div>
+            </div>
+
+            <!-- Item 5: Telecoms -->
+            <div class="obs-item">
+                <div class="obs-label">TELECOMS :</div>
+                <div class="obs-accord">Accordée</div>
+                <div class="obs-check">☐ Oui</div>
+                <div class="obs-check">☐ Non</div>
+                <div class="obs-visa">
+                    <div class="visa-box">Visa :</div>
+                </div>
+                <div class="obs-comment">Commentaires :
+                    ....................................................................................................................................
+                </div>
+            </div>
+
+            <!-- Item 6: AEP -->
+            <div class="obs-item">
+                <div class="obs-label">AEP :</div>
+                <div class="obs-accord">Accordée</div>
+                <div class="obs-check">☐ Oui</div>
+                <div class="obs-check">☐ Non</div>
+                <div class="obs-visa">
+                    <div class="visa-box">Visa :</div>
+                </div>
+                <div class="obs-comment">Commentaires :
+                    ....................................................................................................................................
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer-section">
+            <div class="footer-left">
+                <div class="footer-title">Accusé réception MDC</div>
+                <div class="footer-content"></div>
+            </div>
+            <div class="footer-right">
+                <div class="footer-title">Décision de l'Ingénieur
+                    :................................................................</div>
+                <div class="footer-content">
+                    <br>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</body>
+
+</html>

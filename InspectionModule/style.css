@@ -1,0 +1,403 @@
+/* Reset and Page Setup */
+* {
+    box-sizing: border-box;
+}
+
+@page {
+    size: A4;
+    margin: 0;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    background-color: #fff;
+    /* White background for print */
+    font-family: Arial, Helvetica, sans-serif;
+    -webkit-print-color-adjust: exact;
+    /* Ensure colors print correctly */
+    print-color-adjust: exact;
+    width: 210mm;
+    height: 297mm;
+}
+
+.page {
+    width: 210mm;
+    min-height: 297mm;
+    padding: 10mm;
+    /* Outer margin of the content */
+    margin: 0 auto;
+    background: white;
+    position: relative;
+    border: 1px solid transparent;
+    /* Prevent margin collapse */
+}
+
+/* General Utilities */
+.row {
+    width: 100%;
+    border: 0.3mm solid black;
+    border-bottom: none;
+    /* Collapsing borders manually */
+    text-align: center;
+    padding: 1mm;
+}
+
+.row:last-child {
+    border-bottom: 0.3mm solid black;
+}
+
+strong {
+    font-weight: bold;
+}
+
+/* Header Section */
+.header-section {
+    width: 100%;
+}
+
+.title-row {
+    font-size: 10pt;
+    padding: 1.5mm;
+    background-color: #fff;
+}
+
+.subtitle-row {
+    font-size: 8pt;
+    padding: 1mm;
+    white-space: pre-line;
+    line-height: 1.2;
+}
+
+.section-title {
+    background-color: #d3d3d3;
+    /* Light grey background */
+    font-size: 9pt;
+    padding: 1mm;
+}
+
+/* Structures Table */
+.structures-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 9pt;
+}
+
+.structures-table td {
+    border: 0.3mm solid black;
+    padding: 1mm;
+    text-align: center;
+    vertical-align: middle;
+}
+
+.col-role {
+    width: 28.33%;
+    font-weight: bold;
+    font-size: 8pt;
+}
+
+.col-name {
+    width: 28.33%;
+}
+
+.col-logo {
+    width: 28.33%;
+}
+
+.col-contract {
+    width: 15%;
+    font-size: 8pt;
+}
+
+.logo-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 8mm;
+    border: 1px dashed #ccc;
+    color: #666;
+    font-size: 7pt;
+}
+
+.logo-img {
+    max-width: 100%;
+    max-height: 10mm;
+    object-fit: contain;
+}
+
+/* Demande de Reception */
+.section-header-row {
+    display: flex;
+    border: 0.3mm solid black;
+    border-top: none;
+    font-size: 9pt;
+}
+
+.cell-left {
+    flex: 1;
+    text-align: center;
+    padding: 1mm;
+    border-right: 0.3mm solid black;
+}
+
+.cell-right {
+    text-align: left;
+    width: 50mm;
+    padding: 1mm;
+}
+
+.checkbox-row {
+    display: flex;
+    justify-content: space-around;
+    border: 0.3mm solid black;
+    border-top: none;
+    font-size: 8pt;
+    padding: 1.5mm;
+}
+
+/* Localisation Table */
+.localisation-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 0;
+}
+
+.localisation-table td {
+    border: 0.3mm solid black;
+    border-top: none;
+    text-align: center;
+    vertical-align: middle;
+}
+
+.col-loc-header,
+.col-nature-header {
+    height: 10mm;
+    font-size: 9pt;
+}
+
+.col-loc-header {
+    width: 60%;
+}
+
+.col-nature-header {
+    width: 40%;
+}
+
+.col-loc-content,
+.col-nature-content {
+    height: 25mm;
+    /* Empty space height */
+}
+
+.col-loc-content {
+    width: 60%;
+}
+
+.col-nature-content {
+    width: 40%;
+}
+
+/* Signatures Section 1 */
+.signatures-section-1 {
+    display: flex;
+    width: 100%;
+    border: 0.3mm solid black;
+    border-top: none;
+    font-size: 8pt;
+}
+
+.sig-col-left {
+    width: 70%;
+    /* border-right: 0.3mm solid black; */
+
+    padding: 1mm;
+}
+
+.sig-col-right {
+    width: 30%;
+    padding: 1mm;
+}
+
+.sig-row {
+    margin-bottom: 2mm;
+    display: flex;
+    align-items: baseline;
+}
+
+.sig-row.name-row {
+    margin-top: 4mm;
+}
+
+.sig-row.visa-row {
+    margin-top: 4mm;
+}
+
+.label {
+    font-weight: bold;
+    margin-right: 2mm;
+}
+
+.value.handwritten {
+    font-family: "Brush Script MT", cursive;
+    /* Simulate handwriting */
+    font-size: 12pt;
+    color: #000;
+}
+
+.reception-check {
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+.check-options {
+    margin-top: 4mm;
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    padding-right: 10mm;
+}
+
+.reception-box {
+    border-left: 0.3mm solid black;
+    border-bottom: 0.3mm solid black;
+    border-right: none;
+    border-top: none;
+    padding: 2mm 1mm 1mm 1mm;
+    margin-left: -1mm;
+    margin-right: -1mm;
+    margin-top: -1mm;
+}
+
+.empty-space {
+    height: 5mm;
+}
+
+/* .quality-section {
+    border-top: 0.3mm solid black;
+    margin-left: -1mm;
+    margin-right: -1mm;
+    padding: 2mm 1mm 0 1mm;
+} */
+
+/* Observations Section */
+.section-title-italic {
+    font-style: italic;
+    font-size: 9pt;
+    border-top: none;
+    padding: 2mm 1mm;
+    /* Increased padding for height */
+}
+
+.observations-list {
+    width: 100%;
+    border: 0.3mm solid black;
+    border-top: none;
+    font-size: 8pt;
+}
+
+.obs-item {
+    display: grid;
+    grid-template-columns: 35mm 1fr 1fr 1fr 40mm;
+    /* Adjusted columns */
+    grid-template-rows: auto auto;
+    border-bottom: 0.1mm dotted #999;
+    padding: 1mm 2mm;
+    align-items: flex-start;
+    row-gap: 1.5mm;
+}
+
+.obs-item:last-child {
+    border-bottom: none;
+}
+
+.obs-label {
+    grid-column: 1;
+    grid-row: 1;
+    font-weight: bold;
+}
+
+.obs-accord {
+    grid-column: 2;
+    grid-row: 1;
+}
+
+.obs-check {
+    grid-row: 1;
+}
+
+.obs-visa {
+    grid-column: 5;
+    grid-row: 1 / span 2;
+    justify-self: end;
+    width: 38mm;
+    /* Reduced width */
+    height: 8mm;
+}
+
+.visa-box {
+    width: 100%;
+    height: 100%;
+    border: 0.3mm solid black;
+    padding: 0.5mm;
+    display: flex;
+    align-items: flex-start;
+}
+
+.obs-comment {
+    grid-column: 1 / span 4;
+    grid-row: 2;
+    margin-top: 1.5mm;
+    line-height: 1.6;
+    white-space: nowrap;
+    overflow: hidden;
+}
+
+/* Footer Section */
+.footer-section {
+    display: flex;
+    width: 100%;
+    border: 0.3mm solid black;
+    border-top: 0.3mm solid black;
+    /* Ensure top border exists */
+    margin-top: 1mm;
+    /* Small gap as in image? Or attached? Image looks attached but with a thick border. Let's attach it. */
+    margin-top: 0;
+    height: 25mm;
+    /* Reduced height */
+}
+
+.footer-left {
+    width: 45%;
+    border-right: 0.3mm solid black;
+    display: flex;
+    flex-direction: column;
+}
+
+.footer-right {
+    width: 55%;
+    display: flex;
+    flex-direction: column;
+}
+
+.footer-title {
+    font-weight: bold;
+    font-size: 8pt;
+    padding: 1mm;
+    border-bottom: 0.1mm dotted #999;
+}
+
+.footer-content {
+    flex: 1;
+    padding: 1mm;
+    font-size: 8pt;
+}
+
+/* Adjustments for specific elements */
+.structures-table tr:first-child td {
+    border-top: none;
+}
+
+/* Remove default margins from p */
+p {
+    margin: 0;
+}
