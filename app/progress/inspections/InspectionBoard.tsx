@@ -736,12 +736,16 @@ export function InspectionBoard({ roads, loadError }: Props) {
     setPdfPending(true)
     setPdfError(null)
     try {
+      const controller = new AbortController()
+      const timeoutId = window.setTimeout(() => controller.abort(), 30_000)
       const res = await fetch('/api/inspections/pdf', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
         body: JSON.stringify({ ids: selectedIds, locale: 'fr', mode }),
       })
+      window.clearTimeout(timeoutId)
       if (!res.ok) {
         const data = (await res.json().catch(() => ({}))) as { message?: string }
         throw new Error(data.message ?? copy.errors.exportFailed)
@@ -763,7 +767,9 @@ export function InspectionBoard({ roads, loadError }: Props) {
 
       window.setTimeout(() => URL.revokeObjectURL(url), 30000)
     } catch (err) {
-      setPdfError((err as Error).message)
+      const message =
+        (err as Error).name === 'AbortError' ? copy.errors.exportFailed : (err as Error).message
+      setPdfError(message)
     } finally {
       setPdfPending(false)
     }

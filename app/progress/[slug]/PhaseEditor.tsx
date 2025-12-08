@@ -1155,7 +1155,6 @@ export function PhaseEditor({
       })
   }, [
     linearDependencyMap,
-    linearSnapshotsByPhase,
     phases,
     resolveLinearInspectionSlices,
     roadLength,

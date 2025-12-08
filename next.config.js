@@ -6,10 +6,9 @@ const nextConfig = {
     if (!dev && !isServer) {
       config.devtool = 'source-map'
     }
-    // 避免服务端打包 Puppeteer/Chromium 时报 private field 解析错误，保持为 runtime 依赖
     if (isServer) {
       config.externals = config.externals || []
-      config.externals.push('@sparticuz/chromium', 'puppeteer-core')
+      config.externals.push('puppeteer')
     }
     return config
   },

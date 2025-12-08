@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import puppeteer, { Browser } from 'puppeteer'
 
 import { renderInspectionReportHtml } from '@/lib/templates/inspectionReport'
 import { getSessionUser, hasPermission } from '@/lib/server/authSession'
@@ -8,8 +9,65 @@ export const runtime = 'nodejs'
 export const maxDuration = 60
 
 const MAX_EXPORT_COUNT = 30
+const EXPORT_TIMEOUT_MS = 30_000
+const logPrefix = '[pdf-export]'
+const EXECUTABLE_PATH = process.env.CHROMIUM_EXECUTABLE_PATH ?? '/usr/bin/chromium-browser'
+const LAUNCH_ARGS = [
+  '--single-process',
+  '--no-sandbox',
+  '--disable-setuid-sandbox',
+  '--disable-dev-shm-usage',
+  '--disable-gpu',
+]
+
+let browserPromise: Promise<Browser> | null = null
+
+const withTimeout = async <T>(promise: Promise<T>, label: string, timeoutMs = EXPORT_TIMEOUT_MS) => {
+  let timer: NodeJS.Timeout | null = null
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`${label} 超时 (${timeoutMs}ms)，请稍后重试`)), timeoutMs)
+  })
+  try {
+    return await Promise.race([promise, timeoutPromise])
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
+}
+
+const getBrowser = async () => {
+  if (!browserPromise) {
+    browserPromise = puppeteer
+      .launch({
+        headless: true,
+        executablePath: EXECUTABLE_PATH,
+        args: LAUNCH_ARGS,
+      })
+      .catch((err) => {
+        browserPromise = null
+        throw err
+      })
+  }
+  const browser = await browserPromise
+  browser.on('disconnected', () => {
+    browserPromise = null
+  })
+  return browser
+}
 
 export async function POST(request: Request) {
+  const started = Date.now()
+  const logError = (error: unknown) => {
+    if (error instanceof Error) {
+      console.error(logPrefix, 'error', {
+        name: error.name,
+        message: error.message,
+        stack: error.stack?.slice(0, 500),
+      })
+    } else {
+      console.error(logPrefix, 'error', error)
+    }
+  }
+
   const sessionUser = getSessionUser()
   if (!sessionUser) {
     return NextResponse.json({ message: '请先登录后再导出报检 PDF' }, { status: 401 })
@@ -44,27 +102,24 @@ export async function POST(request: Request) {
     }
 
     const html = renderInspectionReportHtml(inspections, { locale })
-    const { default: chromium } = await import('@sparticuz/chromium')
-    const { default: puppeteer } = await import('puppeteer-core')
-    chromium.setHeadlessMode = true
-    chromium.setGraphicsMode = false
-    const executablePath = process.env.CHROMIUM_EXECUTABLE_PATH ?? (await chromium.executablePath())
 
-    const browser = await puppeteer.launch({
-      args: chromium.args,
-      defaultViewport: chromium.defaultViewport,
-      executablePath,
-      headless: chromium.headless,
-    })
+    const browser = await withTimeout(getBrowser(), '启动浏览器')
 
+    let page: Awaited<ReturnType<typeof browser.newPage>> | null = null
     try {
-      const page = await browser.newPage()
-      await page.setContent(html, { waitUntil: 'networkidle0' })
-      const pdf = await page.pdf({
-        format: 'A4',
-        printBackground: true,
-        margin: { top: '10mm', bottom: '10mm', left: '12mm', right: '12mm' },
-      })
+      page = await withTimeout(browser.newPage(), '创建页面', 12_000)
+
+      await withTimeout(page.setContent(html, { waitUntil: 'networkidle2' }), '渲染页面', 15_000)
+
+      const pdf = await withTimeout(
+        page.pdf({
+          format: 'A4',
+          printBackground: true,
+          margin: { top: '10mm', bottom: '10mm', left: '12mm', right: '12mm' },
+        }),
+        '生成 PDF',
+        20_000,
+      )
 
       const filename = `inspection-export-${new Date().toISOString().slice(0, 10)}.pdf`
       const disposition = mode === 'preview' ? 'inline' : 'attachment'
@@ -78,9 +133,20 @@ export async function POST(request: Request) {
         },
       })
     } finally {
-      await browser.close()
+      if (page) {
+        await page.close().catch((closeErr) => console.error(logPrefix, 'close page error', closeErr))
+      }
+      // 浏览器复用，单次请求不关闭，避免频繁启动开销
     }
   } catch (error) {
-    return NextResponse.json({ message: (error as Error).message }, { status: 500 })
+    logError(error)
+    const message =
+      error instanceof Error
+        ? error.message
+        : typeof error === 'string'
+          ? error
+          : '导出失败，请稍后重试'
+    console.error(logPrefix, 'export failed', { durationMs: Date.now() - started, error: message })
+    return NextResponse.json({ message }, { status: 500 })
   }
 }
