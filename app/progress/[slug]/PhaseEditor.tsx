@@ -1325,8 +1325,8 @@ export function PhaseEditor({
       const matchesRight = snapshotMatches(selectedSegment.phaseId, 'RIGHT', startPk, endPk)
       const matchesBoth = snapshotMatches(selectedSegment.phaseId, 'BOTH', startPk, endPk)
 
-      const gatherSatisfied = (side: IntervalSide) => {
-        const set = new Set<string>()
+      const buildCoverage = (side: IntervalSide) => {
+        const map = new Map<string, Array<{ start: number; end: number }>>()
         latestPointInspectionsRef.current.forEach((snapshot) => {
           if (!workflowSatisfiedStatuses.includes(snapshot.status ?? 'PENDING')) return
           const match =
@@ -1336,30 +1336,66 @@ export function PhaseEditor({
                 ? matchesLeft(snapshot)
                 : matchesRight(snapshot)
           if (!match) return
+          const [snapshotStart, snapshotEnd] = normalizeRange(snapshot.startPk, snapshot.endPk)
+          const clippedStart = Math.max(snapshotStart, startPk)
+          const clippedEnd = Math.min(snapshotEnd, endPk)
+          if (clippedEnd < clippedStart) return
           snapshot.layers?.forEach((layerName) => {
             splitLayerTokens(layerName).forEach((token) => {
               const normalizedLayerName = normalizeLabel(
                 localizeProgressTerm('layer', token, 'zh', { phaseName: workflowPhaseNameForContext }),
               )
               const meta = workflowLayerByName.get(normalizedLayerName)
-              if (meta) set.add(meta.id)
+              if (!meta) return
+              const list = map.get(meta.id) ?? []
+              list.push({ start: clippedStart, end: clippedEnd })
+              map.set(meta.id, list)
             })
           })
         })
-        return set
+        return map
       }
 
-      const satisfiedLeft = gatherSatisfied('LEFT')
-      const satisfiedRight = gatherSatisfied('RIGHT')
-      const satisfiedBoth = new Set<string>()
-      satisfiedLeft.forEach((id) => {
-        if (satisfiedRight.has(id)) {
-          satisfiedBoth.add(id)
+      const mergeRanges = (ranges: Array<{ start: number; end: number }>) => {
+        if (!ranges.length) return []
+        const sorted = [...ranges].sort((a, b) => a.start - b.start)
+        const merged: Array<{ start: number; end: number }> = []
+        sorted.forEach((range) => {
+          const last = merged[merged.length - 1]
+          if (last && range.start <= last.end + 1e-6) {
+            merged[merged.length - 1] = { start: last.start, end: Math.max(last.end, range.end) }
+          } else {
+            merged.push({ ...range })
+          }
+        })
+        return merged
+      }
+
+      const isCovered = (layerId: string, side: IntervalSide, coverage: Map<string, Array<{ start: number; end: number }>>) => {
+        const ranges = coverage.get(layerId)
+        if (!ranges || !ranges.length) return false
+        const merged = mergeRanges(ranges)
+        const targetStartOrdered = Math.min(startPk, endPk)
+        const targetEndOrdered = Math.max(startPk, endPk)
+        let cursor = targetStartOrdered
+        for (const range of merged) {
+          if (range.end < cursor - 1e-6) continue
+          if (range.start > cursor + 1e-6) {
+            return false
+          }
+          cursor = Math.max(cursor, range.end)
+          if (cursor >= targetEndOrdered - 1e-6) {
+            return true
+          }
         }
-      })
+        return cursor >= targetEndOrdered - 1e-6
+      }
+
+      const coverageLeft = buildCoverage('LEFT')
+      const coverageRight = buildCoverage('RIGHT')
+      const coverageBoth = buildCoverage('BOTH')
 
       const completedWorkflowChecksByLayer = computeCompletedWorkflowChecksByLayer()
-      const satisfied = selectedSide === 'BOTH' ? satisfiedBoth : selectedSide === 'LEFT' ? satisfiedLeft : satisfiedRight
       const selectedLayerIds = new Set<string>()
       selectedLayers.forEach((layer) => {
         const meta = workflowLayerByName.get(normalizeLabel(layer))
@@ -1372,10 +1408,16 @@ export function PhaseEditor({
         const meta = workflowLayerByName.get(normalizeLabel(layer))
         if (!meta || !meta.dependencies?.length) return
         meta.dependencies.forEach((dep) => {
-          if (satisfied.has(dep) || selectedLayerIds.has(dep)) return
+          const coveredCurrent =
+            selectedSide === 'BOTH'
+              ? isCovered(dep, 'LEFT', coverageLeft) && isCovered(dep, 'RIGHT', coverageRight)
+              : selectedSide === 'LEFT'
+                ? isCovered(dep, 'LEFT', coverageLeft) || isCovered(dep, 'BOTH', coverageBoth)
+                : isCovered(dep, 'RIGHT', coverageRight) || isCovered(dep, 'BOTH', coverageBoth)
+          if (coveredCurrent || selectedLayerIds.has(dep)) return
           if (selectedSide === 'BOTH') {
-            const leftMissing = !satisfiedLeft.has(dep)
-            const rightMissing = !satisfiedRight.has(dep)
+            const leftMissing = !isCovered(dep, 'LEFT', coverageLeft) && !isCovered(dep, 'BOTH', coverageBoth)
+            const rightMissing = !isCovered(dep, 'RIGHT', coverageRight) && !isCovered(dep, 'BOTH', coverageBoth)
             const name = workflowLayerNameMap?.get(dep) ?? workflowLayerById?.get(dep)?.name ?? dep
             if (leftMissing && rightMissing) {
               missingDeps.add(`${t.inspection.sideBoth}：${name}`)
