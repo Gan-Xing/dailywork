@@ -1,7 +1,5 @@
 import { NextResponse } from 'next/server'
 
-import path from 'path'
-
 import { renderInspectionReportHtml } from '@/lib/templates/inspectionReport'
 import { getSessionUser, hasPermission } from '@/lib/server/authSession'
 import { getInspectionsByIds } from '@/lib/server/inspectionStore'
@@ -51,13 +49,9 @@ export async function POST(request: Request) {
     chromium.setHeadlessMode = true
     chromium.setGraphicsMode = false
     const executablePath = process.env.CHROMIUM_EXECUTABLE_PATH ?? (await chromium.executablePath())
-    const binDir = path.dirname(executablePath)
-    const libDir = path.join(binDir, '..', 'lib')
-    const ldPathParts = [binDir, libDir, process.env.LD_LIBRARY_PATH].filter(Boolean)
-    process.env.LD_LIBRARY_PATH = ldPathParts.join(':')
 
     const browser = await puppeteer.launch({
-      args: [...chromium.args, '--no-sandbox', '--disable-setuid-sandbox'],
+      args: chromium.args,
       defaultViewport: chromium.defaultViewport,
       executablePath,
       headless: chromium.headless,
