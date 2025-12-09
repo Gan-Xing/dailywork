@@ -72,6 +72,7 @@ interface Segment {
   workflow?: WorkflowBinding
   workflowLayers?: WorkflowLayerTemplate[]
   workflowTypeOptions?: string[]
+  pointHasSides: boolean
 }
 
 interface Side {
@@ -551,6 +552,7 @@ function PointLane({
       end: item.endPk,
       spec: item.spec ?? null,
       billQuantity: item.billQuantity ?? null,
+      pointHasSides: phase.pointHasSides,
     })
   }
 
@@ -1311,6 +1313,7 @@ export function PhaseEditor({
       raiseSubmitError(t.errors.submitAppointmentMissing)
       return
     }
+    const targetSide = enforcedSide ?? selectedSide
     const payloadBase: Omit<InspectionSubmitPayload, 'side' | 'layers' | 'checks'> = {
       phaseId: selectedSegment.phaseId,
       startPk,
@@ -1408,13 +1411,13 @@ export function PhaseEditor({
         if (!meta || !meta.dependencies?.length) return
         meta.dependencies.forEach((dep) => {
           const coveredCurrent =
-            selectedSide === 'BOTH'
+            targetSide === 'BOTH'
               ? isCovered(dep, 'LEFT', coverageLeft) && isCovered(dep, 'RIGHT', coverageRight)
-              : selectedSide === 'LEFT'
+              : targetSide === 'LEFT'
                 ? isCovered(dep, 'LEFT', coverageLeft) || isCovered(dep, 'BOTH', coverageBoth)
                 : isCovered(dep, 'RIGHT', coverageRight) || isCovered(dep, 'BOTH', coverageBoth)
           if (coveredCurrent || selectedLayerIds.has(dep)) return
-          if (selectedSide === 'BOTH') {
+          if (targetSide === 'BOTH') {
             const leftMissing = !isCovered(dep, 'LEFT', coverageLeft) && !isCovered(dep, 'BOTH', coverageBoth)
             const rightMissing = !isCovered(dep, 'RIGHT', coverageRight) && !isCovered(dep, 'BOTH', coverageBoth)
             const name = workflowLayerNameMap?.get(dep) ?? workflowLayerById?.get(dep)?.name ?? dep
@@ -1552,7 +1555,7 @@ export function PhaseEditor({
         return
       }
 
-      const finalTarget = target ?? selectedSide
+      const finalTarget = target ?? targetSide
       if (finalTarget === 'LEFT') {
         singleLeft.checks.push(check)
       } else if (finalTarget === 'RIGHT') {
@@ -1567,7 +1570,7 @@ export function PhaseEditor({
     if (hasMissingCheckMeta) {
       payloads.push({
         ...payloadBase,
-        side: selectedSide,
+        side: targetSide,
         layers: selectedLayers,
         checks: selectedChecks,
       })
@@ -1591,7 +1594,7 @@ export function PhaseEditor({
       if (bothGroup.layers.length) {
         payloads.push({
           ...payloadBase,
-          side: selectedSide,
+          side: targetSide,
           layers: bothGroup.layers,
           checks: bothGroup.checks,
         })
@@ -1622,6 +1625,13 @@ export function PhaseEditor({
   const [alertDialog, setAlertDialog] = useState<AlertDialogState | null>(null)
   const [submitPending, setSubmitPending] = useState(false)
   const [manualCheckExclusions, setManualCheckExclusions] = useState<string[]>([])
+  const enforcedSide = useMemo<IntervalSide | null>(
+    () =>
+      selectedSegment && selectedSegment.measure === 'POINT' && selectedSegment.pointHasSides
+        ? selectedSegment.side
+        : null,
+    [selectedSegment],
+  )
   const intervalRange = useMemo(() => {
     const start = Number(startPkInput || selectedSegment?.start || 0)
     const end = Number(endPkInput || selectedSegment?.end || 0)
@@ -1657,12 +1667,14 @@ export function PhaseEditor({
       }
     })
     let lockedSide: IntervalSide | null = null
-    if (!both) {
+    if (enforcedSide) {
+      lockedSide = enforcedSide
+    } else if (!both) {
       if (left && !right) lockedSide = 'RIGHT'
       if (right && !left) lockedSide = 'LEFT'
     }
     return { left, right, both, lockedSide }
-  }, [intervalRange, latestPointInspections, selectedSegment])
+  }, [enforcedSide, intervalRange, latestPointInspections, selectedSegment])
 
   useEffect(() => {
     if (!sideBooking.lockedSide) return
@@ -3219,6 +3231,7 @@ export function PhaseEditor({
                                             end: seg.end,
                                             spec: seg.spec ?? null,
                                             billQuantity: seg.billQuantity ?? null,
+                                            pointHasSides: phase.pointHasSides,
                                           })
                                         }}
                                       >
@@ -3322,28 +3335,51 @@ export function PhaseEditor({
                   <div className="grid gap-3 md:grid-cols-3">
                     <label className="flex flex-col gap-1 text-xs text-slate-200">
                       <span className="font-semibold">{t.inspection.sideLabel}</span>
-                      <select
-                        className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 shadow-inner shadow-slate-900/40 focus:border-emerald-300 focus:outline-none"
-                        value={selectedSide}
-                        onChange={(e) => setSelectedSide(e.target.value as IntervalSide)}
-                      >
-                        <option value="LEFT" disabled={Boolean(sideBooking.lockedSide && sideBooking.lockedSide !== 'LEFT')}>
-                          {t.inspection.sideLeft}
-                        </option>
-                        <option value="RIGHT" disabled={Boolean(sideBooking.lockedSide && sideBooking.lockedSide !== 'RIGHT')}>
-                          {t.inspection.sideRight}
-                        </option>
-                        <option
-                          value="BOTH"
-                          disabled={
-                            Boolean(sideBooking.lockedSide) ||
-                            (sideBooking.left && !sideBooking.right) ||
-                            (sideBooking.right && !sideBooking.left)
-                          }
-                        >
-                          {t.inspection.sideBoth}
-                        </option>
-                      </select>
+                      {(() => {
+                        const sideOptionsForSelect = enforcedSide
+                          ? [
+                              {
+                                value: enforcedSide,
+                                label:
+                                  enforcedSide === 'LEFT'
+                                    ? t.inspection.sideLeft
+                                    : enforcedSide === 'RIGHT'
+                                      ? t.inspection.sideRight
+                                      : t.inspection.sideBoth,
+                              },
+                            ]
+                          : [
+                              { value: 'LEFT' as const, label: t.inspection.sideLeft },
+                              { value: 'RIGHT' as const, label: t.inspection.sideRight },
+                              { value: 'BOTH' as const, label: t.inspection.sideBoth },
+                            ]
+                        return (
+                          <select
+                            className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 shadow-inner shadow-slate-900/40 focus:border-emerald-300 focus:outline-none"
+                            value={selectedSide}
+                            onChange={(e) => setSelectedSide(e.target.value as IntervalSide)}
+                            disabled={Boolean(enforcedSide)}
+                          >
+                            {sideOptionsForSelect.map((option) => (
+                              <option
+                                key={option.value}
+                                value={option.value}
+                                disabled={
+                                  !enforcedSide &&
+                                  Boolean(
+                                    sideBooking.lockedSide &&
+                                      ((option.value === 'LEFT' && sideBooking.lockedSide !== 'LEFT') ||
+                                        (option.value === 'RIGHT' && sideBooking.lockedSide !== 'RIGHT') ||
+                                        (option.value === 'BOTH' && sideBooking.lockedSide)),
+                                  )
+                                }
+                              >
+                                {option.label}
+                              </option>
+                            ))}
+                          </select>
+                        )
+                      })()}
                     </label>
                     <label className="flex flex-col gap-1 text-xs text-slate-200">
                       <span className="font-semibold">{t.inspection.startLabel}</span>
@@ -3396,7 +3432,9 @@ export function PhaseEditor({
                         <div className="relative space-y-3 border-l border-dashed border-emerald-300/30 pl-4">
                           {selectedSegment.workflowLayers.flatMap((layer) => {
                             let sideSequence: IntervalSide[]
-                            if (shouldSplitLayerBySide(layer)) {
+                            if (enforcedSide) {
+                              sideSequence = [enforcedSide]
+                            } else if (shouldSplitLayerBySide(layer)) {
                               sideSequence = ['LEFT', 'RIGHT']
                             } else if (sideBooking.lockedSide) {
                               sideSequence = [sideBooking.lockedSide === 'LEFT' ? 'RIGHT' : 'LEFT', sideBooking.lockedSide]

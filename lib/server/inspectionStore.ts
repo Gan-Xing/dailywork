@@ -1,4 +1,4 @@
-import { InspectionStatus, IntervalSide, Prisma } from '@prisma/client'
+import { InspectionStatus, IntervalSide, PhaseMeasure, Prisma } from '@prisma/client'
 
 import type {
   InspectionBulkPayload,
@@ -19,6 +19,34 @@ const normalizeRange = (start: number, end: number) => {
   const safeEnd = Number.isFinite(end) ? end : safeStart
   const ordered = safeStart <= safeEnd ? [safeStart, safeEnd] : [safeEnd, safeStart]
   return { startPk: ordered[0], endPk: ordered[1] }
+}
+
+const overlapsRange = (startA: number, endA: number, startB: number, endB: number) =>
+  Math.max(startA, startB) < Math.min(endA, endB)
+
+const assertPointSideAllowed = (
+  phase: { measure: PhaseMeasure; pointHasSides: boolean; intervals?: { startPk: number; endPk: number; side: IntervalSide }[] },
+  side: IntervalSide,
+  range: { startPk: number; endPk: number },
+) => {
+  if (phase.measure !== 'POINT' || !phase.pointHasSides) return
+  if (side === 'BOTH') {
+    throw new Error('单体按左右侧展示的报检不可选择“双侧”，请根据点位所在侧提交单侧报检。')
+  }
+  const intervals = phase.intervals ?? []
+  const overlappingSides = new Set(
+    intervals
+      .filter((interval) => overlapsRange(interval.startPk, interval.endPk, range.startPk, range.endPk))
+      .map((interval) => interval.side)
+      .filter((value) => value !== 'BOTH'),
+  )
+  if (overlappingSides.size === 1) {
+    const expectedSide = Array.from(overlappingSides)[0]
+    if (side !== expectedSide) {
+      const sideLabel = expectedSide === 'LEFT' ? '左侧' : '右侧'
+      throw new Error(`该单体点位配置为${sideLabel}，报检侧别需保持一致。`)
+    }
+  }
 }
 
 const mapInspection = (
@@ -186,6 +214,14 @@ export const createInspection = async (
   const side = normalizeSide(payload.side)
   const range = normalizeRange(payload.startPk, payload.endPk)
   const appointmentDate = payload.appointmentDate ? new Date(payload.appointmentDate) : null
+  const phase = await prisma.roadPhase.findUnique({
+    where: { id: phaseId },
+    include: { intervals: true },
+  })
+  if (!phase) {
+    throw new Error('分项不存在或已删除')
+  }
+  assertPointSideAllowed(phase, side as IntervalSide, range)
 
   const inspection = await prisma.inspectionRequest.create({
     data: {
@@ -229,6 +265,7 @@ export const updateInspection = async (
 
   const phase = await prisma.roadPhase.findFirst({
     where: { id: payload.phaseId, roadId: existing.roadId },
+    include: { intervals: true },
   })
   if (!phase) {
     throw new Error('分项不存在或不属于当前路段')
@@ -238,6 +275,7 @@ export const updateInspection = async (
   const range = normalizeRange(payload.startPk, payload.endPk)
   const appointmentDate = payload.appointmentDate ? new Date(payload.appointmentDate) : null
   const submittedAt = payload.submittedAt ? new Date(payload.submittedAt) : null
+  assertPointSideAllowed(phase, side as IntervalSide, range)
 
   const inspection = await prisma.inspectionRequest.update({
     where: { id },
@@ -343,7 +381,7 @@ export const updateInspectionsBulk = async (
 
   const rows = await prisma.inspectionRequest.findMany({
     where: { id: { in: uniqueIds } },
-    include: { road: true, phase: true, creator: true, submitter: true, updater: true },
+    include: { road: true, phase: { include: { intervals: true } }, creator: true, submitter: true, updater: true },
   })
   if (rows.length === 0) {
     throw new Error('报检记录不存在或已删除')
@@ -353,19 +391,23 @@ export const updateInspectionsBulk = async (
     const results: typeof rows = []
     for (const row of rows) {
       const nextPhaseId = patch.phaseId ?? row.phaseId
+      let phaseForValidation = row.phase
       if (patch.phaseId) {
         const phase = await tx.roadPhase.findFirst({
           where: { id: patch.phaseId, roadId: row.roadId },
+          include: { intervals: true },
         })
         if (!phase) {
           throw new Error(`所选分项不属于路段 ${row.road.name}`)
         }
+        phaseForValidation = phase
       }
 
       const side = patch.side ? normalizeSide(patch.side) : row.side
       const range = rangeProvided
         ? normalizeRange(Number(patch.startPk), Number(patch.endPk))
         : { startPk: row.startPk, endPk: row.endPk }
+      assertPointSideAllowed(phaseForValidation, side as IntervalSide, range)
       const appointmentDate =
         patch.appointmentDate === undefined ? row.appointmentDate : patch.appointmentDate ? new Date(patch.appointmentDate) : null
       const submittedAt =
