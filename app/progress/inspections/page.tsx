@@ -10,6 +10,7 @@ export const dynamic = 'force-dynamic'
 export default async function InspectionListPage() {
   const sessionUser = getSessionUser()
   const canView = sessionUser?.permissions.includes('inspection:view') ?? false
+  const canBulkEdit = sessionUser?.permissions.includes('inspection:bulk-edit') ?? false
 
   if (!canView) {
     const t = getProgressCopy('zh')
@@ -25,5 +26,5 @@ export default async function InspectionListPage() {
     loadError = (error as Error).message
   }
 
-  return <InspectionBoard roads={roads} loadError={loadError} />
+  return <InspectionBoard roads={roads} loadError={loadError} canBulkEdit={canBulkEdit} />
 }

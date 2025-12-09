@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import type {
+  InspectionBulkPayload,
   InspectionListItem,
   InspectionStatus,
   IntervalSide,
@@ -26,6 +27,7 @@ import { usePreferredLocale } from '@/lib/usePreferredLocale'
 interface Props {
   roads: RoadSectionWithPhasesDTO[]
   loadError: string | null
+  canBulkEdit: boolean
 }
 
 type PhaseOption = RoadSectionWithPhasesDTO['phases'][number] & {
@@ -135,7 +137,7 @@ type EditFormState = {
   submittedAt: string
 }
 
-export function InspectionBoard({ roads, loadError }: Props) {
+export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
   const { locale } = usePreferredLocale('zh', locales)
   const t = getProgressCopy(locale)
   const copy = t.inspectionBoard
@@ -181,9 +183,24 @@ export function InspectionBoard({ roads, loadError }: Props) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(loadError)
   const [selectedIds, setSelectedIds] = useState<number[]>([])
-  const [bulkStatus, setBulkStatus] = useState<InspectionStatus | ''>('')
-  const [bulkPending, setBulkPending] = useState(false)
   const [bulkError, setBulkError] = useState<string | null>(null)
+  const [bulkEditOpen, setBulkEditOpen] = useState(false)
+  const [bulkEditPending, setBulkEditPending] = useState(false)
+  const [bulkEditError, setBulkEditError] = useState<string | null>(null)
+  const [bulkEditForm, setBulkEditForm] = useState<EditFormState>({
+    phaseId: '',
+    side: '',
+    startPk: '',
+    endPk: '',
+    layers: '',
+    checks: '',
+    types: '',
+    status: '',
+    remark: '',
+    appointmentDate: '',
+    submissionOrder: '',
+    submittedAt: '',
+  })
   const [pdfPending, setPdfPending] = useState(false)
   const [pdfError, setPdfError] = useState<string | null>(null)
   const [showPrefabModal, setShowPrefabModal] = useState(false)
@@ -328,10 +345,20 @@ export function InspectionBoard({ roads, loadError }: Props) {
     return found?.phases ?? []
   }, [editing, roads])
 
+  const allPhaseOptions = useMemo<PhaseOption[]>(() => {
+    const list: PhaseOption[] = []
+    roads.forEach((road) => {
+      ;(road.phases ?? []).forEach((phase) => {
+        list.push({ ...phase, roadSlug: road.slug, roadName: road.name })
+      })
+    })
+    return list
+  }, [roads])
+
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
   const pageIds = useMemo(() => items.map((item) => item.id), [items])
   const allSelected = pageIds.length > 0 && pageIds.every((id) => selectedIds.includes(id))
-  const columnCount = visibleColumns.length + 2
+  const columnCount = visibleColumns.length + 1
   const isVisible = (key: ColumnKey) => visibleColumns.includes(key)
 
   const fetchData = async () => {
@@ -392,7 +419,11 @@ export function InspectionBoard({ roads, loadError }: Props) {
 
   useEffect(() => {
     setBulkError(null)
-  }, [selectedIds, bulkStatus])
+  }, [selectedIds])
+
+  useEffect(() => {
+    setBulkEditError(null)
+  }, [bulkEditForm, selectedIds])
 
   useEffect(() => {
     setPdfError(null)
@@ -450,6 +481,22 @@ export function InspectionBoard({ roads, loadError }: Props) {
       : [...visibleColumns, key]
     persistVisibleColumns(next)
   }
+
+  const resetBulkEditForm = () =>
+    setBulkEditForm({
+      phaseId: '',
+      side: '',
+      startPk: '',
+      endPk: '',
+      layers: '',
+      checks: '',
+      types: '',
+      status: '',
+      remark: '',
+      appointmentDate: '',
+      submissionOrder: '',
+      submittedAt: '',
+    })
 
   const toggleSelect = (id: number) => {
     setSelectedIds((prev) => (prev.includes(id) ? prev.filter((itemId) => itemId !== id) : [...prev, id]))
@@ -695,23 +742,71 @@ export function InspectionBoard({ roads, loadError }: Props) {
     }
   }
 
-  const applyBulkStatus = async () => {
+  const applyBulkEdit = async () => {
+    if (!canBulkEdit) {
+      return
+    }
     if (selectedIds.length === 0) {
       setBulkError(copy.bulk.missingSelection)
       return
     }
-    if (!bulkStatus) {
-      setBulkError(copy.bulk.missingStatus)
+
+    const submissionOrderText = bulkEditForm.submissionOrder.trim()
+    const payload: InspectionBulkPayload = {}
+    if (bulkEditForm.phaseId) payload.phaseId = bulkEditForm.phaseId
+    if (bulkEditForm.side) payload.side = bulkEditForm.side
+    const startProvided = bulkEditForm.startPk.trim() !== ''
+    const endProvided = bulkEditForm.endPk.trim() !== ''
+    if (startProvided || endProvided) {
+      const startPk = Number(bulkEditForm.startPk)
+      const endPk = Number(bulkEditForm.endPk)
+      if (!Number.isFinite(startPk) || !Number.isFinite(endPk)) {
+        setBulkEditError(copy.bulkEdit.invalidRange)
+        return
+      }
+      payload.startPk = startPk
+      payload.endPk = endPk
+    }
+    const layers = splitTokens(bulkEditForm.layers)
+    if (layers.length) payload.layers = layers
+    const checks = splitTokens(bulkEditForm.checks)
+    if (checks.length) payload.checks = checks
+    const types = splitTokens(bulkEditForm.types)
+    if (types.length) payload.types = types
+    if (bulkEditForm.status) payload.status = bulkEditForm.status
+    const remark = bulkEditForm.remark.trim()
+    if (remark) payload.remark = remark
+    if (bulkEditForm.appointmentDate) payload.appointmentDate = bulkEditForm.appointmentDate
+    if (bulkEditForm.submittedAt) {
+      const submittedAt = new Date(bulkEditForm.submittedAt)
+      if (Number.isNaN(submittedAt.getTime())) {
+        setBulkEditError(copy.bulkEdit.invalidSubmittedAt)
+        return
+      }
+      payload.submittedAt = submittedAt.toISOString()
+    }
+    if (submissionOrderText) {
+      const submissionOrder = Number(submissionOrderText)
+      if (!Number.isFinite(submissionOrder)) {
+        setBulkEditError(copy.bulkEdit.invalidSubmissionOrder)
+        return
+      }
+      payload.submissionOrder = submissionOrder
+    }
+
+    if (Object.keys(payload).length === 0) {
+      setBulkEditError(copy.bulkEdit.missingFields)
       return
     }
-    setBulkPending(true)
-    setBulkError(null)
+
+    setBulkEditPending(true)
+    setBulkEditError(null)
     try {
-      const res = await fetch('/api/inspections/bulk-status', {
+      const res = await fetch('/api/inspections/bulk-edit', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ids: selectedIds, status: bulkStatus }),
+        body: JSON.stringify({ ids: selectedIds, payload }),
       })
       const data = (await res.json().catch(() => ({}))) as { items?: InspectionListItem[]; message?: string }
       if (!res.ok || !data.items) {
@@ -720,11 +815,26 @@ export function InspectionBoard({ roads, loadError }: Props) {
       const updatedMap = new Map(data.items.map((item) => [item.id, item]))
       setItems((prev) => prev.map((item) => updatedMap.get(item.id) ?? item))
       setSelectedIds([])
+      setBulkEditOpen(false)
+      setBulkEditForm({
+        phaseId: '',
+        side: '',
+        startPk: '',
+        endPk: '',
+        layers: '',
+        checks: '',
+        types: '',
+        status: '',
+        remark: '',
+        appointmentDate: '',
+        submissionOrder: '',
+        submittedAt: '',
+      })
       await fetchData()
     } catch (err) {
-      setBulkError((err as Error).message)
+      setBulkEditError((err as Error).message)
     } finally {
-      setBulkPending(false)
+      setBulkEditPending(false)
     }
   }
 
@@ -1067,7 +1177,7 @@ export function InspectionBoard({ roads, loadError }: Props) {
                   <span className="text-xs text-slate-400">⌕</span>
                 </button>
                 {showColumnSelector ? (
-                  <div className="absolute right-0 z-10 mt-2 w-64 max-w-full rounded-xl border border-white/15 bg-slate-900/95 p-3 text-xs text-slate-100 shadow-lg shadow-slate-900/40 backdrop-blur">
+                  <div className="absolute right-0 z-10 mt-2 w-80 max-w-sm rounded-xl border border-white/15 bg-slate-900/95 p-3 text-xs text-slate-100 shadow-lg shadow-slate-900/40 backdrop-blur">
                     <div className="flex items-center justify-between border-b border-white/10 pb-2 text-[11px] text-slate-300">
                       <button className="text-emerald-300 hover:underline" onClick={handleSelectAllColumns}>
                         {copy.columnSelector.selectAll}
@@ -1093,33 +1203,27 @@ export function InspectionBoard({ roads, loadError }: Props) {
                             checked={visibleColumns.includes(option.key)}
                             onChange={() => toggleColumnVisibility(option.key)}
                           />
-                          <span className="truncate">{option.label}</span>
+                          <span className="break-words whitespace-normal">{option.label}</span>
                         </label>
                       ))}
                     </div>
                   </div>
                 ) : null}
               </div>
-              <select
-                className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-xs text-slate-50 focus:border-emerald-300 focus:outline-none"
-                value={bulkStatus}
-                onChange={(e) => setBulkStatus(e.target.value as InspectionStatus)}
-              >
-                <option value="">{copy.bulk.statusPlaceholder}</option>
-                {statusOptions.map((item) => (
-                  <option key={item} value={item}>
-                    {statusCopy[item] ?? item}
-                  </option>
-                ))}
-              </select>
-              <button
-                type="button"
-                className="rounded-xl bg-emerald-300 px-4 py-2 text-xs font-semibold text-slate-900 shadow-lg shadow-emerald-400/30 transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
-                onClick={applyBulkStatus}
-                disabled={bulkPending || selectedIds.length === 0}
-              >
-                {bulkPending ? copy.bulk.applying : copy.bulk.apply}
-              </button>
+              {canBulkEdit ? (
+                <button
+                  type="button"
+                  className="rounded-xl bg-emerald-300 px-4 py-2 text-xs font-semibold text-slate-900 shadow-lg shadow-emerald-400/30 transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+                  onClick={() => {
+                    resetBulkEditForm()
+                    setBulkEditOpen(true)
+                    setBulkEditError(null)
+                  }}
+                  disabled={selectedIds.length === 0}
+                >
+                  {copy.bulk.edit}
+                </button>
+              ) : null}
               <button
                 type="button"
                 className="rounded-xl border border-white/20 px-4 py-2 text-xs font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
@@ -1281,13 +1385,13 @@ export function InspectionBoard({ roads, loadError }: Props) {
                     const submittedByText = item.submittedBy?.username ?? '—'
                     const createdByText = item.createdBy?.username ?? '—'
                     const updatedByText = item.updatedBy?.username ?? '—'
-                    const remarkText = item.remark ?? '—'
-                    return (
-                      <tr
-                        key={item.id}
-                        className={`border-t border-white/5 transition ${isRowSelected ? 'bg-emerald-400/10' : 'bg-white/0'} hover:bg-white/5`}
-                        onClick={() => toggleSelect(item.id)}
-                      >
+                  const remarkText = item.remark ?? '—'
+                  return (
+                    <tr
+                      key={item.id}
+                      className={`border-t border-white/5 transition ${isRowSelected ? 'bg-emerald-400/10' : 'bg-white/0'} hover:bg-white/5`}
+                      onClick={() => toggleSelect(item.id)}
+                    >
                       <td className="px-4 py-3 text-xs text-slate-300">
                         <div className="flex items-center gap-2">
                           <input
@@ -1715,6 +1819,214 @@ export function InspectionBoard({ roads, loadError }: Props) {
             </div>
               )
             })()}
+          </div>
+        ) : null}
+
+        {bulkEditOpen ? (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 px-4 py-6"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) {
+                setBulkEditOpen(false)
+                resetBulkEditForm()
+              }
+            }}
+          >
+            <div className="w-full max-w-5xl rounded-3xl border border-white/10 bg-slate-900/95 p-6 text-sm text-slate-100 shadow-2xl shadow-emerald-400/30 backdrop-blur">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.2em] text-emerald-100">{copy.bulkEdit.badge}</p>
+                  <h2 className="text-xl font-semibold text-slate-50">{copy.bulkEdit.title}</h2>
+                  <p className="text-sm text-slate-300">
+                    {formatProgressCopy(copy.bulk.selectedCount, { count: selectedIds.length })}
+                  </p>
+                  <p className="text-xs text-slate-400">{copy.bulkEdit.hint}</p>
+                </div>
+                <button
+                  type="button"
+                  className="rounded-full border border-white/20 px-3 py-1 text-xs font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/20"
+                  onClick={() => {
+                    setBulkEditOpen(false)
+                    resetBulkEditForm()
+                  }}
+                  aria-label={copy.bulkEdit.closeAria}
+                >
+                  ×
+                </button>
+              </div>
+
+              <div className="mt-4 space-y-4 text-sm text-slate-200">
+                <div className="grid gap-3 md:grid-cols-2">
+                  <label className="flex flex-col gap-1">
+                    {copy.editModal.phaseLabel}
+                    <select
+                      className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
+                      value={bulkEditForm.phaseId}
+                      onChange={(e) =>
+                        setBulkEditForm((prev) => ({
+                          ...prev,
+                          phaseId: e.target.value ? Number(e.target.value) : '',
+                        }))
+                      }
+                    >
+                      <option value="">{copy.bulkEdit.noChange}</option>
+                      {allPhaseOptions.map((phase) => (
+                        <option key={phase.id} value={phase.id}>
+                          {resolveRoadName({ slug: phase.roadSlug, name: phase.roadName }, locale)} ·{' '}
+                          {localizeProgressTerm('phase', phase.name, locale)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="flex flex-col gap-1">
+                    {copy.editModal.sideLabel}
+                    <select
+                      className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
+                      value={bulkEditForm.side}
+                      onChange={(e) => setBulkEditForm((prev) => ({ ...prev, side: e.target.value as IntervalSide }))}
+                    >
+                      <option value="">{copy.bulkEdit.noChange}</option>
+                      <option value="LEFT">{copy.editModal.sideLeft}</option>
+                      <option value="RIGHT">{copy.editModal.sideRight}</option>
+                      <option value="BOTH">{copy.editModal.sideBoth}</option>
+                    </select>
+                  </label>
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-2">
+                  <label className="flex flex-col gap-1">
+                    <span className="flex items-center justify-between gap-2">
+                      <span>{copy.editModal.startLabel}</span>
+                      <span className="text-[11px] text-slate-400">{copy.bulkEdit.noChange}</span>
+                    </span>
+                    <input
+                      type="number"
+                      className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
+                      value={bulkEditForm.startPk}
+                      onChange={(e) => setBulkEditForm((prev) => ({ ...prev, startPk: e.target.value }))}
+                      placeholder={copy.bulkEdit.rangeHint}
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1">
+                    {copy.editModal.endLabel}
+                    <input
+                      type="number"
+                      className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
+                      value={bulkEditForm.endPk}
+                      onChange={(e) => setBulkEditForm((prev) => ({ ...prev, endPk: e.target.value }))}
+                      placeholder={copy.bulkEdit.rangeHint}
+                    />
+                  </label>
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-2">
+                  <label className="flex flex-col gap-1">
+                    {copy.editModal.layersLabel}
+                    <input
+                      className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-200/60 focus:border-emerald-300 focus:outline-none"
+                      value={bulkEditForm.layers}
+                      onChange={(e) => setBulkEditForm((prev) => ({ ...prev, layers: e.target.value }))}
+                      placeholder={copy.bulkEdit.tokenHint}
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1">
+                    {copy.editModal.checksLabel}
+                    <input
+                      className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-200/60 focus:border-emerald-300 focus:outline-none"
+                      value={bulkEditForm.checks}
+                      onChange={(e) => setBulkEditForm((prev) => ({ ...prev, checks: e.target.value }))}
+                      placeholder={copy.bulkEdit.tokenHint}
+                    />
+                  </label>
+                </div>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <label className="flex flex-col gap-1">
+                    {copy.editModal.typesLabel}
+                    <input
+                      className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-200/60 focus:border-emerald-300 focus:outline-none"
+                      value={bulkEditForm.types}
+                      onChange={(e) => setBulkEditForm((prev) => ({ ...prev, types: e.target.value }))}
+                      placeholder={copy.bulkEdit.tokenHint}
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1">
+                    {copy.editModal.appointmentLabel}
+                    <input
+                      type="date"
+                      className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
+                      value={bulkEditForm.appointmentDate}
+                      onChange={(e) => setBulkEditForm((prev) => ({ ...prev, appointmentDate: e.target.value }))}
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1">
+                    {copy.editModal.submittedAtLabel}
+                    <input
+                      type="datetime-local"
+                      className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
+                      value={bulkEditForm.submittedAt}
+                      onChange={(e) => setBulkEditForm((prev) => ({ ...prev, submittedAt: e.target.value }))}
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1">
+                    {copy.editModal.statusLabel}
+                    <select
+                      className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
+                      value={bulkEditForm.status}
+                      onChange={(e) => setBulkEditForm((prev) => ({ ...prev, status: e.target.value as InspectionStatus }))}
+                    >
+                      <option value="">{copy.bulkEdit.noChange}</option>
+                      {statusOptions.map((item) => (
+                        <option key={item} value={item}>
+                          {statusCopy[item] ?? item}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="flex flex-col gap-1">
+                    {copy.editModal.submissionOrderLabel}
+                    <input
+                      type="number"
+                      className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
+                      value={bulkEditForm.submissionOrder}
+                      onChange={(e) => setBulkEditForm((prev) => ({ ...prev, submissionOrder: e.target.value }))}
+                      placeholder={copy.editModal.submissionOrderPlaceholder}
+                    />
+                  </label>
+                </div>
+                <label className="flex flex-col gap-1">
+                  {copy.editModal.remarkLabel}
+                  <textarea
+                    className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-200/60 focus:border-emerald-300 focus:outline-none"
+                    rows={3}
+                    value={bulkEditForm.remark}
+                    onChange={(e) => setBulkEditForm((prev) => ({ ...prev, remark: e.target.value }))}
+                    placeholder={copy.bulkEdit.remarkHint}
+                  />
+                </label>
+                <p className="text-xs text-slate-400">{copy.bulkEdit.noChangeHint}</p>
+                {bulkEditError ? <p className="text-xs text-amber-200">{bulkEditError}</p> : null}
+                <div className="flex items-center justify-end gap-3">
+                  <button
+                    type="button"
+                    className="rounded-xl border border-white/20 px-4 py-2 text-xs font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/10"
+                    onClick={() => {
+                      setBulkEditOpen(false)
+                      resetBulkEditForm()
+                    }}
+                  >
+                    {copy.bulkEdit.cancel}
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded-xl bg-emerald-300 px-4 py-2 text-xs font-semibold text-slate-900 shadow-lg shadow-emerald-400/30 transition hover:-translate-y-0.5 disabled:opacity-60"
+                    onClick={applyBulkEdit}
+                    disabled={bulkEditPending}
+                  >
+                    {bulkEditPending ? copy.bulkEdit.saving : copy.bulkEdit.save}
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         ) : null}
 

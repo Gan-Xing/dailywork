@@ -1,6 +1,7 @@
 import { InspectionStatus, IntervalSide, Prisma } from '@prisma/client'
 
 import type {
+  InspectionBulkPayload,
   InspectionDTO,
   InspectionFilter,
   InspectionListItem,
@@ -296,6 +297,107 @@ export const updateInspectionStatuses = async (
     }
     throw error
   }
+}
+
+export const updateInspectionsBulk = async (
+  ids: Array<number | string>,
+  patch: InspectionBulkPayload,
+  userId: number | null,
+): Promise<InspectionListItem[]> => {
+  const uniqueIds = Array.from(new Set(ids.map((id) => Number(id)).filter((id) => Number.isFinite(id) && id > 0)))
+  if (uniqueIds.length === 0) {
+    throw new Error('请选择需要更新的报检记录')
+  }
+
+  const hasAnyField = Object.values(patch).some((value) => value !== undefined && value !== '')
+  if (!hasAnyField) {
+    throw new Error('请至少填写一个需要批量修改的字段')
+  }
+
+  const rangeProvided = patch.startPk !== undefined || patch.endPk !== undefined
+  if (rangeProvided && (patch.startPk === undefined || patch.endPk === undefined)) {
+    throw new Error('批量修改里程时请同时填写起点和终点')
+  }
+
+  if (patch.submittedAt) {
+    const submittedAt = new Date(patch.submittedAt)
+    if (Number.isNaN(submittedAt.getTime())) {
+      throw new Error('送检时间格式无效')
+    }
+  }
+  if (patch.appointmentDate) {
+    const appointmentDate = new Date(patch.appointmentDate)
+    if (Number.isNaN(appointmentDate.getTime())) {
+      throw new Error('预约日期格式无效')
+    }
+  }
+  if (patch.layers && patch.layers.length === 0) {
+    throw new Error(inspectionErrors.submitLayerMissing)
+  }
+  if (patch.checks && patch.checks.length === 0) {
+    throw new Error(inspectionErrors.submitCheckMissing)
+  }
+  if (patch.types && patch.types.length === 0) {
+    throw new Error(inspectionErrors.submitTypeMissing)
+  }
+
+  const rows = await prisma.inspectionRequest.findMany({
+    where: { id: { in: uniqueIds } },
+    include: { road: true, phase: true, creator: true, submitter: true, updater: true },
+  })
+  if (rows.length === 0) {
+    throw new Error('报检记录不存在或已删除')
+  }
+
+  const updates = await prisma.$transaction(async (tx) => {
+    const results: typeof rows = []
+    for (const row of rows) {
+      const nextPhaseId = patch.phaseId ?? row.phaseId
+      if (patch.phaseId) {
+        const phase = await tx.roadPhase.findFirst({
+          where: { id: patch.phaseId, roadId: row.roadId },
+        })
+        if (!phase) {
+          throw new Error(`所选分项不属于路段 ${row.road.name}`)
+        }
+      }
+
+      const side = patch.side ? normalizeSide(patch.side) : row.side
+      const range = rangeProvided
+        ? normalizeRange(Number(patch.startPk), Number(patch.endPk))
+        : { startPk: row.startPk, endPk: row.endPk }
+      const appointmentDate =
+        patch.appointmentDate === undefined ? row.appointmentDate : patch.appointmentDate ? new Date(patch.appointmentDate) : null
+      const submittedAt =
+        patch.submittedAt === undefined ? row.submittedAt : patch.submittedAt ? new Date(patch.submittedAt) : null
+      const submissionOrder =
+        patch.submissionOrder === undefined ? row.submissionOrder : patch.submissionOrder ?? null
+
+      const updated = await tx.inspectionRequest.update({
+        where: { id: row.id },
+        data: {
+          phaseId: nextPhaseId,
+          side: side as IntervalSide,
+          startPk: range.startPk,
+          endPk: range.endPk,
+          layers: patch.layers ?? row.layers,
+          checks: patch.checks ?? row.checks,
+          types: patch.types ?? row.types,
+          status: patch.status ?? row.status,
+          submissionOrder,
+          remark: patch.remark ?? row.remark,
+          appointmentDate: appointmentDate ?? undefined,
+          submittedAt: submittedAt ?? row.submittedAt,
+          updatedBy: userId ?? undefined,
+        },
+        include: { road: true, phase: true, creator: true, submitter: true, updater: true },
+      })
+      results.push(updated)
+    }
+    return results
+  })
+
+  return updates.map(mapInspectionListItem)
 }
 
 export const getInspectionListItem = async (id: number): Promise<InspectionListItem> => {

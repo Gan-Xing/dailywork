@@ -1,19 +1,19 @@
 import { NextResponse } from 'next/server'
 
-import type { InspectionStatus } from '@/lib/progressTypes'
+import type { InspectionBulkPayload } from '@/lib/progressTypes'
 import { getSessionUser, hasPermission } from '@/lib/server/authSession'
-import { updateInspectionStatuses } from '@/lib/server/inspectionStore'
+import { updateInspectionsBulk } from '@/lib/server/inspectionStore'
 
 export async function POST(request: Request) {
   const sessionUser = getSessionUser()
   if (!sessionUser) {
-    return NextResponse.json({ message: '请先登录后再批量修改报检状态' }, { status: 401 })
+    return NextResponse.json({ message: '请先登录后再批量编辑报检' }, { status: 401 })
   }
   if (!hasPermission('inspection:bulk-edit') || !hasPermission('inspection:create')) {
     return NextResponse.json({ message: '缺少报检批量编辑权限' }, { status: 403 })
   }
 
-  let body: { ids?: unknown; status?: unknown }
+  let body: { ids?: unknown; payload?: unknown }
   try {
     body = (await request.json()) as typeof body
   } catch {
@@ -21,14 +21,10 @@ export async function POST(request: Request) {
   }
 
   const ids = Array.isArray(body.ids) ? (body.ids as Array<number | string>) : []
-  const status = body.status as InspectionStatus | undefined
-
-  if (!status) {
-    return NextResponse.json({ message: '请选择要更新的状态' }, { status: 400 })
-  }
+  const payload = (body.payload ?? {}) as InspectionBulkPayload
 
   try {
-    const items = await updateInspectionStatuses(ids, status, sessionUser.id)
+    const items = await updateInspectionsBulk(ids, payload, sessionUser.id)
     return NextResponse.json({ items })
   } catch (error) {
     return NextResponse.json({ message: (error as Error).message }, { status: 400 })

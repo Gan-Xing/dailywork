@@ -187,6 +187,21 @@ export interface InspectionPayload {
   submittedAt?: string
 }
 
+export interface InspectionBulkPayload {
+  phaseId?: number
+  startPk?: number
+  endPk?: number
+  side?: IntervalSide
+  layers?: string[]
+  checks?: string[]
+  types?: string[]
+  status?: InspectionStatus
+  submissionOrder?: number | null
+  remark?: string
+  appointmentDate?: string
+  submittedAt?: string
+}
+
 export interface InspectionDTO extends InspectionPayload {
   id: number
   roadId: number

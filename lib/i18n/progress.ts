@@ -414,17 +414,33 @@ type InspectionBoardCopy = {
   }
   bulk: {
     selectedCount: string
-    statusPlaceholder: string
-    apply: string
-    applying: string
     missingSelection: string
-    missingStatus: string
+    edit: string
+  }
+  bulkEdit: {
+    badge: string
+    title: string
+    hint: string
+    noChange: string
+    noChangeHint: string
+    rangeHint: string
+    tokenHint: string
+    remarkHint: string
+    invalidRange: string
+    invalidSubmittedAt: string
+    invalidSubmissionOrder: string
+    missingFields: string
+    save: string
+    saving: string
+    cancel: string
+    closeAria: string
   }
   table: {
     loading: string
     empty: string
     selectPage: string
     selectRow: string
+    view: string
     edit: string
     delete: string
   }
@@ -940,11 +956,26 @@ const progressCopy: Record<Locale, ProgressCopy> = {
       },
       bulk: {
         selectedCount: '已选 {count} 条',
-        statusPlaceholder: '选择要更新的状态',
-        apply: '批量修改状态',
-        applying: '批量更新中...',
         missingSelection: '请选择至少一条报检记录',
-        missingStatus: '请选择要更新的状态',
+        edit: '批量编辑',
+      },
+      bulkEdit: {
+        badge: '批量编辑',
+        title: '批量修改报检',
+        hint: '仅填写/选择的字段会被覆盖，其余保持不变。',
+        noChange: '不修改',
+        noChangeHint: '提示：字段留空即不修改；如需修改里程，请同时填写起点与终点。',
+        rangeHint: '留空则不修改，填写需起终点成对出现',
+        tokenHint: '多个值用逗号/换行分隔，留空不修改',
+        remarkHint: '填写则批量替换备注，留空不变',
+        invalidRange: '请填写有效的起止里程',
+        invalidSubmittedAt: '送检时间格式无效',
+        invalidSubmissionOrder: '提交单必须为数字',
+        missingFields: '请至少填写一个需要修改的字段',
+        save: '应用批量修改',
+        saving: '批量更新中...',
+        cancel: '取消',
+        closeAria: '关闭批量编辑',
       },
       table: {
         loading: '加载中...',
@@ -1487,11 +1518,26 @@ const progressCopy: Record<Locale, ProgressCopy> = {
       },
       bulk: {
         selectedCount: '{count} sélection',
-        statusPlaceholder: 'Choisir un statut',
-        apply: 'Mettre à jour',
-        applying: 'Mise à jour...',
         missingSelection: 'Sélectionnez au moins un contrôle',
-        missingStatus: 'Choisissez un statut',
+        edit: 'Édition groupée',
+      },
+      bulkEdit: {
+        badge: 'Édition groupée',
+        title: 'Modifier plusieurs contrôles',
+        hint: 'Seuls les champs remplis seront appliqués, les autres restent inchangés.',
+        noChange: 'Ne pas modifier',
+        noChangeHint: 'Astuce : champ vide = pas de modification. Pour modifier les PK, saisir début et fin.',
+        rangeHint: 'Laissez vide pour conserver, saisir début + fin pour modifier',
+        tokenHint: 'Séparez par virgules / retours ligne, vide = pas de changement',
+        remarkHint: 'Saisi = remplace toutes les remarques sélectionnées; vide = ne change pas',
+        invalidRange: 'Veuillez saisir une plage PK valide',
+        invalidSubmittedAt: 'Horodatage de soumission invalide',
+        invalidSubmissionOrder: 'Le numéro de soumission doit être numérique',
+        missingFields: 'Renseignez au moins un champ à modifier',
+        save: 'Appliquer',
+        saving: 'Mise à jour...',
+        cancel: 'Annuler',
+        closeAria: 'Fermer l’édition groupée',
       },
       table: {
         loading: 'Chargement...',
