@@ -227,7 +227,7 @@ export default function ReportsLandingPage() {
   }
 
   return (
-    <main className="relative mx-auto flex max-w-5xl flex-col gap-8 px-4 py-10 lg:px-0">
+    <main className="relative mx-auto flex max-w-6xl flex-col gap-8 px-4 py-10 sm:px-6 lg:px-8 xl:max-w-[1500px] xl:px-10 2xl:max-w-[1700px] 2xl:px-12">
       {alertNode}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <nav className="flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-600">

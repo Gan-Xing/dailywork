@@ -275,7 +275,7 @@ export default function HomePage() {
 			<div className='absolute inset-0 -z-10 bg-[radial-gradient(circle_at_10%_20%,rgba(69,162,255,0.15),transparent_25%),radial-gradient(circle_at_90%_10%,rgba(244,137,37,0.16),transparent_20%),radial-gradient(circle_at_60%_70%,rgba(72,236,169,0.15),transparent_25%)]' />
 			<div className='absolute left-1/2 top-0 -z-10 h-80 w-[60vw] -translate-x-1/2 rounded-full bg-gradient-to-br from-white/8 via-blue-400/10 to-transparent blur-3xl' />
 
-			<div className='relative mx-auto max-w-6xl px-6 py-16 sm:px-8 lg:px-12'>
+			<div className='relative mx-auto max-w-6xl px-6 py-16 sm:px-8 lg:px-12 xl:max-w-[1500px] xl:px-14 2xl:max-w-[1700px] 2xl:px-16'>
 				<div className='mb-6 flex flex-wrap items-center justify-end gap-3'>
 					{session ? (
 						<div className='relative' ref={menuRef}>
@@ -409,7 +409,7 @@ export default function HomePage() {
 
 				</header>
 
-				<section className='mt-12 grid gap-6 md:grid-cols-2'>
+				<section className='mt-12 grid gap-6 md:grid-cols-2 xl:grid-cols-3 xl:gap-8'>
 					{t.modules.map((module) => {
 						const required = modulePermissions[module.href] ?? [];
 						const allowed = can(required);
@@ -460,8 +460,8 @@ export default function HomePage() {
 			</section>
 
 				{canViewRoadmap ? (
-					<section className='mt-12 overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-white/5 via-white/0 to-white/5 p-6 text-sm text-slate-100 shadow-xl shadow-slate-950/20 backdrop-blur'>
-						<div className='grid gap-6 lg:grid-cols-[1.2fr,1fr] lg:items-stretch'>
+					<section className='mt-12 overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-white/5 via-white/0 to-white/5 p-6 text-sm text-slate-100 shadow-xl shadow-slate-950/20 backdrop-blur xl:p-8'>
+						<div className='grid gap-6 lg:grid-cols-[1.2fr,1fr] lg:items-stretch xl:grid-cols-[1.3fr,1fr] xl:gap-8'>
 							<div className='flex h-full flex-col gap-4'>
 								<div className='flex items-center gap-2'>
 									<div className='h-2 w-2 rounded-full bg-emerald-300' />

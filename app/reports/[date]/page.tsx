@@ -637,7 +637,7 @@ export default function ReportEditorPage() {
 
 	if (!isReady) {
 		return (
-			<main className='mx-auto flex max-w-4xl flex-col gap-6 px-4 py-10'>
+			<main className='mx-auto flex max-w-5xl flex-col gap-6 px-4 py-10 sm:px-6 lg:px-8 xl:max-w-[1500px] xl:px-10 2xl:max-w-[1700px] 2xl:px-12'>
 				<p className='text-center text-sm text-slate-500'>
 					加载中...
 				</p>
@@ -647,7 +647,7 @@ export default function ReportEditorPage() {
 
 	if (loadError) {
 		return (
-			<main className='mx-auto flex max-w-4xl flex-col gap-6 px-4 py-10'>
+			<main className='mx-auto flex max-w-5xl flex-col gap-6 px-4 py-10 sm:px-6 lg:px-8 xl:max-w-[1500px] xl:px-10 2xl:max-w-[1700px] 2xl:px-12'>
 				<div className='rounded-3xl border border-red-200 bg-red-50 p-6 text-center text-sm text-red-700'>
 					{loadError}
 				</div>
@@ -673,7 +673,7 @@ export default function ReportEditorPage() {
 
 	return (
 		<>
-			<main className='mx-auto flex max-w-6xl flex-col gap-8 px-4 py-10 lg:px-8 lg:py-12'>
+			<main className='mx-auto flex max-w-6xl flex-col gap-8 px-4 py-10 lg:px-8 lg:py-12 xl:max-w-[1500px] xl:px-10 2xl:max-w-[1700px] 2xl:px-12'>
 				<nav className='flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-600'>
 					<Link
 						href='/'

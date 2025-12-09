@@ -425,7 +425,7 @@ export function WorkflowManager({ initialWorkflows }: Props) {
 
   return (
     <main className="min-h-screen bg-slate-950 text-slate-50">
-      <div className="relative mx-auto max-w-6xl px-6 py-12">
+      <div className="relative mx-auto max-w-6xl px-6 py-12 xl:max-w-[1500px] xl:px-10 2xl:max-w-[1700px] 2xl:px-12">
         <div className="absolute inset-x-0 top-10 -z-10 h-48 bg-gradient-to-r from-emerald-400/20 via-blue-400/15 to-amber-300/20 blur-3xl" />
         <header className="flex flex-col gap-3">
           <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
@@ -459,7 +459,7 @@ export function WorkflowManager({ initialWorkflows }: Props) {
           {error ? <p className="text-sm text-amber-200">{error}</p> : null}
         </header>
 
-        <div className="mt-10 grid gap-6 lg:grid-cols-12">
+        <div className="mt-10 grid gap-6 lg:grid-cols-12 xl:gap-8">
           <section className="space-y-4 lg:col-span-5">
             <div className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-lg shadow-emerald-500/10">
               <div className="flex items-center justify-between">

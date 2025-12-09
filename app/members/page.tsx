@@ -613,6 +613,16 @@ export default function MembersPage() {
   const activeCount = membersData.filter((member) => member.employmentStatus === 'ACTIVE').length
   const roleCount = rolesData.length
   const permissionCoverage = permissions.length
+  const permissionGroups = useMemo(() => {
+    const grouped = new Map<string, typeof permissions>()
+    permissions.forEach((permission) => {
+      const prefix = permission.code.includes(':') ? permission.code.split(':')[0] : 'other'
+      const bucket = grouped.get(prefix) ?? []
+      bucket.push(permission)
+      grouped.set(prefix, bucket)
+    })
+    return Array.from(grouped.entries()).map(([key, items]) => ({ key, items }))
+  }, [permissions])
 
   if (shouldShowAccessDenied) {
     return (
@@ -628,7 +638,7 @@ export default function MembersPage() {
     <main className="min-h-screen bg-slate-50">
       <section className="relative bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 pb-14 pt-12 text-white">
         <div className="absolute inset-0 opacity-60" style={{ backgroundImage: 'radial-gradient(circle at 20% 20%, rgba(14,165,233,0.2), transparent 40%), radial-gradient(circle at 80% 0%, rgba(94,234,212,0.18), transparent 36%)' }} />
-        <div className="relative mx-auto flex max-w-[1600px] flex-col gap-8 px-6 sm:px-8">
+        <div className="relative mx-auto flex max-w-6xl flex-col gap-8 px-6 sm:px-8 xl:max-w-[1500px] xl:px-12 2xl:max-w-[1700px] 2xl:px-14">
           <div className="flex flex-col justify-between gap-6 sm:flex-row sm:items-center">
             <div className="flex flex-col gap-4">
               <div>
@@ -651,7 +661,7 @@ export default function MembersPage() {
             </div>
             <LocaleSwitcher locale={locale} onChange={setLocale} />
           </div>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:gap-6 2xl:gap-8">
             <StatCard label={t.stats.headcount} value={headcount} accent="from-sky-400 to-cyan-300" />
             <StatCard label={t.stats.active} value={activeCount} accent="from-emerald-400 to-lime-300" helper={headcount ? `${Math.round((activeCount / headcount) * 100)}%` : undefined} />
             <StatCard
@@ -671,7 +681,7 @@ export default function MembersPage() {
       </section>
 
       <section className="w-full bg-slate-50">
-        <div className="mx-auto grid max-w-[1600px] gap-8 px-6 pb-14 pt-6 sm:px-8 sm:pt-10 min-w-0">
+        <div className="mx-auto grid max-w-6xl gap-8 px-6 pb-14 pt-6 sm:px-8 sm:pt-10 xl:max-w-[1500px] xl:gap-10 xl:px-12 xl:pt-12 2xl:max-w-[1700px] 2xl:gap-12 2xl:px-14 min-w-0">
           <div className="min-w-0 w-full rounded-3xl border border-slate-200 bg-white shadow-xl shadow-slate-900/5">
             <div className="flex flex-col gap-4 border-b border-slate-100 p-6 sm:flex-row sm:items-center sm:justify-between">
               <div>
@@ -975,7 +985,7 @@ export default function MembersPage() {
                         <ActionButton>{t.actions.export}</ActionButton>
                       </div>
                     </div>
-                    <div className="grid gap-3 md:grid-cols-2">
+                    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
                       {rolesData.map((role) => (
                         <div
                           key={role.id}
@@ -1054,32 +1064,48 @@ export default function MembersPage() {
                         {permissions.length} items
                       </span>
                     </div>
-                    <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-slate-900 shadow-sm">
-                      {permissions.map((permission) => (
-                        <div
-                          key={permission.code}
-                          className="rounded-2xl border border-slate-100 bg-white p-4 shadow-inner"
-                        >
-                          <div className="flex items-start justify-between gap-3">
-                            <div>
-                              <p className="text-sm font-semibold text-slate-900">{permission.code}</p>
-                              <p className="text-xs text-slate-600">{permission.name}</p>
-                            </div>
-                            <span className="rounded-full bg-slate-100 px-2 py-1 text-[11px] font-semibold uppercase text-slate-700 ring-1 ring-slate-200">
-                              {t.permissionPanel.code}: {permission.code}
-                            </span>
-                          </div>
-                          <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-slate-700">
-                            <span className="rounded-full bg-slate-100 px-2 py-1 ring-1 ring-slate-200">
-                              {t.permissionPanel.roles}: {permission.roles.length}
-                            </span>
-                            {permission.roles.map((role) => (
-                              <span
-                                key={`${permission.code}-${role}`}
-                                className="rounded-full bg-sky-50 px-2 py-1 font-semibold text-sky-800 ring-1 ring-sky-200"
-                              >
-                                {role}
+                    <div className="space-y-6 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-slate-900 shadow-sm">
+                      {permissionGroups.map((group) => (
+                        <div key={group.key} className="space-y-3">
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-2">
+                              <span className="rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-white">
+                                {group.key}
                               </span>
+                              <span className="text-xs text-slate-500">
+                                {group.items.length} {t.permissionPanel.title.toLowerCase()}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                            {group.items.map((permission) => (
+                              <div
+                                key={permission.code}
+                                className="rounded-2xl border border-slate-100 bg-white p-4 shadow-inner"
+                              >
+                                <div className="flex items-start justify-between gap-3">
+                                  <div>
+                                    <p className="text-sm font-semibold text-slate-900">{permission.code}</p>
+                                    <p className="text-xs text-slate-600">{permission.name}</p>
+                                  </div>
+                                  <span className="rounded-full bg-slate-100 px-2 py-1 text-[11px] font-semibold uppercase text-slate-700 ring-1 ring-slate-200">
+                                    {t.permissionPanel.code}: {permission.code}
+                                  </span>
+                                </div>
+                                <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-slate-700">
+                                  <span className="rounded-full bg-slate-100 px-2 py-1 ring-1 ring-slate-200">
+                                    {t.permissionPanel.roles}: {permission.roles.length}
+                                  </span>
+                                  {permission.roles.map((role) => (
+                                    <span
+                                      key={`${permission.code}-${role}`}
+                                      className="rounded-full bg-sky-50 px-2 py-1 font-semibold text-sky-800 ring-1 ring-sky-200"
+                                    >
+                                      {role}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
                             ))}
                           </div>
                         </div>

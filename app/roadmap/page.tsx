@@ -311,7 +311,7 @@ export default function RoadmapPage() {
       <div className='absolute inset-0 -z-10 bg-[radial-gradient(circle_at_10%_20%,rgba(69,162,255,0.12),transparent_25%),radial-gradient(circle_at_90%_10%,rgba(244,137,37,0.14),transparent_20%),radial-gradient(circle_at_60%_70%,rgba(72,236,169,0.12),transparent_25%)]' />
       <div className='absolute left-1/2 top-0 -z-10 h-80 w-[60vw] -translate-x-1/2 rounded-full bg-gradient-to-br from-white/8 via-blue-400/10 to-transparent blur-3xl' />
 
-      <div className='relative mx-auto max-w-5xl px-6 py-16 sm:px-8 lg:px-10'>
+      <div className='relative mx-auto max-w-6xl px-6 py-16 sm:px-8 lg:px-10 xl:max-w-[1500px] xl:px-12 2xl:max-w-[1700px] 2xl:px-14'>
         <header className='flex flex-col gap-4'>
           <Breadcrumbs
             items={[
@@ -543,7 +543,7 @@ export default function RoadmapPage() {
         </div>
 
         <div
-          className='mt-4 grid gap-6 lg:[grid-template-columns:var(--roadmap-columns)]'
+          className='mt-4 grid gap-6 lg:[grid-template-columns:var(--roadmap-columns)] xl:gap-8'
           style={columnStyles}
         >
           <div className='space-y-4 rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl shadow-slate-950/30 backdrop-blur'>

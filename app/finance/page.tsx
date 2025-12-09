@@ -1141,7 +1141,7 @@ export default function FinancePage() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl overflow-x-hidden p-4 space-y-6 sm:p-6">
+    <div className="mx-auto max-w-6xl overflow-x-hidden p-4 space-y-6 sm:p-6 xl:max-w-[1500px] xl:px-10 xl:py-8 2xl:max-w-[1700px] 2xl:px-12 2xl:py-10">
       <nav className="flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-600">
         <Link
           href="/"
@@ -1205,8 +1205,8 @@ export default function FinancePage() {
                   )}
                 </div>
               </div>
-          <div className="grid min-w-0 gap-3 md:grid-cols-12">
-            <div className="min-w-0 md:col-span-3">
+            <div className="grid min-w-0 gap-3 md:grid-cols-12 xl:gap-4 2xl:gap-5">
+            <div className="min-w-0 md:col-span-6 lg:col-span-4 xl:col-span-3">
               <label className="space-y-1 text-sm">
                 <span className="text-slate-700">项目</span>
                 <div className="relative" ref={projectRef}>
@@ -1272,7 +1272,7 @@ export default function FinancePage() {
               </label>
             </div>
 
-            <div className="min-w-0 md:col-span-3">
+            <div className="min-w-0 md:col-span-6 lg:col-span-4 xl:col-span-3">
               <label className="space-y-1 text-sm">
                 <span className="text-slate-700">支付方式</span>
                 <div className="relative" ref={paymentRef}>
@@ -1338,7 +1338,7 @@ export default function FinancePage() {
               </label>
             </div>
 
-            <div className="min-w-0 md:col-span-3">
+            <div className="min-w-0 md:col-span-6 lg:col-span-4 xl:col-span-3">
               <label className="space-y-1 text-sm">
                 <span className="text-slate-700">经办人</span>
                 <div className="relative" ref={handlerRef}>
@@ -1404,7 +1404,7 @@ export default function FinancePage() {
               </label>
             </div>
 
-            <div className="min-w-0 md:col-span-3">
+            <div className="min-w-0 md:col-span-6 lg:col-span-4 xl:col-span-3">
               <div className="relative space-y-1 text-sm" ref={columnChooserRef}>
                 <span className="text-slate-700">显示列</span>
                 <div>
@@ -1467,7 +1467,7 @@ export default function FinancePage() {
               </div>
             </div>
 
-            <div className="min-w-0 md:col-span-7 flex items-center">
+            <div className="min-w-0 md:col-span-12 lg:col-span-8 xl:col-span-6 flex items-center">
               <div className="flex w-full items-center gap-3 text-sm">
                 <span className="shrink-0 text-slate-700">分类</span>
                 <div className="relative w-full" ref={categoryRef}>
@@ -1547,7 +1547,7 @@ export default function FinancePage() {
               </div>
             </div>
 
-            <div className="min-w-0 md:col-span-5 flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 p-3 shadow-sm">
+            <div className="min-w-0 md:col-span-6 lg:col-span-6 xl:col-span-4 flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 p-3 shadow-sm">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium text-slate-700">金额范围</span>
                 <div className="flex items-center gap-2">
@@ -1618,7 +1618,7 @@ export default function FinancePage() {
               </div>
             </div>
 
-            <div className="md:col-span-12 flex flex-col gap-3 rounded-lg border border-slate-200 p-3 shadow-sm md:flex-row md:items-center md:justify-between md:gap-4">
+            <div className="min-w-0 md:col-span-6 lg:col-span-6 xl:col-span-4 flex flex-col gap-3 rounded-lg border border-slate-200 p-3 shadow-sm md:flex-row md:items-center md:justify-between md:gap-4">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-sm font-medium text-slate-700">日期范围</span>
                 <div className="flex items-center gap-2">
@@ -1637,18 +1637,19 @@ export default function FinancePage() {
                   />
                 </div>
               </div>
-              <div className="flex flex-1 flex-wrap items-center gap-2 md:flex-[1.4]">
-                <div className="flex w-full items-center gap-2 text-sm">
-                  <span className="shrink-0 text-slate-700">事由</span>
-                  <input
-                    className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
-                    placeholder="模糊搜索事由"
-                    value={listDraft.reasonKeyword}
-                    onChange={(e) => setListDraft((prev) => ({ ...prev, reasonKeyword: e.target.value }))}
-                  />
-                </div>
+            </div>
+
+            <div className="md:col-span-12 lg:col-span-12 xl:col-span-8 flex flex-col gap-3 rounded-lg border border-slate-200 p-3 shadow-sm md:flex-row md:items-center md:justify-between md:gap-4">
+              <div className="flex flex-1 flex-wrap items-center gap-2">
+                <span className="shrink-0 text-sm font-medium text-slate-700">事由</span>
+                <input
+                  className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
+                  placeholder="模糊搜索事由"
+                  value={listDraft.reasonKeyword}
+                  onChange={(e) => setListDraft((prev) => ({ ...prev, reasonKeyword: e.target.value }))}
+                />
               </div>
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2 md:justify-end">
                 <button
                   onClick={() => {
                     const nextFilters = { ...listDraft, page: 1 }

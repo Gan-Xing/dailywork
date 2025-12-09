@@ -184,7 +184,7 @@ const RoadBoard = forwardRef<RoadBoardHandle, Props>(function RoadBoard(
             {t.list.emptyHelp}
           </div>
         ) : (
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
             {roads.map((road) => (
               <RoadCard
                 key={road.id}

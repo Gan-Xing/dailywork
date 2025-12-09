@@ -35,7 +35,7 @@ export function ProgressShell({
 
   return (
     <main className="min-h-screen bg-slate-950 text-slate-50">
-      <div className="relative mx-auto max-w-5xl px-6 py-14 sm:px-8">
+      <div className="relative mx-auto max-w-6xl px-6 py-14 sm:px-8 xl:max-w-[1500px] xl:px-10 2xl:max-w-[1700px] 2xl:px-12">
         <div className="absolute inset-x-0 top-10 -z-10 h-48 bg-gradient-to-r from-emerald-300/20 via-blue-300/15 to-amber-200/20 blur-3xl" />
         <header className="flex flex-col gap-3">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-100">
