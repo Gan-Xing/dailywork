@@ -73,12 +73,16 @@ const dictionaries: Record<DictionaryKind, Record<string, Entry>> = {
   },
   check: {
     [normalize('钢筋绑扎验收')]: { zh: '钢筋绑扎验收', fr: 'Ferraillage' },
-    [normalize('模版验收')]: { zh: '模版验收', fr: 'Réception coffrage' },
+    [normalize('Ferraillage')]: { zh: '钢筋绑扎验收', fr: 'Ferraillage' },
+    [normalize('模版验收')]: { zh: '模板安装验收', fr: 'Réception coffrage' },
+    [normalize('Réception coffrage')]: { zh: '模板安装验收', fr: 'Réception coffrage' },
     [normalize('模版安装验收')]: { zh: '模板安装验收', fr: 'Coffrage' },
     [normalize('模板安装验收')]: { zh: '模板安装验收', fr: 'Coffrage' },
     [normalize('混凝土浇筑验收')]: { zh: '混凝土浇筑验收', fr: 'Réception bétonnage' },
+    [normalize('Réception bétonnage')]: { zh: '混凝土浇筑验收', fr: 'Réception bétonnage' },
     [normalize('放样与开挖')]: { zh: '放样与开挖', fr: 'Implantation et fouille' },
     [normalize('Implatation et fouille')]: { zh: '放样与开挖', fr: 'Implantation et fouille' },
+    [normalize('Implantation et fouille')]: { zh: '放样与开挖', fr: 'Implantation et fouille' },
     [normalize('Coffrage')]: { zh: '模板安装验收', fr: 'Coffrage' },
     [normalize('起终点桩号及清理完成验收')]: { zh: '起终点桩号及清理完成验收', fr: 'Réception des sections et nettoyage' },
     [normalize('Recption des Section et Netoyer')]: {
@@ -90,14 +94,15 @@ const dictionaries: Record<DictionaryKind, Record<string, Entry>> = {
     [normalize('标高验收')]: { zh: '标高验收', fr: 'Nivellement' },
     [normalize('弯沉验收')]: { zh: '弯沉验收', fr: 'Déflexion' },
     [normalize('安装验收')]: { zh: '安装验收', fr: 'Réception de pose' },
+    [normalize('Réception de pose')]: { zh: '安装验收', fr: 'Réception de pose' },
     // French aliases for consistency
     [normalize('Reception Pose')]: { zh: '安装验收', fr: 'Réception de pose' },
     [normalize('Deflextion')]: { zh: '弯沉验收', fr: 'Déflexion' },
     [normalize('Nivelement')]: { zh: '标高验收', fr: 'Nivellement' },
     [normalize('埋墙粉刷验收')]: { zh: '埋墙粉刷验收', fr: 'Badigeonnage' },
     [normalize('badigeonnage')]: { zh: '埋墙粉刷', fr: 'Badigeonnage' },
-    [normalize('badigeonnage des murs enterrés')]: { zh: '埋墙粉刷', fr: 'Badigeonnage des murs enterrés' },
-    [normalize('埋墙粉刷')]: { zh: '埋墙粉刷', fr: 'Badigeonnage des murs enterrés' },
+    [normalize('badigeonnage des murs enterrés')]: { zh: '埋墙粉刷', fr: 'Badigeonnage' },
+    [normalize('埋墙粉刷')]: { zh: '埋墙粉刷', fr: 'Badigeonnage' },
   },
   type: {
     [normalize('现场验收')]: { zh: '现场验收', fr: 'GENIE CIVIL' },
@@ -108,6 +113,7 @@ const dictionaries: Record<DictionaryKind, Record<string, Entry>> = {
     [normalize('TOPOGRAPIQUE')]: { zh: '测量验收', fr: 'TOPOGRAPHIQUE' },
     [normalize('TOPOGRAPHIQUE')]: { zh: '测量验收', fr: 'TOPOGRAPHIQUE' },
     [normalize('GEOTECHNIQUE')]: { zh: '试验验收', fr: 'GEOTECHNIQUE' },
+    [normalize('Autre')]: { zh: '其他', fr: 'Autre' },
   },
 }
 
@@ -176,6 +182,26 @@ export const localizeProgressList = (
   locale: Locale,
   options?: LocalizeOptions,
 ) => values.map((item) => localizeValue(kind, item, locale, options))
+
+const canonicalizeValue = (kind: DictionaryKind, value: string) => {
+  const key = normalize(value)
+  const entry = dictionaries[kind][key]
+  return entry ? entry.zh : value.trim()
+}
+
+export const canonicalizeProgressList = (kind: DictionaryKind, values: string[]) => {
+  const seen = new Set<string>()
+  const result: string[] = []
+  values.forEach((value) => {
+    if (!value) return
+    const canonical = canonicalizeValue(kind, value)
+    const normalized = normalize(canonical)
+    if (seen.has(normalized)) return
+    seen.add(normalized)
+    result.push(canonical)
+  })
+  return result
+}
 
 export const progressDictionary = dictionaries
 

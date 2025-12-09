@@ -9,6 +9,7 @@ import type {
   InspectionPayload,
 } from '@/lib/progressTypes'
 import { getProgressCopy } from '@/lib/i18n/progress'
+import { canonicalizeProgressList } from '@/lib/i18n/progressDictionary'
 import { prisma } from '@/lib/prisma'
 
 const normalizeSide = (side: string | undefined) =>
@@ -106,7 +107,14 @@ const mapInspectionListItem = (
 
 const inspectionErrors = getProgressCopy('zh').phase.errors
 
-const assertRequiredFields = (payload: InspectionPayload) => {
+const normalizeInspectionPayload = (payload: InspectionPayload) => {
+  const layers = canonicalizeProgressList('layer', payload.layers ?? [])
+  const checks = canonicalizeProgressList('check', payload.checks ?? [])
+  const types = canonicalizeProgressList('type', payload.types ?? [])
+  return { ...payload, layers, checks, types }
+}
+
+const assertRequiredFields = (payload: Pick<InspectionPayload, 'layers' | 'checks' | 'types'>) => {
   if (!payload.layers || payload.layers.length === 0) {
     throw new Error(inspectionErrors.submitLayerMissing)
   }
@@ -209,7 +217,8 @@ export const createInspection = async (
   payload: InspectionPayload,
   userId: number | null,
 ) => {
-  assertRequiredFields(payload)
+  const normalizedPayload = normalizeInspectionPayload(payload)
+  assertRequiredFields(normalizedPayload)
 
   const side = normalizeSide(payload.side)
   const range = normalizeRange(payload.startPk, payload.endPk)
@@ -230,12 +239,12 @@ export const createInspection = async (
       side: side as IntervalSide,
       startPk: range.startPk,
       endPk: range.endPk,
-      layers: payload.layers,
-      checks: payload.checks,
-      types: payload.types,
-      submissionOrder: payload.submissionOrder ?? undefined,
-      remark: payload.remark,
-      status: (payload.status as InspectionStatus | undefined) ?? InspectionStatus.SCHEDULED,
+      layers: normalizedPayload.layers,
+      checks: normalizedPayload.checks,
+      types: normalizedPayload.types,
+      submissionOrder: normalizedPayload.submissionOrder ?? undefined,
+      remark: normalizedPayload.remark,
+      status: (normalizedPayload.status as InspectionStatus | undefined) ?? InspectionStatus.SCHEDULED,
       appointmentDate: appointmentDate ?? undefined,
       submittedAt: new Date(),
       submittedBy: userId ?? undefined,
@@ -253,7 +262,8 @@ export const updateInspection = async (
   payload: InspectionPayload,
   userId: number | null,
 ): Promise<InspectionListItem> => {
-  assertRequiredFields(payload)
+  const normalizedPayload = normalizeInspectionPayload(payload)
+  assertRequiredFields(normalizedPayload)
 
   const existing = await prisma.inspectionRequest.findUnique({
     where: { id },
@@ -284,12 +294,12 @@ export const updateInspection = async (
       side: side as IntervalSide,
       startPk: range.startPk,
       endPk: range.endPk,
-      layers: payload.layers,
-      checks: payload.checks,
-      types: payload.types,
-      status: (payload.status as InspectionStatus | undefined) ?? existing.status,
-      submissionOrder: payload.submissionOrder ?? undefined,
-      remark: payload.remark,
+      layers: normalizedPayload.layers,
+      checks: normalizedPayload.checks,
+      types: normalizedPayload.types,
+      status: (normalizedPayload.status as InspectionStatus | undefined) ?? existing.status,
+      submissionOrder: normalizedPayload.submissionOrder ?? undefined,
+      remark: normalizedPayload.remark,
       appointmentDate: appointmentDate ?? undefined,
       submittedAt: submittedAt ?? existing.submittedAt,
       updatedBy: userId ?? undefined,
@@ -379,6 +389,13 @@ export const updateInspectionsBulk = async (
     throw new Error(inspectionErrors.submitTypeMissing)
   }
 
+  const normalizedPatch: InspectionBulkPayload = {
+    ...patch,
+    layers: patch.layers ? canonicalizeProgressList('layer', patch.layers) : undefined,
+    checks: patch.checks ? canonicalizeProgressList('check', patch.checks) : undefined,
+    types: patch.types ? canonicalizeProgressList('type', patch.types) : undefined,
+  }
+
   const rows = await prisma.inspectionRequest.findMany({
     where: { id: { in: uniqueIds } },
     include: { road: true, phase: { include: { intervals: true } }, creator: true, submitter: true, updater: true },
@@ -409,11 +426,19 @@ export const updateInspectionsBulk = async (
         : { startPk: row.startPk, endPk: row.endPk }
       assertPointSideAllowed(phaseForValidation, side as IntervalSide, range)
       const appointmentDate =
-        patch.appointmentDate === undefined ? row.appointmentDate : patch.appointmentDate ? new Date(patch.appointmentDate) : null
+        normalizedPatch.appointmentDate === undefined
+          ? row.appointmentDate
+          : normalizedPatch.appointmentDate
+            ? new Date(normalizedPatch.appointmentDate)
+            : null
       const submittedAt =
-        patch.submittedAt === undefined ? row.submittedAt : patch.submittedAt ? new Date(patch.submittedAt) : null
+        normalizedPatch.submittedAt === undefined
+          ? row.submittedAt
+          : normalizedPatch.submittedAt
+            ? new Date(normalizedPatch.submittedAt)
+            : null
       const submissionOrder =
-        patch.submissionOrder === undefined ? row.submissionOrder : patch.submissionOrder ?? null
+        normalizedPatch.submissionOrder === undefined ? row.submissionOrder : normalizedPatch.submissionOrder ?? null
 
       const updated = await tx.inspectionRequest.update({
         where: { id: row.id },
@@ -422,12 +447,12 @@ export const updateInspectionsBulk = async (
           side: side as IntervalSide,
           startPk: range.startPk,
           endPk: range.endPk,
-          layers: patch.layers ?? row.layers,
-          checks: patch.checks ?? row.checks,
-          types: patch.types ?? row.types,
-          status: patch.status ?? row.status,
+          layers: normalizedPatch.layers ?? row.layers,
+          checks: normalizedPatch.checks ?? row.checks,
+          types: normalizedPatch.types ?? row.types,
+          status: normalizedPatch.status ?? row.status,
           submissionOrder,
-          remark: patch.remark ?? row.remark,
+          remark: normalizedPatch.remark ?? row.remark,
           appointmentDate: appointmentDate ?? undefined,
           submittedAt: submittedAt ?? row.submittedAt,
           updatedBy: userId ?? undefined,

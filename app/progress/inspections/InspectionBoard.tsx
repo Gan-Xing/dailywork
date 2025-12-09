@@ -20,7 +20,11 @@ import {
   type PrefabPhaseKey,
 } from '@/lib/prefabInspection'
 import { getProgressCopy, formatProgressCopy } from '@/lib/i18n/progress'
-import { localizeProgressList, localizeProgressTerm } from '@/lib/i18n/progressDictionary'
+import {
+  canonicalizeProgressList,
+  localizeProgressList,
+  localizeProgressTerm,
+} from '@/lib/i18n/progressDictionary'
 import { locales } from '@/lib/i18n'
 import { usePreferredLocale } from '@/lib/usePreferredLocale'
 
@@ -157,6 +161,14 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
     localizeProgressTerm('phase', definition.name, locale)
   const formatTypeLabel = (value: string) => localizeProgressTerm('type', value, locale)
   const formatRoadName = (slug?: string, name?: string) => resolveRoadName({ slug, name }, locale)
+  const normalizeLayerLabels = (values: string[], phaseName?: string) =>
+    localizeProgressList('layer', canonicalizeProgressList('layer', values), locale, {
+      phaseName,
+    })
+  const normalizeCheckLabels = (values: string[]) =>
+    localizeProgressList('check', canonicalizeProgressList('check', values), locale)
+  const normalizeTypeLabels = (values: string[]) =>
+    localizeProgressList('type', canonicalizeProgressList('type', values), locale)
   const inspectionTypeOptions = useMemo(
     () => ['现场验收', '试验验收', '测量验收', '其他'],
     [],
@@ -622,13 +634,9 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
     if (!editing) return
     const joiner = locale === 'fr' ? ', ' : '，'
     const nowIso = new Date().toISOString()
-    const localizedLayers = localizeProgressList('layer', editing.layers, locale, {
-      phaseName: editing.phaseName,
-    }).join(joiner)
-    const localizedChecks = localizeProgressList('check', editing.checks, locale, {
-      phaseName: editing.phaseName,
-    }).join(joiner)
-    const localizedTypes = localizeProgressList('type', editing.types, locale).join(joiner)
+    const localizedLayers = normalizeLayerLabels(editing.layers, editing.phaseName).join(joiner)
+    const localizedChecks = normalizeCheckLabels(editing.checks).join(joiner)
+    const localizedTypes = normalizeTypeLabels(editing.types).join(joiner)
     setEditForm({
       phaseId: editing.phaseId,
       side: editing.side,
@@ -1378,9 +1386,9 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                       : formatRoadName(item.roadSlug, item.roadName)
                     const sideText = isPrefab ? '—' : sideCopy[item.side] ?? item.side
                     const rangeText = isPrefab ? '—' : `${formatPK(item.startPk)} → ${formatPK(item.endPk)}`
-                    const layersText = localizeProgressList('layer', item.layers, locale, {
-                      phaseName: item.phaseName,
-                    }).join(' / ')
+                    const layersText = normalizeLayerLabels(item.layers, item.phaseName).join(' / ')
+                    const checksText = normalizeCheckLabels(item.checks).join(' / ')
+                    const typesText = normalizeTypeLabels(item.types).join(' / ')
                     const appointmentText = formatAppointmentDate(item.appointmentDate)
                     const submittedByText = item.submittedBy?.username ?? '—'
                     const createdByText = item.createdBy?.username ?? '—'
@@ -1432,17 +1440,17 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                       {isVisible('checks') ? (
                         <td
                           className="px-4 py-3 max-w-xs truncate"
-                          title={localizeProgressList('check', item.checks, locale).join(' / ')}
+                          title={checksText}
                         >
-                          {localizeProgressList('check', item.checks, locale).join(' / ')}
+                          {checksText}
                         </td>
                       ) : null}
                       {isVisible('types') ? (
                         <td
                           className="px-4 py-3 max-w-xs truncate"
-                          title={localizeProgressList('type', item.types, locale).join(' / ')}
+                          title={typesText}
                         >
-                          {localizeProgressList('type', item.types, locale).join(' / ')}
+                          {typesText}
                         </td>
                       ) : null}
                       {isVisible('submissionOrder') ? (
@@ -1705,15 +1713,10 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
               const sideText = isPrefab ? '—' : sideCopy[selected.side] ?? selected.side
               const rangeText = isPrefab ? '—' : `${formatPK(selected.startPk)} → ${formatPK(selected.endPk)}`
               const roadText = isPrefab ? prefabRoadLabel : formatRoadName(selected.roadSlug, selected.roadName)
-              const layerText = localizeProgressList('layer', selected.layers, locale, {
-                phaseName: selected.phaseName,
-              }).join(locale === 'fr' ? ', ' : ' / ')
-              const checksText = localizeProgressList('check', selected.checks, locale).join(
-                locale === 'fr' ? ', ' : ' / ',
-              )
-              const typesText = localizeProgressList('type', selected.types, locale).join(
-                locale === 'fr' ? ', ' : ' / ',
-              )
+              const joiner = locale === 'fr' ? ', ' : ' / '
+              const layerText = normalizeLayerLabels(selected.layers, selected.phaseName).join(joiner)
+              const checksText = normalizeCheckLabels(selected.checks).join(joiner)
+              const typesText = normalizeTypeLabels(selected.types).join(joiner)
               const submittedByText = selected.submittedBy?.username ?? copy.detailModal.unknownUser
               const createdByText = selected.createdBy?.username ?? copy.detailModal.unknownUser
               const updatedByText = selected.updatedBy?.username ?? copy.detailModal.unknownUser
