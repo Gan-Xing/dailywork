@@ -120,6 +120,7 @@ interface SelectedSegment {
   workflow?: WorkflowBinding
   workflowLayers?: WorkflowLayerTemplate[]
   workflowTypeOptions?: string[]
+  pointHasSides: boolean
 }
 
 type AlertDialogState = {
@@ -247,13 +248,13 @@ const fillNonDesignGaps = (segments: Segment[], start: number, end: number) => {
   let cursor = start
   sorted.forEach((seg) => {
     if (seg.start > cursor) {
-      result.push({ start: cursor, end: seg.start, status: 'nonDesign' })
+      result.push({ start: cursor, end: seg.start, status: 'nonDesign', pointHasSides: false })
     }
     result.push(seg)
     cursor = Math.max(cursor, seg.end)
   })
   if (cursor < end) {
-    result.push({ start: cursor, end, status: 'nonDesign' })
+    result.push({ start: cursor, end, status: 'nonDesign', pointHasSides: false })
   }
   return result
 }
@@ -353,6 +354,7 @@ const applyInspectionStatuses = (segments: Segment[], inspections: InspectionSli
       status,
       spec: design.spec,
       billQuantity: design.billQuantity,
+      pointHasSides: design.pointHasSides,
     })
   }
   return mergeAdjacentSegments(result)
@@ -383,6 +385,7 @@ const buildLinearView = (
       status: 'pending' as Status,
       spec: interval.spec,
       billQuantity: interval.billQuantity,
+      pointHasSides: Boolean(phase.pointHasSides),
     }
     if (interval.side === 'LEFT') left.push(baseSegment)
     if (interval.side === 'RIGHT') right.push(baseSegment)

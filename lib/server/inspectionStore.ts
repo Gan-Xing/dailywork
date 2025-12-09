@@ -432,7 +432,7 @@ export const updateInspectionsBulk = async (
           submittedAt: submittedAt ?? row.submittedAt,
           updatedBy: userId ?? undefined,
         },
-        include: { road: true, phase: true, creator: true, submitter: true, updater: true },
+        include: { road: true, phase: { include: { intervals: true } }, creator: true, submitter: true, updater: true },
       })
       results.push(updated)
     }
