@@ -777,7 +777,7 @@ export function InspectionBoard({ roads, loadError }: Props) {
 
   return (
     <main className="min-h-screen bg-slate-950 text-slate-50">
-      <div className="relative mx-auto max-w-6xl px-6 py-12 sm:px-8">
+      <div className="relative mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8 xl:max-w-[1500px] xl:px-10 2xl:max-w-[1700px] 2xl:px-12">
         <div className="absolute inset-x-0 top-10 -z-10 h-48 bg-gradient-to-r from-emerald-300/15 via-blue-300/10 to-amber-200/10 blur-3xl" />
         <header className="space-y-3">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-100">{copy.badge}</p>
@@ -1268,6 +1268,7 @@ export function InspectionBoard({ roads, loadError }: Props) {
                   items.map((item, index) => {
                     const displayIndex = (page - 1) * pageSize + index + 1
                     const isPrefab = isPrefabItem(item)
+                    const isRowSelected = selectedIds.includes(item.id)
                     const roadText = isPrefab
                       ? prefabRoadLabel
                       : formatRoadName(item.roadSlug, item.roadName)
@@ -1284,8 +1285,8 @@ export function InspectionBoard({ roads, loadError }: Props) {
                     return (
                       <tr
                         key={item.id}
-                        className="border-t border-white/5 bg-white/0 transition hover:bg-white/5"
-                        onClick={() => setSelected(item)}
+                        className={`border-t border-white/5 transition ${isRowSelected ? 'bg-emerald-400/10' : 'bg-white/0'} hover:bg-white/5`}
+                        onClick={() => toggleSelect(item.id)}
                       >
                       <td className="px-4 py-3 text-xs text-slate-300">
                         <div className="flex items-center gap-2">
@@ -1378,6 +1379,16 @@ export function InspectionBoard({ roads, loadError }: Props) {
                       {isVisible('action') ? (
                         <td className="px-4 py-3 text-center">
                           <div className="flex items-center justify-center gap-2">
+                            <button
+                              type="button"
+                              className="rounded-lg border border-white/20 px-3 py-1 text-xs font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/10"
+                              onClick={(event) => {
+                                event.stopPropagation()
+                                setSelected(item)
+                              }}
+                            >
+                              {copy.table.view}
+                            </button>
                             <button
                               type="button"
                               className="rounded-lg border border-white/20 px-3 py-1 text-xs font-semibold text-slate-50 transition hover:border-emerald-200/70 hover:bg-emerald-200/15"

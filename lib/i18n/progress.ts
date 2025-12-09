@@ -858,7 +858,7 @@ const progressCopy: Record<Locale, ProgressCopy> = {
     inspectionBoard: {
       badge: '报检列表',
       title: '所有报检记录',
-      description: '可按道路、分项、状态、侧别、时间等条件筛选，点击表头可排序，点击行查看详情。',
+      description: '可按道路、分项、状态、侧别、时间等条件筛选，点击表头可排序；点击行仅勾选，详情请在操作中点击查看。',
       breadcrumb: {
         home: '首页',
         progress: '进度管理',
@@ -951,6 +951,7 @@ const progressCopy: Record<Locale, ProgressCopy> = {
         empty: '暂无记录',
         selectPage: '全选当页报检记录',
         selectRow: '选择报检 {index}',
+        view: '查看',
         edit: '编辑',
         delete: '删除',
       },
@@ -1404,7 +1405,7 @@ const progressCopy: Record<Locale, ProgressCopy> = {
       badge: 'Contrôles',
       title: 'Toutes les demandes',
       description:
-        'Filtrez par route, phase, statut, côté ou dates; tri possible via les entêtes, cliquez sur une ligne pour le détail.',
+        'Filtrez par route, phase, statut, côté ou dates; tri possible via les entêtes. Clic sur une ligne = sélection, détail via les actions.',
       breadcrumb: {
         home: 'Accueil',
         progress: "Suivi d'avancement",
@@ -1497,6 +1498,7 @@ const progressCopy: Record<Locale, ProgressCopy> = {
         empty: 'Aucune donnée',
         selectPage: 'Tout sélectionner sur cette page',
         selectRow: 'Sélectionner le contrôle {index}',
+        view: 'Voir',
         edit: 'Éditer',
         delete: 'Supprimer',
       },
