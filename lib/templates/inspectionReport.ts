@@ -462,8 +462,7 @@ const buildPage = (inspection: InspectionListItem, locale: Locale) => {
   const checksText = localizeProgressList('check', inspection.checks, locale, {
     phaseName: inspection.phaseName,
   }).join(' / ')
-  const typesText = localizeProgressList('type', inspection.types, locale).join(' / ')
-  const natureTravaux = checksText || layersText || typesText
+  const natureTravaux = [layersText, checksText].filter(Boolean).join(' / ')
 
   const numero = ''
   const dateSubmitted = formatDate(inspection.submittedAt, locale)
