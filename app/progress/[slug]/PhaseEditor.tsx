@@ -52,6 +52,8 @@ type InspectionSlice = {
   updatedAt: number
 }
 
+type LayerStatusByName = Record<string, { status: InspectionStatus; updatedAt: number }>
+
 type LatestPointInspection = {
   phaseId: number
   side: IntervalSide
@@ -61,6 +63,7 @@ type LatestPointInspection = {
   layers: string[]
   checks?: string[]
   updatedAt: number
+  layerStatus?: LayerStatusByName
 }
 
 interface Segment {
@@ -275,7 +278,9 @@ const mapInspectionStatus = (status: InspectionStatus): Status => {
   return 'pending'
 }
 
-const workflowSatisfiedStatuses: InspectionStatus[] = ['PENDING', 'SCHEDULED', 'SUBMITTED', 'IN_PROGRESS', 'APPROVED']
+const workflowSatisfiedStatuses: InspectionStatus[] = ['SCHEDULED', 'SUBMITTED', 'IN_PROGRESS', 'APPROVED']
+const isWorkflowSatisfied = (status?: InspectionStatus) =>
+  (statusPriority[status ?? 'PENDING'] ?? 0) >= (statusPriority.SCHEDULED ?? 0)
 
 const snapshotMatches =
   (phaseId: number, targetSide: IntervalSide, targetStart: number, targetEnd: number) =>
@@ -1192,7 +1197,20 @@ export function PhaseEditor({
 
   const openInspectionModal = (phase: PhaseDTO, segment: SelectedSegment) => {
     const workflowSelection = resolveWorkflowSelection(phase)
-    const layers = workflowSelection?.layerNames.length ? workflowSelection.layerNames : segment.layers
+    let workflowLayers = workflowSelection?.sortedLayers
+    let layers = workflowSelection?.layerNames.length ? workflowSelection.layerNames : segment.layers
+    if (workflowSelection?.sortedLayers?.length && segment.layers.length) {
+      const targetTokens = new Set(
+        segment.layers.flatMap((name) => normalizeLayerTokens(name, phase.name)),
+      )
+      const filtered = workflowSelection.sortedLayers.filter((layer) =>
+        normalizeLayerTokens(layer.name, phase.name).some((token) => targetTokens.has(token)),
+      )
+      if (filtered.length) {
+        workflowLayers = filtered
+        layers = filtered.map((layer) => layer.name)
+      }
+    }
     const checks = workflowSelection?.checkNames.length ? workflowSelection.checkNames : segment.checks
     const typeOptions = workflowSelection?.typeOptions ?? defaultInspectionTypes
     setSelectedSegment({
@@ -1201,7 +1219,7 @@ export function PhaseEditor({
       layers: localizeProgressList('layer', layers, locale, { phaseName: phase.name }),
       checks: localizeProgressList('check', checks, locale),
       workflow: workflowSelection?.binding,
-      workflowLayers: workflowSelection?.sortedLayers,
+      workflowLayers,
       workflowTypeOptions: typeOptions,
     })
   }
@@ -1333,7 +1351,6 @@ export function PhaseEditor({
       const buildCoverage = (side: IntervalSide) => {
         const map = new Map<string, Array<{ start: number; end: number }>>()
         latestPointInspectionsRef.current.forEach((snapshot) => {
-          if (!workflowSatisfiedStatuses.includes(snapshot.status ?? 'PENDING')) return
           const match =
             side === 'BOTH'
               ? matchesBoth(snapshot)
@@ -1351,6 +1368,8 @@ export function PhaseEditor({
                 localizeProgressTerm('layer', token, 'zh', { phaseName: workflowPhaseNameForContext }),
               )
               const meta = workflowLayerByName.get(normalizedLayerName)
+              const statusForLayer = resolveSnapshotLayerStatus(snapshot, new Set([normalizedLayerName]))
+              if (!isWorkflowSatisfied(statusForLayer)) return
               if (!meta) return
               const list = map.get(meta.id) ?? []
               list.push({ start: clippedStart, end: clippedEnd })
@@ -1742,6 +1761,16 @@ export function PhaseEditor({
       .map((item) => normalizeLabel(item))
   }, [])
 
+  const resolveSnapshotLayerStatus = useCallback(
+    (snapshot: LatestPointInspection, normalizedLayerNames: Set<string>): InspectionStatus =>
+      Array.from(normalizedLayerNames).reduce<InspectionStatus | null>((result, name) => {
+        if (result) return result
+        const entry = snapshot.layerStatus?.[name]
+        return entry?.status ?? null
+      }, null) ?? snapshot.status ?? 'PENDING',
+    [],
+  )
+
   const sortedPhases = useMemo(() => {
     if (!phases.length) return phases
     const order = new Map(phases.map((phase, index) => [phase.id, index]))
@@ -1838,15 +1867,14 @@ export function PhaseEditor({
       effectiveLayers.forEach((layer) => {
         const normalizedLayerNames = new Set(normalizeLayerTokens(layer.name, phaseNameForContext))
         if (!normalizedLayerNames.size) return
-        const approvedSnapshots = snapshots.filter((snapshot) => snapshot.status === 'APPROVED')
-        if (!approvedSnapshots.length) return
-
-        const layerSnapshots = approvedSnapshots.filter((snapshot) =>
-          (snapshot.layers ?? []).some((layerName) => {
+        const layerSnapshots = snapshots.filter((snapshot) => {
+          const statusForLayer = resolveSnapshotLayerStatus(snapshot, normalizedLayerNames)
+          if (statusForLayer !== 'APPROVED') return false
+          return (snapshot.layers ?? []).some((layerName) => {
             const normalizedSnapshotLayer = normalizeLayerTokens(layerName, phaseNameForContext)
             return normalizedSnapshotLayer.some((token) => normalizedLayerNames.has(token))
-          }),
-        )
+          })
+        })
         const requiredChecks = new Set(
           (layer.checks ?? []).flatMap((check) => normalizeCheckTokens(check.name)),
         )
@@ -1873,7 +1901,15 @@ export function PhaseEditor({
       const percent = totalLayers > 0 ? (completedLayers / totalLayers) * 100 : 0
       return { percent, completedLayers, totalLayers }
     },
-    [findIntervalLayers, normalizeCheckTokens, normalizeLayerTokens, phases, resolvePointSnapshots, workflowLayersByPhaseId],
+    [
+      findIntervalLayers,
+      normalizeCheckTokens,
+      normalizeLayerTokens,
+      phases,
+      resolvePointSnapshots,
+      resolveSnapshotLayerStatus,
+      workflowLayersByPhaseId,
+    ],
   )
 
   const workflowLayerById = useMemo(() => {
@@ -2076,9 +2112,10 @@ export function PhaseEditor({
       const matchRight = snapshotMatchesSide(snapshot, 'RIGHT')
       const matchCurrentSide = snapshotMatchesTarget(snapshot)
       if (!matchLeft && !matchRight && !matchCurrentSide) return
-      const status = snapshot.status ?? 'PENDING'
+      const baseStatus = snapshot.status ?? 'PENDING'
       const [snapshotStart, snapshotEnd] = normalizeRange(snapshot.startPk, snapshot.endPk)
       const snapshotLayerIds = new Set<string>()
+      const snapshotLayerStatuses = new Map<string, InspectionStatus>()
       snapshot.layers?.forEach((layerName) => {
         splitLayerTokens(layerName).forEach((token) => {
           const normalizedLayerName = normalizeLabel(
@@ -2086,12 +2123,16 @@ export function PhaseEditor({
           )
           const layerMeta = workflowLayerByName?.get(normalizedLayerName)
           const layerKey = layerMeta?.id ?? normalizedLayerName
+          const statusForLayer = resolveSnapshotLayerStatus(snapshot, new Set([normalizedLayerName]))
+          if (layerMeta?.id) {
+            snapshotLayerStatuses.set(layerMeta.id, statusForLayer)
+          }
           if (matchCurrentSide) {
-            pushLayerStatus(layerKey, status)
+            pushLayerStatus(layerKey, statusForLayer)
           }
           if (layerMeta?.id) {
-            if (matchLeft) pushLayerSideStatus(layerMeta.id, 'LEFT', status)
-            if (matchRight) pushLayerSideStatus(layerMeta.id, 'RIGHT', status)
+            if (matchLeft) pushLayerSideStatus(layerMeta.id, 'LEFT', statusForLayer)
+            if (matchRight) pushLayerSideStatus(layerMeta.id, 'RIGHT', statusForLayer)
           }
           if (layerMeta?.id) {
             snapshotLayerIds.add(layerMeta.id)
@@ -2108,16 +2149,19 @@ export function PhaseEditor({
         const normalizedCandidates = checkNames.map((name) => normalizeLabel(name))
         const meta = normalizedCandidates.map((key) => workflowCheckMetaByName?.get(key)).find(Boolean) ?? null
         const layerKey = meta?.layerId ?? ''
+        const statusForCheck = layerKey
+          ? snapshotLayerStatuses.get(layerKey) ?? baseStatus
+          : baseStatus
         if (matchCurrentSide) {
           if (layerKey && snapshotLayerIds.size && !snapshotLayerIds.has(layerKey)) {
             return
           }
           normalizedCandidates.forEach((candidate) => {
             const checkKey = layerKey ? `${layerKey}|${candidate}` : candidate
-            pushCheckStatus(checkKey, status)
+            pushCheckStatus(checkKey, statusForCheck)
             if (layerKey) {
-              if (matchLeft) pushCheckSideStatus(checkKey, 'LEFT', status)
-              if (matchRight) pushCheckSideStatus(checkKey, 'RIGHT', status)
+              if (matchLeft) pushCheckSideStatus(checkKey, 'LEFT', statusForCheck)
+              if (matchRight) pushCheckSideStatus(checkKey, 'RIGHT', statusForCheck)
             }
           })
         } else if (layerKey) {
@@ -2125,8 +2169,8 @@ export function PhaseEditor({
           if (snapshotLayerIds.has(layerKey)) {
             normalizedCandidates.forEach((candidate) => {
               const checkKey = `${layerKey}|${candidate}`
-              if (matchLeft) pushCheckSideStatus(checkKey, 'LEFT', status)
-              if (matchRight) pushCheckSideStatus(checkKey, 'RIGHT', status)
+              if (matchLeft) pushCheckSideStatus(checkKey, 'LEFT', statusForCheck)
+              if (matchRight) pushCheckSideStatus(checkKey, 'RIGHT', statusForCheck)
             })
           }
         }
@@ -2140,6 +2184,7 @@ export function PhaseEditor({
     selectedSegment,
     selectedSide,
     startPkInput,
+    resolveSnapshotLayerStatus,
     workflowCheckMetaByName,
     workflowLayerByName,
     workflowPhaseNameForContext,
@@ -2182,7 +2227,6 @@ export function PhaseEditor({
       const matchRight = matchForSide('RIGHT')(latest)
       const matchBoth = matchForSide('BOTH')(latest)
       if (!(matchLeft || matchRight || matchBoth)) return
-      if (!workflowSatisfiedStatuses.includes(latest.status ?? 'PENDING')) return
 
       // Mark completed layers -> all checks in该层视为完成
       latest.layers.forEach((layerName) => {
@@ -2191,6 +2235,8 @@ export function PhaseEditor({
             localizeProgressTerm('layer', token, 'zh', { phaseName: workflowPhaseNameForContext }),
           )
           const meta = workflowLayerByName.get(normalizedLayerName)
+          const statusForLayer = resolveSnapshotLayerStatus(latest, new Set([normalizedLayerName]))
+          if (!isWorkflowSatisfied(statusForLayer)) return
           if (!meta) return
           if (matchBoth) {
             markLayerCompleted(meta.id)
@@ -2208,6 +2254,19 @@ export function PhaseEditor({
       latest.checks?.forEach((checkName) => {
         const meta = workflowCheckMetaByName.get(normalizeLabel(checkName))
         if (!meta) return
+        const layerNameForStatus = workflowLayerById?.get(meta.layerId)?.name ?? ''
+        const normalizedLayerName = layerNameForStatus
+          ? normalizeLabel(
+            localizeProgressTerm('layer', layerNameForStatus, 'zh', {
+              phaseName: workflowPhaseNameForContext,
+            }),
+          )
+          : null
+        const statusForCheck =
+          normalizedLayerName && normalizedLayerName.trim()
+            ? resolveSnapshotLayerStatus(latest, new Set([normalizedLayerName]))
+            : resolveSnapshotLayerStatus(latest, new Set())
+        if (!isWorkflowSatisfied(statusForCheck)) return
         const normalized = normalizeLabel(checkName)
         const localized = normalizeLabel(localizeProgressTerm('check', checkName, locale))
         if (matchBoth) {
@@ -2305,7 +2364,6 @@ export function PhaseEditor({
       const leftSet = new Set<string>()
       const rightSet = new Set<string>()
       latestPointInspectionsRef.current.forEach((latest) => {
-        if (!workflowSatisfiedStatuses.includes(latest.status ?? 'PENDING')) return
         if (matchesLeft(latest)) {
           latest.layers.forEach((layerName) => {
             splitLayerTokens(layerName).forEach((token) => {
@@ -2313,6 +2371,8 @@ export function PhaseEditor({
                 localizeProgressTerm('layer', token, 'zh', { phaseName: workflowPhaseNameForContext }),
               )
               const meta = workflowLayerByName.get(normalizedLayerName)
+              const statusForLayer = resolveSnapshotLayerStatus(latest, new Set([normalizedLayerName]))
+              if (!isWorkflowSatisfied(statusForLayer)) return
               if (meta) leftSet.add(meta.id)
             })
           })
@@ -2324,6 +2384,8 @@ export function PhaseEditor({
                 localizeProgressTerm('layer', token, 'zh', { phaseName: workflowPhaseNameForContext }),
               )
               const meta = workflowLayerByName.get(normalizedLayerName)
+              const statusForLayer = resolveSnapshotLayerStatus(latest, new Set([normalizedLayerName]))
+              if (!isWorkflowSatisfied(statusForLayer)) return
               if (meta) rightSet.add(meta.id)
             })
           })
@@ -2337,13 +2399,14 @@ export function PhaseEditor({
     } else {
       latestPointInspectionsRef.current.forEach((latest) => {
         if (!matchesSnapshot(latest)) return
-        if (!workflowSatisfiedStatuses.includes(latest.status ?? 'PENDING')) return
         latest.layers.forEach((layerName) => {
           splitLayerTokens(layerName).forEach((token) => {
             const normalizedLayerName = normalizeLabel(
               localizeProgressTerm('layer', token, 'zh', { phaseName: workflowPhaseNameForContext }),
             )
             const meta = workflowLayerByName.get(normalizedLayerName)
+            const statusForLayer = resolveSnapshotLayerStatus(latest, new Set([normalizedLayerName]))
+            if (!isWorkflowSatisfied(statusForLayer)) return
             if (meta) set.add(meta.id)
           })
         })
@@ -2539,6 +2602,61 @@ export function PhaseEditor({
       if (options?.phaseId) {
         search.set('phaseId', String(options.phaseId))
       }
+      const buildLayerStatusMap = (
+        layers: string[] | undefined,
+        status: InspectionStatus,
+        updatedAt: number,
+        phaseName?: string,
+      ): LayerStatusByName => {
+        const map: LayerStatusByName = {}
+        if (!layers?.length) return map
+        layers.forEach((layerName) => {
+          splitLayerTokens(layerName).forEach((token) => {
+            const normalized = normalizeLabel(
+              localizeProgressTerm('layer', token, 'zh', { phaseName }),
+            )
+            if (!normalized) return
+            const existing = map[normalized]
+            if (!existing) {
+              map[normalized] = { status, updatedAt }
+              return
+            }
+            const existingPriority = statusPriority[existing.status] ?? 0
+            const incomingPriority = statusPriority[status] ?? 0
+            if (
+              incomingPriority > existingPriority ||
+              (incomingPriority === existingPriority && updatedAt >= existing.updatedAt)
+            ) {
+              map[normalized] = { status, updatedAt }
+            }
+          })
+        })
+        return map
+      }
+
+      const mergeLayerStatusMap = (
+        target: LayerStatusByName | undefined,
+        incoming: LayerStatusByName | undefined,
+      ): LayerStatusByName => {
+        const result: LayerStatusByName = target ? { ...target } : {}
+        Object.entries(incoming ?? {}).forEach(([name, entry]) => {
+          const existing = result[name]
+          if (!existing) {
+            result[name] = entry
+            return
+          }
+          const existingPriority = statusPriority[existing.status] ?? 0
+          const incomingPriority = statusPriority[entry.status] ?? 0
+          if (
+            incomingPriority > existingPriority ||
+            (incomingPriority === existingPriority && entry.updatedAt >= existing.updatedAt)
+          ) {
+            result[name] = entry
+          }
+        })
+        return result
+      }
+
       const url = `/api/progress/${road.slug}/inspections?${search.toString()}`
       try {
         const res = await fetch(url, { credentials: 'include' })
@@ -2554,6 +2672,7 @@ export function PhaseEditor({
         const data = (await res.json()) as {
           items?: Array<{
             phaseId: number
+            phaseName?: string
             startPk: number
             endPk: number
             side: IntervalSide
@@ -2576,6 +2695,12 @@ export function PhaseEditor({
           const side = item.side ?? 'BOTH'
           const key = buildPointKey(item.phaseId, side, orderedStart, orderedEnd)
           const existing = map.get(key)
+          const layerStatus = buildLayerStatusMap(
+            item.layers,
+            item.status ?? 'PENDING',
+            ts || 0,
+            item.phaseName,
+          )
           const snapshot: LatestPointInspection = {
             phaseId: Number(item.phaseId),
             side,
@@ -2585,6 +2710,7 @@ export function PhaseEditor({
             checks: item.checks || [],
             updatedAt: ts || 0,
             status: item.status ?? 'PENDING',
+            layerStatus,
           }
           if (!existing) {
             map.set(key, snapshot)
@@ -2602,26 +2728,22 @@ export function PhaseEditor({
                   ? snapshot.status
                   : existing.status
 
-            let mergedLayers: string[] = []
-            let mergedChecks: string[] = []
-            if (mergedStatus === existing.status && mergedStatus !== snapshot.status) {
-              mergedLayers = existing.layers || []
-              mergedChecks = existing.checks || []
-            } else if (mergedStatus === snapshot.status && mergedStatus !== existing.status) {
-              mergedLayers = snapshot.layers || []
-              mergedChecks = snapshot.checks || []
-            } else {
-              mergedLayers = Array.from(new Set([...(existing.layers || []), ...(snapshot.layers || [])]))
-              mergedChecks = Array.from(new Set([...(existing.checks || []), ...(snapshot.checks || [])]))
-            }
+            const mergedLayers = Array.from(
+              new Set([...(existing.layers || []), ...(snapshot.layers || [])]),
+            )
+            const mergedChecks = Array.from(
+              new Set([...(existing.checks || []), ...(snapshot.checks || [])]),
+            )
 
             const mergedUpdatedAt = Math.max(existing.updatedAt ?? 0, snapshot.updatedAt ?? 0)
+            const mergedLayerStatus = mergeLayerStatusMap(existing.layerStatus, snapshot.layerStatus)
             const merged: LatestPointInspection = {
               ...snapshot,
               layers: mergedLayers,
               checks: mergedChecks,
               updatedAt: mergedUpdatedAt,
               status: mergedStatus,
+              layerStatus: mergedLayerStatus,
             }
             map.set(key, merged)
           }
@@ -2637,6 +2759,7 @@ export function PhaseEditor({
         if (!isCancelled()) {
           const linearRaw = new Map<number, LatestPointInspection[]>()
           data.items.forEach((item) => {
+            const ts = new Date(item.updatedAt).getTime() || 0
             const snapshot: LatestPointInspection = {
               phaseId: Number(item.phaseId),
               side: item.side ?? 'BOTH',
@@ -2644,13 +2767,30 @@ export function PhaseEditor({
               endPk: Number(item.endPk),
               layers: item.layers || [],
               checks: item.checks || [],
-              updatedAt: new Date(item.updatedAt).getTime() || 0,
+              updatedAt: ts,
               status: item.status ?? 'PENDING',
+              layerStatus: buildLayerStatusMap(
+                item.layers,
+                item.status ?? 'PENDING',
+                ts,
+                item.phaseName,
+              ),
             }
             const list = linearRaw.get(snapshot.phaseId) ?? []
             list.push(snapshot)
             linearRaw.set(snapshot.phaseId, list)
           })
+          if (process.env.NODE_ENV !== 'production') {
+            const debug = Array.from(map.values()).map((snap) => ({
+              phaseId: snap.phaseId,
+              side: snap.side,
+              range: `${snap.startPk}-${snap.endPk}`,
+              status: snap.status,
+              layers: snap.layers,
+              layerStatus: snap.layerStatus,
+            }))
+            console.log('[progress debug] latestPointInspections', debug)
+          }
           latestPointInspectionsRef.current = map
           setLatestPointInspections(map)
           setInspectionSlices(slices)
@@ -2684,28 +2824,32 @@ export function PhaseEditor({
       if (!selectedSegment || !intervalRange) return false
       if (selectedSide !== 'BOTH') return false
       const [rangeStart, rangeEnd] = intervalRange
-      const coversRange = (snapshot: LatestPointInspection) => {
-        const [snapshotStart, snapshotEnd] = normalizeRange(snapshot.startPk, snapshot.endPk)
-        return snapshot.phaseId === selectedSegment.phaseId && snapshotStart <= rangeStart && snapshotEnd >= rangeEnd
-      }
-      let hasBoth = false
-      let hasSingle = false
-      latestPointInspections.forEach((snapshot) => {
-        if (!workflowSatisfiedStatuses.includes(snapshot.status ?? 'PENDING')) return
-        if (!coversRange(snapshot)) return
-        let includesLayer = false
-        snapshot.layers?.forEach((layerName) => {
-          splitLayerTokens(layerName).forEach((token) => {
-            const normalizedLayerName = normalizeLabel(
-              localizeProgressTerm('layer', token, 'zh', { phaseName: workflowPhaseNameForContext }),
+    const coversRange = (snapshot: LatestPointInspection) => {
+      const [snapshotStart, snapshotEnd] = normalizeRange(snapshot.startPk, snapshot.endPk)
+      return snapshot.phaseId === selectedSegment.phaseId && snapshotStart <= rangeStart && snapshotEnd >= rangeEnd
+    }
+    let hasBoth = false
+    let hasSingle = false
+    latestPointInspections.forEach((snapshot) => {
+      if (!coversRange(snapshot)) return
+      let includesLayer = false
+      snapshot.layers?.forEach((layerName) => {
+        splitLayerTokens(layerName).forEach((token) => {
+          const normalizedLayerName = normalizeLabel(
+            localizeProgressTerm('layer', token, 'zh', { phaseName: workflowPhaseNameForContext }),
+          )
+          const meta = workflowLayerByName?.get(normalizedLayerName)
+          if (meta?.id === layer.id) {
+            const statusForLayer = resolveSnapshotLayerStatus(
+              snapshot,
+              new Set([normalizedLayerName]),
             )
-            const meta = workflowLayerByName?.get(normalizedLayerName)
-            if (meta?.id === layer.id) {
-              includesLayer = true
-            }
-          })
+            if (!isWorkflowSatisfied(statusForLayer)) return
+            includesLayer = true
+          }
         })
-        if (!includesLayer) return
+      })
+      if (!includesLayer) return
         if (snapshot.side === 'BOTH') {
           hasBoth = true
         } else {
