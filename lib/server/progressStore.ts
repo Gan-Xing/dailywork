@@ -3,6 +3,7 @@ import type { CheckDefinition, LayerDefinition } from '@prisma/client'
 
 import type { CheckDefinitionDTO, LayerDefinitionDTO, PhaseDTO, PhaseDefinitionDTO, PhasePayload } from '@/lib/progressTypes'
 import { prisma } from '@/lib/prisma'
+import { canonicalizeProgressList } from '@/lib/i18n/progressDictionary'
 
 const TRANSACTION_TIMEOUT_MS = 15000
 
@@ -135,107 +136,18 @@ const mapPhaseToDTO = (
   }
 }
 
-const ensureLayerDefinitions = async (names: string[], tx: Prisma.TransactionClient) => {
-  const unique = Array.from(new Set(normalizeCommonList(names)))
-  if (!unique.length) return [] as LayerDefinition[]
-  await Promise.all(
-    unique.map((name) =>
-      tx.layerDefinition.upsert({
-        where: { name },
-        create: { name },
-        update: { isActive: true },
-      }),
-    ),
-  )
-  return tx.layerDefinition.findMany({ where: { name: { in: unique } } })
-}
-
-const ensureCheckDefinitions = async (names: string[], tx: Prisma.TransactionClient) => {
-  const unique = Array.from(new Set(normalizeCommonList(names)))
-  if (!unique.length) return [] as CheckDefinition[]
-  await Promise.all(
-    unique.map((name) =>
-      tx.checkDefinition.upsert({
-        where: { name },
-        create: { name },
-        update: { isActive: true },
-      }),
-    ),
-  )
-  return tx.checkDefinition.findMany({ where: { name: { in: unique } } })
-}
-
-const ensurePhaseDefinition = async (
-  tx: Prisma.TransactionClient,
-  payload: {
-    phaseDefinitionId?: number
-    name: string
-    measure: PhaseMeasure
-    pointHasSides?: boolean
-    defaultLayers?: string[]
-    defaultChecks?: string[]
-  },
-) => {
-  if (payload.phaseDefinitionId) {
-    const definition = await tx.phaseDefinition.findUnique({ where: { id: payload.phaseDefinitionId } })
-    if (!definition) {
-      throw new Error('分项模板不存在')
-    }
-    return definition
-  }
-
-  const definition = await tx.phaseDefinition.findUnique({ where: { name: payload.name } })
-  if (definition) {
-    return definition
-  }
-
-  const layerDefs = await ensureLayerDefinitions(payload.defaultLayers ?? [], tx)
-  const checkDefs = await ensureCheckDefinitions(payload.defaultChecks ?? [], tx)
-
-  const created = await tx.phaseDefinition.create({
-    data: {
-      name: payload.name,
-      measure: payload.measure,
-      pointHasSides: payload.pointHasSides ?? false,
-      defaultLayers: {
-        create: layerDefs.map((layer) => ({ layerDefinitionId: layer.id })),
-      },
-      defaultChecks: {
-        create: checkDefs.map((check) => ({ checkDefinitionId: check.id })),
-      },
+const fetchDefinitionWithRelations = async (tx: Prisma.TransactionClient, id: number) => {
+  const definition = await tx.phaseDefinition.findUnique({
+    where: { id },
+    include: {
+      defaultLayers: { include: { layerDefinition: true } },
+      defaultChecks: { include: { checkDefinition: true } },
     },
   })
-  return created
-}
-
-const syncPhaseDefinitionDefaults = async (
-  tx: Prisma.TransactionClient,
-  params: { definitionId: number; layerIds: number[]; checkIds: number[] },
-) => {
-  await tx.phaseDefinitionLayer.deleteMany({ where: { phaseDefinitionId: params.definitionId } })
-  if (params.layerIds.length) {
-    await tx.phaseDefinitionLayer.createMany({
-      data: params.layerIds.map((id) => ({
-        phaseDefinitionId: params.definitionId,
-        layerDefinitionId: id,
-      })),
-    })
+  if (!definition) {
+    throw new Error('分项模板不存在或已删除')
   }
-
-  await tx.phaseDefinitionCheck.deleteMany({ where: { phaseDefinitionId: params.definitionId } })
-  if (params.checkIds.length) {
-    await tx.phaseDefinitionCheck.createMany({
-      data: params.checkIds.map((id) => ({
-        phaseDefinitionId: params.definitionId,
-        checkDefinitionId: id,
-      })),
-    })
-  }
-
-  await tx.phaseDefinition.update({
-    where: { id: params.definitionId },
-    data: { updatedAt: new Date() },
-  })
+  return definition
 }
 
 export const listPhases = async (roadId: number) => {
@@ -289,6 +201,19 @@ export const createPhase = async (roadId: number, payload: PhasePayload) => {
   if (!payload.intervals || payload.intervals.length === 0) {
     throw new Error('请至少填写一个起点-终点区间')
   }
+  if (!payload.phaseDefinitionId) {
+    throw new Error('请选择分项模板')
+  }
+  const targetDefinitionId = Number(payload.phaseDefinitionId)
+  if (!Number.isInteger(targetDefinitionId) || targetDefinitionId <= 0) {
+    throw new Error('分项模板无效')
+  }
+  if (payload.newLayers && payload.newLayers.length) {
+    throw new Error('层次需在模板中维护，分项创建时不可新增层次')
+  }
+  if (payload.newChecks && payload.newChecks.length) {
+    throw new Error('验收内容需在模板中维护，分项创建时不可新增验收内容')
+  }
 
   const normalizedIntervals = payload.intervals.map((i) => normalizeInterval(i, payload.measure))
   const designLength = calcDesignLength(payload.measure, normalizedIntervals)
@@ -302,34 +227,56 @@ export const createPhase = async (roadId: number, payload: PhasePayload) => {
         throw new Error('分项名称已存在，请更换')
       }
 
-      const definition = await ensurePhaseDefinition(tx, {
-        phaseDefinitionId: payload.phaseDefinitionId,
-        name: payload.name,
-        measure: payload.measure === 'POINT' ? PhaseMeasure.POINT : PhaseMeasure.LINEAR,
-        pointHasSides: payload.measure === 'POINT' ? payload.pointHasSides : false,
-        defaultLayers: payload.newLayers,
-        defaultChecks: payload.newChecks,
-      })
+      const definition = await fetchDefinitionWithRelations(tx, targetDefinitionId)
+      const measureFromDefinition = definition.measure
+      const pointHasSidesFromDefinition = definition.pointHasSides
+      if (measureFromDefinition !== (payload.measure === 'POINT' ? PhaseMeasure.POINT : PhaseMeasure.LINEAR)) {
+        throw new Error('分项显示方式必须与模板一致')
+      }
+      if (
+        payload.pointHasSides !== undefined &&
+        payload.measure === 'POINT' &&
+        Boolean(payload.pointHasSides) !== pointHasSidesFromDefinition
+      ) {
+        throw new Error('分项左右侧设置必须与模板一致')
+      }
 
-      const layerIds = payload.layerIds ?? []
-      const checkIds = payload.checkIds ?? []
-      const newLayerDefs = await ensureLayerDefinitions(payload.newLayers ?? [], tx)
-      const newCheckDefs = await ensureCheckDefinitions(payload.newChecks ?? [], tx)
-      const resolvedLayerIds = Array.from(new Set([...layerIds, ...newLayerDefs.map((l) => l.id)]))
-      const resolvedCheckIds = Array.from(new Set([...checkIds, ...newCheckDefs.map((c) => c.id)]))
-      await syncPhaseDefinitionDefaults(tx, {
-        definitionId: definition.id,
-        layerIds: resolvedLayerIds,
-        checkIds: resolvedCheckIds,
-      })
+      const allowedLayerIds = definition.defaultLayers.map((item) => item.layerDefinitionId)
+      const allowedCheckIds = definition.defaultChecks.map((item) => item.checkDefinitionId)
+      const requestedLayerIds = payload.layerIds && payload.layerIds.length ? payload.layerIds : allowedLayerIds
+      const requestedCheckIds = payload.checkIds && payload.checkIds.length ? payload.checkIds : allowedCheckIds
+      const invalidLayerIds = requestedLayerIds.filter((id) => !allowedLayerIds.includes(id))
+      if (invalidLayerIds.length) {
+        throw new Error('所选层次不属于模板，请先在模板中维护')
+      }
+      const invalidCheckIds = requestedCheckIds.filter((id) => !allowedCheckIds.includes(id))
+      if (invalidCheckIds.length) {
+        throw new Error('所选验收内容不属于模板，请先在模板中维护')
+      }
+
+      const allowedLayerNames = new Set(
+        canonicalizeProgressList(
+          'layer',
+          definition.defaultLayers.map((item) => item.layerDefinition.name),
+        ),
+      )
+      const normalizeIntervalLayers = (layers?: string[]) => {
+        if (!layers || !layers.length) return undefined
+        const canonical = canonicalizeProgressList('layer', layers)
+        const invalid = canonical.filter((name) => !allowedLayerNames.has(name))
+        if (invalid.length) {
+          throw new Error(`区间层次必须来自模板：${invalid.join('、')}`)
+        }
+        return canonical
+      }
 
       const created = await tx.roadPhase.create({
         data: {
           roadId,
           phaseDefinitionId: definition.id,
           name: payload.name,
-          measure: payload.measure === 'POINT' ? PhaseMeasure.POINT : PhaseMeasure.LINEAR,
-          pointHasSides: payload.measure === 'POINT' ? Boolean(payload.pointHasSides) : false,
+          measure: measureFromDefinition,
+          pointHasSides: measureFromDefinition === PhaseMeasure.POINT ? pointHasSidesFromDefinition : false,
           designLength,
           intervals: {
             create: normalizedIntervals.map((item) => ({
@@ -337,18 +284,18 @@ export const createPhase = async (roadId: number, payload: PhasePayload) => {
               endPk: item.endPk,
               side: item.side,
               spec: item.spec || undefined,
-              layers: item.layers,
+              layers: normalizeIntervalLayers((item as { layers?: string[] }).layers),
               billQuantity: item.billQuantity ?? undefined,
             })),
           },
-          layerLinks: resolvedLayerIds.length
+          layerLinks: requestedLayerIds.length
             ? {
-                create: resolvedLayerIds.map((id) => ({ layerDefinitionId: id })),
+                create: requestedLayerIds.map((id) => ({ layerDefinitionId: id })),
               }
             : undefined,
-          checkLinks: resolvedCheckIds.length
+          checkLinks: requestedCheckIds.length
             ? {
-                create: resolvedCheckIds.map((id) => ({ checkDefinitionId: id })),
+                create: requestedCheckIds.map((id) => ({ checkDefinitionId: id })),
               }
             : undefined,
         },
@@ -383,6 +330,19 @@ export const updatePhase = async (roadId: number, phaseId: number, payload: Phas
   if (!payload.intervals || payload.intervals.length === 0) {
     throw new Error('请至少填写一个起点-终点区间')
   }
+  if (!payload.phaseDefinitionId) {
+    throw new Error('请选择分项模板')
+  }
+  const targetDefinitionId = Number(payload.phaseDefinitionId)
+  if (!Number.isInteger(targetDefinitionId) || targetDefinitionId <= 0) {
+    throw new Error('分项模板无效')
+  }
+  if (payload.newLayers && payload.newLayers.length) {
+    throw new Error('层次需在模板中维护，分项编辑时不可新增层次')
+  }
+  if (payload.newChecks && payload.newChecks.length) {
+    throw new Error('验收内容需在模板中维护，分项编辑时不可新增验收内容')
+  }
   if (!Number.isInteger(phaseId) || phaseId <= 0) {
     throw new Error('无效的分项 ID')
   }
@@ -404,34 +364,56 @@ export const updatePhase = async (roadId: number, phaseId: number, payload: Phas
         throw new Error('分项不存在或不属于当前路段')
       }
 
-      const definition = await ensurePhaseDefinition(tx, {
-        phaseDefinitionId: payload.phaseDefinitionId ?? existing.phaseDefinitionId,
-        name: payload.name,
-        measure: payload.measure === 'POINT' ? PhaseMeasure.POINT : PhaseMeasure.LINEAR,
-        pointHasSides: payload.measure === 'POINT' ? payload.pointHasSides : false,
-        defaultLayers: payload.newLayers,
-        defaultChecks: payload.newChecks,
-      })
+      const definition = await fetchDefinitionWithRelations(tx, targetDefinitionId)
+      const measureFromDefinition = definition.measure
+      const pointHasSidesFromDefinition = definition.pointHasSides
+      if (measureFromDefinition !== (payload.measure === 'POINT' ? PhaseMeasure.POINT : PhaseMeasure.LINEAR)) {
+        throw new Error('分项显示方式必须与模板一致')
+      }
+      if (
+        payload.pointHasSides !== undefined &&
+        payload.measure === 'POINT' &&
+        Boolean(payload.pointHasSides) !== pointHasSidesFromDefinition
+      ) {
+        throw new Error('分项左右侧设置必须与模板一致')
+      }
 
-      const layerIds = payload.layerIds ?? []
-      const checkIds = payload.checkIds ?? []
-      const newLayerDefs = await ensureLayerDefinitions(payload.newLayers ?? [], tx)
-      const newCheckDefs = await ensureCheckDefinitions(payload.newChecks ?? [], tx)
-      const resolvedLayerIds = Array.from(new Set([...layerIds, ...newLayerDefs.map((l) => l.id)]))
-      const resolvedCheckIds = Array.from(new Set([...checkIds, ...newCheckDefs.map((c) => c.id)]))
-      await syncPhaseDefinitionDefaults(tx, {
-        definitionId: definition.id,
-        layerIds: resolvedLayerIds,
-        checkIds: resolvedCheckIds,
-      })
+      const allowedLayerIds = definition.defaultLayers.map((item) => item.layerDefinitionId)
+      const allowedCheckIds = definition.defaultChecks.map((item) => item.checkDefinitionId)
+      const requestedLayerIds = payload.layerIds && payload.layerIds.length ? payload.layerIds : allowedLayerIds
+      const requestedCheckIds = payload.checkIds && payload.checkIds.length ? payload.checkIds : allowedCheckIds
+      const invalidLayerIds = requestedLayerIds.filter((id) => !allowedLayerIds.includes(id))
+      if (invalidLayerIds.length) {
+        throw new Error('所选层次不属于模板，请先在模板中维护')
+      }
+      const invalidCheckIds = requestedCheckIds.filter((id) => !allowedCheckIds.includes(id))
+      if (invalidCheckIds.length) {
+        throw new Error('所选验收内容不属于模板，请先在模板中维护')
+      }
+
+      const allowedLayerNames = new Set(
+        canonicalizeProgressList(
+          'layer',
+          definition.defaultLayers.map((item) => item.layerDefinition.name),
+        ),
+      )
+      const normalizeIntervalLayers = (layers?: string[]) => {
+        if (!layers || !layers.length) return undefined
+        const canonical = canonicalizeProgressList('layer', layers)
+        const invalid = canonical.filter((name) => !allowedLayerNames.has(name))
+        if (invalid.length) {
+          throw new Error(`区间层次必须来自模板：${invalid.join('、')}`)
+        }
+        return canonical
+      }
 
       const updated = await tx.roadPhase.update({
         where: { id: phaseId, roadId },
         data: {
           phaseDefinitionId: definition.id,
           name: payload.name,
-          measure: payload.measure === 'POINT' ? PhaseMeasure.POINT : PhaseMeasure.LINEAR,
-          pointHasSides: payload.measure === 'POINT' ? Boolean(payload.pointHasSides) : false,
+          measure: measureFromDefinition,
+          pointHasSides: measureFromDefinition === PhaseMeasure.POINT ? pointHasSidesFromDefinition : false,
           designLength,
         },
       })
@@ -444,22 +426,22 @@ export const updatePhase = async (roadId: number, phaseId: number, payload: Phas
           endPk: item.endPk,
           side: item.side,
           spec: item.spec || undefined,
-          layers: item.layers,
+          layers: normalizeIntervalLayers((item as { layers?: string[] }).layers),
           billQuantity: item.billQuantity ?? undefined,
         })),
       })
 
       await tx.roadPhaseLayer.deleteMany({ where: { roadPhaseId: phaseId } })
-      if (resolvedLayerIds.length) {
+      if (requestedLayerIds.length) {
         await tx.roadPhaseLayer.createMany({
-          data: resolvedLayerIds.map((id) => ({ roadPhaseId: phaseId, layerDefinitionId: id })),
+          data: requestedLayerIds.map((id) => ({ roadPhaseId: phaseId, layerDefinitionId: id })),
         })
       }
 
       await tx.roadPhaseCheck.deleteMany({ where: { roadPhaseId: phaseId } })
-      if (resolvedCheckIds.length) {
+      if (requestedCheckIds.length) {
         await tx.roadPhaseCheck.createMany({
-          data: resolvedCheckIds.map((id) => ({ roadPhaseId: phaseId, checkDefinitionId: id })),
+          data: requestedCheckIds.map((id) => ({ roadPhaseId: phaseId, checkDefinitionId: id })),
         })
       }
 
