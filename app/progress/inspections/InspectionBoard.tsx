@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import type {
   InspectionBulkPayload,
@@ -157,18 +157,27 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
     copy.prefabModal.layerOptions[key] ?? fallback
   const getPrefabCheckLabel = (value: string) => copy.prefabModal.checkOptions[value] ?? value
   const getPrefabTypeLabel = (value: string) => copy.prefabModal.typeOptions[value] ?? value
-  const formatPhaseDefinitionLabel = (definition: PhaseDefinitionOption) =>
-    localizeProgressTerm('phase', definition.name, locale)
-  const formatTypeLabel = (value: string) => localizeProgressTerm('type', value, locale)
-  const formatRoadName = (slug?: string, name?: string) => resolveRoadName({ slug, name }, locale)
-  const normalizeLayerLabels = (values: string[], phaseName?: string) =>
-    localizeProgressList('layer', canonicalizeProgressList('layer', values), locale, {
-      phaseName,
-    })
-  const normalizeCheckLabels = (values: string[]) =>
-    localizeProgressList('check', canonicalizeProgressList('check', values), locale)
-  const normalizeTypeLabels = (values: string[]) =>
-    localizeProgressList('type', canonicalizeProgressList('type', values), locale)
+  const formatPhaseDefinitionLabel = useCallback(
+    (definition: PhaseDefinitionOption) => localizeProgressTerm('phase', definition.name, locale),
+    [locale],
+  )
+  const formatTypeLabel = useCallback((value: string) => localizeProgressTerm('type', value, locale), [locale])
+  const formatRoadName = useCallback((slug?: string, name?: string) => resolveRoadName({ slug, name }, locale), [locale])
+  const normalizeLayerLabels = useCallback(
+    (values: string[], phaseName?: string) =>
+      localizeProgressList('layer', canonicalizeProgressList('layer', values), locale, {
+        phaseName,
+      }),
+    [locale],
+  )
+  const normalizeCheckLabels = useCallback(
+    (values: string[]) => localizeProgressList('check', canonicalizeProgressList('check', values), locale),
+    [locale],
+  )
+  const normalizeTypeLabels = useCallback(
+    (values: string[]) => localizeProgressList('type', canonicalizeProgressList('type', values), locale),
+    [locale],
+  )
   const inspectionTypeOptions = useMemo(
     () => ['现场验收', '试验验收', '测量验收', '其他'],
     [],

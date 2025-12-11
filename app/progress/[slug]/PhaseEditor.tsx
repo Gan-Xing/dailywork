@@ -1747,7 +1747,7 @@ export function PhaseEditor({
         .filter(Boolean)
         .map((item) => normalizeLabel(item))
     },
-    [localizeProgressTerm],
+    [],
   )
 
   const normalizeCheckTokens = useCallback((value: string) => {
@@ -2834,7 +2834,7 @@ export function PhaseEditor({
         }
       }
     },
-    [canViewInspection, road.slug, t.alerts.fetchInspectionFailed],
+    [canViewInspection, phases, road.slug, t.alerts.fetchInspectionFailed],
   )
 
   useEffect(() => {
