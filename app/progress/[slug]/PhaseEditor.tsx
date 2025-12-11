@@ -2607,8 +2607,6 @@ export function PhaseEditor({
         status: InspectionStatus,
         updatedAt: number,
         phaseName: string | undefined,
-        requiredChecks: string[],
-        checksInInspection: string[],
       ): LayerStatusByName => {
         const map: LayerStatusByName = {}
         if (!layers?.length) return map
@@ -2616,33 +2614,14 @@ export function PhaseEditor({
           splitLayerTokens(layerName).forEach((token) => {
             const normalized = normalizeLabel(localizeProgressTerm('layer', token, 'zh', { phaseName }))
             if (!normalized) return
-            // 取这次报检包含的检查项；若缺少某必需检查，则该层视为最低状态（PENDING）
-            const required = requiredChecks.length ? requiredChecks : checksInInspection
-            if (!required.length) {
-              // 没有可用的检查定义，保持原有逻辑
-              const existing = map[normalized]
-              const incomingPriority = statusPriority[status] ?? 0
-              if (!existing || incomingPriority > (statusPriority[existing.status] ?? 0) || updatedAt >= existing.updatedAt) {
-                map[normalized] = { status, updatedAt }
-              }
-              return
-            }
-            // 计算所有必需检查的最小优先级（缺失的按 PENDING）
-            const aggregateStatus = required.reduce<InspectionStatus>((acc, checkName) => {
-              const hasCheck = checksInInspection.some((c) => normalizeLabel(c) === normalizeLabel(checkName))
-              const candidate = hasCheck ? status : 'PENDING'
-              const accPriority = statusPriority[acc] ?? 0
-              const candPriority = statusPriority[candidate] ?? 0
-              return candPriority < accPriority ? candidate : acc
-            }, status)
             const existing = map[normalized]
-            const incomingPriority = statusPriority[aggregateStatus] ?? 0
+            const incomingPriority = statusPriority[status] ?? 0
             if (
               !existing ||
-              incomingPriority < (statusPriority[existing.status] ?? 0) ||
+              incomingPriority > (statusPriority[existing.status] ?? 0) ||
               (incomingPriority === (statusPriority[existing.status] ?? 0) && updatedAt >= existing.updatedAt)
             ) {
-              map[normalized] = { status: aggregateStatus, updatedAt }
+              map[normalized] = { status, updatedAt }
             }
           })
         })
@@ -2662,9 +2641,9 @@ export function PhaseEditor({
           }
           const existingPriority = statusPriority[existing.status] ?? 0
           const incomingPriority = statusPriority[entry.status] ?? 0
-          // 对层级状态取“更保守”的状态（优先级更低的），缺失检查会让状态回落
+          // 对层级状态取优先级高的，若相同取更新的
           if (
-            incomingPriority < existingPriority ||
+            incomingPriority > existingPriority ||
             (incomingPriority === existingPriority && entry.updatedAt >= existing.updatedAt)
           ) {
             result[name] = entry
@@ -2700,10 +2679,6 @@ export function PhaseEditor({
         }
         if (!data.items || isCancelled()) return
         const map = new Map<string, LatestPointInspection>()
-        const requiredChecksByPhase = new Map<number, string[]>()
-        phases.forEach((p) => {
-          requiredChecksByPhase.set(p.id, Array.isArray(p.resolvedChecks) ? p.resolvedChecks : [])
-        })
         const slices: InspectionSlice[] = []
         data.items.forEach((item) => {
           const ts = new Date(item.updatedAt).getTime()
@@ -2715,14 +2690,11 @@ export function PhaseEditor({
           const side = item.side ?? 'BOTH'
           const key = buildPointKey(item.phaseId, side, orderedStart, orderedEnd)
           const existing = map.get(key)
-          const requiredChecks = requiredChecksByPhase.get(Number(item.phaseId)) ?? []
           const layerStatus = buildLayerStatusMap(
             item.layers,
             item.status ?? 'PENDING',
             ts || 0,
             item.phaseName,
-            requiredChecks,
-            Array.isArray(item.checks) ? item.checks : [],
           )
             const snapshot: LatestPointInspection = {
               phaseId: Number(item.phaseId),
@@ -2783,7 +2755,6 @@ export function PhaseEditor({
           const linearRaw = new Map<number, LatestPointInspection[]>()
           data.items.forEach((item) => {
             const ts = new Date(item.updatedAt).getTime() || 0
-            const requiredChecks = requiredChecksByPhase.get(Number(item.phaseId)) ?? []
             const snapshot: LatestPointInspection = {
               phaseId: Number(item.phaseId),
               side: item.side ?? 'BOTH',
@@ -2798,8 +2769,6 @@ export function PhaseEditor({
                 item.status ?? 'PENDING',
                 ts,
                 item.phaseName,
-                requiredChecks,
-                Array.isArray(item.checks) ? item.checks : [],
               ),
             }
             const list = linearRaw.get(snapshot.phaseId) ?? []
