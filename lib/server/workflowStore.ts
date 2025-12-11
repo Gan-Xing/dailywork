@@ -269,9 +269,7 @@ const syncPhasesWithTemplate = async (
   definition: Prisma.PhaseDefinitionGetPayload<{
     include: { defaultLayers: { include: { layerDefinition: true } }; defaultChecks: { include: { checkDefinition: true } } }
   }>,
-  options?: { intervalMode?: 'filter' | 'overwrite' },
 ) => {
-  const intervalMode = options?.intervalMode ?? 'overwrite'
   const layerIds = definition.defaultLayers.map((item) => item.layerDefinitionId)
   const checkIds = definition.defaultChecks.map((item) => item.checkDefinitionId)
   const layerNames = canonicalizeProgressList(
@@ -309,18 +307,10 @@ const syncPhasesWithTemplate = async (
     }
 
     for (const interval of phase.intervals) {
-      let layersForInterval = layerNames
-      if (intervalMode === 'filter') {
-        const raw = Array.isArray((interval as { layers?: string[] }).layers)
-          ? ((interval as { layers?: string[] }).layers ?? [])
-          : []
-        const canonical = canonicalizeProgressList('layer', raw)
-        const filtered = canonical.filter((name) => layerNameSet.has(name))
-        layersForInterval = filtered
-      }
+      // 先过滤非法名称，再覆盖为模板全集，保证新模板层次自动追加，模板外层次剔除
       await tx.phaseInterval.update({
         where: { id: interval.id },
-        data: { layers: layersForInterval },
+        data: { layers: layerNames },
       })
     }
   }
@@ -388,7 +378,7 @@ export const updateWorkflowTemplate = async (params: {
       update: { config: normalizedWorkflow },
     })
 
-    await syncPhasesWithTemplate(tx, savedDefinition, { intervalMode: 'overwrite' })
+    await syncPhasesWithTemplate(tx, savedDefinition)
 
     return {
       definition: {
@@ -479,7 +469,7 @@ export const createWorkflowTemplate = async (params: {
       data: { phaseDefinitionId: definition.id, config: normalizedWorkflow },
     })
 
-    await syncPhasesWithTemplate(tx, definition, { intervalMode: 'overwrite' })
+    await syncPhasesWithTemplate(tx, definition)
 
     return { definition, workflow: normalizedWorkflow }
   })

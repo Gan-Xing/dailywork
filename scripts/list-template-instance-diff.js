@@ -92,6 +92,18 @@ async function main() {
 
   console.log('TEMPLATES:\n' + JSON.stringify(Array.from(definitionMap.values()), null, 2))
   console.log('\nPHASES_DIFF:\n' + JSON.stringify(phaseSummary, null, 2))
+
+  // Summary stats
+  const summary = phaseSummary.reduce(
+    (acc, item) => {
+      if (item.extraLayers.length || item.missingLayers.length || item.intervalIssues.length) acc.layerMismatches += 1
+      if (item.extraChecks.length || item.missingChecks.length) acc.checkMismatches += 1
+      if (item.intervalIssues.length) acc.intervalIssuesCount += item.intervalIssues.length
+      return acc
+    },
+    { layerMismatches: 0, checkMismatches: 0, intervalIssuesCount: 0, total: phaseSummary.length },
+  )
+  console.log('\nSUMMARY:', JSON.stringify(summary, null, 2))
 }
 
 main()
