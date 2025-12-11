@@ -9,6 +9,7 @@ import {
 } from '@/lib/progressWorkflow'
 import type { PhaseMeasure } from '@/lib/progressTypes'
 import { prisma } from '@/lib/prisma'
+import { canonicalizeProgressList } from '@/lib/i18n/progressDictionary'
 
 type WorkflowItem = WorkflowBinding
 type LayerDefinition = Prisma.LayerDefinitionGetPayload<{}>
@@ -263,6 +264,68 @@ const assertNonEmptyTemplate = (layers: string[], checks: string[]) => {
   }
 }
 
+const syncPhasesWithTemplate = async (
+  tx: Prisma.TransactionClient,
+  definition: Prisma.PhaseDefinitionGetPayload<{
+    include: { defaultLayers: { include: { layerDefinition: true } }; defaultChecks: { include: { checkDefinition: true } } }
+  }>,
+  options?: { intervalMode?: 'filter' | 'overwrite' },
+) => {
+  const intervalMode = options?.intervalMode ?? 'overwrite'
+  const layerIds = definition.defaultLayers.map((item) => item.layerDefinitionId)
+  const checkIds = definition.defaultChecks.map((item) => item.checkDefinitionId)
+  const layerNames = canonicalizeProgressList(
+    'layer',
+    definition.defaultLayers.map((item) => item.layerDefinition.name),
+  )
+  const layerNameSet = new Set(layerNames)
+
+  const phases = await tx.roadPhase.findMany({
+    where: { phaseDefinitionId: definition.id },
+    include: { intervals: true },
+  })
+
+  for (const phase of phases) {
+    await tx.roadPhase.update({
+      where: { id: phase.id },
+      data: {
+        measure: definition.measure,
+        pointHasSides: definition.measure === PrismaPhaseMeasure.POINT ? definition.pointHasSides : false,
+      },
+    })
+
+    await tx.roadPhaseLayer.deleteMany({ where: { roadPhaseId: phase.id } })
+    if (layerIds.length) {
+      await tx.roadPhaseLayer.createMany({
+        data: layerIds.map((id) => ({ roadPhaseId: phase.id, layerDefinitionId: id })),
+      })
+    }
+
+    await tx.roadPhaseCheck.deleteMany({ where: { roadPhaseId: phase.id } })
+    if (checkIds.length) {
+      await tx.roadPhaseCheck.createMany({
+        data: checkIds.map((id) => ({ roadPhaseId: phase.id, checkDefinitionId: id })),
+      })
+    }
+
+    for (const interval of phase.intervals) {
+      let layersForInterval = layerNames
+      if (intervalMode === 'filter') {
+        const raw = Array.isArray((interval as { layers?: string[] }).layers)
+          ? ((interval as { layers?: string[] }).layers ?? [])
+          : []
+        const canonical = canonicalizeProgressList('layer', raw)
+        const filtered = canonical.filter((name) => layerNameSet.has(name))
+        layersForInterval = filtered
+      }
+      await tx.phaseInterval.update({
+        where: { id: interval.id },
+        data: { layers: layersForInterval },
+      })
+    }
+  }
+}
+
 export const updateWorkflowTemplate = async (params: {
   phaseDefinitionId: number
   workflow: WorkflowTemplate
@@ -324,6 +387,8 @@ export const updateWorkflowTemplate = async (params: {
       create: { phaseDefinitionId: definition.id, config: normalizedWorkflow },
       update: { config: normalizedWorkflow },
     })
+
+    await syncPhasesWithTemplate(tx, savedDefinition, { intervalMode: 'overwrite' })
 
     return {
       definition: {
@@ -413,6 +478,8 @@ export const createWorkflowTemplate = async (params: {
     await tx.phaseWorkflowDefinition.create({
       data: { phaseDefinitionId: definition.id, config: normalizedWorkflow },
     })
+
+    await syncPhasesWithTemplate(tx, definition, { intervalMode: 'overwrite' })
 
     return { definition, workflow: normalizedWorkflow }
   })

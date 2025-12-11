@@ -2,9 +2,9 @@
  * 清理历史分项中的层次，使其严格匹配模板(defaultLayers)。
  *
  * 规则：
- * - 每个分项实例(RoadPhase)仅保留其模板(PhaseDefinition)的层次；
- * - 区间(PhaseInterval.layers)会过滤到模板层次之外的值；
- * - roadPhaseLayer 关联表中不在模板里的层次会被删除；
+ * - 每个分项实例(RoadPhase)强制绑定模板(PhaseDefinition)的层次/验收全集；
+ * - 区间(PhaseInterval.layers)会过滤到模板之外并覆盖为模板层次全集；
+ * - measure/pointHasSides 对齐模板；
  *
  * 用法：
  *   DRY_RUN=1 node scripts/fix-phase-template-layers.js   # 仅查看将要修改的内容（默认）
@@ -36,18 +36,27 @@ const APPLY = process.env.APPLY === '1'
 
 async function main() {
   const definitions = await prisma.phaseDefinition.findMany({
-    include: { defaultLayers: { include: { layerDefinition: true } } },
+    include: {
+      defaultLayers: { include: { layerDefinition: true } },
+      defaultChecks: { include: { checkDefinition: true } },
+    },
   })
   const definitionMap = new Map(
     definitions.map((def) => {
       const layerIds = def.defaultLayers.map((l) => l.layerDefinitionId)
       const layerNames = canonicalizeList(def.defaultLayers.map((l) => l.layerDefinition.name))
+      const checkIds = def.defaultChecks.map((c) => c.checkDefinitionId)
+      const checkNames = canonicalizeList(def.defaultChecks.map((c) => c.checkDefinition.name))
       return [
         def.id,
         {
           name: def.name,
           layerIds,
           layerNames,
+          checkIds,
+          checkNames,
+          measure: def.measure,
+          pointHasSides: def.pointHasSides,
           layerNameSet: new Set(layerNames.map(canonicalize)),
         },
       ]
@@ -58,61 +67,101 @@ async function main() {
     include: {
       intervals: true,
       layerLinks: true,
+      checkLinks: true,
     },
   })
 
   const summary = {
     phasesTouched: 0,
-    layerLinksDeleted: 0,
-    intervalsUpdated: 0,
+    layerLinksReset: 0,
+    checkLinksReset: 0,
+    intervalsOverwritten: 0,
+    phasesUpdatedMeasure: 0,
   }
 
   for (const phase of phases) {
     const definition = definitionMap.get(phase.phaseDefinitionId)
     if (!definition) continue
 
-    const invalidLayerLinks = phase.layerLinks.filter((link) => !definition.layerIds.includes(link.layerDefinitionId))
+    const hasLayerMismatch =
+      phase.layerLinks.length !== definition.layerIds.length ||
+      phase.layerLinks.some((link) => !definition.layerIds.includes(link.layerDefinitionId))
+    const hasCheckMismatch =
+      phase.checkLinks.length !== definition.checkIds.length ||
+      phase.checkLinks.some((link) => !definition.checkIds.includes(link.checkDefinitionId))
 
     const intervalUpdates = []
     for (const interval of phase.intervals) {
       const rawLayers = Array.isArray(interval.layers) ? interval.layers : []
-      if (!rawLayers.length) continue
       const canonical = canonicalizeList(rawLayers)
       const filtered = canonical.filter((name) => definition.layerNameSet.has(canonicalize(name)))
-      if (filtered.length !== canonical.length) {
-        intervalUpdates.push({ id: interval.id, layers: filtered })
+      const needsOverwrite =
+        filtered.length !== definition.layerNames.length ||
+        definition.layerNames.some((name, idx) => name !== filtered[idx])
+      if (needsOverwrite) {
+        intervalUpdates.push({ id: interval.id, layers: definition.layerNames })
       }
     }
 
-    const hasInvalidLinks = invalidLayerLinks.length > 0
-    const shouldCleanupFallback = !hasInvalidLinks && definition.layerIds.length > 0 && phase.layerLinks.length > 0
-    if (!hasInvalidLinks && !intervalUpdates.length && !shouldCleanupFallback) continue
+    const needsMeasureUpdate = phase.measure !== definition.measure || phase.pointHasSides !== definition.pointHasSides
+
+    if (!hasLayerMismatch && !hasCheckMismatch && !intervalUpdates.length && !needsMeasureUpdate) continue
 
     summary.phasesTouched += 1
-    summary.layerLinksDeleted += hasInvalidLinks ? invalidLayerLinks.length : 0
-    summary.intervalsUpdated += intervalUpdates.length
+    summary.layerLinksReset += hasLayerMismatch ? 1 : 0
+    summary.checkLinksReset += hasCheckMismatch ? 1 : 0
+    summary.intervalsOverwritten += intervalUpdates.length
+    summary.phasesUpdatedMeasure += needsMeasureUpdate ? 1 : 0
 
     console.log(
-      `[${APPLY ? 'APPLY' : 'DRY'}] phase #${phase.id} (${definition.name}) -> remove links: ${invalidLayerLinks.length}, update intervals: ${intervalUpdates.length}`,
+      `[${APPLY ? 'APPLY' : 'DRY'}] phase #${phase.id} (${definition.name}) -> reset layers: ${hasLayerMismatch ? 'yes' : 'no'}, reset checks: ${hasCheckMismatch ? 'yes' : 'no'}, overwrite intervals: ${intervalUpdates.length}${
+        needsMeasureUpdate ? ', update measure/pointHasSides' : ''
+      }`,
     )
 
     if (!APPLY) continue
 
     const ops = []
-    if (hasInvalidLinks || shouldCleanupFallback) {
-      // 删除实例中不在模板里的所有层次绑定；如果模板为空则清空绑定
+
+    // 同步 measure / pointHasSides
+    if (needsMeasureUpdate) {
       ops.push(
-        prisma.roadPhaseLayer.deleteMany({
-          where: {
-            roadPhaseId: phase.id,
-            ...(definition.layerIds.length ? { layerDefinitionId: { notIn: definition.layerIds } } : {}),
+        prisma.roadPhase.update({
+          where: { id: phase.id },
+          data: {
+            measure: definition.measure,
+            pointHasSides: definition.pointHasSides ?? false,
           },
         }),
       )
     }
+
+    // 重置层次与验收绑定为模板全集
+    if (hasLayerMismatch) {
+      ops.push(prisma.roadPhaseLayer.deleteMany({ where: { roadPhaseId: phase.id } }))
+      if (definition.layerIds.length) {
+        ops.push(
+          prisma.roadPhaseLayer.createMany({
+            data: definition.layerIds.map((id) => ({ roadPhaseId: phase.id, layerDefinitionId: id })),
+          }),
+        )
+      }
+    }
+    if (hasCheckMismatch) {
+      ops.push(prisma.roadPhaseCheck.deleteMany({ where: { roadPhaseId: phase.id } }))
+      if (definition.checkIds.length) {
+        ops.push(
+          prisma.roadPhaseCheck.createMany({
+            data: definition.checkIds.map((id) => ({ roadPhaseId: phase.id, checkDefinitionId: id })),
+          }),
+        )
+      }
+    }
+
     intervalUpdates.forEach((item) => {
       ops.push(prisma.phaseInterval.update({ where: { id: item.id }, data: { layers: item.layers } }))
     })
+
     if (ops.length) {
       await prisma.$transaction(ops)
     }
