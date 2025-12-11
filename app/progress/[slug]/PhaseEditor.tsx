@@ -2607,9 +2607,18 @@ export function PhaseEditor({
         status: InspectionStatus,
         updatedAt: number,
         phaseName: string | undefined,
+        requiredChecks: string[],
+        checksInInspection: string[],
       ): LayerStatusByName => {
         const map: LayerStatusByName = {}
         if (!layers?.length) return map
+        // 仅当本次报检覆盖了该分项的全部验收内容时，才对层级打标，避免部分检查导致“全层已预约”
+        const hasAllRequiredChecks =
+          !requiredChecks.length ||
+          requiredChecks.every((checkName) =>
+            checksInInspection.some((c) => normalizeLabel(c) === normalizeLabel(checkName)),
+          )
+        if (!hasAllRequiredChecks) return map
         layers.forEach((layerName) => {
           splitLayerTokens(layerName).forEach((token) => {
             const normalized = normalizeLabel(localizeProgressTerm('layer', token, 'zh', { phaseName }))
@@ -2679,6 +2688,10 @@ export function PhaseEditor({
         }
         if (!data.items || isCancelled()) return
         const map = new Map<string, LatestPointInspection>()
+        const requiredChecksByPhase = new Map<number, string[]>()
+        phases.forEach((p) => {
+          requiredChecksByPhase.set(p.id, Array.isArray(p.resolvedChecks) ? p.resolvedChecks : [])
+        })
         const slices: InspectionSlice[] = []
         data.items.forEach((item) => {
           const ts = new Date(item.updatedAt).getTime()
@@ -2690,11 +2703,14 @@ export function PhaseEditor({
           const side = item.side ?? 'BOTH'
           const key = buildPointKey(item.phaseId, side, orderedStart, orderedEnd)
           const existing = map.get(key)
+          const requiredChecks = requiredChecksByPhase.get(Number(item.phaseId)) ?? []
           const layerStatus = buildLayerStatusMap(
             item.layers,
             item.status ?? 'PENDING',
             ts || 0,
             item.phaseName,
+            requiredChecks,
+            Array.isArray(item.checks) ? item.checks : [],
           )
             const snapshot: LatestPointInspection = {
               phaseId: Number(item.phaseId),
@@ -2755,6 +2771,7 @@ export function PhaseEditor({
           const linearRaw = new Map<number, LatestPointInspection[]>()
           data.items.forEach((item) => {
             const ts = new Date(item.updatedAt).getTime() || 0
+            const requiredChecks = requiredChecksByPhase.get(Number(item.phaseId)) ?? []
             const snapshot: LatestPointInspection = {
               phaseId: Number(item.phaseId),
               side: item.side ?? 'BOTH',
@@ -2769,6 +2786,8 @@ export function PhaseEditor({
                 item.status ?? 'PENDING',
                 ts,
                 item.phaseName,
+                requiredChecks,
+                Array.isArray(item.checks) ? item.checks : [],
               ),
             }
             const list = linearRaw.get(snapshot.phaseId) ?? []
