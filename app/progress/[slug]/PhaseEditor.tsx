@@ -1747,7 +1747,7 @@ export function PhaseEditor({
         .filter(Boolean)
         .map((item) => normalizeLabel(item))
     },
-    [],
+    [localizeProgressTerm],
   )
 
   const normalizeCheckTokens = useCallback((value: string) => {
@@ -2783,6 +2783,7 @@ export function PhaseEditor({
           const linearRaw = new Map<number, LatestPointInspection[]>()
           data.items.forEach((item) => {
             const ts = new Date(item.updatedAt).getTime() || 0
+            const requiredChecks = requiredChecksByPhase.get(Number(item.phaseId)) ?? []
             const snapshot: LatestPointInspection = {
               phaseId: Number(item.phaseId),
               side: item.side ?? 'BOTH',
@@ -2797,6 +2798,8 @@ export function PhaseEditor({
                 item.status ?? 'PENDING',
                 ts,
                 item.phaseName,
+                requiredChecks,
+                Array.isArray(item.checks) ? item.checks : [],
               ),
             }
             const list = linearRaw.get(snapshot.phaseId) ?? []
@@ -2881,7 +2884,15 @@ export function PhaseEditor({
       })
       return hasSingle && !hasBoth
     },
-    [intervalRange, latestPointInspections, selectedSegment, selectedSide, workflowLayerByName, workflowPhaseNameForContext],
+    [
+      intervalRange,
+      latestPointInspections,
+      resolveSnapshotLayerStatus,
+      selectedSegment,
+      selectedSide,
+      workflowLayerByName,
+      workflowPhaseNameForContext,
+    ],
   )
 
   const resolveSplitTargetSide = useCallback(

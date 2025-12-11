@@ -122,11 +122,11 @@ export function WorkflowManager({ initialWorkflows }: Props) {
     const layerCount = selected.layers.length
     const checkCount = selected.layers.flatMap((layer) => layer.checks || []).filter((c) => c && c.name?.trim()).length
     if (!layerCount) {
-      setError(copy.errors?.layerRequired || '模板至少需要 1 个层次')
+      setError('模板至少需要 1 个层次')
       return
     }
     if (!checkCount) {
-      setError(copy.errors?.checkRequired || '模板至少需要 1 个验收内容')
+      setError('模板至少需要 1 个验收内容')
       return
     }
     setSaving(true)
@@ -166,7 +166,7 @@ export function WorkflowManager({ initialWorkflows }: Props) {
       return
     }
     if (!layerNameDraft.trim()) {
-      setError(copy.errors?.layerRequired || '模板至少需要 1 个层次')
+      setError('模板至少需要 1 个层次')
       return
     }
     setSaving(true)
@@ -180,13 +180,13 @@ export function WorkflowManager({ initialWorkflows }: Props) {
         lockStepWith: [],
         parallelWith: [],
         description: '',
-        checks: [
-          {
-            id: `check-${Date.now().toString(36)}`,
-            name: copy.checkPlaceholder || '验收内容',
-            types: defaultWorkflowTypes,
-          },
-        ],
+          checks: [
+            {
+              id: `check-${Date.now().toString(36)}`,
+              name: '验收内容',
+              types: defaultWorkflowTypes,
+            },
+          ],
       }
       const res = await fetch('/api/progress/workflows', {
         method: 'POST',

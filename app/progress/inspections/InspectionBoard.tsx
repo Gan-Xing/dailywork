@@ -655,7 +655,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
       submittedAt: formatDateTimeInputValue(editing.submittedAt ?? nowIso) || formatDateTimeInputValue(nowIso),
     })
     setEditError(null)
-  }, [editing, locale])
+  }, [editing, locale, normalizeCheckLabels, normalizeLayerLabels, normalizeTypeLabels])
 
   const submitEdit = async () => {
     if (!editing) return
