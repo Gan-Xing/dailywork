@@ -74,6 +74,8 @@ export interface InspectionListItem {
   roadSlug: string
   phaseId: number
   phaseName: string
+  submissionId?: number | null
+  submissionCode?: string | null
   side: IntervalSide
   startPk: number
   endPk: number
@@ -181,6 +183,7 @@ export interface InspectionPayload {
   checks: string[]
   types: string[]
   status?: InspectionStatus
+  submissionId?: number | null
   submissionOrder?: number | null
   remark?: string
   appointmentDate?: string
@@ -196,6 +199,7 @@ export interface InspectionBulkPayload {
   checks?: string[]
   types?: string[]
   status?: InspectionStatus
+  submissionId?: number | null
   submissionOrder?: number | null
   remark?: string
   appointmentDate?: string
@@ -206,6 +210,8 @@ export interface InspectionDTO extends InspectionPayload {
   id: number
   roadId: number
   status: InspectionStatus
+  submissionId?: number | null
+  submissionCode?: string | null
   submissionOrder?: number | null
   appointmentDate?: string
   submittedAt: string

@@ -52,12 +52,14 @@ const assertPointSideAllowed = (
 
 const mapInspection = (
   row: Prisma.InspectionRequestGetPayload<{
-    include: { creator: true; submitter: true; updater: true }
+    include: { creator: true; submitter: true; updater: true; submission: true }
   }>,
 ): InspectionDTO => ({
   id: row.id,
   roadId: row.roadId,
   phaseId: row.phaseId,
+  submissionId: row.submissionId ?? undefined,
+  submissionCode: row.submission?.code ?? undefined,
   side: row.side,
   startPk: row.startPk,
   endPk: row.endPk,
@@ -78,7 +80,7 @@ const mapInspection = (
 
 const mapInspectionListItem = (
   row: Prisma.InspectionRequestGetPayload<{
-    include: { road: true; phase: true; creator: true; submitter: true; updater: true }
+    include: { road: true; phase: true; creator: true; submitter: true; updater: true; submission: true }
   }>,
 ): InspectionListItem => ({
   id: row.id,
@@ -87,6 +89,8 @@ const mapInspectionListItem = (
   roadSlug: row.road.slug,
   phaseId: row.phaseId,
   phaseName: row.phase.name,
+  submissionId: row.submissionId ?? undefined,
+  submissionCode: row.submission?.code ?? undefined,
   side: row.side,
   startPk: row.startPk,
   endPk: row.endPk,
@@ -196,7 +200,7 @@ export const listInspections = async (filter: InspectionFilter): Promise<Inspect
     prisma.inspectionRequest.count({ where }),
     prisma.inspectionRequest.findMany({
       where,
-      include: { road: true, phase: true, creator: true, submitter: true, updater: true },
+      include: { road: true, phase: true, creator: true, submitter: true, updater: true, submission: true },
       orderBy,
       skip,
       take: pageSize,
@@ -223,6 +227,12 @@ export const createInspection = async (
   const side = normalizeSide(payload.side)
   const range = normalizeRange(payload.startPk, payload.endPk)
   const appointmentDate = payload.appointmentDate ? new Date(payload.appointmentDate) : null
+  if (normalizedPayload.submissionId) {
+    const exists = await prisma.submission.findUnique({ where: { id: normalizedPayload.submissionId } })
+    if (!exists) {
+      throw new Error('提交单号不存在，请重新选择')
+    }
+  }
   const phase = await prisma.roadPhase.findUnique({
     where: { id: phaseId },
     include: { intervals: true },
@@ -242,6 +252,7 @@ export const createInspection = async (
       layers: normalizedPayload.layers,
       checks: normalizedPayload.checks,
       types: normalizedPayload.types,
+      submissionId: normalizedPayload.submissionId ?? undefined,
       submissionOrder: normalizedPayload.submissionOrder ?? undefined,
       remark: normalizedPayload.remark,
       status: (normalizedPayload.status as InspectionStatus | undefined) ?? InspectionStatus.SCHEDULED,
@@ -251,7 +262,7 @@ export const createInspection = async (
       createdBy: userId ?? undefined,
       updatedBy: userId ?? undefined,
     },
-    include: { creator: true, submitter: true, updater: true },
+    include: { creator: true, submitter: true, updater: true, submission: true },
   })
 
   return mapInspection(inspection)
@@ -280,6 +291,12 @@ export const updateInspection = async (
   if (!phase) {
     throw new Error('分项不存在或不属于当前路段')
   }
+  if (normalizedPayload.submissionId) {
+    const exists = await prisma.submission.findUnique({ where: { id: normalizedPayload.submissionId } })
+    if (!exists) {
+      throw new Error('提交单号不存在，请重新选择')
+    }
+  }
 
   const side = normalizeSide(payload.side)
   const range = normalizeRange(payload.startPk, payload.endPk)
@@ -298,13 +315,14 @@ export const updateInspection = async (
       checks: normalizedPayload.checks,
       types: normalizedPayload.types,
       status: (normalizedPayload.status as InspectionStatus | undefined) ?? existing.status,
+      submissionId: normalizedPayload.submissionId ?? undefined,
       submissionOrder: normalizedPayload.submissionOrder ?? undefined,
       remark: normalizedPayload.remark,
       appointmentDate: appointmentDate ?? undefined,
       submittedAt: submittedAt ?? existing.submittedAt,
       updatedBy: userId ?? undefined,
     },
-    include: { road: true, phase: true, creator: true, submitter: true, updater: true },
+    include: { road: true, phase: true, creator: true, submitter: true, updater: true, submission: true },
   })
 
   return mapInspectionListItem(inspection)
