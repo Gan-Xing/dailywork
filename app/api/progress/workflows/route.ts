@@ -45,6 +45,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: '缺少必填字段：phaseDefinitionId 或 workflow' }, { status: 400 })
     }
 
+    const layers = Array.isArray((payload.workflow as any)?.layers) ? (payload.workflow as any).layers : []
+    const checks =
+      layers.flatMap((layer: any) => (Array.isArray(layer.checks) ? layer.checks : [])).filter((c: any) => c && c.name)
+    if (!layers.length) {
+      return NextResponse.json({ message: '模板至少需要 1 个层次，请先添加层次后再保存' }, { status: 400 })
+    }
+    if (!checks.length) {
+      return NextResponse.json({ message: '模板至少需要 1 个验收内容，请先添加验收内容后再保存' }, { status: 400 })
+    }
+
     const workflow = await updateWorkflowTemplate({
       phaseDefinitionId: Number(payload.phaseDefinitionId),
       workflow: payload.workflow as any,

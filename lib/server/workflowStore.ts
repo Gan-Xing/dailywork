@@ -254,6 +254,15 @@ const fetchDefinitionWithRelations = async (phaseDefinitionId: number) =>
     },
   })
 
+const assertNonEmptyTemplate = (layers: string[], checks: string[]) => {
+  if (!layers.length) {
+    throw new Error('模板至少需要 1 个层次，请先添加层次后再保存')
+  }
+  if (!checks.length) {
+    throw new Error('模板至少需要 1 个验收内容，请先添加验收内容后再保存')
+  }
+}
+
 export const updateWorkflowTemplate = async (params: {
   phaseDefinitionId: number
   workflow: WorkflowTemplate
@@ -272,6 +281,7 @@ export const updateWorkflowTemplate = async (params: {
   const checkNames = normalizeNames(
     params.workflow.layers?.flatMap((item) => item.checks?.map((check) => check.name) || []),
   )
+  assertNonEmptyTemplate(layerNames, checkNames)
 
   const { definition: savedDefinition, workflow: savedWorkflow } = await prisma.$transaction(async (tx) => {
     if (nextName !== definition.name) {
@@ -365,6 +375,7 @@ export const createWorkflowTemplate = async (params: {
   const checkNames = normalizeNames(
     initialWorkflow.layers?.flatMap((item) => item.checks?.map((check) => check.name) || []),
   )
+  assertNonEmptyTemplate(layerNames, checkNames)
 
   const created = await prisma.$transaction(async (tx) => {
     const layerDefs = await ensureLayerDefinitions(layerNames, tx)

@@ -119,6 +119,16 @@ export function WorkflowManager({ initialWorkflows }: Props) {
 
   const handleManualSave = async () => {
     if (!selected) return
+    const layerCount = selected.layers.length
+    const checkCount = selected.layers.flatMap((layer) => layer.checks || []).filter((c) => c && c.name?.trim()).length
+    if (!layerCount) {
+      setError(copy.errors?.layerRequired || '模板至少需要 1 个层次')
+      return
+    }
+    if (!checkCount) {
+      setError(copy.errors?.checkRequired || '模板至少需要 1 个验收内容')
+      return
+    }
     setSaving(true)
     setError(null)
     try {
@@ -155,9 +165,29 @@ export function WorkflowManager({ initialWorkflows }: Props) {
       setError(copy.errors.templateNameRequired)
       return
     }
+    if (!layerNameDraft.trim()) {
+      setError(copy.errors?.layerRequired || '模板至少需要 1 个层次')
+      return
+    }
     setSaving(true)
     setError(null)
     try {
+      const initialLayer = {
+        id: `layer-${Date.now().toString(36)}`,
+        name: layerNameDraft.trim(),
+        stage: 1,
+        dependencies: [],
+        lockStepWith: [],
+        parallelWith: [],
+        description: '',
+        checks: [
+          {
+            id: `check-${Date.now().toString(36)}`,
+            name: copy.checkPlaceholder || '验收内容',
+            types: defaultWorkflowTypes,
+          },
+        ],
+      }
       const res = await fetch('/api/progress/workflows', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -171,7 +201,7 @@ export function WorkflowManager({ initialWorkflows }: Props) {
             phaseName: name,
             measure: newTemplateMeasure,
             defaultTypes: defaultWorkflowTypes,
-            layers: [],
+            layers: [initialLayer],
           },
         }),
       })
@@ -184,6 +214,7 @@ export function WorkflowManager({ initialWorkflows }: Props) {
       setNewTemplateName('')
       setNewTemplateMeasure('LINEAR')
       setNewTemplatePointHasSides(false)
+      setLayerNameDraft('')
       addToast(copy.templateCreated, { tone: 'success' })
     } catch (err) {
       setError((err as Error).message)
