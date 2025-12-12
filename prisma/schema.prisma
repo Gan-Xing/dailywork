@@ -126,6 +126,7 @@ model RoadSection {
   updatedAt DateTime @updatedAt
   phases    RoadPhase[]
   inspections InspectionRequest[]
+  inspectionEntries InspectionEntry[]
 }
 
 model RoadPhase {
@@ -140,6 +141,7 @@ model RoadPhase {
   designLength      Float               @default(0)
   intervals         PhaseInterval[]
   inspections       InspectionRequest[]
+  entries           InspectionEntry[]
   layerLinks        RoadPhaseLayer[]
   checkLinks        RoadPhaseCheck[]
   createdAt         DateTime            @default(now())
@@ -181,8 +183,6 @@ model InspectionRequest {
   road       RoadSection      @relation(fields: [roadId], references: [id], onDelete: Cascade)
   phaseId    Int
   phase      RoadPhase        @relation(fields: [phaseId], references: [id], onDelete: Cascade)
-  submissionId Int?
-  submission  Submission?      @relation(fields: [submissionId], references: [id], onDelete: SetNull)
   side       IntervalSide
   startPk    Float
   endPk      Float
@@ -204,7 +204,6 @@ model InspectionRequest {
   updatedAt       DateTime     @updatedAt
 
   @@index([phaseId, status, updatedAt])
-  @@index([submissionId])
 }
 
 model Submission {
@@ -214,7 +213,41 @@ model Submission {
   remark    String?
   createdAt DateTime          @default(now())
   updatedAt DateTime          @updatedAt
-  inspections InspectionRequest[]
+  entries   InspectionEntry[]
+}
+
+model InspectionEntry {
+  id           Int              @id @default(autoincrement())
+  submissionId Int
+  submission   Submission       @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  roadId       Int
+  road         RoadSection      @relation(fields: [roadId], references: [id], onDelete: Cascade)
+  phaseId      Int
+  phase        RoadPhase        @relation(fields: [phaseId], references: [id], onDelete: Cascade)
+  side         IntervalSide
+  startPk      Float
+  endPk        Float
+  layerId      Int?
+  layerName    String
+  checkId      Int?
+  checkName    String
+  types        String[]
+  status       InspectionStatus @default(PENDING)
+  appointmentDate DateTime?
+  remark       String?
+  submissionOrder Int?
+  submittedAt  DateTime         @default(now())
+  submittedBy  Int?
+  submitter    User?            @relation("InspectionEntrySubmitter", fields: [submittedBy], references: [id])
+  createdBy    Int?
+  creator      User?            @relation("InspectionEntryCreator", fields: [createdBy], references: [id])
+  updatedBy    Int?
+  updater      User?            @relation("InspectionEntryUpdater", fields: [updatedBy], references: [id])
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  @@index([roadId, phaseId, side, startPk, endPk, status])
+  @@index([submissionId])
 }
 
 model RoadPhaseLayer {
@@ -270,6 +303,9 @@ model User {
   submittedInspections InspectionRequest[] @relation("InspectionSubmitter")
   createdInspections  InspectionRequest[] @relation("InspectionCreator")
   updatedInspections  InspectionRequest[] @relation("InspectionUpdater")
+  submittedInspectionEntries InspectionEntry[] @relation("InspectionEntrySubmitter")
+  createdInspectionEntries  InspectionEntry[] @relation("InspectionEntryCreator")
+  updatedInspectionEntries  InspectionEntry[] @relation("InspectionEntryUpdater")
   createdFinances FinanceEntry[] @relation("FinanceEntryCreator")
   deletedFinances FinanceEntry[] @relation("FinanceEntryDeleter")
   handledFinances FinanceEntry[] @relation("FinanceEntryHandler")
