@@ -1417,7 +1417,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                 placeholder={copy.filters.keywordPlaceholder}
               />
             </label>
-            <div className="flex flex-wrap items-center justify-end gap-3 md:col-span-2">
+            <div className="flex flex-wrap items-center justify-end gap-3 md:col-span-4 md:col-start-1 md:mt-0">
               <button
                 type="button"
                 className="rounded-xl border border-white/20 px-4 py-2 text-xs font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/10"
