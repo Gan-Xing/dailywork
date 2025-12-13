@@ -257,54 +257,52 @@ export function PhaseFormModal({
                         placeholder={t.form.intervalSpec}
                       />
                     </label>
-                    <label className="flex flex-col items-center gap-1 text-center">
-                      {t.form.intervalBillQuantity}
-                      <input
-                        type="number"
-                        className="w-full rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
-                        value={Number.isFinite(item.billQuantity ?? Number.NaN) ? item.billQuantity ?? '' : ''}
-                        onChange={(e) =>
-                          onIntervalChange(index, {
-                            billQuantity: e.target.value === '' ? null : Number(e.target.value),
-                          })
-                        }
-                      />
-                    </label>
-                    {(measure === 'POINT' && layerOptions.length) || intervals.length > 1 ? (
-                      <div className="md:col-span-6 flex flex-wrap items-start gap-3">
-                        {measure === 'POINT' && layerOptions.length ? (
-                          <div className="flex flex-1 flex-wrap gap-2">
-                            {(layerOptions.length ? layerOptions : defaultLayers).map((layer) => {
-                              const selected =
-                                (item.layers?.length ? item.layers : defaultLayers).some(
-                                  (layerName) => layerName.trim().toLowerCase() === layer.trim().toLowerCase(),
-                                )
-                              return (
-                                <button
-                                  key={`${index}-${layer}`}
-                                  type="button"
-                                  onClick={() => onToggleIntervalLayer(index, layer)}
-                                  className={`rounded-full px-3 py-1 text-[11px] font-semibold transition ${
-                                    selected
-                                      ? 'bg-emerald-300 text-slate-900 shadow-lg shadow-emerald-400/30'
-                                      : 'bg-white/10 text-slate-200 hover:bg-white/20'
-                                  }`}
-                                >
-                                  {layer}
-                                </button>
-                              )
-                            })}
-                          </div>
-                        ) : null}
-                        {intervals.length > 1 ? (
-                          <button
-                            type="button"
-                            className="ml-auto self-start rounded-xl border border-rose-200/60 px-3 py-2 text-xs font-semibold text-rose-100 transition hover:border-rose-200/60 hover:bg-rose-200/10"
-                            onClick={() => onRemoveInterval(index)}
-                          >
-                            {t.form.intervalDelete}
-                          </button>
-                        ) : null}
+                    <div className="md:col-span-2 flex flex-col gap-3 md:flex-row md:items-center md:gap-3">
+                      <label className="flex w-full flex-col items-center gap-1 text-center md:mb-0">
+                        {t.form.intervalBillQuantity}
+                        <input
+                          type="number"
+                          className="w-full rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
+                          value={Number.isFinite(item.billQuantity ?? Number.NaN) ? item.billQuantity ?? '' : ''}
+                          onChange={(e) =>
+                            onIntervalChange(index, {
+                              billQuantity: e.target.value === '' ? null : Number(e.target.value),
+                            })
+                          }
+                        />
+                      </label>
+                      {intervals.length > 1 ? (
+                        <button
+                          type="button"
+                          className="w-full self-end rounded-xl border border-rose-200/60 px-3 py-2 text-xs font-semibold text-rose-100 transition hover:border-rose-200/60 hover:bg-rose-200/10 md:w-auto md:ml-auto md:self-center"
+                          onClick={() => onRemoveInterval(index)}
+                        >
+                          {t.form.intervalDelete}
+                        </button>
+                      ) : null}
+                    </div>
+                    {measure === 'POINT' && layerOptions.length ? (
+                      <div className="md:col-span-6 flex flex-wrap gap-2">
+                        {(layerOptions.length ? layerOptions : defaultLayers).map((layer) => {
+                          const selected =
+                            (item.layers?.length ? item.layers : defaultLayers).some(
+                              (layerName) => layerName.trim().toLowerCase() === layer.trim().toLowerCase(),
+                            )
+                          return (
+                            <button
+                              key={`${index}-${layer}`}
+                              type="button"
+                              onClick={() => onToggleIntervalLayer(index, layer)}
+                              className={`rounded-full px-3 py-1 text-[11px] font-semibold transition ${
+                                selected
+                                  ? 'bg-emerald-300 text-slate-900 shadow-lg shadow-emerald-400/30'
+                                  : 'bg-white/10 text-slate-200 hover:bg-white/20'
+                              }`}
+                            >
+                              {layer}
+                            </button>
+                          )
+                        })}
                       </div>
                     ) : null}
                   </div>

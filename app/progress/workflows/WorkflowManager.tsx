@@ -61,6 +61,15 @@ export function WorkflowManager({ initialWorkflows }: Props) {
     (name: string) => localizeProgressTerm('type', name, locale),
     [locale],
   )
+  const formatTemplateLabel = useCallback(
+    (tpl?: WorkflowItem | null) => {
+      if (!tpl) return copy.templateEmpty
+      const measureLabel = tpl.measure === 'POINT' ? copy.measurePoint : copy.measureLinear
+      const sideLabel = tpl.measure === 'POINT' && tpl.pointHasSides ? copy.pointHasSidesLabel : ''
+      return [tpl.phaseName, measureLabel, sideLabel].filter(Boolean).join(' · ')
+    },
+    [copy.measureLinear, copy.measurePoint, copy.pointHasSidesLabel, copy.templateEmpty],
+  )
 
   useEffect(() => {
     setWorkflows(initialWorkflows)
@@ -165,16 +174,14 @@ export function WorkflowManager({ initialWorkflows }: Props) {
       setError(copy.errors.templateNameRequired)
       return
     }
-    if (!layerNameDraft.trim()) {
-      setError('模板至少需要 1 个层次')
-      return
-    }
     setSaving(true)
     setError(null)
     try {
+      const defaultLayerName = layerNameDraft.trim() || copy.newLayer
+      const defaultCheckName = copy.newCheck
       const initialLayer = {
         id: `layer-${Date.now().toString(36)}`,
-        name: layerNameDraft.trim(),
+        name: defaultLayerName,
         stage: 1,
         dependencies: [],
         lockStepWith: [],
@@ -183,7 +190,7 @@ export function WorkflowManager({ initialWorkflows }: Props) {
           checks: [
             {
               id: `check-${Date.now().toString(36)}`,
-              name: '验收内容',
+              name: defaultCheckName,
               types: defaultWorkflowTypes,
             },
           ],
@@ -501,9 +508,23 @@ export function WorkflowManager({ initialWorkflows }: Props) {
                   <h2 className="text-lg font-semibold text-white">{copy.templateTitle}</h2>
                   <p className="text-xs text-slate-300">{copy.templateHint}</p>
                 </div>
-                <span className="rounded-full border border-white/10 px-3 py-1 text-xs text-slate-200">
-                  {selected?.phaseName || copy.templateEmpty}
-                </span>
+                <div className="flex flex-wrap justify-end gap-2">
+                  <span className="rounded-full border border-white/10 px-3 py-1 text-xs text-slate-200">
+                    {selected?.phaseName || copy.templateEmpty}
+                  </span>
+                  {selected ? (
+                    <>
+                      <span className="rounded-full bg-white/10 px-2 py-1 text-[11px] text-slate-100">
+                        {selected.measure === 'POINT' ? copy.measurePoint : copy.measureLinear}
+                      </span>
+                      {selected.measure === 'POINT' && selected.pointHasSides ? (
+                        <span className="rounded-full bg-emerald-300/20 px-2 py-1 text-[11px] text-emerald-50">
+                          {copy.pointHasSidesLabel}
+                        </span>
+                      ) : null}
+                    </>
+                  ) : null}
+                </div>
               </div>
               <div className="mt-3 grid gap-3 text-xs text-slate-200/80">
                 <label className="flex w-full items-center gap-3 text-sm text-slate-200">
@@ -518,7 +539,7 @@ export function WorkflowManager({ initialWorkflows }: Props) {
                     {!selected ? <option value="">{copy.empty}</option> : null}
                     {workflows.map((tpl) => (
                       <option key={tpl.id} value={tpl.id}>
-                        {tpl.phaseName}
+                        {formatTemplateLabel(tpl)}
                       </option>
                     ))}
                   </select>

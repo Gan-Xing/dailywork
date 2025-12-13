@@ -47,7 +47,7 @@ enum RoadmapStatus {
 
 model PhaseDefinition {
   id             Int                     @id @default(autoincrement())
-  name           String                  @unique
+  name           String
   measure        PhaseMeasure
   unitPrice      Decimal?                @db.Decimal(18, 2)
   pointHasSides  Boolean                 @default(false)
@@ -59,6 +59,8 @@ model PhaseDefinition {
   workflows      PhaseWorkflowDefinition[]
   createdAt      DateTime                @default(now())
   updatedAt      DateTime                @updatedAt
+
+  @@unique([name, measure])
 }
 
 model LayerDefinition {

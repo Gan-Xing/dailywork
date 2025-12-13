@@ -330,6 +330,9 @@ export const updateWorkflowTemplate = async (params: {
 
   const nextName = params.name?.trim() || params.workflow.phaseName?.trim() || definition.name
   const nextMeasure = params.measure ?? params.workflow.measure ?? inferMeasure(definition.measure)
+  const prismaMeasure = toPrismaMeasure(nextMeasure)
+  const nextPointHasSides =
+    nextMeasure === 'POINT' ? Boolean(params.pointHasSides ?? definition.pointHasSides) : false
   const layerNames = normalizeNames(params.workflow.layers?.map((item) => item.name))
   const checkNames = normalizeNames(
     params.workflow.layers?.flatMap((item) => item.checks?.map((check) => check.name) || []),
@@ -337,11 +340,15 @@ export const updateWorkflowTemplate = async (params: {
   assertNonEmptyTemplate(layerNames, checkNames)
 
   const { definition: savedDefinition, workflow: savedWorkflow } = await prisma.$transaction(async (tx) => {
-    if (nextName !== definition.name) {
-      const duplicate = await tx.phaseDefinition.findUnique({ where: { name: nextName } })
-      if (duplicate && duplicate.id !== definition.id) {
-        throw new Error('已存在同名的分项模板，请更换名称。')
-      }
+    const duplicate = await tx.phaseDefinition.findFirst({
+      where: {
+        name: nextName,
+        measure: prismaMeasure,
+        NOT: { id: definition.id },
+      },
+    })
+    if (duplicate) {
+      throw new Error('已存在同名且计量方式相同的模板，请更换名称或计量方式。')
     }
 
     const layerDefs = await ensureLayerDefinitions(layerNames, tx)
@@ -356,8 +363,8 @@ export const updateWorkflowTemplate = async (params: {
       where: { id: definition.id },
       data: {
         name: nextName,
-        measure: toPrismaMeasure(nextMeasure),
-        pointHasSides: nextMeasure === 'POINT' ? Boolean(params.pointHasSides ?? definition.pointHasSides) : false,
+        measure: prismaMeasure,
+        pointHasSides: nextPointHasSides,
         updatedAt: new Date(),
       },
     })
@@ -366,8 +373,8 @@ export const updateWorkflowTemplate = async (params: {
       {
         ...definition,
         name: nextName,
-        measure: toPrismaMeasure(nextMeasure),
-        pointHasSides: updated.pointHasSides,
+        measure: prismaMeasure,
+        pointHasSides: nextPointHasSides,
       },
       params.workflow,
     )
@@ -378,24 +385,23 @@ export const updateWorkflowTemplate = async (params: {
       update: { config: normalizedWorkflow },
     })
 
-    await syncPhasesWithTemplate(tx, savedDefinition)
-
-    return {
-      definition: {
-        ...updated,
-        defaultLayers: layerDefs.map((layer) => ({
-          phaseDefinitionId: updated.id,
-          layerDefinitionId: layer.id,
-          layerDefinition: layer,
-        })),
-        defaultChecks: checkDefs.map((check) => ({
-          phaseDefinitionId: updated.id,
-          checkDefinitionId: check.id,
-          checkDefinition: check,
-        })),
-      },
-      workflow: normalizedWorkflow,
+    const definitionWithRelations = {
+      ...updated,
+      defaultLayers: layerDefs.map((layer) => ({
+        phaseDefinitionId: updated.id,
+        layerDefinitionId: layer.id,
+        layerDefinition: layer,
+      })),
+      defaultChecks: checkDefs.map((check) => ({
+        phaseDefinitionId: updated.id,
+        checkDefinitionId: check.id,
+        checkDefinition: check,
+      })),
     }
+
+    await syncPhasesWithTemplate(tx, definitionWithRelations)
+
+    return { definition: definitionWithRelations, workflow: normalizedWorkflow }
   })
 
   return normalizeWorkflow(savedDefinition, savedWorkflow)
@@ -412,9 +418,13 @@ export const createWorkflowTemplate = async (params: {
     throw new Error('模板名称不能为空')
   }
 
-  const existing = await prisma.phaseDefinition.findUnique({ where: { name } })
+  const measure = toPrismaMeasure(params.measure)
+  const pointHasSides = params.measure === 'POINT' ? Boolean(params.pointHasSides) : false
+  const existing = await prisma.phaseDefinition.findFirst({
+    where: { name, measure },
+  })
   if (existing) {
-    throw new Error('模板名称已存在，请更换')
+    throw new Error('已存在同名且计量方式相同的模板，请更换名称或计量方式')
   }
 
   const fallback = defaultWorkflowTemplates.find((tpl) => tpl.phaseName === name)
@@ -439,8 +449,8 @@ export const createWorkflowTemplate = async (params: {
     const definition = await tx.phaseDefinition.create({
       data: {
         name,
-        measure: toPrismaMeasure(params.measure),
-        pointHasSides: params.measure === 'POINT' ? Boolean(params.pointHasSides) : false,
+        measure,
+        pointHasSides,
         isActive: true,
         defaultLayers: layerDefs.length
           ? {
