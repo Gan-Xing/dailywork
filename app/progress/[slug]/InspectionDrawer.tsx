@@ -24,7 +24,7 @@ import type {
 type PhaseCopy = ReturnType<typeof getProgressCopy>['phase']
 type WorkflowCopy = ReturnType<typeof getProgressCopy>['workflow']
 
-interface InspectionDrawerProps {
+export interface InspectionDrawerProps {
   selectedSegment: SelectedSegment | null
   locale: Locale
   t: PhaseCopy

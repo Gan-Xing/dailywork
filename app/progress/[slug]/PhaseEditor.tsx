@@ -3,21 +3,38 @@
 
 import { useEffect, useMemo, useRef } from 'react'
 
-import { DeletePhaseDialog } from './DeletePhaseDialog'
-import { InspectionDrawer } from './InspectionDrawer'
+import dynamic from 'next/dynamic'
+
 import { useInspectionFlow } from './hooks/useInspectionFlow'
 import { usePhaseManagement } from './hooks/usePhaseManagement'
-import { PhaseFormModal } from './PhaseFormModal'
 import { PointLane } from './PointLane'
 import { calcCompletedBySide, formatPK, statusTone } from './phaseEditorUtils'
 import type { PhaseEditorProps, Status } from './phaseEditorTypes'
+import type { DeletePhaseDialogProps } from './DeletePhaseDialog'
+import type { InspectionDrawerProps } from './InspectionDrawer'
+import type { PhaseFormModalProps } from './PhaseFormModal'
 import { AlertDialog } from '@/components/AlertDialog'
 import { useToast } from '@/components/ToastProvider'
 import { getProgressCopy, formatProgressCopy } from '@/lib/i18n/progress'
 import { localizeProgressTerm } from '@/lib/i18n/progressDictionary'
 import { locales } from '@/lib/i18n'
 import { usePreferredLocale } from '@/lib/usePreferredLocale'
-import type { IntervalSide } from '@/lib/progressTypes'
+import type { IntervalSide, PhaseMeasure } from '@/lib/progressTypes'
+
+const PhaseFormModal = dynamic<PhaseFormModalProps>(
+  () => import('./PhaseFormModal').then((mod) => mod.PhaseFormModal),
+  { ssr: false, loading: () => null },
+)
+
+const DeletePhaseDialog = dynamic<DeletePhaseDialogProps>(
+  () => import('./DeletePhaseDialog').then((mod) => mod.DeletePhaseDialog),
+  { ssr: false, loading: () => null },
+)
+
+const InspectionDrawer = dynamic<InspectionDrawerProps>(
+  () => import('./InspectionDrawer').then((mod) => mod.InspectionDrawer),
+  { ssr: false, loading: () => null },
+)
 
 export function PhaseEditor({
   road,
@@ -184,52 +201,56 @@ export function PhaseEditor({
         </p>
       </section>
 
-      <PhaseFormModal
-        open={phaseState.showFormModal}
-        canManage={canManage}
-        t={t}
-        designLength={phaseState.designLength}
-        roadLength={roadLength}
-        measure={phaseState.measure}
-        name={phaseState.name}
-        definitionId={phaseState.definitionId}
-        editingId={phaseState.editingId}
-        definitions={phaseState.definitions}
-        pointHasSides={phaseState.pointHasSides}
-        intervals={phaseState.intervals}
-        sideOptions={sideOptions}
-        defaultLayers={phaseState.defaultLayers}
-        layerOptions={phaseState.layerOptions}
-        isPending={phaseState.isPending}
-        error={phaseState.error}
-        nameInputRef={phaseState.nameInputRef}
-        onClose={phaseState.closeFormModal}
-        onReset={phaseState.resetForm}
-        onSubmit={phaseState.handleSubmit}
-        onTemplateSelect={phaseState.applyDefinitionTemplate}
-        onNameChange={phaseState.setName}
-        onMeasureChange={(value) => {
-          phaseState.setMeasure(value)
-          if (value === 'LINEAR') {
-            phaseState.setPointHasSides(false)
-          }
-        }}
-        onPointHasSidesChange={phaseState.setPointHasSides}
-        onIntervalChange={phaseState.updateInterval}
-        onToggleIntervalLayer={phaseState.toggleIntervalLayer}
-        onAddInterval={phaseState.addInterval}
-        onRemoveInterval={phaseState.removeInterval}
-      />
+      {phaseState.showFormModal ? (
+        <PhaseFormModal
+          open={phaseState.showFormModal}
+          canManage={canManage}
+          t={t}
+          designLength={phaseState.designLength}
+          roadLength={roadLength}
+          measure={phaseState.measure}
+          name={phaseState.name}
+          definitionId={phaseState.definitionId}
+          editingId={phaseState.editingId}
+          definitions={phaseState.definitions}
+          pointHasSides={phaseState.pointHasSides}
+          intervals={phaseState.intervals}
+          sideOptions={sideOptions}
+          defaultLayers={phaseState.defaultLayers}
+          layerOptions={phaseState.layerOptions}
+          isPending={phaseState.isPending}
+          error={phaseState.error}
+          nameInputRef={phaseState.nameInputRef}
+          onClose={phaseState.closeFormModal}
+          onReset={phaseState.resetForm}
+          onSubmit={phaseState.handleSubmit}
+          onTemplateSelect={phaseState.applyDefinitionTemplate}
+          onNameChange={phaseState.setName}
+          onMeasureChange={(value: PhaseMeasure) => {
+            phaseState.setMeasure(value)
+            if (value === 'LINEAR') {
+              phaseState.setPointHasSides(false)
+            }
+          }}
+          onPointHasSidesChange={phaseState.setPointHasSides}
+          onIntervalChange={phaseState.updateInterval}
+          onToggleIntervalLayer={phaseState.toggleIntervalLayer}
+          onAddInterval={phaseState.addInterval}
+          onRemoveInterval={phaseState.removeInterval}
+        />
+      ) : null}
 
-      <DeletePhaseDialog
-        open={Boolean(phaseState.deleteTarget && canManage)}
-        phase={phaseState.deleteTarget}
-        t={t}
-        deleteError={phaseState.deleteError}
-        deletingId={phaseState.deletingId}
-        onCancel={phaseState.resetDeleteState}
-        onConfirm={phaseState.confirmDelete}
-      />
+      {phaseState.deleteTarget && canManage ? (
+        <DeletePhaseDialog
+          open={Boolean(phaseState.deleteTarget && canManage)}
+          phase={phaseState.deleteTarget}
+          t={t}
+          deleteError={phaseState.deleteError}
+          deletingId={phaseState.deletingId}
+          onCancel={phaseState.resetDeleteState}
+          onConfirm={phaseState.confirmDelete}
+        />
+      ) : null}
 
       <section className="space-y-6 rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur">
         <div className="flex flex-wrap items-center gap-3 text-xs font-semibold uppercase tracking-[0.2em] text-slate-200">
@@ -441,10 +462,12 @@ export function PhaseEditor({
         )}
       </section>
 
-      <InspectionDrawer
-        {...inspectionDrawerProps}
-        onClose={() => setSelectedSegment(null)}
-      />
+      {inspectionDrawerProps.selectedSegment ? (
+        <InspectionDrawer
+          {...inspectionDrawerProps}
+          onClose={() => setSelectedSegment(null)}
+        />
+      ) : null}
     </div>
   )
 }

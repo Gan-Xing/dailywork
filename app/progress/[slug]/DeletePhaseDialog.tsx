@@ -6,7 +6,7 @@ import { formatProgressCopy } from '@/lib/i18n/progress'
 
 type PhaseCopy = ReturnType<typeof getProgressCopy>['phase']
 
-interface DeletePhaseDialogProps {
+export interface DeletePhaseDialogProps {
   open: boolean
   phase: PhaseDTO | null
   t: PhaseCopy

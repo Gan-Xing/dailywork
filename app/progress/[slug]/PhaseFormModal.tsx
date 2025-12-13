@@ -8,7 +8,7 @@ import { formatProgressCopy } from '@/lib/i18n/progress'
 
 type PhaseCopy = ReturnType<typeof getProgressCopy>['phase']
 
-interface PhaseFormModalProps {
+export interface PhaseFormModalProps {
   open: boolean
   canManage: boolean
   t: PhaseCopy

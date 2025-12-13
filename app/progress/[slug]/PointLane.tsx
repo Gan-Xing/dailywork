@@ -3,10 +3,20 @@
 
 import { useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
 
-import { PointProgressWave } from './PointProgressWave'
+import dynamic from 'next/dynamic'
+
 import type { PointView, SelectedSegment } from './phaseEditorTypes'
 import { formatPK, getPointCenter } from './phaseEditorUtils'
+import type { PointProgressWaveProps } from './PointProgressWave'
 import type { IntervalSide, PhaseDTO } from '@/lib/progressTypes'
+
+const PointProgressWave = dynamic<PointProgressWaveProps>(
+  () => import('./PointProgressWave').then((mod) => mod.PointProgressWave),
+  {
+    ssr: false,
+    loading: () => <div className="h-12 w-12 animate-pulse rounded-full bg-slate-800" />,
+  },
+)
 
 const useElementWidth = (ref: RefObject<HTMLElement>) => {
   const [width, setWidth] = useState(0)

@@ -5,7 +5,7 @@ import { useEffect, useRef } from 'react'
 import type { LiquidOptions } from '@antv/g2plot'
 import { Liquid } from '@antv/g2plot'
 
-interface Props {
+export interface PointProgressWaveProps {
   percent: number
   size?: number
   className?: string
@@ -18,7 +18,7 @@ const clampPercent = (value: number) => {
   return value
 }
 
-export function PointProgressWave({ percent, size = 56, className }: Props) {
+export function PointProgressWave({ percent, size = 56, className }: PointProgressWaveProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
