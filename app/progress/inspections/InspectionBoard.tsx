@@ -134,10 +134,10 @@ const mapEntryToListItem = (entry: InspectionEntryDTO): InspectionListItem => {
   return {
     id: entry.id,
     roadId: entry.roadId,
-    roadName: entry.roadName,
-    roadSlug: entry.roadSlug,
+    roadName: entry.roadName ?? entry.road?.name ?? '',
+    roadSlug: entry.roadSlug ?? entry.road?.slug ?? '',
     phaseId: entry.phaseId,
-    phaseName: entry.phaseName,
+    phaseName: entry.phaseName ?? entry.phase?.name ?? '',
     submissionId: entry.submissionId ?? null,
     submissionCode: entry.submissionCode ?? undefined,
     side: entry.side,
@@ -1390,7 +1390,7 @@ const [bulkEditError, setBulkEditError] = useState<string | null>(null)
                       {isVisible('road') ? <td className="px-4 py-3 whitespace-nowrap">{roadText}</td> : null}
                       {isVisible('phase') ? (
                         <td className="px-4 py-3 whitespace-nowrap">
-                          {localizeProgressTerm('phase', item.phaseName, locale)}
+                          {item.phaseName ? localizeProgressTerm('phase', item.phaseName, locale) : '—'}
                         </td>
                       ) : null}
                       {isVisible('side') ? (
