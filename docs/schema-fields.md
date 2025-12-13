@@ -228,6 +228,22 @@
 
 > 继承与覆盖规则：路段下新建分项实例时选择一个模板，初始层次/验收内容取模板默认值；实例可新增/删除候选，保存后 `layerIds`/`checkIds` 记录实例实际选中的定义集合。报检弹窗展示与提交时使用 `resolvedLayers`/`resolvedChecks`。
 
+## 分项区间（PhaseInterval）
+
+- **用途**：记录每条区间/点位的起终桩号、规格、层次和计量信息。
+- **字段**
+     0. `id`：唯一标识。
+     1. `phaseId`：关联 `RoadPhase`。
+     2. `startPk` / `endPk`：区间起止桩号。
+     3. `side`：区间侧别（`BOTH` / `LEFT` / `RIGHT`）。
+     4. `spec?`：规格文字。
+     5. `layers`：字符串数组，记录当前区间可选层次名称，来自提交时 `PhasePayload.intervals.layers`。
+     6. `layerIds`：整数数组，对应 `LayerDefinition.id`，由当前区间的层次名称映射为模板的定义 ID，用于区分每条区间各自的层次集合。
+     7. `billQuantity?`：计量工料值。
+     8. `createdAt` / `updatedAt`：时间戳。
+
+> 说明：保存时会根据模板 `defaultLayers` 里的 `LayerDefinition` 名称做名称 → ID 映射，若某个名称不属于模板则报错；该映射结果记录在 `layerIds`，使每个区间都能各自声明层次 ID 而不会只用分项级的 `layerIds`。
+
 ## 报检记录（InspectionRequest）
 - **用途**：记录分项的报检预约与提交信息。
 - **字段**

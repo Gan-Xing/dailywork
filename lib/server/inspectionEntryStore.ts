@@ -140,6 +140,20 @@ const mergeRanges = (ranges: Array<{ start: number; end: number }>) => {
 const isWorkflowSatisfied = (status?: InspectionStatus) =>
   (statusPriority[status ?? InspectionStatus.PENDING] ?? 0) >= (statusPriority.SCHEDULED ?? 0)
 
+const resolvePhaseLayers = (phase: {
+  layerLinks?: { layerDefinition?: { name: string | null } | null }[]
+  phaseDefinition?: { defaultLayers?: { layerDefinition?: { name: string | null } | null }[] } | null
+}) => {
+  const instanceLayers =
+    phase.layerLinks?.map((link) => link.layerDefinition?.name).filter(Boolean) ?? []
+  if (instanceLayers.length) {
+    return Array.from(new Set(instanceLayers)) as string[]
+  }
+  const defaultLayers =
+    phase.phaseDefinition?.defaultLayers?.map((item) => item.layerDefinition?.name).filter(Boolean) ?? []
+  return Array.from(new Set(defaultLayers)) as string[]
+}
+
 export class WorkflowValidationError extends Error {
   details?: string[]
   constructor(message: string, details?: string[]) {
@@ -159,6 +173,7 @@ const assertWorkflowSubmissionRules = async (params: {
   endPk: number
   layers: string[]
   checks: string[]
+  availableLayers?: string[]
 }) => {
   const workflow = await getWorkflowByPhaseDefinitionId(params.phase.phaseDefinitionId)
   if (!workflow || !workflow.layers?.length) return
@@ -179,6 +194,14 @@ const assertWorkflowSubmissionRules = async (params: {
       checkMetaByName.set(normalizeLabel(check.name), list)
     })
   })
+
+  const availableLayerIds = new Set<string>()
+  if (params.availableLayers?.length) {
+    params.availableLayers.forEach((name) => {
+      const matched = layerIdByName.get(normalizeLabel(name))
+      if (matched) availableLayerIds.add(matched)
+    })
+  }
 
   const selectedLayerIds = new Set<string>()
   params.layers.forEach((layer) => {
@@ -204,24 +227,6 @@ const assertWorkflowSubmissionRules = async (params: {
     },
   })
   // 打印模板与本次报检内容，便于直接定位前置校验
-  console.dir({
-    phaseId: params.phase.id,
-    phaseDefinitionId: params.phase.phaseDefinitionId,
-    layers: workflow.layers.map((layer) => ({
-      id: layer.id,
-      name: layer.name,
-      dependencies: layer.dependencies,
-      checks: layer.checks.map((check) => ({ id: check.id, name: check.name, order: check.order })),
-    })),
-    incoming: {
-      side: params.side,
-      startPk: targetRange.startPk,
-      endPk: targetRange.endPk,
-      layers: params.layers,
-      checks: params.checks,
-    },
-  }, { depth: 6 })
-
   const coverageByLayer = new Map<string, { LEFT: Array<{ start: number; end: number }>; RIGHT: Array<{ start: number; end: number }> }>()
   const completedChecksBySide: { LEFT: Map<string, Set<string>>; RIGHT: Map<string, Set<string>> } = {
     LEFT: new Map(),
@@ -311,10 +316,30 @@ const assertWorkflowSubmissionRules = async (params: {
   }
 
   const missingDeps = new Set<string>()
+  const resolveDependencies = (layerId: string, visited = new Set<string>()): string[] => {
+    if (visited.has(layerId)) return []
+    visited.add(layerId)
+    const layer = workflow.layers.find((item) => item.id === layerId)
+    if (!layer || !layer.dependencies?.length) return []
+    const resolved: string[] = []
+    layer.dependencies.forEach((depId) => {
+      if (!availableLayerIds.size || availableLayerIds.has(depId)) {
+        resolved.push(depId)
+        return
+      }
+      const fallback = resolveDependencies(depId, new Set(visited))
+      if (fallback.length) {
+        resolved.push(...fallback)
+      }
+    })
+    return Array.from(new Set(resolved))
+  }
+
   selectedLayerIds.forEach((layerId) => {
     const layer = workflow.layers.find((item) => item.id === layerId)
     if (!layer || !layer.dependencies?.length) return
-    layer.dependencies.forEach((depId) => {
+    const dependenciesToCheck = resolveDependencies(layerId)
+    dependenciesToCheck.forEach((depId) => {
       if (selectedLayerIds.has(depId)) return
       if (params.side === 'BOTH') {
         const leftCovered = hasCoverage(depId, 'LEFT')
@@ -496,12 +521,17 @@ export const createInspectionEntries = async (
   const phaseIds = Array.from(new Set(entries.map((item) => item.phaseId)))
   const phases = await prisma.roadPhase.findMany({
     where: { id: { in: phaseIds } },
-    include: { intervals: true },
+    include: {
+      intervals: true,
+      layerLinks: { include: { layerDefinition: true } },
+      phaseDefinition: { include: { defaultLayers: { include: { layerDefinition: true } } } },
+    },
   })
   if (phases.length !== phaseIds.length) {
     throw new Error('分项不存在或已删除')
   }
   const phaseMap = new Map(phases.map((phase) => [phase.id, phase]))
+  const resolvedLayersByPhaseId = new Map<number, string[]>(phases.map((phase) => [phase.id, resolvePhaseLayers(phase)]))
 
   const prepared: { data: InspectionEntryCreateData; meta: { roadSlug: string } }[] = []
   let generatedSubmissionId: number | null = null
@@ -585,6 +615,7 @@ export const createInspectionEntries = async (
   }
 
   for (const group of Array.from(workflowGroups.values())) {
+    const availableLayers = resolvedLayersByPhaseId.get(group.phase.id)
     await assertWorkflowSubmissionRules({
       phase: { id: group.phase.id, phaseDefinitionId: group.phase.phaseDefinitionId },
       side: group.side,
@@ -592,6 +623,7 @@ export const createInspectionEntries = async (
       endPk: group.endPk,
       layers: Array.from(group.layers),
       checks: Array.from(group.checks),
+      availableLayers,
     })
   }
 
@@ -728,82 +760,6 @@ export const aggregateEntriesAsListItems = async (
 
   const items = Array.from(grouped.values())
   return { items, total, page, pageSize }
-}
-
-export const createEntriesFromLegacyPayload = async (
-  roadId: number,
-  phaseId: number,
-  payload: {
-    layers: string[]
-    checks: string[]
-    types: string[]
-    side: IntervalSide
-    startPk: number
-    endPk: number
-    submissionId?: number | null
-    submissionOrder?: number | null
-    remark?: string
-    appointmentDate?: string
-    submittedAt?: string
-    status?: InspectionStatus
-  },
-  userId: number | null,
-  options?: { phase?: { id: number; phaseDefinitionId: number } },
-) => {
-  const layers = canonicalizeProgressList('layer', payload.layers ?? [])
-  const checks = canonicalizeProgressList('check', payload.checks ?? [])
-  const types = canonicalizeProgressList('type', payload.types ?? [])
-  if (!layers.length) throw new Error('层次必填')
-  if (!checks.length) throw new Error('验收内容必填')
-  if (!types.length) throw new Error('验收类型必填')
-
-  const phaseForValidation =
-    options?.phase ??
-    (await prisma.roadPhase.findFirst({
-      where: { id: phaseId, roadId },
-      select: { id: true, phaseDefinitionId: true },
-    }))
-  if (phaseForValidation) {
-    await assertWorkflowSubmissionRules({
-      phase: phaseForValidation,
-      side: payload.side,
-      startPk: payload.startPk,
-      endPk: payload.endPk,
-      layers,
-      checks,
-    })
-  }
-
-  const submissionId =
-    payload.submissionId ??
-    (await (async () => {
-      const submission = await createSubmission(undefined, undefined, [])
-      return submission.id
-    })())
-
-  const entries: InspectionEntryPayload[] = []
-  layers.forEach((layer) => {
-    checks.forEach((check) => {
-      entries.push({
-        submissionId,
-        roadId,
-        phaseId,
-        side: payload.side,
-        startPk: payload.startPk,
-        endPk: payload.endPk,
-        layerName: layer,
-        checkName: check,
-        types,
-        status: payload.status,
-        appointmentDate: payload.appointmentDate,
-        remark: payload.remark,
-        submissionOrder: payload.submissionOrder,
-        submittedAt: payload.submittedAt,
-      })
-    })
-  })
-
-  return createInspectionEntries(entries, userId)
 }
 
 export const listSubmissions = async (): Promise<{ id: number; code: string }[]> => {

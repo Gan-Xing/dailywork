@@ -57,6 +57,43 @@ const toOptionalNumber = (value: number | Prisma.Decimal | null | undefined) => 
   return Number(value)
 }
 
+const buildAllowedLayerMap = (layers: { layerDefinition: { id: number; name: string } }[]) => {
+  const map = new Map<string, number>()
+  layers.forEach((item) => {
+    const canonical = canonicalizeProgressList('layer', [item.layerDefinition.name]).at(0)
+    if (canonical) {
+      map.set(canonical, item.layerDefinition.id)
+    }
+  })
+  return map
+}
+
+const resolveIntervalLayers = (
+  layers: string[] | undefined,
+  allowedLayerMap: Map<string, number>,
+) => {
+  if (!layers || !layers.length) {
+    return { layers: undefined, layerIds: [] as number[] }
+  }
+  const canonical = canonicalizeProgressList('layer', layers)
+  const normalized = canonical.filter(Boolean)
+  if (!normalized.length) {
+    return { layers: undefined, layerIds: [] }
+  }
+  const invalid = normalized.filter((name) => !allowedLayerMap.has(name))
+  if (invalid.length) {
+    throw new Error(`区间层次必须来自模板：${invalid.join('、')}`)
+  }
+  const layerIds = Array.from(
+    new Set(
+      normalized
+        .map((name) => allowedLayerMap.get(name))
+        .filter((id): id is number => Number.isInteger(id)),
+    ),
+  )
+  return { layers: normalized, layerIds }
+}
+
 const mapDefinitionToDTO = (
   definition: Prisma.PhaseDefinitionGetPayload<{
     include: { defaultLayers: { include: { layerDefinition: true } }; defaultChecks: { include: { checkDefinition: true } } }
@@ -67,6 +104,10 @@ const mapDefinitionToDTO = (
   measure: definition.measure,
   pointHasSides: definition.pointHasSides,
   defaultLayers: definition.defaultLayers.map((l) => l.layerDefinition.name),
+  defaultLayerObjects: definition.defaultLayers.map((l) => ({
+    id: l.layerDefinition.id,
+    name: l.layerDefinition.name,
+  })),
   defaultChecks: definition.defaultChecks.map((c) => c.checkDefinition.name),
   unitPrice: toOptionalNumber(definition.unitPrice),
   isActive: definition.isActive,
@@ -119,6 +160,10 @@ const mapPhaseToDTO = (
     resolvedChecks: resolvedChecks.map((c) => c.name),
     definitionName: phase.phaseDefinition.name,
     definitionId: phase.phaseDefinitionId,
+    allowedLayers: phase.phaseDefinition.defaultLayers.map((l) => ({
+      id: l.layerDefinition.id,
+      name: l.layerDefinition.name,
+    })),
     definitionLayerIds: defaultLayers.map((l) => l.id),
     definitionCheckIds: defaultChecks.map((c) => c.id),
     layerIds: instanceLayers.map((l) => l.id),
@@ -129,6 +174,7 @@ const mapPhaseToDTO = (
       side: i.side,
       spec: i.spec,
       layers: (i as { layers?: string[] }).layers ?? [],
+      layerIds: i.layerIds ?? [],
       billQuantity: i.billQuantity,
     })),
     createdAt: phase.createdAt.toISOString(),
@@ -243,7 +289,19 @@ export const createPhase = async (roadId: number, payload: PhasePayload) => {
 
       const allowedLayerIds = definition.defaultLayers.map((item) => item.layerDefinitionId)
       const allowedCheckIds = definition.defaultChecks.map((item) => item.checkDefinitionId)
-      const requestedLayerIds = payload.layerIds && payload.layerIds.length ? payload.layerIds : allowedLayerIds
+      const allowedLayerMap = buildAllowedLayerMap(definition.defaultLayers)
+      const intervalLayerData = payload.intervals.map((item) =>
+        resolveIntervalLayers((item as { layers?: string[] }).layers, allowedLayerMap),
+      )
+      const intervalLayerIds = Array.from(
+        new Set(intervalLayerData.flatMap((item) => item.layerIds)),
+      )
+      const requestedLayerIds =
+        payload.layerIds && payload.layerIds.length
+          ? payload.layerIds
+          : intervalLayerIds.length
+            ? intervalLayerIds
+            : allowedLayerIds
       const requestedCheckIds = payload.checkIds && payload.checkIds.length ? payload.checkIds : allowedCheckIds
       const invalidLayerIds = requestedLayerIds.filter((id) => !allowedLayerIds.includes(id))
       if (invalidLayerIds.length) {
@@ -252,22 +310,6 @@ export const createPhase = async (roadId: number, payload: PhasePayload) => {
       const invalidCheckIds = requestedCheckIds.filter((id) => !allowedCheckIds.includes(id))
       if (invalidCheckIds.length) {
         throw new Error('所选验收内容不属于模板，请先在模板中维护')
-      }
-
-      const allowedLayerNames = new Set(
-        canonicalizeProgressList(
-          'layer',
-          definition.defaultLayers.map((item) => item.layerDefinition.name),
-        ),
-      )
-      const normalizeIntervalLayers = (layers?: string[]) => {
-        if (!layers || !layers.length) return undefined
-        const canonical = canonicalizeProgressList('layer', layers)
-        const invalid = canonical.filter((name) => !allowedLayerNames.has(name))
-        if (invalid.length) {
-          throw new Error(`区间层次必须来自模板：${invalid.join('、')}`)
-        }
-        return canonical
       }
 
       const created = await tx.roadPhase.create({
@@ -279,14 +321,18 @@ export const createPhase = async (roadId: number, payload: PhasePayload) => {
           pointHasSides: measureFromDefinition === PhaseMeasure.POINT ? pointHasSidesFromDefinition : false,
           designLength,
           intervals: {
-            create: normalizedIntervals.map((item) => ({
-              startPk: item.startPk,
-              endPk: item.endPk,
-              side: item.side,
-              spec: item.spec || undefined,
-              layers: normalizeIntervalLayers((item as { layers?: string[] }).layers),
-              billQuantity: item.billQuantity ?? undefined,
-            })),
+            create: normalizedIntervals.map((item, idx) => {
+              const layerMetadata = intervalLayerData[idx]
+              return {
+                startPk: item.startPk,
+                endPk: item.endPk,
+                side: item.side,
+                spec: item.spec || undefined,
+                layers: layerMetadata.layers,
+                layerIds: layerMetadata.layerIds,
+                billQuantity: item.billQuantity ?? undefined,
+              }
+            }),
           },
           layerLinks: requestedLayerIds.length
             ? {
@@ -380,7 +426,19 @@ export const updatePhase = async (roadId: number, phaseId: number, payload: Phas
 
       const allowedLayerIds = definition.defaultLayers.map((item) => item.layerDefinitionId)
       const allowedCheckIds = definition.defaultChecks.map((item) => item.checkDefinitionId)
-      const requestedLayerIds = payload.layerIds && payload.layerIds.length ? payload.layerIds : allowedLayerIds
+      const allowedLayerMap = buildAllowedLayerMap(definition.defaultLayers)
+      const intervalLayerData = payload.intervals.map((item) =>
+        resolveIntervalLayers((item as { layers?: string[] }).layers, allowedLayerMap),
+      )
+      const intervalLayerIds = Array.from(
+        new Set(intervalLayerData.flatMap((item) => item.layerIds)),
+      )
+      const requestedLayerIds =
+        payload.layerIds && payload.layerIds.length
+          ? payload.layerIds
+          : intervalLayerIds.length
+            ? intervalLayerIds
+            : allowedLayerIds
       const requestedCheckIds = payload.checkIds && payload.checkIds.length ? payload.checkIds : allowedCheckIds
       const invalidLayerIds = requestedLayerIds.filter((id) => !allowedLayerIds.includes(id))
       if (invalidLayerIds.length) {
@@ -389,22 +447,6 @@ export const updatePhase = async (roadId: number, phaseId: number, payload: Phas
       const invalidCheckIds = requestedCheckIds.filter((id) => !allowedCheckIds.includes(id))
       if (invalidCheckIds.length) {
         throw new Error('所选验收内容不属于模板，请先在模板中维护')
-      }
-
-      const allowedLayerNames = new Set(
-        canonicalizeProgressList(
-          'layer',
-          definition.defaultLayers.map((item) => item.layerDefinition.name),
-        ),
-      )
-      const normalizeIntervalLayers = (layers?: string[]) => {
-        if (!layers || !layers.length) return undefined
-        const canonical = canonicalizeProgressList('layer', layers)
-        const invalid = canonical.filter((name) => !allowedLayerNames.has(name))
-        if (invalid.length) {
-          throw new Error(`区间层次必须来自模板：${invalid.join('、')}`)
-        }
-        return canonical
       }
 
       const updated = await tx.roadPhase.update({
@@ -420,15 +462,19 @@ export const updatePhase = async (roadId: number, phaseId: number, payload: Phas
 
       await tx.phaseInterval.deleteMany({ where: { phaseId } })
       await tx.phaseInterval.createMany({
-        data: normalizedIntervals.map((item) => ({
-          phaseId: updated.id,
-          startPk: item.startPk,
-          endPk: item.endPk,
-          side: item.side,
-          spec: item.spec || undefined,
-          layers: normalizeIntervalLayers((item as { layers?: string[] }).layers),
-          billQuantity: item.billQuantity ?? undefined,
-        })),
+        data: normalizedIntervals.map((item, idx) => {
+          const layerMetadata = intervalLayerData[idx]
+          return {
+            phaseId: updated.id,
+            startPk: item.startPk,
+            endPk: item.endPk,
+            side: item.side,
+            spec: item.spec || undefined,
+            layers: layerMetadata.layers,
+            layerIds: layerMetadata.layerIds,
+            billQuantity: item.billQuantity ?? undefined,
+          }
+        }),
       })
 
       await tx.roadPhaseLayer.deleteMany({ where: { roadPhaseId: phaseId } })

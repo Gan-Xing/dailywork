@@ -50,6 +50,7 @@ export interface RoadSectionProgressSummaryDTO extends RoadSectionDTO {
 }
 
 export type InspectionStatus = 'PENDING' | 'SCHEDULED' | 'SUBMITTED' | 'IN_PROGRESS' | 'APPROVED'
+export type NamedLayer = { id: number; name: string }
 export interface InspectionFilter {
   roadSlug?: string
   phaseId?: number
@@ -180,6 +181,7 @@ export interface PhaseIntervalPayload {
   side: IntervalSide
   spec?: string | null
   layers?: string[]
+  layerIds?: number[]
   billQuantity?: number | null
 }
 
@@ -189,6 +191,7 @@ export interface PhaseIntervalProgress {
   side: IntervalSide
   spec: string | null
   layers?: string[]
+  layerIds: number[]
 }
 
 export interface PhasePayload {
@@ -211,6 +214,7 @@ export interface PhaseDTO extends PhasePayload {
   resolvedChecks: string[]
   definitionName: string
   definitionId: number
+  allowedLayers: NamedLayer[]
   definitionLayerIds: number[]
   definitionCheckIds: number[]
   layerIds: number[]
@@ -225,6 +229,7 @@ export interface PhaseDefinitionDTO {
   measure: PhaseMeasure
   pointHasSides: boolean
   defaultLayers: string[]
+  defaultLayerObjects: NamedLayer[]
   defaultChecks: string[]
   isActive: boolean
   unitPrice: number | null

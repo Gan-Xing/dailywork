@@ -238,6 +238,7 @@ export const listRoadSectionsWithProgress = async (): Promise<RoadSectionProgres
         side: interval.side,
         spec: interval.spec ?? null,
         layers: (interval as { layers?: string[] }).layers ?? [],
+        layerIds: (interval as { layerIds?: number[] }).layerIds ?? [],
       })) ?? []
       const inspectionRanges = phase.inspections.map((inspection) => ({
         startPk: inspection.startPk,

@@ -151,6 +151,12 @@ export function usePhaseManagement({
     return []
   }, [currentPhaseForForm, definitionId, workflowLayersByPhaseId, workflows])
 
+  const allowedLayersForForm = useMemo(() => {
+    if (currentPhaseForForm?.allowedLayers?.length) return currentPhaseForForm.allowedLayers
+    const def = definitions.find((item) => item.id === definitionId) ?? definitions[0]
+    return def?.defaultLayerObjects ?? []
+  }, [currentPhaseForForm?.allowedLayers, definitionId, definitions])
+
   const defaultLayers = useMemo(() => {
     const def = definitions.find((item) => item.id === definitionId) ?? definitions[0]
     const definitionLayers = def?.defaultLayers ?? []
@@ -173,12 +179,13 @@ export function usePhaseManagement({
 
   const layerOptions = useMemo(() => {
     const set = new Set<string>(defaultLayers)
+    allowedLayersForForm.forEach((item) => set.add(item.name))
     workflowLayersForForm.forEach((layer) => set.add(layer))
     intervals.forEach((interval) => {
       interval.layers?.forEach((layer: string) => set.add(layer))
     })
     return Array.from(set)
-  }, [defaultLayers, intervals, workflowLayersForForm])
+  }, [allowedLayersForForm, defaultLayers, intervals, workflowLayersForForm])
 
   const applyDefinitionTemplate = useCallback(
     (definition: PhaseDefinitionDTO) => {
@@ -284,45 +291,54 @@ export function usePhaseManagement({
         setError(t.errors.definitionMissing)
         return
       }
+      const allowedLayerIdByName = new Map<string, number>()
+      allowedLayersForForm.forEach((item) => {
+        allowedLayerIdByName.set(normalizeLabel(item.name), item.id)
+      })
+      const payloadIntervals = intervals.map((item) => {
+        const startPk = Number(item.startPk)
+        const endPk = Number(item.endPk)
+        const spec = typeof item.spec === 'string' ? item.spec.trim() : ''
+        const billQuantityInput = item.billQuantity
+        const numericBillQuantity =
+          billQuantityInput === null || billQuantityInput === undefined
+            ? null
+            : Number(billQuantityInput)
+        const layers =
+          measure === 'POINT'
+            ? Array.from(
+              new Set(
+                (item.layers?.length
+                  ? item.layers
+                  : layerOptions.length
+                    ? layerOptions
+                    : defaultLayers
+                ).filter(Boolean),
+              ),
+            )
+            : []
+        const layerIds = layers
+          .map((name) => allowedLayerIdByName.get(normalizeLabel(name)))
+          .filter((id): id is number => Number.isInteger(id))
+        return {
+          startPk,
+          endPk,
+          side: item.side,
+          spec: spec || undefined,
+          layers,
+          layerIds,
+          billQuantity:
+            numericBillQuantity === null || !Number.isFinite(numericBillQuantity)
+              ? undefined
+              : numericBillQuantity,
+        }
+      })
       const payload: PhasePayload = {
         phaseDefinitionId: definitionId,
         name,
         measure,
         pointHasSides: measure === 'POINT' ? pointHasSides : false,
-        intervals: intervals.map((item) => {
-          const startPk = Number(item.startPk)
-          const endPk = Number(item.endPk)
-          const spec = typeof item.spec === 'string' ? item.spec.trim() : ''
-          const billQuantityInput = item.billQuantity
-          const numericBillQuantity =
-            billQuantityInput === null || billQuantityInput === undefined
-              ? null
-              : Number(billQuantityInput)
-          const layers =
-            measure === 'POINT'
-              ? Array.from(
-                new Set(
-                  (item.layers?.length
-                    ? item.layers
-                    : layerOptions.length
-                      ? layerOptions
-                      : defaultLayers
-                  ).filter(Boolean),
-                ),
-              )
-              : []
-          return {
-            startPk,
-            endPk,
-            side: item.side,
-            spec: spec || undefined,
-            layers,
-            billQuantity:
-              numericBillQuantity === null || !Number.isFinite(numericBillQuantity)
-                ? undefined
-                : numericBillQuantity,
-          }
-        }),
+        intervals: payloadIntervals,
       }
 
       const target = editingId
@@ -353,6 +369,7 @@ export function usePhaseManagement({
               measure: phase.measure,
               pointHasSides: phase.pointHasSides,
               defaultLayers: phase.resolvedLayers,
+              defaultLayerObjects: phase.allowedLayers ?? [],
               defaultChecks: phase.resolvedChecks,
               isActive: true,
               unitPrice: null,
@@ -368,6 +385,7 @@ export function usePhaseManagement({
               measure: phase.measure,
               pointHasSides: phase.pointHasSides,
               defaultLayers: phase.resolvedLayers,
+              defaultLayerObjects: phase.allowedLayers ?? [],
               defaultChecks: phase.resolvedChecks,
               updatedAt: phase.updatedAt,
             }

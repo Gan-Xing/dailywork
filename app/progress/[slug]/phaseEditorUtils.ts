@@ -37,6 +37,9 @@ export const normalizePhaseDTO = (phase: PhaseDTO): PhaseDTO => ({
   pointHasSides: Boolean(phase.pointHasSides),
   resolvedLayers: Array.isArray(phase.resolvedLayers) ? [...phase.resolvedLayers] : [],
   resolvedChecks: Array.isArray(phase.resolvedChecks) ? [...phase.resolvedChecks] : [],
+  allowedLayers: Array.isArray((phase as { allowedLayers?: { id: number; name: string }[] }).allowedLayers)
+    ? ((phase as { allowedLayers?: { id: number; name: string }[] }).allowedLayers ?? [])
+    : [],
   definitionLayerIds: Array.isArray(phase.definitionLayerIds) ? [...phase.definitionLayerIds] : [],
   definitionCheckIds: Array.isArray(phase.definitionCheckIds) ? [...phase.definitionCheckIds] : [],
   layerIds: Array.isArray(phase.layerIds) ? [...phase.layerIds] : [],
@@ -48,6 +51,9 @@ export const normalizePhaseDTO = (phase: PhaseDTO): PhaseDTO => ({
     spec: interval.spec ?? null,
     layers: Array.isArray((interval as { layers?: string[] }).layers)
       ? ((interval as { layers?: string[] }).layers ?? []).filter(Boolean)
+      : [],
+    layerIds: Array.isArray((interval as { layerIds?: number[] }).layerIds)
+      ? ((interval as { layerIds?: number[] }).layerIds ?? [])
       : [],
     billQuantity: interval.billQuantity ?? null,
   })),

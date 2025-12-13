@@ -63,3 +63,8 @@
 ## 待处理任务
 - [ ] API 尚未添加鉴权/多角色保护，后续需要接入登录与访问控制。
 - [ ] 编写 Prisma/接口层的自动化测试与数据校验（含输入 schema 校验、防止脏数据）。
+
+## 10. Prisma 迁移策略（操作约束）
+- **禁止**在本地/任何环境直接执行 `npx prisma migrate dev`，因为项目依赖的 Supabase 数据库已集中托管，命令会尝试连接 CI/产线的 pooling 端点导致失败或数据不一致。  
+- 要应用 schema 变更，请在受控脚本中编写 SQL migration 并由运维在目标数据库上执行，或以 `prisma migrate deploy` + 预先生成的 migration 文件形式在 CI/production 中同步。  
+- 本地可以使用 `prisma db pull` 观察结构，但请不要以 `migrate dev` 形式写入远端；所有由我们提交的 schema 变动必须经过复核并在文档中记录（见本文件 Section 8/9 的规则）。

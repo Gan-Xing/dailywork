@@ -172,6 +172,7 @@ model PhaseInterval {
   side      IntervalSide
   spec      String?
   layers    String[]      @default([])
+  layerIds  Int[]         @default([])
   billQuantity Float?
   createdAt DateTime      @default(now())
   updatedAt DateTime      @updatedAt
