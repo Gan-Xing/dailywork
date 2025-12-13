@@ -14,7 +14,7 @@ const ensurePrefabRoad = async () => {
 
 const ensurePhaseDefinition = async (name: string) => {
   return prisma.phaseDefinition.upsert({
-    where: { name },
+    where: { name_measure: { name, measure: PhaseMeasure.POINT } },
     update: { measure: PhaseMeasure.POINT, pointHasSides: false },
     create: { name, measure: PhaseMeasure.POINT, pointHasSides: false },
   })
