@@ -926,7 +926,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
         <header className="space-y-3">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-100">{copy.badge}</p>
           <h1 className="text-3xl font-semibold leading-tight text-slate-50">{copy.title}</h1>
-          <p className="max-w-2xl text-sm text-slate-200/80">{copy.description}</p>
+          <p className="text-sm text-slate-200/80 whitespace-nowrap">{copy.description}</p>
           <nav className="flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-200/80">
             <Link
               href="/"
