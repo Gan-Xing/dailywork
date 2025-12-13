@@ -1352,9 +1352,12 @@ const [bulkEditError, setBulkEditError] = useState<string | null>(null)
                       : formatRoadName(item.roadSlug, item.roadName)
                     const sideText = isPrefab ? '—' : sideCopy[item.side] ?? item.side
                     const rangeText = isPrefab ? '—' : `${formatPK(item.startPk)} → ${formatPK(item.endPk)}`
-                    const layersText = normalizeLayerLabels(item.layers, item.phaseName).join(' / ')
-                    const checksText = normalizeCheckLabels(item.checks).join(' / ')
-                    const typesText = normalizeTypeLabels(item.types).join(' / ')
+                    const layersText = normalizeLayerLabels(
+                      Array.isArray(item.layers) ? item.layers : [],
+                      item.phaseName,
+                    ).join(' / ')
+                    const checksText = normalizeCheckLabels(Array.isArray(item.checks) ? item.checks : []).join(' / ')
+                    const typesText = normalizeTypeLabels(Array.isArray(item.types) ? item.types : []).join(' / ')
                     const appointmentText = formatAppointmentDate(item.appointmentDate)
                     const submittedByText = item.submittedBy?.username ?? '—'
                     const createdByText = item.createdBy?.username ?? '—'
