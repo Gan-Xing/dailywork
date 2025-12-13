@@ -208,12 +208,9 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
     (values: string[]) => localizeProgressList('type', canonicalizeProgressList('type', values), locale),
     [locale],
   )
-  const inspectionTypeOptions = useMemo(
-    () => ['现场验收', '试验验收', '测量验收', '其他'],
-    [],
-  )
-  const [roadSlug, setRoadSlug] = useState('')
-  const [phaseDefinitionId, setPhaseDefinitionId] = useState<number | ''>('')
+  const inspectionTypeOptions = useMemo(() => ['现场验收', '试验验收', '测量验收', '其他'], [])
+  const [roadSlugs, setRoadSlugs] = useState<string[]>([])
+  const [phaseDefinitionIds, setPhaseDefinitionIds] = useState<number[]>([])
   const [status, setStatus] = useState<InspectionStatus[]>([])
   const [side, setSide] = useState('')
   const [layerFilters, setLayerFilters] = useState<string[]>([])
@@ -222,14 +219,17 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
     [layerFilters],
   )
   const [types, setTypes] = useState<string[]>([])
-  const [check, setCheck] = useState('')
+  const [checkFilters, setCheckFilters] = useState<string[]>([])
   const [keyword, setKeyword] = useState('')
   const [checkOptions, setCheckOptions] = useState<string[]>([])
   const [checkOptionsError, setCheckOptionsError] = useState<string | null>(null)
   const [checkOptionsLoading, setCheckOptionsLoading] = useState(false)
   const [typeOpen, setTypeOpen] = useState(false)
+  const [checkOpen, setCheckOpen] = useState(false)
   const [statusOpen, setStatusOpen] = useState(false)
   const [layerOpen, setLayerOpen] = useState(false)
+  const [roadOpen, setRoadOpen] = useState(false)
+  const [phaseOpen, setPhaseOpen] = useState(false)
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [sortField, setSortField] = useState<SortField>('updatedAt')
@@ -292,6 +292,9 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
   const typeSelectorRef = useRef<HTMLDivElement | null>(null)
   const statusSelectorRef = useRef<HTMLDivElement | null>(null)
   const layerSelectorRef = useRef<HTMLDivElement | null>(null)
+  const roadSelectorRef = useRef<HTMLDivElement | null>(null)
+  const phaseSelectorRef = useRef<HTMLDivElement | null>(null)
+  const checkSelectorRef = useRef<HTMLDivElement | null>(null)
 
   const persistVisibleColumns = (next: ColumnKey[]) => {
     if (typeof window !== 'undefined') {
@@ -426,13 +429,16 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
     setError(null)
     try {
       const query = buildQuery({
-        roadSlug: roadSlug || undefined,
-        phaseDefinitionId: phaseDefinitionId || undefined,
+        roadSlug: undefined,
+        roadSlugs: roadSlugs.length ? roadSlugs : undefined,
+        phaseDefinitionId: undefined,
+        phaseDefinitionIds: phaseDefinitionIds.length ? phaseDefinitionIds : undefined,
         status: status.length ? status : undefined,
         side: side || undefined,
         layerName: layerFilterValues.length ? layerFilterValues : undefined,
         type: types.length ? types : undefined,
-        checkName: check || undefined,
+        checkName: undefined,
+        checkNames: checkFilters.length ? checkFilters : undefined,
         keyword: keyword ? `remark:${keyword}` : undefined,
         startDate: startDate || undefined,
         endDate: endDate || undefined,
@@ -470,13 +476,13 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
     fetchData()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
-    roadSlug,
-    phaseDefinitionId,
+    roadSlugs,
+    phaseDefinitionIds,
     status,
     side,
     layerFilterValues,
     types,
-    check,
+    checkFilters,
     keyword,
     startDate,
     endDate,
@@ -523,6 +529,15 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
       }
       if (layerSelectorRef.current && !layerSelectorRef.current.contains(event.target as Node)) {
         setLayerOpen(false)
+      }
+      if (roadSelectorRef.current && !roadSelectorRef.current.contains(event.target as Node)) {
+        setRoadOpen(false)
+      }
+      if (phaseSelectorRef.current && !phaseSelectorRef.current.contains(event.target as Node)) {
+        setPhaseOpen(false)
+      }
+      if (checkSelectorRef.current && !checkSelectorRef.current.contains(event.target as Node)) {
+        setCheckOpen(false)
       }
     }
     document.addEventListener('mousedown', handleClickOutside)
@@ -606,13 +621,13 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
   }
 
   const resetFilters = () => {
-    setRoadSlug('')
-    setPhaseDefinitionId('')
+    setRoadSlugs([])
+    setPhaseDefinitionIds([])
     setStatus([])
     setSide('')
     setLayerFilters([])
     setTypes([])
-    setCheck('')
+    setCheckFilters([])
     setKeyword('')
     setStartDate('')
     setEndDate('')
@@ -941,41 +956,138 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
           <div className="grid gap-3 md:grid-cols-4">
             <label className="flex flex-col gap-1 text-xs text-slate-200">
               {copy.filters.road}
-              <select
-                className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
-                value={roadSlug}
-                onChange={(e) => {
-                  setRoadSlug(e.target.value)
-                  setPage(1)
-                }}
-              >
-                <option value="">{copy.filters.all}</option>
-                {roads.map((road) => (
-                  <option key={road.id} value={road.slug}>
-                    {resolveRoadName(road, locale)}
-                  </option>
-                ))}
-              </select>
+              <div className="relative" ref={roadSelectorRef}>
+                <button
+                  type="button"
+                  onClick={() => setRoadOpen((prev) => !prev)}
+                  className="flex w-full items-center justify-between rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-left text-sm text-slate-50 shadow-inner shadow-slate-900/30 focus:border-emerald-300 focus:outline-none"
+                >
+                  <span className="truncate">
+                    {roadSlugs.length === 0
+                      ? copy.filters.all
+                      : formatProgressCopy(copy.typePicker.selected, { count: roadSlugs.length })}
+                  </span>
+                  <span className="text-xs text-slate-300">⌕</span>
+                </button>
+                {roadOpen ? (
+                  <div className="absolute z-10 mt-2 w-full rounded-xl border border-white/15 bg-slate-900/95 p-3 text-xs text-slate-100 shadow-lg shadow-slate-900/40 backdrop-blur">
+                    <div className="flex items-center justify-between border-b border-white/10 pb-2 text-[11px] text-slate-300">
+                      <span>
+                        {formatProgressCopy(copy.typePicker.summary, {
+                          count: roadSlugs.length ? roadSlugs.length : copy.typePicker.all,
+                        })}
+                      </span>
+                      <div className="flex gap-2">
+                        <button
+                          className="text-emerald-300 hover:underline"
+                          onClick={() => {
+                            setRoadSlugs(roads.map((road) => road.slug))
+                            setPage(1)
+                          }}
+                        >
+                          {copy.typePicker.selectAll}
+                        </button>
+                        <button
+                          className="text-slate-400 hover:underline"
+                          onClick={() => {
+                            setRoadSlugs([])
+                            setPage(1)
+                          }}
+                        >
+                          {copy.typePicker.clear}
+                        </button>
+                      </div>
+                    </div>
+                    <div className="mt-2 max-h-48 space-y-1 overflow-y-auto">
+                      {roads.map((road) => (
+                        <label
+                          key={road.id}
+                          className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 hover:bg-white/5"
+                        >
+                          <input
+                            type="checkbox"
+                            className="h-4 w-4 rounded border-white/30 bg-slate-900/60 accent-emerald-300"
+                            checked={roadSlugs.includes(road.slug)}
+                            onChange={() => {
+                              setRoadSlugs((prev) => toggleValue(prev, road.slug))
+                              setPage(1)
+                            }}
+                          />
+                          <span className="truncate">{resolveRoadName(road, locale)}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
             </label>
             <label className="flex flex-col gap-1 text-xs text-slate-200">
               {copy.filters.phase}
-              <select
-                className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
-                value={phaseDefinitionId}
-                onChange={(e) => {
-                const value = e.target.value
-                setPhaseDefinitionId(value ? Number(value) : '')
-                setPage(1)
-              }}
-            >
-              <option value="">{copy.filters.all}</option>
-              {phaseDefinitions.map((definition) => (
-                <option key={definition.id} value={definition.id}>
-                  {formatPhaseDefinitionLabel(definition)}
-                </option>
-              ))}
-            </select>
-          </label>
+              <div className="relative" ref={phaseSelectorRef}>
+                <button
+                  type="button"
+                  onClick={() => setPhaseOpen((prev) => !prev)}
+                  className="flex w-full items-center justify-between rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-left text-sm text-slate-50 shadow-inner shadow-slate-900/30 focus:border-emerald-300 focus:outline-none"
+                >
+                  <span className="truncate">
+                    {phaseDefinitionIds.length === 0
+                      ? copy.filters.all
+                      : formatProgressCopy(copy.typePicker.selected, { count: phaseDefinitionIds.length })}
+                  </span>
+                  <span className="text-xs text-slate-300">⌕</span>
+                </button>
+                {phaseOpen ? (
+                  <div className="absolute z-10 mt-2 w-full rounded-xl border border-white/15 bg-slate-900/95 p-3 text-xs text-slate-100 shadow-lg shadow-slate-900/40 backdrop-blur">
+                    <div className="flex items-center justify-between border-b border-white/10 pb-2 text-[11px] text-slate-300">
+                      <span>
+                        {formatProgressCopy(copy.typePicker.summary, {
+                          count: phaseDefinitionIds.length ? phaseDefinitionIds.length : copy.typePicker.all,
+                        })}
+                      </span>
+                      <div className="flex gap-2">
+                        <button
+                          className="text-emerald-300 hover:underline"
+                          onClick={() => {
+                            setPhaseDefinitionIds(phaseDefinitions.map((definition) => definition.id))
+                            setPage(1)
+                          }}
+                        >
+                          {copy.typePicker.selectAll}
+                        </button>
+                        <button
+                          className="text-slate-400 hover:underline"
+                          onClick={() => {
+                            setPhaseDefinitionIds([])
+                            setPage(1)
+                          }}
+                        >
+                          {copy.typePicker.clear}
+                        </button>
+                      </div>
+                    </div>
+                    <div className="mt-2 max-h-48 space-y-1 overflow-y-auto">
+                      {phaseDefinitions.map((definition) => (
+                        <label
+                          key={definition.id}
+                          className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 hover:bg-white/5"
+                        >
+                          <input
+                            type="checkbox"
+                            className="h-4 w-4 rounded border-white/30 bg-slate-900/60 accent-emerald-300"
+                            checked={phaseDefinitionIds.includes(definition.id)}
+                            onChange={() => {
+                              setPhaseDefinitionIds((prev) => toggleValue(prev, definition.id))
+                              setPage(1)
+                            }}
+                          />
+                          <span className="truncate">{formatPhaseDefinitionLabel(definition)}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            </label>
           <label className="flex flex-col gap-1 text-xs text-slate-200">
             {copy.filters.side}
             <select
@@ -1131,27 +1243,76 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
           </label>
           <label className="flex flex-col gap-1 text-xs text-slate-200">
             {copy.filters.check}
-            <select
-              className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
-              value={check}
-              onChange={(e) => {
-                setCheck(e.target.value)
-                setPage(1)
-              }}
-            >
-              <option value="">{copy.filters.all}</option>
-              {checkOptions.map((option) => (
-                <option key={option} value={option}>
-                  {localizeProgressTerm('check', option, locale)}
-                </option>
-              ))}
-            </select>
-            {checkOptionsLoading ? (
-              <span className="text-[11px] text-slate-300">{copy.filters.loading}</span>
-            ) : null}
-            {checkOptionsError ? (
-              <span className="text-[11px] text-amber-200">{checkOptionsError}</span>
-            ) : null}
+            <div className="relative" ref={checkSelectorRef}>
+              <button
+                type="button"
+                onClick={() => setCheckOpen((prev) => !prev)}
+                className="flex w-full items-center justify-between rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-left text-sm text-slate-50 shadow-inner shadow-slate-900/30 focus:border-emerald-300 focus:outline-none"
+              >
+                <span className="truncate">
+                  {checkFilters.length === 0
+                    ? copy.filters.all
+                    : formatProgressCopy(copy.typePicker.selected, { count: checkFilters.length })}
+                </span>
+                <span className="text-xs text-slate-300">⌕</span>
+              </button>
+              {checkOpen ? (
+                <div className="absolute z-10 mt-2 w-full rounded-xl border border-white/15 bg-slate-900/95 p-3 text-xs text-slate-100 shadow-lg shadow-slate-900/40 backdrop-blur">
+                  <div className="flex items-center justify-between border-b border-white/10 pb-2 text-[11px] text-slate-300">
+                    <span>
+                      {formatProgressCopy(copy.typePicker.summary, {
+                        count: checkFilters.length ? checkFilters.length : copy.typePicker.all,
+                      })}
+                    </span>
+                    <div className="flex gap-2">
+                      <button
+                        className="text-emerald-300 hover:underline"
+                        onClick={() => {
+                          setCheckFilters(checkOptions)
+                          setPage(1)
+                        }}
+                      >
+                        {copy.typePicker.selectAll}
+                      </button>
+                      <button
+                        className="text-slate-400 hover:underline"
+                        onClick={() => {
+                          setCheckFilters([])
+                          setPage(1)
+                        }}
+                      >
+                        {copy.typePicker.clear}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="mt-2 max-h-48 space-y-1 overflow-y-auto">
+                    {checkOptions.map((option) => (
+                      <label
+                        key={option}
+                        className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 hover:bg-white/5"
+                      >
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 rounded border-white/30 bg-slate-900/60 accent-emerald-300"
+                          checked={checkFilters.includes(option)}
+                          onChange={() => {
+                            setCheckFilters((prev) => toggleValue(prev, option))
+                            setPage(1)
+                          }}
+                        />
+                        <span className="truncate">{localizeProgressTerm('check', option, locale)}</span>
+                      </label>
+                    ))}
+                    {checkOptionsLoading ? (
+                      <span className="px-2 text-[11px] text-slate-300">{copy.filters.loading}</span>
+                    ) : null}
+                    {checkOptionsError ? (
+                      <span className="px-2 text-[11px] text-amber-200">{checkOptionsError}</span>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
+            </div>
           </label>
           <label className="flex flex-col gap-1 text-xs text-slate-200">
             {copy.filters.status}

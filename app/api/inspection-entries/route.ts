@@ -17,19 +17,28 @@ export async function GET(request: Request) {
   const statusParams = searchParams.getAll('status').filter(Boolean) as InspectionStatus[]
   const typeParams = searchParams.getAll('type').filter(Boolean)
   const layerParams = searchParams.getAll('layerName').filter(Boolean)
+  const roadParams = searchParams.getAll('roadSlug').filter(Boolean)
+  const phaseDefinitionParams = searchParams
+    .getAll('phaseDefinitionId')
+    .map((value) => Number(value))
+    .filter((value) => Number.isFinite(value))
+  const checkParams = searchParams.getAll('checkName').filter(Boolean)
 
   const filter = {
     roadSlug: searchParams.get('roadSlug') ?? undefined,
+    roadSlugs: roadParams.length ? roadParams : undefined,
     phaseId: searchParams.get('phaseId') ? Number(searchParams.get('phaseId')) : undefined,
     phaseDefinitionId: searchParams.get('phaseDefinitionId')
       ? Number(searchParams.get('phaseDefinitionId'))
       : undefined,
+    phaseDefinitionIds: phaseDefinitionParams.length ? phaseDefinitionParams : undefined,
     status: statusParams.length ? statusParams : undefined,
     side: (searchParams.get('side') as 'LEFT' | 'RIGHT' | 'BOTH' | null) ?? undefined,
     layerNames: layerParams.length ? layerParams : undefined,
     types: typeParams.length ? typeParams : undefined,
     checkId: searchParams.get('checkId') ? Number(searchParams.get('checkId')) : undefined,
     checkName: searchParams.get('checkName') ?? undefined,
+    checkNames: checkParams.length ? checkParams : undefined,
     keyword: searchParams.get('keyword') ?? undefined,
     startDate: searchParams.get('startDate') ?? undefined,
     endDate: searchParams.get('endDate') ?? undefined,

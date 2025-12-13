@@ -391,13 +391,17 @@ export const listInspectionEntries = async (filter: InspectionEntryFilter): Prom
   })()
 
   const where: Prisma.InspectionEntryWhereInput = {}
-  if (filter.roadSlug) {
+  if (filter.roadSlugs && filter.roadSlugs.length) {
+    where.road = { slug: { in: filter.roadSlugs } }
+  } else if (filter.roadSlug) {
     where.road = { slug: filter.roadSlug }
   }
   if (filter.phaseId) {
     where.phaseId = filter.phaseId
   }
-  if (filter.phaseDefinitionId) {
+  if (filter.phaseDefinitionIds && filter.phaseDefinitionIds.length) {
+    where.phase = { is: { phaseDefinitionId: { in: filter.phaseDefinitionIds } } }
+  } else if (filter.phaseDefinitionId) {
     where.phase = { is: { phaseDefinitionId: filter.phaseDefinitionId } }
   }
   if (filter.status && filter.status.length) {
@@ -415,7 +419,9 @@ export const listInspectionEntries = async (filter: InspectionEntryFilter): Prom
   if (filter.checkId) {
     where.checkId = filter.checkId
   }
-  if (filter.checkName) {
+  if (filter.checkNames && filter.checkNames.length) {
+    where.checkName = { in: filter.checkNames }
+  } else if (filter.checkName) {
     where.checkName = { contains: filter.checkName, mode: 'insensitive' }
   }
   if (filter.keyword) {

@@ -147,14 +147,17 @@ export interface InspectionEntryDTO extends InspectionEntryPayload {
 
 export interface InspectionEntryFilter {
   roadSlug?: string
+  roadSlugs?: string[]
   phaseId?: number
   phaseDefinitionId?: number
+  phaseDefinitionIds?: number[]
   status?: InspectionStatus[]
   side?: IntervalSide
   layerNames?: string[]
   types?: string[]
   checkId?: number
   checkName?: string
+  checkNames?: string[]
   keyword?: string
   startDate?: string
   endDate?: string
