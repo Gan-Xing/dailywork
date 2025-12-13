@@ -120,6 +120,23 @@ export function useInspectionFlow({
   const [latestPointInspections, setLatestPointInspections] = useState<Map<string, LatestPointInspection>>(
     () => latestPointInspectionsRef.current,
   )
+  const measureByPhaseId = useMemo(() => new Map(phases.map((p) => [p.id, p.measure])), [phases])
+  const topLayerNamesByPhaseId = useMemo(() => {
+    const map = new Map<number, Set<string>>()
+    workflowLayersByPhaseId.forEach((value, phaseId) => {
+      const layers = value?.layers ?? []
+      if (layers.length <= 1) return
+      const maxStage = Math.max(...layers.map((layer) => layer.stage ?? 1))
+      const names = layers
+        .filter((layer) => (layer.stage ?? 1) === maxStage)
+        .map((layer) => normalizeLabel(layer.name))
+        .filter(Boolean)
+      if (names.length) {
+        map.set(phaseId, new Set(names))
+      }
+    })
+    return map
+  }, [workflowLayersByPhaseId])
 
   const resolveLinearInspectionSlices = useCallback(
     (phase: PhaseDTO): InspectionSlice[] => {
@@ -806,22 +823,35 @@ export function useInspectionFlow({
             map.set(statusKey, snapshot)
           }
 
-          const sliceKey = `${snapshot.phaseId}:${side}:${orderedStart}:${orderedEnd}`
-          const prevSlice = sliceMap.get(sliceKey)
-          const prevPriority = statusPriority[prevSlice?.status ?? 'PENDING'] ?? 0
-          if (
-            !prevSlice ||
-            incomingPriority > prevPriority ||
-            (incomingPriority === prevPriority && ts >= (prevSlice.updatedAt ?? 0))
-          ) {
-            sliceMap.set(sliceKey, {
-              phaseId: snapshot.phaseId,
-              side,
-              startPk: orderedStart,
-              endPk: orderedEnd,
-              status: snapshot.status ?? 'PENDING',
-              updatedAt: ts,
-            })
+          const phaseMeasure = measureByPhaseId.get(snapshot.phaseId)
+          const topLayerNames = topLayerNamesByPhaseId.get(snapshot.phaseId)
+          const normalizedLayerName =
+            snapshot.layerName || snapshot.layerId
+              ? normalizeLabel(String(snapshot.layerName ?? snapshot.layerId))
+              : null
+          const restrictToTopLayer =
+            phaseMeasure === 'LINEAR' && topLayerNames && topLayerNames.size > 0
+          const skipSlice =
+            restrictToTopLayer && (!normalizedLayerName || !topLayerNames.has(normalizedLayerName))
+
+          if (!skipSlice) {
+            const sliceKey = `${snapshot.phaseId}:${side}:${orderedStart}:${orderedEnd}`
+            const prevSlice = sliceMap.get(sliceKey)
+            const prevPriority = statusPriority[prevSlice?.status ?? 'PENDING'] ?? 0
+            if (
+              !prevSlice ||
+              incomingPriority > prevPriority ||
+              (incomingPriority === prevPriority && ts >= (prevSlice.updatedAt ?? 0))
+            ) {
+              sliceMap.set(sliceKey, {
+                phaseId: snapshot.phaseId,
+                side,
+                startPk: orderedStart,
+                endPk: orderedEnd,
+                status: snapshot.status ?? 'PENDING',
+                updatedAt: ts,
+              })
+            }
           }
         })
         if (!isCancelled()) {
@@ -840,7 +870,7 @@ export function useInspectionFlow({
         }
       }
     },
-    [canViewInspection, road.slug, t.alerts.fetchInspectionFailed],
+    [canViewInspection, measureByPhaseId, road.slug, t.alerts.fetchInspectionFailed, topLayerNamesByPhaseId],
   )
 
   useEffect(() => {
