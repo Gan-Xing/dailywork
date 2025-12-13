@@ -430,8 +430,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
     try {
       const query = buildQuery({
         roadSlug: roadSlugs.length ? roadSlugs : undefined,
-        phaseDefinitionId: undefined,
-        phaseDefinitionIds: phaseDefinitionIds.length ? phaseDefinitionIds : undefined,
+        phaseDefinitionId: phaseDefinitionIds.length ? phaseDefinitionIds : undefined,
         status: status.length ? status : undefined,
         side: side || undefined,
         layerName: layerFilterValues.length ? layerFilterValues : undefined,
