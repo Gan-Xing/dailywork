@@ -953,26 +953,6 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
           ) : null}
         </header>
         <section className="mt-6 space-y-4 rounded-3xl border border-white/10 bg-white/5 p-5 shadow-xl shadow-slate-900/30 backdrop-blur">
-          <div className="flex flex-wrap items-center justify-end gap-3">
-            <button
-              type="button"
-              className="rounded-xl border border-white/20 px-4 py-2 text-xs font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/10"
-              onClick={resetFilters}
-            >
-              {copy.filters.reset}
-            </button>
-            <button
-              type="button"
-              className="rounded-xl bg-emerald-300 px-4 py-2 text-xs font-semibold text-slate-900 shadow-lg shadow-emerald-400/30 transition hover:-translate-y-0.5"
-              onClick={() => {
-                setPage(1)
-                fetchData()
-              }}
-            >
-              {copy.filters.search}
-            </button>
-            {loading ? <span className="text-xs text-slate-200">{copy.filters.loading}</span> : null}
-          </div>
           <div className="grid gap-3 md:grid-cols-4">
             <label className="flex flex-col gap-1 text-xs text-slate-200">
               {copy.filters.road}
@@ -1437,6 +1417,26 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                 placeholder={copy.filters.keywordPlaceholder}
               />
             </label>
+            <div className="flex items-end justify-end gap-3 md:col-span-2 md:col-start-3">
+              <button
+                type="button"
+                className="h-10 rounded-xl border border-white/20 px-4 text-xs font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/10"
+                onClick={resetFilters}
+              >
+                {copy.filters.reset}
+              </button>
+              <button
+                type="button"
+                className="h-10 rounded-xl bg-emerald-300 px-4 text-xs font-semibold text-slate-900 shadow-lg shadow-emerald-400/30 transition hover:-translate-y-0.5"
+                onClick={() => {
+                  setPage(1)
+                  fetchData()
+                }}
+              >
+                {copy.filters.search}
+              </button>
+              {loading ? <span className="text-xs text-slate-200">{copy.filters.loading}</span> : null}
+            </div>
           </div>
         </section>
 
