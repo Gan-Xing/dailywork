@@ -665,6 +665,8 @@ const [bulkEditError, setBulkEditError] = useState<string | null>(null)
     setEditPending(true)
     setEditError(null)
     try {
+      const layerName = layers[0]
+      const checkName = checks[0]
       const res = await fetch(`/api/inspection-entries/${editing.id}`, {
         method: 'PUT',
         credentials: 'include',
@@ -674,8 +676,8 @@ const [bulkEditError, setBulkEditError] = useState<string | null>(null)
           side: editForm.side || 'BOTH',
           startPk,
           endPk,
-          layers,
-          checks,
+          layerName,
+          checkName,
           types,
           status: nextStatus,
           submissionOrder,
