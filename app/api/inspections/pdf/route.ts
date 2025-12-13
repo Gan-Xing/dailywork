@@ -3,7 +3,7 @@ import puppeteer, { Browser } from 'puppeteer'
 
 import { renderInspectionReportHtml } from '@/lib/templates/inspectionReport'
 import { getSessionUser, hasPermission } from '@/lib/server/authSession'
-import { getInspectionsByIds } from '@/lib/server/inspectionStore'
+import { aggregateEntriesAsListItems } from '@/lib/server/inspectionEntryStore'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -96,12 +96,13 @@ export async function POST(request: Request) {
   }
 
   try {
-    const inspections = await getInspectionsByIds(numericIds)
-    if (inspections.length === 0) {
+    // 以 entry id 查询，并按层次聚合同层验收内容到同一 Nature
+    const { items } = await aggregateEntriesAsListItems({ ids: numericIds, groupByLayer: true })
+    if (items.length === 0) {
       return NextResponse.json({ message: '未找到可导出的报检记录' }, { status: 404 })
     }
 
-    const html = renderInspectionReportHtml(inspections, { locale })
+    const html = renderInspectionReportHtml(items, { locale })
 
     const browser = await withTimeout(getBrowser(), '启动浏览器')
 

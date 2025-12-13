@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 
 import type { InspectionStatus } from '@/lib/progressTypes'
 import { hasPermission } from '@/lib/server/authSession'
-import { listInspections } from '@/lib/server/inspectionStore'
+import { aggregateEntriesAsListItems } from '@/lib/server/inspectionEntryStore'
 
 export async function GET(request: Request) {
   if (!hasPermission('inspection:view')) {
@@ -31,7 +31,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const result = await listInspections(filter)
+    const result = await aggregateEntriesAsListItems(filter)
     return NextResponse.json(result)
   } catch (error) {
     return NextResponse.json({ message: (error as Error).message }, { status: 400 })

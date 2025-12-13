@@ -1,9 +1,13 @@
 import { NextResponse } from 'next/server'
 
 import { getSessionUser, hasPermission } from '@/lib/server/authSession'
-import { createInspection, listInspections } from '@/lib/server/inspectionStore'
 import { prisma } from '@/lib/prisma'
 import { getRoadBySlug } from '@/lib/server/roadStore'
+import {
+  aggregateEntriesAsListItems,
+  createEntriesFromLegacyPayload,
+  isWorkflowValidationError,
+} from '@/lib/server/inspectionEntryStore'
 import type { InspectionStatus } from '@/lib/progressTypes'
 
 interface RouteParams {
@@ -55,11 +59,10 @@ export async function POST(request: Request, { params }: RouteParams) {
   }
 
   try {
-    const inspection = await createInspection(
+    const entries = await createEntriesFromLegacyPayload(
       road.id,
       phase.id,
       {
-        phaseId: phase.id,
         startPk: Number(payload.startPk),
         endPk: Number(payload.endPk),
         side: payload.side as 'LEFT' | 'RIGHT' | 'BOTH',
@@ -68,11 +71,65 @@ export async function POST(request: Request, { params }: RouteParams) {
         types: payload.types ?? [],
         remark: payload.remark,
         appointmentDate: payload.appointmentDate,
+        submissionId: (payload as any).submissionId ?? null,
+        submissionOrder: (payload as any).submissionOrder ?? null,
+        submittedAt: undefined,
+        status: (payload as any).status,
       },
       sessionUser.id,
+      { phase },
     )
-    return NextResponse.json({ inspection })
+    // 兼容旧前端：按同一分项/区间聚合成单条 inspection
+    const aggregateKey = `${phase.id}:${payload.side}:${payload.startPk}:${payload.endPk}`
+    const map = new Map<string, { layers: Set<string>; checks: Set<string>; latest: typeof entries[number] }>()
+    entries.forEach((entry) => {
+      const key = aggregateKey
+      const existing = map.get(key)
+      if (!existing) {
+        map.set(key, { layers: new Set([entry.layerName]), checks: new Set([entry.checkName]), latest: entry })
+      } else {
+        existing.layers.add(entry.layerName)
+        existing.checks.add(entry.checkName)
+        if (new Date(entry.updatedAt).getTime() >= new Date(existing.latest.updatedAt).getTime()) {
+          existing.latest = entry
+        }
+      }
+    })
+    const aggregated = Array.from(map.values()).map((group) => ({
+      id: group.latest.id,
+      roadId: road.id,
+      roadName: road.name,
+      roadSlug: road.slug,
+      phaseId: phase.id,
+      phaseName: phase.name,
+      submissionId: entries[0]?.submissionId ?? null,
+      submissionCode: entries[0]?.submissionCode ?? null,
+      side: payload.side as 'LEFT' | 'RIGHT' | 'BOTH',
+      startPk: Number(payload.startPk),
+      endPk: Number(payload.endPk),
+      layers: Array.from(group.layers),
+      checks: Array.from(group.checks),
+      types: Array.from(new Set(entries.flatMap((e) => e.types || []))),
+      submissionOrder: (payload as any).submissionOrder ?? null,
+      status: entries[0]?.status ?? 'SCHEDULED',
+      remark: payload.remark ?? undefined,
+      appointmentDate: payload.appointmentDate,
+      submittedAt: entries[0]?.submittedAt ?? new Date().toISOString(),
+      submittedBy: entries[0]?.submittedBy ?? null,
+      createdBy: entries[0]?.createdBy ?? null,
+      createdAt: entries[0]?.createdAt ?? new Date().toISOString(),
+      updatedAt: entries[0]?.updatedAt ?? new Date().toISOString(),
+      updatedBy: entries[0]?.updatedBy ?? null,
+    }))[0]
+
+    return NextResponse.json({ entries, inspection: aggregated })
   } catch (error) {
+    if (isWorkflowValidationError(error)) {
+      return NextResponse.json(
+        { message: error.message, details: error.details },
+        { status: 400 },
+      )
+    }
     return NextResponse.json({ message: (error as Error).message }, { status: 400 })
   }
 }
@@ -102,7 +159,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const result = await listInspections(filter)
+    const result = await aggregateEntriesAsListItems(filter)
     return NextResponse.json(result)
   } catch (error) {
     return NextResponse.json({ message: (error as Error).message }, { status: 400 })

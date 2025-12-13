@@ -5,6 +5,7 @@ export type WorkflowCheckTemplate = {
   name: string
   types: string[]
   notes?: string
+  order?: number
 }
 
 export type WorkflowLayerTemplate = {

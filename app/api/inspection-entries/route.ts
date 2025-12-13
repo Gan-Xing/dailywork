@@ -1,0 +1,81 @@
+import { Prisma } from '@prisma/client'
+import { NextResponse } from 'next/server'
+
+import type { InspectionStatus } from '@/lib/progressTypes'
+import { hasPermission, getSessionUser } from '@/lib/server/authSession'
+import {
+  createInspectionEntries,
+  listInspectionEntries,
+} from '@/lib/server/inspectionEntryStore'
+
+export async function GET(request: Request) {
+  if (!hasPermission('inspection:view')) {
+    return NextResponse.json({ message: '缺少报检查看权限' }, { status: 403 })
+  }
+
+  const { searchParams } = new URL(request.url)
+  const statusParams = searchParams.getAll('status').filter(Boolean) as InspectionStatus[]
+  const typeParams = searchParams.getAll('type').filter(Boolean)
+
+  const filter = {
+    roadSlug: searchParams.get('roadSlug') ?? undefined,
+    phaseId: searchParams.get('phaseId') ? Number(searchParams.get('phaseId')) : undefined,
+    phaseDefinitionId: searchParams.get('phaseDefinitionId')
+      ? Number(searchParams.get('phaseDefinitionId'))
+      : undefined,
+    status: statusParams.length ? statusParams : undefined,
+    side: (searchParams.get('side') as 'LEFT' | 'RIGHT' | 'BOTH' | null) ?? undefined,
+    types: typeParams.length ? typeParams : undefined,
+    checkId: searchParams.get('checkId') ? Number(searchParams.get('checkId')) : undefined,
+    checkName: searchParams.get('checkName') ?? undefined,
+    keyword: searchParams.get('keyword') ?? undefined,
+    startDate: searchParams.get('startDate') ?? undefined,
+    endDate: searchParams.get('endDate') ?? undefined,
+    sortField: (searchParams.get('sortField') as 'createdAt' | 'updatedAt' | null) ?? undefined,
+    sortOrder: (searchParams.get('sortOrder') as 'asc' | 'desc' | null) ?? undefined,
+    page: searchParams.get('page') ? Number(searchParams.get('page')) : undefined,
+    pageSize: searchParams.get('pageSize') ? Number(searchParams.get('pageSize')) : undefined,
+  }
+
+  try {
+    const result = await listInspectionEntries(filter)
+    return NextResponse.json(result)
+  } catch (error) {
+    return NextResponse.json({ message: (error as Error).message }, { status: 400 })
+  }
+}
+
+export async function POST(request: Request) {
+  const sessionUser = getSessionUser()
+  if (!sessionUser) {
+    return NextResponse.json({ message: '请先登录后再报检' }, { status: 401 })
+  }
+  if (!hasPermission('inspection:create')) {
+    return NextResponse.json({ message: '缺少报检权限' }, { status: 403 })
+  }
+
+  let payload: { entries?: unknown[] }
+  try {
+    payload = (await request.json()) as typeof payload
+  } catch {
+    return NextResponse.json({ message: 'Invalid JSON body' }, { status: 400 })
+  }
+
+  if (!Array.isArray(payload.entries) || payload.entries.length === 0) {
+    return NextResponse.json({ message: '至少需要一条报检明细' }, { status: 400 })
+  }
+
+  try {
+    const entries = await createInspectionEntries(payload.entries as any, sessionUser.id)
+    return NextResponse.json({ entries })
+  } catch (error) {
+    const err = error as Error
+    const friendlyMessage =
+      error instanceof Prisma.PrismaClientValidationError
+        ? '报检数据格式不正确，请检查必填项后重试。'
+        : error instanceof Prisma.PrismaClientKnownRequestError
+          ? '报检保存失败，请稍后重试或联系管理员。'
+          : err.message
+    return NextResponse.json({ message: friendlyMessage }, { status: 400 })
+  }
+}

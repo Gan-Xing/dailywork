@@ -65,6 +65,7 @@ export interface InspectionFilter {
   sortOrder?: 'asc' | 'desc'
   page?: number
   pageSize?: number
+  groupByLayer?: boolean
 }
 
 export interface InspectionListItem {
@@ -103,6 +104,71 @@ export interface InspectionListResponse {
 
 export type PhaseMeasure = 'LINEAR' | 'POINT'
 export type IntervalSide = 'BOTH' | 'LEFT' | 'RIGHT'
+export interface SubmissionDTO {
+  id: number
+  code: string
+  files: unknown[]
+  remark?: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface InspectionEntryPayload {
+  submissionId?: number | null
+  roadId: number
+  phaseId: number
+  side: IntervalSide
+  startPk: number
+  endPk: number
+  layerId?: number | null
+  layerName: string
+  checkId?: number | null
+  checkName: string
+  types: string[]
+  status?: InspectionStatus
+  appointmentDate?: string
+  remark?: string
+  submissionOrder?: number | null
+  submittedAt?: string
+}
+
+export interface InspectionEntryDTO extends InspectionEntryPayload {
+  id: number
+  submissionCode?: string | null
+  roadName: string
+  roadSlug: string
+  phaseName: string
+  submittedBy?: { id: number; username: string } | null
+  createdBy?: { id: number; username: string } | null
+  createdAt: string
+  updatedAt: string
+  updatedBy?: { id: number; username: string } | null
+}
+
+export interface InspectionEntryFilter {
+  roadSlug?: string
+  phaseId?: number
+  phaseDefinitionId?: number
+  status?: InspectionStatus[]
+  side?: IntervalSide
+  types?: string[]
+  checkId?: number
+  checkName?: string
+  keyword?: string
+  startDate?: string
+  endDate?: string
+  sortField?: 'appointmentDate' | 'road' | 'phase' | 'side' | 'createdAt' | 'updatedAt'
+  sortOrder?: 'asc' | 'desc'
+  page?: number
+  pageSize?: number
+}
+
+export interface InspectionEntryListResponse {
+  items: InspectionEntryDTO[]
+  total: number
+  page: number
+  pageSize: number
+}
 
 export interface PhaseIntervalPayload {
   startPk: number

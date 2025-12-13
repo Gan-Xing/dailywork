@@ -4,21 +4,14 @@ import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import type {
-  InspectionBulkPayload,
+  InspectionEntryDTO,
   InspectionListItem,
   InspectionStatus,
   IntervalSide,
   RoadSectionWithPhasesDTO,
 } from '@/lib/progressTypes'
 import { resolveRoadName } from '@/lib/i18n/roadDictionary'
-import {
-  PREFAB_ROAD_NAME,
-  PREFAB_ROAD_SLUG,
-  prefabCheckOptions,
-  prefabPhaseOptions,
-  prefabTypeOptions,
-  type PrefabPhaseKey,
-} from '@/lib/prefabInspection'
+import { PREFAB_ROAD_SLUG } from '@/lib/prefabInspection'
 import { getProgressCopy, formatProgressCopy } from '@/lib/i18n/progress'
 import {
   canonicalizeProgressList,
@@ -74,6 +67,7 @@ const defaultVisibleColumns: ColumnKey[] = [
   'phase',
   'range',
   'layers',
+  'checks',
   'status',
   'updatedAt',
   'action',
@@ -91,6 +85,14 @@ const formatPK = (value: number) => {
   const km = Math.floor(value / 1000)
   const m = Math.round(value % 1000)
   return `PK${km}+${String(m).padStart(3, '0')}`
+}
+
+const statusPriority: Record<InspectionStatus, number> = {
+  PENDING: 1,
+  SCHEDULED: 2,
+  SUBMITTED: 3,
+  IN_PROGRESS: 4,
+  APPROVED: 5,
 }
 
 const buildQuery = (params: Record<string, string | number | undefined | (string | number)[]>) => {
@@ -126,6 +128,37 @@ const splitTokens = (value: string) =>
     .map((item) => item.trim())
     .filter(Boolean)
 
+const mapEntryToListItem = (entry: InspectionEntryDTO): InspectionListItem => {
+  const status = entry.status ?? 'PENDING'
+  const submittedAt = entry.submittedAt ?? entry.createdAt ?? new Date().toISOString()
+  return {
+    id: entry.id,
+    roadId: entry.roadId,
+    roadName: entry.roadName,
+    roadSlug: entry.roadSlug,
+    phaseId: entry.phaseId,
+    phaseName: entry.phaseName,
+    submissionId: entry.submissionId ?? null,
+    submissionCode: entry.submissionCode ?? undefined,
+    side: entry.side,
+    startPk: entry.startPk,
+    endPk: entry.endPk,
+    layers: entry.layerName ? [entry.layerName] : [],
+    checks: entry.checkName ? [entry.checkName] : [],
+    types: entry.types || [],
+    submissionOrder: entry.submissionOrder ?? null,
+    status,
+    remark: entry.remark ?? undefined,
+    appointmentDate: entry.appointmentDate ?? undefined,
+    submittedAt,
+    submittedBy: entry.submittedBy ?? null,
+    createdBy: entry.createdBy ?? null,
+    createdAt: entry.createdAt,
+    updatedAt: entry.updatedAt,
+    updatedBy: entry.updatedBy ?? null,
+  }
+}
+
 type EditFormState = {
   phaseId: number | ''
   side: IntervalSide | ''
@@ -152,11 +185,6 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
     BOTH: copy.filters.sideBoth,
   }
   const prefabRoadLabel = copy.prefabRoadName
-  const getPrefabPhaseLabel = (key: PrefabPhaseKey) => copy.prefabModal.phaseOptions[key] ?? key
-  const getPrefabLayerLabel = (key: PrefabPhaseKey, fallback: string) =>
-    copy.prefabModal.layerOptions[key] ?? fallback
-  const getPrefabCheckLabel = (value: string) => copy.prefabModal.checkOptions[value] ?? value
-  const getPrefabTypeLabel = (value: string) => copy.prefabModal.typeOptions[value] ?? value
   const formatPhaseDefinitionLabel = useCallback(
     (definition: PhaseDefinitionOption) => localizeProgressTerm('phase', definition.name, locale),
     [locale],
@@ -198,6 +226,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
   const [sortField, setSortField] = useState<SortField>('updatedAt')
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc')
   const [page, setPage] = useState(1)
+  const [pageInput, setPageInput] = useState('1')
   const [pageSize] = useState(20)
   const [items, setItems] = useState<InspectionListItem[]>([])
   const [total, setTotal] = useState(0)
@@ -206,8 +235,8 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
   const [selectedIds, setSelectedIds] = useState<number[]>([])
   const [bulkError, setBulkError] = useState<string | null>(null)
   const [bulkEditOpen, setBulkEditOpen] = useState(false)
-  const [bulkEditPending, setBulkEditPending] = useState(false)
-  const [bulkEditError, setBulkEditError] = useState<string | null>(null)
+const [bulkEditPending, setBulkEditPending] = useState(false)
+const [bulkEditError, setBulkEditError] = useState<string | null>(null)
   const [bulkEditForm, setBulkEditForm] = useState<EditFormState>({
     phaseId: '',
     side: '',
@@ -224,24 +253,6 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
   })
   const [pdfPending, setPdfPending] = useState(false)
   const [pdfError, setPdfError] = useState<string | null>(null)
-  const [showPrefabModal, setShowPrefabModal] = useState(false)
-  const [prefabPending, setPrefabPending] = useState(false)
-  const [prefabError, setPrefabError] = useState<string | null>(null)
-  const [prefabForm, setPrefabForm] = useState<{
-    phaseKey: PrefabPhaseKey
-    layers: string[]
-    checks: string[]
-    types: string[]
-    appointmentDate: string
-    remark: string
-  }>({
-    phaseKey: 'ditch',
-    layers: [prefabPhaseOptions[0]?.layer ?? ''],
-    checks: prefabCheckOptions,
-    types: prefabTypeOptions,
-    appointmentDate: '',
-    remark: '',
-  })
   const columnOptions: { key: ColumnKey; label: string }[] = useMemo(
     () => [
       { key: 'sequence', label: copy.columns.sequence },
@@ -392,7 +403,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
         status: status.length ? status : undefined,
         side: side || undefined,
         type: types.length ? types : undefined,
-        check: check || undefined,
+        checkName: check || undefined,
         keyword: keyword || undefined,
         startDate: startDate || undefined,
         endDate: endDate || undefined,
@@ -401,13 +412,24 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
         page,
         pageSize,
       })
-      const res = await fetch(`/api/inspections?${query}`)
-      const data = (await res.json()) as { message?: string; items?: InspectionListItem[]; total?: number; page?: number }
+      const res = await fetch(`/api/inspection-entries?${query}`)
+      const data = (await res.json()) as {
+        message?: string
+        items?: InspectionEntryDTO[]
+        total?: number
+        page?: number
+      }
       if (!res.ok) {
         throw new Error(data.message ?? copy.errors.loadFailed)
       }
-      setItems(data.items ?? [])
-      setTotal(data.total ?? 0)
+      if (!Array.isArray(data.items)) {
+        setItems([])
+        setTotal(0)
+      } else {
+        const list = data.items.map((entry) => mapEntryToListItem(entry))
+        setItems(list)
+        setTotal(data.total ?? list.length)
+      }
     } catch (err) {
       setError((err as Error).message)
     } finally {
@@ -437,6 +459,10 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
   useEffect(() => {
     setSelectedIds((prev) => prev.filter((id) => items.some((item) => item.id === id)))
   }, [items])
+
+  useEffect(() => {
+    setPageInput(String(page))
+  }, [page])
 
   useEffect(() => {
     setBulkError(null)
@@ -531,24 +557,6 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
     }
   }
 
-  const togglePrefabArrayValue = (field: 'layers' | 'checks' | 'types', value: string) => {
-    setPrefabForm((prev) => {
-      const next = prev[field].includes(value)
-        ? prev[field].filter((item) => item !== value)
-        : [...prev[field], value]
-      return { ...prev, [field]: next }
-    })
-  }
-
-  const handlePrefabPhaseChange = (value: PrefabPhaseKey) => {
-    const matched = prefabPhaseOptions.find((item) => item.key === value)
-    setPrefabForm((prev) => ({
-      ...prev,
-      phaseKey: value,
-      layers: matched ? [matched.layer] : prev.layers,
-    }))
-  }
-
   const isPrefabItem = (item: InspectionListItem) => item.roadSlug === PREFAB_ROAD_SLUG
 
   const handleSort = (field: SortField) => {
@@ -574,49 +582,6 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
     setSortField('updatedAt')
     setSortOrder('desc')
     setPage(1)
-  }
-
-  const submitPrefab = async () => {
-    if (!prefabForm.layers.length || !prefabForm.checks.length || !prefabForm.types.length) {
-      setPrefabError(copy.editModal.missingRequired)
-      return
-    }
-    if (!prefabForm.appointmentDate) {
-      setPrefabError(copy.editModal.appointmentMissing)
-      return
-    }
-    setPrefabPending(true)
-    setPrefabError(null)
-    try {
-      const res = await fetch('/api/inspections/prefab', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          phaseKey: prefabForm.phaseKey,
-          layers: prefabForm.layers,
-          checks: prefabForm.checks,
-          types: prefabForm.types,
-          appointmentDate: prefabForm.appointmentDate,
-          remark: prefabForm.remark || undefined,
-        }),
-      })
-      const data = (await res.json().catch(() => ({}))) as { inspection?: InspectionListItem; message?: string }
-      if (!res.ok || !data.inspection) {
-        throw new Error(data.message ?? copy.errors.createFailed)
-      }
-      setShowPrefabModal(false)
-      setPrefabForm((prev) => ({
-        ...prev,
-        appointmentDate: '',
-        remark: '',
-      }))
-      await fetchData()
-    } catch (err) {
-      setPrefabError((err as Error).message)
-    } finally {
-      setPrefabPending(false)
-    }
   }
 
   const formatDate = (value: string) =>
@@ -700,7 +665,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
     setEditPending(true)
     setEditError(null)
     try {
-      const res = await fetch(`/api/inspections/${editing.id}`, {
+      const res = await fetch(`/api/inspection-entries/${editing.id}`, {
         method: 'PUT',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -719,11 +684,11 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
           submittedAt: submittedAtValue.toISOString(),
         }),
       })
-      const data = (await res.json().catch(() => ({}))) as { inspection?: InspectionListItem; message?: string }
-      if (!res.ok || !data.inspection) {
+      const data = (await res.json().catch(() => ({}))) as { entry?: InspectionEntryDTO; message?: string }
+      if (!res.ok || !data.entry) {
         throw new Error(data.message ?? copy.errors.updateFailed)
       }
-      const updatedInspection = data.inspection!
+      const updatedInspection = mapEntryToListItem(data.entry)
       setItems((prev) => prev.map((item) => (item.id === editing.id ? updatedInspection : item)))
       setEditing(null)
     } catch (err) {
@@ -738,7 +703,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
     setDeletePending(true)
     setDeleteError(null)
     try {
-      const res = await fetch(`/api/inspections/${deleteTarget.id}`, {
+      const res = await fetch(`/api/inspection-entries/${deleteTarget.id}`, {
         method: 'DELETE',
         credentials: 'include',
       })
@@ -769,7 +734,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
     }
 
     const submissionOrderText = bulkEditForm.submissionOrder.trim()
-    const payload: InspectionBulkPayload = {}
+    const payload: Record<string, unknown> = {}
     if (bulkEditForm.phaseId) payload.phaseId = bulkEditForm.phaseId
     if (bulkEditForm.side) payload.side = bulkEditForm.side
     const startProvided = bulkEditForm.startPk.trim() !== ''
@@ -785,9 +750,9 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
       payload.endPk = endPk
     }
     const layers = splitTokens(bulkEditForm.layers)
-    if (layers.length) payload.layers = layers
+    if (layers.length) payload.layerName = layers[0]
     const checks = splitTokens(bulkEditForm.checks)
-    if (checks.length) payload.checks = checks
+    if (checks.length) payload.checkName = checks[0]
     const types = splitTokens(bulkEditForm.types)
     if (types.length) payload.types = types
     if (bulkEditForm.status) payload.status = bulkEditForm.status
@@ -819,18 +784,17 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
     setBulkEditPending(true)
     setBulkEditError(null)
     try {
-      const res = await fetch('/api/inspections/bulk-edit', {
+      const res = await fetch('/api/inspection-entries/bulk-edit', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ids: selectedIds, payload }),
       })
-      const data = (await res.json().catch(() => ({}))) as { items?: InspectionListItem[]; message?: string }
+      const data = (await res.json().catch(() => ({}))) as { items?: InspectionEntryDTO[]; message?: string }
       if (!res.ok || !data.items) {
         throw new Error(data.message ?? copy.errors.bulkFailed)
       }
-      const updatedMap = new Map(data.items.map((item) => [item.id, item]))
-      setItems((prev) => prev.map((item) => updatedMap.get(item.id) ?? item))
+      await fetchData()
       setSelectedIds([])
       setBulkEditOpen(false)
       setBulkEditForm({
@@ -847,7 +811,6 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
         submissionOrder: '',
         submittedAt: '',
       })
-      await fetchData()
     } catch (err) {
       setBulkEditError((err as Error).message)
     } finally {
@@ -935,7 +898,6 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
             </p>
           ) : null}
         </header>
-
         <section className="mt-6 space-y-4 rounded-3xl border border-white/10 bg-white/5 p-5 shadow-xl shadow-slate-900/30 backdrop-blur">
           <div className="grid gap-3 md:grid-cols-4">
             <label className="flex flex-col gap-1 text-xs text-slate-200">
@@ -1155,16 +1117,6 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
               >
                 {copy.filters.search}
               </button>
-              <button
-                type="button"
-                className="rounded-xl bg-sky-200 px-4 py-2 text-xs font-semibold text-slate-900 shadow-lg shadow-sky-300/30 transition hover:-translate-y-0.5"
-                onClick={() => {
-                  setShowPrefabModal(true)
-                  setPrefabError(null)
-                }}
-              >
-                {copy.filters.addPrefab}
-              </button>
               {loading ? <span className="text-xs text-slate-200">{copy.filters.loading}</span> : null}
             </div>
           </div>
@@ -1180,6 +1132,9 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
               {pdfError ? <span className="text-xs text-amber-200">{pdfError}</span> : null}
             </div>
             <div className="flex flex-wrap items-center gap-2">
+              {canBulkEdit ? (
+                null
+              ) : null}
               <div className="relative" ref={columnSelectorRef}>
                 <button
                   type="button"
@@ -1557,6 +1512,36 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
               >
                 {copy.pagination.prev}
               </button>
+              <div className="flex items-center gap-1 text-xs text-slate-200">
+                <input
+                  type="number"
+                  min={1}
+                  max={totalPages}
+                  value={pageInput}
+                  onChange={(e) => setPageInput(e.target.value)}
+                  onBlur={() => {
+                    const value = Number(pageInput)
+                    if (!Number.isFinite(value)) {
+                      setPageInput(String(page))
+                      return
+                    }
+                    const next = Math.min(totalPages, Math.max(1, Math.round(value)))
+                    if (next !== page) setPage(next)
+                    setPageInput(String(next))
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      const value = Number(pageInput)
+                      const next = Number.isFinite(value) ? Math.min(totalPages, Math.max(1, Math.round(value))) : page
+                      if (next !== page) setPage(next)
+                      setPageInput(String(next))
+                    }
+                  }}
+                  className="h-8 w-14 rounded-lg border border-white/20 bg-slate-900 px-2 py-1 text-center text-xs text-slate-50 focus:border-emerald-300 focus:outline-none"
+                  aria-label={copy.pagination.goTo}
+                />
+                <span className="text-slate-400">/ {totalPages}</span>
+              </div>
               <button
                 type="button"
                 className="rounded-xl border border-white/20 px-3 py-1 text-xs text-slate-100 transition hover:border-white/40 hover:bg-white/10 disabled:opacity-40"
@@ -1568,147 +1553,6 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
             </div>
           </div>
         </section>
-
-        {showPrefabModal ? (
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 px-4 py-6"
-            onClick={(e) => {
-              if (e.target === e.currentTarget) setShowPrefabModal(false)
-            }}
-          >
-            <div className="w-full max-w-3xl rounded-3xl border border-white/10 bg-slate-900/95 p-6 shadow-2xl shadow-sky-400/20 backdrop-blur">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-xs uppercase tracking-[0.2em] text-sky-100">{copy.prefabModal.badge}</p>
-                  <h2 className="text-xl font-semibold text-slate-50">{copy.prefabModal.title}</h2>
-                  <p className="text-sm text-slate-300">{copy.prefabModal.subtitle}</p>
-                </div>
-                <button
-                  type="button"
-                  className="rounded-full border border-white/20 px-3 py-1 text-xs font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/20"
-                  onClick={() => setShowPrefabModal(false)}
-                  aria-label={copy.prefabModal.closeAria}
-                >
-                  ×
-                </button>
-              </div>
-              <div className="mt-4 space-y-4 text-sm text-slate-200">
-                <div className="grid gap-3 md:grid-cols-2">
-                  <label className="flex flex-col gap-1">
-                    {copy.prefabModal.phaseLabel}
-                    <select
-                      className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
-                        value={prefabForm.phaseKey}
-                        onChange={(e) => handlePrefabPhaseChange(e.target.value as PrefabPhaseKey)}
-                      >
-                        {prefabPhaseOptions.map((option) => (
-                          <option key={option.key} value={option.key}>
-                            {getPrefabPhaseLabel(option.key)}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  <label className="flex flex-col gap-1">
-                    {copy.prefabModal.appointmentLabel}
-                    <input
-                      type="date"
-                      className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
-                      value={prefabForm.appointmentDate}
-                      onChange={(e) => setPrefabForm((prev) => ({ ...prev, appointmentDate: e.target.value }))}
-                    />
-                  </label>
-                </div>
-                <div className="grid gap-3 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <p className="text-xs text-slate-300">{copy.prefabModal.layersLabel}</p>
-                    <div className="flex flex-wrap gap-2">
-                      {prefabPhaseOptions.map((option) => (
-                        <button
-                          key={option.layer}
-                          type="button"
-                          className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                            prefabForm.layers.includes(option.layer)
-                              ? 'bg-emerald-300 text-slate-900 shadow shadow-emerald-300/30'
-                              : 'border border-white/20 bg-white/5 text-slate-100'
-                          }`}
-                          onClick={() => togglePrefabArrayValue('layers', option.layer)}
-                        >
-                          {getPrefabLayerLabel(option.key, option.layer)}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <p className="text-xs text-slate-300">{copy.prefabModal.typesLabel}</p>
-                    <div className="flex flex-wrap gap-2">
-                      {prefabTypeOptions.map((option) => (
-                        <button
-                          key={option}
-                          type="button"
-                          className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                            prefabForm.types.includes(option)
-                              ? 'bg-emerald-300 text-slate-900 shadow shadow-emerald-300/30'
-                              : 'border border-white/20 bg-white/5 text-slate-100'
-                          }`}
-                          onClick={() => togglePrefabArrayValue('types', option)}
-                        >
-                          {getPrefabTypeLabel(option)}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <p className="text-xs text-slate-300">{copy.prefabModal.checksLabel}</p>
-                  <div className="flex flex-wrap gap-2">
-                    {prefabCheckOptions.map((option) => (
-                      <button
-                        key={option}
-                        type="button"
-                        className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                          prefabForm.checks.includes(option)
-                            ? 'bg-emerald-300 text-slate-900 shadow shadow-emerald-300/30'
-                            : 'border border-white/20 bg-white/5 text-slate-100'
-                        }`}
-                        onClick={() => togglePrefabArrayValue('checks', option)}
-                      >
-                          {getPrefabCheckLabel(option)}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <label className="flex flex-col gap-1">
-                  {copy.prefabModal.remarkLabel}
-                  <textarea
-                    className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-200/60 focus:border-emerald-300 focus:outline-none"
-                    rows={3}
-                    value={prefabForm.remark}
-                    onChange={(e) => setPrefabForm((prev) => ({ ...prev, remark: e.target.value }))}
-                    placeholder={copy.prefabModal.remarkPlaceholder}
-                  />
-                </label>
-                {prefabError ? <p className="text-xs text-amber-200">{prefabError}</p> : null}
-                <div className="flex items-center justify-end gap-3">
-                  <button
-                    type="button"
-                    className="rounded-xl border border-white/20 px-4 py-2 text-xs font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/10"
-                    onClick={() => setShowPrefabModal(false)}
-                  >
-                    {copy.prefabModal.cancel}
-                  </button>
-                  <button
-                    type="button"
-                    className="rounded-xl bg-sky-200 px-4 py-2 text-xs font-semibold text-slate-900 shadow-lg shadow-sky-300/30 transition hover:-translate-y-0.5 disabled:opacity-60"
-                    onClick={submitPrefab}
-                    disabled={prefabPending}
-                  >
-                    {prefabPending ? copy.prefabModal.submitting : copy.prefabModal.submit}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        ) : null}
 
         {selected ? (
           <div

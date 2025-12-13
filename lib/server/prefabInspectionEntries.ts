@@ -1,9 +1,8 @@
 import { PhaseMeasure } from '@prisma/client'
 
 import { PREFAB_ROAD_NAME, PREFAB_ROAD_SLUG, prefabPhaseOptions, type PrefabPhaseKey } from '@/lib/prefabInspection'
-import type { InspectionListItem } from '@/lib/progressTypes'
 import { prisma } from '@/lib/prisma'
-import { createInspection, getInspectionListItem } from './inspectionStore'
+import { createInspectionEntries } from './inspectionEntryStore'
 
 const ensurePrefabRoad = async () => {
   return prisma.roadSection.upsert({
@@ -53,28 +52,28 @@ export const createPrefabInspection = async (
     remark?: string
   },
   userId: number | null,
-): Promise<InspectionListItem> => {
+) => {
   const road = await ensurePrefabRoad()
   const phase = await ensurePrefabPhase(road.id, phaseKey)
   const matchedLayer = prefabPhaseOptions.find((item) => item.key === phaseKey)?.layer
   const layers = payload.layers && payload.layers.length ? payload.layers : matchedLayer ? [matchedLayer] : []
 
-  const inspection = await createInspection(
-    road.id,
-    phase.id,
-    {
+  const entriesPayload = layers.flatMap((layerName) =>
+    payload.checks.map((checkName) => ({
+      roadId: road.id,
       phaseId: phase.id,
-      side: 'BOTH',
+      side: 'BOTH' as const,
       startPk: 0,
       endPk: 0,
-      layers,
-      checks: payload.checks,
+      layerName,
+      checkName,
       types: payload.types,
-      remark: payload.remark,
+      status: 'SCHEDULED' as const,
       appointmentDate: payload.appointmentDate,
-    },
-    userId,
+      remark: payload.remark,
+    })),
   )
 
-  return getInspectionListItem(inspection.id)
+  const entries = await createInspectionEntries(entriesPayload, userId)
+  return entries
 }

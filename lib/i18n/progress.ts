@@ -436,6 +436,7 @@ type InspectionBoardCopy = {
     closeAria: string
   }
   table: {
+    add: string
     loading: string
     empty: string
     selectPage: string
@@ -448,6 +449,7 @@ type InspectionBoardCopy = {
     summary: string
     prev: string
     next: string
+    goTo: string
   }
   prefabModal: {
     badge: string
@@ -978,6 +980,7 @@ const progressCopy: Record<Locale, ProgressCopy> = {
         closeAria: '关闭批量编辑',
       },
       table: {
+        add: '新增报检',
         loading: '加载中...',
         empty: '暂无记录',
         selectPage: '全选当页报检记录',
@@ -990,6 +993,7 @@ const progressCopy: Record<Locale, ProgressCopy> = {
         summary: '共 {total} 条 · 第 {page}/{totalPages} 页',
         prev: '上一页',
         next: '下一页',
+        goTo: '跳转页码',
       },
       prefabModal: {
         badge: '新增预制报检',
@@ -1540,6 +1544,7 @@ const progressCopy: Record<Locale, ProgressCopy> = {
         closeAria: 'Fermer l’édition groupée',
       },
       table: {
+        add: 'Ajouter un contrôle',
         loading: 'Chargement...',
         empty: 'Aucune donnée',
         selectPage: 'Tout sélectionner sur cette page',
@@ -1552,6 +1557,7 @@ const progressCopy: Record<Locale, ProgressCopy> = {
         summary: '{total} au total · Page {page}/{totalPages}',
         prev: 'Précédent',
         next: 'Suivant',
+        goTo: 'Aller à la page',
       },
       prefabModal: {
         badge: 'Nouveau contrôle préfab',

@@ -218,8 +218,8 @@ model Submission {
 
 model InspectionEntry {
   id           Int              @id @default(autoincrement())
-  submissionId Int
-  submission   Submission       @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  submissionId Int?
+  submission   Submission?      @relation(fields: [submissionId], references: [id], onDelete: Cascade)
   roadId       Int
   road         RoadSection      @relation(fields: [roadId], references: [id], onDelete: Cascade)
   phaseId      Int

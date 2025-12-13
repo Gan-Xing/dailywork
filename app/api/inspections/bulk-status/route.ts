@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 
 import type { InspectionStatus } from '@/lib/progressTypes'
 import { getSessionUser, hasPermission } from '@/lib/server/authSession'
-import { updateInspectionStatuses } from '@/lib/server/inspectionStore'
+import { prisma } from '@/lib/prisma'
 
 export async function POST(request: Request) {
   const sessionUser = getSessionUser()
@@ -20,16 +20,27 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: 'Invalid JSON body' }, { status: 400 })
   }
 
-  const ids = Array.isArray(body.ids) ? (body.ids as Array<number | string>) : []
+  const ids = Array.isArray(body.ids) ? body.ids.map((id) => Number(id)).filter((id) => Number.isFinite(id) && id > 0) : []
   const status = body.status as InspectionStatus | undefined
 
   if (!status) {
     return NextResponse.json({ message: '请选择要更新的状态' }, { status: 400 })
   }
+  if (!ids.length) {
+    return NextResponse.json({ message: '请选择需要更新的报检明细' }, { status: 400 })
+  }
 
   try {
-    const items = await updateInspectionStatuses(ids, status, sessionUser.id)
-    return NextResponse.json({ items })
+    const updates = await prisma.$transaction(
+      ids.map((id) =>
+        prisma.inspectionEntry.update({
+          where: { id },
+          data: { status, updatedBy: sessionUser.id },
+          include: { road: true, phase: true, submission: true, submitter: true, creator: true, updater: true },
+        }),
+      ),
+    )
+    return NextResponse.json({ items: updates })
   } catch (error) {
     return NextResponse.json({ message: (error as Error).message }, { status: 400 })
   }
