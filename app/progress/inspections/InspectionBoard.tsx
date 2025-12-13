@@ -431,7 +431,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
         layerName: layerFilterValues.length ? layerFilterValues : undefined,
         type: types.length ? types : undefined,
         checkName: check || undefined,
-        keyword: keyword || undefined,
+        keyword: keyword ? `remark:${keyword}` : undefined,
         startDate: startDate || undefined,
         endDate: endDate || undefined,
         sortField,
@@ -1191,7 +1191,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                 }}
               />
             </label>
-            <label className="flex flex-col gap-1 text-xs text-slate-200 md:col-span-2">
+            <label className="flex flex-col gap-1 text-xs text-slate-200 md:col-span-2 md:max-w-xs">
               {copy.filters.keyword}
               <input
                 className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-200/60 focus:border-emerald-300 focus:outline-none"
@@ -1203,7 +1203,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                 placeholder={copy.filters.keywordPlaceholder}
               />
             </label>
-            <div className="flex items-center gap-3 md:col-span-2">
+            <div className="flex flex-wrap items-center justify-end gap-3 md:col-span-2">
               <button
                 type="button"
                 className="rounded-xl border border-white/20 px-4 py-2 text-xs font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/10"
