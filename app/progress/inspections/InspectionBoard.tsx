@@ -228,6 +228,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
   const [checkOptionsError, setCheckOptionsError] = useState<string | null>(null)
   const [checkOptionsLoading, setCheckOptionsLoading] = useState(false)
   const [typeOpen, setTypeOpen] = useState(false)
+  const [statusOpen, setStatusOpen] = useState(false)
   const [layerOpen, setLayerOpen] = useState(false)
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
@@ -289,6 +290,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
   const [showColumnSelector, setShowColumnSelector] = useState(false)
   const columnSelectorRef = useRef<HTMLDivElement | null>(null)
   const typeSelectorRef = useRef<HTMLDivElement | null>(null)
+  const statusSelectorRef = useRef<HTMLDivElement | null>(null)
   const layerSelectorRef = useRef<HTMLDivElement | null>(null)
 
   const persistVisibleColumns = (next: ColumnKey[]) => {
@@ -515,6 +517,9 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
       }
       if (typeSelectorRef.current && !typeSelectorRef.current.contains(event.target as Node)) {
         setTypeOpen(false)
+      }
+      if (statusSelectorRef.current && !statusSelectorRef.current.contains(event.target as Node)) {
+        setStatusOpen(false)
       }
       if (layerSelectorRef.current && !layerSelectorRef.current.contains(event.target as Node)) {
         setLayerOpen(false)
@@ -1148,25 +1153,73 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
               <span className="text-[11px] text-amber-200">{checkOptionsError}</span>
             ) : null}
           </label>
-          <div className="flex items-center gap-2 text-xs text-slate-200">
-            <span className="whitespace-nowrap">{copy.filters.status}</span>
-            <div className="flex flex-wrap gap-2">
-              {statusOptions.map((item) => (
-                <button
-                  key={item}
-                  type="button"
-                  className={`rounded-full px-3 py-1 text-[11px] font-semibold ${
-                    status.includes(item)
-                      ? 'bg-emerald-300 text-slate-900 shadow shadow-emerald-300/40'
-                      : 'bg-white/10 text-slate-100'
-                  }`}
-                  onClick={() => toggleStatus(item)}
-                >
-                  {statusCopy[item]}
-                </button>
-              ))}
+          <label className="flex flex-col gap-1 text-xs text-slate-200">
+            {copy.filters.status}
+            <div className="relative" ref={statusSelectorRef}>
+              <button
+                type="button"
+                onClick={() => setStatusOpen((prev) => !prev)}
+                className="flex w-full items-center justify-between rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-left text-sm text-slate-50 shadow-inner shadow-slate-900/30 focus:border-emerald-300 focus:outline-none"
+              >
+                <span className="truncate">
+                  {status.length === 0
+                    ? copy.filters.all
+                    : formatProgressCopy(copy.typePicker.selected, { count: status.length })}
+                </span>
+                <span className="text-xs text-slate-300">⌕</span>
+              </button>
+              {statusOpen ? (
+                <div className="absolute z-10 mt-2 w-full rounded-xl border border-white/15 bg-slate-900/95 p-3 text-xs text-slate-100 shadow-lg shadow-slate-900/40 backdrop-blur">
+                  <div className="flex items-center justify-between border-b border-white/10 pb-2 text-[11px] text-slate-300">
+                    <span>
+                      {formatProgressCopy(copy.typePicker.summary, {
+                        count: status.length ? status.length : copy.typePicker.all,
+                      })}
+                    </span>
+                    <div className="flex gap-2">
+                      <button
+                        className="text-emerald-300 hover:underline"
+                        onClick={() => {
+                          setStatus(statusOptions)
+                          setPage(1)
+                        }}
+                      >
+                        {copy.typePicker.selectAll}
+                      </button>
+                      <button
+                        className="text-slate-400 hover:underline"
+                        onClick={() => {
+                          setStatus([])
+                          setPage(1)
+                        }}
+                      >
+                        {copy.typePicker.clear}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="mt-2 max-h-48 space-y-1 overflow-y-auto">
+                    {statusOptions.map((option) => (
+                      <label
+                        key={option}
+                        className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 hover:bg-white/5"
+                      >
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 rounded border-white/30 bg-slate-900/60 accent-emerald-300"
+                          checked={status.includes(option)}
+                          onChange={() => {
+                            setStatus((prev) => toggleValue(prev, option))
+                            setPage(1)
+                          }}
+                        />
+                        <span className="truncate">{statusCopy[option]}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
             </div>
-          </div>
+          </label>
             <label className="flex flex-col gap-1 text-xs text-slate-200">
               {copy.filters.startDate}
               <input
