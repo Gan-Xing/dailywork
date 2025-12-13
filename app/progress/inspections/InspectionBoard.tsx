@@ -429,8 +429,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
     setError(null)
     try {
       const query = buildQuery({
-        roadSlug: undefined,
-        roadSlugs: roadSlugs.length ? roadSlugs : undefined,
+        roadSlug: roadSlugs.length ? roadSlugs : undefined,
         phaseDefinitionId: undefined,
         phaseDefinitionIds: phaseDefinitionIds.length ? phaseDefinitionIds : undefined,
         status: status.length ? status : undefined,
