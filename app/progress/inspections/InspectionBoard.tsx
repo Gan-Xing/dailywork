@@ -1417,19 +1417,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                 placeholder={copy.filters.keywordPlaceholder}
               />
             </label>
-          </div>
-        </section>
-
-        <section className="mt-6 rounded-3xl border border-white/10 bg-white/5 shadow-xl shadow-slate-900/30">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-5 py-3 text-sm text-slate-200">
-            <div className="flex items-center gap-3">
-              <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-50">
-                {formatProgressCopy(copy.bulk.selectedCount, { count: selectedIds.length })}
-              </span>
-              {bulkError ? <span className="text-xs text-amber-200">{bulkError}</span> : null}
-              {pdfError ? <span className="text-xs text-amber-200">{pdfError}</span> : null}
-            </div>
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="flex flex-wrap items-center justify-end gap-3 md:col-span-2">
               <button
                 type="button"
                 className="rounded-xl border border-white/20 px-4 py-2 text-xs font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/10"
@@ -1448,6 +1436,20 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                 {copy.filters.search}
               </button>
               {loading ? <span className="text-xs text-slate-200">{copy.filters.loading}</span> : null}
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-6 rounded-3xl border border-white/10 bg-white/5 shadow-xl shadow-slate-900/30">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-5 py-3 text-sm text-slate-200">
+            <div className="flex items-center gap-3">
+              <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-50">
+                {formatProgressCopy(copy.bulk.selectedCount, { count: selectedIds.length })}
+              </span>
+              {bulkError ? <span className="text-xs text-amber-200">{bulkError}</span> : null}
+              {pdfError ? <span className="text-xs text-amber-200">{pdfError}</span> : null}
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
               <div className="relative" ref={columnSelectorRef}>
                 <button
                   type="button"
