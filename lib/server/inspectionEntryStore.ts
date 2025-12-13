@@ -425,13 +425,22 @@ export const listInspectionEntries = async (filter: InspectionEntryFilter): Prom
     where.checkName = { contains: filter.checkName, mode: 'insensitive' }
   }
   if (filter.keyword) {
-    where.OR = [
-      { remark: { contains: filter.keyword, mode: 'insensitive' } },
-      { layerName: { contains: filter.keyword, mode: 'insensitive' } },
-      { checkName: { contains: filter.keyword, mode: 'insensitive' } },
-      { phase: { name: { contains: filter.keyword, mode: 'insensitive' } } },
-      { road: { name: { contains: filter.keyword, mode: 'insensitive' } } },
-    ]
+    const normalizedKeyword = filter.keyword.trim()
+    const remarkPrefix = 'remark:'
+    if (normalizedKeyword.toLowerCase().startsWith(remarkPrefix)) {
+      const remarkValue = normalizedKeyword.slice(remarkPrefix.length).trim()
+      if (remarkValue) {
+        where.remark = { contains: remarkValue, mode: 'insensitive' }
+      }
+    } else {
+      where.OR = [
+        { remark: { contains: normalizedKeyword, mode: 'insensitive' } },
+        { layerName: { contains: normalizedKeyword, mode: 'insensitive' } },
+        { checkName: { contains: normalizedKeyword, mode: 'insensitive' } },
+        { phase: { name: { contains: normalizedKeyword, mode: 'insensitive' } } },
+        { road: { name: { contains: normalizedKeyword, mode: 'insensitive' } } },
+      ]
+    }
   }
   if (filter.startDate || filter.endDate) {
     where.createdAt = {

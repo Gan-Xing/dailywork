@@ -355,14 +355,14 @@ type InspectionBoardCopy = {
     sideRight: string
     sideBoth: string
     type: string
-    typePlaceholder: string
-    check: string
-    checkPlaceholder: string
-    status: string
-    startDate: string
-    endDate: string
-    keyword: string
-    keywordPlaceholder: string
+      typePlaceholder: string
+      check: string
+      checkPlaceholder: string
+      status: string
+      startDate: string
+      endDate: string
+      keyword: string
+      keywordPlaceholder: string
     reset: string
     search: string
     addPrefab: string
@@ -899,8 +899,8 @@ const progressCopy: Record<Locale, ProgressCopy> = {
         status: '状态',
         startDate: '开始日期',
         endDate: '结束日期',
-        keyword: '关键字（分项/备注/验收内容）',
-        keywordPlaceholder: '输入关键字后自动过滤',
+        keyword: '备注关键字',
+        keywordPlaceholder: '仅按备注模糊过滤',
         reset: '重置筛选',
         search: '立即查询',
         addPrefab: '新增预制报检',
@@ -1463,8 +1463,8 @@ const progressCopy: Record<Locale, ProgressCopy> = {
         status: 'Statut',
         startDate: 'Début',
         endDate: 'Fin',
-        keyword: 'Mot-clé (phase / remarques / contenu)',
-        keywordPlaceholder: 'Filtre auto après saisie',
+        keyword: 'Mot-clé (remarque)',
+        keywordPlaceholder: 'Filtrer seulement la remarque',
         reset: 'Réinitialiser',
         search: 'Rechercher',
         addPrefab: 'Ajouter contrôle préfab',
