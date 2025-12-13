@@ -131,13 +131,15 @@ const splitTokens = (value: string) =>
 const mapEntryToListItem = (entry: InspectionEntryDTO): InspectionListItem => {
   const status = entry.status ?? 'PENDING'
   const submittedAt = entry.submittedAt ?? entry.createdAt ?? new Date().toISOString()
+  const rawRoad = (entry as any).road as { slug?: string; name?: string } | undefined
+  const rawPhase = (entry as any).phase as { name?: string } | undefined
   return {
     id: entry.id,
     roadId: entry.roadId,
-    roadName: entry.roadName ?? entry.road?.name ?? '',
-    roadSlug: entry.roadSlug ?? entry.road?.slug ?? '',
+    roadName: entry.roadName ?? rawRoad?.name ?? '',
+    roadSlug: entry.roadSlug ?? rawRoad?.slug ?? '',
     phaseId: entry.phaseId,
-    phaseName: entry.phaseName ?? entry.phase?.name ?? '',
+    phaseName: entry.phaseName ?? rawPhase?.name ?? '',
     submissionId: entry.submissionId ?? null,
     submissionCode: entry.submissionCode ?? undefined,
     side: entry.side,
@@ -214,6 +216,11 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
   const [phaseDefinitionId, setPhaseDefinitionId] = useState<number | ''>('')
   const [status, setStatus] = useState<InspectionStatus[]>([])
   const [side, setSide] = useState('')
+  const [layerFilters, setLayerFilters] = useState<string[]>([])
+  const layerFilterValues = useMemo(
+    () => canonicalizeProgressList('layer', layerFilters),
+    [layerFilters],
+  )
   const [types, setTypes] = useState<string[]>([])
   const [check, setCheck] = useState('')
   const [keyword, setKeyword] = useState('')
@@ -221,6 +228,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
   const [checkOptionsError, setCheckOptionsError] = useState<string | null>(null)
   const [checkOptionsLoading, setCheckOptionsLoading] = useState(false)
   const [typeOpen, setTypeOpen] = useState(false)
+  const [layerOpen, setLayerOpen] = useState(false)
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [sortField, setSortField] = useState<SortField>('updatedAt')
@@ -235,8 +243,8 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
   const [selectedIds, setSelectedIds] = useState<number[]>([])
   const [bulkError, setBulkError] = useState<string | null>(null)
   const [bulkEditOpen, setBulkEditOpen] = useState(false)
-const [bulkEditPending, setBulkEditPending] = useState(false)
-const [bulkEditError, setBulkEditError] = useState<string | null>(null)
+  const [bulkEditPending, setBulkEditPending] = useState(false)
+  const [bulkEditError, setBulkEditError] = useState<string | null>(null)
   const [bulkEditForm, setBulkEditForm] = useState<EditFormState>({
     phaseId: '',
     side: '',
@@ -281,6 +289,7 @@ const [bulkEditError, setBulkEditError] = useState<string | null>(null)
   const [showColumnSelector, setShowColumnSelector] = useState(false)
   const columnSelectorRef = useRef<HTMLDivElement | null>(null)
   const typeSelectorRef = useRef<HTMLDivElement | null>(null)
+  const layerSelectorRef = useRef<HTMLDivElement | null>(null)
 
   const persistVisibleColumns = (next: ColumnKey[]) => {
     if (typeof window !== 'undefined') {
@@ -371,6 +380,23 @@ const [bulkEditError, setBulkEditError] = useState<string | null>(null)
     }
   }, [copy.errors.loadFailed])
 
+  const layerOptions = useMemo(() => {
+    const set = new Set<string>()
+    roads.forEach((road) => {
+      ;(road.phases ?? []).forEach((phase) => {
+        ;(phase.resolvedLayers ?? []).forEach((layer) => {
+          if (layer) set.add(layer)
+        })
+      })
+    })
+    items.forEach((item) => {
+      ;(item.layers ?? []).forEach((layer) => {
+        if (layer) set.add(layer)
+      })
+    })
+    return Array.from(set)
+  }, [items, roads])
+
   const editingPhases = useMemo(() => {
     if (!editing) return []
     const found = roads.find((road) => road.slug === editing.roadSlug)
@@ -402,6 +428,7 @@ const [bulkEditError, setBulkEditError] = useState<string | null>(null)
         phaseDefinitionId: phaseDefinitionId || undefined,
         status: status.length ? status : undefined,
         side: side || undefined,
+        layerName: layerFilterValues.length ? layerFilterValues : undefined,
         type: types.length ? types : undefined,
         checkName: check || undefined,
         keyword: keyword || undefined,
@@ -445,6 +472,7 @@ const [bulkEditError, setBulkEditError] = useState<string | null>(null)
     phaseDefinitionId,
     status,
     side,
+    layerFilterValues,
     types,
     check,
     keyword,
@@ -487,6 +515,9 @@ const [bulkEditError, setBulkEditError] = useState<string | null>(null)
       }
       if (typeSelectorRef.current && !typeSelectorRef.current.contains(event.target as Node)) {
         setTypeOpen(false)
+      }
+      if (layerSelectorRef.current && !layerSelectorRef.current.contains(event.target as Node)) {
+        setLayerOpen(false)
       }
     }
     document.addEventListener('mousedown', handleClickOutside)
@@ -574,6 +605,7 @@ const [bulkEditError, setBulkEditError] = useState<string | null>(null)
     setPhaseDefinitionId('')
     setStatus([])
     setSide('')
+    setLayerFilters([])
     setTypes([])
     setCheck('')
     setKeyword('')
@@ -954,6 +986,76 @@ const [bulkEditError, setBulkEditError] = useState<string | null>(null)
               <option value="RIGHT">{copy.filters.sideRight}</option>
               <option value="BOTH">{copy.filters.sideBoth}</option>
             </select>
+          </label>
+          <label className="flex flex-col gap-1 text-xs text-slate-200">
+            {copy.columns.layers}
+            <div className="relative" ref={layerSelectorRef}>
+              <button
+                type="button"
+                onClick={() => setLayerOpen((prev) => !prev)}
+                className="flex w-full items-center justify-between rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-left text-sm text-slate-50 shadow-inner shadow-slate-900/30 focus:border-emerald-300 focus:outline-none"
+              >
+                <span className="truncate">
+                  {layerFilters.length === 0
+                    ? copy.filters.all
+                    : formatProgressCopy(copy.typePicker.selected, { count: layerFilters.length })}
+                </span>
+                <span className="text-xs text-slate-300">⌕</span>
+              </button>
+              {layerOpen ? (
+                <div className="absolute z-10 mt-2 w-full rounded-xl border border-white/15 bg-slate-900/95 p-3 text-xs text-slate-100 shadow-lg shadow-slate-900/40 backdrop-blur">
+                  <div className="flex items-center justify-between border-b border-white/10 pb-2 text-[11px] text-slate-300">
+                    <span>
+                      {formatProgressCopy(copy.typePicker.summary, {
+                        count: layerFilters.length ? layerFilters.length : copy.typePicker.all,
+                      })}
+                    </span>
+                    <div className="flex gap-2">
+                      <button
+                        className="text-emerald-300 hover:underline"
+                        onClick={() => {
+                          setLayerFilters(layerOptions)
+                          setPage(1)
+                        }}
+                      >
+                        {copy.typePicker.selectAll}
+                      </button>
+                      <button
+                        className="text-slate-400 hover:underline"
+                        onClick={() => {
+                          setLayerFilters([])
+                          setPage(1)
+                        }}
+                      >
+                        {copy.typePicker.clear}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="mt-2 max-h-48 space-y-1 overflow-y-auto">
+                    {layerOptions.map((option) => (
+                      <label
+                        key={option}
+                        className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 hover:bg-white/5"
+                      >
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 rounded border-white/30 bg-slate-900/60 accent-emerald-300"
+                          checked={layerFilters.includes(option)}
+                          onChange={() => {
+                            setLayerFilters((prev) => toggleValue(prev, option))
+                            setPage(1)
+                          }}
+                        />
+                        <span className="truncate">{localizeProgressTerm('layer', option, locale)}</span>
+                      </label>
+                    ))}
+                    {layerOptions.length === 0 ? (
+                      <p className="px-2 py-1 text-[11px] text-slate-300">{copy.filters.loading}</p>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
+            </div>
           </label>
           <label className="flex flex-col gap-1 text-xs text-slate-200">
             {copy.filters.type}

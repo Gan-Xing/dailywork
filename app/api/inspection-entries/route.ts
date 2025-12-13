@@ -16,6 +16,7 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const statusParams = searchParams.getAll('status').filter(Boolean) as InspectionStatus[]
   const typeParams = searchParams.getAll('type').filter(Boolean)
+  const layerParams = searchParams.getAll('layerName').filter(Boolean)
 
   const filter = {
     roadSlug: searchParams.get('roadSlug') ?? undefined,
@@ -25,6 +26,7 @@ export async function GET(request: Request) {
       : undefined,
     status: statusParams.length ? statusParams : undefined,
     side: (searchParams.get('side') as 'LEFT' | 'RIGHT' | 'BOTH' | null) ?? undefined,
+    layerNames: layerParams.length ? layerParams : undefined,
     types: typeParams.length ? typeParams : undefined,
     checkId: searchParams.get('checkId') ? Number(searchParams.get('checkId')) : undefined,
     checkName: searchParams.get('checkName') ?? undefined,

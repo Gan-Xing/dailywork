@@ -406,6 +406,9 @@ export const listInspectionEntries = async (filter: InspectionEntryFilter): Prom
   if (filter.side) {
     where.side = filter.side as IntervalSide
   }
+  if (filter.layerNames && filter.layerNames.length) {
+    where.layerName = { in: filter.layerNames }
+  }
   if (filter.types && filter.types.length) {
     where.types = { hasSome: filter.types }
   }

@@ -151,6 +151,7 @@ export interface InspectionEntryFilter {
   phaseDefinitionId?: number
   status?: InspectionStatus[]
   side?: IntervalSide
+  layerNames?: string[]
   types?: string[]
   checkId?: number
   checkName?: string
