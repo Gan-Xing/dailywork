@@ -5,7 +5,7 @@ import { deactivateFinanceCategory, ensureFinanceCategories, upsertFinanceCatego
 import { prisma } from '@/lib/prisma'
 
 export async function GET() {
-  if (!hasPermission('finance:view')) {
+  if (!(await hasPermission('finance:view'))) {
     return NextResponse.json({ message: '缺少财务查看权限' }, { status: 403 })
   }
   await ensureFinanceCategories()
@@ -16,7 +16,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  if (!hasPermission('finance:manage')) {
+  if (!(await hasPermission('finance:manage'))) {
     return NextResponse.json({ message: '缺少财务管理权限' }, { status: 403 })
   }
 
@@ -58,7 +58,7 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  if (!hasPermission('finance:manage')) {
+  if (!(await hasPermission('finance:manage'))) {
     return NextResponse.json({ message: '缺少财务管理权限' }, { status: 403 })
   }
   let payload: { key?: string }

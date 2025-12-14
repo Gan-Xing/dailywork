@@ -22,11 +22,15 @@ type PatchPayload = {
 }
 
 export async function POST(request: Request) {
-  const sessionUser = getSessionUser()
+  const sessionUser = await getSessionUser()
   if (!sessionUser) {
     return NextResponse.json({ message: '请先登录后再批量编辑报检' }, { status: 401 })
   }
-  if (!hasPermission('inspection:bulk-edit') || !hasPermission('inspection:create')) {
+  const [canBulkEdit, canCreate] = await Promise.all([
+    hasPermission('inspection:bulk-edit'),
+    hasPermission('inspection:create'),
+  ])
+  if (!canBulkEdit || !canCreate) {
     return NextResponse.json({ message: '缺少报检批量编辑权限' }, { status: 403 })
   }
 

@@ -4,7 +4,7 @@ import { hasPermission, getSessionUser } from '@/lib/server/authSession'
 import { createSubmission, listSubmissions } from '@/lib/server/inspectionEntryStore'
 
 export async function GET() {
-  if (!hasPermission('inspection:view')) {
+  if (!(await hasPermission('inspection:view'))) {
     return NextResponse.json({ message: '缺少报检查看权限' }, { status: 403 })
   }
   const rows = await listSubmissions()
@@ -12,11 +12,11 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const sessionUser = getSessionUser()
+  const sessionUser = await getSessionUser()
   if (!sessionUser) {
     return NextResponse.json({ message: '请先登录后再操作' }, { status: 401 })
   }
-  if (!hasPermission('inspection:create')) {
+  if (!(await hasPermission('inspection:create'))) {
     return NextResponse.json({ message: '缺少报检权限' }, { status: 403 })
   }
 

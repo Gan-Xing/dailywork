@@ -5,7 +5,7 @@ import { hasPermission } from '@/lib/server/authSession'
 import { aggregateEntriesAsListItems } from '@/lib/server/inspectionEntryStore'
 
 export async function GET(request: Request) {
-  if (!hasPermission('inspection:view')) {
+  if (!(await hasPermission('inspection:view'))) {
     return NextResponse.json({ message: '缺少报检查看权限' }, { status: 403 })
   }
   const { searchParams } = new URL(request.url)

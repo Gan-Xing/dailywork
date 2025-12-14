@@ -5,7 +5,11 @@ import { hasPermission } from '@/lib/server/authSession'
 import { isUniqueConstraintError } from '@/lib/server/roadStore'
 
 export async function GET() {
-  if (!hasPermission('road:view') && !hasPermission('road:manage')) {
+  const [canView, canManage] = await Promise.all([
+    hasPermission('road:view'),
+    hasPermission('road:manage'),
+  ])
+  if (!canView && !canManage) {
     return NextResponse.json({ message: '缺少路段查看权限' }, { status: 403 })
   }
   const roads = await listRoadSections()
@@ -13,7 +17,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  if (!hasPermission('road:manage')) {
+  if (!(await hasPermission('road:manage'))) {
     return NextResponse.json({ message: '缺少路段管理权限' }, { status: 403 })
   }
 

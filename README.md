@@ -4,7 +4,7 @@ A Next.js app for collecting daily construction reports with bilingual copy and 
 
 ## Prerequisites
 
-- Node.js 18.16 (current dev environment)
+- Node.js 18.18+ (Next.js 14 requirement; align local runtime with production)
 - A Supabase project with Postgres enabled (pooling + non-pooling URLs available)
 - Package manager: `pnpm` (use pnpm commands; npm is not used in this repo)
 
@@ -27,7 +27,9 @@ A Next.js app for collecting daily construction reports with bilingual copy and 
 
 Run the dev server:
 ```bash
-pnpm run dev
+pnpm run dev       # Turbopack (faster; default)
+# If you hit a Turbopack compatibility issue, fall back to:
+pnpm run dev:webpack
 ```
 Visit `http://localhost:3000` for the dashboard. Creating or editing a report will read/write through the `/api/reports` endpoints backed by Postgres.
 

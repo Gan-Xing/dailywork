@@ -12,15 +12,10 @@ import { getWorkflowByPhaseDefinitionId } from '@/lib/server/workflowStore'
 
 export const dynamic = 'force-dynamic'
 
-interface Params {
-  params: {
-    slug: string
-  }
-}
-
-export default async function RoadDetailPage({ params }: Params) {
-  const road = (await getRoadBySlug(params.slug)) as RoadSectionDTO | null
-  const sessionUser = getSessionUser()
+export default async function RoadDetailPage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params
+  const road = (await getRoadBySlug(slug)) as RoadSectionDTO | null
+  const sessionUser = await getSessionUser()
   const canView =
     !sessionUser || sessionUser?.permissions.includes('progress:view') || false
   const canManage = sessionUser?.permissions.includes('progress:edit') || false

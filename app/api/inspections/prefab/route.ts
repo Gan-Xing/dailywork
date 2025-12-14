@@ -5,11 +5,11 @@ import type { PrefabPhaseKey } from '@/lib/prefabInspection'
 import { createPrefabInspection } from '@/lib/server/prefabInspectionEntries'
 
 export async function POST(request: Request) {
-  const sessionUser = getSessionUser()
+  const sessionUser = await getSessionUser()
   if (!sessionUser) {
     return NextResponse.json({ message: '请先登录后再报检' }, { status: 401 })
   }
-  if (!hasPermission('inspection:create')) {
+  if (!(await hasPermission('inspection:create'))) {
     return NextResponse.json({ message: '缺少报检权限' }, { status: 403 })
   }
 

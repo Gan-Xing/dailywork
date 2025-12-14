@@ -5,7 +5,7 @@ import { parseFinanceFilters } from '@/lib/server/financeFilters'
 import { createFinanceEntry, listFinanceEntries } from '@/lib/server/financeStore'
 
 export async function GET(request: Request) {
-  if (!hasPermission('finance:view')) {
+  if (!(await hasPermission('finance:view'))) {
     return NextResponse.json({ message: '缺少财务查看权限' }, { status: 403 })
   }
   const { searchParams } = new URL(request.url)
@@ -25,7 +25,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  if (!hasPermission('finance:edit')) {
+  if (!(await hasPermission('finance:edit'))) {
     return NextResponse.json({ message: '缺少财务编辑权限' }, { status: 403 })
   }
   let payload: {
@@ -59,7 +59,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const session = getSessionUser()
+    const session = await getSessionUser()
     const entry = await createFinanceEntry(
       {
         projectId: Number(payload.projectId),

@@ -4,7 +4,7 @@ import { changePassword, getUserWithPermissions } from '@/lib/server/authStore'
 import { getSessionUser, issueSession } from '@/lib/server/authSession'
 
 export async function POST(request: Request) {
-  const sessionUser = getSessionUser()
+  const sessionUser = await getSessionUser()
   if (!sessionUser) {
     return NextResponse.json({ message: '未登录' }, { status: 401 })
   }
@@ -24,7 +24,7 @@ export async function POST(request: Request) {
     await changePassword(sessionUser.id, payload.currentPassword, payload.newPassword)
     const freshUser = await getUserWithPermissions(sessionUser.id)
     if (freshUser) {
-      issueSession(freshUser)
+      await issueSession(freshUser)
     }
     return NextResponse.json({ success: true })
   } catch (error) {

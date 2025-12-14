@@ -47,7 +47,7 @@ const parseMeasure = (value: unknown): PhaseMeasure => {
 }
 
 export async function GET() {
-  if (!hasPermission('value:view')) {
+  if (!(await hasPermission('value:view'))) {
     return respond('缺少产值查看权限', 403)
   }
   try {
@@ -77,7 +77,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  if (!hasPermission('value:create')) {
+  if (!(await hasPermission('value:create'))) {
     return respond('缺少产值新增权限', 403)
   }
 
@@ -163,7 +163,7 @@ export async function POST(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  if (!hasPermission('value:update')) {
+  if (!(await hasPermission('value:update'))) {
     return respond('缺少产值更新权限', 403)
   }
 
@@ -251,7 +251,7 @@ export async function PATCH(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  if (!hasPermission('value:delete')) {
+  if (!(await hasPermission('value:delete'))) {
     return respond('缺少产值删除权限', 403)
   }
 

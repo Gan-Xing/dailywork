@@ -9,7 +9,7 @@ import {
 } from '@/lib/server/workflowStore'
 
 export async function GET() {
-  if (!hasPermission('road:manage')) {
+  if (!(await hasPermission('road:manage'))) {
     return NextResponse.json({ message: '缺少道路管理权限' }, { status: 403 })
   }
   const workflows = await listWorkflowsWithDefaults()
@@ -17,7 +17,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  if (!hasPermission('road:manage')) {
+  if (!(await hasPermission('road:manage'))) {
     return NextResponse.json({ message: '缺少道路管理权限' }, { status: 403 })
   }
 
@@ -69,7 +69,7 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  if (!hasPermission('road:manage')) {
+  if (!(await hasPermission('road:manage'))) {
     return NextResponse.json({ message: '缺少道路管理权限' }, { status: 403 })
   }
 

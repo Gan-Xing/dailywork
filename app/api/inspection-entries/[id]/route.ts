@@ -1,19 +1,16 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, type NextRequest } from 'next/server'
 
 import type { InspectionEntryPayload } from '@/lib/progressTypes'
 import { canonicalizeProgressList } from '@/lib/i18n/progressDictionary'
 import { getSessionUser, hasPermission } from '@/lib/server/authSession'
 import { prisma } from '@/lib/prisma'
 
-interface RouteParams {
-  params: { id: string }
-}
-
-export async function GET(request: Request, { params }: RouteParams) {
-  if (!hasPermission('inspection:view')) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  if (!(await hasPermission('inspection:view'))) {
     return NextResponse.json({ message: '缺少报检查看权限' }, { status: 403 })
   }
-  const id = Number(params.id)
+  const { id: idParam } = await params
+  const id = Number(idParam)
   if (!Number.isFinite(id) || id <= 0) return NextResponse.json({ message: '报检 ID 无效' }, { status: 400 })
   const row = await prisma.inspectionEntry.findUnique({
     where: { id },
@@ -23,16 +20,17 @@ export async function GET(request: Request, { params }: RouteParams) {
   return NextResponse.json({ entry: row })
 }
 
-export async function PUT(request: Request, { params }: RouteParams) {
-  const sessionUser = getSessionUser()
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id: idParam } = await params
+  const sessionUser = await getSessionUser()
   if (!sessionUser) {
     return NextResponse.json({ message: '请先登录后再编辑报检' }, { status: 401 })
   }
-  if (!hasPermission('inspection:create')) {
+  if (!(await hasPermission('inspection:create'))) {
     return NextResponse.json({ message: '缺少报检编辑权限' }, { status: 403 })
   }
 
-  const id = Number(params.id)
+  const id = Number(idParam)
   if (!Number.isFinite(id) || id <= 0) {
     return NextResponse.json({ message: '报检 ID 无效' }, { status: 400 })
   }
@@ -84,15 +82,16 @@ export async function PUT(request: Request, { params }: RouteParams) {
   }
 }
 
-export async function DELETE(request: Request, { params }: RouteParams) {
-  const sessionUser = getSessionUser()
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id: idParam } = await params
+  const sessionUser = await getSessionUser()
   if (!sessionUser) {
     return NextResponse.json({ message: '请先登录后再删除报检' }, { status: 401 })
   }
-  if (!hasPermission('inspection:create')) {
+  if (!(await hasPermission('inspection:create'))) {
     return NextResponse.json({ message: '缺少报检删除权限' }, { status: 403 })
   }
-  const id = Number(params.id)
+  const id = Number(idParam)
   if (!Number.isFinite(id) || id <= 0) {
     return NextResponse.json({ message: '报检 ID 无效' }, { status: 400 })
   }

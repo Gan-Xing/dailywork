@@ -18,7 +18,7 @@ export async function POST(request: Request) {
   try {
     const user = await login(payload.username, payload.password)
     const response = NextResponse.json({ user })
-    issueSession(user)
+    await issueSession(user)
     return response
   } catch (error) {
     return NextResponse.json({ message: (error as Error).message }, { status: 401 })

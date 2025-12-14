@@ -1,17 +1,14 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, type NextRequest } from 'next/server'
 
 import { getSessionUser, hasPermission } from '@/lib/server/authSession'
 import { softDeleteFinanceEntry, updateFinanceEntry } from '@/lib/server/financeStore'
 
-interface RouteParams {
-  params: { id: string }
-}
-
-export async function PUT(request: Request, { params }: RouteParams) {
-  if (!hasPermission('finance:edit')) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id: idParam } = await params
+  if (!(await hasPermission('finance:edit'))) {
     return NextResponse.json({ message: '缺少财务编辑权限' }, { status: 403 })
   }
-  const id = Number(params.id)
+  const id = Number(idParam)
   if (!Number.isFinite(id)) {
     return NextResponse.json({ message: '无效的 ID' }, { status: 400 })
   }
@@ -35,7 +32,7 @@ export async function PUT(request: Request, { params }: RouteParams) {
   }
 
   try {
-    const session = getSessionUser()
+    const session = await getSessionUser()
     const entry = await updateFinanceEntry(id, payload, session?.id)
     return NextResponse.json({ entry })
   } catch (error) {
@@ -43,16 +40,17 @@ export async function PUT(request: Request, { params }: RouteParams) {
   }
 }
 
-export async function DELETE(_request: Request, { params }: RouteParams) {
-  if (!hasPermission('finance:edit')) {
+export async function DELETE(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id: idParam } = await params
+  if (!(await hasPermission('finance:edit'))) {
     return NextResponse.json({ message: '缺少财务编辑权限' }, { status: 403 })
   }
-  const id = Number(params.id)
+  const id = Number(idParam)
   if (!Number.isFinite(id)) {
     return NextResponse.json({ message: '无效的 ID' }, { status: 400 })
   }
   try {
-    const session = getSessionUser()
+    const session = await getSessionUser()
     await softDeleteFinanceEntry(id, session?.id)
     return NextResponse.json({ ok: true })
   } catch (error) {

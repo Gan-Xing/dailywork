@@ -1,27 +1,24 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, type NextRequest } from 'next/server'
 
 import { hasPermission } from '@/lib/server/authSession'
 import { deletePhase, updatePhase } from '@/lib/server/progressStore'
 import { getRoadBySlug } from '@/lib/server/roadStore'
 
-interface RouteParams {
-  params: {
-    slug: string
-    id: string
-  }
-}
-
-export async function PUT(request: Request, { params }: RouteParams) {
-  if (!hasPermission('progress:edit')) {
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ slug: string; id: string }> },
+) {
+  const { slug, id: idParam } = await params
+  if (!(await hasPermission('progress:edit'))) {
     return NextResponse.json({ message: '缺少编辑进度权限' }, { status: 403 })
   }
 
-  const phaseId = Number(params.id)
+  const phaseId = Number(idParam)
   if (!Number.isInteger(phaseId) || phaseId <= 0) {
     return NextResponse.json({ message: '无效的分项 ID' }, { status: 400 })
   }
 
-  const road = await getRoadBySlug(params.slug)
+  const road = await getRoadBySlug(slug)
   if (!road) {
     return NextResponse.json({ message: '路段不存在' }, { status: 404 })
   }
@@ -86,17 +83,21 @@ export async function PUT(request: Request, { params }: RouteParams) {
   }
 }
 
-export async function DELETE(_request: Request, { params }: RouteParams) {
-  if (!hasPermission('progress:edit')) {
+export async function DELETE(
+  _request: NextRequest,
+  { params }: { params: Promise<{ slug: string; id: string }> },
+) {
+  const { slug, id: idParam } = await params
+  if (!(await hasPermission('progress:edit'))) {
     return NextResponse.json({ message: '缺少编辑进度权限' }, { status: 403 })
   }
 
-  const phaseId = Number(params.id)
+  const phaseId = Number(idParam)
   if (!Number.isInteger(phaseId) || phaseId <= 0) {
     return NextResponse.json({ message: '无效的分项 ID' }, { status: 400 })
   }
 
-  const road = await getRoadBySlug(params.slug)
+  const road = await getRoadBySlug(slug)
   if (!road) {
     return NextResponse.json({ message: '路段不存在' }, { status: 404 })
   }

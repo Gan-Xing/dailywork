@@ -4,7 +4,7 @@ import { hasPermission } from '@/lib/server/authSession'
 import { listFinanceMetadata } from '@/lib/server/financeStore'
 
 export async function GET() {
-  if (!hasPermission('finance:view')) {
+  if (!(await hasPermission('finance:view'))) {
     return NextResponse.json({ message: '缺少财务查看权限' }, { status: 403 })
   }
 

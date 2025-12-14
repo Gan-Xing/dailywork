@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { getSessionUser } from '@/lib/server/authSession'
 
 export async function GET() {
-  const user = getSessionUser()
+  const user = await getSessionUser()
   if (!user) {
     return NextResponse.json({ message: '请先登录后再查看路线' }, { status: 401 })
   }
@@ -24,7 +24,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const user = getSessionUser()
+  const user = await getSessionUser()
   if (!user) {
     return NextResponse.json({ message: '请先登录后再记录想法' }, { status: 401 })
   }

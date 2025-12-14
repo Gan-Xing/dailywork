@@ -1,5 +1,5 @@
 import { Prisma } from '@prisma/client'
-import { NextResponse } from 'next/server'
+import { NextResponse, type NextRequest } from 'next/server'
 
 import { prisma } from '@/lib/prisma'
 import { getSessionUser } from '@/lib/server/authSession'
@@ -7,10 +7,11 @@ import { getSessionUser } from '@/lib/server/authSession'
 const allowedStatuses = new Set(['PENDING', 'DONE'])
 
 export async function PATCH(
-  request: Request,
-  { params }: { params: { id: string } }
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const user = getSessionUser()
+  const { id: idParam } = await params
+  const user = await getSessionUser()
   if (!user) {
     return NextResponse.json({ message: '请先登录后再更新路线' }, { status: 401 })
   }
@@ -18,7 +19,7 @@ export async function PATCH(
     return NextResponse.json({ message: '缺少开发路线编辑权限' }, { status: 403 })
   }
 
-  const id = Number(params.id)
+  const id = Number(idParam)
   if (!Number.isInteger(id)) {
     return NextResponse.json({ message: '无效的路线 ID' }, { status: 400 })
   }
@@ -131,10 +132,11 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _request: Request,
-  { params }: { params: { id: string } }
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const user = getSessionUser()
+  const { id: idParam } = await params
+  const user = await getSessionUser()
   if (!user) {
     return NextResponse.json({ message: '请先登录后再删除路线' }, { status: 401 })
   }
@@ -142,7 +144,7 @@ export async function DELETE(
     return NextResponse.json({ message: '缺少开发路线删除权限' }, { status: 403 })
   }
 
-  const id = Number(params.id)
+  const id = Number(idParam)
   if (!Number.isInteger(id)) {
     return NextResponse.json({ message: '无效的路线 ID' }, { status: 400 })
   }

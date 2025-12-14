@@ -7,7 +7,7 @@ import { listWorkflowsWithDefaults } from '@/lib/server/workflowStore'
 export const dynamic = 'force-dynamic'
 
 export default async function WorkflowPage() {
-  const sessionUser = getSessionUser()
+  const sessionUser = await getSessionUser()
   const canManage = sessionUser?.permissions.includes('road:manage') ?? false
 
   if (!canManage) {

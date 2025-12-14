@@ -1,3 +1,4 @@
+import { unstable_noStore as noStore } from 'next/cache'
 import { cookies } from 'next/headers'
 import { createHmac } from 'crypto'
 
@@ -36,7 +37,8 @@ const decode = (token: string): SessionUser | null => {
   }
 }
 
-export const issueSession = (user: AuthUser) => {
+export const issueSession = async (user: AuthUser) => {
+  noStore()
   const session: SessionUser = {
     id: user.id,
     username: user.username,
@@ -45,7 +47,7 @@ export const issueSession = (user: AuthUser) => {
     issuedAt: Date.now(),
   }
   const token = encode(session)
-  const jar = cookies()
+  const jar = await cookies()
   jar.set(SESSION_COOKIE, token, {
     httpOnly: true,
     sameSite: 'lax',
@@ -55,19 +57,23 @@ export const issueSession = (user: AuthUser) => {
   return session
 }
 
-export const clearSession = () => {
-  const jar = cookies()
+export const clearSession = async () => {
+  noStore()
+  const jar = await cookies()
   jar.delete(SESSION_COOKIE)
 }
 
-export const getSessionUser = (): SessionUser | null => {
-  const token = cookies().get(SESSION_COOKIE)?.value
+export const getSessionUser = async (): Promise<SessionUser | null> => {
+  noStore()
+  const jar = await cookies()
+  const token = jar.get(SESSION_COOKIE)?.value
   if (!token) return null
   return decode(token)
 }
 
-export const hasPermission = (permission: string) => {
-  const user = getSessionUser()
+export const hasPermission = async (permission: string) => {
+  noStore()
+  const user = await getSessionUser()
   if (!user) return false
   return user.permissions.includes(permission)
 }

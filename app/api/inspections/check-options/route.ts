@@ -4,7 +4,7 @@ import { hasPermission } from '@/lib/server/authSession'
 import { listCheckDefinitions } from '@/lib/server/progressStore'
 
 export async function GET() {
-  if (!hasPermission('inspection:view')) {
+  if (!(await hasPermission('inspection:view'))) {
     return NextResponse.json({ message: '缺少报检查看权限' }, { status: 403 })
   }
 

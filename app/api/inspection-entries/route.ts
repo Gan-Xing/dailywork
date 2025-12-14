@@ -9,7 +9,7 @@ import {
 } from '@/lib/server/inspectionEntryStore'
 
 export async function GET(request: Request) {
-  if (!hasPermission('inspection:view')) {
+  if (!(await hasPermission('inspection:view'))) {
     return NextResponse.json({ message: '缺少报检查看权限' }, { status: 403 })
   }
 
@@ -57,11 +57,11 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const sessionUser = getSessionUser()
+  const sessionUser = await getSessionUser()
   if (!sessionUser) {
     return NextResponse.json({ message: '请先登录后再报检' }, { status: 401 })
   }
-  if (!hasPermission('inspection:create')) {
+  if (!(await hasPermission('inspection:create'))) {
     return NextResponse.json({ message: '缺少报检权限' }, { status: 403 })
   }
 

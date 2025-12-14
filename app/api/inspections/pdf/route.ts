@@ -5,7 +5,6 @@ import { renderInspectionReportHtml } from '@/lib/templates/inspectionReport'
 import { getSessionUser, hasPermission } from '@/lib/server/authSession'
 import { aggregateEntriesAsListItems } from '@/lib/server/inspectionEntryStore'
 
-export const runtime = 'nodejs'
 export const maxDuration = 60
 
 const MAX_EXPORT_COUNT = 30
@@ -68,11 +67,11 @@ export async function POST(request: Request) {
     }
   }
 
-  const sessionUser = getSessionUser()
+  const sessionUser = await getSessionUser()
   if (!sessionUser) {
     return NextResponse.json({ message: '请先登录后再导出报检 PDF' }, { status: 401 })
   }
-  if (!hasPermission('inspection:view')) {
+  if (!(await hasPermission('inspection:view'))) {
     return NextResponse.json({ message: '缺少报检查看权限' }, { status: 403 })
   }
 

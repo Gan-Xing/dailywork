@@ -3,18 +3,20 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "prisma generate && next build",
+    "dev": "next dev --turbo",
+    "dev:webpack": "next dev",
+    "dev:turbo": "next dev --turbo",
+    "build": "prisma generate && next build --webpack",
     "start": "next start -p 3001",
     "lint": "next lint",
     "test:deepseek": "tsx tests/deepseekSmoke.ts"
   },
   "dependencies": {
     "@antv/g2plot": "^2.4.35",
-    "next": "13.5.4",
+    "next": "16.1.0-canary.20",
     "puppeteer": "^24.32.1",
-    "react": "^18",
-    "react-dom": "^18",
+    "react": "19.3.0-canary-b061b597-20251212",
+    "react-dom": "19.3.0-canary-b061b597-20251212",
     "server-only": "^0.0.1"
   },
   "devDependencies": {
@@ -22,10 +24,11 @@
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
+    "@typescript-eslint/parser": "^8.49.0",
     "autoprefixer": "^10",
     "dotenv": "^17.2.3",
     "eslint": "^8",
-    "eslint-config-next": "13.5.4",
+    "eslint-config-next": "16.1.0-canary.20",
     "postcss": "^8",
     "prisma": "^6.19.0",
     "tailwindcss": "^3",

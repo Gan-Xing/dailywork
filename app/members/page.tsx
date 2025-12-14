@@ -19,6 +19,8 @@ import {
 import { type SessionUser } from '@/lib/server/authSession'
 import { usePreferredLocale } from '@/lib/usePreferredLocale'
 
+export const dynamic = 'force-dynamic'
+
 type Member = {
   id: number
   name: string | null

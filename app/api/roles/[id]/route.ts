@@ -1,14 +1,15 @@
 import { Prisma } from '@prisma/client'
-import { NextResponse } from 'next/server'
+import { NextResponse, type NextRequest } from 'next/server'
 
 import { hasPermission } from '@/lib/server/authSession'
 import { prisma } from '@/lib/prisma'
 
-export async function PUT(request: Request, { params }: { params: { id: string } }) {
-  if (!hasPermission('role:manage')) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
+  if (!(await hasPermission('role:manage'))) {
     return NextResponse.json({ error: '缺少角色管理权限' }, { status: 403 })
   }
-  const roleId = Number(params.id)
+  const roleId = Number(id)
   if (!Number.isInteger(roleId) || roleId <= 0) {
     return NextResponse.json({ error: '无效的角色 ID' }, { status: 400 })
   }
@@ -74,11 +75,12 @@ export async function PUT(request: Request, { params }: { params: { id: string }
   }
 }
 
-export async function DELETE(_request: Request, { params }: { params: { id: string } }) {
-  if (!hasPermission('role:manage')) {
+export async function DELETE(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
+  if (!(await hasPermission('role:manage'))) {
     return NextResponse.json({ error: '缺少角色管理权限' }, { status: 403 })
   }
-  const roleId = Number(params.id)
+  const roleId = Number(id)
   if (!Number.isInteger(roleId) || roleId <= 0) {
     return NextResponse.json({ error: '无效的角色 ID' }, { status: 400 })
   }

@@ -8,6 +8,8 @@ import type { DailyReport } from '@/lib/reportState'
 import { getReportPreviewCopy } from '@/lib/i18n/reportPreview'
 import { DATE_KEY_REGEX, normalizeReportForDate } from '@/lib/reportUtils'
 
+export const dynamic = 'force-dynamic'
+
 const STORAGE_PREFIX = 'report-preview-'
 
 export default function ReportPreviewPage() {

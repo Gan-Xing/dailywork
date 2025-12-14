@@ -48,6 +48,8 @@ import {
 	yearOptions
 } from '@/lib/i18n/reportEditor';
 
+export const dynamic = 'force-dynamic';
+
 type NarrativeGroup = 'observations' | 'works' | 'additional';
 
 type ObservationSectionRef = {

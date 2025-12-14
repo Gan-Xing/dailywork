@@ -1,17 +1,14 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, type NextRequest } from 'next/server'
 
 import { hasPermission } from '@/lib/server/authSession'
 import { prisma } from '@/lib/prisma'
 
-interface RouteParams {
-  params: { id: string }
-}
-
-export async function PUT(request: Request, { params }: RouteParams) {
-  if (!hasPermission('finance:manage')) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id: idParam } = await params
+  if (!(await hasPermission('finance:manage'))) {
     return NextResponse.json({ message: '缺少财务管理权限' }, { status: 403 })
   }
-  const id = Number(params.id)
+  const id = Number(idParam)
   if (!Number.isFinite(id)) {
     return NextResponse.json({ message: '无效的单位 ID' }, { status: 400 })
   }
@@ -43,11 +40,12 @@ export async function PUT(request: Request, { params }: RouteParams) {
   }
 }
 
-export async function DELETE(_request: Request, { params }: RouteParams) {
-  if (!hasPermission('finance:manage')) {
+export async function DELETE(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id: idParam } = await params
+  if (!(await hasPermission('finance:manage'))) {
     return NextResponse.json({ message: '缺少财务管理权限' }, { status: 403 })
   }
-  const id = Number(params.id)
+  const id = Number(idParam)
   if (!Number.isFinite(id)) {
     return NextResponse.json({ message: '无效的单位 ID' }, { status: 400 })
   }

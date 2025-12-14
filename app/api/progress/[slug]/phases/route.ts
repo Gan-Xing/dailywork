@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, type NextRequest } from 'next/server'
 
 import { hasPermission } from '@/lib/server/authSession'
 import {
@@ -10,17 +10,12 @@ import {
 } from '@/lib/server/progressStore'
 import { getRoadBySlug } from '@/lib/server/roadStore'
 
-interface RouteParams {
-  params: {
-    slug: string
-  }
-}
-
-export async function GET(_request: Request, { params }: RouteParams) {
-  if (!hasPermission('progress:view')) {
+export async function GET(_request: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params
+  if (!(await hasPermission('progress:view'))) {
     return NextResponse.json({ message: '缺少进度查看权限' }, { status: 403 })
   }
-  const road = await getRoadBySlug(params.slug)
+  const road = await getRoadBySlug(slug)
   if (!road) {
     return NextResponse.json({ message: '路段不存在' }, { status: 404 })
   }
@@ -33,11 +28,12 @@ export async function GET(_request: Request, { params }: RouteParams) {
   return NextResponse.json({ road, phases, definitions, layerOptions, checkOptions })
 }
 
-export async function POST(request: Request, { params }: RouteParams) {
-  if (!hasPermission('progress:edit')) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params
+  if (!(await hasPermission('progress:edit'))) {
     return NextResponse.json({ message: '缺少编辑进度权限' }, { status: 403 })
   }
-  const road = await getRoadBySlug(params.slug)
+  const road = await getRoadBySlug(slug)
   if (!road) {
     return NextResponse.json({ message: '路段不存在' }, { status: 404 })
   }

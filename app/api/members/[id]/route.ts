@@ -1,18 +1,17 @@
 import { Prisma } from '@prisma/client'
-import { NextResponse } from 'next/server'
+import { NextResponse, type NextRequest } from 'next/server'
 
 import { hashPassword } from '@/lib/auth/password'
 import { hasPermission } from '@/lib/server/authSession'
 import { prisma } from '@/lib/prisma'
 
-export const dynamic = 'force-dynamic'
-
-export async function PUT(request: Request, { params }: { params: { id: string } }) {
-  const userId = Number(params.id)
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
+  const userId = Number(id)
   if (!userId) {
     return NextResponse.json({ error: '缺少成员 ID' }, { status: 400 })
   }
-  if (!hasPermission('member:edit')) {
+  if (!(await hasPermission('member:edit'))) {
     return NextResponse.json({ error: '缺少成员编辑权限' }, { status: 403 })
   }
   const body = await request.json()
@@ -104,12 +103,13 @@ export async function PUT(request: Request, { params }: { params: { id: string }
   }
 }
 
-export async function DELETE(_: Request, { params }: { params: { id: string } }) {
-  const userId = Number(params.id)
+export async function DELETE(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
+  const userId = Number(id)
   if (!userId) {
     return NextResponse.json({ error: '缺少成员 ID' }, { status: 400 })
   }
-  if (!hasPermission('member:manage')) {
+  if (!(await hasPermission('member:manage'))) {
     return NextResponse.json({ error: '缺少成员管理权限' }, { status: 403 })
   }
 

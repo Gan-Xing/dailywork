@@ -8,7 +8,7 @@ import { listRoadSectionsWithPhases } from '@/lib/server/roadStore'
 export const dynamic = 'force-dynamic'
 
 export default async function InspectionListPage() {
-  const sessionUser = getSessionUser()
+  const sessionUser = await getSessionUser()
   const canView = sessionUser?.permissions.includes('inspection:view') ?? false
   const canBulkEdit = sessionUser?.permissions.includes('inspection:bulk-edit') ?? false
 

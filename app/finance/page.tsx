@@ -6,6 +6,8 @@ import Link from 'next/link'
 
 import { AccessDenied } from '@/components/AccessDenied'
 
+export const dynamic = 'force-dynamic'
+
 type SessionUser = {
   id: number
   username: string

@@ -15,6 +15,8 @@ import {
 } from '@/lib/i18n/reportsLanding'
 import { usePreferredLocale } from '@/lib/usePreferredLocale'
 
+export const dynamic = 'force-dynamic'
+
 interface ReportSummary {
   date: string
   createdAt: string

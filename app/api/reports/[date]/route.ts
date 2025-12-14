@@ -1,23 +1,21 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, type NextRequest } from 'next/server'
 
 import type { DailyReport } from '@/lib/reportState'
 import { hasPermission } from '@/lib/server/authSession'
 import { prepareReportForDate, saveReportForDate } from '@/lib/server/reportStore'
 import { DATE_KEY_REGEX } from '@/lib/reportUtils'
 
-interface RouteParams {
-  params: {
-    date: string
-  }
-}
-
 const invalidDateResponse = NextResponse.json({ message: 'Invalid date' }, { status: 400 })
 
-export async function GET(_request: Request, { params }: RouteParams) {
-  if (!hasPermission('report:view') && !hasPermission('report:edit')) {
+export async function GET(_request: NextRequest, { params }: { params: Promise<{ date: string }> }) {
+  const [canView, canEdit] = await Promise.all([
+    hasPermission('report:view'),
+    hasPermission('report:edit'),
+  ])
+  if (!canView && !canEdit) {
     return NextResponse.json({ message: '缺少日报查看权限' }, { status: 403 })
   }
-  const dateKey = params.date
+  const { date: dateKey } = await params
   if (!DATE_KEY_REGEX.test(dateKey)) {
     return invalidDateResponse
   }
@@ -29,11 +27,11 @@ export async function GET(_request: Request, { params }: RouteParams) {
   }
 }
 
-export async function PUT(request: Request, { params }: RouteParams) {
-  if (!hasPermission('report:edit')) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ date: string }> }) {
+  if (!(await hasPermission('report:edit'))) {
     return NextResponse.json({ message: '缺少日报编辑权限' }, { status: 403 })
   }
-  const dateKey = params.date
+  const { date: dateKey } = await params
   if (!DATE_KEY_REGEX.test(dateKey)) {
     return invalidDateResponse
   }
