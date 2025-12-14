@@ -415,7 +415,16 @@ type InspectionBoardCopy = {
   bulk: {
     selectedCount: string
     missingSelection: string
+    delete: string
     edit: string
+  }
+  bulkDelete: {
+    badge: string
+    title: string
+    hint: string
+    cancel: string
+    confirm: string
+    confirming: string
   }
   bulkEdit: {
     badge: string
@@ -537,6 +546,7 @@ type InspectionBoardCopy = {
     createFailed: string
     updateFailed: string
     deleteFailed: string
+    bulkDeleteFailed: string
     bulkFailed: string
     exportFailed: string
   }
