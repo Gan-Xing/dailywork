@@ -42,6 +42,7 @@ export function PointProgressWave({ percent, size = 56, className }: PointProgre
   return (
     <LiquidGauge
       className={className}
+      style={{ width: size, height: size, display: 'inline-block' }}
       width={size}
       height={size}
       value={clamped}
