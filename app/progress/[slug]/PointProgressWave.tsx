@@ -64,8 +64,17 @@ export function PointProgressWave({ percent, size = 56, className }: PointProgre
         strokeWidth: 2,
       }}
       circleStyle={{
-        fill: '#0ea5e910',
+        fill: '#0ea5e930',
+        stroke: '#0ea5e9',
+        strokeWidth: 1,
+      }}
+      textStyle={{
+        fill: '#f8fafc',
+        fontSize: `${Math.max(10, Math.round(size * 0.24))}px`,
+        fontWeight: 700,
       }}
     />
   )
 }
+
+export default PointProgressWave
