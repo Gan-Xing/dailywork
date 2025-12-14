@@ -12,11 +12,12 @@
     "test:deepseek": "tsx tests/deepseekSmoke.ts"
   },
   "dependencies": {
-    "@antv/g2plot": "^2.4.35",
+    "d3-scale": "^4.0.2",
     "next": "16.1.0-canary.20",
     "puppeteer": "^24.32.1",
     "react": "19.3.0-canary-b061b597-20251212",
     "react-dom": "19.3.0-canary-b061b597-20251212",
+    "react-liquid-gauge": "^1.2.4",
     "server-only": "^0.0.1"
   },
   "devDependencies": {

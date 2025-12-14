@@ -1,9 +1,6 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
-
-import type { LiquidOptions } from '@antv/g2plot'
-import { Liquid } from '@antv/g2plot'
+import LiquidGauge, { type GradientStop } from 'react-liquid-gauge'
 
 export interface PointProgressWaveProps {
   percent: number
@@ -18,52 +15,57 @@ const clampPercent = (value: number) => {
   return value
 }
 
+const gradientStops: GradientStop[] = [
+  {
+    key: '0%',
+    stopColor: '#34d399',
+    stopOpacity: 1,
+    offset: '0%',
+  },
+  {
+    key: '50%',
+    stopColor: '#22d3ee',
+    stopOpacity: 0.9,
+    offset: '50%',
+  },
+  {
+    key: '100%',
+    stopColor: '#0ea5e9',
+    stopOpacity: 0.85,
+    offset: '100%',
+  },
+]
+
 export function PointProgressWave({ percent, size = 56, className }: PointProgressWaveProps) {
-  const containerRef = useRef<HTMLDivElement | null>(null)
+  const clamped = clampPercent(percent)
 
-  useEffect(() => {
-    const node = containerRef.current
-    if (!node) return undefined
-
-    const clamped = clampPercent(percent)
-    const options: LiquidOptions = {
-      percent: clamped / 100,
-      width: size,
-      height: size,
-      outline: { border: 2, distance: 2 },
-      wave: { length: 56, count: 4 }, // 再加密波峰、缩短波长，波动更明显
-      liquidStyle: {
-        fill: 'l(90) 0:#34d399 1:#22d3ee',
-      },
-      statistic: {
-        title: false,
-        content: {
-          formatter: () => `${clamped.toFixed(1)}%`,
-          style: {
-            fontSize: '12px',
-            fontWeight: 700,
-            fill: '#f8fafc', // 高对比度文字，适配深色背景
-          },
-        },
-      },
-      theme: {
-        styleSheet: {
-          brandColor: '#22d3ee',
-        },
-      },
-      animation: {
-        appear: { animation: 'wave-in', duration: 1200 },
-        update: { animation: 'wave-in', duration: 1200 },
-      },
-    }
-
-    const chart = new Liquid(node, options)
-    chart.render()
-
-    return () => {
-      chart.destroy()
-    }
-  }, [percent, size])
-
-  return <div ref={containerRef} className={className} />
+  return (
+    <LiquidGauge
+      className={className}
+      width={size}
+      height={size}
+      value={clamped}
+      minValue={0}
+      maxValue={100}
+      textRenderer={() => `${clamped.toFixed(1)}%`}
+      waveFrequency={2.4}
+      waveAmplitude={3}
+      riseAnimation
+      waveAnimation
+      gradientStops={gradientStops}
+      waveTextStyle={{
+        fill: '#f8fafc',
+        fontSize: `${Math.max(10, Math.round(size * 0.24))}px`,
+        fontWeight: 700,
+      }}
+      outerCircleStyle={{
+        fill: 'transparent',
+        stroke: '#0ea5e9',
+        strokeWidth: 2,
+      }}
+      circleStyle={{
+        fill: '#0ea5e910',
+      }}
+    />
+  )
 }
