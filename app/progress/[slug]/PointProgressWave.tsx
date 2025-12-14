@@ -50,6 +50,7 @@ export function PointProgressWave({ percent, size = 56, className }: PointProgre
         placeItems: 'center',
         overflow: 'hidden',
         margin: '0 auto',
+        transform: 'translateY(1px)',
       }}
       width={innerSize}
       height={innerSize}
