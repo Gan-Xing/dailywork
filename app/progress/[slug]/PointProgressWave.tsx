@@ -38,13 +38,21 @@ const gradientStops: GradientStop[] = [
 
 export function PointProgressWave({ percent, size = 56, className }: PointProgressWaveProps) {
   const clamped = clampPercent(percent)
+  const innerSize = Math.max(0, size - 2)
 
   return (
     <LiquidGauge
       className={className}
-      style={{ width: size, height: size, display: 'block', margin: '0 auto' }}
-      width={size}
-      height={size}
+      style={{
+        width: size,
+        height: size,
+        display: 'grid',
+        placeItems: 'center',
+        overflow: 'hidden',
+        margin: '0 auto',
+      }}
+      width={innerSize}
+      height={innerSize}
       value={clamped}
       minValue={0}
       maxValue={100}
