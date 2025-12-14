@@ -959,7 +959,16 @@ const progressCopy: Record<Locale, ProgressCopy> = {
       bulk: {
         selectedCount: '已选 {count} 条',
         missingSelection: '请选择至少一条报检记录',
+        delete: '批量删除',
         edit: '批量编辑',
+      },
+      bulkDelete: {
+        badge: '批量删除',
+        title: '删除选中的报检记录？',
+        hint: '删除后将无法恢复，请确认是否继续。',
+        cancel: '取消',
+        confirm: '确认删除',
+        confirming: '删除中...',
       },
       bulkEdit: {
         badge: '批量编辑',
@@ -1096,6 +1105,7 @@ const progressCopy: Record<Locale, ProgressCopy> = {
         createFailed: '创建失败',
         updateFailed: '更新失败',
         deleteFailed: '删除失败',
+        bulkDeleteFailed: '批量删除失败',
         bulkFailed: '批量更新失败',
         exportFailed: '导出失败，请稍后重试',
       },
@@ -1523,7 +1533,16 @@ const progressCopy: Record<Locale, ProgressCopy> = {
       bulk: {
         selectedCount: '{count} sélection',
         missingSelection: 'Sélectionnez au moins un contrôle',
+        delete: 'Suppression groupée',
         edit: 'Édition groupée',
+      },
+      bulkDelete: {
+        badge: 'Suppression groupée',
+        title: 'Supprimer les contrôles sélectionnés ?',
+        hint: 'Cette action est définitive. Voulez-vous continuer ?',
+        cancel: 'Annuler',
+        confirm: 'Confirmer',
+        confirming: 'Suppression...',
       },
       bulkEdit: {
         badge: 'Édition groupée',
@@ -1660,6 +1679,7 @@ const progressCopy: Record<Locale, ProgressCopy> = {
         createFailed: 'Échec de création',
         updateFailed: 'Échec de mise à jour',
         deleteFailed: 'Échec de suppression',
+        bulkDeleteFailed: 'Échec de la suppression groupée',
         bulkFailed: 'Échec de la mise à jour groupée',
         exportFailed: "Échec de l'export PDF",
       },

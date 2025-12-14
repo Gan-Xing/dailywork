@@ -4,6 +4,7 @@
 import { useEffect, useMemo, useRef } from 'react'
 
 import dynamic from 'next/dynamic'
+import Link from 'next/link'
 
 import { useInspectionFlow } from './hooks/useInspectionFlow'
 import { usePhaseManagement } from './hooks/usePhaseManagement'
@@ -186,15 +187,26 @@ export function PhaseEditor({
               })}
             </span>
           </div>
-          {canManage ? (
-            <button
-              type="button"
-              className="inline-flex items-center gap-2 rounded-2xl bg-emerald-300 px-4 py-2 text-xs font-semibold text-slate-900 shadow-lg shadow-emerald-400/30 transition hover:-translate-y-0.5"
-              onClick={phaseState.openCreateModal}
-            >
-              {t.addButton}
-            </button>
-          ) : null}
+          <div className="flex items-center gap-2">
+            {canViewInspection ? (
+              <Link
+                href="/progress/inspections"
+                prefetch={false}
+                className="inline-flex items-center gap-2 rounded-2xl border border-emerald-200/60 px-4 py-2 text-xs font-semibold text-emerald-50 shadow-[0_0_0_1px_rgba(255,255,255,0.08)] transition hover:-translate-y-0.5 hover:border-white/80 hover:bg-white/10"
+              >
+                {progressCopy.nav.inspections}
+              </Link>
+            ) : null}
+            {canManage ? (
+              <button
+                type="button"
+                className="inline-flex items-center gap-2 rounded-2xl bg-emerald-300 px-4 py-2 text-xs font-semibold text-slate-900 shadow-lg shadow-emerald-400/30 transition hover:-translate-y-0.5"
+                onClick={phaseState.openCreateModal}
+              >
+                {t.addButton}
+              </button>
+            ) : null}
+          </div>
         </div>
         <p className="mt-3 text-sm text-slate-200/80">
           {canManage ? t.manageTip : t.viewOnlyTip}

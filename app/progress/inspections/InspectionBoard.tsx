@@ -65,10 +65,11 @@ const defaultVisibleColumns: ColumnKey[] = [
   'sequence',
   'road',
   'phase',
+  'side',
   'range',
+  'appointmentDate',
   'layers',
   'checks',
-  'status',
   'updatedAt',
   'action',
 ]
@@ -260,6 +261,9 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
     submissionOrder: '',
     submittedAt: '',
   })
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
+  const [bulkDeletePending, setBulkDeletePending] = useState(false)
+  const [bulkDeleteError, setBulkDeleteError] = useState<string | null>(null)
   const [pdfPending, setPdfPending] = useState(false)
   const [pdfError, setPdfError] = useState<string | null>(null)
   const columnOptions: { key: ColumnKey; label: string }[] = useMemo(
@@ -499,6 +503,10 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
 
   useEffect(() => {
     setBulkError(null)
+  }, [selectedIds])
+
+  useEffect(() => {
+    setBulkDeleteError(null)
   }, [selectedIds])
 
   useEffect(() => {
@@ -866,6 +874,46 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
       setBulkEditError((err as Error).message)
     } finally {
       setBulkEditPending(false)
+    }
+  }
+
+  const openBulkDelete = () => {
+    if (!canBulkEdit) return
+    if (selectedIds.length === 0) {
+      setBulkError(copy.bulk.missingSelection)
+      return
+    }
+    setBulkDeleteError(null)
+    setBulkDeleteOpen(true)
+  }
+
+  const applyBulkDelete = async () => {
+    if (!canBulkEdit) return
+    if (selectedIds.length === 0) {
+      setBulkError(copy.bulk.missingSelection)
+      setBulkDeleteOpen(false)
+      return
+    }
+    setBulkDeletePending(true)
+    setBulkDeleteError(null)
+    try {
+      const res = await fetch('/api/inspection-entries/bulk-delete', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: selectedIds }),
+      })
+      const data = (await res.json().catch(() => ({}))) as { deleted?: number; message?: string }
+      if (!res.ok) {
+        throw new Error(data.message ?? copy.errors.bulkDeleteFailed)
+      }
+      await fetchData()
+      setSelectedIds([])
+      setBulkDeleteOpen(false)
+    } catch (err) {
+      setBulkDeleteError((err as Error).message)
+    } finally {
+      setBulkDeletePending(false)
     }
   }
 
@@ -1499,6 +1547,16 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
               {canBulkEdit ? (
                 <button
                   type="button"
+                  className="rounded-xl border border-rose-200/60 px-4 py-2 text-xs font-semibold text-rose-50 transition hover:-translate-y-0.5 hover:border-rose-200 hover:bg-rose-200/10 disabled:cursor-not-allowed disabled:opacity-60"
+                  onClick={openBulkDelete}
+                  disabled={selectedIds.length === 0}
+                >
+                  {copy.bulk.delete}
+                </button>
+              ) : null}
+              {canBulkEdit ? (
+                <button
+                  type="button"
                   className="rounded-xl bg-emerald-300 px-4 py-2 text-xs font-semibold text-slate-900 shadow-lg shadow-emerald-400/30 transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
                   onClick={() => {
                     resetBulkEditForm()
@@ -1992,6 +2050,65 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
             </div>
               )
             })()}
+          </div>
+        ) : null}
+
+        {bulkDeleteOpen ? (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 px-4 py-6"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) {
+                setBulkDeleteOpen(false)
+                setBulkDeleteError(null)
+              }
+            }}
+          >
+            <div className="w-full max-w-2xl rounded-3xl border border-white/10 bg-slate-900/95 p-6 text-sm text-slate-100 shadow-2xl shadow-rose-400/30 backdrop-blur">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.2em] text-amber-100">{copy.bulkDelete.badge}</p>
+                  <h2 className="text-xl font-semibold text-slate-50">{copy.bulkDelete.title}</h2>
+                  <p className="text-sm text-slate-300">
+                    {formatProgressCopy(copy.bulk.selectedCount, { count: selectedIds.length })}
+                  </p>
+                  <p className="text-xs text-slate-400">{copy.bulkDelete.hint}</p>
+                </div>
+                <button
+                  type="button"
+                  className="rounded-full border border-white/20 px-3 py-1 text-xs font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/20"
+                  onClick={() => {
+                    setBulkDeleteOpen(false)
+                    setBulkDeleteError(null)
+                  }}
+                  aria-label={copy.bulkDelete.cancel}
+                >
+                  ×
+                </button>
+              </div>
+              {bulkDeleteError ? (
+                <p className="mt-3 text-xs text-amber-200">{bulkDeleteError}</p>
+              ) : null}
+              <div className="mt-5 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  className="rounded-xl border border-white/20 px-4 py-2 text-xs font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/10"
+                  onClick={() => {
+                    setBulkDeleteOpen(false)
+                    setBulkDeleteError(null)
+                  }}
+                >
+                  {copy.bulkDelete.cancel}
+                </button>
+                <button
+                  type="button"
+                  className="rounded-xl bg-rose-300 px-4 py-2 text-xs font-semibold text-rose-900 shadow-lg shadow-rose-400/30 transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+                  onClick={applyBulkDelete}
+                  disabled={bulkDeletePending}
+                >
+                  {bulkDeletePending ? copy.bulkDelete.confirming : copy.bulkDelete.confirm}
+                </button>
+              </div>
+            </div>
           </div>
         ) : null}
 
