@@ -1,7 +1,7 @@
 import { Prisma } from '@prisma/client'
 import { NextResponse } from 'next/server'
 
-import type { InspectionStatus } from '@/lib/progressTypes'
+import type { InspectionStatus, InspectionEntryFilter } from '@/lib/progressTypes'
 import { hasPermission, getSessionUser } from '@/lib/server/authSession'
 import {
   createInspectionEntries,
@@ -24,6 +24,30 @@ export async function GET(request: Request) {
     .filter((value) => Number.isFinite(value))
   const checkParams = searchParams.getAll('checkName').filter(Boolean)
 
+  const allowedSortFields: InspectionEntryFilter['sortField'][] = [
+    'appointmentDate',
+    'road',
+    'phase',
+    'side',
+    'range',
+    'layers',
+    'checks',
+    'submissionOrder',
+    'status',
+    'submittedAt',
+    'submittedBy',
+    'createdBy',
+    'createdAt',
+    'updatedBy',
+    'updatedAt',
+    'remark',
+  ]
+
+  const rawSortField = searchParams.get('sortField')
+  const sortField = allowedSortFields.includes(rawSortField as InspectionEntryFilter['sortField'])
+    ? (rawSortField as InspectionEntryFilter['sortField'])
+    : undefined
+
   const filter = {
     roadSlug: searchParams.get('roadSlug') ?? undefined,
     roadSlugs: roadParams.length ? roadParams : undefined,
@@ -42,7 +66,7 @@ export async function GET(request: Request) {
     keyword: searchParams.get('keyword') ?? undefined,
     startDate: searchParams.get('startDate') ?? undefined,
     endDate: searchParams.get('endDate') ?? undefined,
-    sortField: (searchParams.get('sortField') as 'createdAt' | 'updatedAt' | null) ?? undefined,
+    sortField,
     sortOrder: (searchParams.get('sortOrder') as 'asc' | 'desc' | null) ?? undefined,
     page: searchParams.get('page') ? Number(searchParams.get('page')) : undefined,
     pageSize: searchParams.get('pageSize') ? Number(searchParams.get('pageSize')) : undefined,

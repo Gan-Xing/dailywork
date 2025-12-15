@@ -162,7 +162,23 @@ export interface InspectionEntryFilter {
   keyword?: string
   startDate?: string
   endDate?: string
-  sortField?: 'appointmentDate' | 'road' | 'phase' | 'side' | 'createdAt' | 'updatedAt'
+  sortField?:
+    | 'appointmentDate'
+    | 'road'
+    | 'phase'
+    | 'side'
+    | 'range'
+    | 'layers'
+    | 'checks'
+    | 'submissionOrder'
+    | 'status'
+    | 'submittedAt'
+    | 'submittedBy'
+    | 'createdBy'
+    | 'createdAt'
+    | 'updatedBy'
+    | 'updatedAt'
+    | 'remark'
   sortOrder?: 'asc' | 'desc'
   page?: number
   pageSize?: number

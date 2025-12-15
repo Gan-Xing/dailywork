@@ -37,7 +37,23 @@ type PhaseDefinitionOption = {
   name: string
 }
 
-type SortField = 'road' | 'phase' | 'side' | 'appointmentDate' | 'createdAt' | 'updatedAt'
+type SortField =
+  | 'road'
+  | 'phase'
+  | 'side'
+  | 'range'
+  | 'layers'
+  | 'checks'
+  | 'submissionOrder'
+  | 'status'
+  | 'appointmentDate'
+  | 'submittedAt'
+  | 'submittedBy'
+  | 'createdBy'
+  | 'createdAt'
+  | 'updatedBy'
+  | 'updatedAt'
+  | 'remark'
 type SortOrder = 'asc' | 'desc'
 type ColumnKey =
   | 'sequence'
@@ -1627,18 +1643,27 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                     </th>
                   ) : null}
                   {isVisible('range') ? (
-                    <th className="px-4 py-3 whitespace-nowrap">
-                      {copy.columns.range}
+                    <th
+                      className="px-4 py-3 whitespace-nowrap cursor-pointer select-none"
+                      onClick={() => handleSort('range')}
+                    >
+                      {copy.columns.range} {sortField === 'range' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
                     </th>
                   ) : null}
                   {isVisible('layers') ? (
-                    <th className="px-4 py-3 whitespace-nowrap">
-                      {copy.columns.layers}
+                    <th
+                      className="px-4 py-3 whitespace-nowrap cursor-pointer select-none"
+                      onClick={() => handleSort('layers')}
+                    >
+                      {copy.columns.layers} {sortField === 'layers' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
                     </th>
                   ) : null}
                   {isVisible('checks') ? (
-                    <th className="px-4 py-3">
-                      {copy.columns.checks}
+                    <th
+                      className="px-4 py-3 cursor-pointer select-none"
+                      onClick={() => handleSort('checks')}
+                    >
+                      {copy.columns.checks} {sortField === 'checks' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
                     </th>
                   ) : null}
                   {isVisible('types') ? (
@@ -1647,11 +1672,20 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                     </th>
                   ) : null}
                   {isVisible('submissionOrder') ? (
-                    <th className="px-4 py-3 whitespace-nowrap">{copy.columns.submissionOrder}</th>
+                    <th
+                      className="px-4 py-3 whitespace-nowrap cursor-pointer select-none"
+                      onClick={() => handleSort('submissionOrder')}
+                    >
+                      {copy.columns.submissionOrder}{' '}
+                      {sortField === 'submissionOrder' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
+                    </th>
                   ) : null}
                   {isVisible('status') ? (
-                    <th className="px-4 py-3 min-w-[120px]">
-                      {copy.columns.status}
+                    <th
+                      className="px-4 py-3 min-w-[120px] cursor-pointer select-none"
+                      onClick={() => handleSort('status')}
+                    >
+                      {copy.columns.status} {sortField === 'status' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
                     </th>
                   ) : null}
                   {isVisible('appointmentDate') ? (
@@ -1664,15 +1698,31 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                     </th>
                   ) : null}
                   {isVisible('submittedAt') ? (
-                    <th className="px-4 py-3">
-                      {copy.columns.submittedAt}
+                    <th
+                      className="px-4 py-3 cursor-pointer select-none"
+                      onClick={() => handleSort('submittedAt')}
+                    >
+                      {copy.columns.submittedAt}{' '}
+                      {sortField === 'submittedAt' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
                     </th>
                   ) : null}
                   {isVisible('submittedBy') ? (
-                    <th className="px-4 py-3">{copy.columns.submittedBy}</th>
+                    <th
+                      className="px-4 py-3 cursor-pointer select-none"
+                      onClick={() => handleSort('submittedBy')}
+                    >
+                      {copy.columns.submittedBy}{' '}
+                      {sortField === 'submittedBy' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
+                    </th>
                   ) : null}
                   {isVisible('createdBy') ? (
-                    <th className="px-4 py-3">{copy.columns.createdBy}</th>
+                    <th
+                      className="px-4 py-3 cursor-pointer select-none"
+                      onClick={() => handleSort('createdBy')}
+                    >
+                      {copy.columns.createdBy}{' '}
+                      {sortField === 'createdBy' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
+                    </th>
                   ) : null}
                   {isVisible('createdAt') ? (
                     <th
@@ -1684,7 +1734,13 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                     </th>
                   ) : null}
                   {isVisible('updatedBy') ? (
-                    <th className="px-4 py-3">{copy.columns.updatedBy}</th>
+                    <th
+                      className="px-4 py-3 cursor-pointer select-none"
+                      onClick={() => handleSort('updatedBy')}
+                    >
+                      {copy.columns.updatedBy}{' '}
+                      {sortField === 'updatedBy' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
+                    </th>
                   ) : null}
                   {isVisible('updatedAt') ? (
                     <th
@@ -1697,11 +1753,16 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                   ) : null}
                   {isVisible('action') ? (
                     <th className="px-4 py-3 text-center">
-                    {copy.columns.actions}
+                      {copy.columns.actions}
                     </th>
                   ) : null}
                   {isVisible('remark') ? (
-                    <th className="px-4 py-3">{copy.columns.remark}</th>
+                    <th
+                      className="px-4 py-3 cursor-pointer select-none"
+                      onClick={() => handleSort('remark')}
+                    >
+                      {copy.columns.remark} {sortField === 'remark' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
+                    </th>
                   ) : null}
                 </tr>
               </thead>

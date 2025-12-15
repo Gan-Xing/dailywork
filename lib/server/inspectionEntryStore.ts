@@ -405,11 +405,32 @@ export const listInspectionEntries = async (filter: InspectionEntryFilter): Prom
         return { phase: { name: sortOrder } }
       case 'side':
         return { side: sortOrder }
+      case 'range':
+        return { startPk: sortOrder, endPk: sortOrder }
+      case 'layers':
+        return { layerName: sortOrder }
+      case 'checks':
+        return { checkName: sortOrder }
+      case 'submissionOrder':
+        return { submissionOrder: sortOrder, startPk: sortOrder }
+      case 'status':
+        return { status: sortOrder }
       case 'appointmentDate':
         return { appointmentDate: sortOrder }
+      case 'submittedAt':
+        return { submittedAt: sortOrder }
+      case 'submittedBy':
+        return { submitter: { username: sortOrder } }
+      case 'createdBy':
+        return { creator: { username: sortOrder } }
       case 'createdAt':
         return { createdAt: sortOrder }
+      case 'updatedBy':
+        return { updater: { username: sortOrder } }
       case 'updatedAt':
+        return { updatedAt: sortOrder }
+      case 'remark':
+        return { remark: sortOrder }
       default:
         return { updatedAt: sortOrder }
     }
