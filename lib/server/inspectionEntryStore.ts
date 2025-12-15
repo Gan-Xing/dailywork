@@ -397,7 +397,7 @@ export const listInspectionEntries = async (filter: InspectionEntryFilter): Prom
   const skip = (page - 1) * pageSize
   const sortField = filter.sortField ?? 'updatedAt'
   const sortOrder = filter.sortOrder ?? 'desc'
-  const orderBy: Prisma.InspectionEntryOrderByWithRelationInput = (() => {
+  const orderBy: Prisma.InspectionEntryOrderByWithRelationInput | Prisma.InspectionEntryOrderByWithRelationInput[] = (() => {
     switch (sortField) {
       case 'road':
         return { road: { name: sortOrder } }
@@ -406,13 +406,13 @@ export const listInspectionEntries = async (filter: InspectionEntryFilter): Prom
       case 'side':
         return { side: sortOrder }
       case 'range':
-        return { startPk: sortOrder, endPk: sortOrder }
+        return [{ startPk: sortOrder }, { endPk: sortOrder }]
       case 'layers':
         return { layerName: sortOrder }
       case 'checks':
         return { checkName: sortOrder }
       case 'submissionOrder':
-        return { submissionOrder: sortOrder, startPk: sortOrder }
+        return [{ submissionOrder: sortOrder }, { startPk: sortOrder }]
       case 'status':
         return { status: sortOrder }
       case 'appointmentDate':
