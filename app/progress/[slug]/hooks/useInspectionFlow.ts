@@ -321,7 +321,8 @@ export function useInspectionFlow({
       return false
     }
     addToast(t.inspection.submitSuccess, { tone: 'success' })
-    await fetchLatestInspections()
+    // fire refresh without blocking modal close
+    void fetchLatestInspections()
     if (!options?.skipReset) {
       setSelectedSegment(null)
       resetInspectionForm()
