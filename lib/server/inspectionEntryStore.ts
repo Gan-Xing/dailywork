@@ -486,10 +486,10 @@ export const listInspectionEntries = async (filter: InspectionEntryFilter): Prom
     where.checkName = { contains: filter.checkName, mode: 'insensitive' }
   }
   if (Number.isFinite(filter.startPkFrom)) {
-    where.endPk = { gte: filter.startPkFrom as number }
+    where.startPk = { gte: filter.startPkFrom as number }
   }
   if (Number.isFinite(filter.startPkTo)) {
-    where.startPk = { lte: filter.startPkTo as number }
+    where.endPk = { lte: filter.startPkTo as number }
   }
   if (filter.keyword) {
     const normalizedKeyword = filter.keyword.trim()
