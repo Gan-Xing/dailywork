@@ -162,6 +162,8 @@ export interface InspectionEntryFilter {
   keyword?: string
   startDate?: string
   endDate?: string
+  startPkFrom?: number
+  startPkTo?: number
   sortField?:
     | 'appointmentDate'
     | 'road'
@@ -180,6 +182,26 @@ export interface InspectionEntryFilter {
     | 'updatedAt'
     | 'remark'
   sortOrder?: 'asc' | 'desc'
+  sort?: Array<{
+    field:
+      | 'appointmentDate'
+      | 'road'
+      | 'phase'
+      | 'side'
+      | 'range'
+      | 'layers'
+      | 'checks'
+      | 'submissionOrder'
+      | 'status'
+      | 'submittedAt'
+      | 'submittedBy'
+      | 'createdBy'
+      | 'createdAt'
+      | 'updatedBy'
+      | 'updatedAt'
+      | 'remark'
+    order: 'asc' | 'desc'
+  }>
   page?: number
   pageSize?: number
 }

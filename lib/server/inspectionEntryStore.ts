@@ -8,6 +8,7 @@ import type {
   InspectionListItem,
 } from '@/lib/progressTypes'
 import { canonicalizeProgressList } from '@/lib/i18n/progressDictionary'
+import { clampTypesForCheck, mergeTypesForCheck } from './inspectionTypeRules'
 import { prisma } from '@/lib/prisma'
 import { getWorkflowByPhaseDefinitionId } from './workflowStore'
 
@@ -99,7 +100,7 @@ type InspectionEntryCreateData = Omit<Prisma.InspectionEntryUncheckedCreateInput
 const normalizeEntry = (entry: InspectionEntryPayload): InspectionEntryPayload => {
   const normalizedLayer = canonicalizeProgressList('layer', [entry.layerName ?? '']).at(0) ?? ''
   const normalizedCheck = canonicalizeProgressList('check', [entry.checkName ?? '']).at(0) ?? ''
-  const normalizedTypes = canonicalizeProgressList('type', entry.types ?? [])
+  const normalizedTypes = clampTypesForCheck(normalizedCheck, entry.types ?? [])
   return {
     ...entry,
     layerName: normalizedLayer,
@@ -391,50 +392,64 @@ const assertWorkflowSubmissionRules = async (params: {
   }
 }
 
+const toOrderBy = (
+  field: NonNullable<InspectionEntryFilter['sortField']>,
+  order: 'asc' | 'desc',
+): Prisma.InspectionEntryOrderByWithRelationInput | Prisma.InspectionEntryOrderByWithRelationInput[] => {
+  switch (field) {
+    case 'road':
+      return { road: { name: order } }
+    case 'phase':
+      return { phase: { name: order } }
+    case 'side':
+      return { side: order }
+    case 'range':
+      return [{ startPk: order }, { endPk: order }]
+    case 'layers':
+      return { layerName: order }
+    case 'checks':
+      return { checkName: order }
+    case 'submissionOrder':
+      return [{ submissionOrder: order }, { startPk: order }]
+    case 'status':
+      return { status: order }
+    case 'appointmentDate':
+      return { appointmentDate: order }
+    case 'submittedAt':
+      return { submittedAt: order }
+    case 'submittedBy':
+      return { submitter: { username: order } }
+    case 'createdBy':
+      return { creator: { username: order } }
+    case 'createdAt':
+      return { createdAt: order }
+    case 'updatedBy':
+      return { updater: { username: order } }
+    case 'updatedAt':
+      return { updatedAt: order }
+    case 'remark':
+      return { remark: order }
+    default:
+      return { updatedAt: order }
+  }
+}
+
 export const listInspectionEntries = async (filter: InspectionEntryFilter): Promise<InspectionEntryListResponse> => {
   const page = Math.max(1, filter.page || 1)
   const pageSize = Math.max(1, Math.min(1000, filter.pageSize || 20))
   const skip = (page - 1) * pageSize
-  const sortField = filter.sortField ?? 'updatedAt'
-  const sortOrder = filter.sortOrder ?? 'desc'
-  const orderBy: Prisma.InspectionEntryOrderByWithRelationInput | Prisma.InspectionEntryOrderByWithRelationInput[] = (() => {
-    switch (sortField) {
-      case 'road':
-        return { road: { name: sortOrder } }
-      case 'phase':
-        return { phase: { name: sortOrder } }
-      case 'side':
-        return { side: sortOrder }
-      case 'range':
-        return [{ startPk: sortOrder }, { endPk: sortOrder }]
-      case 'layers':
-        return { layerName: sortOrder }
-      case 'checks':
-        return { checkName: sortOrder }
-      case 'submissionOrder':
-        return [{ submissionOrder: sortOrder }, { startPk: sortOrder }]
-      case 'status':
-        return { status: sortOrder }
-      case 'appointmentDate':
-        return { appointmentDate: sortOrder }
-      case 'submittedAt':
-        return { submittedAt: sortOrder }
-      case 'submittedBy':
-        return { submitter: { username: sortOrder } }
-      case 'createdBy':
-        return { creator: { username: sortOrder } }
-      case 'createdAt':
-        return { createdAt: sortOrder }
-      case 'updatedBy':
-        return { updater: { username: sortOrder } }
-      case 'updatedAt':
-        return { updatedAt: sortOrder }
-      case 'remark':
-        return { remark: sortOrder }
-      default:
-        return { updatedAt: sortOrder }
+  const sortStack = filter.sort?.length
+    ? filter.sort
+    : [{ field: filter.sortField ?? 'updatedAt', order: filter.sortOrder ?? 'desc' }]
+  const orderBy: Prisma.InspectionEntryOrderByWithRelationInput[] = []
+  sortStack.forEach((spec) => {
+    const clause = toOrderBy(spec.field, spec.order)
+    if (Array.isArray(clause)) {
+      orderBy.push(...clause)
+    } else {
+      orderBy.push(clause)
     }
-  })()
+  })
 
   const where: Prisma.InspectionEntryWhereInput = {}
   if (filter.roadSlugs && filter.roadSlugs.length) {
@@ -470,6 +485,12 @@ export const listInspectionEntries = async (filter: InspectionEntryFilter): Prom
   } else if (filter.checkName) {
     where.checkName = { contains: filter.checkName, mode: 'insensitive' }
   }
+  if (Number.isFinite(filter.startPkFrom)) {
+    where.endPk = { gte: filter.startPkFrom as number }
+  }
+  if (Number.isFinite(filter.startPkTo)) {
+    where.startPk = { lte: filter.startPkTo as number }
+  }
   if (filter.keyword) {
     const normalizedKeyword = filter.keyword.trim()
     const remarkPrefix = 'remark:'
@@ -500,7 +521,7 @@ export const listInspectionEntries = async (filter: InspectionEntryFilter): Prom
     prisma.inspectionEntry.findMany({
       where,
       include: { road: true, phase: true, submission: true, submitter: true, creator: true, updater: true },
-      orderBy,
+      orderBy: orderBy.length ? orderBy : [{ updatedAt: 'desc' }],
       skip,
       take: pageSize,
     }),
@@ -577,8 +598,8 @@ export const createInspectionEntries = async (
   }
 
   for (const raw of entries) {
-    assertEntryRequiredFields(raw)
     const normalized = normalizeEntry(raw)
+    assertEntryRequiredFields(normalized)
     const submissionId = await ensureSubmissionId(normalized.submissionId ?? null)
     const side = normalizeSide(normalized.side)
     const range = normalizeRange(normalized.startPk, normalized.endPk)
@@ -648,17 +669,78 @@ export const createInspectionEntries = async (
     })
   }
 
-  const created = await prisma.$transaction(
-    prepared.map((item) =>
-      prisma.inspectionEntry.create({
-        // submissionId 可为空，预约阶段不强制生成提交单
-        data: item.data as Prisma.InspectionEntryUncheckedCreateInput,
-        include: { road: true, phase: true, submission: true, submitter: true, creator: true, updater: true },
-      }),
-    ),
-  )
+  const uniqueByKey = new Map<string, InspectionEntryCreateData>()
+  const keyFor = (data: InspectionEntryCreateData) =>
+    [
+      data.roadId,
+      data.phaseId,
+      data.side,
+      data.startPk,
+      data.endPk,
+      normalizeLabel(data.layerName),
+      normalizeLabel(data.checkName),
+    ].join(':')
 
-  return created.map(mapEntry)
+  prepared.forEach((item) => {
+    const key = keyFor(item.data)
+    const existing = uniqueByKey.get(key)
+    if (!existing) {
+      uniqueByKey.set(key, item.data)
+      return
+    }
+    const mergedTypes = mergeTypesForCheck(item.data.checkName, existing.types, item.data.types)
+    uniqueByKey.set(key, {
+      ...existing,
+      types: mergedTypes,
+      remark: item.data.remark ?? existing.remark,
+      appointmentDate: item.data.appointmentDate ?? existing.appointmentDate,
+      submissionOrder:
+        item.data.submissionOrder !== undefined ? item.data.submissionOrder : existing.submissionOrder,
+    })
+  })
+
+  const results: InspectionEntryDTO[] = []
+  for (const data of uniqueByKey.values()) {
+    const existing = await prisma.inspectionEntry.findFirst({
+      where: {
+        roadId: data.roadId,
+        phaseId: data.phaseId,
+        side: data.side,
+        startPk: data.startPk,
+        endPk: data.endPk,
+        layerName: data.layerName,
+        checkName: data.checkName,
+      },
+      orderBy: { id: 'asc' },
+      include: { road: true, phase: true, submission: true, submitter: true, creator: true, updater: true },
+    })
+
+    if (existing) {
+      const mergedTypes = mergeTypesForCheck(data.checkName, existing.types, data.types)
+      const updateData: Prisma.InspectionEntryUpdateInput = {
+        types: mergedTypes,
+        updatedBy: data.updatedBy,
+      }
+      if (data.remark) updateData.remark = data.remark
+      if (data.appointmentDate) updateData.appointmentDate = data.appointmentDate
+      if (data.submissionOrder !== undefined) updateData.submissionOrder = data.submissionOrder
+
+      const updated = await prisma.inspectionEntry.update({
+        where: { id: existing.id },
+        data: updateData,
+        include: { road: true, phase: true, submission: true, submitter: true, creator: true, updater: true },
+      })
+      results.push(mapEntry(updated as any))
+    } else {
+      const created = await prisma.inspectionEntry.create({
+        data: data as Prisma.InspectionEntryUncheckedCreateInput,
+        include: { road: true, phase: true, submission: true, submitter: true, creator: true, updater: true },
+      })
+      results.push(mapEntry(created as any))
+    }
+  }
+
+  return results
 }
 
 export const aggregateEntriesAsListItems = async (

@@ -249,8 +249,11 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
   const [phaseOpen, setPhaseOpen] = useState(false)
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
-  const [sortField, setSortField] = useState<SortField>('updatedAt')
-  const [sortOrder, setSortOrder] = useState<SortOrder>('desc')
+  const [startPkFrom, setStartPkFrom] = useState('')
+  const [startPkTo, setStartPkTo] = useState('')
+  const [sortStack, setSortStack] = useState<Array<{ field: SortField; order: SortOrder }>>([
+    { field: 'updatedAt', order: 'desc' },
+  ])
   const [page, setPage] = useState(1)
   const [pageInput, setPageInput] = useState('1')
   const [pageSize] = useState(20)
@@ -459,8 +462,9 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
         keyword: keyword ? `remark:${keyword}` : undefined,
         startDate: startDate || undefined,
         endDate: endDate || undefined,
-        sortField,
-        sortOrder,
+        startPkFrom: startPkFrom || undefined,
+        startPkTo: startPkTo || undefined,
+        sort: sortStack.map((spec) => `${spec.field}:${spec.order}`),
         page,
         pageSize,
       })
@@ -503,8 +507,9 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
     keyword,
     startDate,
     endDate,
-    sortField,
-    sortOrder,
+    startPkFrom,
+    startPkTo,
+    sortStack,
     page,
     pageSize,
   ])
@@ -633,12 +638,12 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
 
   const handleSort = (field: SortField) => {
     setPage(1)
-    if (sortField === field) {
-      setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'))
-    } else {
-      setSortField(field)
-      setSortOrder('desc')
-    }
+    setSortStack((prev) => {
+      const existing = prev.find((item) => item.field === field)
+      const nextOrder = existing ? (existing.order === 'asc' ? 'desc' : 'asc') : 'desc'
+      const filtered = prev.filter((item) => item.field !== field)
+      return [{ field, order: nextOrder }, ...filtered].slice(0, 4)
+    })
   }
 
   const resetFilters = () => {
@@ -652,8 +657,9 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
     setKeyword('')
     setStartDate('')
     setEndDate('')
-    setSortField('updatedAt')
-    setSortOrder('desc')
+    setStartPkFrom('')
+    setStartPkTo('')
+    setSortStack([{ field: 'updatedAt', order: 'desc' }])
     setPage(1)
   }
 
@@ -675,6 +681,13 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
       month: '2-digit',
       day: '2-digit',
     })
+  }
+
+  const sortIndicator = (field: SortField) => {
+    const idx = sortStack.findIndex((item) => item.field === field)
+    if (idx === -1) return ''
+    const arrow = sortStack[idx].order === 'asc' ? '↑' : '↓'
+    return `${arrow}${idx + 1}`
   }
 
   useEffect(() => {
@@ -1466,6 +1479,34 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                 }}
               />
             </label>
+            <label className="flex flex-col gap-1 text-xs text-slate-200">
+              {copy.filters.startPkFrom ?? '起点桩号 >=（米）'}
+              <input
+                type="number"
+                inputMode="decimal"
+                className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
+                value={startPkFrom}
+                onChange={(e) => {
+                  setStartPkFrom(e.target.value)
+                  setPage(1)
+                }}
+                placeholder="例：480"
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-xs text-slate-200">
+              {copy.filters.startPkTo ?? '终点桩号 <=（米）'}
+              <input
+                type="number"
+                inputMode="decimal"
+                className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
+                value={startPkTo}
+                onChange={(e) => {
+                  setStartPkTo(e.target.value)
+                  setPage(1)
+                }}
+                placeholder="例：1500"
+              />
+            </label>
             <div className="flex flex-col gap-1 text-xs text-slate-200 md:col-span-2">
               {copy.filters.keyword}
               <div className="flex flex-col gap-2 md:flex-row md:items-end md:gap-3">
@@ -1623,7 +1664,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                       className="px-4 py-3 cursor-pointer select-none whitespace-nowrap"
                       onClick={() => handleSort('road')}
                     >
-                      {copy.columns.road} {sortField === 'road' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
+                      {copy.columns.road} {sortIndicator('road')}
                     </th>
                   ) : null}
                   {isVisible('phase') ? (
@@ -1631,7 +1672,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                       className="px-4 py-3 cursor-pointer select-none whitespace-nowrap"
                       onClick={() => handleSort('phase')}
                     >
-                      {copy.columns.phase} {sortField === 'phase' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
+                      {copy.columns.phase} {sortIndicator('phase')}
                     </th>
                   ) : null}
                   {isVisible('side') ? (
@@ -1639,7 +1680,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                       className="px-4 py-3 min-w-[80px] cursor-pointer select-none whitespace-nowrap"
                       onClick={() => handleSort('side')}
                     >
-                      {copy.columns.side} {sortField === 'side' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
+                      {copy.columns.side} {sortIndicator('side')}
                     </th>
                   ) : null}
                   {isVisible('range') ? (
@@ -1647,7 +1688,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                       className="px-4 py-3 whitespace-nowrap cursor-pointer select-none"
                       onClick={() => handleSort('range')}
                     >
-                      {copy.columns.range} {sortField === 'range' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
+                      {copy.columns.range} {sortIndicator('range')}
                     </th>
                   ) : null}
                   {isVisible('layers') ? (
@@ -1655,7 +1696,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                       className="px-4 py-3 whitespace-nowrap cursor-pointer select-none"
                       onClick={() => handleSort('layers')}
                     >
-                      {copy.columns.layers} {sortField === 'layers' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
+                      {copy.columns.layers} {sortIndicator('layers')}
                     </th>
                   ) : null}
                   {isVisible('checks') ? (
@@ -1663,7 +1704,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                       className="px-4 py-3 cursor-pointer select-none"
                       onClick={() => handleSort('checks')}
                     >
-                      {copy.columns.checks} {sortField === 'checks' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
+                      {copy.columns.checks} {sortIndicator('checks')}
                     </th>
                   ) : null}
                   {isVisible('types') ? (
@@ -1677,7 +1718,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                       onClick={() => handleSort('submissionOrder')}
                     >
                       {copy.columns.submissionOrder}{' '}
-                      {sortField === 'submissionOrder' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
+                      {sortIndicator('submissionOrder')}
                     </th>
                   ) : null}
                   {isVisible('status') ? (
@@ -1685,7 +1726,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                       className="px-4 py-3 min-w-[120px] cursor-pointer select-none"
                       onClick={() => handleSort('status')}
                     >
-                      {copy.columns.status} {sortField === 'status' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
+                      {copy.columns.status} {sortIndicator('status')}
                     </th>
                   ) : null}
                   {isVisible('appointmentDate') ? (
@@ -1694,7 +1735,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                       onClick={() => handleSort('appointmentDate')}
                     >
                       {copy.columns.appointmentDate}{' '}
-                      {sortField === 'appointmentDate' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
+                      {sortIndicator('appointmentDate')}
                     </th>
                   ) : null}
                   {isVisible('submittedAt') ? (
@@ -1703,7 +1744,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                       onClick={() => handleSort('submittedAt')}
                     >
                       {copy.columns.submittedAt}{' '}
-                      {sortField === 'submittedAt' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
+                      {sortIndicator('submittedAt')}
                     </th>
                   ) : null}
                   {isVisible('submittedBy') ? (
@@ -1712,7 +1753,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                       onClick={() => handleSort('submittedBy')}
                     >
                       {copy.columns.submittedBy}{' '}
-                      {sortField === 'submittedBy' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
+                      {sortIndicator('submittedBy')}
                     </th>
                   ) : null}
                   {isVisible('createdBy') ? (
@@ -1721,7 +1762,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                       onClick={() => handleSort('createdBy')}
                     >
                       {copy.columns.createdBy}{' '}
-                      {sortField === 'createdBy' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
+                      {sortIndicator('createdBy')}
                     </th>
                   ) : null}
                   {isVisible('createdAt') ? (
@@ -1730,7 +1771,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                       onClick={() => handleSort('createdAt')}
                     >
                       {copy.columns.createdAt}{' '}
-                      {sortField === 'createdAt' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
+                      {sortIndicator('createdAt')}
                     </th>
                   ) : null}
                   {isVisible('updatedBy') ? (
@@ -1738,8 +1779,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                       className="px-4 py-3 cursor-pointer select-none"
                       onClick={() => handleSort('updatedBy')}
                     >
-                      {copy.columns.updatedBy}{' '}
-                      {sortField === 'updatedBy' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
+                      {copy.columns.updatedBy} {sortIndicator('updatedBy')}
                     </th>
                   ) : null}
                   {isVisible('updatedAt') ? (
@@ -1748,7 +1788,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                       onClick={() => handleSort('updatedAt')}
                     >
                       {copy.columns.updatedAt}{' '}
-                      {sortField === 'updatedAt' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
+                      {sortIndicator('updatedAt')}
                     </th>
                   ) : null}
                   {isVisible('action') ? (
@@ -1761,7 +1801,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                       className="px-4 py-3 cursor-pointer select-none"
                       onClick={() => handleSort('remark')}
                     >
-                      {copy.columns.remark} {sortField === 'remark' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
+                      {copy.columns.remark} {sortIndicator('remark')}
                     </th>
                   ) : null}
                 </tr>
@@ -1782,7 +1822,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                       ? prefabRoadLabel
                       : formatRoadName(item.roadSlug, item.roadName)
                     const sideText = isPrefab ? '—' : sideCopy[item.side] ?? item.side
-                    const rangeText = isPrefab ? '—' : `${formatPK(item.startPk)} → ${formatPK(item.endPk)}`
+    const rangeText = isPrefab ? '—' : `${formatPK(item.startPk)} → ${formatPK(item.endPk)}`
                     const layersText = normalizeLayerLabels(
                       Array.isArray(item.layers) ? item.layers : [],
                       item.phaseName,

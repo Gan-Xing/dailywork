@@ -24,7 +24,7 @@ export async function GET(request: Request) {
     .filter((value) => Number.isFinite(value))
   const checkParams = searchParams.getAll('checkName').filter(Boolean)
 
-  const allowedSortFields: InspectionEntryFilter['sortField'][] = [
+  const allowedSortFields: NonNullable<InspectionEntryFilter['sortField']>[] = [
     'appointmentDate',
     'road',
     'phase',
@@ -48,6 +48,16 @@ export async function GET(request: Request) {
     ? (rawSortField as InspectionEntryFilter['sortField'])
     : undefined
 
+  const sortParams = searchParams.getAll('sort')
+  const sort: NonNullable<InspectionEntryFilter['sort']> = sortParams
+    .map((value) => {
+      const [field, order] = value.split(':')
+      if (!allowedSortFields.includes(field as any)) return null
+      const ord = order === 'asc' || order === 'desc' ? order : 'desc'
+      return { field: field as NonNullable<InspectionEntryFilter['sortField']>, order: ord }
+    })
+    .filter(Boolean) as NonNullable<InspectionEntryFilter['sort']>
+
   const filter = {
     roadSlug: searchParams.get('roadSlug') ?? undefined,
     roadSlugs: roadParams.length ? roadParams : undefined,
@@ -66,8 +76,11 @@ export async function GET(request: Request) {
     keyword: searchParams.get('keyword') ?? undefined,
     startDate: searchParams.get('startDate') ?? undefined,
     endDate: searchParams.get('endDate') ?? undefined,
+    startPkFrom: searchParams.get('startPkFrom') ? Number(searchParams.get('startPkFrom')) : undefined,
+    startPkTo: searchParams.get('startPkTo') ? Number(searchParams.get('startPkTo')) : undefined,
     sortField,
     sortOrder: (searchParams.get('sortOrder') as 'asc' | 'desc' | null) ?? undefined,
+    sort: sort.length ? sort : undefined,
     page: searchParams.get('page') ? Number(searchParams.get('page')) : undefined,
     pageSize: searchParams.get('pageSize') ? Number(searchParams.get('pageSize')) : undefined,
   }
