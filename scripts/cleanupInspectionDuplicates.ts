@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client'
+import { Prisma, PrismaClient } from '@prisma/client'
 
 import { canonicalizeProgressList } from '@/lib/i18n/progressDictionary'
 import {
@@ -9,6 +9,7 @@ import {
 } from '@/lib/server/inspectionTypeRules'
 
 const prisma = new PrismaClient()
+type Entry = Prisma.InspectionEntryGetPayload<{ include: { road: true; phase: true } }>
 
 type Key = {
   roadId: number
@@ -93,7 +94,7 @@ const mergeTypes = (allowedMap: AllowedTypesMap, checkName: string, current: str
 async function main() {
   const allowedMap = await loadTemplateAllowedTypes()
 
-  const entries = await prisma.inspectionEntry.findMany({
+  const entries: Entry[] = await prisma.inspectionEntry.findMany({
     include: { road: true, phase: true },
     orderBy: { id: 'asc' },
   })
@@ -114,13 +115,7 @@ async function main() {
     }
   }
 
-  const groups = new Map<
-    string,
-    {
-      key: Key
-      items: typeof entries
-    }
-  >()
+  const groups = new Map<string, { key: Key; items: Entry[] }>()
 
   entries.forEach((entry) => {
     const canonicalLayer = canonicalizeProgressList('layer', [entry.layerName]).at(0) ?? entry.layerName
@@ -135,7 +130,7 @@ async function main() {
       checkName: canonicalCheck,
     }
     const k = keyOf(key)
-    const group = groups.get(k) ?? { key, items: [] as typeof entries }
+    const group = groups.get(k) ?? { key, items: [] as Entry[] }
     group.items.push({
       ...entry,
       layerName: canonicalLayer,
@@ -147,7 +142,7 @@ async function main() {
   let cleaned = 0
   let touched = 0
 
-  for (const group of groups.values()) {
+  for (const group of Array.from(groups.values())) {
     if (group.items.length <= 1) continue
     // sort by id asc; keep the oldest
     const sorted = group.items.slice().sort((a, b) => a.id - b.id)

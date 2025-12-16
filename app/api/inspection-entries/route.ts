@@ -24,7 +24,9 @@ export async function GET(request: Request) {
     .filter((value) => Number.isFinite(value))
   const checkParams = searchParams.getAll('checkName').filter(Boolean)
 
-  const allowedSortFields: NonNullable<InspectionEntryFilter['sortField']>[] = [
+  type SortField = NonNullable<InspectionEntryFilter['sortField']>
+
+  const allowedSortFields: SortField[] = [
     'appointmentDate',
     'road',
     'phase',
@@ -43,18 +45,19 @@ export async function GET(request: Request) {
     'remark',
   ]
 
+  const isSortField = (value: string | null): value is SortField =>
+    Boolean(value) && allowedSortFields.includes(value as SortField)
+
   const rawSortField = searchParams.get('sortField')
-  const sortField = allowedSortFields.includes(rawSortField as InspectionEntryFilter['sortField'])
-    ? (rawSortField as InspectionEntryFilter['sortField'])
-    : undefined
+  const sortField = isSortField(rawSortField) ? rawSortField : undefined
 
   const sortParams = searchParams.getAll('sort')
   const sort: NonNullable<InspectionEntryFilter['sort']> = sortParams
     .map((value) => {
       const [field, order] = value.split(':')
-      if (!allowedSortFields.includes(field as any)) return null
+      if (!isSortField(field)) return null
       const ord = order === 'asc' || order === 'desc' ? order : 'desc'
-      return { field: field as NonNullable<InspectionEntryFilter['sortField']>, order: ord }
+      return { field, order: ord }
     })
     .filter(Boolean) as NonNullable<InspectionEntryFilter['sort']>
 

@@ -93,8 +93,9 @@ const mapEntry = (
   updatedBy: row.updater ? { id: row.updater.id, username: row.updater.username } : null,
 })
 
-type InspectionEntryCreateData = Omit<Prisma.InspectionEntryUncheckedCreateInput, 'submissionId'> & {
+type InspectionEntryCreateData = Omit<Prisma.InspectionEntryUncheckedCreateInput, 'submissionId' | 'types'> & {
   submissionId?: number | null
+  types: string[]
 }
 
 const normalizeEntry = (entry: InspectionEntryPayload): InspectionEntryPayload => {
@@ -700,7 +701,7 @@ export const createInspectionEntries = async (
   })
 
   const results: InspectionEntryDTO[] = []
-  for (const data of uniqueByKey.values()) {
+  for (const data of Array.from(uniqueByKey.values())) {
     const existing = await prisma.inspectionEntry.findFirst({
       where: {
         roadId: data.roadId,
@@ -717,7 +718,7 @@ export const createInspectionEntries = async (
 
     if (existing) {
       const mergedTypes = mergeTypesForCheck(data.checkName, existing.types, data.types)
-      const updateData: Prisma.InspectionEntryUpdateInput = {
+      const updateData: Prisma.InspectionEntryUncheckedUpdateInput = {
         types: mergedTypes,
         updatedBy: data.updatedBy,
       }

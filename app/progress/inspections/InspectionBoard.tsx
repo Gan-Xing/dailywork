@@ -640,7 +640,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
     setPage(1)
     setSortStack((prev) => {
       const existing = prev.find((item) => item.field === field)
-      const nextOrder = existing ? (existing.order === 'asc' ? 'desc' : 'asc') : 'desc'
+      const nextOrder: SortOrder = existing ? (existing.order === 'asc' ? 'desc' : 'asc') : 'desc'
       const filtered = prev.filter((item) => item.field !== field)
       return [{ field, order: nextOrder }, ...filtered].slice(0, 4)
     })

@@ -355,14 +355,16 @@ type InspectionBoardCopy = {
     sideRight: string
     sideBoth: string
     type: string
-      typePlaceholder: string
-      check: string
-      checkPlaceholder: string
-      status: string
-      startDate: string
-      endDate: string
-      keyword: string
-      keywordPlaceholder: string
+    typePlaceholder: string
+    check: string
+    checkPlaceholder: string
+    status: string
+    startPkFrom: string
+    startPkTo: string
+    startDate: string
+    endDate: string
+    keyword: string
+    keywordPlaceholder: string
     reset: string
     search: string
     addPrefab: string
@@ -907,6 +909,8 @@ const progressCopy: Record<Locale, ProgressCopy> = {
         check: '验收内容',
         checkPlaceholder: '钢筋验收',
         status: '状态',
+        startPkFrom: '起点桩号 >=（米）',
+        startPkTo: '终点桩号 <=（米）',
         startDate: '开始日期',
         endDate: '结束日期',
         keyword: '备注关键字',
@@ -1481,6 +1485,8 @@ const progressCopy: Record<Locale, ProgressCopy> = {
         check: 'Contenu',
         checkPlaceholder: 'ex : Armatures',
         status: 'Statut',
+        startPkFrom: 'PK début ≥ (m)',
+        startPkTo: 'PK fin ≤ (m)',
         startDate: 'Début',
         endDate: 'Fin',
         keyword: 'Mot-clé (remarque)',
