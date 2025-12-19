@@ -60,6 +60,17 @@
 - 入口：主页“入口卡片”新增“产值计量”模块，链接 `/value`，与其他核心入口保持同样的视觉与权限体验（需“进度查看”权限）。
 - 价格维护：新增 `/value/prices` 页面，允许按分项定义录入多个“可报价分项名称”（如涵洞的混凝土/模板/钢筋），每个名称绑定规格、计价说明与单价。界面支持增删改查：多规格但同价的分项可只维护默认价（`spec` 为空），需要拆分构件/规格（如涵洞）则创建附加条目，产值统计优先匹配 `phaseDefinitionId+spec`，再回退默认价格，需“进度编辑”权限。
 
+## 11. 文档管理模块（提交单/Bordereau Phase 1）
+
+- 范围：仅做提交单线上填充/保存/筛选/导出 PDF（其他文档类型先占位）。
+- 现状适配：
+  - 报检绑定：报检记录仅存 `documentId`（兼容 `submissionId` 别名），可选 `submissionNumber` 查 Submission 取 `documentId` 绑定；未提供则留空，不再自动创建 Document/Submission。
+  - 模板：已存在 `/module/bordereau.html` + `/module/bordereau.css`，但内部值是硬编码（无 `{{ }}` 占位符）；同时保留旧版 `module/index.html`（含 `{{ NUMERO }}` 等占位符）。建议以 `/module/bordereau.html` 为源，补齐占位符并复制到正式的模板存储（如 `app/documents/templates/bordereau.html`），同时保留原文件以便回溯。
+  - 导出：已有 `InspectionModule/generate-pdf.mjs` 可抽成组件重用，优先导出 PDF，暂不新增浏览器打印路由。
+  - 审计：沿用 `createdBy/updatedBy/createdAt/updatedAt`，暂不新增事件表。
+- 设计落地：字段定义见 `docs/schema-fields.md` 的“文档管理”章节；计划在 Prisma schema 新增 `DocumentTemplate`（或 `SubmissionTemplate`）并扩展 `Submission`。
+- 近期任务：解析/存储 HTML 模板、自动生成表单、保存 `Submission.data`、生成/缓存渲染 HTML + PDF 导出；列表筛选基于 `Submission.status`/更新时间。
+
 ## 待处理任务
 - [ ] API 尚未添加鉴权/多角色保护，后续需要接入登录与访问控制。
 - [ ] 编写 Prisma/接口层的自动化测试与数据校验（含输入 schema 校验、防止脏数据）。

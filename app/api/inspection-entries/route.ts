@@ -18,6 +18,14 @@ export async function GET(request: Request) {
   const typeParams = searchParams.getAll('type').filter(Boolean)
   const layerParams = searchParams.getAll('layerName').filter(Boolean)
   const roadParams = searchParams.getAll('roadSlug').filter(Boolean)
+  const documentParams = searchParams
+    .getAll('documentId')
+    .map((value) => Number(value))
+    .filter((value) => Number.isFinite(value))
+  const submissionNumberParams = searchParams
+    .getAll('submissionNumber')
+    .map((value) => Number(value))
+    .filter((value) => Number.isFinite(value))
   const phaseDefinitionParams = searchParams
     .getAll('phaseDefinitionId')
     .map((value) => Number(value))
@@ -61,9 +69,19 @@ export async function GET(request: Request) {
     })
     .filter(Boolean) as NonNullable<InspectionEntryFilter['sort']>
 
+  const documentIdValue = searchParams.get('documentId')
+  const submissionNumberValue = searchParams.get('submissionNumber')
   const filter = {
     roadSlug: searchParams.get('roadSlug') ?? undefined,
     roadSlugs: roadParams.length ? roadParams : undefined,
+    documentId:
+      documentIdValue && Number.isFinite(Number(documentIdValue)) ? Number(documentIdValue) : undefined,
+    documentIds: documentParams.length ? documentParams : undefined,
+    submissionNumber:
+      submissionNumberValue && Number.isFinite(Number(submissionNumberValue))
+        ? Number(submissionNumberValue)
+        : undefined,
+    submissionNumbers: submissionNumberParams.length ? submissionNumberParams : undefined,
     phaseId: searchParams.get('phaseId') ? Number(searchParams.get('phaseId')) : undefined,
     phaseDefinitionId: searchParams.get('phaseDefinitionId')
       ? Number(searchParams.get('phaseDefinitionId'))

@@ -102,6 +102,14 @@ export const homeCopy: Record<Locale, HomeCopy> = {
     moduleStatus: '持续维护',
     modules: [
       {
+        title: '文档管理',
+        href: '/documents',
+        tone: 'from-rose-300/80 via-orange-200/80 to-amber-200/70',
+        description: '在线填写提交单，使用模板生成表单与 PDF 导出，后续扩展函件/会议纪要等文档类型。',
+        tags: ['模板', '提交单', 'PDF 导出'],
+        cta: '进入文档管理'
+      },
+      {
         title: '日报系统',
         href: '/reports',
         tone: 'from-blue-400/80 via-cyan-300/80 to-emerald-300/60',
@@ -145,9 +153,9 @@ export const homeCopy: Record<Locale, HomeCopy> = {
     ],
     stats: {
       entriesLabel: '当前入口',
-      entriesValue: '5',
+      entriesValue: '6',
       recentLabel: '最近更新',
-      recentValue: '新增成员管理与产值计量入口，日报/进度/财务持续维护',
+      recentValue: '新增文档管理（提交单）入口；成员管理、产值计量上线，日报/进度/财务持续维护',
       upcomingTitle: '即将推出',
       upcomingBody: '支持更多入口：质量巡检、物资追踪、风险复盘。'
     },
@@ -233,6 +241,15 @@ export const homeCopy: Record<Locale, HomeCopy> = {
     moduleStatus: 'Maintenance continue',
     modules: [
       {
+        title: 'Gestion des documents',
+        href: '/documents',
+        tone: 'from-rose-300/80 via-orange-200/80 to-amber-200/70',
+        description:
+          'Saisie en ligne du bordereau avec modèle HTML, génération de PDF, extensible aux correspondances et PV.',
+        tags: ['Modèle', 'Bordereau', 'Export PDF'],
+        cta: 'Ouvrir les documents'
+      },
+      {
         title: 'Rapport quotidien',
         href: '/reports',
         tone: 'from-blue-400/80 via-cyan-300/80 to-emerald-300/60',
@@ -279,9 +296,9 @@ export const homeCopy: Record<Locale, HomeCopy> = {
     ],
     stats: {
       entriesLabel: 'Entrées actives',
-      entriesValue: '5',
+      entriesValue: '6',
       recentLabel: 'Mise à jour',
-      recentValue: 'Entrées membres et valeurs ajoutées, rapport/avancement/compta synchronisés',
+      recentValue: 'Nouveau hub “Documents” (bordereau) ajouté ; membres et valeurs en ligne, autres modules maintenus',
       upcomingTitle: 'Prochainement',
       upcomingBody: 'Inspection qualité, flux matériaux, revues de risques.'
     },

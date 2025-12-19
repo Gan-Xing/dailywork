@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 
 import type { InspectionStatus, IntervalSide } from '@prisma/client'
+import { DocumentType } from '@prisma/client'
 import { getSessionUser, hasPermission } from '@/lib/server/authSession'
 import { canonicalizeProgressList } from '@/lib/i18n/progressDictionary'
 import { prisma } from '@/lib/prisma'
@@ -14,11 +15,60 @@ type PatchPayload = {
   checkName?: string
   types?: string[]
   status?: InspectionStatus
-  submissionId?: number | null
+  documentId?: number | null
+  submissionNumber?: number | null
   submissionOrder?: number | null
   remark?: string
   appointmentDate?: string
   submittedAt?: string
+}
+
+const parseOptionalNumber = (value: unknown) => {
+  if (value === null || value === undefined || value === '') return null
+  const num = Number(value)
+  return Number.isFinite(num) ? num : null
+}
+
+const resolveDocumentId = async (payload: PatchPayload) => {
+  const hasDocumentIdField =
+    Object.prototype.hasOwnProperty.call(payload as any, 'documentId') ||
+    Object.prototype.hasOwnProperty.call(payload as any, 'submissionId')
+  const parsedDocumentId = parseOptionalNumber((payload as any).documentId ?? (payload as any).submissionId)
+  const hasSubmissionNumberField = Object.prototype.hasOwnProperty.call(payload as any, 'submissionNumber')
+  const parsedSubmissionNumber = parseOptionalNumber((payload as any).submissionNumber)
+
+  let targetDocumentId = parsedDocumentId
+  const bindingProvided = hasDocumentIdField || hasSubmissionNumberField
+
+  if (hasSubmissionNumberField) {
+    if (parsedSubmissionNumber === null) {
+      targetDocumentId = targetDocumentId ?? null
+    } else {
+      const submission = await prisma.submission.findUnique({
+        where: { submissionNumber: parsedSubmissionNumber },
+        select: { documentId: true },
+      })
+      if (!submission) {
+        throw new Error('提交单编号不存在，请重新输入')
+      }
+      if (targetDocumentId && targetDocumentId !== submission.documentId) {
+        throw new Error('提交单编号与提交单 ID 不一致，请检查输入')
+      }
+      targetDocumentId = submission.documentId
+    }
+  }
+
+  if (hasDocumentIdField && parsedDocumentId !== null) {
+    const exists = await prisma.document.findFirst({
+      where: { id: parsedDocumentId, type: DocumentType.SUBMISSION },
+      select: { id: true },
+    })
+    if (!exists) {
+      throw new Error('提交单不存在，请重新选择')
+    }
+  }
+
+  return bindingProvided ? targetDocumentId ?? null : undefined
 }
 
 export async function POST(request: Request) {
@@ -51,8 +101,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: '请至少填写一个需要批量修改的字段' }, { status: 400 })
   }
 
+  let resolvedDocumentId: number | null | undefined
+  try {
+    resolvedDocumentId = await resolveDocumentId(payload)
+  } catch (error) {
+    return NextResponse.json({ message: (error as Error).message }, { status: 400 })
+  }
+
   const normalizedPatch: PatchPayload = {
     ...payload,
+    documentId: resolvedDocumentId,
+    submissionNumber: undefined,
     layerName: payload.layerName ? canonicalizeProgressList('layer', [payload.layerName]).at(0) : undefined,
     checkName: payload.checkName ? canonicalizeProgressList('check', [payload.checkName]).at(0) : undefined,
     types: payload.types ? canonicalizeProgressList('type', payload.types) : undefined,
@@ -72,7 +131,8 @@ export async function POST(request: Request) {
             checkName: normalizedPatch.checkName,
             types: normalizedPatch.types,
             status: normalizedPatch.status,
-            submissionId: normalizedPatch.submissionId ?? undefined,
+            documentId:
+              normalizedPatch.documentId === undefined ? undefined : normalizedPatch.documentId,
             submissionOrder:
               normalizedPatch.submissionOrder === undefined ? undefined : normalizedPatch.submissionOrder ?? null,
             remark: normalizedPatch.remark,
@@ -80,7 +140,14 @@ export async function POST(request: Request) {
             submittedAt: normalizedPatch.submittedAt ? new Date(normalizedPatch.submittedAt) : undefined,
             updatedBy: sessionUser.id,
           },
-          include: { road: true, phase: true, submission: true, submitter: true, creator: true, updater: true },
+          include: {
+            road: true,
+            phase: true,
+            document: { include: { submission: true } },
+            submitter: true,
+            creator: true,
+            updater: true,
+          },
         }),
       ),
     )

@@ -461,6 +461,7 @@ type InspectionBoardCopy = {
     prev: string
     next: string
     goTo: string
+    pageSizeLabel: string
   }
   prefabModal: {
     badge: string
@@ -944,7 +945,7 @@ const progressCopy: Record<Locale, ProgressCopy> = {
         layers: '层次',
         checks: '验收内容',
         types: '验收类型',
-        submissionOrder: '提交单',
+        submissionOrder: '提交单编号',
         status: '状态',
         appointmentDate: '预约报检时间',
         submittedAt: '提交时间',
@@ -995,7 +996,7 @@ const progressCopy: Record<Locale, ProgressCopy> = {
         remarkHint: '填写则批量替换备注，留空不变',
         invalidRange: '请填写有效的起止里程',
         invalidSubmittedAt: '送检时间格式无效',
-        invalidSubmissionOrder: '提交单必须为数字',
+        invalidSubmissionOrder: '提交单编号必须为数字',
         missingFields: '请至少填写一个需要修改的字段',
         save: '应用批量修改',
         saving: '批量更新中...',
@@ -1017,6 +1018,7 @@ const progressCopy: Record<Locale, ProgressCopy> = {
         prev: '上一页',
         next: '下一页',
         goTo: '跳转页码',
+        pageSizeLabel: '每页条数',
       },
       prefabModal: {
         badge: '新增预制报检',
@@ -1091,7 +1093,7 @@ const progressCopy: Record<Locale, ProgressCopy> = {
         submittedAtLabel: '提交日期',
         statusLabel: '状态',
         statusPlaceholder: '选择状态',
-        submissionOrderLabel: '提交单',
+        submissionOrderLabel: '提交单编号',
         submissionOrderPlaceholder: '数字，可留空',
         remarkLabel: '备注',
         remarkPlaceholder: '补充说明',
@@ -1102,7 +1104,7 @@ const progressCopy: Record<Locale, ProgressCopy> = {
         missingPhase: '请选择分项',
         missingRequired: '层次、验收内容、验收类型均不能为空',
         appointmentMissing: '请选择预约报检日期',
-        invalidSubmissionOrder: '提交单需为数字（可留空）',
+        invalidSubmissionOrder: '提交单编号需为数字（可留空）',
         saveFailed: '更新失败',
       },
       deleteModal: {
@@ -1593,6 +1595,7 @@ const progressCopy: Record<Locale, ProgressCopy> = {
         prev: 'Précédent',
         next: 'Suivant',
         goTo: 'Aller à la page',
+        pageSizeLabel: 'Par page',
       },
       prefabModal: {
         badge: 'Nouveau contrôle préfab',

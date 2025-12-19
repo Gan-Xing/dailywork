@@ -76,7 +76,10 @@ export interface InspectionListItem {
   roadSlug: string
   phaseId: number
   phaseName: string
+  documentId?: number | null
   submissionId?: number | null
+  submissionNumber?: number | null
+  documentCode?: string | null
   submissionCode?: string | null
   side: IntervalSide
   startPk: number
@@ -115,7 +118,9 @@ export interface SubmissionDTO {
 }
 
 export interface InspectionEntryPayload {
-  submissionId?: number | null
+  submissionId?: number | null // alias of documentId for backward compatibility
+  submissionNumber?: number | null
+  documentId?: number | null
   roadId: number
   phaseId: number
   side: IntervalSide
@@ -135,7 +140,10 @@ export interface InspectionEntryPayload {
 
 export interface InspectionEntryDTO extends InspectionEntryPayload {
   id: number
+  submissionId?: number | null
   submissionCode?: string | null
+  submissionNumber?: number | null
+  documentCode?: string | null
   roadName: string
   roadSlug: string
   phaseName: string
@@ -149,6 +157,10 @@ export interface InspectionEntryDTO extends InspectionEntryPayload {
 export interface InspectionEntryFilter {
   roadSlug?: string
   roadSlugs?: string[]
+  documentId?: number
+  documentIds?: number[]
+  submissionNumber?: number
+  submissionNumbers?: number[]
   phaseId?: number
   phaseDefinitionId?: number
   phaseDefinitionIds?: number[]
@@ -297,6 +309,8 @@ export interface InspectionPayload {
   types: string[]
   status?: InspectionStatus
   submissionId?: number | null
+  submissionNumber?: number | null
+  documentId?: number | null
   submissionOrder?: number | null
   remark?: string
   appointmentDate?: string
@@ -313,6 +327,8 @@ export interface InspectionBulkPayload {
   types?: string[]
   status?: InspectionStatus
   submissionId?: number | null
+  submissionNumber?: number | null
+  documentId?: number | null
   submissionOrder?: number | null
   remark?: string
   appointmentDate?: string
@@ -324,6 +340,7 @@ export interface InspectionDTO extends InspectionPayload {
   roadId: number
   status: InspectionStatus
   submissionId?: number | null
+  submissionNumber?: number | null
   submissionCode?: string | null
   submissionOrder?: number | null
   appointmentDate?: string

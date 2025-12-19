@@ -23,28 +23,34 @@ const useElementWidth = (ref: RefObject<HTMLElement>) => {
 
   useLayoutEffect(() => {
     const node = ref.current
-    if (!node) {
-      setWidth(0)
-      return
-    }
+    if (!node || typeof window === 'undefined') return
+
+    let rafId: number | null = null
     const updateWidth = () => {
+      rafId = null
       setWidth(node.clientWidth || 0)
     }
-    updateWidth()
-
-    if (typeof window === 'undefined') {
-      return
+    const scheduleUpdate = () => {
+      if (rafId !== null) return
+      rafId = window.requestAnimationFrame(updateWidth)
     }
+    scheduleUpdate()
 
     if (typeof ResizeObserver !== 'undefined') {
-      const observer = new ResizeObserver(() => updateWidth())
+      const observer = new ResizeObserver(() => scheduleUpdate())
       observer.observe(node)
-      return () => observer.disconnect()
+      return () => {
+        observer.disconnect()
+        if (rafId !== null) window.cancelAnimationFrame(rafId)
+      }
     }
 
-    const handleResize = () => updateWidth()
+    const handleResize = () => scheduleUpdate()
     window.addEventListener('resize', handleResize)
-    return () => window.removeEventListener('resize', handleResize)
+    return () => {
+      window.removeEventListener('resize', handleResize)
+      if (rafId !== null) window.cancelAnimationFrame(rafId)
+    }
   }, [ref])
 
   return width

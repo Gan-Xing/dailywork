@@ -51,7 +51,7 @@ export async function POST(request: Request) {
     // 聚合为旧结构，便于前端兼容
     const grouped = new Map<string, { layers: Set<string>; checks: Set<string>; latest: (typeof entries)[number] }>()
     entries.forEach((entry) => {
-      const key = `${entry.phaseId}:${entry.side}:${entry.startPk}:${entry.endPk}:${entry.submissionId ?? ''}`
+      const key = `${entry.phaseId}:${entry.side}:${entry.startPk}:${entry.endPk}:${entry.documentId ?? ''}`
       const existing = grouped.get(key)
       if (!existing) {
         grouped.set(key, { layers: new Set([entry.layerName]), checks: new Set([entry.checkName]), latest: entry })
@@ -70,8 +70,8 @@ export async function POST(request: Request) {
       roadSlug: entries[0]?.roadSlug ?? '',
       phaseId: group.latest.phaseId,
       phaseName: group.latest.phaseName,
-      submissionId: group.latest.submissionId,
-      submissionCode: group.latest.submissionCode,
+      documentId: group.latest.documentId,
+      documentCode: group.latest.documentCode,
       side: group.latest.side,
       startPk: group.latest.startPk,
       endPk: group.latest.endPk,

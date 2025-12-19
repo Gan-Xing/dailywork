@@ -1,4 +1,4 @@
-import { InspectionStatus, IntervalSide, PhaseMeasure, Prisma } from '@prisma/client'
+import { DocumentType, InspectionStatus, IntervalSide, PhaseMeasure, Prisma } from '@prisma/client'
 
 import type {
   InspectionEntryDTO,
@@ -26,6 +26,12 @@ const normalizeRange = (start: number, end: number) => {
 
 const overlapsRange = (startA: number, endA: number, startB: number, endB: number) =>
   Math.max(startA, startB) < Math.min(endA, endB)
+
+const parseOptionalNumber = (value: unknown) => {
+  if (value === null || value === undefined || value === '') return null
+  const num = Number(value)
+  return Number.isFinite(num) ? num : null
+}
 
 const statusPriority: Record<InspectionStatus, number> = {
   PENDING: 1,
@@ -62,12 +68,22 @@ const assertPointSideAllowed = (
 
 const mapEntry = (
   row: Prisma.InspectionEntryGetPayload<{
-    include: { submission: true; road: true; phase: true; submitter: true; creator: true; updater: true }
+    include: {
+      document: { include: { submission: true } }
+      road: true
+      phase: true
+      submitter: true
+      creator: true
+      updater: true
+    }
   }>,
 ): InspectionEntryDTO => ({
   id: row.id,
-  submissionId: row.submissionId,
-  submissionCode: row.submission?.code ?? null,
+  documentId: row.documentId ?? null,
+  documentCode: row.document?.code ?? null,
+  submissionId: row.documentId ?? null,
+  submissionCode: row.document?.code ?? null,
+  submissionNumber: row.document?.submission?.submissionNumber ?? null,
   roadId: row.roadId,
   roadName: row.road.name,
   roadSlug: row.road.slug,
@@ -93,8 +109,7 @@ const mapEntry = (
   updatedBy: row.updater ? { id: row.updater.id, username: row.updater.username } : null,
 })
 
-type InspectionEntryCreateData = Omit<Prisma.InspectionEntryUncheckedCreateInput, 'submissionId' | 'types'> & {
-  submissionId?: number | null
+type InspectionEntryCreateData = Omit<Prisma.InspectionEntryUncheckedCreateInput, 'types'> & {
   types: string[]
 }
 
@@ -411,7 +426,11 @@ const toOrderBy = (
     case 'checks':
       return { checkName: order }
     case 'submissionOrder':
-      return [{ submissionOrder: order }, { startPk: order }]
+      return [
+        { document: { submission: { submissionNumber: order } } },
+        { submissionOrder: order },
+        { startPk: order },
+      ]
     case 'status':
       return { status: order }
     case 'appointmentDate':
@@ -453,6 +472,7 @@ export const listInspectionEntries = async (filter: InspectionEntryFilter): Prom
   })
 
   const where: Prisma.InspectionEntryWhereInput = {}
+  const and: Prisma.InspectionEntryWhereInput[] = []
   if (filter.roadSlugs && filter.roadSlugs.length) {
     where.road = { slug: { in: filter.roadSlugs } }
   } else if (filter.roadSlug) {
@@ -516,12 +536,32 @@ export const listInspectionEntries = async (filter: InspectionEntryFilter): Prom
       lte: filter.endDate ? new Date(filter.endDate) : undefined,
     }
   }
+  if (filter.documentIds && filter.documentIds.length) {
+    and.push({ documentId: { in: filter.documentIds } })
+  } else if (Number.isFinite(filter.documentId)) {
+    and.push({ documentId: filter.documentId as number })
+  }
+  if (filter.submissionNumbers && filter.submissionNumbers.length) {
+    and.push({ document: { submission: { submissionNumber: { in: filter.submissionNumbers } } } })
+  } else if (Number.isFinite(filter.submissionNumber)) {
+    and.push({ document: { submission: { submissionNumber: filter.submissionNumber as number } } })
+  }
+  if (and.length) {
+    where.AND = [...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []), ...and]
+  }
 
   const [total, rows] = await prisma.$transaction([
     prisma.inspectionEntry.count({ where }),
     prisma.inspectionEntry.findMany({
       where,
-      include: { road: true, phase: true, submission: true, submitter: true, creator: true, updater: true },
+      include: {
+        road: true,
+        phase: true,
+        document: { include: { submission: true } },
+        submitter: true,
+        creator: true,
+        updater: true,
+      },
       orderBy: orderBy.length ? orderBy : [{ updatedAt: 'desc' }],
       skip,
       take: pageSize,
@@ -544,14 +584,51 @@ export const createInspectionEntries = async (
     throw new Error('至少需要一条报检明细')
   }
 
-  const providedSubmissionIds = Array.from(
-    new Set(entries.map((item) => item.submissionId).filter((v): v is number => Number.isFinite(v))),
-  )
-  if (providedSubmissionIds.length) {
-    const submissions = await prisma.submission.findMany({ where: { id: { in: providedSubmissionIds } } })
-    if (submissions.length !== providedSubmissionIds.length) {
+  const providedDocumentIds = new Set<number>()
+  const providedSubmissionNumbers = new Set<number>()
+  entries.forEach((item) => {
+    const docId = parseOptionalNumber((item as any).documentId ?? (item as any).submissionId)
+    if (docId !== null) providedDocumentIds.add(docId)
+    const submissionNumber = parseOptionalNumber((item as any).submissionNumber)
+    if (submissionNumber !== null) providedSubmissionNumbers.add(submissionNumber)
+  })
+
+  if (providedDocumentIds.size) {
+    const submissions = await prisma.document.findMany({
+      where: { id: { in: Array.from(providedDocumentIds) }, type: DocumentType.SUBMISSION },
+    })
+    if (submissions.length !== providedDocumentIds.size) {
       throw new Error('提交单号不存在，请重新选择')
     }
+  }
+
+  const submissionDocIdByNumber = new Map<number, number>()
+  if (providedSubmissionNumbers.size) {
+    const submissionRows = await prisma.submission.findMany({
+      where: { submissionNumber: { in: Array.from(providedSubmissionNumbers) } },
+      select: { submissionNumber: true, documentId: true },
+    })
+    submissionRows.forEach((row) => submissionDocIdByNumber.set(row.submissionNumber, row.documentId))
+    const missingNumbers = Array.from(providedSubmissionNumbers).filter((num) => !submissionDocIdByNumber.has(num))
+    if (missingNumbers.length) {
+      throw new Error('提交单编号不存在，请重新输入')
+    }
+  }
+
+  const resolveDocumentBinding = (entry: InspectionEntryPayload) => {
+    const explicitId = parseOptionalNumber((entry as any).documentId ?? (entry as any).submissionId)
+    const submissionNumber = parseOptionalNumber((entry as any).submissionNumber)
+    const provided = explicitId !== null || submissionNumber !== null
+    if (!provided) return { documentId: null, provided: false }
+    const mappedId = submissionNumber !== null ? submissionDocIdByNumber.get(submissionNumber) ?? null : null
+    if (explicitId && mappedId && explicitId !== mappedId) {
+      throw new Error('提交单编号与提交单 ID 不一致，请检查输入')
+    }
+    const documentId = explicitId ?? mappedId
+    if (documentId === null) {
+      throw new Error('提交单编号不存在，请重新输入')
+    }
+    return { documentId, provided: true }
   }
 
   const roadIds = Array.from(new Set(entries.map((item) => item.roadId)))
@@ -576,8 +653,7 @@ export const createInspectionEntries = async (
   const phaseMap = new Map(phases.map((phase) => [phase.id, phase]))
   const resolvedLayersByPhaseId = new Map<number, string[]>(phases.map((phase) => [phase.id, resolvePhaseLayers(phase)]))
 
-  const prepared: { data: InspectionEntryCreateData; meta: { roadSlug: string } }[] = []
-  let generatedSubmissionId: number | null = null
+  const prepared: { data: InspectionEntryCreateData; meta: { roadSlug: string }; bindingProvided: boolean }[] = []
   const workflowGroups = new Map<
     string,
     {
@@ -589,19 +665,19 @@ export const createInspectionEntries = async (
       checks: Set<string>
     }
   >()
-  const ensureSubmissionId = async (provided?: number | null) => {
-    if (Number.isFinite(provided)) return provided as number
-    if (!generatedSubmissionId) {
-      const submission = await createSubmission(undefined, undefined, [])
-      generatedSubmissionId = submission.id
-    }
-    return generatedSubmissionId
-  }
-
   for (const raw of entries) {
     const normalized = normalizeEntry(raw)
     assertEntryRequiredFields(normalized)
-    const submissionId = await ensureSubmissionId(normalized.submissionId ?? null)
+    const { documentId, provided: bindingProvided } = resolveDocumentBinding(normalized)
+    const submissionNumber = parseOptionalNumber((normalized as any).submissionNumber)
+    const submissionOrder =
+      normalized.submissionOrder === null
+        ? null
+        : normalized.submissionOrder === undefined
+          ? submissionNumber === null
+            ? undefined
+            : submissionNumber
+          : normalized.submissionOrder
     const side = normalizeSide(normalized.side)
     const range = normalizeRange(normalized.startPk, normalized.endPk)
     const phase = phaseMap.get(normalized.phaseId)!
@@ -633,7 +709,7 @@ export const createInspectionEntries = async (
 
     prepared.push({
       data: {
-        submissionId,
+        documentId: bindingProvided ? documentId ?? null : undefined,
         roadId: normalized.roadId,
         phaseId: normalized.phaseId,
         side: side as IntervalSide,
@@ -647,13 +723,14 @@ export const createInspectionEntries = async (
         status: (normalized.status as InspectionStatus | undefined) ?? InspectionStatus.SCHEDULED,
         appointmentDate: appointmentDate ?? undefined,
         remark: normalized.remark,
-        submissionOrder: normalized.submissionOrder ?? undefined,
+        submissionOrder,
         submittedAt,
         submittedBy: userId ?? undefined,
         createdBy: userId ?? undefined,
         updatedBy: userId ?? undefined,
       },
       meta: { roadSlug: road.slug },
+      bindingProvided,
     })
   }
 
@@ -671,6 +748,7 @@ export const createInspectionEntries = async (
   }
 
   const uniqueByKey = new Map<string, InspectionEntryCreateData>()
+  const bindingMap = new Map<string, boolean>()
   const keyFor = (data: InspectionEntryCreateData) =>
     [
       data.roadId,
@@ -687,21 +765,33 @@ export const createInspectionEntries = async (
     const existing = uniqueByKey.get(key)
     if (!existing) {
       uniqueByKey.set(key, item.data)
+      bindingMap.set(key, item.bindingProvided)
       return
     }
     const mergedTypes = mergeTypesForCheck(item.data.checkName, existing.types, item.data.types)
+    const existingBinding = bindingMap.get(key) ?? false
+    if (existingBinding && item.bindingProvided && existing.documentId !== item.data.documentId) {
+      throw new Error('同一报检明细的提交单不一致，请检查输入后重试')
+    }
+    const shouldUpdateDocument = item.bindingProvided || existingBinding
+    const documentId = item.bindingProvided
+      ? item.data.documentId ?? null
+      : existing.documentId ?? null
     uniqueByKey.set(key, {
       ...existing,
+      documentId: shouldUpdateDocument ? documentId : existing.documentId,
       types: mergedTypes,
       remark: item.data.remark ?? existing.remark,
       appointmentDate: item.data.appointmentDate ?? existing.appointmentDate,
       submissionOrder:
         item.data.submissionOrder !== undefined ? item.data.submissionOrder : existing.submissionOrder,
     })
+    bindingMap.set(key, shouldUpdateDocument)
   })
 
   const results: InspectionEntryDTO[] = []
-  for (const data of Array.from(uniqueByKey.values())) {
+  for (const [key, data] of Array.from(uniqueByKey.entries())) {
+    const bindingProvided = bindingMap.get(key) ?? false
     const existing = await prisma.inspectionEntry.findFirst({
       where: {
         roadId: data.roadId,
@@ -713,7 +803,14 @@ export const createInspectionEntries = async (
         checkName: data.checkName,
       },
       orderBy: { id: 'asc' },
-      include: { road: true, phase: true, submission: true, submitter: true, creator: true, updater: true },
+      include: {
+        road: true,
+        phase: true,
+        document: { include: { submission: true } },
+        submitter: true,
+        creator: true,
+        updater: true,
+      },
     })
 
     if (existing) {
@@ -722,6 +819,9 @@ export const createInspectionEntries = async (
         types: mergedTypes,
         updatedBy: data.updatedBy,
       }
+      if (bindingProvided) {
+        updateData.documentId = data.documentId ?? null
+      }
       if (data.remark) updateData.remark = data.remark
       if (data.appointmentDate) updateData.appointmentDate = data.appointmentDate
       if (data.submissionOrder !== undefined) updateData.submissionOrder = data.submissionOrder
@@ -729,13 +829,27 @@ export const createInspectionEntries = async (
       const updated = await prisma.inspectionEntry.update({
         where: { id: existing.id },
         data: updateData,
-        include: { road: true, phase: true, submission: true, submitter: true, creator: true, updater: true },
+        include: {
+          road: true,
+          phase: true,
+          document: { include: { submission: true } },
+          submitter: true,
+          creator: true,
+          updater: true,
+        },
       })
       results.push(mapEntry(updated as any))
     } else {
       const created = await prisma.inspectionEntry.create({
         data: data as Prisma.InspectionEntryUncheckedCreateInput,
-        include: { road: true, phase: true, submission: true, submitter: true, creator: true, updater: true },
+        include: {
+          road: true,
+          phase: true,
+          document: { include: { submission: true } },
+          submitter: true,
+          creator: true,
+          updater: true,
+        },
       })
       results.push(mapEntry(created as any))
     }
@@ -780,12 +894,33 @@ export const aggregateEntriesAsListItems = async (
         }
       : {}),
   }
+  const and: Prisma.InspectionEntryWhereInput[] = []
+  if (filter.documentIds && filter.documentIds.length) {
+    and.push({ documentId: { in: filter.documentIds } })
+  } else if (Number.isFinite(filter.documentId)) {
+    and.push({ documentId: filter.documentId as number })
+  }
+  if (filter.submissionNumbers && filter.submissionNumbers.length) {
+    and.push({ document: { submission: { submissionNumber: { in: filter.submissionNumbers } } } })
+  } else if (Number.isFinite(filter.submissionNumber)) {
+    and.push({ document: { submission: { submissionNumber: filter.submissionNumber as number } } })
+  }
+  if (and.length) {
+    where.AND = [...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []), ...and]
+  }
 
   const [total, entries] = await prisma.$transaction([
     prisma.inspectionEntry.count({ where }),
     prisma.inspectionEntry.findMany({
       where,
-      include: { road: true, phase: true, submission: true, submitter: true, creator: true, updater: true },
+      include: {
+        road: true,
+        phase: true,
+        document: { include: { submission: true } },
+        submitter: true,
+        creator: true,
+        updater: true,
+      },
       orderBy: [{ updatedAt: 'desc' }],
       skip,
       take: pageSize,
@@ -799,7 +934,7 @@ export const aggregateEntriesAsListItems = async (
       : entry.layerName
         ? `name:${normalizeLabel(entry.layerName)}`
         : 'layer:unknown'
-    const baseKey = `${entry.roadId}:${entry.phaseId}:${entry.side}:${entry.startPk}:${entry.endPk}:${entry.submissionId ?? ''}`
+    const baseKey = `${entry.roadId}:${entry.phaseId}:${entry.side}:${entry.startPk}:${entry.endPk}:${entry.documentId ?? ''}`
     const key = filter.groupByLayer ? `${baseKey}:${layerKey}` : baseKey
     const priority = statusPriority[entry.status]
     const existing = grouped.get(key)
@@ -814,8 +949,11 @@ export const aggregateEntriesAsListItems = async (
         roadSlug: entry.road.slug,
         phaseId: entry.phaseId,
         phaseName: entry.phase.name,
-        submissionId: entry.submissionId,
-        submissionCode: entry.submission?.code ?? null,
+        documentId: entry.documentId,
+        documentCode: entry.document?.code ?? null,
+        submissionId: entry.documentId,
+        submissionCode: entry.document?.code ?? null,
+        submissionNumber: entry.document?.submission?.submissionNumber ?? null,
         side: entry.side,
         startPk: entry.startPk,
         endPk: entry.endPk,
@@ -846,6 +984,11 @@ export const aggregateEntriesAsListItems = async (
       grouped.set(key, {
         ...existing,
         id: Math.max(existing.id, entry.id),
+        documentId: existing.documentId ?? entry.documentId,
+        documentCode: existing.documentCode ?? entry.document?.code ?? null,
+        submissionId: existing.submissionId ?? entry.documentId,
+        submissionCode: existing.submissionCode ?? entry.document?.code ?? null,
+        submissionNumber: existing.submissionNumber ?? entry.document?.submission?.submissionNumber ?? null,
         layers: filter.groupByLayer
           ? existing.layers && existing.layers.length
             ? existing.layers
@@ -866,23 +1009,28 @@ export const aggregateEntriesAsListItems = async (
   return { items, total, page, pageSize }
 }
 
-export const listSubmissions = async (): Promise<{ id: number; code: string }[]> => {
-  const rows = await prisma.submission.findMany({
+export const listSubmissions = async (): Promise<{ id: number; code: string; submissionNumber: number | null }[]> => {
+  const rows = await prisma.document.findMany({
+    where: { type: DocumentType.SUBMISSION },
     orderBy: [{ id: 'asc' }],
-    select: { id: true, code: true },
+    select: { id: true, code: true, submission: { select: { submissionNumber: true } } },
   })
-  return rows
+  return rows.map((row) => ({
+    id: row.id,
+    code: row.code,
+    submissionNumber: row.submission?.submissionNumber ?? null,
+  }))
 }
 
 const nextSubmissionCode = async () => {
-  const latest = await prisma.submission.findFirst({ orderBy: { id: 'desc' }, select: { id: true } })
+  const latest = await prisma.document.findFirst({ orderBy: { id: 'desc' }, select: { id: true } })
   const next = (latest?.id ?? 0) + 1
   return `SUB-${String(next).padStart(3, '0')}`
 }
 
 export const createSubmission = async (code?: string, remark?: string, files?: unknown) => {
   const finalCode = code && code.trim().length > 0 ? code.trim() : await nextSubmissionCode()
-  const submission = await prisma.submission.create({
+  const submission = await prisma.document.create({
     data: {
       code: finalCode,
       remark: remark ?? undefined,

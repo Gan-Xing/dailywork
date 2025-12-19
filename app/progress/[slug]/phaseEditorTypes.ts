@@ -145,6 +145,7 @@ export type InspectionEntrySubmitPayload = {
   remark?: string
   appointmentDate?: string
   status: InspectionStatus
+  submissionNumber?: number | null
 }
 
 export type WorkflowStatusMaps = {

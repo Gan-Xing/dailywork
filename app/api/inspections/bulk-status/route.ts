@@ -40,7 +40,14 @@ export async function POST(request: Request) {
         prisma.inspectionEntry.update({
           where: { id },
           data: { status, updatedBy: sessionUser.id },
-          include: { road: true, phase: true, submission: true, submitter: true, creator: true, updater: true },
+          include: {
+            road: true,
+            phase: true,
+            document: { include: { submission: true } },
+            submitter: true,
+            creator: true,
+            updater: true,
+          },
         }),
       ),
     )

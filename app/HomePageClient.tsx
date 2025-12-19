@@ -68,6 +68,7 @@ export default function HomePageClient() {
 			'/members': ['member:view'],
 			'/finance': ['finance:view'],
 			'/value': ['value:view'],
+			'/documents': [],
 			'/roadmap': ['roadmap:view'],
 		}),
 		[]

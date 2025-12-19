@@ -1,9 +1,16 @@
+import { DocumentType } from '@prisma/client'
 import { NextResponse, type NextRequest } from 'next/server'
 
 import type { InspectionPayload } from '@/lib/progressTypes'
 import { getSessionUser, hasPermission } from '@/lib/server/authSession'
 import { canonicalizeProgressList } from '@/lib/i18n/progressDictionary'
 import { prisma } from '@/lib/prisma'
+
+const parseOptionalNumber = (value: unknown) => {
+  if (value === null || value === undefined || value === '') return null
+  const num = Number(value)
+  return Number.isFinite(num) ? num : null
+}
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id: idParam } = await params
@@ -40,13 +47,62 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   }
 
   try {
-    // 旧接口：找到该 entry，按旧 payload 把同区间同 submission 的 entries 覆盖重建
-    const existing = await prisma.inspectionEntry.findUnique({ where: { id } })
+    // 旧接口：找到该 entry，按旧 payload 把同区间同 document 的 entries 覆盖重建
+    const existing = await prisma.inspectionEntry.findUnique({
+      where: { id },
+      include: {
+        road: true,
+        phase: true,
+        document: { include: { submission: true } },
+        submitter: true,
+        creator: true,
+        updater: true,
+      },
+    })
     if (!existing) return NextResponse.json({ message: '报检记录不存在或已删除' }, { status: 404 })
+
+    const hasDocumentIdField =
+      Object.prototype.hasOwnProperty.call(payload as any, 'documentId') ||
+      Object.prototype.hasOwnProperty.call(payload as any, 'submissionId')
+    const parsedDocumentId = parseOptionalNumber((payload as any).documentId ?? (payload as any).submissionId)
+    const hasSubmissionNumberField = Object.prototype.hasOwnProperty.call(payload as any, 'submissionNumber')
+    const parsedSubmissionNumber = parseOptionalNumber((payload as any).submissionNumber)
+    let targetDocumentId = hasDocumentIdField ? parsedDocumentId : existing.documentId
+    const bindingProvided = hasDocumentIdField || hasSubmissionNumberField
+
+    if (hasSubmissionNumberField) {
+      if (parsedSubmissionNumber === null) {
+        targetDocumentId = targetDocumentId ?? null
+      } else {
+        const submission = await prisma.submission.findUnique({
+          where: { submissionNumber: parsedSubmissionNumber },
+          select: { documentId: true },
+        })
+        if (!submission) {
+          return NextResponse.json({ message: '提交单编号不存在，请重新输入' }, { status: 400 })
+        }
+        if (targetDocumentId && targetDocumentId !== submission.documentId) {
+          return NextResponse.json({ message: '提交单编号与提交单 ID 不一致，请检查输入' }, { status: 400 })
+        }
+        targetDocumentId = submission.documentId
+      }
+    }
+
+    if (hasDocumentIdField && parsedDocumentId !== null) {
+      const exists = await prisma.document.findFirst({
+        where: { id: parsedDocumentId, type: DocumentType.SUBMISSION },
+        select: { id: true },
+      })
+      if (!exists) {
+        return NextResponse.json({ message: '提交单不存在，请重新选择' }, { status: 400 })
+      }
+    }
+
+    const resolvedDocumentId = bindingProvided ? targetDocumentId ?? null : existing.documentId
 
     await prisma.inspectionEntry.deleteMany({
       where: {
-        submissionId: existing.submissionId,
+        documentId: existing.documentId,
         roadId: existing.roadId,
         phaseId: existing.phaseId,
         side: existing.side,
@@ -60,7 +116,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         checks.map((check) =>
           prisma.inspectionEntry.create({
             data: {
-              submissionId: existing.submissionId,
+              documentId: resolvedDocumentId ?? undefined,
               roadId: existing.roadId,
               phaseId: payload.phaseId,
               side: payload.side as any,
@@ -79,7 +135,14 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
               submittedAt: payload.submittedAt ? new Date(payload.submittedAt) : undefined,
               updatedBy: sessionUser.id,
             },
-            include: { road: true, phase: true, submission: true, submitter: true, creator: true, updater: true },
+            include: {
+              road: true,
+              phase: true,
+              document: { include: { submission: true } },
+              submitter: true,
+              creator: true,
+              updater: true,
+            },
           }),
         ),
       ),
@@ -93,8 +156,11 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       roadSlug: first.road.slug,
       phaseId: first.phaseId,
       phaseName: first.phase.name,
-      submissionId: first.submissionId,
-      submissionCode: first.submission?.code ?? null,
+      documentId: first.documentId,
+      documentCode: first.document?.code ?? null,
+      submissionId: first.documentId,
+      submissionCode: first.document?.code ?? null,
+      submissionNumber: first.document?.submission?.submissionNumber ?? null,
       side: first.side,
       startPk: first.startPk,
       endPk: first.endPk,

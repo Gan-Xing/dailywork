@@ -45,6 +45,25 @@ enum RoadmapStatus {
   DONE
 }
 
+enum DocumentType {
+  SUBMISSION
+  LETTER
+  MINUTES
+  SUPPLY_REQUEST
+}
+
+enum TemplateStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum DocumentStatus {
+  DRAFT
+  FINAL
+  ARCHIVED
+}
+
 model PhaseDefinition {
   id             Int                     @id @default(autoincrement())
   name           String
@@ -209,20 +228,37 @@ model InspectionRequest {
   @@index([phaseId, status, updatedAt])
 }
 
-model Submission {
-  id        Int               @id @default(autoincrement())
-  code      String            @unique
-  files     Json              @default("[]")
-  remark    String?
-  createdAt DateTime          @default(now())
-  updatedAt DateTime          @updatedAt
-  entries   InspectionEntry[]
+model Document {
+  id              Int                @id @default(autoincrement())
+  code            String             @unique
+  files           Json               @default("[]")
+  remark          String?
+  type            DocumentType       @default(SUBMISSION)
+  templateId      String?
+  template        DocumentTemplate? @relation(fields: [templateId], references: [id])
+  templateVersion Int?
+  status          DocumentStatus     @default(DRAFT)
+  title           String?
+  data            Json?
+  createdById     Int?
+  updatedById     Int?
+  createdBy       User?              @relation("DocumentCreator", fields: [createdById], references: [id])
+  updatedBy       User?              @relation("DocumentUpdater", fields: [updatedById], references: [id])
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  entries         InspectionEntry[]
+  submission      Submission?
+  items           SubmissionItem[]
+
+  @@index([type, status])
+  @@index([createdAt])
+  @@index([updatedAt])
 }
 
 model InspectionEntry {
   id           Int              @id @default(autoincrement())
-  submissionId Int?
-  submission   Submission?      @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  documentId   Int?
+  document     Document?        @relation(fields: [documentId], references: [id], onDelete: Cascade)
   roadId       Int
   road         RoadSection      @relation(fields: [roadId], references: [id], onDelete: Cascade)
   phaseId      Int
@@ -250,7 +286,49 @@ model InspectionEntry {
   updatedAt    DateTime         @updatedAt
 
   @@index([roadId, phaseId, side, startPk, endPk, status])
-  @@index([submissionId])
+  @@index([documentId])
+}
+
+model Submission {
+  documentId         Int    @id
+  submissionNumber   Int    @unique
+  projectName        String
+  projectCode        String
+  contractNumbers    Json
+  bordereauNumber    Int
+  subject            String
+  senderOrg          String
+  senderDate         String
+  senderLastName     String
+  senderFirstName    String
+  senderSignature    String?
+  senderTime         String?
+  recipientOrg       String
+  recipientDate      String
+  recipientLastName  String
+  recipientFirstName String
+  recipientSignature String?
+  recipientTime      String?
+  comments           String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+}
+
+model SubmissionItem {
+  id          Int      @id @default(autoincrement())
+  documentId  Int
+  order       Int?
+  designation String
+  quantity    Float?
+  observation String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([documentId, order])
 }
 
 model RoadPhaseLayer {
@@ -323,6 +401,10 @@ model User {
   updatedUsers User[]     @relation("UserUpdater")
   roadmapIdeasCreated RoadmapIdea[] @relation("RoadmapIdeaCreator")
   roadmapIdeasUpdated RoadmapIdea[] @relation("RoadmapIdeaUpdater")
+  createdDocumentTemplates DocumentTemplate[] @relation("DocumentTemplateCreator")
+  updatedDocumentTemplates DocumentTemplate[] @relation("DocumentTemplateUpdater")
+  createdDocuments Document[] @relation("DocumentCreator")
+  updatedDocuments Document[] @relation("DocumentUpdater")
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 }
@@ -456,6 +538,27 @@ model FinanceEntry {
   @@index([paymentDate])
   @@index([isDeleted])
   @@index([handlerId])
+}
+
+model DocumentTemplate {
+  id           String         @id @default(cuid())
+  name         String
+  type         DocumentType   @default(SUBMISSION)
+  version      Int            @default(1)
+  status       TemplateStatus @default(DRAFT)
+  language     String         @default("fr")
+  html         String         @db.Text
+  placeholders Json
+  createdById  Int?
+  updatedById  Int?
+  createdBy    User?          @relation("DocumentTemplateCreator", fields: [createdById], references: [id])
+  updatedBy    User?          @relation("DocumentTemplateUpdater", fields: [updatedById], references: [id])
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  documents    Document[]
+
+  @@index([type, status])
+  @@index([name])
 }
 
 model RoadmapIdea {

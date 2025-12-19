@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Fiche de Bordereau N°{{documentMeta.bordereauNumber}}</title>
+    <link rel="stylesheet" href="bordereau.css" />
+  </head>
+  <body>
+    <div class="page">
+      <!-- Header Section -->
+      <div class="header-grid">
+        <div class="logo-box">
+          <img src="logo_rb.png" alt="RB CRBC Logo" style="margin-bottom: 2px" />
+          <span style="font-weight: bold; font-size: 9pt; color: #004488">CRBC</span>
+        </div>
+        <div class="project-title-box">{{documentMeta.projectName}}</div>
+        <div class="ref-box">{{documentMeta.projectCode}}</div>
+      </div>
+
+      <!-- Market Number -->
+      <div class="market-row">MARCHE N° {{documentMeta.contractNumbers}}</div>
+
+      <!-- Fiche Title -->
+      <div class="fiche-title">Fiche de Bordereau N°{{documentMeta.bordereauNumber}}</div>
+
+      <!-- Object Section -->
+      <div class="object-row">
+        <div class="label-bold" style="padding-left: 2mm">OBJET</div>
+        <div class="colon-sep">:</div>
+        <div class="object-content">{{documentMeta.subject}}</div>
+      </div>
+
+      <!-- Info Grid -->
+      <div class="info-grid">
+        <!-- Emetteur Column -->
+        <div class="info-col info-col-left">
+          <div class="info-header">
+            <span>EMETTEUR</span>
+            <span>{{parties.sender.organization}}</span>
+          </div>
+          <div class="info-row">
+            <div class="info-label">DATE :</div>
+            <div class="info-value">{{parties.sender.date}}</div>
+          </div>
+          <div class="info-row">
+            <div class="info-label">NOM :</div>
+            <div class="info-value">{{parties.sender.lastName}}</div>
+          </div>
+          <div class="info-row">
+            <div class="info-label">PRENOMS :</div>
+            <div class="info-value">{{parties.sender.firstName}}</div>
+          </div>
+          <div class="info-row signature-row">
+            <div class="info-label">SIGNATURE :</div>
+            <div class="info-value">{{parties.sender.signature}}</div>
+          </div>
+          <div class="info-row">
+            <div class="info-label">HEURE :</div>
+            <div class="info-value">{{parties.sender.time}}</div>
+          </div>
+        </div>
+
+        <!-- Destinataire Column -->
+        <div class="info-col">
+          <div class="info-header">
+            <span>DESTINATAIRE :</span>
+            <span>{{parties.recipient.organization}}</span>
+          </div>
+          <div class="info-row">
+            <div class="info-label">DATE :</div>
+            <div class="info-value">{{parties.recipient.date}}</div>
+          </div>
+          <div class="info-row">
+            <div class="info-label">NOM :</div>
+            <div class="info-value">{{parties.recipient.lastName}}</div>
+          </div>
+          <div class="info-row">
+            <div class="info-label">PRENOMS :</div>
+            <div class="info-value">{{parties.recipient.firstName}}</div>
+          </div>
+          <div class="info-row signature-row">
+            <div class="info-label">SIGNATURE :</div>
+            <div class="info-value">{{parties.recipient.signature}}</div>
+          </div>
+          <div class="info-row">
+            <div class="info-label">HEURE :</div>
+            <div class="info-value">{{parties.recipient.time}}</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Cachet -->
+      <div class="cachet-section">CACHET</div>
+
+      <!-- Main Table -->
+      <table class="main-table">
+        <thead>
+          <tr>
+            <th class="col-num" style="border-right-color: transparent">N°</th>
+            <th class="col-des">DESIGNATIONS</th>
+            <th class="col-qte">Qté</th>
+            <th class="col-obs">OBSERVATIONS</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{itemsTable}}
+        </tbody>
+      </table>
+
+      <!-- Comments Footer -->
+      <div class="footer-comments">{{comments}}</div>
+    </div>
+  </body>
+</html>

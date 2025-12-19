@@ -116,9 +116,8 @@ export function useInspectionFlow({
   addToast,
 }: UseInspectionFlowParams) {
   const [inspectionSlices, setInspectionSlices] = useState<InspectionSlice[]>([])
-  const latestPointInspectionsRef = useRef<Map<string, LatestPointInspection>>(new Map())
   const [latestPointInspections, setLatestPointInspections] = useState<Map<string, LatestPointInspection>>(
-    () => latestPointInspectionsRef.current,
+    () => new Map(),
   )
   const measureByPhaseId = useMemo(() => new Map(phases.map((p) => [p.id, p.measure])), [phases])
   const topLayerNamesByPhaseId = useMemo(() => {
@@ -137,6 +136,34 @@ export function useInspectionFlow({
     })
     return map
   }, [workflowLayersByPhaseId])
+
+  const phaseIdByWorkflow = useMemo(() => {
+    const map = new Map<string, number>()
+    phases.forEach((phase) => {
+      const binding = workflowMap.get(phase.definitionId)
+      if (binding?.id && !map.has(binding.id)) {
+        map.set(binding.id, phase.id)
+      }
+      if (!binding?.id) {
+        if (phase.name === '土方' && !map.has('earthwork')) {
+          map.set('earthwork', phase.id)
+        }
+        if (phase.name === '垫层' && !map.has('subbase')) {
+          map.set('subbase', phase.id)
+        }
+      }
+    })
+    return map
+  }, [phases, workflowMap])
+
+  const earthworkPhaseId = phaseIdByWorkflow.get('earthwork') ?? null
+  const subbasePhaseId = phaseIdByWorkflow.get('subbase') ?? null
+  const earthworkTopLayerName = useMemo(() => {
+    if (!earthworkPhaseId) return null
+    const names = topLayerNamesByPhaseId.get(earthworkPhaseId)
+    if (!names || names.size === 0) return null
+    return Array.from(names.values())[0] ?? null
+  }, [earthworkPhaseId, topLayerNamesByPhaseId])
 
   const resolveLinearInspectionSlices = useCallback(
     (phase: PhaseDTO): InspectionSlice[] => {
@@ -197,6 +224,7 @@ export function useInspectionFlow({
   const [startPkInput, setStartPkInput] = useState<string>('')
   const [endPkInput, setEndPkInput] = useState<string>('')
   const [appointmentDateInput, setAppointmentDateInput] = useState<string>('')
+  const [submissionNumberInput, setSubmissionNumberInput] = useState<string>('')
   const [selectedLayers, setSelectedLayers] = useState<string[]>([])
   const [selectedChecks, setSelectedChecks] = useState<string[]>([])
   const [selectedTypes, setSelectedTypes] = useState<string[]>([])
@@ -279,6 +307,7 @@ export function useInspectionFlow({
     setRemark('')
     setSubmitError(null)
     setAppointmentDateInput('')
+    setSubmissionNumberInput('')
     setAlertDialog(null)
   }, [])
 
@@ -362,8 +391,14 @@ export function useInspectionFlow({
     [],
   )
 
+  const selectedPhaseName = selectedSegment?.phase ?? ''
+  const selectedWorkflowPhaseName = selectedSegment?.workflow?.phaseName ?? ''
+  const selectedWorkflowSideRule = selectedSegment?.workflow?.sideRule ?? ''
+  const selectedWorkflowLayers = selectedSegment?.workflowLayers ?? null
+  const selectedWorkflowTypeOptions = selectedSegment?.workflowTypeOptions ?? null
+
   const [workflowLayerNameMap, workflowLayerByName, workflowChecksByLayerName, workflowTypesByLayerName, workflowCheckTypesByName, workflowCheckMetaByName] = useMemo(() => {
-    if (!selectedSegment?.workflowLayers?.length) {
+    if (!selectedWorkflowLayers?.length) {
       return [null, null, null, null, null, null]
     }
     const layerNameMap = new Map<string, string>()
@@ -373,16 +408,16 @@ export function useInspectionFlow({
     const checkTypesByName = new Map<string, Set<string>>()
     const checkMetaByName = new Map<string, { layerId: string; order: number; types: Set<string> }>()
 
-    selectedSegment.workflowLayers.forEach((layer) => {
+    selectedWorkflowLayers.forEach((layer) => {
       const localizedName = localizeProgressTerm('layer', layer.name, locale, {
-        phaseName: selectedSegment.workflow?.phaseName ?? selectedSegment.phase,
+        phaseName: selectedWorkflowPhaseName || selectedPhaseName,
       })
       layerNameMap.set(layer.id, localizedName)
       const names = [
         layer.name,
         localizedName,
-        localizeProgressTerm('layer', layer.name, 'zh', { phaseName: selectedSegment.phase }),
-        localizeProgressTerm('layer', layer.name, 'fr', { phaseName: selectedSegment.phase }),
+        localizeProgressTerm('layer', layer.name, 'zh', { phaseName: selectedPhaseName }),
+        localizeProgressTerm('layer', layer.name, 'fr', { phaseName: selectedPhaseName }),
       ]
       names
         .filter(Boolean)
@@ -426,21 +461,21 @@ export function useInspectionFlow({
     })
 
     return [layerNameMap, layerByName, checksByLayerName, typesByLayerName, checkTypesByName, checkMetaByName]
-  }, [locale, selectedSegment?.phase, selectedSegment?.workflow?.phaseName, selectedSegment?.workflowLayers])
+  }, [locale, selectedPhaseName, selectedWorkflowLayers, selectedWorkflowPhaseName])
 
   const localizedWorkflowPhaseName = useMemo(() => {
-    if (!selectedSegment?.workflow?.phaseName) return null
-    return localizeProgressTerm('phase', selectedSegment.workflow.phaseName, locale)
-  }, [locale, selectedSegment?.workflow?.phaseName])
+    if (!selectedWorkflowPhaseName) return null
+    return localizeProgressTerm('phase', selectedWorkflowPhaseName, locale)
+  }, [locale, selectedWorkflowPhaseName])
 
   const localizedWorkflowSideRule = useMemo(() => {
-    if (!selectedSegment?.workflow?.sideRule) return null
-    return localizeProgressText(selectedSegment.workflow.sideRule, locale)
-  }, [locale, selectedSegment?.workflow?.sideRule])
+    if (!selectedWorkflowSideRule) return null
+    return localizeProgressText(selectedWorkflowSideRule, locale)
+  }, [locale, selectedWorkflowSideRule])
 
   const workflowPhaseNameForContext = useMemo(
-    () => selectedSegment?.workflow?.phaseName ?? selectedSegment?.phase ?? '',
-    [selectedSegment?.phase, selectedSegment?.workflow?.phaseName],
+    () => selectedWorkflowPhaseName || selectedPhaseName,
+    [selectedPhaseName, selectedWorkflowPhaseName],
   )
 
   const workflowStatusMaps = useMemo(() => {
@@ -490,7 +525,7 @@ export function useInspectionFlow({
       if (snapshotStart !== targetStart || snapshotEnd !== targetEnd) return
       const keyInput = {
         phaseId: snapshot.phaseId,
-        phaseName: snapshot.phaseName ?? selectedSegment.workflow?.phaseName ?? selectedSegment.phase,
+        phaseName: snapshot.phaseName ?? (selectedWorkflowPhaseName || selectedPhaseName),
         layerId: snapshot.layerId ?? null,
         layerName: snapshot.layerName ?? snapshot.layerId ?? null,
         checkId: snapshot.checkId ?? null,
@@ -522,12 +557,7 @@ export function useInspectionFlow({
     })
 
     return { checkStatus, checkStatusBySide }
-  }, [endPkInput, latestPointInspections, selectedSegment, startPkInput])
-
-  const [selectedWorkflowLayers, setSelectedWorkflowLayers] = useState<WorkflowLayerTemplate[] | null>(null)
-  useEffect(() => {
-    setSelectedWorkflowLayers(selectedSegment?.workflowLayers ?? null)
-  }, [selectedSegment?.workflowLayers])
+  }, [endPkInput, latestPointInspections, selectedPhaseName, selectedSegment, selectedWorkflowPhaseName, startPkInput])
 
   const allowedCheckSet = useMemo(() => {
     if (!workflowChecksByLayerName) return null
@@ -541,8 +571,8 @@ export function useInspectionFlow({
 
   const activeInspectionTypes = useMemo(() => {
     const base =
-      selectedSegment?.workflowTypeOptions && selectedSegment.workflowTypeOptions.length
-        ? selectedSegment.workflowTypeOptions
+      selectedWorkflowTypeOptions && selectedWorkflowTypeOptions.length
+        ? selectedWorkflowTypeOptions
         : defaultInspectionTypes
     const baseSet = new Set(base)
     if (!workflowTypesByLayerName || !selectedLayers.length) return base
@@ -557,7 +587,7 @@ export function useInspectionFlow({
     })
     if (!scoped.size) return base
     return base.filter((type) => scoped.has(type))
-  }, [defaultInspectionTypes, selectedLayers, selectedSegment?.workflowTypeOptions, workflowTypesByLayerName])
+  }, [defaultInspectionTypes, selectedLayers, selectedWorkflowTypeOptions, workflowTypesByLayerName])
 
   const allowedWorkflowStages = useMemo(() => {
     if (!workflowLayerByName || !selectedLayers.length) return null
@@ -658,7 +688,8 @@ export function useInspectionFlow({
   }
 
   useEffect(() => {
-    if (selectedSegment) {
+    if (!selectedSegment || typeof window === 'undefined') return
+    const frame = window.requestAnimationFrame(() => {
       setSelectedLayers([])
       setSelectedChecks(
         selectedSegment.checks.length === 1 ? [selectedSegment.checks[0]] : [],
@@ -673,44 +704,63 @@ export function useInspectionFlow({
       tomorrow.setDate(tomorrow.getDate() + 1)
       setAppointmentDateInput(tomorrow.toISOString().slice(0, 10))
       setManualCheckExclusions([])
-    }
+      setSubmissionNumberInput('')
+    })
+    return () => window.cancelAnimationFrame(frame)
   }, [selectedSegment])
 
   useEffect(() => {
     if (!workflowChecksByLayerName) return
+    let nextChecks: string[] | null = null
+    let nextManual: string[] | null = null
+
     if (!allowedCheckSet || !allowedCheckSet.size) {
       if (selectedChecks.length) {
-        setSelectedChecks([])
+        nextChecks = []
       }
       if (manualCheckExclusions.length) {
-        setManualCheckExclusions([])
+        nextManual = []
       }
-      return
+    } else {
+      const manualSet = new Set(manualCheckExclusions)
+      const candidateChecks = Array.from(allowedCheckSet).filter((item) => !manualSet.has(item))
+      const cleanedManual = manualCheckExclusions.filter((item) => allowedCheckSet.has(item))
+      if (cleanedManual.length !== manualCheckExclusions.length) {
+        nextManual = cleanedManual
+      }
+      const prevSet = new Set(selectedChecks)
+      const changed =
+        candidateChecks.length !== selectedChecks.length ||
+        candidateChecks.some((item) => !prevSet.has(item))
+      if (changed) {
+        nextChecks = candidateChecks
+      }
     }
-    const manualSet = new Set(manualCheckExclusions)
-    const nextChecks = Array.from(allowedCheckSet).filter((item) => !manualSet.has(item))
-    const cleanedManual = manualCheckExclusions.filter((item) => allowedCheckSet.has(item))
-    if (cleanedManual.length !== manualCheckExclusions.length) {
-      setManualCheckExclusions(cleanedManual)
-    }
-    const prevSet = new Set(selectedChecks)
-    const changed =
-      nextChecks.length !== selectedChecks.length ||
-      nextChecks.some((item) => !prevSet.has(item))
-    if (changed) {
-      setSelectedChecks(nextChecks)
-    }
+
+    if (!nextChecks && !nextManual) return
+    if (typeof window === 'undefined') return
+    const frame = window.requestAnimationFrame(() => {
+      if (nextManual) setManualCheckExclusions(nextManual)
+      if (nextChecks) setSelectedChecks(nextChecks)
+    })
+    return () => window.cancelAnimationFrame(frame)
   }, [allowedCheckSet, manualCheckExclusions, selectedChecks, selectedLayers, workflowChecksByLayerName])
 
   const prevSideRef = useRef<IntervalSide>(selectedSide)
   useEffect(() => {
-    if (prevSideRef.current !== selectedSide) {
+    if (prevSideRef.current === selectedSide) return
+    if (typeof window === 'undefined') {
+      prevSideRef.current = selectedSide
+      return
+    }
+    const frame = window.requestAnimationFrame(() => {
       setSelectedLayers([])
       setSelectedChecks([])
       setSelectedTypes([])
       setManualCheckExclusions([])
       prevSideRef.current = selectedSide
-    }
+    })
+    return () => window.cancelAnimationFrame(frame)
   }, [selectedSide])
 
   useEffect(() => {
@@ -729,15 +779,17 @@ export function useInspectionFlow({
     const next = union.size ? allowed.filter((type) => union.has(type)) : allowed
     const changed =
       next.length !== selectedTypes.length || next.some((type, idx) => type !== selectedTypes[idx])
-    if (changed) {
+    if (!changed) return
+    if (typeof window === 'undefined') return
+    const frame = window.requestAnimationFrame(() => {
       setSelectedTypes(next)
-    }
+    })
+    return () => window.cancelAnimationFrame(frame)
   }, [activeInspectionTypes, selectedChecks, selectedTypes, workflowCheckTypesByName])
 
   const fetchLatestInspections = useCallback(
     async (options?: { phaseId?: number; signalCancelled?: () => boolean }) => {
       if (!canViewInspection) {
-        latestPointInspectionsRef.current = new Map()
         setInspectionSlices([])
         setLatestPointInspections(new Map())
         return
@@ -757,7 +809,6 @@ export function useInspectionFlow({
         const res = await fetch(url, { credentials: 'include' })
         if (!res.ok) {
           if (!isCancelled()) {
-            latestPointInspectionsRef.current = new Map()
             setInspectionSlices([])
             setLatestPointInspections(new Map())
           }
@@ -781,27 +832,8 @@ export function useInspectionFlow({
         if (!data.items || isCancelled()) return
         const map = new Map<string, LatestPointInspection>()
         const sliceMap = new Map<string, InspectionSlice>()
-        data.items.forEach((item) => {
-          const ts = new Date(item.updatedAt).getTime() || 0
-          const [orderedStart, orderedEnd] = normalizeRange(Number(item.startPk), Number(item.endPk))
-          const side = item.side ?? 'BOTH'
-          const snapshot: LatestPointInspection = {
-            phaseId: Number(item.phaseId),
-            phaseName: item.phaseName ?? null,
-            layerId: item.layerId !== undefined && item.layerId !== null ? String(item.layerId) : null,
-            layerName:
-              item.layerName ??
-              (item.layerId !== undefined && item.layerId !== null ? String(item.layerId) : null),
-            checkId: item.checkId !== undefined && item.checkId !== null ? String(item.checkId) : null,
-            checkName:
-              item.checkName ??
-              (item.checkId !== undefined && item.checkId !== null ? String(item.checkId) : null),
-            side,
-            startPk: orderedStart,
-            endPk: orderedEnd,
-            status: item.status ?? 'PENDING',
-            updatedAt: ts,
-          }
+        const applySnapshot = (snapshot: LatestPointInspection) => {
+          const ts = snapshot.updatedAt ?? 0
           const statusKey = buildCheckStatusKey({
             phaseId: snapshot.phaseId,
             phaseName: snapshot.phaseName,
@@ -836,7 +868,7 @@ export function useInspectionFlow({
             restrictToTopLayer && (!normalizedLayerName || !topLayerNames.has(normalizedLayerName))
 
           if (!skipSlice) {
-            const sliceKey = `${snapshot.phaseId}:${side}:${orderedStart}:${orderedEnd}`
+            const sliceKey = `${snapshot.phaseId}:${snapshot.side}:${snapshot.startPk}:${snapshot.endPk}`
             const prevSlice = sliceMap.get(sliceKey)
             const prevPriority = statusPriority[prevSlice?.status ?? 'PENDING'] ?? 0
             if (
@@ -846,23 +878,67 @@ export function useInspectionFlow({
             ) {
               sliceMap.set(sliceKey, {
                 phaseId: snapshot.phaseId,
-                side,
-                startPk: orderedStart,
-                endPk: orderedEnd,
+                side: snapshot.side,
+                startPk: snapshot.startPk,
+                endPk: snapshot.endPk,
                 status: snapshot.status ?? 'PENDING',
                 updatedAt: ts,
               })
             }
           }
+        }
+
+        data.items.forEach((item) => {
+          const ts = new Date(item.updatedAt).getTime() || 0
+          const [orderedStart, orderedEnd] = normalizeRange(Number(item.startPk), Number(item.endPk))
+          const side = item.side ?? 'BOTH'
+          const snapshot: LatestPointInspection = {
+            phaseId: Number(item.phaseId),
+            phaseName: item.phaseName ?? null,
+            layerId: item.layerId !== undefined && item.layerId !== null ? String(item.layerId) : null,
+            layerName:
+              item.layerName ??
+              (item.layerId !== undefined && item.layerId !== null ? String(item.layerId) : null),
+            checkId: item.checkId !== undefined && item.checkId !== null ? String(item.checkId) : null,
+            checkName:
+              item.checkName ??
+              (item.checkId !== undefined && item.checkId !== null ? String(item.checkId) : null),
+            side,
+            startPk: orderedStart,
+            endPk: orderedEnd,
+            status: item.status ?? 'PENDING',
+            updatedAt: ts,
+          }
+
+          const isEarthwork = earthworkPhaseId && snapshot.phaseId === earthworkPhaseId
+          const isSubbase = subbasePhaseId && snapshot.phaseId === subbasePhaseId
+          const hasEarthworkMapping = earthworkPhaseId && subbasePhaseId
+
+          if (!isEarthwork || !hasEarthworkMapping) {
+            applySnapshot(snapshot)
+          }
+
+          // Map subbase (Couche de forme) schedules to earthwork as completed.
+          if (isSubbase && earthworkPhaseId) {
+            const statusLevel = statusPriority[snapshot.status ?? 'PENDING'] ?? 0
+            if (statusLevel >= (statusPriority.SCHEDULED ?? 0)) {
+              const mappedLayerName = earthworkTopLayerName ?? snapshot.layerName ?? snapshot.layerId
+              applySnapshot({
+                ...snapshot,
+                phaseId: earthworkPhaseId,
+                status: 'APPROVED',
+                layerId: mappedLayerName ? String(mappedLayerName) : null,
+                layerName: mappedLayerName ? String(mappedLayerName) : null,
+              })
+            }
+          }
         })
         if (!isCancelled()) {
-          latestPointInspectionsRef.current = map
           setLatestPointInspections(map)
           setInspectionSlices(Array.from(sliceMap.values()))
         }
       } catch (err) {
         if (!isCancelled()) {
-          latestPointInspectionsRef.current = new Map()
           setInspectionSlices([])
           setLatestPointInspections(new Map())
         }
@@ -871,7 +947,16 @@ export function useInspectionFlow({
         }
       }
     },
-    [canViewInspection, measureByPhaseId, road.slug, t.alerts.fetchInspectionFailed, topLayerNamesByPhaseId],
+    [
+      canViewInspection,
+      earthworkPhaseId,
+      earthworkTopLayerName,
+      measureByPhaseId,
+      road.slug,
+      subbasePhaseId,
+      t.alerts.fetchInspectionFailed,
+      topLayerNamesByPhaseId,
+    ],
   )
 
   useEffect(() => {
@@ -935,10 +1020,14 @@ export function useInspectionFlow({
   }, [enforcedSide, intervalRange, latestPointInspections, selectedSegment])
 
   useEffect(() => {
-    if (!sideBooking.lockedSide) return
-    if (selectedSide !== sideBooking.lockedSide) {
-      setSelectedSide(sideBooking.lockedSide)
-    }
+    const lockedSide = sideBooking.lockedSide
+    if (!lockedSide) return
+    if (selectedSide === lockedSide) return
+    if (typeof window === 'undefined') return
+    const frame = window.requestAnimationFrame(() => {
+      setSelectedSide(lockedSide)
+    })
+    return () => window.cancelAnimationFrame(frame)
   }, [selectedSide, sideBooking.lockedSide])
 
   const listJoiner = locale === 'fr' ? ', ' : ' / '
@@ -1137,6 +1226,13 @@ export function useInspectionFlow({
       raiseSubmitError(t.errors.submitAppointmentMissing)
       return
     }
+    const submissionNumberText = submissionNumberInput.trim()
+    const submissionNumber =
+      submissionNumberText === '' ? undefined : Number(submissionNumberText)
+    if (submissionNumberText && !Number.isFinite(submissionNumber)) {
+      raiseSubmitError('提交单编号需为数字')
+      return
+    }
     const targetSide = enforcedSide ?? selectedSide
     const payloadBase: Omit<InspectionSubmitBatch, 'side' | 'layers' | 'checks'> = {
       phaseId: selectedSegment.phaseId,
@@ -1284,6 +1380,7 @@ export function useInspectionFlow({
           remark: remarkText || undefined,
           appointmentDate,
           status: 'SCHEDULED',
+          submissionNumber,
         })),
       )
     })
@@ -1324,6 +1421,8 @@ export function useInspectionFlow({
       setEndPkInput,
       appointmentDateInput,
       setAppointmentDateInput,
+      submissionNumberInput,
+      setSubmissionNumberInput,
       selectedLayers,
       selectedChecks,
       selectedTypes,

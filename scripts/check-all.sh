@@ -30,7 +30,7 @@ run_step() {
   echo
 }
 
-run_step "ESLint (next lint)" npm run lint -- --max-warnings=0
+run_step "ESLint (eslint)" env ESLINT_USE_FLAT_CONFIG=true npx eslint .
 run_step "TypeScript (tsc --noEmit)" npx tsc --noEmit
 
 exit $status

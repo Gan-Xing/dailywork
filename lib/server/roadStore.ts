@@ -84,6 +84,12 @@ const normalizeSegment = (startPk: number, endPk: number) => {
   return start <= end ? [start, end] : [end, start]
 }
 
+const EARTHWORK_PHASE_NAME = '土方'
+const SUBBASE_PHASE_NAME = '垫层'
+const SUBBASE_LAYER_NAME = '路基垫层'
+
+const normalizePhaseName = (value: string) => value.trim()
+
 const calcCompletedLinearLength = (
   inspections: { startPk: number; endPk: number; side: string }[],
 ) => {
@@ -119,6 +125,19 @@ const resolvePhaseLayers = (phase: {
     ?.map((item) => item.layerDefinition?.name)
     .filter(Boolean) ?? []
   return Array.from(new Set(defaultLayers))
+}
+
+const isEarthworkPhase = (phase: { name: string }) =>
+  normalizePhaseName(phase.name) === EARTHWORK_PHASE_NAME
+
+const isSubbasePhase = (phase: {
+  name: string
+  layerLinks: { layerDefinition: { name: string } }[]
+  phaseDefinition?: { defaultLayers: { layerDefinition: { name: string } }[] } | null
+}) => {
+  if (normalizePhaseName(phase.name) !== SUBBASE_PHASE_NAME) return false
+  const layers = resolvePhaseLayers(phase)
+  return layers.includes(SUBBASE_LAYER_NAME)
 }
 
 const calcCompletedPointStructures = (
@@ -180,9 +199,9 @@ export const listRoadSectionsWithProgress = async (): Promise<RoadSectionProgres
               designLength: true,
           updatedAt: true,
           inspections: {
-            where: { status: 'APPROVED' },
+            where: { status: { in: ['SCHEDULED', 'SUBMITTED', 'IN_PROGRESS', 'APPROVED'] } },
             orderBy: { updatedAt: 'desc' },
-            select: { startPk: true, endPk: true, side: true, layers: true, updatedAt: true },
+            select: { startPk: true, endPk: true, side: true, layers: true, updatedAt: true, status: true },
           },
           intervals: {
             select: {
@@ -220,18 +239,26 @@ export const listRoadSectionsWithProgress = async (): Promise<RoadSectionProgres
   })
 
   return roads.map((road) => {
-      const phases: RoadPhaseProgressDTO[] = road.phases.map((phase) => {
-        const designLength = Math.max(0, phase.designLength || 0)
-        const resolvedLayers = phase.measure === 'POINT' ? resolvePhaseLayers(phase) : []
+    const subbasePhase = road.phases.find((phase) => isSubbasePhase(phase))
+    const subbaseInspections = subbasePhase
+      ? subbasePhase.inspections.filter((inspection) => inspection.status !== 'PENDING')
+      : []
+    const phases: RoadPhaseProgressDTO[] = road.phases.map((phase) => {
+      const designLength = Math.max(0, phase.designLength || 0)
+      const resolvedLayers = phase.measure === 'POINT' ? resolvePhaseLayers(phase) : []
+      const approvedInspections = phase.inspections.filter((inspection) => inspection.status === 'APPROVED')
+      // Earthwork progress is driven by subbase (Couche de forme) scheduled ranges.
+      const sourceInspections =
+        isEarthworkPhase(phase) && subbasePhase ? subbaseInspections : approvedInspections
       const rawCompletedLength =
         phase.measure === 'POINT'
-          ? calcCompletedPointStructures(phase.inspections, resolvedLayers)
-          : calcCompletedLinearLength(phase.inspections)
+          ? calcCompletedPointStructures(sourceInspections, resolvedLayers)
+          : calcCompletedLinearLength(sourceInspections)
       const cappedCompletedLength =
         designLength > 0 ? Math.min(designLength, rawCompletedLength) : rawCompletedLength
       const completedPercent =
         designLength > 0 ? Math.min(100, Math.round((cappedCompletedLength / designLength) * 100)) : 0
-      const latestUpdate = phase.inspections[0]?.updatedAt ?? phase.updatedAt
+      const latestUpdate = sourceInspections[0]?.updatedAt ?? phase.updatedAt
       const intervalSpecs = phase.intervals?.map((interval) => ({
         startPk: interval.startPk,
         endPk: interval.endPk,
@@ -240,7 +267,7 @@ export const listRoadSectionsWithProgress = async (): Promise<RoadSectionProgres
         layers: (interval as { layers?: string[] }).layers ?? [],
         layerIds: (interval as { layerIds?: number[] }).layerIds ?? [],
       })) ?? []
-      const inspectionRanges = phase.inspections.map((inspection) => ({
+      const inspectionRanges = sourceInspections.map((inspection) => ({
         startPk: inspection.startPk,
         endPk: inspection.endPk,
         side: inspection.side,

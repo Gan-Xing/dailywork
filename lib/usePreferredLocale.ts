@@ -65,13 +65,18 @@ export const LocaleProvider = ({
   useEffect(() => {
     if (typeof window === 'undefined') return
 
-    const stored = window.localStorage.getItem(STORAGE_KEY) as Locale | null
-    if (stored && supported.includes(stored)) {
-      setLocale(stored)
-      setHasManualChoice(true)
-      return
+    const syncLocale = () => {
+      const stored = window.localStorage.getItem(STORAGE_KEY) as Locale | null
+      if (stored && supported.includes(stored)) {
+        setLocale(stored)
+        setHasManualChoice(true)
+        return
+      }
+      setLocale(detectLocale(supported, fallback))
     }
-    setLocale(detectLocale(supported, fallback))
+
+    const frame = window.requestAnimationFrame(syncLocale)
+    return () => window.cancelAnimationFrame(frame)
   }, [fallback, supported])
 
   useEffect(() => {

@@ -6,8 +6,8 @@ import type { FormEvent } from 'react'
 import {
   forwardRef,
   useCallback,
-  useEffect,
   useImperativeHandle,
+  useMemo,
   useState,
   useTransition,
 } from 'react'
@@ -61,10 +61,7 @@ const RoadBoard = forwardRef<RoadBoardHandle, Props>(function RoadBoard(
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const [showFormModal, setShowFormModal] = useState(false)
-
-  useEffect(() => {
-    setRoads((prev) => sortRoads(prev, locale))
-  }, [locale])
+  const sortedRoads = useMemo(() => sortRoads(roads, locale), [roads, locale])
 
   const resetForm = () => {
     setForm(emptyForm)
@@ -174,18 +171,18 @@ const RoadBoard = forwardRef<RoadBoardHandle, Props>(function RoadBoard(
         <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-200">
           {t.list.overview}
           <span className="h-px w-12 bg-white/30" />
-          {roads.length === 0
+          {sortedRoads.length === 0
             ? t.list.none
-            : formatProgressCopy(t.list.count, { count: roads.length })}
+            : formatProgressCopy(t.list.count, { count: sortedRoads.length })}
         </div>
 
-        {roads.length === 0 ? (
+        {sortedRoads.length === 0 ? (
           <div className="rounded-3xl border border-dashed border-white/15 bg-white/5 p-6 text-sm text-slate-200/80">
             {t.list.emptyHelp}
           </div>
         ) : (
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-            {roads.map((road) => (
+            {sortedRoads.map((road) => (
               <RoadCard
                 key={road.id}
                 road={road}

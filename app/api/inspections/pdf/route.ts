@@ -1,5 +1,9 @@
+import fs from 'fs/promises'
+import os from 'os'
+import path from 'path'
+
 import { NextResponse } from 'next/server'
-import puppeteer, { Browser } from 'puppeteer'
+import puppeteer from 'puppeteer'
 
 import { renderInspectionReportHtml } from '@/lib/templates/inspectionReport'
 import { getSessionUser, hasPermission } from '@/lib/server/authSession'
@@ -18,8 +22,7 @@ const LAUNCH_ARGS = [
   '--disable-dev-shm-usage',
   '--disable-gpu',
 ]
-
-let browserPromise: Promise<Browser> | null = null
+const USER_DATA_DIR_PREFIX = path.join(os.tmpdir(), 'inspection-puppeteer-')
 
 const withTimeout = async <T>(promise: Promise<T>, label: string, timeoutMs = EXPORT_TIMEOUT_MS) => {
   let timer: NodeJS.Timeout | null = null
@@ -33,24 +36,45 @@ const withTimeout = async <T>(promise: Promise<T>, label: string, timeoutMs = EX
   }
 }
 
-const getBrowser = async () => {
-  if (!browserPromise) {
-    browserPromise = puppeteer
-      .launch({
+const cleanupUserDataDir = async (dir: string | null) => {
+  if (!dir) return
+  try {
+    await fs.rm(dir, { recursive: true, force: true })
+  } catch (err) {
+    console.warn(logPrefix, 'cleanup profile dir failed', err)
+  }
+}
+
+const isProfileLockError = (error: unknown) =>
+  error instanceof Error && /already running for .*puppeteer.*profile/i.test(error.message)
+
+const launchBrowser = async () => {
+  let lastError: unknown
+
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const userDataDir = await fs.mkdtemp(USER_DATA_DIR_PREFIX)
+    try {
+      const browser = await puppeteer.launch({
         headless: true,
         executablePath: EXECUTABLE_PATH,
         args: LAUNCH_ARGS,
+        userDataDir,
       })
-      .catch((err) => {
-        browserPromise = null
-        throw err
+      return { browser, userDataDir }
+    } catch (err) {
+      lastError = err
+      await cleanupUserDataDir(userDataDir)
+      if (!isProfileLockError(err)) {
+        break
+      }
+      console.warn(logPrefix, 'userDataDir in use, retrying with a fresh profile dir', {
+        attempt: attempt + 1,
+        message: err instanceof Error ? err.message : String(err),
       })
+    }
   }
-  const browser = await browserPromise
-  browser.on('disconnected', () => {
-    browserPromise = null
-  })
-  return browser
+
+  throw lastError instanceof Error ? lastError : new Error('无法启动浏览器')
 }
 
 export async function POST(request: Request) {
@@ -103,7 +127,7 @@ export async function POST(request: Request) {
 
     const html = renderInspectionReportHtml(items, { locale })
 
-    const browser = await withTimeout(getBrowser(), '启动浏览器')
+    const { browser, userDataDir } = await withTimeout(launchBrowser(), '启动浏览器')
 
     let page: Awaited<ReturnType<typeof browser.newPage>> | null = null
     try {
@@ -136,7 +160,8 @@ export async function POST(request: Request) {
       if (page) {
         await page.close().catch((closeErr) => console.error(logPrefix, 'close page error', closeErr))
       }
-      // 浏览器复用，单次请求不关闭，避免频繁启动开销
+      await browser.close().catch((closeErr) => console.error(logPrefix, 'close browser error', closeErr))
+      await cleanupUserDataDir(userDataDir)
     }
   } catch (error) {
     logError(error)

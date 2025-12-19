@@ -157,8 +157,9 @@ const mapEntryToListItem = (entry: InspectionEntryDTO): InspectionListItem => {
     roadSlug: entry.roadSlug ?? rawRoad?.slug ?? '',
     phaseId: entry.phaseId,
     phaseName: entry.phaseName ?? rawPhase?.name ?? '',
-    submissionId: entry.submissionId ?? null,
-    submissionCode: entry.submissionCode ?? undefined,
+    documentId: entry.documentId ?? null,
+    documentCode: entry.documentCode ?? undefined,
+    submissionNumber: entry.submissionNumber ?? null,
     side: entry.side,
     startPk: entry.startPk,
     endPk: entry.endPk,
@@ -256,7 +257,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
   ])
   const [page, setPage] = useState(1)
   const [pageInput, setPageInput] = useState('1')
-  const [pageSize] = useState(20)
+  const [pageSize, setPageSize] = useState(20)
   const [items, setItems] = useState<InspectionListItem[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(false)
@@ -709,9 +710,11 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
       remark: editing.remark ?? '',
       appointmentDate: formatDateInputValue(editing.appointmentDate),
       submissionOrder:
-        editing.submissionOrder === null || editing.submissionOrder === undefined
-          ? ''
-          : String(editing.submissionOrder),
+        editing.submissionNumber === null || editing.submissionNumber === undefined
+          ? editing.submissionOrder === null || editing.submissionOrder === undefined
+            ? ''
+            : String(editing.submissionOrder)
+          : String(editing.submissionNumber),
       submittedAt: formatDateTimeInputValue(editing.submittedAt ?? nowIso) || formatDateTimeInputValue(nowIso),
     })
     setEditError(null)
@@ -766,7 +769,8 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
           checkName,
           types,
           status: nextStatus,
-          submissionOrder,
+          submissionNumber: submissionOrderText === '' ? null : submissionOrder,
+          submissionOrder: submissionOrderText === '' ? null : submissionOrder,
           remark: editForm.remark || undefined,
           appointmentDate: editForm.appointmentDate || undefined,
           submittedAt: submittedAtValue.toISOString(),
@@ -861,6 +865,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
         setBulkEditError(copy.bulkEdit.invalidSubmissionOrder)
         return
       }
+      payload.submissionNumber = submissionOrder
       payload.submissionOrder = submissionOrder
     }
 
@@ -1895,9 +1900,11 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                       ) : null}
                       {isVisible('submissionOrder') ? (
                         <td className="px-4 py-3 whitespace-nowrap">
-                          {item.submissionOrder === null || item.submissionOrder === undefined
-                            ? '—'
-                            : item.submissionOrder}
+                          {item.submissionNumber === null || item.submissionNumber === undefined
+                            ? item.submissionOrder === null || item.submissionOrder === undefined
+                              ? '—'
+                              : item.submissionOrder
+                            : item.submissionNumber}
                         </td>
                       ) : null}
                       {isVisible('status') ? (
@@ -1980,6 +1987,26 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/10 px-5 py-3 text-sm text-slate-200">
             <span>{formatProgressCopy(copy.pagination.summary, { total, page, totalPages })}</span>
             <div className="flex items-center gap-2">
+              <label className="flex items-center gap-2 text-xs text-slate-200">
+                <span className="text-slate-400">{copy.pagination.pageSizeLabel}</span>
+                <select
+                  value={pageSize}
+                  onChange={(e) => {
+                    const value = Number(e.target.value)
+                    if (!Number.isFinite(value)) return
+                    setPageSize(value)
+                    setPage(1)
+                  }}
+                  className="h-8 rounded-lg border border-white/20 bg-slate-900 px-2 py-1 text-xs text-slate-50 focus:border-emerald-300 focus:outline-none"
+                  aria-label={copy.pagination.pageSizeLabel}
+                >
+                  {[10, 20, 30, 50, 100].map((size) => (
+                    <option key={size} value={size}>
+                      {size}
+                    </option>
+                  ))}
+                </select>
+              </label>
               <button
                 type="button"
                 className="rounded-xl border border-white/20 px-3 py-1 text-xs text-slate-100 transition hover:border-white/40 hover:bg-white/10 disabled:opacity-40"
@@ -2050,9 +2077,11 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
               const createdByText = selected.createdBy?.username ?? copy.detailModal.unknownUser
               const updatedByText = selected.updatedBy?.username ?? copy.detailModal.unknownUser
               const submissionOrderText =
-                selected.submissionOrder === null || selected.submissionOrder === undefined
-                  ? '—'
-                  : String(selected.submissionOrder)
+                selected.submissionNumber === null || selected.submissionNumber === undefined
+                  ? selected.submissionOrder === null || selected.submissionOrder === undefined
+                    ? '—'
+                    : String(selected.submissionOrder)
+                  : String(selected.submissionNumber)
               return (
             <div className="w-full max-w-3xl rounded-3xl border border-white/10 bg-slate-900/95 p-6 shadow-2xl shadow-slate-900/50 backdrop-blur">
               <div className="flex items-start justify-between gap-3">

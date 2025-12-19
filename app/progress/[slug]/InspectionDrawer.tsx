@@ -38,6 +38,8 @@ export interface InspectionDrawerProps {
   setEndPkInput: (value: string) => void
   appointmentDateInput: string
   setAppointmentDateInput: (value: string) => void
+  submissionNumberInput: string
+  setSubmissionNumberInput: (value: string) => void
   selectedLayers: string[]
   selectedChecks: string[]
   selectedTypes: string[]
@@ -92,6 +94,8 @@ export function InspectionDrawer({
   setEndPkInput,
   appointmentDateInput,
   setAppointmentDateInput,
+  submissionNumberInput,
+  setSubmissionNumberInput,
   selectedLayers,
   selectedChecks,
   selectedTypes,
@@ -284,7 +288,7 @@ export function InspectionDrawer({
         <div className="mt-4 flex-1 overflow-y-auto">
           <div className="grid gap-4 border-t border-white/5 bg-white/2 px-6 py-6 text-sm text-slate-100 lg:grid-cols-5">
             <div className="lg:col-span-5 space-y-4">
-              <div className="grid gap-3 md:grid-cols-3">
+              <div className="grid gap-3 md:grid-cols-4">
                 <label className="flex flex-col gap-1 text-xs text-slate-200">
                   <span className="font-semibold">{t.inspection.sideLabel}</span>
                   {(() => {
@@ -361,6 +365,16 @@ export function InspectionDrawer({
                     value={appointmentDateInput}
                     onChange={(e) => setAppointmentDateInput(e.target.value)}
                     placeholder={t.inspection.appointmentPlaceholder}
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-xs text-slate-200">
+                  <span className="font-semibold">提交单编号（可选）</span>
+                  <input
+                    type="number"
+                    className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 shadow-inner shadow-slate-900/40 focus:border-emerald-300 focus:outline-none"
+                    value={submissionNumberInput}
+                    onChange={(e) => setSubmissionNumberInput(e.target.value)}
+                    placeholder="填入提交单编号，不填则不绑定"
                   />
                 </label>
               </div>

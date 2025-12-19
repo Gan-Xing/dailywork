@@ -17,7 +17,7 @@ function toSubCode(n) {
 
 async function main() {
   const [subCnt, entryCnt] = await Promise.all([
-    prisma.submission.count(),
+    prisma.document.count(),
     prisma.inspectionEntry.count(),
   ]);
 
@@ -56,12 +56,12 @@ async function main() {
     return;
   }
 
-  await prisma.submission.createMany({
+  await prisma.document.createMany({
     data: codes.map(code => ({ code, files: [], remark: null })),
     skipDuplicates: true,
   });
 
-  const subs = await prisma.submission.findMany({
+  const subs = await prisma.document.findMany({
     where: { code: { in: codes } },
     select: { id: true, code: true },
   });

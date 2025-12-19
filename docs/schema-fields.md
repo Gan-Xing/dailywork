@@ -255,7 +255,7 @@
      5. `status`：枚举 `PENDING` / `SCHEDULED` / `SUBMITTED` / `IN_PROGRESS` / `APPROVED`。
      6. `updatedAt` / `updatedBy`：最近更新时间与更新人。
      7. `layers` / `checks` / `types`：数组字段，记录层次、验收内容、报检类型。
-     8. `submissionOrder`：提交单编号，数字，可空。
+     8. `submissionOrder`：提交单编号（历史字段，已弃用），数字，可空；新绑定以 `InspectionEntry.documentId` → `Submission.submissionNumber` 为准。
      9. `remark`：多行备注。
 
 ## 财务记账字段（FinanceEntry）
@@ -362,3 +362,67 @@
      8. `createdBy?` / `updatedBy?`：操作用户（可为空）。
      9. `createdAt` / `updatedAt`：自动时间戳。
 - **交互**：首页入口跳转 `/roadmap`，可新增想法、查看待开发与已完成列表，并在列表中直接切换状态。
+
+## 文档管理（提交单/Bordereau Phase 1）
+
+- 适配说明：仅覆盖提交单；保留现有报检关联与 `Submission` 存量数据；导出优先使用 PDF（复用 `InspectionModule/generate-pdf.mjs`），暂不做浏览器打印路由；审计依赖 `createdBy/updatedBy/createdAt/updatedAt`。
+- 模板来源：现有文件 `/module/bordereau.html` + `/module/bordereau.css`（内容为硬编码值，无 `{{ }}` 占位符），以及旧版 `/module/index.html`（含 `{{ NUMERO }}` 等占位符）。建议以 `/module/bordereau.html` 为源，补充占位符并复制到正式模板目录，同时保留原文件以便回溯。
+
+### 枚举（计划新增）
+- `DocumentType`：`SUBMISSION`（预留 `LETTER`、`MINUTES`、`SUPPLY_REQUEST`）。
+- `TemplateStatus`：`DRAFT` / `PUBLISHED` / `ARCHIVED`。
+- `SubmissionStatus`：`DRAFT` / `FINAL` / `ARCHIVED`。
+
+### SubmissionTemplate（新表）
+- `id`：字符串（cuid）。
+- `name`：模板名称。
+- `type`：`DocumentType`，默认 `SUBMISSION`。
+- `version`：整数，默认 1。
+- `status`：`TemplateStatus`，默认 `DRAFT`（仅 `PUBLISHED` 可用于创建）。
+- `language`：字符串，默认 `fr`。
+- `html`：长文本，存储模板源码。
+- `placeholders`：JSON，占位符清单，结构 `{ key, label, inputType, required, path, defaultValue?, options? }`。
+- `createdById?` / `updatedById?`：关联 `User`。
+- `createdAt` / `updatedAt`：时间戳。
+- 索引：`(type, status)`、`name`。
+
+### Submission（扩展字段，保持与报检兼容）
+- 保留：`id`（自增）、`code`（唯一）、`files`（JSON，默认 `[]`）、`remark?`、`createdAt`、`updatedAt`，报检通过 `InspectionEntry.documentId`（兼容别名 `submissionId`）关联提交单；提交单编号统一使用 `Submission.submissionNumber`，`InspectionRequest/Entry.submissionOrder` 仅做历史兼容。
+- 新增/调整（可空以兼容存量数据）：
+     1. `type`：`DocumentType`，默认 `SUBMISSION`。
+     2. `templateId?`：关联 `SubmissionTemplate.id`。
+     3. `templateVersion?`：整数，记录创建时的模板版本。
+     4. `status`：`SubmissionStatus`，默认 `DRAFT`。
+     5. `title?`：用于列表展示的标题。
+     6. `data?`：JSON，结构见下方 `SubmissionData`。
+     7. `renderedHtml?`：长文本，缓存渲染结果（便于直接导出 PDF）。
+     8. `createdById?` / `updatedById?`：关联 `User`。
+- 迁移约束：新增字段需有默认值或可空，先批量回填 `type=SUBMISSION`，再接入模板/数据写入，既有 `documentId` 关联不变，`submissionNumber` 用于反查 Submission → Document.id。
+
+### SubmissionData（用于 `Submission.data`）
+- `documentMeta`：
+     1. `projectName`：字符串。
+     2. `projectCode`：字符串。
+     3. `contractNumbers`：字符串数组。
+     4. `bordereauNumber`：数字。
+     5. `subject`：字符串。
+- `parties`：
+     1. `sender`：`{ organization: string; date: string; lastName: string; firstName: string; signature?: string; time?: string }`
+     2. `recipient`：结构同上。
+- `items`：数组，元素 `{ designation: string; quantity?: number; observation?: string }`。
+- `comments?`：字符串。
+- 默认值示例：`projectName`/`projectCode`/`subject` 可使用当前模板中的固定法文文案作初始值。
+- 占位符映射（建议写入 `/module/bordereau.html`，示例采用 `{{path}}` 形式；列表字段由渲染函数循环生成）：
+     1. 页眉中部：`{{documentMeta.projectName}}`
+     2. 页眉右侧：`{{documentMeta.projectCode}}`
+     3. 合同号行：`{{documentMeta.contractNumbers}}`（渲染时用 `ET` 连接）
+     4. 标题 “Fiche de Bordereau N°…”：`{{documentMeta.bordereauNumber}}`
+     5. OBJET 行：`{{documentMeta.subject}}`
+     6. Emetteur/DESTINATAIRE 组织：`{{parties.sender.organization}}` / `{{parties.recipient.organization}}`
+     7. Emetteur/DESTINATAIRE 日期：`{{parties.sender.date}}` / `{{parties.recipient.date}}`
+     8. 姓/名：`{{parties.sender.lastName}}` / `{{parties.sender.firstName}}`；`{{parties.recipient.lastName}}` / `{{parties.recipient.firstName}}`
+     9. 时间：`{{parties.sender.time}}` / `{{parties.recipient.time}}`
+    10. 签名占位：`{{parties.sender.signature}}` / `{{parties.recipient.signature}}`（可为空或图片地址）
+    11. 明细表：`items` 数组，每行渲染为 `designation`/`quantity`/`observation`；不足 12 行自动补空白以保持版式。
+    12. 页脚备注：`{{comments}}`
+    13. 如需页码水印，可保持 “第 1 页”为静态或替换为 `{{pageNumber}}`。
