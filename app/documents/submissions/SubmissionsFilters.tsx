@@ -4,6 +4,10 @@ import type React from 'react'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 
+import { locales } from '@/lib/i18n'
+import { getDocumentsCopy } from '@/lib/i18n/documents'
+import { usePreferredLocale } from '@/lib/usePreferredLocale'
+
 type Option = { value: string; label: string }
 
 type Props = {
@@ -13,12 +17,6 @@ type Props = {
   statusList: string[]
   submissionNumbers: number[]
 }
-
-const STATUS_OPTIONS: Option[] = [
-  { value: 'DRAFT', label: '草稿' },
-  { value: 'FINAL', label: '完成' },
-  { value: 'ARCHIVED', label: '归档' },
-]
 
 const parseSet = (input: unknown) => {
   if (!input) return new Set<string>()
@@ -54,6 +52,13 @@ export default function SubmissionsFilters({ query, templates, creators, statusL
   const [statusOpen, setStatusOpen] = useState(false)
   const [templateOpen, setTemplateOpen] = useState(false)
   const [creatorOpen, setCreatorOpen] = useState(false)
+  const { locale } = usePreferredLocale('zh', locales)
+  const copy = getDocumentsCopy(locale)
+  const statusOptions: Option[] = [
+    { value: 'DRAFT', label: copy.status.document.DRAFT },
+    { value: 'FINAL', label: copy.status.document.FINAL },
+    { value: 'ARCHIVED', label: copy.status.document.ARCHIVED },
+  ]
 
   const [statusSelected, setStatusSelected] = useState<Set<string>>(() => parseSet(query.status ?? statusList))
   const [templateSelected, setTemplateSelected] = useState<Set<string>>(() => parseSet(query.templateId))
@@ -112,20 +117,26 @@ export default function SubmissionsFilters({ query, templates, creators, statusL
         className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm hover:border-emerald-200 hover:text-emerald-700"
       >
         <span>{label}</span>
-        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-600">{selected.size || '全部'}</span>
+        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-600">
+          {selected.size || copy.submissionsFilters.allLabel}
+        </span>
       </button>
       {open ? (
         <div className="absolute z-20 mt-2 w-56 rounded-2xl border border-slate-200 bg-white p-3 shadow-xl">
           <div className="flex items-center justify-between pb-2 text-[11px] text-slate-500">
-            <button type="button" onClick={() => setSelected(new Set(options.map((o) => o.value)))} className="rounded-full px-2 py-1 hover:bg-slate-100">
-              全选
+            <button
+              type="button"
+              onClick={() => setSelected(new Set(options.map((o) => o.value)))}
+              className="rounded-full px-2 py-1 hover:bg-slate-100"
+            >
+              {copy.submissionsFilters.selectAll}
             </button>
             <button
               type="button"
               onClick={() => setSelected(new Set())}
               className="rounded-full px-2 py-1 hover:bg-slate-100"
             >
-              清空
+              {copy.submissionsFilters.clear}
             </button>
           </div>
           <div className="max-h-64 space-y-2 overflow-y-auto">
@@ -151,9 +162,16 @@ export default function SubmissionsFilters({ query, templates, creators, statusL
 
   return (
     <div className="flex flex-wrap items-center gap-3 rounded-3xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-      {renderDropdown('状态', statusOpen, setStatusOpen, STATUS_OPTIONS, statusSelected, setStatusSelected)}
       {renderDropdown(
-        '模版',
+        copy.submissionsFilters.statusLabel,
+        statusOpen,
+        setStatusOpen,
+        statusOptions,
+        statusSelected,
+        setStatusSelected,
+      )}
+      {renderDropdown(
+        copy.submissionsFilters.templateLabel,
         templateOpen,
         setTemplateOpen,
         templates.map((tpl) => ({ value: String(tpl.id), label: tpl.name })),
@@ -161,7 +179,7 @@ export default function SubmissionsFilters({ query, templates, creators, statusL
         setTemplateSelected,
       )}
       {renderDropdown(
-        '创建人',
+        copy.submissionsFilters.creatorLabel,
         creatorOpen,
         setCreatorOpen,
         creators.map((user) => ({
@@ -172,16 +190,16 @@ export default function SubmissionsFilters({ query, templates, creators, statusL
         setCreatorSelected,
       )}
       <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700">
-        <span className="font-semibold">提交单编号</span>
+        <span className="font-semibold">{copy.submissionsFilters.submissionNumberLabel}</span>
         <input
           value={submissionInput}
           onChange={(e) => setSubmissionInput(e.target.value)}
-          placeholder="多编号用逗号分隔"
+          placeholder={copy.submissionsFilters.submissionNumberPlaceholder}
           className="w-40 rounded-xl border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 placeholder:text-slate-400 focus:border-emerald-300 focus:outline-none"
         />
       </div>
       <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700">
-        <span className="font-semibold">更新时间</span>
+        <span className="font-semibold">{copy.submissionsFilters.updatedAtLabel}</span>
         <input
           type="date"
           value={updatedFrom}
@@ -197,11 +215,11 @@ export default function SubmissionsFilters({ query, templates, creators, statusL
         />
       </div>
       <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700">
-        <span className="font-semibold">关键词</span>
+        <span className="font-semibold">{copy.submissionsFilters.keywordLabel}</span>
         <input
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
-          placeholder="搜索 code / 标题 / 创建人"
+          placeholder={copy.submissionsFilters.keywordPlaceholder}
           className="w-48 rounded-xl border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 placeholder:text-slate-400 focus:border-emerald-300 focus:outline-none"
         />
       </div>
@@ -211,14 +229,14 @@ export default function SubmissionsFilters({ query, templates, creators, statusL
           onClick={applyFilters}
           className="rounded-full bg-emerald-500 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-emerald-200/40 transition hover:-translate-y-0.5 hover:shadow-emerald-300/60"
         >
-          应用筛选
+          {copy.submissionsFilters.apply}
         </button>
         <button
           type="button"
           onClick={resetFilters}
           className="rounded-full border border-slate-300 px-4 py-2 text-xs font-semibold text-slate-700 hover:border-slate-400 hover:bg-slate-100"
         >
-          重置
+          {copy.submissionsFilters.reset}
         </button>
       </div>
     </div>

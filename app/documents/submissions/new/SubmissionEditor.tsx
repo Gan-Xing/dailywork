@@ -5,11 +5,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { DocumentStatus } from '@prisma/client'
 
-import { renderBordereauTemplate } from '@/lib/documents/render'
-import type { Locale } from '@/lib/i18n'
+import { formatCopy, locales, type Locale } from '@/lib/i18n'
+import { getDocumentsCopy } from '@/lib/i18n/documents'
 import { localizeProgressList, localizeProgressTerm } from '@/lib/i18n/progressDictionary'
 import { resolveRoadName } from '@/lib/i18n/roadDictionary'
 import type { InspectionListItem } from '@/lib/progressTypes'
+import { usePreferredLocale } from '@/lib/usePreferredLocale'
 import type { SubmissionData, SubmissionItem, Party } from '@/types/documents'
 
 type TemplateOption = { id: string; name: string; version: number; status: string; html?: string; placeholders: Array<{ key: string; path?: string }> }
@@ -24,6 +25,7 @@ type Props = {
     status: DocumentStatus
   }
   canManage?: boolean
+  canEdit?: boolean
   currentUser?: { id: number; username: string } | null
 }
 
@@ -60,7 +62,9 @@ const buildDefaultData = (): SubmissionData => {
   }
 }
 
-export default function SubmissionEditor({ initialSubmission, canManage = false }: Props) {
+export default function SubmissionEditor({ initialSubmission, canManage = false, canEdit = false }: Props) {
+  const { locale } = usePreferredLocale('zh', locales)
+  const copy = getDocumentsCopy(locale)
   const [templates, setTemplates] = useState<TemplateOption[]>([])
   const [loadingTpls, setLoadingTpls] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -81,6 +85,9 @@ export default function SubmissionEditor({ initialSubmission, canManage = false 
   const [inspectionError, setInspectionError] = useState<string | null>(null)
   const [loadingInspections, setLoadingInspections] = useState(false)
   const hasLoadedInspectionBindingRef = useRef(false)
+  const isReadOnly = !canEdit
+  const statusLabel = copy.status.document[status] ?? status
+  const statusText = formatCopy(copy.submissionEditor.template.statusTemplate, { status: statusLabel })
 
   const selectedTemplate = useMemo(
     () => templates.find((tpl) => tpl.id === selectedTemplateId),
@@ -142,17 +149,19 @@ export default function SubmissionEditor({ initialSubmission, canManage = false 
 
   const validateForm = useCallback((): boolean => {
     const errs: Record<string, string> = {}
-    if (!data.documentMeta.projectName.trim()) errs.projectName = '项目名称必填'
-    if (!data.documentMeta.projectCode.trim()) errs.projectCode = '项目编码必填'
-    if (!data.documentMeta.bordereauNumber || data.documentMeta.bordereauNumber <= 0) errs.bordereauNumber = '编号需为正整数'
-    if (!data.documentMeta.subject.trim()) errs.subject = '主题不能为空'
-    if (!data.parties.sender.organization.trim()) errs.senderOrg = '提交方组织必填'
-    if (!data.parties.recipient.organization.trim()) errs.recipientOrg = '接收方组织必填'
+    if (!data.documentMeta.projectName.trim()) errs.projectName = copy.submissionEditor.validation.projectName
+    if (!data.documentMeta.projectCode.trim()) errs.projectCode = copy.submissionEditor.validation.projectCode
+    if (!data.documentMeta.bordereauNumber || data.documentMeta.bordereauNumber <= 0) {
+      errs.bordereauNumber = copy.submissionEditor.validation.bordereauNumber
+    }
+    if (!data.documentMeta.subject.trim()) errs.subject = copy.submissionEditor.validation.subject
+    if (!data.parties.sender.organization.trim()) errs.senderOrg = copy.submissionEditor.validation.senderOrg
+    if (!data.parties.recipient.organization.trim()) errs.recipientOrg = copy.submissionEditor.validation.recipientOrg
     const hasItem = (data.items || []).length > 0
-    if (!hasItem) errs.items = '请至少添加一条明细'
+    if (!hasItem) errs.items = copy.submissionEditor.validation.items
     setFieldErrors(errs)
     return Object.keys(errs).length === 0
-  }, [data])
+  }, [copy.submissionEditor.validation, data])
 
   const handleRender = useCallback(async () => {
     if (!validateForm()) return
@@ -190,7 +199,7 @@ export default function SubmissionEditor({ initialSubmission, canManage = false 
       const res = await fetch(`/api/inspection-entries?${search.toString()}`, { credentials: 'include' })
       const json = (await res.json()) as { items?: InspectionListItem[]; message?: string }
       if (!res.ok) {
-        throw new Error(json.message ?? '加载报检记录失败')
+        throw new Error(json.message ?? copy.submissionEditor.errors.loadInspections)
       }
       const merged = new Map<number, InspectionListItem>()
       ;(json.items ?? []).forEach((item) => merged.set(item.id, item))
@@ -201,7 +210,7 @@ export default function SubmissionEditor({ initialSubmission, canManage = false 
         )
         const boundJson = (await boundRes.json()) as { items?: InspectionListItem[]; message?: string }
         if (!boundRes.ok) {
-          throw new Error(boundJson.message ?? '加载已绑定报检失败')
+          throw new Error(boundJson.message ?? copy.submissionEditor.errors.loadBoundInspections)
         }
         const boundItems = boundJson.items ?? []
         boundItems.forEach((item) => merged.set(item.id, item))
@@ -218,15 +227,17 @@ export default function SubmissionEditor({ initialSubmission, canManage = false 
     } finally {
       setLoadingInspections(false)
     }
-  }, [initialSubmission?.id])
+  }, [copy.submissionEditor.errors, initialSubmission?.id])
 
   const toggleInspectionSelection = (id: number) => {
+    if (isReadOnly) return
     setSelectedInspectionIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
   }
 
   const clearInspectionSelection = () => setSelectedInspectionIds([])
 
   const toggleAllVisibleInspections = () => {
+    if (isReadOnly) return
     if (!inspectionOptions.length) return
     const visibleIds = inspectionOptions.map((item) => item.id)
     const allSelected = visibleIds.every((id) => selectedInspectionIds.includes(id))
@@ -254,7 +265,7 @@ export default function SubmissionEditor({ initialSubmission, canManage = false 
       })
       const json = (await res.json().catch(() => ({}))) as { message?: string }
       if (!res.ok) {
-        throw new Error(json.message ?? '绑定报检记录失败')
+        throw new Error(json.message ?? copy.submissionEditor.errors.bindInspections)
       }
     }
 
@@ -267,7 +278,7 @@ export default function SubmissionEditor({ initialSubmission, canManage = false 
       })
       const json = (await res.json().catch(() => ({}))) as { message?: string }
       if (!res.ok) {
-        throw new Error(json.message ?? '解绑报检记录失败')
+        throw new Error(json.message ?? copy.submissionEditor.errors.unbindInspections)
       }
     }
 
@@ -280,7 +291,7 @@ export default function SubmissionEditor({ initialSubmission, canManage = false 
       try {
         const res = await fetch('/api/documents/templates', { credentials: 'include' })
         const json = (await res.json()) as { items?: TemplateOption[]; message?: string }
-        if (!res.ok) throw new Error(json.message ?? '加载模版失败')
+        if (!res.ok) throw new Error(json.message ?? copy.submissionEditor.errors.loadTemplates)
         const items = json.items ?? []
         setTemplates(items)
         if ((!selectedTemplateId || !items.find((t) => t.id === selectedTemplateId)) && items.length) {
@@ -304,7 +315,7 @@ export default function SubmissionEditor({ initialSubmission, canManage = false 
       }
     }
     loadTemplates()
-  }, [selectedTemplateId])
+  }, [copy.submissionEditor.errors.loadTemplates, selectedTemplateId])
 
   useEffect(() => {
     hasLoadedInspectionBindingRef.current = false
@@ -339,8 +350,12 @@ export default function SubmissionEditor({ initialSubmission, canManage = false 
   }, [handleRender, rendering, renderedHtml, selectedTemplateId])
 
   const handleSave = async (nextStatus: DocumentStatus) => {
+    if (isReadOnly) {
+      setError(copy.submissionEditor.errors.readOnly)
+      return
+    }
     if (!selectedTemplateId) {
-      setError('请选择模版')
+      setError(copy.submissionEditor.errors.selectTemplate)
       return
     }
     if (!validateForm()) return
@@ -519,11 +534,14 @@ export default function SubmissionEditor({ initialSubmission, canManage = false 
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-4 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700">
             <span className="inline-block h-2 w-2 rounded-full bg-emerald-500" />
-            {initialSubmission ? '编辑提交单' : '新建提交单'}
+            {initialSubmission ? copy.submissionEditor.badge.edit : copy.submissionEditor.badge.create}
           </div>
           <div className="flex gap-2 text-xs font-semibold">
-            <Link href="/documents/submissions" className="rounded-full border border-slate-200 px-4 py-2 text-slate-700 hover:border-slate-300 hover:bg-slate-100">
-              返回列表
+            <Link
+              href="/documents/submissions"
+              className="rounded-full border border-slate-200 px-4 py-2 text-slate-700 hover:border-slate-300 hover:bg-slate-100"
+            >
+              {copy.submissionEditor.back}
             </Link>
           </div>
         </div>
@@ -536,14 +554,14 @@ export default function SubmissionEditor({ initialSubmission, canManage = false 
             onClick={() => setActiveTab('form')}
             className={`rounded-full px-4 py-2 text-sm transition ${activeTab === 'form' ? 'bg-emerald-500 text-white shadow shadow-emerald-300/40' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
           >
-            填写内容
+            {copy.submissionEditor.tabs.form}
           </button>
           <button
             type="button"
             onClick={() => setActiveTab('preview')}
             className={`rounded-full px-4 py-2 text-sm transition ${activeTab === 'preview' ? 'bg-sky-500 text-white shadow shadow-sky-300/40' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
           >
-            预览 / 导出
+            {copy.submissionEditor.tabs.preview}
           </button>
           {canManage ? (
             <button
@@ -551,342 +569,362 @@ export default function SubmissionEditor({ initialSubmission, canManage = false 
               onClick={() => setShowBaseModal(true)}
               className="rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-800 hover:border-slate-400 hover:bg-slate-100"
             >
-              基础字段
+              {copy.submissionEditor.baseFields.label}
             </button>
+          ) : null}
+          {isReadOnly ? (
+            <span className="rounded-full bg-amber-50 px-3 py-2 text-[11px] font-semibold text-amber-700">
+              {copy.submissionEditor.baseFields.readOnly}
+            </span>
           ) : null}
         </div>
 
         {activeTab === 'form' ? (
           <div className="space-y-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-md">
-            <div className="flex flex-wrap items-center gap-3">
-              <label className="text-sm font-semibold text-slate-900">模版</label>
-              <select
-                className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:border-emerald-300 focus:outline-none"
-                value={selectedTemplateId ?? ''}
-                onChange={(e) => setSelectedTemplateId(e.target.value)}
-                disabled={loadingTpls}
-              >
-                <option value="">选择模版</option>
-                {templates.map((tpl) => (
-                  <option key={tpl.id} value={tpl.id}>
-                    {formatTplName(tpl.name)} v{tpl.version} ({tpl.status})
-                  </option>
-                ))}
-              </select>
-              <label className="text-sm font-semibold text-slate-900">标题</label>
-              <input
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="可选"
-                className="min-w-[200px] rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:border-emerald-300 focus:outline-none"
-              />
-              <span className="rounded-full bg-slate-100 px-3 py-2 text-[11px] font-semibold text-slate-700">状态：{status}</span>
-              {loadingTpls ? <span className="text-xs text-slate-500">加载模版中...</span> : null}
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <h3 className="text-sm font-semibold text-slate-900">基础字段摘要</h3>
-                <div className="mt-3 grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 md:grid-cols-2">
-                  <div className="space-y-1 text-xs text-slate-700">
-                    <p className="font-semibold text-slate-900">项目名称</p>
-                    <p className="rounded-xl bg-white px-3 py-2 text-sm text-slate-800">{data.documentMeta.projectName || '—'}</p>
-                  </div>
-                  <div className="space-y-1 text-xs text-slate-700">
-                    <p className="font-semibold text-slate-900">项目编码</p>
-                    <p className="rounded-xl bg-white px-3 py-2 text-sm text-slate-800">{data.documentMeta.projectCode || '—'}</p>
-                  </div>
-                  <div className="space-y-1 text-xs text-slate-700">
-                    <p className="font-semibold text-slate-900">合同号</p>
-                    <p className="rounded-xl bg-white px-3 py-2 text-sm text-slate-800">
-                      {(data.documentMeta.contractNumbers ?? []).join(', ') || '—'}
-                    </p>
-                  </div>
-                  <div className="space-y-1 text-xs text-slate-700">
-                    <p className="font-semibold text-slate-900">接收方</p>
-                    <p className="rounded-xl bg-white px-3 py-2 text-sm text-slate-800">
-                      {[data.parties.recipient.organization, data.parties.recipient.lastName, data.parties.recipient.firstName]
-                        .filter(Boolean)
-                        .join(' / ') || '—'}
-                    </p>
-                  </div>
-                  <div className="space-y-1 text-xs text-slate-700 md:col-span-2">
-                    <p className="font-semibold text-slate-900">提交方</p>
-                    <p className="rounded-xl bg-white px-3 py-2 text-sm text-slate-800">
-                      {[data.parties.sender.organization, data.parties.sender.lastName, data.parties.sender.firstName].filter(Boolean).join(' / ') ||
-                        '—'}
-                    </p>
-                  </div>
-                </div>
-                {!canManage ? (
-                  <p className="mt-1 text-xs text-slate-500">以上字段由有提交单管理权限的用户在“基础字段”中编辑。</p>
+            <fieldset className={`space-y-4 border-0 p-0 ${isReadOnly ? 'opacity-75' : ''}`} disabled={isReadOnly}>
+              <div className="flex flex-wrap items-center gap-3">
+                <label className="text-sm font-semibold text-slate-900">{copy.submissionEditor.template.label}</label>
+                <select
+                  className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:border-emerald-300 focus:outline-none"
+                  value={selectedTemplateId ?? ''}
+                  onChange={(e) => setSelectedTemplateId(e.target.value)}
+                  disabled={loadingTpls}
+                >
+                  <option value="">{copy.submissionEditor.template.placeholder}</option>
+                  {templates.map((tpl) => (
+                    <option key={tpl.id} value={tpl.id}>
+                      {formatTplName(tpl.name)} v{tpl.version} (
+                      {copy.status.template[tpl.status] ?? tpl.status})
+                    </option>
+                  ))}
+                </select>
+                <label className="text-sm font-semibold text-slate-900">{copy.submissionEditor.template.titleLabel}</label>
+                <input
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder={copy.submissionEditor.template.titlePlaceholder}
+                  className="min-w-[200px] rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:border-emerald-300 focus:outline-none"
+                />
+                <span className="rounded-full bg-slate-100 px-3 py-2 text-[11px] font-semibold text-slate-700">
+                  {statusText}
+                </span>
+                {loadingTpls ? (
+                  <span className="text-xs text-slate-500">{copy.submissionEditor.template.loading}</span>
                 ) : null}
               </div>
 
-              <div className="grid gap-3 md:grid-cols-[1fr,8fr,1.5fr,1.5fr]">
-                <label className="space-y-1 text-xs text-slate-700">
-                  提交单编号
-                  <input
-                    type="number"
-                    value={data.documentMeta.bordereauNumber}
-                    onChange={(e) =>
-                      setData({
-                        ...data,
-                        documentMeta: { ...data.documentMeta, bordereauNumber: Number(e.target.value) || 0 },
-                      })
-                    }
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:border-emerald-300 focus:outline-none"
-                  />
-                  {fieldErrors.bordereauNumber ? <span className="text-xs text-amber-700">{fieldErrors.bordereauNumber}</span> : null}
-                </label>
-                <label className="space-y-1 text-xs text-slate-700">
-                  主题
-                  <input
-                    value={data.documentMeta.subject}
-                    onChange={(e) => setData({ ...data, documentMeta: { ...data.documentMeta, subject: e.target.value } })}
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:border-emerald-300 focus:outline-none"
-                  />
-                  {fieldErrors.subject ? <span className="text-xs text-amber-700">{fieldErrors.subject}</span> : null}
-                </label>
-                <label className="space-y-1 text-xs text-slate-700">
-                  提交日期
-                  <input
-                    type="date"
-                    value={data.parties.sender.date}
-                    onChange={(e) => updateParty('sender', 'date', e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:border-emerald-300 focus:outline-none"
-                  />
-                </label>
-                <label className="space-y-1 text-xs text-slate-700">
-                  提交时间
-                  <input
-                    type="time"
-                    value={data.parties.sender.time ?? ''}
-                    onChange={(e) => updateParty('sender', 'time', e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:border-emerald-300 focus:outline-none"
-                  />
-                </label>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-semibold text-slate-900">明细行</p>
-                <button
-                  type="button"
-                  onClick={addItem}
-                  className="rounded-full border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-700 hover:border-slate-400 hover:bg-slate-100"
-                >
-                  + 添加行
-                </button>
-              </div>
-              <div className="space-y-3">
-                {(data.items || []).map((item, idx) => (
-                  <div
-                    key={idx}
-                    className="grid grid-cols-[8fr,1fr,2fr,1fr] items-start gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm"
-                  >
-                    <label className="space-y-1 text-xs text-slate-700">
-                      明细描述
-                      <textarea
-                        value={item.designation}
-                        onChange={(e) => updateItem(idx, 'designation', e.target.value)}
-                        className="h-16 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:border-emerald-300 focus:outline-none"
-                      />
-                    </label>
-                    <label className="space-y-1 text-xs text-slate-700">
-                      数量
-                      <input
-                        type="number"
-                        value={item.quantity ?? ''}
-                        onChange={(e) => updateItem(idx, 'quantity', e.target.value)}
-                        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:border-emerald-300 focus:outline-none"
-                      />
-                    </label>
-                    <label className="space-y-1 text-xs text-slate-700">
-                      备注
-                      <input
-                        value={item.observation ?? ''}
-                        onChange={(e) => updateItem(idx, 'observation', e.target.value)}
-                        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:border-emerald-300 focus:outline-none"
-                      />
-                    </label>
-                    <div className="flex items-start justify-end">
-                      <button
-                        type="button"
-                        onClick={() => removeItem(idx)}
-                        className="mt-6 min-w-[72px] rounded-full border border-rose-200 px-3 py-2 text-xs font-semibold text-rose-700 transition hover:border-rose-300 hover:bg-rose-50"
-                        aria-label="删除明细行"
-                      >
-                        删除
-                      </button>
+              <div className="space-y-4">
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-900">{copy.submissionEditor.summary.title}</h3>
+                  <div className="mt-3 grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 md:grid-cols-2">
+                    <div className="space-y-1 text-xs text-slate-700">
+                      <p className="font-semibold text-slate-900">{copy.submissionEditor.summary.fields.projectName}</p>
+                      <p className="rounded-xl bg-white px-3 py-2 text-sm text-slate-800">{data.documentMeta.projectName || '—'}</p>
+                    </div>
+                    <div className="space-y-1 text-xs text-slate-700">
+                      <p className="font-semibold text-slate-900">{copy.submissionEditor.summary.fields.projectCode}</p>
+                      <p className="rounded-xl bg-white px-3 py-2 text-sm text-slate-800">{data.documentMeta.projectCode || '—'}</p>
+                    </div>
+                    <div className="space-y-1 text-xs text-slate-700">
+                      <p className="font-semibold text-slate-900">{copy.submissionEditor.summary.fields.contractNumber}</p>
+                      <p className="rounded-xl bg-white px-3 py-2 text-sm text-slate-800">
+                        {(data.documentMeta.contractNumbers ?? []).join(', ') || '—'}
+                      </p>
+                    </div>
+                    <div className="space-y-1 text-xs text-slate-700">
+                      <p className="font-semibold text-slate-900">{copy.submissionEditor.summary.fields.recipient}</p>
+                      <p className="rounded-xl bg-white px-3 py-2 text-sm text-slate-800">
+                        {[data.parties.recipient.organization, data.parties.recipient.lastName, data.parties.recipient.firstName]
+                          .filter(Boolean)
+                          .join(' / ') || '—'}
+                      </p>
+                    </div>
+                    <div className="space-y-1 text-xs text-slate-700 md:col-span-2">
+                      <p className="font-semibold text-slate-900">{copy.submissionEditor.summary.fields.sender}</p>
+                      <p className="rounded-xl bg-white px-3 py-2 text-sm text-slate-800">
+                        {[data.parties.sender.organization, data.parties.sender.lastName, data.parties.sender.firstName].filter(Boolean).join(' / ') ||
+                          '—'}
+                      </p>
                     </div>
                   </div>
-                ))}
-                {(data.items || []).length === 0 && fieldErrors.items ? (
-                  <p className="text-xs text-amber-700">{fieldErrors.items}</p>
-                ) : null}
-              </div>
-            </div>
-
-            <div className="space-y-1 text-xs text-slate-700">
-              备注
-              <textarea
-                value={data.comments ?? ''}
-                onChange={(e) => setData({ ...data, comments: e.target.value })}
-                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:border-emerald-300 focus:outline-none"
-              />
-            </div>
-
-            <div className="space-y-3 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm font-semibold text-slate-900">关联报检记录</p>
-                  <p className="text-xs text-slate-500">选中后保存会将报检记录绑定到当前提交单，留空则不绑定。</p>
+                  {!canManage ? (
+                    <p className="mt-1 text-xs text-slate-500">{copy.submissionEditor.summary.hint}</p>
+                  ) : null}
                 </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <input
-                    value={inspectionSearch}
-                    onChange={(e) => setInspectionSearch(e.target.value)}
-                    placeholder="按路段/分项/备注搜索"
-                    className="w-48 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:border-emerald-300 focus:outline-none"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => fetchInspectionOptions({ keepSelection: true, searchTerm: inspectionSearch })}
-                    disabled={loadingInspections}
-                    className="rounded-full border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-700 hover:border-slate-400 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {loadingInspections ? '加载中...' : '搜索 / 刷新'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={toggleAllVisibleInspections}
-                    disabled={!inspectionOptions.length}
-                    className="rounded-full border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-700 hover:border-slate-400 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    全选/清空
-                  </button>
+
+                <div className="grid gap-3 md:grid-cols-[1fr,8fr,1.5fr,1.5fr]">
+                  <label className="space-y-1 text-xs text-slate-700">
+                    {copy.submissionEditor.meta.submissionNumber}
+                    <input
+                      type="number"
+                      value={data.documentMeta.bordereauNumber}
+                      onChange={(e) =>
+                        setData({
+                          ...data,
+                          documentMeta: { ...data.documentMeta, bordereauNumber: Number(e.target.value) || 0 },
+                        })
+                      }
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:border-emerald-300 focus:outline-none"
+                    />
+                    {fieldErrors.bordereauNumber ? <span className="text-xs text-amber-700">{fieldErrors.bordereauNumber}</span> : null}
+                  </label>
+                  <label className="space-y-1 text-xs text-slate-700">
+                    {copy.submissionEditor.meta.subject}
+                    <input
+                      value={data.documentMeta.subject}
+                      onChange={(e) => setData({ ...data, documentMeta: { ...data.documentMeta, subject: e.target.value } })}
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:border-emerald-300 focus:outline-none"
+                    />
+                    {fieldErrors.subject ? <span className="text-xs text-amber-700">{fieldErrors.subject}</span> : null}
+                  </label>
+                  <label className="space-y-1 text-xs text-slate-700">
+                    {copy.submissionEditor.meta.submissionDate}
+                    <input
+                      type="date"
+                      value={data.parties.sender.date}
+                      onChange={(e) => updateParty('sender', 'date', e.target.value)}
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:border-emerald-300 focus:outline-none"
+                    />
+                  </label>
+                  <label className="space-y-1 text-xs text-slate-700">
+                    {copy.submissionEditor.meta.submissionTime}
+                    <input
+                      type="time"
+                      value={data.parties.sender.time ?? ''}
+                      onChange={(e) => updateParty('sender', 'time', e.target.value)}
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:border-emerald-300 focus:outline-none"
+                    />
+                  </label>
                 </div>
               </div>
-
-              {inspectionError ? (
-                <div className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-amber-800">{inspectionError}</div>
-              ) : null}
 
               <div className="space-y-2">
-                {inspectionOptions.map((item) => {
-                  const checked = selectedInspectionIds.includes(item.id)
-                  const layers = item.layers ?? []
-                  const checks = item.checks ?? []
-                  const types = item.types ?? []
-                  const boundToCurrent = initialSubmission?.id && item.documentId === initialSubmission.id
-                  const boundLabel =
-                    item.submissionNumber || item.submissionCode
-                      ? `已绑定 ${item.submissionNumber ? `#${item.submissionNumber}` : ''}${
-                          item.submissionCode ? ` (${item.submissionCode})` : ''
-                        }`
-                      : '未绑定'
-                  return (
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-semibold text-slate-900">{copy.submissionEditor.items.title}</p>
+                  <button
+                    type="button"
+                    onClick={addItem}
+                    className="rounded-full border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-700 hover:border-slate-400 hover:bg-slate-100"
+                  >
+                    {copy.submissionEditor.items.add}
+                  </button>
+                </div>
+                <div className="space-y-3">
+                  {(data.items || []).map((item, idx) => (
                     <div
-                      key={item.id}
-                      className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50/50"
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => toggleInspectionSelection(item.id)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          e.preventDefault()
-                          toggleInspectionSelection(item.id)
-                        }
-                      }}
+                      key={idx}
+                      className="grid grid-cols-[8fr,1fr,2fr,1fr] items-start gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm"
                     >
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={() => toggleInspectionSelection(item.id)}
-                        onClick={(e) => e.stopPropagation()}
-                        className="mt-1 h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-400"
-                        aria-label={`选择报检 ${item.id}`}
-                      />
-                      <div className="flex-1 space-y-2">
-                        <div className="grid gap-2 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-center">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="text-sm font-semibold text-slate-900">
-                              {item.roadName} · {item.phaseName}
-                            </span>
-                            <span className="rounded-full bg-slate-900/80 px-2 py-1 text-[11px] font-semibold text-slate-50">
-                              {formatPk(item.startPk)} → {formatPk(item.endPk)}
-                            </span>
-                          </div>
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="rounded-full bg-white px-2 py-1 text-[11px] font-semibold text-slate-700 ring-1 ring-slate-200">
-                              {item.status}
-                            </span>
-                            <span
-                              className={`rounded-full px-2 py-1 text-[11px] font-semibold ${
-                                boundToCurrent
-                                  ? 'bg-emerald-100 text-emerald-700'
-                                  : item.documentId
-                                    ? 'bg-amber-100 text-amber-700'
-                                    : 'bg-slate-100 text-slate-700'
-                              }`}
-                            >
-                              {boundToCurrent ? '已绑定当前提交单' : boundLabel}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="grid gap-2 text-[11px] text-slate-700 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
-                          {layers.length ? (
-                            <span className="inline-flex rounded-full bg-white px-2 py-1 ring-1 ring-slate-200">
-                              层次：{layers.join(' / ')}
-                            </span>
-                          ) : null}
-                          {checks.length ? (
-                            <span className="inline-flex rounded-full bg-white px-2 py-1 ring-1 ring-slate-200">
-                              内容：{checks.join(' / ')}
-                            </span>
-                          ) : null}
-                          {types.length ? (
-                            <span className="inline-flex rounded-full bg-white px-2 py-1 ring-1 ring-slate-200">
-                              类型：{types.join(' / ')}
-                            </span>
-                          ) : null}
-                          {item.appointmentDate ? (
-                            <span className="inline-flex rounded-full bg-white px-2 py-1 ring-1 ring-slate-200">
-                              预约：{item.appointmentDate.slice(0, 10)}
-                            </span>
-                          ) : null}
-                          {item.submissionNumber !== null && item.submissionNumber !== undefined ? (
-                            <span className="inline-flex rounded-full bg-white px-2 py-1 ring-1 ring-slate-200">
-                              提交单编号：{item.submissionNumber}
-                            </span>
-                          ) : item.submissionOrder !== null && item.submissionOrder !== undefined ? (
-                            <span className="inline-flex rounded-full bg-white px-2 py-1 ring-1 ring-slate-200">
-                              提交单编号：{item.submissionOrder}
-                            </span>
-                          ) : null}
-                          {item.remark ? (
-                            <span className="inline-flex rounded-full bg-white px-2 py-1 ring-1 ring-slate-200">
-                              备注：{item.remark}
-                            </span>
-                          ) : null}
-                        </div>
+                      <label className="space-y-1 text-xs text-slate-700">
+                        {copy.submissionEditor.items.description}
+                        <textarea
+                          value={item.designation}
+                          onChange={(e) => updateItem(idx, 'designation', e.target.value)}
+                          className="h-16 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:border-emerald-300 focus:outline-none"
+                        />
+                      </label>
+                      <label className="space-y-1 text-xs text-slate-700">
+                        {copy.submissionEditor.items.quantity}
+                        <input
+                          type="number"
+                          value={item.quantity ?? ''}
+                          onChange={(e) => updateItem(idx, 'quantity', e.target.value)}
+                          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:border-emerald-300 focus:outline-none"
+                        />
+                      </label>
+                      <label className="space-y-1 text-xs text-slate-700">
+                        {copy.submissionEditor.items.remark}
+                        <input
+                          value={item.observation ?? ''}
+                          onChange={(e) => updateItem(idx, 'observation', e.target.value)}
+                          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:border-emerald-300 focus:outline-none"
+                        />
+                      </label>
+                      <div className="flex items-start justify-end">
+                        <button
+                          type="button"
+                          onClick={() => removeItem(idx)}
+                          className="mt-6 min-w-[72px] rounded-full border border-rose-200 px-3 py-2 text-xs font-semibold text-rose-700 transition hover:border-rose-300 hover:bg-rose-50"
+                          aria-label={copy.submissionEditor.items.removeAria}
+                        >
+                          {copy.submissionEditor.items.remove}
+                        </button>
                       </div>
                     </div>
-                  )
-                })}
-                {!inspectionOptions.length ? (
-                  <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">
-                    {loadingInspections ? '加载报检记录中...' : '暂无报检记录，可调整搜索条件后刷新。'}
+                  ))}
+                  {(data.items || []).length === 0 && fieldErrors.items ? (
+                    <p className="text-xs text-amber-700">{fieldErrors.items}</p>
+                  ) : null}
+                </div>
+              </div>
+
+              <div className="space-y-1 text-xs text-slate-700">
+                {copy.submissionEditor.comments.label}
+                <textarea
+                  value={data.comments ?? ''}
+                  onChange={(e) => setData({ ...data, comments: e.target.value })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:border-emerald-300 focus:outline-none"
+                />
+              </div>
+
+              <div className="space-y-3 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">{copy.submissionEditor.inspections.title}</p>
+                    <p className="text-xs text-slate-500">{copy.submissionEditor.inspections.hint}</p>
                   </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <input
+                      value={inspectionSearch}
+                      onChange={(e) => setInspectionSearch(e.target.value)}
+                      placeholder={copy.submissionEditor.inspections.searchPlaceholder}
+                      className="w-48 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:border-emerald-300 focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => fetchInspectionOptions({ keepSelection: true, searchTerm: inspectionSearch })}
+                      disabled={loadingInspections}
+                      className="rounded-full border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-700 hover:border-slate-400 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {loadingInspections
+                        ? copy.submissionEditor.inspections.searchLoading
+                        : copy.submissionEditor.inspections.searchButton}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={toggleAllVisibleInspections}
+                      disabled={!inspectionOptions.length}
+                      className="rounded-full border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-700 hover:border-slate-400 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {copy.submissionEditor.inspections.toggleAll}
+                    </button>
+                  </div>
+                </div>
+
+                {inspectionError ? (
+                  <div className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-amber-800">{inspectionError}</div>
                 ) : null}
+
+                <div className="space-y-2">
+                  {inspectionOptions.map((item) => {
+                    const checked = selectedInspectionIds.includes(item.id)
+                    const layers = item.layers ?? []
+                    const checks = item.checks ?? []
+                    const types = item.types ?? []
+                    const boundToCurrent = initialSubmission?.id && item.documentId === initialSubmission.id
+                    const boundMeta = `${
+                      item.submissionNumber ? `#${item.submissionNumber}` : ''
+                    }${item.submissionCode ? ` (${item.submissionCode})` : ''}`.trim()
+                    const boundLabel = boundMeta
+                      ? formatCopy(copy.submissionEditor.inspections.boundLabelTemplate, { label: boundMeta })
+                      : copy.submissionEditor.inspections.unbound
+                    return (
+                      <div
+                        key={item.id}
+                        className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50/50"
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => toggleInspectionSelection(item.id)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault()
+                            toggleInspectionSelection(item.id)
+                          }
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggleInspectionSelection(item.id)}
+                          onClick={(e) => e.stopPropagation()}
+                          className="mt-1 h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-400"
+                          aria-label={formatCopy(copy.submissionEditor.inspections.ariaSelectTemplate, { id: item.id })}
+                        />
+                        <div className="flex-1 space-y-2">
+                          <div className="grid gap-2 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-center">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="text-sm font-semibold text-slate-900">
+                                {item.roadName} · {item.phaseName}
+                              </span>
+                              <span className="rounded-full bg-slate-900/80 px-2 py-1 text-[11px] font-semibold text-slate-50">
+                                {formatPk(item.startPk)} → {formatPk(item.endPk)}
+                              </span>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="rounded-full bg-white px-2 py-1 text-[11px] font-semibold text-slate-700 ring-1 ring-slate-200">
+                                {item.status}
+                              </span>
+                              <span
+                                className={`rounded-full px-2 py-1 text-[11px] font-semibold ${
+                                  boundToCurrent
+                                    ? 'bg-emerald-100 text-emerald-700'
+                                    : item.documentId
+                                      ? 'bg-amber-100 text-amber-700'
+                                      : 'bg-slate-100 text-slate-700'
+                                }`}
+                              >
+                                {boundToCurrent ? copy.submissionEditor.inspections.boundCurrent : boundLabel}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="grid gap-2 text-[11px] text-slate-700 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+                            {layers.length ? (
+                              <span className="inline-flex rounded-full bg-white px-2 py-1 ring-1 ring-slate-200">
+                                {copy.submissionEditor.inspections.labels.layer}：{layers.join(' / ')}
+                              </span>
+                            ) : null}
+                            {checks.length ? (
+                              <span className="inline-flex rounded-full bg-white px-2 py-1 ring-1 ring-slate-200">
+                                {copy.submissionEditor.inspections.labels.content}：{checks.join(' / ')}
+                              </span>
+                            ) : null}
+                            {types.length ? (
+                              <span className="inline-flex rounded-full bg-white px-2 py-1 ring-1 ring-slate-200">
+                                {copy.submissionEditor.inspections.labels.type}：{types.join(' / ')}
+                              </span>
+                            ) : null}
+                            {item.appointmentDate ? (
+                              <span className="inline-flex rounded-full bg-white px-2 py-1 ring-1 ring-slate-200">
+                                {copy.submissionEditor.inspections.labels.appointment}：{item.appointmentDate.slice(0, 10)}
+                              </span>
+                            ) : null}
+                            {item.submissionNumber !== null && item.submissionNumber !== undefined ? (
+                              <span className="inline-flex rounded-full bg-white px-2 py-1 ring-1 ring-slate-200">
+                                {copy.submissionEditor.inspections.labels.submissionNumber}：{item.submissionNumber}
+                              </span>
+                            ) : item.submissionOrder !== null && item.submissionOrder !== undefined ? (
+                              <span className="inline-flex rounded-full bg-white px-2 py-1 ring-1 ring-slate-200">
+                                {copy.submissionEditor.inspections.labels.submissionNumber}：{item.submissionOrder}
+                              </span>
+                            ) : null}
+                            {item.remark ? (
+                              <span className="inline-flex rounded-full bg-white px-2 py-1 ring-1 ring-slate-200">
+                                {copy.submissionEditor.inspections.labels.remark}：{item.remark}
+                              </span>
+                            ) : null}
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                  {!inspectionOptions.length ? (
+                    <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">
+                      {loadingInspections
+                        ? copy.submissionEditor.inspections.emptyLoading
+                        : copy.submissionEditor.inspections.empty}
+                    </div>
+                  ) : null}
+                </div>
+                <div className="flex items-center justify-between text-xs text-slate-600">
+                  <span>
+                    {formatCopy(copy.submissionEditor.inspections.selectedCountTemplate, {
+                      count: selectedInspectionIds.length,
+                    })}
+                  </span>
+                  <span className="text-slate-500">{copy.submissionEditor.inspections.syncHint}</span>
+                </div>
               </div>
-              <div className="flex items-center justify-between text-xs text-slate-600">
-                <span>已选择 {selectedInspectionIds.length} 条报检记录</span>
-                <span className="text-slate-500">保存提交单时将同步更新报检绑定关系</span>
-              </div>
-            </div>
+            </fieldset>
 
             <div className="flex flex-wrap gap-2 text-xs font-semibold">
               <button
@@ -895,30 +933,38 @@ export default function SubmissionEditor({ initialSubmission, canManage = false 
                 disabled={rendering}
                 className="rounded-full bg-emerald-500 px-4 py-2 text-white shadow-md shadow-emerald-300/30 transition hover:-translate-y-0.5 hover:shadow-emerald-400/40 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {rendering ? '渲染中...' : '渲染预览'}
+                {rendering ? copy.submissionEditor.actions.rendering : copy.submissionEditor.actions.render}
               </button>
-              <button
-                type="button"
-                onClick={() => handleSave(DocumentStatus.DRAFT)}
-                disabled={saving}
-                className="rounded-full border border-slate-300 px-4 py-2 text-slate-800 hover:border-slate-400 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {saving && status === DocumentStatus.DRAFT ? '保存中...' : '保存草稿'}
-              </button>
-              <button
-                type="button"
-                onClick={() => handleSave(DocumentStatus.FINAL)}
-                disabled={saving}
-                className="rounded-full bg-sky-500 px-4 py-2 text-white shadow-md shadow-sky-300/30 transition hover:-translate-y-0.5 hover:shadow-sky-400/40 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {saving && status === DocumentStatus.FINAL ? '完成中...' : '完成并保存'}
-              </button>
+              {canEdit ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => handleSave(DocumentStatus.DRAFT)}
+                    disabled={saving}
+                    className="rounded-full border border-slate-300 px-4 py-2 text-slate-800 hover:border-slate-400 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {saving && status === DocumentStatus.DRAFT
+                      ? copy.submissionEditor.actions.savingDraft
+                      : copy.submissionEditor.actions.saveDraft}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleSave(DocumentStatus.FINAL)}
+                    disabled={saving}
+                    className="rounded-full bg-sky-500 px-4 py-2 text-white shadow-md shadow-sky-300/30 transition hover:-translate-y-0.5 hover:shadow-sky-400/40 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {saving && status === DocumentStatus.FINAL
+                      ? copy.submissionEditor.actions.savingFinal
+                      : copy.submissionEditor.actions.saveFinal}
+                  </button>
+                </>
+              ) : null}
               <button
                 type="button"
                 onClick={handleDownloadPdf}
                 className="rounded-full border border-slate-300 px-4 py-2 text-slate-800 hover:border-slate-400 hover:bg-slate-100"
               >
-                导出 PDF
+                {copy.submissionEditor.actions.exportPdf}
               </button>
             </div>
           </div>
@@ -928,9 +974,11 @@ export default function SubmissionEditor({ initialSubmission, canManage = false 
           <div className="space-y-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-md">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <p className="text-sm font-semibold text-slate-900">预览</p>
+                <p className="text-sm font-semibold text-slate-900">{copy.submissionEditor.preview.title}</p>
                 <p className="text-xs text-slate-500">
-                  模版：{selectedTemplate ? formatTplName(selectedTemplate.name) : '未选'} {selectedTemplate?.version ? `v${selectedTemplate.version}` : ''}
+                  {copy.submissionEditor.preview.templateLabel}
+                  {selectedTemplate ? formatTplName(selectedTemplate.name) : copy.submissionEditor.preview.templateEmpty}{' '}
+                  {selectedTemplate?.version ? `v${selectedTemplate.version}` : ''}
                 </p>
               </div>
               <div className="flex flex-wrap gap-2 text-xs font-semibold">
@@ -940,27 +988,27 @@ export default function SubmissionEditor({ initialSubmission, canManage = false 
                   disabled={rendering}
                   className="rounded-full bg-emerald-500 px-4 py-2 text-white shadow-md shadow-emerald-300/30 transition hover:-translate-y-0.5 hover:shadow-emerald-400/40 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {rendering ? '渲染中...' : '刷新预览'}
+                  {rendering ? copy.submissionEditor.actions.rendering : copy.submissionEditor.preview.refresh}
                 </button>
                 <button
                   type="button"
                   onClick={handleDownloadPdf}
                   className="rounded-full border border-slate-300 px-4 py-2 text-slate-800 hover:border-slate-400 hover:bg-slate-100"
                 >
-                  导出 PDF
+                  {copy.submissionEditor.preview.exportPdf}
                 </button>
               </div>
             </div>
             <div className="min-h-[420px] rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-900">
               {renderedHtml ? (
                 <iframe
-                  title="submission-preview"
+                  title={copy.submissionEditor.preview.frameTitle}
                   className="mx-auto block h-[900px] w-full max-w-[860px] rounded-xl border border-slate-200 bg-white shadow-inner"
                   sandbox=""
                   srcDoc={renderedHtml}
                 />
               ) : (
-                <p className="text-slate-500">填写表单后点击“刷新预览”查看输出。</p>
+                <p className="text-slate-500">{copy.submissionEditor.preview.emptyHint}</p>
               )}
             </div>
           </div>
@@ -970,18 +1018,18 @@ export default function SubmissionEditor({ initialSubmission, canManage = false 
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
           <div className="w-full max-w-3xl rounded-3xl bg-white p-6 shadow-2xl">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-slate-900">基础字段</h3>
+              <h3 className="text-lg font-semibold text-slate-900">{copy.submissionEditor.baseModal.title}</h3>
               <button
                 type="button"
                 onClick={() => setShowBaseModal(false)}
                 className="rounded-full border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-700 hover:border-slate-400 hover:bg-slate-100"
               >
-                关闭
+                {copy.submissionEditor.baseModal.close}
               </button>
             </div>
             <div className="mt-4 grid gap-3 md:grid-cols-2">
               <label className="space-y-1 text-xs text-slate-700 md:col-span-2">
-                项目名称
+                {copy.submissionEditor.baseModal.fields.projectName}
                 <textarea
                   value={data.documentMeta.projectName}
                   onChange={(e) => setData({ ...data, documentMeta: { ...data.documentMeta, projectName: e.target.value } })}
@@ -989,7 +1037,7 @@ export default function SubmissionEditor({ initialSubmission, canManage = false 
                 />
               </label>
               <label className="space-y-1 text-xs text-slate-700">
-                项目编码
+                {copy.submissionEditor.baseModal.fields.projectCode}
                 <input
                   value={data.documentMeta.projectCode}
                   onChange={(e) => setData({ ...data, documentMeta: { ...data.documentMeta, projectCode: e.target.value } })}
@@ -997,7 +1045,7 @@ export default function SubmissionEditor({ initialSubmission, canManage = false 
                 />
               </label>
               <label className="space-y-1 text-xs text-slate-700">
-                合同号（用逗号分隔）
+                {copy.submissionEditor.baseModal.fields.contractNumbers}
                 <input
                   value={data.documentMeta.contractNumbers.join(', ')}
                   onChange={(e) =>
@@ -1010,9 +1058,9 @@ export default function SubmissionEditor({ initialSubmission, canManage = false 
                 />
               </label>
               <div className="space-y-2 rounded-2xl border border-slate-200 bg-slate-50 p-3 md:col-span-2">
-                <p className="text-sm font-semibold text-slate-900">提交方</p>
+                <p className="text-sm font-semibold text-slate-900">{copy.submissionEditor.baseModal.fields.senderTitle}</p>
                 <label className="space-y-1 text-xs text-slate-700">
-                  组织
+                  {copy.submissionEditor.baseModal.fields.organization}
                   <input
                     value={data.parties.sender.organization}
                     onChange={(e) => updateParty('sender', 'organization', e.target.value)}
@@ -1020,7 +1068,7 @@ export default function SubmissionEditor({ initialSubmission, canManage = false 
                   />
                 </label>
                 <label className="space-y-1 text-xs text-slate-700">
-                  姓
+                  {copy.submissionEditor.baseModal.fields.lastName}
                   <input
                     value={data.parties.sender.lastName}
                     onChange={(e) => updateParty('sender', 'lastName', e.target.value)}
@@ -1028,7 +1076,7 @@ export default function SubmissionEditor({ initialSubmission, canManage = false 
                   />
                 </label>
                 <label className="space-y-1 text-xs text-slate-700">
-                  名
+                  {copy.submissionEditor.baseModal.fields.firstName}
                   <input
                     value={data.parties.sender.firstName}
                     onChange={(e) => updateParty('sender', 'firstName', e.target.value)}
@@ -1036,7 +1084,7 @@ export default function SubmissionEditor({ initialSubmission, canManage = false 
                   />
                 </label>
                 <label className="space-y-1 text-xs text-slate-700">
-                  签名（可为图片 URL）
+                  {copy.submissionEditor.baseModal.fields.signature}
                   <input
                     value={data.parties.sender.signature ?? ''}
                     onChange={(e) => updateParty('sender', 'signature', e.target.value)}
@@ -1046,9 +1094,9 @@ export default function SubmissionEditor({ initialSubmission, canManage = false 
               </div>
 
               <div className="space-y-2 rounded-2xl border border-slate-200 bg-slate-50 p-3 md:col-span-2">
-                <p className="text-sm font-semibold text-slate-900">接收方</p>
+                <p className="text-sm font-semibold text-slate-900">{copy.submissionEditor.baseModal.fields.recipientTitle}</p>
                 <label className="space-y-1 text-xs text-slate-700">
-                  组织
+                  {copy.submissionEditor.baseModal.fields.organization}
                   <input
                     value={data.parties.recipient.organization}
                     onChange={(e) => updateParty('recipient', 'organization', e.target.value)}
@@ -1056,7 +1104,7 @@ export default function SubmissionEditor({ initialSubmission, canManage = false 
                   />
                 </label>
                 <label className="space-y-1 text-xs text-slate-700">
-                  日期
+                  {copy.submissionEditor.baseModal.fields.date}
                   <input
                     type="date"
                     value={data.parties.recipient.date}
@@ -1065,7 +1113,7 @@ export default function SubmissionEditor({ initialSubmission, canManage = false 
                   />
                 </label>
                 <label className="space-y-1 text-xs text-slate-700">
-                  姓
+                  {copy.submissionEditor.baseModal.fields.lastName}
                   <input
                     value={data.parties.recipient.lastName}
                     onChange={(e) => updateParty('recipient', 'lastName', e.target.value)}
@@ -1073,7 +1121,7 @@ export default function SubmissionEditor({ initialSubmission, canManage = false 
                   />
                 </label>
                 <label className="space-y-1 text-xs text-slate-700">
-                  名
+                  {copy.submissionEditor.baseModal.fields.firstName}
                   <input
                     value={data.parties.recipient.firstName}
                     onChange={(e) => updateParty('recipient', 'firstName', e.target.value)}
@@ -1081,7 +1129,7 @@ export default function SubmissionEditor({ initialSubmission, canManage = false 
                   />
                 </label>
                 <label className="space-y-1 text-xs text-slate-700">
-                  时间
+                  {copy.submissionEditor.baseModal.fields.time}
                   <input
                     value={data.parties.recipient.time ?? ''}
                     onChange={(e) => updateParty('recipient', 'time', e.target.value)}
@@ -1089,7 +1137,7 @@ export default function SubmissionEditor({ initialSubmission, canManage = false 
                   />
                 </label>
                 <label className="space-y-1 text-xs text-slate-700">
-                  签名（可为图片 URL）
+                  {copy.submissionEditor.baseModal.fields.signature}
                   <input
                     value={data.parties.recipient.signature ?? ''}
                     onChange={(e) => updateParty('recipient', 'signature', e.target.value)}
@@ -1104,7 +1152,7 @@ export default function SubmissionEditor({ initialSubmission, canManage = false 
                 onClick={() => setShowBaseModal(false)}
                 className="rounded-full border border-slate-300 px-4 py-2 text-xs font-semibold text-slate-700 hover:border-slate-400 hover:bg-slate-100"
               >
-                关闭
+                {copy.submissionEditor.baseModal.close}
               </button>
             </div>
           </div>

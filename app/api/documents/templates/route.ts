@@ -6,8 +6,12 @@ import { hasPermission, getSessionUser } from '@/lib/server/authSession'
 import { archiveTemplate, createTemplate, listTemplates } from '@/lib/server/templateStore'
 
 export async function GET() {
-  if (!(await hasPermission('report:view'))) {
-    return NextResponse.json({ message: '缺少查看权限' }, { status: 403 })
+  const [canView, canUpdate] = await Promise.all([
+    hasPermission('template:view'),
+    hasPermission('template:update'),
+  ])
+  if (!canView && !canUpdate) {
+    return NextResponse.json({ message: '缺少模板查看权限' }, { status: 403 })
   }
   const items = await listTemplates()
   return NextResponse.json({ items })
@@ -18,8 +22,8 @@ export async function POST(request: Request) {
   if (!sessionUser) {
     return NextResponse.json({ message: '请先登录后再操作' }, { status: 401 })
   }
-  if (!(await hasPermission('report:edit'))) {
-    return NextResponse.json({ message: '缺少编辑权限' }, { status: 403 })
+  if (!(await hasPermission('template:create'))) {
+    return NextResponse.json({ message: '缺少模板新增权限' }, { status: 403 })
   }
   let payload: { name?: string; html?: string; status?: TemplateStatus; language?: string; version?: number }
   try {
@@ -47,8 +51,8 @@ export async function POST(request: Request) {
 
 // 兼容原来的发布/归档操作，批量归档接口
 export async function PATCH(request: Request) {
-  if (!(await hasPermission('report:edit'))) {
-    return NextResponse.json({ message: '缺少编辑权限' }, { status: 403 })
+  if (!(await hasPermission('template:update'))) {
+    return NextResponse.json({ message: '缺少模板编辑权限' }, { status: 403 })
   }
   let payload: { id?: string; action?: 'archive' }
   try {

@@ -1,10 +1,9 @@
-import Link from 'next/link'
-
 import { prisma } from '@/lib/prisma'
 import { getSessionUser } from '@/lib/server/authSession'
 
-import SubmissionsTable, { type SubmissionRow } from './SubmissionsTable'
-import SubmissionsFilters from './SubmissionsFilters'
+import { DocumentsAccessDenied } from '../DocumentsAccessDenied'
+import { SubmissionsPageClient } from './SubmissionsPageClient'
+import type { SubmissionRow } from './SubmissionsTable'
 
 function formatDate(value?: Date | null) {
   if (!value) return ''
@@ -30,6 +29,16 @@ type QueryParams = {
 export default async function SubmissionsPage({ searchParams }: { searchParams: Promise<QueryParams> }) {
   const query = await searchParams
   const sessionUser = await getSessionUser()
+  const permissions = sessionUser?.permissions ?? []
+  const canView = permissions.includes('submission:view') || permissions.includes('submission:update')
+  const canCreate = permissions.includes('submission:create')
+  const canUpdate = permissions.includes('submission:update')
+  const canDelete = permissions.includes('submission:delete')
+  const canViewTemplates = permissions.includes('template:view') || permissions.includes('template:update')
+
+  if (!sessionUser || !canView) {
+    return <DocumentsAccessDenied permissions={['submission:view']} variant="submissionsList" />
+  }
   const parseList = (value?: string | string[]) => {
     if (!value) return []
     const arr = Array.isArray(value) ? value : [value]
@@ -166,39 +175,18 @@ export default async function SubmissionsPage({ searchParams }: { searchParams: 
   })
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-4 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700">
-          <span className="inline-block h-2 w-2 rounded-full bg-emerald-500" />
-          Submissions
-          <span className="h-[1px] w-10 bg-emerald-200" />
-          列表/创建
-        </div>
-        <div className="flex items-center gap-2">
-          <Link
-            href="/documents/templates"
-            className="rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700 hover:border-slate-300 hover:bg-slate-100"
-          >
-            模版管理 →
-          </Link>
-          <Link
-            href="/documents/submissions/new"
-            className="rounded-full bg-emerald-500 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-emerald-300/30 transition hover:-translate-y-0.5 hover:shadow-emerald-400/40"
-          >
-            新建提交单
-          </Link>
-        </div>
-      </div>
-
-      <SubmissionsFilters
-        query={query}
-        templates={templates}
-        creators={creators}
-        statusList={statusList}
-        submissionNumbers={submissionNumbers}
-      />
-
-      <SubmissionsTable rows={rows} />
-    </div>
+    <SubmissionsPageClient
+      query={query}
+      templates={templates}
+      creators={creators}
+      statusList={statusList}
+      submissionNumbers={submissionNumbers}
+      rows={rows}
+      canViewTemplates={canViewTemplates}
+      canCreate={canCreate}
+      canUpdate={canUpdate}
+      canDelete={canDelete}
+      canView={canView}
+    />
   )
 }

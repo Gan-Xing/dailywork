@@ -3,6 +3,10 @@
 import Link from 'next/link'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
+import { formatCopy, locales } from '@/lib/i18n'
+import { getDocumentsCopy } from '@/lib/i18n/documents'
+import { usePreferredLocale } from '@/lib/usePreferredLocale'
+
 const SUBMISSION_COLUMN_STORAGE_KEY = 'submission-visible-columns'
 
 export type SubmissionRow = {
@@ -150,7 +154,16 @@ const displayValue = (value: unknown) => {
   return String(value)
 }
 
-export default function SubmissionsTable({ rows }: { rows: SubmissionRow[] }) {
+type SubmissionsTableProps = {
+  rows: SubmissionRow[]
+  canUpdate?: boolean
+  canDelete?: boolean
+  canView?: boolean
+}
+
+export default function SubmissionsTable({ rows, canUpdate = false, canDelete = false, canView = false }: SubmissionsTableProps) {
+  const { locale } = usePreferredLocale('zh', locales)
+  const copy = getDocumentsCopy(locale)
   const [selected, setSelected] = useState<number[]>([])
   const [data, setData] = useState<SubmissionRow[]>(rows)
   const [loadingAction, setLoadingAction] = useState(false)
@@ -158,55 +171,57 @@ export default function SubmissionsTable({ rows }: { rows: SubmissionRow[] }) {
   const [showColumnSelector, setShowColumnSelector] = useState(false)
   const columnSelectorRef = useRef<HTMLDivElement | null>(null)
 
+  const columnLabels = copy.submissionsTable.columns
+
   const columnOptions: ColumnOption[] = useMemo(
     () => [
-      { key: 'code', label: '编号' },
-      { key: 'submissionNumber', label: '提交单编号' },
-      { key: 'rawCode', label: '原始编号' },
-      { key: 'docId', label: '文档ID' },
-      { key: 'status', label: '状态' },
-      { key: 'projectName', label: '项目名称' },
-      { key: 'projectCode', label: '项目编码' },
-      { key: 'contractNumbers', label: '合同编号' },
-      { key: 'bordereauNumber', label: '清单编号' },
-      { key: 'subject', label: '主题' },
-      { key: 'senderOrg', label: '发件单位' },
-      { key: 'senderDate', label: '提交时间' },
-      { key: 'senderLastName', label: '发件人姓' },
-      { key: 'senderFirstName', label: '发件人名' },
-      { key: 'senderTime', label: '发件时间' },
-      { key: 'recipientOrg', label: '收件单位' },
-      { key: 'recipientDate', label: '收件日期' },
-      { key: 'recipientLastName', label: '收件人姓' },
-      { key: 'recipientFirstName', label: '收件人名' },
-      { key: 'recipientTime', label: '收件时间' },
-      { key: 'comments', label: '提交单备注' },
-      { key: 'submissionCreatedAt', label: '创建时间' },
-      { key: 'submissionUpdatedAt', label: '提交单更新时间' },
-      { key: 'designation', label: '明细' },
-      { key: 'quantity', label: '数量' },
-      { key: 'observation', label: '明细备注' },
-      { key: 'itemId', label: '明细ID' },
-      { key: 'itemOrder', label: '明细序号' },
-      { key: 'itemCreatedAt', label: '明细创建时间' },
-      { key: 'itemUpdatedAt', label: '明细更新时间' },
-      { key: 'title', label: '标题' },
-      { key: 'documentType', label: '单据类型' },
-      { key: 'documentRemark', label: '文档备注' },
-      { key: 'documentData', label: '文档数据' },
-      { key: 'documentFiles', label: '附件' },
-      { key: 'documentCreatedAt', label: '文档创建时间' },
-      { key: 'documentUpdatedAt', label: '文档更新时间' },
-      { key: 'templateName', label: '模板名称' },
-      { key: 'templateVersion', label: '模板版本' },
-      { key: 'templateId', label: '模板ID' },
-      { key: 'createdBy', label: '创建人' },
-      { key: 'createdById', label: '创建人ID' },
-      { key: 'updatedBy', label: '更新人' },
-      { key: 'updatedById', label: '更新人ID' },
-      { key: 'action', label: '操作' },
+      { key: 'code', label: columnLabels.code },
+      { key: 'submissionNumber', label: columnLabels.submissionNumber },
+      { key: 'rawCode', label: columnLabels.rawCode },
+      { key: 'docId', label: columnLabels.docId },
+      { key: 'status', label: columnLabels.status },
+      { key: 'projectName', label: columnLabels.projectName },
+      { key: 'projectCode', label: columnLabels.projectCode },
+      { key: 'contractNumbers', label: columnLabels.contractNumbers },
+      { key: 'bordereauNumber', label: columnLabels.bordereauNumber },
+      { key: 'subject', label: columnLabels.subject },
+      { key: 'senderOrg', label: columnLabels.senderOrg },
+      { key: 'senderDate', label: columnLabels.senderDate },
+      { key: 'senderLastName', label: columnLabels.senderLastName },
+      { key: 'senderFirstName', label: columnLabels.senderFirstName },
+      { key: 'senderTime', label: columnLabels.senderTime },
+      { key: 'recipientOrg', label: columnLabels.recipientOrg },
+      { key: 'recipientDate', label: columnLabels.recipientDate },
+      { key: 'recipientLastName', label: columnLabels.recipientLastName },
+      { key: 'recipientFirstName', label: columnLabels.recipientFirstName },
+      { key: 'recipientTime', label: columnLabels.recipientTime },
+      { key: 'comments', label: columnLabels.comments },
+      { key: 'submissionCreatedAt', label: columnLabels.submissionCreatedAt },
+      { key: 'submissionUpdatedAt', label: columnLabels.submissionUpdatedAt },
+      { key: 'designation', label: columnLabels.designation },
+      { key: 'quantity', label: columnLabels.quantity },
+      { key: 'observation', label: columnLabels.observation },
+      { key: 'itemId', label: columnLabels.itemId },
+      { key: 'itemOrder', label: columnLabels.itemOrder },
+      { key: 'itemCreatedAt', label: columnLabels.itemCreatedAt },
+      { key: 'itemUpdatedAt', label: columnLabels.itemUpdatedAt },
+      { key: 'title', label: columnLabels.title },
+      { key: 'documentType', label: columnLabels.documentType },
+      { key: 'documentRemark', label: columnLabels.documentRemark },
+      { key: 'documentData', label: columnLabels.documentData },
+      { key: 'documentFiles', label: columnLabels.documentFiles },
+      { key: 'documentCreatedAt', label: columnLabels.documentCreatedAt },
+      { key: 'documentUpdatedAt', label: columnLabels.documentUpdatedAt },
+      { key: 'templateName', label: columnLabels.templateName },
+      { key: 'templateVersion', label: columnLabels.templateVersion },
+      { key: 'templateId', label: columnLabels.templateId },
+      { key: 'createdBy', label: columnLabels.createdBy },
+      { key: 'createdById', label: columnLabels.createdById },
+      { key: 'updatedBy', label: columnLabels.updatedBy },
+      { key: 'updatedById', label: columnLabels.updatedById },
+      { key: 'action', label: columnLabels.action },
     ],
-    [],
+    [columnLabels],
   )
 
   const allSelected = selected.length > 0 && selected.length === new Set(data.map((r) => r.docId)).size
@@ -282,6 +297,14 @@ export default function SubmissionsTable({ rows }: { rows: SubmissionRow[] }) {
   }
 
   const callBulk = async (body: Record<string, unknown>) => {
+    if (body.action === 'delete' && !canDelete) {
+      alert(copy.submissionsTable.alerts.noDelete)
+      return
+    }
+    if (body.action !== 'delete' && !canUpdate) {
+      alert(copy.submissionsTable.alerts.noEdit)
+      return
+    }
     setLoadingAction(true)
     try {
       const res = await fetch('/api/documents/submissions/bulk', {
@@ -291,7 +314,7 @@ export default function SubmissionsTable({ rows }: { rows: SubmissionRow[] }) {
         body: JSON.stringify({ ...body, ids: Array.from(new Set(selected)) }),
       })
       const json = (await res.json()) as { message?: string; count?: number }
-      if (!res.ok) throw new Error(json.message ?? '批量操作失败')
+      if (!res.ok) throw new Error(json.message ?? copy.submissionsTable.alerts.bulkError)
       if (body.action === 'delete') {
         setData((prev) => prev.filter((r) => !selected.includes(r.docId)))
       }
@@ -321,7 +344,7 @@ export default function SubmissionsTable({ rows }: { rows: SubmissionRow[] }) {
       case 'status':
         return (
           <span className="rounded-full bg-emerald-50 px-2 py-1 text-center text-[11px] font-semibold text-emerald-700">
-            {displayValue(row.status)}
+            {displayValue(copy.status.document[row.status] ?? row.status)}
           </span>
         )
       case 'projectName':
@@ -412,16 +435,19 @@ export default function SubmissionsTable({ rows }: { rows: SubmissionRow[] }) {
         const href = row.submissionNumber
           ? `/documents/submissions/${row.submissionNumber}`
           : `/documents/submissions/${row.docId}`
+        const actionLabel = canUpdate ? copy.submissionsTable.actions.edit : copy.submissionsTable.actions.view
         return (
           <div className="flex justify-end gap-2 text-xs font-semibold">
-            <Link href={href} className="rounded-full bg-emerald-500 px-3 py-1 text-white shadow">
-              编辑
-            </Link>
+            {canView || canUpdate ? (
+              <Link href={href} className="rounded-full bg-emerald-500 px-3 py-1 text-white shadow">
+                {actionLabel}
+              </Link>
+            ) : null}
             <button
               type="button"
               className="rounded-full border border-slate-300 px-3 py-1 text-slate-700 hover:border-slate-400 hover:bg-slate-100"
             >
-              导出 PDF
+              {copy.submissionsTable.actions.export}
             </button>
           </div>
         )
@@ -445,7 +471,7 @@ export default function SubmissionsTable({ rows }: { rows: SubmissionRow[] }) {
   return (
     <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-md">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 py-3 text-xs font-semibold uppercase tracking-[0.2em] text-slate-600">
-        <span>提交单</span>
+        <span>{copy.submissionsTable.title}</span>
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative" ref={columnSelectorRef}>
             <button
@@ -454,7 +480,9 @@ export default function SubmissionsTable({ rows }: { rows: SubmissionRow[] }) {
               onClick={() => setShowColumnSelector((prev) => !prev)}
             >
               <span className="truncate">
-                {visibleColumns.length ? `已选 ${visibleColumns.length} 列` : '未选择列'}
+                {visibleColumns.length
+                  ? formatCopy(copy.submissionsTable.columnSelector.selectedTemplate, { count: visibleColumns.length })
+                  : copy.submissionsTable.columnSelector.noneSelected}
               </span>
               <span className="text-xs text-slate-400">⌕</span>
             </button>
@@ -462,14 +490,14 @@ export default function SubmissionsTable({ rows }: { rows: SubmissionRow[] }) {
               <div className="absolute right-0 z-10 mt-2 w-80 max-w-sm rounded-2xl border border-slate-200 bg-white p-3 text-xs text-slate-700 shadow-xl">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-2 text-[11px] text-slate-500">
                   <button className="text-emerald-600 hover:underline" onClick={handleSelectAllColumns}>
-                    全选
+                    {copy.submissionsTable.columnSelector.selectAll}
                   </button>
                   <div className="flex gap-2">
                     <button className="text-slate-500 hover:underline" onClick={handleRestoreDefaultColumns}>
-                      恢复默认
+                      {copy.submissionsTable.columnSelector.restoreDefault}
                     </button>
                     <button className="text-slate-500 hover:underline" onClick={handleClearColumns}>
-                      清空
+                      {copy.submissionsTable.columnSelector.clear}
                     </button>
                   </div>
                 </div>
@@ -495,26 +523,26 @@ export default function SubmissionsTable({ rows }: { rows: SubmissionRow[] }) {
           <button
             type="button"
             onClick={() => callBulk({ action: 'status', ids: selected, status: 'FINAL' })}
-            disabled={!selected.length || loadingAction}
+            disabled={!selected.length || loadingAction || !canUpdate}
             className="rounded-full border border-slate-300 px-3 py-1 text-[11px] font-semibold text-slate-700 hover:border-slate-400 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            批量完成
+            {copy.submissionsTable.bulkActions.complete}
           </button>
           <button
             type="button"
             onClick={() => callBulk({ action: 'archive', ids: selected })}
-            disabled={!selected.length || loadingAction}
+            disabled={!selected.length || loadingAction || !canUpdate}
             className="rounded-full border border-slate-300 px-3 py-1 text-[11px] font-semibold text-slate-700 hover:border-slate-400 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            批量归档
+            {copy.submissionsTable.bulkActions.archive}
           </button>
           <button
             type="button"
             onClick={() => callBulk({ action: 'delete', ids: selected })}
-            disabled={!selected.length || loadingAction}
+            disabled={!selected.length || loadingAction || !canDelete}
             className="rounded-full border border-rose-300 px-3 py-1 text-[11px] font-semibold text-rose-700 hover:border-rose-400 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            批量删除
+            {copy.submissionsTable.bulkActions.delete}
           </button>
         </div>
       </div>
@@ -523,7 +551,12 @@ export default function SubmissionsTable({ rows }: { rows: SubmissionRow[] }) {
           <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-[0.2em] text-slate-600">
             <tr>
               <th className="px-4 py-3 text-left">
-                <input type="checkbox" checked={allSelected} onChange={toggleAll} aria-label="全选" />
+                <input
+                  type="checkbox"
+                  checked={allSelected}
+                  onChange={toggleAll}
+                  aria-label={copy.submissionsTable.aria.selectAll}
+                />
               </th>
               {columnOptions.map((option) =>
                 isVisible(option.key) ? (
@@ -547,7 +580,7 @@ export default function SubmissionsTable({ rows }: { rows: SubmissionRow[] }) {
                       type="checkbox"
                       checked={checked}
                       onChange={() => toggleOne(row.docId)}
-                      aria-label={`选择 ${row.code}`}
+                      aria-label={formatCopy(copy.submissionsTable.aria.selectRow, { code: row.code })}
                     />
                   </td>
                   {columnOptions.map((option) =>
@@ -563,7 +596,7 @@ export default function SubmissionsTable({ rows }: { rows: SubmissionRow[] }) {
             {!data.length ? (
               <tr>
                 <td colSpan={columnCount} className="px-4 py-6 text-center text-sm text-slate-500">
-                  暂无提交单，点击“新建提交单”开始。
+                  {copy.submissionsTable.empty}
                 </td>
               </tr>
             ) : null}

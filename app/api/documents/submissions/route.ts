@@ -6,8 +6,12 @@ import { getSessionUser, hasPermission } from '@/lib/server/authSession'
 import { listSubmissionDocs, createSubmissionDoc } from '@/lib/server/submissionDocStore'
 
 export async function GET() {
-  if (!(await hasPermission('report:view'))) {
-    return NextResponse.json({ message: '缺少查看权限' }, { status: 403 })
+  const [canView, canUpdate] = await Promise.all([
+    hasPermission('submission:view'),
+    hasPermission('submission:update'),
+  ])
+  if (!canView && !canUpdate) {
+    return NextResponse.json({ message: '缺少提交单查看权限' }, { status: 403 })
   }
   const items = await listSubmissionDocs()
   return NextResponse.json({ items })
@@ -18,8 +22,8 @@ export async function POST(request: Request) {
   if (!sessionUser) {
     return NextResponse.json({ message: '请先登录后再操作' }, { status: 401 })
   }
-  if (!(await hasPermission('report:edit'))) {
-    return NextResponse.json({ message: '缺少编辑权限' }, { status: 403 })
+  if (!(await hasPermission('submission:create'))) {
+    return NextResponse.json({ message: '缺少提交单新增权限' }, { status: 403 })
   }
 
   let payload: {

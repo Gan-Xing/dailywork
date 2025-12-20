@@ -1,10 +1,19 @@
-import { getSessionUser, hasPermission } from '@/lib/server/authSession'
+import { getSessionUser } from '@/lib/server/authSession'
 
-import SubmissionEditor from './SubmissionEditor'
+import { DocumentsAccessDenied } from '../../DocumentsAccessDenied'
+import { NewSubmissionPageClient } from './NewSubmissionPageClient'
 
 export default async function NewSubmissionPage() {
-  const canManage = await hasPermission('submission:manage')
   const sessionUser = await getSessionUser()
+  const permissions = sessionUser?.permissions ?? []
+  const canCreate = permissions.includes('submission:create')
+  const canManage = permissions.includes('submission:manage')
 
-  return <SubmissionEditor canManage={canManage} currentUser={sessionUser} />
+  if (!sessionUser || !canCreate) {
+    return <DocumentsAccessDenied permissions={['submission:create']} variant="submissionCreate" />
+  }
+
+  return (
+    <NewSubmissionPageClient canManage={canManage} canEdit={canCreate} currentUser={sessionUser} />
+  )
 }

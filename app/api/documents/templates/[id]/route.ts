@@ -7,8 +7,12 @@ import { archiveTemplate, deleteTemplate, getTemplate, updateTemplate } from '@/
 
 export async function GET(_request: Request, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params
-  if (!(await hasPermission('report:view'))) {
-    return NextResponse.json({ message: '缺少查看权限' }, { status: 403 })
+  const [canView, canUpdate] = await Promise.all([
+    hasPermission('template:view'),
+    hasPermission('template:update'),
+  ])
+  if (!canView && !canUpdate) {
+    return NextResponse.json({ message: '缺少模板查看权限' }, { status: 403 })
   }
   if (!id) return NextResponse.json({ message: 'id 必填' }, { status: 400 })
   const tpl = await getTemplate(id)
@@ -22,8 +26,8 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   if (!sessionUser) {
     return NextResponse.json({ message: '请先登录后再操作' }, { status: 401 })
   }
-  if (!(await hasPermission('report:edit'))) {
-    return NextResponse.json({ message: '缺少编辑权限' }, { status: 403 })
+  if (!(await hasPermission('template:update'))) {
+    return NextResponse.json({ message: '缺少模板编辑权限' }, { status: 403 })
   }
   if (!id) {
     return NextResponse.json({ message: 'id 必填' }, { status: 400 })
@@ -44,8 +48,8 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
 
 export async function DELETE(_request: Request, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params
-  if (!(await hasPermission('report:edit'))) {
-    return NextResponse.json({ message: '缺少编辑权限' }, { status: 403 })
+  if (!(await hasPermission('template:delete'))) {
+    return NextResponse.json({ message: '缺少模板删除权限' }, { status: 403 })
   }
   await archiveTemplate(id)
   return NextResponse.json({ ok: true })

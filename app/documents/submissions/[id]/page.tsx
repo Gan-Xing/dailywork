@@ -1,18 +1,29 @@
 import { notFound } from 'next/navigation'
 
-import { getSessionUser, hasPermission } from '@/lib/server/authSession'
+import { getSessionUser } from '@/lib/server/authSession'
 import { findSubmissionDocByIdentifier } from '@/lib/server/submissionDocStore'
 import type { SubmissionData } from '@/types/documents'
 
-import SubmissionEditor from '../new/SubmissionEditor'
+import { DocumentsAccessDenied } from '../../DocumentsAccessDenied'
+import { SubmissionDetailClient } from './SubmissionDetailClient'
 
 export default async function SubmissionEditPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: idParam } = await params
 
-  const [sessionUser, canManage] = await Promise.all([getSessionUser(), hasPermission('submission:manage')])
+  const sessionUser = await getSessionUser()
+  const permissions = sessionUser?.permissions ?? []
+  const canView = permissions.includes('submission:view') || permissions.includes('submission:update')
+  const canEdit = permissions.includes('submission:update')
+  const canManage = permissions.includes('submission:manage')
+
+  if (!sessionUser || !canView) {
+    return <DocumentsAccessDenied permissions={['submission:view']} variant="submissionDetail" />
+  }
 
   const submission = await findSubmissionDocByIdentifier(idParam)
   if (!submission) return notFound()
+
+  const submissionNumber = submission.submission?.submissionNumber ?? null
 
   const data: SubmissionData = {
     documentMeta: {
@@ -55,7 +66,7 @@ export default async function SubmissionEditPage({ params }: { params: Promise<{
   }
 
   return (
-    <SubmissionEditor
+    <SubmissionDetailClient
       initialSubmission={{
         id: submission.id,
         title: submission.title,
@@ -64,7 +75,9 @@ export default async function SubmissionEditPage({ params }: { params: Promise<{
         templateId: submission.templateId,
         templateVersion: submission.templateVersion,
       }}
+      submissionNumber={submissionNumber}
       canManage={canManage}
+      canEdit={canEdit}
       currentUser={sessionUser}
     />
   )

@@ -7,8 +7,12 @@ import { findSubmissionDocByIdentifier, updateSubmissionDoc } from '@/lib/server
 
 export async function GET(_request: NextRequest, context: { params: Promise<{ id: string }> }) {
   const { id: idParam } = await context.params
-  if (!(await hasPermission('report:view'))) {
-    return NextResponse.json({ message: '缺少查看权限' }, { status: 403 })
+  const [canView, canUpdate] = await Promise.all([
+    hasPermission('submission:view'),
+    hasPermission('submission:update'),
+  ])
+  if (!canView && !canUpdate) {
+    return NextResponse.json({ message: '缺少提交单查看权限' }, { status: 403 })
   }
   const submission = await findSubmissionDocByIdentifier(idParam)
   if (!submission) {
@@ -23,8 +27,8 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
   if (!sessionUser) {
     return NextResponse.json({ message: '请先登录后再操作' }, { status: 401 })
   }
-  if (!(await hasPermission('report:edit'))) {
-    return NextResponse.json({ message: '缺少编辑权限' }, { status: 403 })
+  if (!(await hasPermission('submission:update'))) {
+    return NextResponse.json({ message: '缺少提交单编辑权限' }, { status: 403 })
   }
 
   let payload: {

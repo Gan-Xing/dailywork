@@ -68,7 +68,17 @@ export default function HomePageClient() {
 			'/members': ['member:view'],
 			'/finance': ['finance:view'],
 			'/value': ['value:view'],
-			'/documents': [],
+			'/documents': [
+				'submission:view',
+				'submission:create',
+				'submission:update',
+				'submission:delete',
+				'submission:manage',
+				'template:view',
+				'template:create',
+				'template:update',
+				'template:delete'
+			],
 			'/roadmap': ['roadmap:view'],
 		}),
 		[]

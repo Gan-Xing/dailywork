@@ -4,9 +4,19 @@ import puppeteer from 'puppeteer'
 
 import { renderBordereauTemplate } from '@/lib/documents/render'
 import { loadBordereauTemplateFromFile } from '@/lib/documents/templateLoader'
+import { hasPermission } from '@/lib/server/authSession'
 import { getTemplate } from '@/lib/server/templateStore'
 
 export async function POST(request: Request) {
+  const [canView, canCreate, canUpdate] = await Promise.all([
+    hasPermission('submission:view'),
+    hasPermission('submission:create'),
+    hasPermission('submission:update'),
+  ])
+  if (!canView && !canCreate && !canUpdate) {
+    return NextResponse.json({ message: '缺少提交单查看权限' }, { status: 403 })
+  }
+
   let payload: { templateId?: string; data: unknown; pageNumberText?: string }
   try {
     payload = (await request.json()) as typeof payload

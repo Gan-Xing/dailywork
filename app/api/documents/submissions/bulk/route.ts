@@ -15,9 +15,6 @@ export async function POST(request: NextRequest) {
   if (!sessionUser) {
     return NextResponse.json({ message: '请先登录后再操作' }, { status: 401 })
   }
-  if (!(await hasPermission('report:edit'))) {
-    return NextResponse.json({ message: '缺少编辑权限' }, { status: 403 })
-  }
 
   let payload: Payload
   try {
@@ -28,6 +25,14 @@ export async function POST(request: NextRequest) {
 
   if (!Array.isArray(payload.ids) || payload.ids.length === 0) {
     return NextResponse.json({ message: 'ids 不能为空' }, { status: 400 })
+  }
+
+  if (payload.action === 'delete') {
+    if (!(await hasPermission('submission:delete'))) {
+      return NextResponse.json({ message: '缺少提交单删除权限' }, { status: 403 })
+    }
+  } else if (!(await hasPermission('submission:update'))) {
+    return NextResponse.json({ message: '缺少提交单编辑权限' }, { status: 403 })
   }
 
   try {

@@ -8,6 +8,7 @@ export * from './home'
 export * from './reportsLanding'
 export * from './reportEditor'
 export * from './reportPreview'
+export * from './documents'
 
 interface SummaryCardCopy {
   label: string

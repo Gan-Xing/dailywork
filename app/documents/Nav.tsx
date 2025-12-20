@@ -4,15 +4,20 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState } from 'react'
 
-const navItems = [
-  { href: '/documents', label: '概览' },
-  { href: '/documents/submissions', label: '提交单' },
-  { href: '/documents/templates', label: '模版管理' },
-]
+import { locales } from '@/lib/i18n'
+import { getDocumentsCopy } from '@/lib/i18n/documents'
+import { usePreferredLocale } from '@/lib/usePreferredLocale'
 
 export function DocumentsNav() {
   const pathname = usePathname()
   const [collapsed, setCollapsed] = useState(false)
+  const { locale } = usePreferredLocale('zh', locales)
+  const copy = getDocumentsCopy(locale)
+  const navItems = [
+    { href: '/documents', label: copy.nav.items.overview },
+    { href: '/documents/submissions', label: copy.nav.items.submissions },
+    { href: '/documents/templates', label: copy.nav.items.templates },
+  ]
 
   const isExactActive = (href: string) => pathname === href
   const isSectionActive = (href: string) => pathname === href || pathname?.startsWith(`${href}/`)
@@ -24,12 +29,16 @@ export function DocumentsNav() {
       }`}
     >
       <div className="flex items-center justify-between gap-2">
-        {!collapsed ? <p className="px-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">导航</p> : null}
+        {!collapsed ? (
+          <p className="px-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+            {copy.nav.title}
+          </p>
+        ) : null}
         <button
           type="button"
           onClick={() => setCollapsed((prev) => !prev)}
           className="rounded-full border border-slate-200 px-2 py-1 text-[10px] font-semibold text-slate-600 hover:border-slate-300 hover:bg-slate-100"
-          aria-label={collapsed ? '展开导航' : '折叠导航'}
+          aria-label={collapsed ? copy.nav.aria.expand : copy.nav.aria.collapse}
         >
           {collapsed ? '»' : '«'}
         </button>

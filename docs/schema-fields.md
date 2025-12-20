@@ -293,6 +293,7 @@
   - 成员：`member:view`、`member:edit`、`member:manage`、`role:manage`、`permission:view`
   - 道路/进度/报检：`road:view`、`road:manage`、`progress:view`、`progress:edit`、`inspection:create`
   - 日报：`report:view`、`report:edit`
+  - 文档管理（提交单/模板）：`submission:view`、`submission:create`、`submission:update`、`submission:delete`、`submission:manage`、`template:view`、`template:create`、`template:update`、`template:delete`
   - 财务：`finance:view`、`finance:edit`、`finance:manage`
   - 产值计量：`value:view`、`value:create`、`value:update`、`value:delete`
   - 开发路线：`roadmap:view`、`roadmap:create`、`roadmap:update`、`roadmap:delete`
