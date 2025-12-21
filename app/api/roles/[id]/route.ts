@@ -6,8 +6,10 @@ import { prisma } from '@/lib/prisma'
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  if (!(await hasPermission('role:manage'))) {
-    return NextResponse.json({ error: '缺少角色管理权限' }, { status: 403 })
+  const canUpdateRole =
+    (await hasPermission('role:update')) || (await hasPermission('role:manage'))
+  if (!canUpdateRole) {
+    return NextResponse.json({ error: '缺少角色更新权限' }, { status: 403 })
   }
   const roleId = Number(id)
   if (!Number.isInteger(roleId) || roleId <= 0) {
@@ -21,6 +23,20 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         .map((value: unknown) => Number(value))
         .filter((value: number) => Number.isInteger(value) && value > 0)
     : []
+  const uniquePermissionIds = Array.from(new Set(permissionIds))
+  if (uniquePermissionIds.length > 0) {
+    const permissions = await prisma.permission.findMany({
+      where: { id: { in: uniquePermissionIds } },
+      select: { id: true, status: true },
+    })
+    const activeIds = new Set(
+      permissions.filter((permission) => permission.status === 'ACTIVE').map((permission) => permission.id),
+    )
+    const invalidIds = uniquePermissionIds.filter((id) => !activeIds.has(id))
+    if (invalidIds.length > 0) {
+      return NextResponse.json({ error: '包含已归档权限，无法绑定角色' }, { status: 400 })
+    }
+  }
 
   if (!name) {
     return NextResponse.json({ error: '角色名称必填' }, { status: 400 })
@@ -34,9 +50,9 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       })
 
       await tx.rolePermission.deleteMany({ where: { roleId } })
-      if (permissionIds.length) {
+      if (uniquePermissionIds.length) {
         await tx.rolePermission.createMany({
-          data: permissionIds.map((permissionId) => ({ roleId, permissionId })),
+          data: uniquePermissionIds.map((permissionId) => ({ roleId, permissionId })),
         })
       }
 
@@ -59,6 +75,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
           id: item.permission.id,
           code: item.permission.code,
           name: item.permission.name,
+          status: item.permission.status,
         })),
         createdAt: role.createdAt.toISOString(),
         updatedAt: role.updatedAt.toISOString(),
@@ -77,8 +94,10 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
 export async function DELETE(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  if (!(await hasPermission('role:manage'))) {
-    return NextResponse.json({ error: '缺少角色管理权限' }, { status: 403 })
+  const canDeleteRole =
+    (await hasPermission('role:delete')) || (await hasPermission('role:manage'))
+  if (!canDeleteRole) {
+    return NextResponse.json({ error: '缺少角色删除权限' }, { status: 403 })
   }
   const roleId = Number(id)
   if (!Number.isInteger(roleId) || roleId <= 0) {

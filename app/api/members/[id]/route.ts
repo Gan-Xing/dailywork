@@ -11,10 +11,15 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   if (!userId) {
     return NextResponse.json({ error: '缺少成员 ID' }, { status: 400 })
   }
-  if (!(await hasPermission('member:edit'))) {
-    return NextResponse.json({ error: '缺少成员编辑权限' }, { status: 403 })
+  const canUpdateMember =
+    (await hasPermission('member:update')) ||
+    (await hasPermission('member:edit')) ||
+    (await hasPermission('member:manage'))
+  if (!canUpdateMember) {
+    return NextResponse.json({ error: '缺少成员更新权限' }, { status: 403 })
   }
-  const canManageRole = await hasPermission('role:manage')
+  const canAssignRole =
+    (await hasPermission('role:update')) || (await hasPermission('role:manage'))
   const body = await request.json()
   const {
     username,
@@ -45,7 +50,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     resolvedPositionName = null
   }
 
-  const roleIdList: number[] = canManageRole
+  const roleIdList: number[] = canAssignRole
     ? Array.isArray(roleIds)
       ? roleIds.map((value: unknown) => Number(value)).filter(Boolean)
       : []
@@ -64,7 +69,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         joinDate: joinDate ? new Date(joinDate) : undefined,
         position: resolvedPositionName,
         employmentStatus: employmentStatus ?? 'ACTIVE',
-        ...(canManageRole
+        ...(canAssignRole
           ? {
               roles:
                 roleIdList.length === 0
@@ -96,7 +101,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         employmentStatus: user.employmentStatus,
         createdAt: user.createdAt.toISOString(),
         updatedAt: user.updatedAt.toISOString(),
-        roles: canManageRole
+        roles: canAssignRole
           ? user.roles.map((item) => ({ id: item.role.id, name: item.role.name }))
           : [],
       },
@@ -118,8 +123,10 @@ export async function DELETE(_: NextRequest, { params }: { params: Promise<{ id:
   if (!userId) {
     return NextResponse.json({ error: '缺少成员 ID' }, { status: 400 })
   }
-  if (!(await hasPermission('member:manage'))) {
-    return NextResponse.json({ error: '缺少成员管理权限' }, { status: 403 })
+  const canDeleteMember =
+    (await hasPermission('member:delete')) || (await hasPermission('member:manage'))
+  if (!canDeleteMember) {
+    return NextResponse.json({ error: '缺少成员删除权限' }, { status: 403 })
   }
 
   try {

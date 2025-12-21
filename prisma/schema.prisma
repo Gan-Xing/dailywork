@@ -40,6 +40,11 @@ enum EmploymentStatus {
   ON_LEAVE
 }
 
+enum PermissionStatus {
+  ACTIVE
+  ARCHIVED
+}
+
 enum RoadmapStatus {
   PENDING
   DONE
@@ -353,6 +358,7 @@ model Permission {
   id        Int      @id @default(autoincrement())
   code      String   @unique
   name      String
+  status    PermissionStatus @default(ACTIVE)
   roles     RolePermission[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

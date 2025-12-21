@@ -49,13 +49,14 @@ type Member = {
 type Role = {
   id: number
   name: string
-  permissions: { id: number; code: string; name: string }[]
+  permissions: { id: number; code: string; name: string; status?: PermissionStatus }[]
 }
 
 type Permission = {
   id: number
   code: string
   name: string
+  status: PermissionStatus
 }
 
 type FormState = {
@@ -111,6 +112,7 @@ type ImportErrorCode =
   | 'invalid_join_date'
   | 'role_not_found'
 type ImportError = { row: number; code: ImportErrorCode; value?: string }
+type PermissionStatus = 'ACTIVE' | 'ARCHIVED'
 
 const MEMBER_COLUMN_STORAGE_KEY = 'member-visible-columns'
 const defaultVisibleColumns: ColumnKey[] = [
@@ -161,6 +163,7 @@ const REQUIRED_IMPORT_COLUMNS: TemplateColumnKey[] = ['username', 'password']
 const PHONE_PATTERN = /^[+\d][\d\s-]{4,}$/
 const EMPTY_FILTER_VALUE = '__EMPTY__'
 const PAGE_SIZE_OPTIONS = [10, 20, 30, 50, 100, 500]
+const PERMISSION_STATUS_OPTIONS: PermissionStatus[] = ['ACTIVE', 'ARCHIVED']
 
 const normalizeText = (value?: string | null) => (value ?? '').trim()
 const getMonthKey = (value?: string | null) => {
@@ -195,6 +198,10 @@ export default function MembersPage() {
   const [membersData, setMembersData] = useState<Member[]>([])
   const [rolesData, setRolesData] = useState<Role[]>([])
   const [permissionsData, setPermissionsData] = useState<Permission[]>([])
+  const [permissionError, setPermissionError] = useState<string | null>(null)
+  const [editingPermissionId, setEditingPermissionId] = useState<number | null>(null)
+  const [permissionStatusDraft, setPermissionStatusDraft] = useState<PermissionStatus>('ACTIVE')
+  const [permissionUpdatingId, setPermissionUpdatingId] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
@@ -238,11 +245,28 @@ export default function MembersPage() {
   const [updatedAtFilters, setUpdatedAtFilters] = useState<string[]>([])
   const [session, setSession] = useState<SessionUser | null>(null)
   const [authLoaded, setAuthLoaded] = useState(false)
-  const canViewMembers = session?.permissions.includes('member:view') ?? false
-  const canEditMember = session?.permissions.includes('member:edit') ?? false
-  const canManageMember = session?.permissions.includes('member:manage') ?? false
-  const canManageRole = session?.permissions.includes('role:manage') ?? false
-  const canViewPermissions = session?.permissions.includes('permission:view') ?? false
+  const sessionPermissions = session?.permissions ?? []
+  const hasSessionPermission = (permission: string) => sessionPermissions.includes(permission)
+  const canViewMembers = hasSessionPermission('member:view')
+  const canCreateMember =
+    hasSessionPermission('member:create') || hasSessionPermission('member:manage')
+  const canUpdateMember =
+    hasSessionPermission('member:update') ||
+    hasSessionPermission('member:edit') ||
+    hasSessionPermission('member:manage')
+  const canDeleteMember =
+    hasSessionPermission('member:delete') || hasSessionPermission('member:manage')
+  const canCreateRole =
+    hasSessionPermission('role:create') || hasSessionPermission('role:manage')
+  const canUpdateRole =
+    hasSessionPermission('role:update') || hasSessionPermission('role:manage')
+  const canDeleteRole =
+    hasSessionPermission('role:delete') || hasSessionPermission('role:manage')
+  const canViewRole =
+    hasSessionPermission('role:view') || canCreateRole || canUpdateRole || canDeleteRole
+  const canAssignRole = canUpdateRole
+  const canViewPermissions = hasSessionPermission('permission:view')
+  const canUpdatePermissions = hasSessionPermission('permission:update')
   const shouldShowAccessDenied = authLoaded && !canViewMembers
   const statusLabels = employmentStatusLabels[locale]
   const nationalityByRegion = useMemo(() => {
@@ -289,8 +313,8 @@ export default function MembersPage() {
       { key: 'updatedAt', label: t.table.updatedAt },
       { key: 'actions', label: t.table.actions },
     ]
-    return canManageRole ? baseOptions : baseOptions.filter((option) => option.key !== 'roles')
-  }, [canManageRole, t.table])
+    return canAssignRole ? baseOptions : baseOptions.filter((option) => option.key !== 'roles')
+  }, [canAssignRole, t.table])
   const columnLabels = useMemo(
     () => ({
       sequence: t.table.sequence,
@@ -390,10 +414,14 @@ export default function MembersPage() {
     map.set(normalize(memberCopy.fr.status.TERMINATED), 'TERMINATED')
     return map
   }, [])
+  const activePermissions = useMemo(
+    () => permissionsData.filter((permission) => permission.status === 'ACTIVE'),
+    [permissionsData],
+  )
   const templateColumns = useMemo(() => {
-    if (canManageRole) return memberTemplateColumns
+    if (canAssignRole) return memberTemplateColumns
     return memberTemplateColumns.filter((key) => key !== 'roles')
-  }, [canManageRole])
+  }, [canAssignRole])
   const isSortDefault = useMemo(
     () =>
       sortStack.length === defaultSortStack.length &&
@@ -568,7 +596,7 @@ export default function MembersPage() {
       joinDateFilters.length > 0 ||
       positionFilters.length > 0 ||
       statusFilters.length > 0 ||
-      (canManageRole && roleFilters.length > 0) ||
+      (canAssignRole && roleFilters.length > 0) ||
       createdAtFilters.length > 0 ||
       updatedAtFilters.length > 0,
     [
@@ -583,7 +611,7 @@ export default function MembersPage() {
       roleFilters,
       createdAtFilters,
       updatedAtFilters,
-      canManageRole,
+      canAssignRole,
     ],
   )
 
@@ -634,6 +662,7 @@ export default function MembersPage() {
     setError(null)
     try {
       const tasks: Promise<void>[] = []
+      const shouldLoadRoles = canViewRole || canAssignRole
 
       if (canViewMembers) {
         const memberTask = fetch('/api/members')
@@ -655,13 +684,23 @@ export default function MembersPage() {
         setMembersData([])
       }
 
-      if (canViewMembers) {
+      if (shouldLoadRoles) {
         const rolesTask = fetch('/api/roles')
           .then((res) => {
             if (!res.ok) throw new Error(t.feedback.loadError)
             return res.json() as Promise<{ roles: Role[] }>
           })
-          .then((rolesJson) => setRolesData(rolesJson.roles ?? []))
+          .then((rolesJson) =>
+            setRolesData(
+              (rolesJson.roles ?? []).map((role) => ({
+                ...role,
+                permissions: role.permissions.map((permission) => ({
+                  ...permission,
+                  status: permission.status ?? 'ACTIVE',
+                })),
+              })),
+            ),
+          )
         tasks.push(rolesTask)
       } else {
         setRolesData([])
@@ -673,7 +712,14 @@ export default function MembersPage() {
             if (!res.ok) throw new Error(t.feedback.loadError)
             return res.json() as Promise<{ permissions: Permission[] }>
           })
-          .then((permissionsJson) => setPermissionsData(permissionsJson.permissions ?? []))
+          .then((permissionsJson) =>
+            setPermissionsData(
+              (permissionsJson.permissions ?? []).map((permission) => ({
+                ...permission,
+                status: permission.status ?? 'ACTIVE',
+              })),
+            ),
+          )
         tasks.push(permissionsTask)
       } else {
         setPermissionsData([])
@@ -685,7 +731,7 @@ export default function MembersPage() {
     } finally {
       setLoading(false)
     }
-  }, [authLoaded, canViewMembers, canViewPermissions, t.feedback.loadError])
+  }, [authLoaded, canViewMembers, canViewPermissions, canViewRole, canAssignRole, t.feedback.loadError])
 
   useEffect(() => {
     void loadData()
@@ -748,9 +794,9 @@ export default function MembersPage() {
   }, [columnOptions])
 
   useEffect(() => {
-    if (canManageRole) return
+    if (canAssignRole) return
     setSortStack((prev) => prev.filter((item) => item.field !== 'roles'))
-  }, [canManageRole])
+  }, [canAssignRole])
 
   const persistVisibleColumns = (next: ColumnKey[]) => {
     setVisibleColumns(next)
@@ -775,13 +821,13 @@ export default function MembersPage() {
   const restoreDefaultColumns = () => persistVisibleColumns([...defaultVisibleColumns])
   const clearColumns = () => persistVisibleColumns([])
   const isVisible = (key: ColumnKey) => {
-    if (key === 'roles' && !canManageRole) return false
+    if (key === 'roles' && !canAssignRole) return false
     return visibleColumns.includes(key)
   }
 
   const openCreateRoleModal = () => {
-    if (!canManageRole) {
-      setRoleError(t.errors.needRoleManage)
+    if (!canCreateRole) {
+      setRoleError(t.errors.needRoleCreate)
       return
     }
     resetRoleForm()
@@ -789,8 +835,8 @@ export default function MembersPage() {
   }
 
   const openCreateModal = () => {
-    if (!canManageMember) {
-      setActionError(t.errors.needMemberManage)
+    if (!canCreateMember) {
+      setActionError(t.errors.needMemberCreate)
       return
     }
     setActionError(null)
@@ -800,8 +846,8 @@ export default function MembersPage() {
   }
 
   const openEditModal = (member: Member) => {
-    if (!canEditMember) {
-      setActionError(t.errors.needMemberEdit)
+    if (!canUpdateMember) {
+      setActionError(t.errors.needMemberUpdate)
       return
     }
     setActionError(null)
@@ -872,12 +918,12 @@ export default function MembersPage() {
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    if (formMode === 'create' && !canManageMember) {
-      setActionError(t.errors.needMemberManage)
+    if (formMode === 'create' && !canCreateMember) {
+      setActionError(t.errors.needMemberCreate)
       return
     }
-    if (formMode === 'edit' && !canEditMember) {
-      setActionError(t.errors.needMemberEdit)
+    if (formMode === 'edit' && !canUpdateMember) {
+      setActionError(t.errors.needMemberUpdate)
       return
     }
     setSubmitting(true)
@@ -910,7 +956,7 @@ export default function MembersPage() {
       position: formState.position.trim() || null,
       employmentStatus: formState.employmentStatus,
     }
-    if (canManageRole) {
+    if (canAssignRole) {
       payload.roleIds = formState.roleIds
     }
 
@@ -941,8 +987,8 @@ export default function MembersPage() {
   }
 
   const handleDelete = async (member: Member) => {
-    if (!canManageMember) {
-      setActionError(t.errors.needMemberManage)
+    if (!canDeleteMember) {
+      setActionError(t.errors.needMemberDelete)
       return
     }
     if (!window.confirm(t.feedback.deleteConfirm(member.username))) return
@@ -963,8 +1009,8 @@ export default function MembersPage() {
   }
 
   const handleDeleteRole = async (roleId: number) => {
-    if (!canManageRole) {
-      setRoleError(t.errors.needRoleManage)
+    if (!canDeleteRole) {
+      setRoleError(t.errors.needRoleDelete)
       return
     }
     if (!window.confirm(t.errors.roleDeleteConfirm)) return
@@ -995,8 +1041,13 @@ export default function MembersPage() {
 
   const handleCreateRole = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    if (!canManageRole) {
-      setRoleError(t.errors.needRoleManage)
+    const isEditing = Boolean(editingRoleId)
+    if (isEditing && !canUpdateRole) {
+      setRoleError(t.errors.needRoleUpdate)
+      return
+    }
+    if (!isEditing && !canCreateRole) {
+      setRoleError(t.errors.needRoleCreate)
       return
     }
     setRoleSubmitting(true)
@@ -1025,6 +1076,55 @@ export default function MembersPage() {
       setRoleError(err instanceof Error ? err.message : t.feedback.submitError)
     } finally {
       setRoleSubmitting(false)
+    }
+  }
+
+  const startEditPermission = (permission: Permission) => {
+    if (!canUpdatePermissions) {
+      setPermissionError(t.errors.needPermissionUpdate)
+      return
+    }
+    setPermissionError(null)
+    setEditingPermissionId(permission.id)
+    setPermissionStatusDraft(permission.status)
+  }
+
+  const cancelEditPermission = () => {
+    setEditingPermissionId(null)
+    setPermissionStatusDraft('ACTIVE')
+  }
+
+  const savePermissionStatus = async () => {
+    if (!editingPermissionId) return
+    if (!canUpdatePermissions) {
+      setPermissionError(t.errors.needPermissionUpdate)
+      return
+    }
+    setPermissionUpdatingId(editingPermissionId)
+    setPermissionError(null)
+    try {
+      const res = await fetch(`/api/auth/permissions/${editingPermissionId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: permissionStatusDraft }),
+      })
+      const payload = (await res.json().catch(() => ({}))) as { permission?: Permission; error?: string }
+      if (!res.ok) {
+        throw new Error(payload.error ?? t.errors.permissionUpdateFailed)
+      }
+      const updated = payload.permission
+      setPermissionsData((prev) =>
+        prev.map((permission) =>
+          permission.id === editingPermissionId
+            ? { ...permission, status: updated?.status ?? permissionStatusDraft }
+            : permission,
+        ),
+      )
+      setEditingPermissionId(null)
+    } catch (err) {
+      setPermissionError(err instanceof Error ? err.message : t.errors.permissionUpdateFailed)
+    } finally {
+      setPermissionUpdatingId(null)
     }
   }
 
@@ -1068,8 +1168,8 @@ export default function MembersPage() {
   )
 
   const handleImportClick = () => {
-    if (!canManageMember) {
-      setActionError(t.errors.needMemberManage)
+    if (!canCreateMember) {
+      setActionError(t.errors.needMemberCreate)
       setActionNotice(null)
       return
     }
@@ -1080,8 +1180,8 @@ export default function MembersPage() {
     const file = event.target.files?.[0]
     event.target.value = ''
     if (!file) return
-    if (!canManageMember) {
-      setActionError(t.errors.needMemberManage)
+    if (!canCreateMember) {
+      setActionError(t.errors.needMemberCreate)
       setActionNotice(null)
       return
     }
@@ -1239,7 +1339,7 @@ export default function MembersPage() {
               break
             }
             case 'roles': {
-              if (!canManageRole) break
+              if (!canAssignRole) break
               const text = String(rawValue ?? '').trim()
               if (text) {
                 const names = text
@@ -1354,7 +1454,7 @@ export default function MembersPage() {
   }
 
   const handleSort = (field: SortField) => {
-    if (field === 'roles' && !canManageRole) return
+    if (field === 'roles' && !canAssignRole) return
     setSortStack((prev) => {
       const existing = prev.find((item) => item.field === field)
       const nextOrder: SortOrder = existing ? (existing.order === 'asc' ? 'desc' : 'asc') : 'desc'
@@ -1410,7 +1510,7 @@ export default function MembersPage() {
       if (!matchesMonthFilter(member.joinDate, joinDateFilters)) return false
       if (!matchesValueFilter(member.position, positionFilters)) return false
       if (!matchesValueFilter(member.employmentStatus, statusFilters)) return false
-      if (canManageRole && roleFilters.length > 0) {
+      if (canAssignRole && roleFilters.length > 0) {
         const roleNames = member.roles.map(resolveRoleName).map(normalizeText).filter(Boolean)
         if (roleNames.length === 0) {
           if (!roleFilters.includes(EMPTY_FILTER_VALUE)) return false
@@ -1534,7 +1634,7 @@ export default function MembersPage() {
     roleFilters,
     createdAtFilters,
     updatedAtFilters,
-    canManageRole,
+    canAssignRole,
   ])
   const totalMembers = filteredMembers.length
   const totalPages = useMemo(
@@ -1577,7 +1677,7 @@ export default function MembersPage() {
     }
     if (exporting) return
     const selectedColumns = exportableColumnOrder.filter(
-      (key) => visibleColumns.includes(key) && (key !== 'roles' || canManageRole),
+      (key) => visibleColumns.includes(key) && (key !== 'roles' || canAssignRole),
     )
     if (selectedColumns.length === 0) {
       setActionError(t.errors.exportMissingColumns)
@@ -1665,17 +1765,26 @@ export default function MembersPage() {
     }
   }
 
-  const permissions = useMemo(() => {
-    const map = new Map<string, { code: string; name: string; roles: string[] }>()
+  const permissionRolesMap = useMemo(() => {
+    const map = new Map<number, string[]>()
     rolesData.forEach((role) => {
       role.permissions.forEach((perm) => {
-        const existing = map.get(perm.code) ?? { code: perm.code, name: perm.name, roles: [] }
-        existing.roles.push(role.name)
-        map.set(perm.code, existing)
+        const bucket = map.get(perm.id) ?? []
+        bucket.push(role.name)
+        map.set(perm.id, bucket)
       })
     })
-    return Array.from(map.values())
+    return map
   }, [rolesData])
+
+  const permissions = useMemo(
+    () =>
+      permissionsData.map((permission) => ({
+        ...permission,
+        roles: permissionRolesMap.get(permission.id) ?? [],
+      })),
+    [permissionsData, permissionRolesMap],
+  )
 
   const headcount = membersData.length
   const activeCount = membersData.filter((member) => member.employmentStatus === 'ACTIVE').length
@@ -1777,12 +1886,12 @@ export default function MembersPage() {
                     <button
                       type="button"
                       onClick={openCreateModal}
-                      disabled={!canManageMember}
+                      disabled={!canCreateMember}
                       className="inline-flex items-center gap-2 rounded-full bg-sky-600 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-sky-700 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       {t.actions.create}
                     </button>
-                    <ActionButton onClick={handleImportClick} disabled={!canManageMember || importing}>
+                    <ActionButton onClick={handleImportClick} disabled={!canCreateMember || importing}>
                       {t.actions.import}
                     </ActionButton>
                     <ActionButton onClick={handleExportMembers} disabled={!canViewMembers || exporting}>
@@ -1931,7 +2040,7 @@ export default function MembersPage() {
                             onChange={setStatusFilters}
                             {...filterControlProps}
                           />
-                          {canManageRole ? (
+                          {canAssignRole ? (
                             <MultiSelectFilter
                               label={t.table.roles}
                               options={roleFilterOptions}
@@ -2179,7 +2288,7 @@ export default function MembersPage() {
                                           <button
                                             type="button"
                                             onClick={() => openEditModal(member)}
-                                            disabled={!canEditMember}
+                                            disabled={!canUpdateMember}
                                             className="rounded-full border border-slate-200 px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
                                           >
                                             {t.actions.edit}
@@ -2188,7 +2297,7 @@ export default function MembersPage() {
                                             type="button"
                                             onClick={() => handleDelete(member)}
                                             className="rounded-full border border-rose-200 px-2.5 py-1 text-[11px] font-semibold text-rose-700 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
-                                            disabled={!canManageMember || submitting}
+                                            disabled={!canDeleteMember || submitting}
                                           >
                                             {t.actions.delete}
                                           </button>
@@ -2283,9 +2392,9 @@ export default function MembersPage() {
 
             {activeTab === 'roles' ? (
               <div className="space-y-4 p-6">
-                {!canViewMembers ? (
+                {!canViewRole ? (
                   <div className="text-sm text-rose-600">
-                    {t.access.needMemberViewRoles}
+                    {t.access.needRoleView}
                   </div>
                 ) : (
                   <>
@@ -2302,7 +2411,7 @@ export default function MembersPage() {
                         <button
                           type="button"
                           onClick={openCreateRoleModal}
-                          disabled={!canManageRole}
+                          disabled={!canCreateRole}
                           className="inline-flex items-center gap-2 rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-slate-800 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-60"
                         >
                           {t.actions.createRole}
@@ -2324,30 +2433,36 @@ export default function MembersPage() {
                                 {t.rolePanel.permissions}：{role.permissions.length}
                               </p>
                             </div>
-                            {canManageRole ? (
+                            {canUpdateRole || canDeleteRole ? (
                               <div className="flex items-center gap-2">
-                                <button
-                                  type="button"
-                                  className="rounded-full border border-slate-200 px-2 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-100"
-                                  onClick={() => {
+                                {canUpdateRole ? (
+                                  <button
+                                    type="button"
+                                    className="rounded-full border border-slate-200 px-2 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-100"
+                                    onClick={() => {
                                     setEditingRoleId(role.id)
                                     setRoleFormState({
                                       name: role.name,
-                                      permissionIds: role.permissions.map((p) => p.id),
+                                      permissionIds: role.permissions
+                                        .filter((permission) => permission.status !== 'ARCHIVED')
+                                        .map((permission) => permission.id),
                                     })
-                                    setRoleError(null)
-                                    setShowRoleModal(true)
-                                  }}
-                                >
-                                  {t.actions.edit}
-                                </button>
-                                <button
-                                  type="button"
-                                  className="rounded-full border border-rose-200 px-2 py-1 text-[11px] font-semibold text-rose-700 hover:bg-rose-50"
-                                  onClick={() => handleDeleteRole(role.id)}
-                                >
-                                  {t.actions.delete}
-                                </button>
+                                      setRoleError(null)
+                                      setShowRoleModal(true)
+                                    }}
+                                  >
+                                    {t.actions.edit}
+                                  </button>
+                                ) : null}
+                                {canDeleteRole ? (
+                                  <button
+                                    type="button"
+                                    className="rounded-full border border-rose-200 px-2 py-1 text-[11px] font-semibold text-rose-700 hover:bg-rose-50"
+                                    onClick={() => handleDeleteRole(role.id)}
+                                  >
+                                    {t.actions.delete}
+                                  </button>
+                                ) : null}
                               </div>
                             ) : null}
                           </div>
@@ -2390,6 +2505,9 @@ export default function MembersPage() {
                         {permissions.length} items
                       </span>
                     </div>
+                    {permissionError ? (
+                      <div className="text-sm text-rose-600">{permissionError}</div>
+                    ) : null}
                     <div className="space-y-6 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-slate-900 shadow-sm">
                       {permissionGroups.map((group) => (
                         <div key={group.key} className="space-y-3">
@@ -2414,9 +2532,65 @@ export default function MembersPage() {
                                     <p className="text-sm font-semibold text-slate-900">{permission.code}</p>
                                     <p className="text-xs text-slate-600">{permission.name}</p>
                                   </div>
-                                  <span className="rounded-full bg-slate-100 px-2 py-1 text-[11px] font-semibold uppercase text-slate-700 ring-1 ring-slate-200">
-                                    {t.permissionPanel.code}: {permission.code}
-                                  </span>
+                                  <div className="flex flex-col items-end gap-2 text-[11px]">
+                                    <span
+                                      className={`rounded-full px-2 py-1 font-semibold uppercase ring-1 ${
+                                        permission.status === 'ARCHIVED'
+                                          ? 'bg-amber-100 text-amber-700 ring-amber-200'
+                                          : 'bg-emerald-100 text-emerald-700 ring-emerald-200'
+                                      }`}
+                                    >
+                                      {t.permissionPanel.status}: {t.permissionPanel.statusLabels[permission.status] ?? permission.status}
+                                    </span>
+                                    <span className="rounded-full bg-slate-100 px-2 py-1 font-semibold uppercase text-slate-700 ring-1 ring-slate-200">
+                                      {t.permissionPanel.code}: {permission.code}
+                                    </span>
+                                    {canUpdatePermissions ? (
+                                      editingPermissionId === permission.id ? (
+                                        <div className="flex flex-col items-end gap-2">
+                                          <select
+                                            value={permissionStatusDraft}
+                                            onChange={(event) =>
+                                              setPermissionStatusDraft(event.target.value as PermissionStatus)
+                                            }
+                                            className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] text-slate-700 focus:border-sky-400 focus:outline-none"
+                                          >
+                                            {PERMISSION_STATUS_OPTIONS.map((status) => (
+                                              <option key={status} value={status}>
+                                                {t.permissionPanel.statusLabels[status]}
+                                              </option>
+                                            ))}
+                                          </select>
+                                          <div className="flex items-center gap-2">
+                                            <button
+                                              type="button"
+                                              onClick={savePermissionStatus}
+                                              disabled={permissionUpdatingId === permission.id}
+                                              className="rounded-full border border-slate-200 px-2 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                            >
+                                              {t.actions.save}
+                                            </button>
+                                            <button
+                                              type="button"
+                                              onClick={cancelEditPermission}
+                                              disabled={permissionUpdatingId === permission.id}
+                                              className="rounded-full border border-slate-200 px-2 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                            >
+                                              {t.actions.cancel}
+                                            </button>
+                                          </div>
+                                        </div>
+                                      ) : (
+                                        <button
+                                          type="button"
+                                          onClick={() => startEditPermission(permission)}
+                                          className="rounded-full border border-slate-200 px-2 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
+                                        >
+                                          {t.permissionPanel.edit}
+                                        </button>
+                                      )
+                                    ) : null}
+                                  </div>
                                 </div>
                                 <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-slate-700">
                                   <span className="rounded-full bg-slate-100 px-2 py-1 ring-1 ring-slate-200">
@@ -2447,15 +2621,15 @@ export default function MembersPage() {
       </section>
 
       {showRoleModal ? (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 px-4">
-              <div className="w-full max-w-xl rounded-2xl bg-white p-6 shadow-2xl shadow-slate-900/30">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-lg font-semibold text-slate-900">
-                      {editingRoleId ? t.rolePanel.editTitle : t.rolePanel.title}
-                    </p>
-                    <p className="text-sm text-slate-500">{t.rolePanel.subtitle}</p>
-                  </div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 px-4">
+          <div className="flex w-full max-w-3xl max-h-[calc(100vh-2rem)] flex-col overflow-hidden rounded-2xl bg-white p-6 shadow-2xl shadow-slate-900/30">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-lg font-semibold text-slate-900">
+                  {editingRoleId ? t.rolePanel.editTitle : t.rolePanel.title}
+                </p>
+                <p className="text-sm text-slate-500">{t.rolePanel.subtitle}</p>
+              </div>
               <button
                 type="button"
                 onClick={() => setShowRoleModal(false)}
@@ -2465,56 +2639,60 @@ export default function MembersPage() {
               </button>
             </div>
 
-            <form className="mt-4 space-y-4" onSubmit={handleCreateRole}>
-              <label className="space-y-1 text-sm text-slate-700">
-                <span className="block font-semibold">{t.form.roleName}</span>
-                <input
-                  value={roleFormState.name}
-                  onChange={(event) =>
-                    setRoleFormState((prev) => ({
-                      ...prev,
-                      name: event.target.value,
-                    }))
-                  }
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
-                  placeholder={t.rolePanel.namePlaceholder}
-                />
-              </label>
+            <form className="mt-4 flex min-h-0 flex-1 flex-col" onSubmit={handleCreateRole}>
+              <div className="space-y-4 overflow-y-auto pr-1">
+                <label className="space-y-1 text-sm text-slate-700">
+                  <span className="block font-semibold">{t.form.roleName}</span>
+                  <input
+                    value={roleFormState.name}
+                    onChange={(event) =>
+                      setRoleFormState((prev) => ({
+                        ...prev,
+                        name: event.target.value,
+                      }))
+                    }
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+                    placeholder={t.rolePanel.namePlaceholder}
+                  />
+                </label>
 
-              <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
-                <p className="text-xs font-semibold text-slate-600">{t.rolePanel.permissions}</p>
-                {permissionsData.length === 0 ? (
-                  <p className="text-xs text-slate-500">{t.feedback.loading}</p>
-                ) : (
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    {permissionsData.map((permission) => (
-                      <label
-                        key={permission.id}
-                        className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-[11px] font-semibold ${
-                          roleFormState.permissionIds.includes(permission.id)
-                            ? 'border-sky-300 bg-white text-sky-800 ring-1 ring-sky-100'
-                            : 'border-slate-200 text-slate-700'
-                        }`}
-                      >
-                        <input
-                          type="checkbox"
-                          className="accent-sky-600"
-                          checked={roleFormState.permissionIds.includes(permission.id)}
-                          onChange={() => togglePermission(permission.id)}
-                        />
-                        <div className="flex flex-col">
-                          <span>{permission.code}</span>
-                          <span className="text-[10px] font-normal text-slate-500">{permission.name}</span>
-                        </div>
-                      </label>
-                    ))}
-                  </div>
-                )}
+                <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                  <p className="text-xs font-semibold text-slate-600">{t.rolePanel.permissions}</p>
+                  {permissionsData.length === 0 ? (
+                    <p className="text-xs text-slate-500">{t.feedback.loading}</p>
+                  ) : activePermissions.length === 0 ? (
+                    <p className="text-xs text-slate-500">{t.filters.noOptions}</p>
+                  ) : (
+                    <div className="grid gap-2 [grid-template-columns:repeat(auto-fit,minmax(200px,1fr))]">
+                      {activePermissions.map((permission) => (
+                        <label
+                          key={permission.id}
+                          className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-[11px] font-semibold ${
+                            roleFormState.permissionIds.includes(permission.id)
+                              ? 'border-sky-300 bg-white text-sky-800 ring-1 ring-sky-100'
+                              : 'border-slate-200 text-slate-700'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            className="accent-sky-600"
+                            checked={roleFormState.permissionIds.includes(permission.id)}
+                            onChange={() => togglePermission(permission.id)}
+                          />
+                          <div className="flex flex-col">
+                            <span>{permission.code}</span>
+                            <span className="text-[10px] font-normal text-slate-500">{permission.name}</span>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
 
-              {roleError ? <p className="text-sm text-rose-600">{roleError}</p> : null}
+              {roleError ? <p className="pt-3 text-sm text-rose-600">{roleError}</p> : null}
 
-              <div className="flex justify-end gap-2 pt-2">
+              <div className="flex justify-end gap-2 pt-3">
                 <button
                   type="button"
                   onClick={() => setShowRoleModal(false)}
@@ -2750,7 +2928,7 @@ export default function MembersPage() {
                 </label>
               </div>
 
-              {canManageRole ? (
+              {canAssignRole ? (
                 <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
                   <p className="text-xs font-semibold text-slate-600">{t.form.roles}</p>
                   <div className="flex flex-wrap gap-2">

@@ -44,10 +44,13 @@ type ImportError = {
 }
 
 export async function POST(request: Request) {
-  if (!(await hasPermission('member:manage'))) {
-    return NextResponse.json({ error: '缺少成员管理权限' }, { status: 403 })
+  const canCreateMember =
+    (await hasPermission('member:create')) || (await hasPermission('member:manage'))
+  if (!canCreateMember) {
+    return NextResponse.json({ error: '缺少成员新增权限' }, { status: 403 })
   }
-  const canManageRole = await hasPermission('role:manage')
+  const canAssignRole =
+    (await hasPermission('role:update')) || (await hasPermission('role:manage'))
   const body = await request.json().catch(() => null)
   const ignoreErrors = Boolean(body?.ignoreErrors)
   const members = Array.isArray(body?.members) ? (body?.members as ImportMemberInput[]) : []
@@ -99,7 +102,7 @@ export async function POST(request: Request) {
         ? (member.employmentStatus.trim() as PrismaEmploymentStatus)
         : null
     const roleIds =
-      canManageRole && Array.isArray(member.roleIds)
+      canAssignRole && Array.isArray(member.roleIds)
         ? member.roleIds.map((value: unknown) => Number(value)).filter(Boolean)
         : []
     const uniqueRoleIds = Array.from(new Set(roleIds))
@@ -193,7 +196,7 @@ export async function POST(request: Request) {
     })
   }
 
-  if (canManageRole) {
+  if (canAssignRole) {
     const roleIds = Array.from(new Set(prepared.flatMap((member) => member.roleIds)))
     if (roleIds.length > 0) {
       const roles = await prisma.role.findMany({ where: { id: { in: roleIds } }, select: { id: true } })
@@ -234,7 +237,7 @@ export async function POST(request: Request) {
           position: member.position ?? null,
           employmentStatus: member.employmentStatus ?? 'ACTIVE',
           roles:
-            canManageRole && member.roleIds.length > 0
+            canAssignRole && member.roleIds.length > 0
               ? {
                   create: member.roleIds.map((id) => ({
                     role: { connect: { id } },

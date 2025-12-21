@@ -25,7 +25,7 @@
   - 其他：`redBookValidYears`（整数，手动输入；每个自然年末递减，至 0 为止）、`cumulativeAbroadYears`（手动输入，2025-12-31 之后每年自动 +1）、`birthplace`、`residenceInChina`、`medicalHistory`、`healthStatus`。
 - `UserExpatProfile`（仅外籍，暂未定义字段，保留表结构以便后续无破坏扩展）。
 - `Role` / `Permission`
-  - 沿用现有 RBAC：用户-角色多对多，角色-权限多对多；权限以资源-动作编码存储（示例 `member:view`、`member:edit`、`member:manage`）。
+  - 沿用现有 RBAC：用户-角色多对多，角色-权限多对多；权限以资源-动作编码存储（示例 `member:view`、`member:create`、`member:update`，兼容旧 `member:edit`/`member:manage`）。
 
 ## 业务与交互要点
 - 账号/密码：仅存储哈希；复用现有登录/重置流程，避免重复实现认证。
@@ -38,9 +38,10 @@
 - 筛选/排序：成员列表至少支持按角色、状态、国籍、岗位过滤，支持姓名/账号搜索、入职时间排序。
 
 ## 权限策略
-- 权限编码：`member:view`、`member:edit`、`member:manage`、`role:manage`、`permission:view`；日报 `report:view|edit`；文档管理 `submission:view|create|update|delete|manage`、`template:view|create|update|delete`；道路/进度/报检 `road:view|manage`、`progress:view|edit`、`inspection:create`；财务 `finance:view|edit|manage`；产值计量 `value:view|create|update|delete`；开发路线 `roadmap:view|create|update|delete`。
+- 权限编码：`member:view|create|update|delete`、`role:view|create|update|delete`、`permission:view|update`（保留 `member:edit`、`member:manage`、`role:manage` 兼容）；日报 `report:view|edit`；文档管理 `submission:view|create|update|delete|manage`、`template:view|create|update|delete`；道路/进度/报检 `road:view|manage`、`progress:view|edit`、`inspection:create`；财务 `finance:view|edit|manage`；产值计量 `value:view|create|update|delete`；开发路线 `roadmap:view|create|update|delete`。
+- 归档权限：`Permission.status=ARCHIVED` 后不再参与鉴权，也不可绑定到角色。
 - 默认角色：Admin 拥有全部；Employee 拥有 `road:view`、`progress:view`、`inspection:create`、`report:view`、`report:edit`、`finance:view`。
-- API 护栏：成员/角色/权限的读写需对应权限（读 `member:view|permission:view`，写 `member:edit|member:manage|role:manage`）；道路/进度读取需要 `road:view` 或 `progress:view`，进度写入需要 `progress:edit` 或 `road:manage`；报检需要 `inspection:create`；日报读取/写入分别需要 `report:view` / `report:edit`；开发路线访问需 `roadmap:view`，新增或状态调整需 `roadmap:create|roadmap:update`。
+- API 护栏：成员/角色/权限的读写需对应权限（成员读 `member:view`，成员写 `member:create|member:update|member:delete`；角色读 `role:view`，角色写 `role:create|role:update|role:delete`；权限读 `permission:view`，编辑权限状态需 `permission:update`；兼容旧 `member:edit|member:manage|role:manage`）；道路/进度读取需要 `road:view` 或 `progress:view`，进度写入需要 `progress:edit` 或 `road:manage`；报检需要 `inspection:create`；日报读取/写入分别需要 `report:view` / `report:edit`；开发路线访问需 `roadmap:view`，新增或状态调整需 `roadmap:create|roadmap:update`。
 
 ## 后续扩展留口
 - 外籍扩展字段：预留 `UserExpatProfile`，后续新增字段保持后向兼容。

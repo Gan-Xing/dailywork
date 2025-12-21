@@ -98,13 +98,18 @@ export const memberCopy: Record<
     access: {
       hint: string
       needMemberView: string
-      needMemberViewRoles: string
+      needRoleView: string
       needPermissionView: string
     }
     errors: {
-      needRoleManage: string
-      needMemberManage: string
-      needMemberEdit: string
+      needRoleCreate: string
+      needRoleUpdate: string
+      needRoleDelete: string
+      needMemberCreate: string
+      needMemberUpdate: string
+      needMemberDelete: string
+      needPermissionUpdate: string
+      permissionUpdateFailed: string
       usernameRequired: string
       passwordRequired: string
       roleNameRequired: string
@@ -159,6 +164,9 @@ export const memberCopy: Record<
       code: string
       description: string
       roles: string
+      status: string
+      edit: string
+      statusLabels: Record<'ACTIVE' | 'ARCHIVED', string>
       helper: string
     }
     form: {
@@ -293,13 +301,18 @@ export const memberCopy: Record<
     access: {
       hint: '请先登录并开通 member:view 权限后再试。',
       needMemberView: '缺少 member:view 权限，无法查看成员列表。',
-      needMemberViewRoles: '缺少 member:view 权限，无法查看角色列表。',
+      needRoleView: '缺少 role:view 权限，无法查看角色列表。',
       needPermissionView: '缺少 permission:view 权限，无法查看权限列表。',
     },
     errors: {
-      needRoleManage: '权限不足：role:manage',
-      needMemberManage: '缺少成员管理权限',
-      needMemberEdit: '缺少成员编辑权限',
+      needRoleCreate: '缺少角色创建权限',
+      needRoleUpdate: '缺少角色更新权限',
+      needRoleDelete: '缺少角色删除权限',
+      needMemberCreate: '缺少成员新增权限',
+      needMemberUpdate: '缺少成员更新权限',
+      needMemberDelete: '缺少成员删除权限',
+      needPermissionUpdate: '缺少权限更新权限',
+      permissionUpdateFailed: '更新权限状态失败',
       usernameRequired: '账号必填',
       passwordRequired: '初始密码必填',
       roleNameRequired: '角色名称必填',
@@ -334,7 +347,7 @@ export const memberCopy: Record<
         joinDate: '格式：YYYY-MM-DD；示例：2025-01-31',
         position: '自由填写，建议统一用词；示例：工程师',
         employmentStatus: '固定值：ACTIVE / ON_LEAVE / TERMINATED；留空默认 ACTIVE',
-        roles: '仅 role:manage 可见；填写角色名称，多个用 "/" 分隔；示例：Admin / Employee',
+        roles: '仅 role:update / role:manage 可见；填写角色名称，多个用 "/" 分隔；示例：Admin / Employee',
       },
     },
     rolePanel: {
@@ -353,6 +366,12 @@ export const memberCopy: Record<
       code: '编码',
       description: '描述',
       roles: '关联角色',
+      status: '状态',
+      edit: '编辑',
+      statusLabels: {
+        ACTIVE: '启用',
+        ARCHIVED: '归档',
+      },
       helper: '权限遵循资源-动作编码，可直接复用到 API 鉴权策略。',
     },
     form: {
@@ -490,13 +509,18 @@ export const memberCopy: Record<
     access: {
       hint: 'Connectez-vous puis obtenez member:view pour accéder à la liste.',
       needMemberView: 'Droit insuffisant : member:view',
-      needMemberViewRoles: 'Droit insuffisant : member:view pour afficher les rôles.',
+      needRoleView: 'Droit insuffisant : role:view pour afficher les rôles.',
       needPermissionView: 'Droit insuffisant : permission:view pour afficher les permissions.',
     },
     errors: {
-      needRoleManage: 'Droit insuffisant : role:manage',
-      needMemberManage: 'Droit insuffisant : member:manage',
-      needMemberEdit: 'Droit insuffisant : member:edit',
+      needRoleCreate: 'Droit insuffisant : role:create',
+      needRoleUpdate: 'Droit insuffisant : role:update',
+      needRoleDelete: 'Droit insuffisant : role:delete',
+      needMemberCreate: 'Droit insuffisant : member:create',
+      needMemberUpdate: 'Droit insuffisant : member:update',
+      needMemberDelete: 'Droit insuffisant : member:delete',
+      needPermissionUpdate: 'Droit insuffisant : permission:update',
+      permissionUpdateFailed: 'Échec de la mise à jour du statut',
       usernameRequired: "L'identifiant est obligatoire",
       passwordRequired: 'Mot de passe requis',
       roleNameRequired: 'Nom du rôle requis',
@@ -531,7 +555,7 @@ export const memberCopy: Record<
         joinDate: 'Format : YYYY-MM-DD ; ex. 2025-01-31',
         position: 'Texte libre, garder une nomenclature cohérente ; ex. Conducteur de travaux',
         employmentStatus: 'Valeurs fixes : ACTIVE / ON_LEAVE / TERMINATED ; vide = ACTIVE',
-        roles: 'Visible seulement avec role:manage ; saisir les noms de rôles, séparés par "/" ; ex. Admin / Employee',
+        roles: 'Visible avec role:update / role:manage ; saisir les noms de rôles, séparés par "/" ; ex. Admin / Employee',
       },
     },
     rolePanel: {
@@ -550,6 +574,12 @@ export const memberCopy: Record<
       code: 'Code',
       description: 'Description',
       roles: 'Rôles associés',
+      status: 'Statut',
+      edit: 'Éditer',
+      statusLabels: {
+        ACTIVE: 'Actif',
+        ARCHIVED: 'Archivé',
+      },
       helper:
         'Les permissions suivent le format ressource:action et peuvent être réutilisées côté API.',
     },

@@ -1,4 +1,4 @@
-import type { Prisma } from '@prisma/client'
+import type { Prisma, PermissionStatus } from '@prisma/client'
 
 import { verifyPassword } from '@/lib/auth/password'
 import { hashPassword } from '@/lib/auth/password'
@@ -8,6 +8,7 @@ export interface AuthPermission {
   id?: number
   code: string
   name: string
+  status: PermissionStatus
 }
 
 export interface AuthRole {
@@ -46,11 +47,14 @@ const mapUser = (user: Prisma.UserGetPayload<{ select: typeof userSelection }>):
   const roles: AuthRole[] = user.roles.map((userRole) => ({
     id: userRole.role.id,
     name: userRole.role.name,
-    permissions: userRole.role.permissions.map((rp) => ({
-      id: rp.permission.id,
-      code: rp.permission.code,
-      name: rp.permission.name,
-    })),
+    permissions: userRole.role.permissions
+      .map((rp) => ({
+        id: rp.permission.id,
+        code: rp.permission.code,
+        name: rp.permission.name,
+        status: rp.permission.status,
+      }))
+      .filter((perm) => perm.status === 'ACTIVE'),
   }))
 
   const permissions = Array.from(
@@ -134,6 +138,7 @@ export const listPermissions = async () => {
     id: perm.id,
     code: perm.code,
     name: perm.name,
+    status: perm.status,
     createdAt: perm.createdAt.toISOString(),
     updatedAt: perm.updatedAt.toISOString(),
   }))
@@ -169,6 +174,7 @@ export const listRoles = async () => {
       id: rp.permission.id,
       code: rp.permission.code,
       name: rp.permission.name,
+      status: rp.permission.status,
     })),
     createdAt: role.createdAt.toISOString(),
     updatedAt: role.updatedAt.toISOString(),

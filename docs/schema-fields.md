@@ -289,14 +289,15 @@
 
 ## 权限与账户模型
 
-- **Permission**：`code`（唯一标识，如 `road:manage`、`report:edit`）、`name`、`createdAt`、`updatedAt`；当前权限编码覆盖：
-  - 成员：`member:view`、`member:edit`、`member:manage`、`role:manage`、`permission:view`
+- **Permission**：`code`（唯一标识，如 `road:manage`、`report:edit`）、`name`、`status`（`ACTIVE`/`ARCHIVED`，默认 `ACTIVE`）、`createdAt`、`updatedAt`；当前权限编码覆盖：
+  - 成员/角色：`member:view`、`member:create`、`member:update`、`member:delete`、`role:view`、`role:create`、`role:update`、`role:delete`、`permission:view`、`permission:update`（保留 `member:edit`、`member:manage`、`role:manage` 作为兼容）
   - 道路/进度/报检：`road:view`、`road:manage`、`progress:view`、`progress:edit`、`inspection:create`
   - 日报：`report:view`、`report:edit`
   - 文档管理（提交单/模板）：`submission:view`、`submission:create`、`submission:update`、`submission:delete`、`submission:manage`、`template:view`、`template:create`、`template:update`、`template:delete`
   - 财务：`finance:view`、`finance:edit`、`finance:manage`
   - 产值计量：`value:view`、`value:create`、`value:update`、`value:delete`
   - 开发路线：`roadmap:view`、`roadmap:create`、`roadmap:update`、`roadmap:delete`
+- **备注**：`status=ARCHIVED` 表示归档权限，不再参与鉴权，也不允许继续绑定角色。
 - **Role**：`name`（唯一，如 `Admin`、`Employee`）、`permissions`（多对多）、`createdAt`、`updatedAt`。
 - **User**：账号/权限字段包含 `username`（唯一）、`passwordHash`（salt + hash）、`roles`（多对多）、`createdAt`、`updatedAt`；个人资料字段见下方“成员管理字段”。
 - 默认角色与权限：

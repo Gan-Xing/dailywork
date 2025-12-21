@@ -9,19 +9,23 @@ export async function GET() {
   if (!(await hasPermission('member:view'))) {
     return NextResponse.json({ error: '缺少成员查看权限' }, { status: 403 })
   }
-  const canManageRole = await hasPermission('role:manage')
+  const canAssignRole =
+    (await hasPermission('role:update')) || (await hasPermission('role:manage'))
   const members = await listUsers()
-  const payload = canManageRole
+  const payload = canAssignRole
     ? members
     : members.map((member) => ({ ...member, roles: [] }))
   return NextResponse.json({ members: payload })
 }
 
 export async function POST(request: Request) {
-  if (!(await hasPermission('member:manage'))) {
-    return NextResponse.json({ error: '缺少成员管理权限' }, { status: 403 })
+  const canCreateMember =
+    (await hasPermission('member:create')) || (await hasPermission('member:manage'))
+  if (!canCreateMember) {
+    return NextResponse.json({ error: '缺少成员新增权限' }, { status: 403 })
   }
-  const canManageRole = await hasPermission('role:manage')
+  const canAssignRole =
+    (await hasPermission('role:update')) || (await hasPermission('role:manage'))
   const body = await request.json()
   const {
     username,
@@ -54,7 +58,7 @@ export async function POST(request: Request) {
 
   let resolvedPositionName = typeof position === 'string' && position.trim().length ? position.trim() : null
 
-  const roleIdList: number[] = canManageRole
+  const roleIdList: number[] = canAssignRole
     ? Array.isArray(roleIds)
       ? roleIds.map((value: unknown) => Number(value)).filter(Boolean)
       : []
@@ -80,7 +84,7 @@ export async function POST(request: Request) {
         joinDate: joinDate ? new Date(joinDate) : new Date(),
         position: resolvedPositionName,
         employmentStatus: employmentStatus ?? 'ACTIVE',
-        roles: canManageRole
+        roles: canAssignRole
           ? roleIdList.length === 0
             ? undefined
             : {
@@ -108,7 +112,7 @@ export async function POST(request: Request) {
         employmentStatus: user.employmentStatus,
         createdAt: user.createdAt.toISOString(),
         updatedAt: user.updatedAt.toISOString(),
-        roles: canManageRole
+        roles: canAssignRole
           ? user.roles.map((item) => ({ id: item.role.id, name: item.role.name }))
           : [],
       },

@@ -3,6 +3,7 @@ import { cookies } from 'next/headers'
 import { createHmac } from 'crypto'
 
 import type { AuthUser } from '@/lib/server/authStore'
+import { prisma } from '@/lib/prisma'
 
 const SESSION_COOKIE = 'dw-session'
 const SESSION_TTL = 60 * 60 * 24 * 7 // 7 days
@@ -75,5 +76,10 @@ export const hasPermission = async (permission: string) => {
   noStore()
   const user = await getSessionUser()
   if (!user) return false
-  return user.permissions.includes(permission)
+  if (!user.permissions.includes(permission)) return false
+  const record = await prisma.permission.findUnique({
+    where: { code: permission },
+    select: { status: true },
+  })
+  return record?.status === 'ACTIVE'
 }
