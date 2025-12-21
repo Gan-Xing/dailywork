@@ -21,9 +21,12 @@ export const memberCopy: Record<
     title: string
     subtitle: string
     modalSubtitle: string
+    editTitle: string
+    editSubtitle: string
     breadcrumbs: {
       home: string
       members: string
+      memberEdit: string
     }
     tabs: Record<'members' | 'roles' | 'permissions', string>
     tabDescriptions: Record<'members' | 'roles' | 'permissions', string>
@@ -70,6 +73,20 @@ export const memberCopy: Record<
       | 'position'
       | 'employmentStatus'
       | 'roles'
+      | 'frenchName'
+      | 'idNumber'
+      | 'passportNumber'
+      | 'educationAndMajor'
+      | 'certifications'
+      | 'domesticMobile'
+      | 'emergencyContactName'
+      | 'emergencyContactPhone'
+      | 'redBookValidYears'
+      | 'cumulativeAbroadYears'
+      | 'birthplace'
+      | 'residenceInChina'
+      | 'medicalHistory'
+      | 'healthStatus'
       | 'createdAt'
       | 'updatedAt'
       | 'actions'
@@ -144,7 +161,21 @@ export const memberCopy: Record<
         | 'joinDate'
         | 'position'
         | 'employmentStatus'
-        | 'roles',
+        | 'roles'
+        | 'frenchName'
+        | 'idNumber'
+        | 'passportNumber'
+        | 'educationAndMajor'
+        | 'certifications'
+        | 'domesticMobile'
+        | 'emergencyContactName'
+        | 'emergencyContactPhone'
+        | 'redBookValidYears'
+        | 'cumulativeAbroadYears'
+        | 'birthplace'
+        | 'residenceInChina'
+        | 'medicalHistory'
+        | 'healthStatus',
         string
       >
     }
@@ -186,6 +217,27 @@ export const memberCopy: Record<
       nationalityPlaceholder: string
       roleName: string
       positionPlaceholder: string
+      profileSection: string
+      profileChinaHint: string
+      profileExpatHint: string
+      expand: string
+      collapse: string
+      expatEmpty: string
+      frenchName: string
+      idNumber: string
+      passportNumber: string
+      educationAndMajor: string
+      certifications: string
+      certificationsPlaceholder: string
+      domesticMobile: string
+      emergencyContactName: string
+      emergencyContactPhone: string
+      redBookValidYears: string
+      cumulativeAbroadYears: string
+      birthplace: string
+      residenceInChina: string
+      medicalHistory: string
+      healthStatus: string
     }
     feedback: {
       loading: string
@@ -207,10 +259,13 @@ export const memberCopy: Record<
   zh: {
     title: '成员管理',
     subtitle: '集中维护成员信息、角色与权限映射，支持导入/导出与审计记录。',
-    modalSubtitle: '录入共享字段，扩展资料后续在详情页维护。',
+    modalSubtitle: '录入基础字段，扩展资料可选填写。',
+    editTitle: '编辑成员资料',
+    editSubtitle: '更新基础信息与扩展字段。',
     breadcrumbs: {
       home: '首页',
       members: '成员管理',
+      memberEdit: '编辑成员',
     },
     tabs: {
       members: '成员列表',
@@ -275,6 +330,20 @@ export const memberCopy: Record<
       position: '岗位',
       employmentStatus: '状态',
       roles: '角色',
+      frenchName: '法语名',
+      idNumber: '身份证号',
+      passportNumber: '护照号',
+      educationAndMajor: '学历/专业',
+      certifications: '资格证书',
+      domesticMobile: '国内手机',
+      emergencyContactName: '紧急联系人',
+      emergencyContactPhone: '紧急联系电话',
+      redBookValidYears: '红皮书年限',
+      cumulativeAbroadYears: '累计出国年限',
+      birthplace: '籍贯',
+      residenceInChina: '国内常住地',
+      medicalHistory: '既往病史',
+      healthStatus: '健康状况',
       createdAt: '创建时间',
       updatedAt: '更新时间',
       actions: '操作',
@@ -348,6 +417,20 @@ export const memberCopy: Record<
         position: '自由填写，建议统一用词；示例：工程师',
         employmentStatus: '固定值：ACTIVE / ON_LEAVE / TERMINATED；留空默认 ACTIVE',
         roles: '仅 role:update / role:manage 可见；填写角色名称，多个用 "/" 分隔；示例：Admin / Employee',
+        frenchName: '可选；法语名或法语拼写。',
+        idNumber: '可选；身份证号码。',
+        passportNumber: '可选；护照号码。',
+        educationAndMajor: '可选；毕业院校与专业。',
+        certifications: '可选；多个证书用 "/" 或换行分隔。',
+        domesticMobile: '可选；国内手机号。',
+        emergencyContactName: '可选；紧急联系人姓名。',
+        emergencyContactPhone: '可选；紧急联系人电话。',
+        redBookValidYears: '可选；红皮书有效年限（整数）。',
+        cumulativeAbroadYears: '可选；累计出国年限（整数）。',
+        birthplace: '可选；籍贯。',
+        residenceInChina: '可选；国内常住地。',
+        medicalHistory: '可选；既往病史。',
+        healthStatus: '可选；健康状况。',
       },
     },
     rolePanel: {
@@ -391,6 +474,27 @@ export const memberCopy: Record<
       nationalityPlaceholder: '请选择国籍',
       roleName: '角色名称',
       positionPlaceholder: '选择或输入岗位',
+      profileSection: '扩展字段',
+      profileChinaHint: '中国籍成员可填写中方扩展信息。',
+      profileExpatHint: '非中国籍成员暂未配置扩展字段。',
+      expand: '展开',
+      collapse: '收起',
+      expatEmpty: '外籍/当地员工扩展字段暂未配置。',
+      frenchName: '法语名',
+      idNumber: '身份证号',
+      passportNumber: '护照号',
+      educationAndMajor: '毕业院校与专业',
+      certifications: '资格证书',
+      certificationsPlaceholder: '多个证书可换行或用 / 分隔',
+      domesticMobile: '国内手机号',
+      emergencyContactName: '紧急联系人',
+      emergencyContactPhone: '紧急联系人电话',
+      redBookValidYears: '红皮书有效年限',
+      cumulativeAbroadYears: '累计出国年限',
+      birthplace: '籍贯',
+      residenceInChina: '国内常住地',
+      medicalHistory: '既往病史',
+      healthStatus: '健康状况',
     },
     feedback: {
       loading: '正在加载成员...',
@@ -414,10 +518,13 @@ export const memberCopy: Record<
     title: 'Gestion des membres',
     subtitle:
       'Centralisez les profils, rôles et permissions; imports/exports et traces d’audit intégrées.',
-    modalSubtitle: 'Renseignez les champs communs; les détails avancés pourront suivre.',
+    modalSubtitle: 'Renseignez les champs de base; les extensions sont optionnelles.',
+    editTitle: 'Modifier un membre',
+    editSubtitle: 'Mettre à jour les informations de base et les champs étendus.',
     breadcrumbs: {
       home: 'Accueil',
       members: 'Gestion des membres',
+      memberEdit: 'Modifier le membre',
     },
     tabs: {
       members: 'Liste des membres',
@@ -483,6 +590,20 @@ export const memberCopy: Record<
       position: 'Poste',
       employmentStatus: 'Statut',
       roles: 'Rôles',
+      frenchName: 'Nom français',
+      idNumber: 'N° identité',
+      passportNumber: 'N° passeport',
+      educationAndMajor: 'Études / spécialité',
+      certifications: 'Certifications',
+      domesticMobile: 'Mobile (Chine)',
+      emergencyContactName: "Contact d'urgence",
+      emergencyContactPhone: "Téléphone d'urgence",
+      redBookValidYears: 'Années livret rouge',
+      cumulativeAbroadYears: "Années à l'étranger",
+      birthplace: "Lieu d'origine",
+      residenceInChina: 'Résidence en Chine',
+      medicalHistory: 'Antécédents médicaux',
+      healthStatus: 'État de santé',
       createdAt: 'Créé le',
       updatedAt: 'Mis à jour',
       actions: 'Actions',
@@ -556,6 +677,20 @@ export const memberCopy: Record<
         position: 'Texte libre, garder une nomenclature cohérente ; ex. Conducteur de travaux',
         employmentStatus: 'Valeurs fixes : ACTIVE / ON_LEAVE / TERMINATED ; vide = ACTIVE',
         roles: 'Visible avec role:update / role:manage ; saisir les noms de rôles, séparés par "/" ; ex. Admin / Employee',
+        frenchName: 'Optionnel ; nom en français.',
+        idNumber: "Optionnel ; numéro d'identité.",
+        passportNumber: 'Optionnel ; numéro de passeport.',
+        educationAndMajor: 'Optionnel ; diplôme et spécialité.',
+        certifications: 'Optionnel ; plusieurs valeurs séparées par "/" ou retour ligne.',
+        domesticMobile: 'Optionnel ; mobile Chine.',
+        emergencyContactName: 'Optionnel ; contact d’urgence.',
+        emergencyContactPhone: 'Optionnel ; téléphone du contact d’urgence.',
+        redBookValidYears: 'Optionnel ; années (entier).',
+        cumulativeAbroadYears: 'Optionnel ; années cumulées (entier).',
+        birthplace: "Optionnel ; lieu d'origine.",
+        residenceInChina: 'Optionnel ; résidence en Chine.',
+        medicalHistory: 'Optionnel ; antécédents médicaux.',
+        healthStatus: 'Optionnel ; état de santé.',
       },
     },
     rolePanel: {
@@ -600,6 +735,27 @@ export const memberCopy: Record<
       nationalityPlaceholder: 'Choisir une nationalité',
       roleName: 'Nom du rôle',
       positionPlaceholder: 'Sélectionner ou saisir',
+      profileSection: 'Champs étendus',
+      profileChinaHint: 'Champs étendus pour les membres chinois.',
+      profileExpatHint: 'Aucun champ étendu défini pour les non-chinois.',
+      expand: 'Développer',
+      collapse: 'Réduire',
+      expatEmpty: 'Aucun champ étendu défini pour les employés locaux/étrangers.',
+      frenchName: 'Nom français',
+      idNumber: "N° d'identité",
+      passportNumber: 'N° de passeport',
+      educationAndMajor: 'Études / spécialité',
+      certifications: 'Certifications',
+      certificationsPlaceholder: 'Séparer par lignes ou "/"',
+      domesticMobile: 'Mobile (Chine)',
+      emergencyContactName: "Contact d'urgence",
+      emergencyContactPhone: "Téléphone d'urgence",
+      redBookValidYears: 'Années livret rouge',
+      cumulativeAbroadYears: "Années à l'étranger",
+      birthplace: "Lieu d'origine",
+      residenceInChina: 'Résidence en Chine',
+      medicalHistory: 'Antécédents médicaux',
+      healthStatus: 'État de santé',
     },
     feedback: {
       loading: 'Chargement des membres...',

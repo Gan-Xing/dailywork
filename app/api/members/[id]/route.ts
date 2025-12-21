@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 
 import { hashPassword } from '@/lib/auth/password'
 import { hasPermission } from '@/lib/server/authSession'
+import { normalizeChineseProfile } from '@/lib/server/memberProfiles'
 import { prisma } from '@/lib/prisma'
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -32,6 +33,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     position,
     employmentStatus,
     roleIds,
+    chineseProfile,
+    expatProfile,
   } = body ?? {}
 
   const normalizedUsername = typeof username === 'string' ? username.trim() : undefined
@@ -49,6 +52,9 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   if (position === null || position === '') {
     resolvedPositionName = null
   }
+  const isChinese = nationality === 'china'
+  const chineseProfileData = normalizeChineseProfile(chineseProfile)
+  const shouldUpsertExpatProfile = !isChinese && expatProfile !== null && expatProfile !== undefined
 
   const roleIdList: number[] = canAssignRole
     ? Array.isArray(roleIds)
@@ -69,6 +75,22 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         joinDate: joinDate ? new Date(joinDate) : undefined,
         position: resolvedPositionName,
         employmentStatus: employmentStatus ?? 'ACTIVE',
+        chineseProfile: isChinese
+          ? {
+              upsert: {
+                create: chineseProfileData,
+                update: chineseProfileData,
+              },
+            }
+          : undefined,
+        expatProfile: shouldUpsertExpatProfile
+          ? {
+              upsert: {
+                create: {},
+                update: {},
+              },
+            }
+          : undefined,
         ...(canAssignRole
           ? {
               roles:
@@ -85,6 +107,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       },
       include: {
         roles: { include: { role: true } },
+        chineseProfile: true,
+        expatProfile: true,
       },
     })
 
@@ -104,6 +128,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         roles: canAssignRole
           ? user.roles.map((item) => ({ id: item.role.id, name: item.role.name }))
           : [],
+        chineseProfile: user.chineseProfile,
+        expatProfile: user.expatProfile,
       },
     })
   } catch (error) {

@@ -3,6 +3,7 @@ import type { EmploymentStatus as PrismaEmploymentStatus } from '@prisma/client'
 
 import { hashPassword } from '@/lib/auth/password'
 import { hasPermission } from '@/lib/server/authSession'
+import { hasChineseProfileData, normalizeChineseProfile } from '@/lib/server/memberProfiles'
 import { prisma } from '@/lib/prisma'
 
 const PHONE_PATTERN = /^[+\d][\d\s-]{4,}$/
@@ -24,6 +25,20 @@ type ImportMemberInput = {
   position?: string | null
   employmentStatus?: string | null
   roleIds?: number[]
+  frenchName?: string | null
+  idNumber?: string | null
+  passportNumber?: string | null
+  educationAndMajor?: string | null
+  certifications?: string[] | string | null
+  domesticMobile?: string | null
+  emergencyContactName?: string | null
+  emergencyContactPhone?: string | null
+  redBookValidYears?: number | string | null
+  cumulativeAbroadYears?: number | string | null
+  birthplace?: string | null
+  residenceInChina?: string | null
+  medicalHistory?: string | null
+  healthStatus?: string | null
 }
 
 type ImportErrorCode =
@@ -72,6 +87,7 @@ export async function POST(request: Request) {
     position: string | null
     employmentStatus: PrismaEmploymentStatus | null
     roleIds: number[]
+    chineseProfile: ReturnType<typeof normalizeChineseProfile>
   }> = []
   const seenUsernames = new Set<string>()
 
@@ -106,6 +122,22 @@ export async function POST(request: Request) {
         ? member.roleIds.map((value: unknown) => Number(value)).filter(Boolean)
         : []
     const uniqueRoleIds = Array.from(new Set(roleIds))
+    const chineseProfile = normalizeChineseProfile({
+      frenchName: member.frenchName,
+      idNumber: member.idNumber,
+      passportNumber: member.passportNumber,
+      educationAndMajor: member.educationAndMajor,
+      certifications: member.certifications,
+      domesticMobile: member.domesticMobile,
+      emergencyContactName: member.emergencyContactName,
+      emergencyContactPhone: member.emergencyContactPhone,
+      redBookValidYears: member.redBookValidYears,
+      cumulativeAbroadYears: member.cumulativeAbroadYears,
+      birthplace: member.birthplace,
+      residenceInChina: member.residenceInChina,
+      medicalHistory: member.medicalHistory,
+      healthStatus: member.healthStatus,
+    })
 
     let hasRowError = false
     if (!username) {
@@ -166,6 +198,7 @@ export async function POST(request: Request) {
         position,
         employmentStatus,
         roleIds: uniqueRoleIds,
+        chineseProfile,
       })
     }
   })
@@ -225,6 +258,8 @@ export async function POST(request: Request) {
 
   await prisma.$transaction(async (tx) => {
     for (const member of candidates) {
+      const isChinese = member.nationality === 'china'
+      const shouldCreateChineseProfile = isChinese && hasChineseProfileData(member.chineseProfile)
       await tx.user.create({
         data: {
           username: member.username,
@@ -236,14 +271,19 @@ export async function POST(request: Request) {
           joinDate: member.joinDate ?? new Date(),
           position: member.position ?? null,
           employmentStatus: member.employmentStatus ?? 'ACTIVE',
+          chineseProfile: shouldCreateChineseProfile
+            ? {
+                create: member.chineseProfile,
+              }
+            : undefined,
           roles:
             canAssignRole && member.roleIds.length > 0
               ? {
                   create: member.roleIds.map((id) => ({
                     role: { connect: { id } },
                   })),
-                }
-              : undefined,
+              }
+            : undefined,
         },
       })
     }

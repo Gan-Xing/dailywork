@@ -102,6 +102,32 @@ export const listUsers = async () => {
       employmentStatus: true,
       createdAt: true,
       updatedAt: true,
+      chineseProfile: {
+        select: {
+          frenchName: true,
+          idNumber: true,
+          passportNumber: true,
+          educationAndMajor: true,
+          certifications: true,
+          domesticMobile: true,
+          emergencyContactName: true,
+          emergencyContactPhone: true,
+          redBookValidYears: true,
+          cumulativeAbroadYears: true,
+          birthplace: true,
+          residenceInChina: true,
+          medicalHistory: true,
+          healthStatus: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      },
+      expatProfile: {
+        select: {
+          createdAt: true,
+          updatedAt: true,
+        },
+      },
       roles: {
         include: {
           role: true,
@@ -127,7 +153,103 @@ export const listUsers = async () => {
       id: item.role.id,
       name: item.role.name,
     })),
+    chineseProfile: user.chineseProfile
+      ? {
+          ...user.chineseProfile,
+          createdAt: user.chineseProfile.createdAt.toISOString(),
+          updatedAt: user.chineseProfile.updatedAt.toISOString(),
+        }
+      : null,
+    expatProfile: user.expatProfile
+      ? {
+          createdAt: user.expatProfile.createdAt.toISOString(),
+          updatedAt: user.expatProfile.updatedAt.toISOString(),
+        }
+      : null,
   }))
+}
+
+export const getUserById = async (userId: number) => {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      username: true,
+      name: true,
+      gender: true,
+      nationality: true,
+      phones: true,
+      joinDate: true,
+      position: true,
+      employmentStatus: true,
+      createdAt: true,
+      updatedAt: true,
+      chineseProfile: {
+        select: {
+          frenchName: true,
+          idNumber: true,
+          passportNumber: true,
+          educationAndMajor: true,
+          certifications: true,
+          domesticMobile: true,
+          emergencyContactName: true,
+          emergencyContactPhone: true,
+          redBookValidYears: true,
+          cumulativeAbroadYears: true,
+          birthplace: true,
+          residenceInChina: true,
+          medicalHistory: true,
+          healthStatus: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      },
+      expatProfile: {
+        select: {
+          createdAt: true,
+          updatedAt: true,
+        },
+      },
+      roles: {
+        include: {
+          role: true,
+        },
+      },
+    },
+  })
+
+  if (!user) return null
+
+  return {
+    id: user.id,
+    username: user.username,
+    name: user.name,
+    gender: user.gender,
+    nationality: user.nationality,
+    phones: user.phones,
+    joinDate: user.joinDate ? user.joinDate.toISOString() : null,
+    position: user.position,
+    employmentStatus: user.employmentStatus,
+    createdAt: user.createdAt.toISOString(),
+    updatedAt: user.updatedAt.toISOString(),
+    roles: user.roles.map((item) => ({
+      id: item.role.id,
+      name: item.role.name,
+    })),
+    chineseProfile: user.chineseProfile
+      ? {
+          ...user.chineseProfile,
+          createdAt: user.chineseProfile.createdAt.toISOString(),
+          updatedAt: user.chineseProfile.updatedAt.toISOString(),
+        }
+      : null,
+    expatProfile: user.expatProfile
+      ? {
+          createdAt: user.expatProfile.createdAt.toISOString(),
+          updatedAt: user.expatProfile.updatedAt.toISOString(),
+        }
+      : null,
+  }
 }
 
 export const listPermissions = async () => {

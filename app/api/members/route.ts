@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { hashPassword } from '@/lib/auth/password'
 import { hasPermission } from '@/lib/server/authSession'
 import { listUsers } from '@/lib/server/authStore'
+import { hasChineseProfileData, normalizeChineseProfile } from '@/lib/server/memberProfiles'
 import { prisma } from '@/lib/prisma'
 
 export async function GET() {
@@ -38,6 +39,8 @@ export async function POST(request: Request) {
     position,
     employmentStatus,
     roleIds,
+    chineseProfile,
+    expatProfile,
   } = body ?? {}
 
   const normalizedUsername =
@@ -57,6 +60,10 @@ export async function POST(request: Request) {
       : []
 
   let resolvedPositionName = typeof position === 'string' && position.trim().length ? position.trim() : null
+  const isChinese = nationality === 'china'
+  const chineseProfileData = normalizeChineseProfile(chineseProfile)
+  const shouldCreateChineseProfile = isChinese && hasChineseProfileData(chineseProfileData)
+  const shouldCreateExpatProfile = !isChinese && expatProfile !== null && expatProfile !== undefined
 
   const roleIdList: number[] = canAssignRole
     ? Array.isArray(roleIds)
@@ -84,6 +91,16 @@ export async function POST(request: Request) {
         joinDate: joinDate ? new Date(joinDate) : new Date(),
         position: resolvedPositionName,
         employmentStatus: employmentStatus ?? 'ACTIVE',
+        chineseProfile: shouldCreateChineseProfile
+          ? {
+              create: chineseProfileData,
+            }
+          : undefined,
+        expatProfile: shouldCreateExpatProfile
+          ? {
+              create: {},
+            }
+          : undefined,
         roles: canAssignRole
           ? roleIdList.length === 0
             ? undefined
@@ -96,6 +113,8 @@ export async function POST(request: Request) {
       },
       include: {
         roles: { include: { role: true } },
+        chineseProfile: true,
+        expatProfile: true,
       },
     })
 
@@ -115,6 +134,8 @@ export async function POST(request: Request) {
         roles: canAssignRole
           ? user.roles.map((item) => ({ id: item.role.id, name: item.role.name }))
           : [],
+        chineseProfile: user.chineseProfile,
+        expatProfile: user.expatProfile,
       },
     })
   } catch (error) {
