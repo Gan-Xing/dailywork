@@ -274,7 +274,7 @@ export default function MembersPage() {
   )
 
   const columnOptions: { key: ColumnKey; label: ReactNode }[] = useMemo(() => {
-    const baseOptions = [
+    const baseOptions: { key: ColumnKey; label: ReactNode }[] = [
       { key: 'sequence', label: t.table.sequence },
       { key: 'name', label: t.table.name },
       { key: 'username', label: t.table.username },
@@ -507,7 +507,7 @@ export default function MembersPage() {
 
   const statusFilterOptions = useMemo(() => {
     const order: EmploymentStatus[] = ['ACTIVE', 'ON_LEAVE', 'TERMINATED']
-    const options = order.map((status) => ({
+    const options: Array<{ value: string; label: string }> = order.map((status) => ({
       value: status,
       label: statusLabels[status],
     }))

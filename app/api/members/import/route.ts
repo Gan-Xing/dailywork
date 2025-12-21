@@ -1,11 +1,16 @@
 import { NextResponse } from 'next/server'
+import type { EmploymentStatus as PrismaEmploymentStatus } from '@prisma/client'
 
 import { hashPassword } from '@/lib/auth/password'
 import { hasPermission } from '@/lib/server/authSession'
 import { prisma } from '@/lib/prisma'
 
 const PHONE_PATTERN = /^[+\d][\d\s-]{4,}$/
-const EMPLOYMENT_STATUSES = new Set(['ACTIVE', 'ON_LEAVE', 'TERMINATED'])
+const EMPLOYMENT_STATUSES: Set<PrismaEmploymentStatus> = new Set([
+  'ACTIVE',
+  'ON_LEAVE',
+  'TERMINATED',
+])
 
 type ImportMemberInput = {
   row?: number
@@ -62,7 +67,7 @@ export async function POST(request: Request) {
     phones: string[]
     joinDate: Date | null
     position: string | null
-    employmentStatus: string | null
+    employmentStatus: PrismaEmploymentStatus | null
     roleIds: number[]
   }> = []
   const seenUsernames = new Set<string>()
@@ -91,7 +96,7 @@ export async function POST(request: Request) {
       typeof member.position === 'string' && member.position.trim().length ? member.position.trim() : null
     const employmentStatus =
       typeof member.employmentStatus === 'string' && member.employmentStatus.trim().length
-        ? member.employmentStatus.trim()
+        ? (member.employmentStatus.trim() as PrismaEmploymentStatus)
         : null
     const roleIds =
       canManageRole && Array.isArray(member.roleIds)
