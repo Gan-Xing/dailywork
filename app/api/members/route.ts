@@ -9,14 +9,19 @@ export async function GET() {
   if (!(await hasPermission('member:view'))) {
     return NextResponse.json({ error: '缺少成员查看权限' }, { status: 403 })
   }
+  const canManageRole = await hasPermission('role:manage')
   const members = await listUsers()
-  return NextResponse.json({ members })
+  const payload = canManageRole
+    ? members
+    : members.map((member) => ({ ...member, roles: [] }))
+  return NextResponse.json({ members: payload })
 }
 
 export async function POST(request: Request) {
   if (!(await hasPermission('member:manage'))) {
     return NextResponse.json({ error: '缺少成员管理权限' }, { status: 403 })
   }
+  const canManageRole = await hasPermission('role:manage')
   const body = await request.json()
   const {
     username,
@@ -49,8 +54,10 @@ export async function POST(request: Request) {
 
   let resolvedPositionName = typeof position === 'string' && position.trim().length ? position.trim() : null
 
-  const roleIdList: number[] = Array.isArray(roleIds)
-    ? roleIds.map((value: unknown) => Number(value)).filter(Boolean)
+  const roleIdList: number[] = canManageRole
+    ? Array.isArray(roleIds)
+      ? roleIds.map((value: unknown) => Number(value)).filter(Boolean)
+      : []
     : []
 
   try {
@@ -73,14 +80,15 @@ export async function POST(request: Request) {
         joinDate: joinDate ? new Date(joinDate) : new Date(),
         position: resolvedPositionName,
         employmentStatus: employmentStatus ?? 'ACTIVE',
-        roles:
-          roleIdList.length === 0
+        roles: canManageRole
+          ? roleIdList.length === 0
             ? undefined
             : {
                 create: roleIdList.map((id) => ({
                   role: { connect: { id } },
                 })),
-              },
+              }
+          : undefined,
       },
       include: {
         roles: { include: { role: true } },
@@ -100,7 +108,9 @@ export async function POST(request: Request) {
         employmentStatus: user.employmentStatus,
         createdAt: user.createdAt.toISOString(),
         updatedAt: user.updatedAt.toISOString(),
-        roles: user.roles.map((item) => ({ id: item.role.id, name: item.role.name })),
+        roles: canManageRole
+          ? user.roles.map((item) => ({ id: item.role.id, name: item.role.name }))
+          : [],
       },
     })
   } catch (error) {

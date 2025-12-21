@@ -38,6 +38,25 @@ export const memberCopy: Record<
       restore: string
       clear: string
     }
+    filters: {
+      title: string
+      all: string
+      selected: (count: number) => string
+      selectAll: string
+      clear: string
+      reset: string
+      searchPlaceholder: string
+      noOptions: string
+      collapse: string
+      expand: string
+    }
+    pagination: {
+      summary: (total: number, page: number, totalPages: number) => string
+      pageSizeLabel: string
+      prev: string
+      next: string
+      goTo: string
+    }
     listHeading: string
     status: Record<EmploymentStatus, string>
     table: Record<
@@ -66,6 +85,7 @@ export const memberCopy: Record<
       import: string
       export: string
       template: string
+      clearSort: string
       auditTrail: string
       view: string
       edit: string
@@ -89,6 +109,39 @@ export const memberCopy: Record<
       passwordRequired: string
       roleNameRequired: string
       roleDeleteConfirm: string
+      exportMissingColumns: string
+      exportNoData: string
+      exportFailed: string
+      templateDownloadFailed: string
+      importInvalidFile: string
+      importMissingHeaders: string
+      importNoData: string
+      importDuplicateUsername: string
+      importUsernameExists: string
+      importInvalidGender: string
+      importInvalidPhone: string
+      importInvalidStatus: string
+      importInvalidJoinDate: string
+      importRoleNotFound: (role: string) => string
+      importFailed: string
+    }
+    template: {
+      instructionsSheet: string
+      columnsHeader: string
+      notesHeader: string
+      notes: Record<
+        | 'name'
+        | 'username'
+        | 'password'
+        | 'gender'
+        | 'nationality'
+        | 'phones'
+        | 'joinDate'
+        | 'position'
+        | 'employmentStatus'
+        | 'roles',
+        string
+      >
     }
     rolePanel: {
       title: string
@@ -132,6 +185,10 @@ export const memberCopy: Record<
       empty: string
       submitError: string
       deleteConfirm: (username: string) => string
+      importSuccess: (count: number) => string
+      importRowError: (row: number, message: string) => string
+      importSkipConfirm: (validCount: number, errorCount: number) => string
+      importPartialSuccess: (imported: number, skipped: number) => string
     }
     labels: {
       empty: string
@@ -173,6 +230,26 @@ export const memberCopy: Record<
       restore: '恢复默认',
       clear: '清空',
     },
+    filters: {
+      title: '筛选',
+      all: '全部',
+      selected: (count: number) => `已选 ${count} 项`,
+      selectAll: '全选',
+      clear: '清空',
+      reset: '清空筛选',
+      searchPlaceholder: '搜索',
+      noOptions: '暂无可选项',
+      collapse: '收起筛选',
+      expand: '展开筛选',
+    },
+    pagination: {
+      summary: (total: number, page: number, totalPages: number) =>
+        `共 ${total} 条，当前第 ${page} / ${totalPages} 页`,
+      pageSizeLabel: '每页行数',
+      prev: '上一页',
+      next: '下一页',
+      goTo: '跳转到页码',
+    },
     listHeading: '成员列表',
     status: {
       ACTIVE: '在职',
@@ -203,6 +280,7 @@ export const memberCopy: Record<
       import: '导入成员',
       export: '导出 Excel/CSV',
       template: '下载模板',
+      clearSort: '清空排序',
       auditTrail: '审计日志',
       view: '详情',
       edit: '编辑',
@@ -226,6 +304,38 @@ export const memberCopy: Record<
       passwordRequired: '初始密码必填',
       roleNameRequired: '角色名称必填',
       roleDeleteConfirm: '确定删除该角色？',
+      exportMissingColumns: '请先选择要导出的列。',
+      exportNoData: '暂无可导出的成员数据。',
+      exportFailed: '导出失败，请稍后重试。',
+      templateDownloadFailed: '下载模板失败，请稍后重试。',
+      importInvalidFile: '无法识别文件，请上传 CSV 或 Excel 文件。',
+      importMissingHeaders: '缺少必要字段列：账号、初始密码。',
+      importNoData: '未发现可导入的数据行。',
+      importDuplicateUsername: '账号重复（同一文件内）',
+      importUsernameExists: '账号已存在',
+      importInvalidGender: '性别必须为男或女',
+      importInvalidPhone: '电话号码格式不正确',
+      importInvalidStatus: '状态必须为 ACTIVE / ON_LEAVE / TERMINATED',
+      importInvalidJoinDate: '入职日期格式不正确',
+      importRoleNotFound: (role: string) => `角色不存在：${role}`,
+      importFailed: '导入失败，请稍后重试。',
+    },
+    template: {
+      instructionsSheet: '说明',
+      columnsHeader: '字段',
+      notesHeader: '填写要求与示例',
+      notes: {
+        name: '可选；姓名或显示名。',
+        username: '必填且唯一；示例：chen.rong',
+        password: '新建必填；示例：Temp@1234',
+        gender: '仅允许：男 / 女；示例：男',
+        nationality: '示例：中国 / 科特迪瓦 / 马里 / 塞内加尔（使用国家名称）',
+        phones: '可写多个，用 "/" 分隔；示例：13900001111 / 13800002222',
+        joinDate: '格式：YYYY-MM-DD；示例：2025-01-31',
+        position: '自由填写，建议统一用词；示例：工程师',
+        employmentStatus: '固定值：ACTIVE / ON_LEAVE / TERMINATED；留空默认 ACTIVE',
+        roles: '仅 role:manage 可见；填写角色名称，多个用 "/" 分隔；示例：Admin / Employee',
+      },
     },
     rolePanel: {
       title: '角色管理',
@@ -269,6 +379,12 @@ export const memberCopy: Record<
       empty: '暂无成员，试试新增一位。',
       submitError: '提交失败',
       deleteConfirm: (username: string) => `确认删除成员 ${username} 吗？`,
+      importSuccess: (count: number) => `已成功导入 ${count} 条成员。`,
+      importRowError: (row: number, message: string) => `第 ${row} 行：${message}`,
+      importSkipConfirm: (validCount: number, errorCount: number) =>
+        `发现 ${errorCount} 行错误，仍有 ${validCount} 行可导入。是否忽略错误行继续导入？`,
+      importPartialSuccess: (imported: number, skipped: number) =>
+        `已导入 ${imported} 条，已跳过 ${skipped} 条错误数据。`,
     },
     labels: {
       empty: '无',
@@ -311,6 +427,26 @@ export const memberCopy: Record<
       restore: 'Rétablir par défaut',
       clear: 'Tout effacer',
     },
+    filters: {
+      title: 'Filtres',
+      all: 'Tous',
+      selected: (count: number) => `${count} sélectionné(s)`,
+      selectAll: 'Tout sélectionner',
+      clear: 'Tout effacer',
+      reset: 'Effacer les filtres',
+      searchPlaceholder: 'Rechercher',
+      noOptions: 'Aucune option',
+      collapse: 'Réduire',
+      expand: 'Développer',
+    },
+    pagination: {
+      summary: (total: number, page: number, totalPages: number) =>
+        `Total ${total} · Page ${page} / ${totalPages}`,
+      pageSizeLabel: 'Lignes par page',
+      prev: 'Précédent',
+      next: 'Suivant',
+      goTo: 'Aller à la page',
+    },
     listHeading: 'Liste des membres',
     status: {
       ACTIVE: 'Actif',
@@ -341,6 +477,7 @@ export const memberCopy: Record<
       import: 'Importer',
       export: 'Exporter Excel/CSV',
       template: 'Télécharger le modèle',
+      clearSort: 'Réinitialiser le tri',
       auditTrail: "Journal d'audit",
       view: 'Détails',
       edit: 'Éditer',
@@ -364,6 +501,38 @@ export const memberCopy: Record<
       passwordRequired: 'Mot de passe requis',
       roleNameRequired: 'Nom du rôle requis',
       roleDeleteConfirm: 'Confirmer la suppression du rôle ?',
+      exportMissingColumns: 'Sélectionnez au moins une colonne à exporter.',
+      exportNoData: 'Aucun membre à exporter.',
+      exportFailed: "Échec de l'export, réessayez.",
+      templateDownloadFailed: "Échec du téléchargement du modèle, réessayez.",
+      importInvalidFile: 'Fichier non reconnu, veuillez fournir un CSV ou Excel.',
+      importMissingHeaders: 'Colonnes obligatoires manquantes : Identifiant, Mot de passe initial.',
+      importNoData: 'Aucune ligne de données à importer.',
+      importDuplicateUsername: "Identifiant en double dans le fichier",
+      importUsernameExists: "Identifiant déjà utilisé",
+      importInvalidGender: 'Genre invalide (男 / 女)',
+      importInvalidPhone: 'Format de téléphone invalide',
+      importInvalidStatus: 'Statut invalide : ACTIVE / ON_LEAVE / TERMINATED',
+      importInvalidJoinDate: "Date d'arrivée invalide",
+      importRoleNotFound: (role: string) => `Rôle introuvable : ${role}`,
+      importFailed: "Échec de l'import, réessayez.",
+    },
+    template: {
+      instructionsSheet: 'Instructions',
+      columnsHeader: 'Champ',
+      notesHeader: 'Règles et exemples',
+      notes: {
+        name: 'Optionnel ; nom affiché.',
+        username: 'Obligatoire et unique ; ex. chen.rong',
+        password: 'Obligatoire à la création ; ex. Temp@1234',
+        gender: 'Valeurs : 男 / 女 (Homme / Femme) ; ex. 男',
+        nationality: 'Ex. 中国 (Chine) / Côte d’Ivoire / Mali / Sénégal (saisir un nom de pays)',
+        phones: 'Plusieurs numéros séparés par "/" ; ex. 13900001111 / 13800002222',
+        joinDate: 'Format : YYYY-MM-DD ; ex. 2025-01-31',
+        position: 'Texte libre, garder une nomenclature cohérente ; ex. Conducteur de travaux',
+        employmentStatus: 'Valeurs fixes : ACTIVE / ON_LEAVE / TERMINATED ; vide = ACTIVE',
+        roles: 'Visible seulement avec role:manage ; saisir les noms de rôles, séparés par "/" ; ex. Admin / Employee',
+      },
     },
     rolePanel: {
       title: 'Gestion des rôles',
@@ -408,6 +577,12 @@ export const memberCopy: Record<
       empty: 'Aucun membre pour le moment.',
       submitError: 'Échec de la soumission',
       deleteConfirm: (username: string) => `Supprimer le membre ${username} ?`,
+      importSuccess: (count: number) => `Import réussi : ${count} membres.`,
+      importRowError: (row: number, message: string) => `Ligne ${row} : ${message}`,
+      importSkipConfirm: (validCount: number, errorCount: number) =>
+        `${errorCount} lignes en erreur, ${validCount} lignes valides. Ignorer les erreurs et continuer ?`,
+      importPartialSuccess: (imported: number, skipped: number) =>
+        `Import partiel : ${imported} ok, ${skipped} ignorées.`,
     },
     labels: {
       empty: 'N/A',

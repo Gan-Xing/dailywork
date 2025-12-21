@@ -1,11 +1,21 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type FormEvent,
+  type ReactNode,
+} from 'react'
 
 import Link from 'next/link'
 
 import { LocaleSwitcher } from '@/components/LocaleSwitcher'
 import { AccessDenied } from '@/components/AccessDenied'
+import { MultiSelectFilter } from '@/components/MultiSelectFilter'
 import {
   employmentStatusLabels,
   genderOptions,
@@ -77,6 +87,30 @@ type ColumnKey =
   | 'createdAt'
   | 'updatedAt'
   | 'actions'
+type SortOrder = 'asc' | 'desc'
+type SortField = Exclude<ColumnKey, 'sequence' | 'actions'>
+type TemplateColumnKey =
+  | 'name'
+  | 'username'
+  | 'password'
+  | 'gender'
+  | 'nationality'
+  | 'phones'
+  | 'joinDate'
+  | 'position'
+  | 'employmentStatus'
+  | 'roles'
+type ImportErrorCode =
+  | 'missing_username'
+  | 'missing_password'
+  | 'duplicate_username'
+  | 'username_exists'
+  | 'invalid_gender'
+  | 'invalid_phone'
+  | 'invalid_status'
+  | 'invalid_join_date'
+  | 'role_not_found'
+type ImportError = { row: number; code: ImportErrorCode; value?: string }
 
 const MEMBER_COLUMN_STORAGE_KEY = 'member-visible-columns'
 const defaultVisibleColumns: ColumnKey[] = [
@@ -92,6 +126,49 @@ const defaultVisibleColumns: ColumnKey[] = [
   'roles',
   'actions',
 ]
+const memberColumnOrder: ColumnKey[] = [
+  'sequence',
+  'name',
+  'username',
+  'gender',
+  'nationality',
+  'phones',
+  'joinDate',
+  'position',
+  'employmentStatus',
+  'roles',
+  'createdAt',
+  'updatedAt',
+  'actions',
+]
+const exportableColumnOrder = memberColumnOrder.filter((key) => key !== 'actions')
+const defaultSortStack: Array<{ field: SortField; order: SortOrder }> = [
+  { field: 'createdAt', order: 'desc' },
+]
+const memberTemplateColumns: TemplateColumnKey[] = [
+  'name',
+  'username',
+  'password',
+  'gender',
+  'nationality',
+  'phones',
+  'joinDate',
+  'position',
+  'employmentStatus',
+  'roles',
+]
+const REQUIRED_IMPORT_COLUMNS: TemplateColumnKey[] = ['username', 'password']
+const PHONE_PATTERN = /^[+\d][\d\s-]{4,}$/
+const EMPTY_FILTER_VALUE = '__EMPTY__'
+const PAGE_SIZE_OPTIONS = [10, 20, 30, 50, 100, 500]
+
+const normalizeText = (value?: string | null) => (value ?? '').trim()
+const getMonthKey = (value?: string | null) => {
+  if (!value) return null
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return null
+  return parsed.toISOString().slice(0, 7)
+}
 
 export default function MembersPage() {
   const { locale, setLocale } = usePreferredLocale()
@@ -121,7 +198,11 @@ export default function MembersPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const [exporting, setExporting] = useState(false)
+  const [templateDownloading, setTemplateDownloading] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
+  const [actionNotice, setActionNotice] = useState<string | null>(null)
   const [phoneInput, setPhoneInput] = useState('')
   const [showRoleModal, setShowRoleModal] = useState(false)
   const [roleSubmitting, setRoleSubmitting] = useState(false)
@@ -136,6 +217,25 @@ export default function MembersPage() {
   const [showPhonePicker, setShowPhonePicker] = useState(false)
   const phonePickerRef = useRef<HTMLDivElement | null>(null)
   const [editingRoleId, setEditingRoleId] = useState<number | null>(null)
+  const importInputRef = useRef<HTMLInputElement | null>(null)
+  const [sortStack, setSortStack] = useState<Array<{ field: SortField; order: SortOrder }>>(
+    defaultSortStack,
+  )
+  const [filtersOpen, setFiltersOpen] = useState(true)
+  const [page, setPage] = useState(1)
+  const [pageInput, setPageInput] = useState('1')
+  const [pageSize, setPageSize] = useState(20)
+  const [nameFilters, setNameFilters] = useState<string[]>([])
+  const [usernameFilters, setUsernameFilters] = useState<string[]>([])
+  const [genderFilters, setGenderFilters] = useState<string[]>([])
+  const [nationalityFilters, setNationalityFilters] = useState<string[]>([])
+  const [phoneFilters, setPhoneFilters] = useState<string[]>([])
+  const [joinDateFilters, setJoinDateFilters] = useState<string[]>([])
+  const [positionFilters, setPositionFilters] = useState<string[]>([])
+  const [statusFilters, setStatusFilters] = useState<string[]>([])
+  const [roleFilters, setRoleFilters] = useState<string[]>([])
+  const [createdAtFilters, setCreatedAtFilters] = useState<string[]>([])
+  const [updatedAtFilters, setUpdatedAtFilters] = useState<string[]>([])
   const [session, setSession] = useState<SessionUser | null>(null)
   const [authLoaded, setAuthLoaded] = useState(false)
   const canViewMembers = session?.permissions.includes('member:view') ?? false
@@ -167,8 +267,8 @@ export default function MembersPage() {
     return option ? option.label[locale] : value || t.labels.empty
   }
 
-  const columnOptions: { key: ColumnKey; label: ReactNode }[] = useMemo(
-    () => [
+  const columnOptions: { key: ColumnKey; label: ReactNode }[] = useMemo(() => {
+    const baseOptions = [
       { key: 'sequence', label: t.table.sequence },
       { key: 'name', label: t.table.name },
       { key: 'username', label: t.table.username },
@@ -182,20 +282,330 @@ export default function MembersPage() {
       { key: 'createdAt', label: t.table.createdAt },
       { key: 'updatedAt', label: t.table.updatedAt },
       { key: 'actions', label: t.table.actions },
-    ],
+    ]
+    return canManageRole ? baseOptions : baseOptions.filter((option) => option.key !== 'roles')
+  }, [canManageRole, t.table])
+  const columnLabels = useMemo(
+    () => ({
+      sequence: t.table.sequence,
+      name: t.table.name,
+      username: t.table.username,
+      gender: t.table.gender,
+      nationality: t.table.nationality,
+      phones: t.table.phones,
+      joinDate: t.table.joinDate,
+      position: t.table.position,
+      employmentStatus: t.table.employmentStatus,
+      roles: t.table.roles,
+      createdAt: t.table.createdAt,
+      updatedAt: t.table.updatedAt,
+      actions: t.table.actions,
+    }),
     [t.table],
   )
+  const templateColumnLabels = useMemo<Record<TemplateColumnKey, string>>(
+    () => ({
+      name: t.form.name,
+      username: t.form.username,
+      password: t.form.password,
+      gender: t.form.gender,
+      nationality: t.form.nationality,
+      phones: t.form.phones,
+      joinDate: t.form.joinDate,
+      position: t.form.position,
+      employmentStatus: t.form.status,
+      roles: t.form.roles,
+    }),
+    [t.form],
+  )
+  const importHeaderMap = useMemo(() => {
+    const map = new Map<string, TemplateColumnKey>()
+    const normalize = (value: string) => value.trim().toLowerCase()
+    const add = (label: string, key: TemplateColumnKey) => {
+      if (label) map.set(normalize(label), key)
+    }
+    const register = (copy: (typeof memberCopy)[keyof typeof memberCopy]) => {
+      add(copy.form.name, 'name')
+      add(copy.form.username, 'username')
+      add(copy.form.password, 'password')
+      add(copy.form.gender, 'gender')
+      add(copy.form.nationality, 'nationality')
+      add(copy.form.phones, 'phones')
+      add(copy.form.joinDate, 'joinDate')
+      add(copy.form.position, 'position')
+      add(copy.form.status, 'employmentStatus')
+      add(copy.form.roles, 'roles')
+    }
+    register(memberCopy.zh)
+    register(memberCopy.fr)
+    return map
+  }, [])
+  const nationalityLookup = useMemo(() => {
+    const map = new Map<string, string>()
+    const normalize = (value: string) =>
+      value
+        .trim()
+        .toLowerCase()
+        .replace(/[’']/g, "'")
+        .replace(/\s+/g, ' ')
+    nationalityOptions.forEach((option) => {
+      map.set(normalize(option.key), option.key)
+      map.set(normalize(option.label.zh), option.key)
+      map.set(normalize(option.label.fr), option.key)
+    })
+    return map
+  }, [])
+  const genderLookup = useMemo(() => {
+    const map = new Map<string, string>()
+    const normalize = (value: string) => value.trim().toLowerCase()
+    genderOptions.forEach((option) => {
+      map.set(normalize(option.value), option.value)
+      map.set(normalize(option.label.zh), option.value)
+      map.set(normalize(option.label.fr), option.value)
+    })
+    map.set('male', '男')
+    map.set('female', '女')
+    map.set('m', '男')
+    map.set('f', '女')
+    return map
+  }, [])
+  const statusLookup = useMemo(() => {
+    const map = new Map<string, EmploymentStatus>()
+    const normalize = (value: string) => value.trim().toLowerCase()
+    map.set('active', 'ACTIVE')
+    map.set('on_leave', 'ON_LEAVE')
+    map.set('on leave', 'ON_LEAVE')
+    map.set('terminated', 'TERMINATED')
+    map.set(normalize(memberCopy.zh.status.ACTIVE), 'ACTIVE')
+    map.set(normalize(memberCopy.zh.status.ON_LEAVE), 'ON_LEAVE')
+    map.set(normalize(memberCopy.zh.status.TERMINATED), 'TERMINATED')
+    map.set(normalize(memberCopy.fr.status.ACTIVE), 'ACTIVE')
+    map.set(normalize(memberCopy.fr.status.ON_LEAVE), 'ON_LEAVE')
+    map.set(normalize(memberCopy.fr.status.TERMINATED), 'TERMINATED')
+    return map
+  }, [])
+  const templateColumns = useMemo(() => {
+    if (canManageRole) return memberTemplateColumns
+    return memberTemplateColumns.filter((key) => key !== 'roles')
+  }, [canManageRole])
+  const isSortDefault = useMemo(
+    () =>
+      sortStack.length === defaultSortStack.length &&
+      sortStack.every(
+        (spec, index) =>
+          spec.field === defaultSortStack[index]?.field &&
+          spec.order === defaultSortStack[index]?.order,
+      ),
+    [sortStack],
+  )
+  const optionCollator = useMemo(() => {
+    const localeId = locale === 'fr' ? 'fr' : ['zh-Hans-u-co-pinyin', 'zh-Hans', 'zh']
+    return new Intl.Collator(localeId, {
+      numeric: true,
+      sensitivity: 'base',
+    })
+  }, [locale])
   const positionOptions = useMemo(() => {
     const set = new Set<string>()
     membersData.forEach((member) => {
-      if (member.position) set.add(member.position)
+      const value = normalizeText(member.position)
+      if (value) set.add(value)
     })
-    return Array.from(set).sort((a, b) => a.localeCompare(b))
-  }, [membersData])
+    return Array.from(set).sort(optionCollator.compare)
+  }, [membersData, optionCollator])
+
+  const nameFilterOptions = useMemo(() => {
+    const names = membersData.map((member) => normalizeText(member.name)).filter(Boolean)
+    const unique = Array.from(new Set(names)).sort(optionCollator.compare)
+    const options = unique.map((value) => ({ value, label: value }))
+    if (membersData.some((member) => !normalizeText(member.name))) {
+      options.unshift({ value: EMPTY_FILTER_VALUE, label: t.labels.empty })
+    }
+    return options
+  }, [membersData, optionCollator, t.labels.empty])
+
+  const usernameFilterOptions = useMemo(() => {
+    const values = membersData.map((member) => normalizeText(member.username)).filter(Boolean)
+    const sorted = values.slice().sort(optionCollator.compare)
+    return sorted.map((value) => ({ value, label: value }))
+  }, [membersData, optionCollator])
+
+  const genderFilterOptions = useMemo(() => {
+    const options = genderOptions.map((option) => ({
+      value: option.value,
+      label: option.label[locale],
+    }))
+    if (membersData.some((member) => !normalizeText(member.gender))) {
+      options.unshift({ value: EMPTY_FILTER_VALUE, label: t.labels.empty })
+    }
+    return options
+  }, [locale, membersData, t.labels.empty])
+
+  const nationalityFilterOptions = useMemo(() => {
+    const keys = new Set<string>()
+    membersData.forEach((member) => {
+      const value = normalizeText(member.nationality)
+      if (value) keys.add(value)
+    })
+    const options = Array.from(keys)
+      .map((value) => ({
+        value,
+        label: findNationalityLabel(value),
+      }))
+      .sort((a, b) => optionCollator.compare(a.label, b.label))
+    if (membersData.some((member) => !normalizeText(member.nationality))) {
+      options.unshift({ value: EMPTY_FILTER_VALUE, label: t.labels.empty })
+    }
+    return options
+  }, [membersData, optionCollator, t.labels.empty, findNationalityLabel])
+
+  const phoneFilterOptions = useMemo(() => {
+    const values = new Set<string>()
+    membersData.forEach((member) => {
+      member.phones?.forEach((phone) => {
+        const trimmed = normalizeText(phone)
+        if (trimmed) values.add(trimmed)
+      })
+    })
+    const options = Array.from(values)
+      .sort(optionCollator.compare)
+      .map((value) => ({ value, label: value }))
+    if (membersData.some((member) => !member.phones || member.phones.length === 0)) {
+      options.unshift({ value: EMPTY_FILTER_VALUE, label: t.labels.empty })
+    }
+    return options
+  }, [membersData, optionCollator, t.labels.empty])
+
+  const joinDateFilterOptions = useMemo(() => {
+    const values = new Set<string>()
+    membersData.forEach((member) => {
+      const key = getMonthKey(member.joinDate)
+      if (key) values.add(key)
+    })
+    const options = Array.from(values)
+      .sort((a, b) => b.localeCompare(a))
+      .map((value) => ({ value, label: value }))
+    if (membersData.some((member) => !member.joinDate)) {
+      options.unshift({ value: EMPTY_FILTER_VALUE, label: t.labels.empty })
+    }
+    return options
+  }, [membersData, t.labels.empty])
+
+  const positionFilterOptions = useMemo(() => {
+    const options = positionOptions.map((value) => ({ value, label: value }))
+    if (membersData.some((member) => !normalizeText(member.position))) {
+      options.unshift({ value: EMPTY_FILTER_VALUE, label: t.labels.empty })
+    }
+    return options
+  }, [positionOptions, membersData, t.labels.empty])
+
+  const statusFilterOptions = useMemo(() => {
+    const order: EmploymentStatus[] = ['ACTIVE', 'ON_LEAVE', 'TERMINATED']
+    const options = order.map((status) => ({
+      value: status,
+      label: statusLabels[status],
+    }))
+    if (membersData.some((member) => !member.employmentStatus)) {
+      options.unshift({ value: EMPTY_FILTER_VALUE, label: t.labels.empty })
+    }
+    return options
+  }, [membersData, statusLabels, t.labels.empty])
+
+  const roleFilterOptions = useMemo(() => {
+    const names = rolesData.map((role) => normalizeText(role.name)).filter(Boolean)
+    const unique = Array.from(new Set(names))
+      .sort(optionCollator.compare)
+      .map((value) => ({ value, label: value }))
+    if (membersData.some((member) => !member.roles || member.roles.length === 0)) {
+      unique.unshift({ value: EMPTY_FILTER_VALUE, label: t.labels.empty })
+    }
+    return unique
+  }, [rolesData, membersData, optionCollator, t.labels.empty])
+
+  const createdAtFilterOptions = useMemo(() => {
+    const values = new Set<string>()
+    membersData.forEach((member) => {
+      const key = getMonthKey(member.createdAt)
+      if (key) values.add(key)
+    })
+    const options = Array.from(values)
+      .sort((a, b) => b.localeCompare(a))
+      .map((value) => ({ value, label: value }))
+    if (membersData.some((member) => !member.createdAt)) {
+      options.unshift({ value: EMPTY_FILTER_VALUE, label: t.labels.empty })
+    }
+    return options
+  }, [membersData, t.labels.empty])
+
+  const updatedAtFilterOptions = useMemo(() => {
+    const values = new Set<string>()
+    membersData.forEach((member) => {
+      const key = getMonthKey(member.updatedAt)
+      if (key) values.add(key)
+    })
+    const options = Array.from(values)
+      .sort((a, b) => b.localeCompare(a))
+      .map((value) => ({ value, label: value }))
+    if (membersData.some((member) => !member.updatedAt)) {
+      options.unshift({ value: EMPTY_FILTER_VALUE, label: t.labels.empty })
+    }
+    return options
+  }, [membersData, t.labels.empty])
+
+  const hasActiveFilters = useMemo(
+    () =>
+      nameFilters.length > 0 ||
+      usernameFilters.length > 0 ||
+      genderFilters.length > 0 ||
+      nationalityFilters.length > 0 ||
+      phoneFilters.length > 0 ||
+      joinDateFilters.length > 0 ||
+      positionFilters.length > 0 ||
+      statusFilters.length > 0 ||
+      (canManageRole && roleFilters.length > 0) ||
+      createdAtFilters.length > 0 ||
+      updatedAtFilters.length > 0,
+    [
+      nameFilters,
+      usernameFilters,
+      genderFilters,
+      nationalityFilters,
+      phoneFilters,
+      joinDateFilters,
+      positionFilters,
+      statusFilters,
+      roleFilters,
+      createdAtFilters,
+      updatedAtFilters,
+      canManageRole,
+    ],
+  )
+
+  const clearFilters = () => {
+    setNameFilters([])
+    setUsernameFilters([])
+    setGenderFilters([])
+    setNationalityFilters([])
+    setPhoneFilters([])
+    setJoinDateFilters([])
+    setPositionFilters([])
+    setStatusFilters([])
+    setRoleFilters([])
+    setCreatedAtFilters([])
+    setUpdatedAtFilters([])
+  }
 
   const modalTitle =
     formMode === 'edit' ? t.actions.edit : formMode === 'view' ? t.actions.view : t.actions.create
   const modalSubtitle = t.modalSubtitle
+  const filterControlProps = {
+    allLabel: t.filters.all,
+    selectedLabel: t.filters.selected,
+    selectAllLabel: t.filters.selectAll,
+    clearLabel: t.filters.clear,
+    noOptionsLabel: t.filters.noOptions,
+    searchPlaceholder: t.filters.searchPlaceholder,
+  }
 
   useEffect(() => {
     const fetchSession = async () => {
@@ -331,6 +741,11 @@ export default function MembersPage() {
     }
   }, [columnOptions])
 
+  useEffect(() => {
+    if (canManageRole) return
+    setSortStack((prev) => prev.filter((item) => item.field !== 'roles'))
+  }, [canManageRole])
+
   const persistVisibleColumns = (next: ColumnKey[]) => {
     setVisibleColumns(next)
     if (typeof window !== 'undefined') {
@@ -353,7 +768,10 @@ export default function MembersPage() {
   const selectAllColumns = () => persistVisibleColumns(columnOptions.map((item) => item.key))
   const restoreDefaultColumns = () => persistVisibleColumns([...defaultVisibleColumns])
   const clearColumns = () => persistVisibleColumns([])
-  const isVisible = (key: ColumnKey) => visibleColumns.includes(key)
+  const isVisible = (key: ColumnKey) => {
+    if (key === 'roles' && !canManageRole) return false
+    return visibleColumns.includes(key)
+  }
 
   const openCreateRoleModal = () => {
     if (!canManageRole) {
@@ -464,7 +882,18 @@ export default function MembersPage() {
     ].filter(Boolean)
     const joinDateValue =
       formMode === 'create' ? formState.joinDate || getTodayString() : formState.joinDate || undefined
-    const payload = {
+    const payload: {
+      username: string
+      password: string
+      name: string
+      gender: string
+      nationality: string
+      phones: string[]
+      joinDate: string | undefined
+      position: string | null
+      employmentStatus: EmploymentStatus
+      roleIds?: number[]
+    } = {
       username: formState.username.trim(),
       password: formState.password,
       name: formState.name.trim(),
@@ -474,7 +903,9 @@ export default function MembersPage() {
       joinDate: joinDateValue,
       position: formState.position.trim() || null,
       employmentStatus: formState.employmentStatus,
-      roleIds: formState.roleIds,
+    }
+    if (canManageRole) {
+      payload.roleIds = formState.roleIds
     }
 
     try {
@@ -591,13 +1022,642 @@ export default function MembersPage() {
     }
   }
 
-  const filteredMembers = useMemo(
-    () =>
-      [...membersData].sort(
-        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-      ),
-    [membersData],
+  const formatImportError = useCallback(
+    (error: ImportError) => {
+      let message = t.errors.importFailed
+      switch (error.code) {
+        case 'missing_username':
+          message = t.errors.usernameRequired
+          break
+        case 'missing_password':
+          message = t.errors.passwordRequired
+          break
+        case 'duplicate_username':
+          message = t.errors.importDuplicateUsername
+          break
+        case 'username_exists':
+          message = t.errors.importUsernameExists
+          break
+        case 'invalid_gender':
+          message = t.errors.importInvalidGender
+          break
+        case 'invalid_phone':
+          message = t.errors.importInvalidPhone
+          break
+        case 'invalid_status':
+          message = t.errors.importInvalidStatus
+          break
+        case 'invalid_join_date':
+          message = t.errors.importInvalidJoinDate
+          break
+        case 'role_not_found':
+          message = t.errors.importRoleNotFound(error.value ?? '')
+          break
+        default:
+          message = t.errors.importFailed
+      }
+      return t.feedback.importRowError(error.row, message)
+    },
+    [t],
   )
+
+  const handleImportClick = () => {
+    if (!canManageMember) {
+      setActionError(t.errors.needMemberManage)
+      setActionNotice(null)
+      return
+    }
+    importInputRef.current?.click()
+  }
+
+  const handleImportFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    if (!canManageMember) {
+      setActionError(t.errors.needMemberManage)
+      setActionNotice(null)
+      return
+    }
+    setImporting(true)
+    setActionError(null)
+    setActionNotice(null)
+    try {
+      const XLSX = await import('xlsx')
+      const data = await file.arrayBuffer()
+      const workbook = XLSX.read(data, { type: 'array', cellDates: true })
+      const sheetName = workbook.SheetNames[0]
+      const worksheet = sheetName ? workbook.Sheets[sheetName] : null
+      if (!worksheet) {
+        throw new Error(t.errors.importInvalidFile)
+      }
+      const rows = XLSX.utils.sheet_to_json(worksheet, {
+        header: 1,
+        blankrows: false,
+        defval: '',
+      }) as unknown[][]
+      if (!rows.length) {
+        throw new Error(t.errors.importNoData)
+      }
+      const headerRow =
+        rows[0]?.map((cell) => String(cell ?? '').replace(/^\uFEFF/, '').trim()) ?? []
+      const headerKeys = headerRow.map((label) => {
+        if (!label) return null
+        return importHeaderMap.get(label.toLowerCase()) ?? null
+      })
+      const usedKeys = headerKeys.filter(Boolean) as TemplateColumnKey[]
+      const missingRequired = REQUIRED_IMPORT_COLUMNS.filter((key) => !usedKeys.includes(key))
+      if (missingRequired.length > 0) {
+        throw new Error(t.errors.importMissingHeaders)
+      }
+      const errors: ImportError[] = []
+      const prepared: Array<{
+        row: number
+        username: string
+        password: string
+        name?: string
+        gender?: string | null
+        nationality?: string | null
+        phones: string[]
+        joinDate?: string | null
+        position?: string | null
+        employmentStatus?: EmploymentStatus | null
+        roleIds?: number[]
+      }> = []
+      const seenUsernames = new Set<string>()
+
+      const normalizeDate = (value: unknown) => {
+        if (!value) return null
+        if (value instanceof Date && !Number.isNaN(value.getTime())) {
+          return value.toISOString().slice(0, 10)
+        }
+        if (typeof value === 'number') {
+          const parsed = XLSX.SSF.parse_date_code(value)
+          if (parsed) {
+            const month = String(parsed.m).padStart(2, '0')
+            const day = String(parsed.d).padStart(2, '0')
+            return `${parsed.y}-${month}-${day}`
+          }
+        }
+        const text = String(value).trim()
+        if (!text) return null
+        const match = text.match(/^(\d{4})[./-](\d{1,2})[./-](\d{1,2})$/)
+        if (match) {
+          const [, year, month, day] = match
+          return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+        }
+        return null
+      }
+
+      const normalizePhones = (value: unknown) => {
+        if (value == null) return []
+        const text = String(value).trim()
+        if (!text) return []
+        return text
+          .split(/[\/,，;]+/)
+          .map((item) => item.trim())
+          .filter(Boolean)
+      }
+
+      rows.slice(1).forEach((rowValues, index) => {
+        const isEmpty = rowValues.every((cell) => !String(cell ?? '').trim())
+        if (isEmpty) return
+        const rowNumber = index + 2
+        let hasJoinDateValue = false
+        const record: {
+          row: number
+          username: string
+          password: string
+          name?: string
+          gender?: string | null
+          nationality?: string | null
+          phones: string[]
+          joinDate?: string | null
+          position?: string | null
+          employmentStatus?: EmploymentStatus | null
+          roleIds?: number[]
+        } = {
+          row: rowNumber,
+          username: '',
+          password: '',
+          phones: [],
+        }
+        headerKeys.forEach((key, columnIndex) => {
+          if (!key) return
+          const rawValue = rowValues[columnIndex]
+          switch (key) {
+            case 'name':
+              record.name = String(rawValue ?? '').trim()
+              break
+            case 'username':
+              record.username = String(rawValue ?? '').trim()
+              break
+            case 'password':
+              record.password = String(rawValue ?? '').trim()
+              break
+            case 'gender': {
+              const text = String(rawValue ?? '').trim()
+              if (text) {
+                record.gender = genderLookup.get(text.toLowerCase()) ?? text
+              }
+              break
+            }
+            case 'nationality': {
+              const text = String(rawValue ?? '').trim()
+              if (text) {
+                const normalized = text
+                  .toLowerCase()
+                  .replace(/[’']/g, "'")
+                  .replace(/\s+/g, ' ')
+                record.nationality = nationalityLookup.get(normalized) ?? text
+              }
+              break
+            }
+            case 'phones':
+              record.phones = normalizePhones(rawValue)
+              break
+            case 'joinDate':
+              if (String(rawValue ?? '').trim()) {
+                hasJoinDateValue = true
+              }
+              record.joinDate = normalizeDate(rawValue)
+              break
+            case 'position':
+              record.position = String(rawValue ?? '').trim()
+              break
+            case 'employmentStatus': {
+              const text = String(rawValue ?? '').trim()
+              if (text) {
+                record.employmentStatus = statusLookup.get(text.toLowerCase()) ?? (text as EmploymentStatus)
+              }
+              break
+            }
+            case 'roles': {
+              if (!canManageRole) break
+              const text = String(rawValue ?? '').trim()
+              if (text) {
+                const names = text
+                  .split(/[\/,，;]+/)
+                  .map((item) => item.trim())
+                  .filter(Boolean)
+                if (names.length) {
+                  const roleIds = names.map((name) => rolesData.find((role) => role.name === name)?.id)
+                  const missingRole = roleIds.find((id) => !id)
+                  if (missingRole) {
+                    errors.push({ row: rowNumber, code: 'role_not_found', value: text })
+                  } else {
+                    record.roleIds = roleIds.filter(Boolean) as number[]
+                  }
+                }
+              }
+              break
+            }
+            default:
+              break
+          }
+        })
+
+        let hasRowError = false
+        const normalizedUsername = record.username.trim().toLowerCase()
+        if (!normalizedUsername) {
+          errors.push({ row: rowNumber, code: 'missing_username' })
+          hasRowError = true
+        } else if (seenUsernames.has(normalizedUsername)) {
+          errors.push({ row: rowNumber, code: 'duplicate_username' })
+          hasRowError = true
+        } else {
+          seenUsernames.add(normalizedUsername)
+        }
+        if (!record.password) {
+          errors.push({ row: rowNumber, code: 'missing_password' })
+          hasRowError = true
+        }
+        if (record.gender && !['男', '女'].includes(record.gender)) {
+          errors.push({ row: rowNumber, code: 'invalid_gender', value: record.gender })
+          hasRowError = true
+        }
+        const invalidPhone = record.phones.find((phone) => !PHONE_PATTERN.test(phone))
+        if (invalidPhone) {
+          errors.push({ row: rowNumber, code: 'invalid_phone', value: invalidPhone })
+          hasRowError = true
+        }
+        if (record.employmentStatus && !['ACTIVE', 'ON_LEAVE', 'TERMINATED'].includes(record.employmentStatus)) {
+          errors.push({ row: rowNumber, code: 'invalid_status', value: record.employmentStatus })
+          hasRowError = true
+        }
+        if (hasJoinDateValue && !record.joinDate) {
+          errors.push({ row: rowNumber, code: 'invalid_join_date' })
+          hasRowError = true
+        }
+        if (!hasRowError) {
+          prepared.push(record)
+        }
+      })
+
+      if (errors.length > 0) {
+        setActionError(errors.map(formatImportError).join('\n'))
+        if (prepared.length === 0) {
+          return
+        }
+        const errorRowsCount = new Set(errors.map((item) => item.row)).size
+        const shouldContinue = window.confirm(
+          t.feedback.importSkipConfirm(prepared.length, errorRowsCount),
+        )
+        if (!shouldContinue) {
+          return
+        }
+      }
+      if (prepared.length === 0) {
+        throw new Error(t.errors.importNoData)
+      }
+      const res = await fetch('/api/members/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ members: prepared, ignoreErrors: errors.length > 0 }),
+      })
+      const payload = (await res.json().catch(() => ({}))) as {
+        imported?: number
+        error?: string
+        errors?: ImportError[]
+      }
+      if (!res.ok) {
+        if (payload.errors?.length) {
+          setActionError(payload.errors.map(formatImportError).join('\n'))
+          return
+        }
+        throw new Error(payload.error ?? t.errors.importFailed)
+      }
+      const combinedErrors = [...errors, ...(payload.errors ?? [])]
+      if (combinedErrors.length > 0) {
+        setActionError(combinedErrors.map(formatImportError).join('\n'))
+        setActionNotice(
+          t.feedback.importPartialSuccess(
+            payload.imported ?? prepared.length,
+            new Set(combinedErrors.map((item) => item.row)).size,
+          ),
+        )
+      } else {
+        setActionNotice(t.feedback.importSuccess(payload.imported ?? prepared.length))
+      }
+      await loadData()
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : t.errors.importFailed)
+    } finally {
+      setImporting(false)
+    }
+  }
+
+  const handleSort = (field: SortField) => {
+    if (field === 'roles' && !canManageRole) return
+    setSortStack((prev) => {
+      const existing = prev.find((item) => item.field === field)
+      const nextOrder: SortOrder = existing ? (existing.order === 'asc' ? 'desc' : 'asc') : 'desc'
+      const filtered = prev.filter((item) => item.field !== field)
+      return [{ field, order: nextOrder }, ...filtered].slice(0, 4)
+    })
+  }
+
+  const clearSort = () => {
+    setSortStack(defaultSortStack)
+  }
+
+  const sortIndicator = (field: SortField) => {
+    const idx = sortStack.findIndex((item) => item.field === field)
+    if (idx === -1) return ''
+    const arrow = sortStack[idx].order === 'asc' ? '↑' : '↓'
+    return `${arrow}${idx + 1}`
+  }
+
+  const resolveRoleName = useCallback(
+    (role: { id: number; name: string }) => {
+      const match = rolesData.find((item) => item.id === role.id || item.name === role.name)
+      return match?.name ?? role.name
+    },
+    [rolesData],
+  )
+  const filteredMembers = useMemo(() => {
+    const matchesValueFilter = (value: string | null | undefined, filters: string[]) => {
+      if (filters.length === 0) return true
+      const normalized = normalizeText(value)
+      if (!normalized) return filters.includes(EMPTY_FILTER_VALUE)
+      return filters.includes(normalized)
+    }
+    const matchesListFilter = (values: string[] | null | undefined, filters: string[]) => {
+      if (filters.length === 0) return true
+      const normalized = (values ?? []).map(normalizeText).filter(Boolean)
+      if (normalized.length === 0) return filters.includes(EMPTY_FILTER_VALUE)
+      return normalized.some((value) => filters.includes(value))
+    }
+    const matchesMonthFilter = (value: string | null | undefined, filters: string[]) => {
+      if (filters.length === 0) return true
+      const key = getMonthKey(value)
+      if (!key) return filters.includes(EMPTY_FILTER_VALUE)
+      return filters.includes(key)
+    }
+
+    const list = membersData.filter((member) => {
+      if (!matchesValueFilter(member.name, nameFilters)) return false
+      if (!matchesValueFilter(member.username, usernameFilters)) return false
+      if (!matchesValueFilter(member.gender, genderFilters)) return false
+      if (!matchesValueFilter(member.nationality, nationalityFilters)) return false
+      if (!matchesListFilter(member.phones, phoneFilters)) return false
+      if (!matchesMonthFilter(member.joinDate, joinDateFilters)) return false
+      if (!matchesValueFilter(member.position, positionFilters)) return false
+      if (!matchesValueFilter(member.employmentStatus, statusFilters)) return false
+      if (canManageRole && roleFilters.length > 0) {
+        const roleNames = member.roles.map(resolveRoleName).map(normalizeText).filter(Boolean)
+        if (roleNames.length === 0) {
+          if (!roleFilters.includes(EMPTY_FILTER_VALUE)) return false
+        } else if (!roleNames.some((name) => roleFilters.includes(name))) {
+          return false
+        }
+      }
+      if (!matchesMonthFilter(member.createdAt, createdAtFilters)) return false
+      if (!matchesMonthFilter(member.updatedAt, updatedAtFilters)) return false
+      return true
+    })
+
+    if (sortStack.length === 0) return list
+    const collator = new Intl.Collator(locale === 'fr' ? 'fr' : 'zh-Hans', {
+      numeric: true,
+      sensitivity: 'base',
+    })
+    const statusPriority: Record<EmploymentStatus, number> = {
+      ACTIVE: 1,
+      ON_LEAVE: 2,
+      TERMINATED: 3,
+    }
+    const compareNullable = function <T extends string | number>(
+      left: T | null | undefined | '',
+      right: T | null | undefined | '',
+      fn: (a: T, b: T) => number,
+    ) {
+      const isEmptyLeft = left === null || left === undefined || left === ''
+      const isEmptyRight = right === null || right === undefined || right === ''
+      if (isEmptyLeft && isEmptyRight) return 0
+      if (isEmptyLeft) return 1
+      if (isEmptyRight) return -1
+      return fn(left as T, right as T)
+    }
+    const getDateValue = (value?: string | null) => {
+      if (!value) return null
+      const ts = new Date(value).getTime()
+      return Number.isNaN(ts) ? null : ts
+    }
+    const getTextValue = (value?: string | null) => (value ?? '').trim()
+
+    const compareMembers = (left: Member, right: Member) => {
+      for (const sort of sortStack) {
+        let result = 0
+        switch (sort.field) {
+          case 'name':
+            result = compareNullable(getTextValue(left.name), getTextValue(right.name), (a, b) => collator.compare(a, b))
+            break
+          case 'username':
+            result = collator.compare(left.username, right.username)
+            break
+          case 'gender':
+            result = compareNullable(findGenderLabel(left.gender), findGenderLabel(right.gender), (a, b) => collator.compare(a, b))
+            break
+          case 'nationality':
+            result = compareNullable(
+              findNationalityLabel(left.nationality),
+              findNationalityLabel(right.nationality),
+              (a, b) => collator.compare(a, b),
+            )
+            break
+          case 'phones':
+            result = compareNullable(
+              left.phones?.join(' / '),
+              right.phones?.join(' / '),
+              (a, b) => collator.compare(a, b),
+            )
+            break
+          case 'joinDate':
+            result = compareNullable(getDateValue(left.joinDate), getDateValue(right.joinDate), (a, b) => a - b)
+            break
+          case 'position':
+            result = compareNullable(getTextValue(left.position), getTextValue(right.position), (a, b) => collator.compare(a, b))
+            break
+          case 'employmentStatus':
+            result = compareNullable(
+              statusPriority[left.employmentStatus] ?? null,
+              statusPriority[right.employmentStatus] ?? null,
+              (a, b) => a - b,
+            )
+            break
+          case 'roles':
+            result = compareNullable(
+              left.roles.map(resolveRoleName).join(' / '),
+              right.roles.map(resolveRoleName).join(' / '),
+              (a, b) => collator.compare(a, b),
+            )
+            break
+          case 'createdAt':
+            result = compareNullable(getDateValue(left.createdAt), getDateValue(right.createdAt), (a, b) => a - b)
+            break
+          case 'updatedAt':
+            result = compareNullable(getDateValue(left.updatedAt), getDateValue(right.updatedAt), (a, b) => a - b)
+            break
+          default:
+            break
+        }
+        if (result !== 0) {
+          return sort.order === 'asc' ? result : -result
+        }
+      }
+      return 0
+    }
+
+    return list.sort(compareMembers)
+  }, [
+    membersData,
+    sortStack,
+    locale,
+    findGenderLabel,
+    findNationalityLabel,
+    resolveRoleName,
+    nameFilters,
+    usernameFilters,
+    genderFilters,
+    nationalityFilters,
+    phoneFilters,
+    joinDateFilters,
+    positionFilters,
+    statusFilters,
+    roleFilters,
+    createdAtFilters,
+    updatedAtFilters,
+    canManageRole,
+  ])
+  const totalMembers = filteredMembers.length
+  const totalPages = useMemo(
+    () => Math.max(1, Math.ceil(totalMembers / Math.max(pageSize, 1))),
+    [totalMembers, pageSize],
+  )
+  const paginatedMembers = useMemo(() => {
+    const startIndex = (page - 1) * pageSize
+    return filteredMembers.slice(startIndex, startIndex + pageSize)
+  }, [filteredMembers, page, pageSize])
+
+  useEffect(() => {
+    setPageInput(String(page))
+  }, [page])
+
+  useEffect(() => {
+    setPage((prev) => Math.min(totalPages, Math.max(1, prev)))
+  }, [totalPages])
+
+  useEffect(() => {
+    setPage(1)
+  }, [
+    nameFilters,
+    usernameFilters,
+    genderFilters,
+    nationalityFilters,
+    phoneFilters,
+    joinDateFilters,
+    positionFilters,
+    statusFilters,
+    roleFilters,
+    createdAtFilters,
+    updatedAtFilters,
+  ])
+
+  const handleExportMembers = async () => {
+    if (!canViewMembers) {
+      setActionError(t.access.needMemberView)
+      return
+    }
+    if (exporting) return
+    const selectedColumns = exportableColumnOrder.filter(
+      (key) => visibleColumns.includes(key) && (key !== 'roles' || canManageRole),
+    )
+    if (selectedColumns.length === 0) {
+      setActionError(t.errors.exportMissingColumns)
+      return
+    }
+    if (filteredMembers.length === 0) {
+      setActionError(t.errors.exportNoData)
+      return
+    }
+    setExporting(true)
+    setActionError(null)
+    setActionNotice(null)
+    try {
+      const XLSX = await import('xlsx')
+      const headerRow = selectedColumns.map((key) => columnLabels[key])
+      const dataRows = filteredMembers.map((member, index) =>
+        selectedColumns.map((key) => {
+          switch (key) {
+            case 'sequence':
+              return index + 1
+            case 'name':
+              return member.name?.length ? member.name : t.labels.empty
+            case 'username':
+              return member.username
+            case 'gender':
+              return findGenderLabel(member.gender)
+            case 'nationality':
+              return findNationalityLabel(member.nationality)
+            case 'phones':
+              return member.phones?.length ? member.phones.join(' / ') : t.labels.empty
+            case 'joinDate':
+              return member.joinDate ? new Date(member.joinDate).toLocaleDateString(locale) : t.labels.empty
+            case 'position':
+              return member.position || t.labels.empty
+            case 'employmentStatus':
+              return statusLabels[member.employmentStatus] ?? member.employmentStatus
+            case 'roles':
+              return member.roles.length
+                ? member.roles.map(resolveRoleName).filter(Boolean).join(' / ')
+                : t.labels.empty
+            case 'createdAt':
+              return new Date(member.createdAt).toLocaleString(locale)
+            case 'updatedAt':
+              return new Date(member.updatedAt).toLocaleString(locale)
+            default:
+              return ''
+          }
+        }),
+      )
+      const worksheet = XLSX.utils.aoa_to_sheet([headerRow, ...dataRows])
+      const workbook = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(workbook, worksheet, t.tabs.members)
+      const filename = `members-export-${new Date().toISOString().slice(0, 10)}.xlsx`
+      XLSX.writeFile(workbook, filename, { bookType: 'xlsx' })
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : t.errors.exportFailed)
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  const handleDownloadTemplate = async () => {
+    if (templateDownloading) return
+    setTemplateDownloading(true)
+    setActionError(null)
+    setActionNotice(null)
+    try {
+      const XLSX = await import('xlsx')
+      const headerRow = templateColumns.map((key) => templateColumnLabels[key])
+      const worksheet = XLSX.utils.aoa_to_sheet([headerRow])
+      const instructionsRows = [
+        [t.template.columnsHeader, t.template.notesHeader],
+        ...templateColumns.map((key) => [templateColumnLabels[key], t.template.notes[key]]),
+      ]
+      const instructionsSheet = XLSX.utils.aoa_to_sheet(instructionsRows)
+      const workbook = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(workbook, worksheet, t.tabs.members)
+      XLSX.utils.book_append_sheet(workbook, instructionsSheet, t.template.instructionsSheet)
+      const filename = `members-import-template-${new Date().toISOString().slice(0, 10)}.xlsx`
+      XLSX.writeFile(workbook, filename, { bookType: 'xlsx' })
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : t.errors.templateDownloadFailed)
+    } finally {
+      setTemplateDownloading(false)
+    }
+  }
 
   const permissions = useMemo(() => {
     const map = new Map<string, { code: string; name: string; roles: string[] }>()
@@ -716,9 +1776,22 @@ export default function MembersPage() {
                     >
                       {t.actions.create}
                     </button>
-                    <ActionButton>{t.actions.import}</ActionButton>
-                    <ActionButton>{t.actions.export}</ActionButton>
-                    <ActionButton>{t.actions.template}</ActionButton>
+                    <ActionButton onClick={handleImportClick} disabled={!canManageMember || importing}>
+                      {t.actions.import}
+                    </ActionButton>
+                    <ActionButton onClick={handleExportMembers} disabled={!canViewMembers || exporting}>
+                      {t.actions.export}
+                    </ActionButton>
+                    <ActionButton onClick={handleDownloadTemplate} disabled={templateDownloading}>
+                      {t.actions.template}
+                    </ActionButton>
+                    <input
+                      ref={importInputRef}
+                      type="file"
+                      accept=".xlsx,.xls,.csv"
+                      onChange={handleImportFileChange}
+                      className="hidden"
+                    />
                     <div className="relative" ref={columnSelectorRef}>
                       <button
                         type="button"
@@ -757,11 +1830,21 @@ export default function MembersPage() {
                         </div>
                       ) : null}
                     </div>
+                    <ActionButton onClick={clearSort} disabled={isSortDefault}>
+                      {t.actions.clearSort}
+                    </ActionButton>
                   </div>
                 </div>
 
+                {actionNotice && !showCreateModal ? (
+                  <div className="px-6 pt-2 text-sm text-emerald-600 whitespace-pre-line">
+                    {actionNotice}
+                  </div>
+                ) : null}
                 {actionError && !showCreateModal ? (
-                  <div className="px-6 pt-2 text-sm text-rose-600">{actionError}</div>
+                  <div className="px-6 pt-2 text-sm text-rose-600 whitespace-pre-line">
+                    {actionError}
+                  </div>
                 ) : null}
 
                 {!canViewMembers ? (
@@ -769,190 +1852,425 @@ export default function MembersPage() {
                     {t.access.needMemberView}
                   </div>
                 ) : (
-                  <div className="w-full min-w-0 overflow-x-auto border-t border-slate-100">
-                    {loading ? (
-                      <div className="p-6 text-sm text-slate-500">{t.feedback.loading}</div>
-                    ) : null}
-                    {error ? (
-                      <div className="p-6 text-sm text-rose-600">
-                        {t.feedback.loadError}：{error}
+                  <>
+                    <div className="border-t border-slate-100 px-6 pb-4 pt-4">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+                          {t.filters.title}
+                        </p>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <ActionButton onClick={clearFilters} disabled={!hasActiveFilters}>
+                            {t.filters.reset}
+                          </ActionButton>
+                          <ActionButton onClick={() => setFiltersOpen((prev) => !prev)}>
+                            {filtersOpen ? t.filters.collapse : t.filters.expand}
+                          </ActionButton>
+                        </div>
                       </div>
-                    ) : null}
-                    {filteredMembers.length === 0 && !loading ? (
-                      <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-center text-sm text-slate-500">
-                        {t.feedback.empty}
-                      </div>
-                    ) : (
-                      <table className="w-full table-auto text-left text-base text-slate-900">
-                        <thead className="bg-slate-50 text-sm uppercase tracking-wide text-slate-600">
-                          <tr>
-                            {isVisible('sequence') ? (
-                              <th className="px-3 py-3 text-center whitespace-nowrap">{t.table.sequence}</th>
-                            ) : null}
-                            {isVisible('name') ? (
-                              <th className="px-3 py-3 whitespace-nowrap">{t.table.name}</th>
-                            ) : null}
-                            {isVisible('username') ? (
-                              <th className="px-3 py-3 whitespace-nowrap">{t.table.username}</th>
-                            ) : null}
-                            {isVisible('gender') ? (
-                              <th className="px-3 py-3 whitespace-nowrap">{t.table.gender}</th>
-                            ) : null}
-                            {isVisible('nationality') ? (
-                              <th className="px-3 py-3 whitespace-nowrap">{t.table.nationality}</th>
-                            ) : null}
-                            {isVisible('phones') ? (
-                              <th className="px-3 py-3 whitespace-nowrap">{t.table.phones}</th>
-                            ) : null}
-                            {isVisible('joinDate') ? (
-                              <th className="px-3 py-3 whitespace-nowrap">{t.table.joinDate}</th>
-                            ) : null}
-                            {isVisible('position') ? (
-                              <th className="px-3 py-3 whitespace-nowrap">{t.table.position}</th>
-                            ) : null}
-                            {isVisible('employmentStatus') ? (
-                              <th className="px-3 py-3 whitespace-nowrap">{t.table.employmentStatus}</th>
-                            ) : null}
-                            {isVisible('roles') ? (
-                              <th className="min-w-[150px] px-3 py-3 whitespace-nowrap">{t.table.roles}</th>
-                            ) : null}
-                            {isVisible('createdAt') ? (
-                              <th className="px-3 py-3 whitespace-nowrap">{t.table.createdAt}</th>
-                            ) : null}
-                            {isVisible('updatedAt') ? (
-                              <th className="px-3 py-3 whitespace-nowrap">{t.table.updatedAt}</th>
-                            ) : null}
-                            {isVisible('actions') ? (
-                              <th className="px-3 py-3 whitespace-nowrap">{t.table.actions}</th>
-                            ) : null}
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100 align-middle">
-                          {filteredMembers.map((member, index) => (
-                            <tr key={member.id} className="hover:bg-slate-50 align-middle">
-                              {isVisible('sequence') ? (
-                                <td className="whitespace-nowrap px-4 py-3 text-center text-slate-700 align-middle">
-                                  {index + 1}
-                                </td>
-                              ) : null}
-                            {isVisible('name') ? (
-                                <td className="px-4 py-3 align-middle">
-                                  <p className="max-w-[10rem] text-sm font-semibold text-slate-900 break-words leading-snug">
-                                    {member.name?.length ? member.name : t.labels.empty}
-                                  </p>
-                                </td>
-                              ) : null}
-                              {isVisible('username') ? (
-                                <td className="whitespace-nowrap px-4 py-3 align-middle">
-                                  <p className="font-semibold text-slate-900">{member.username}</p>
-                                </td>
-                              ) : null}
-                              {isVisible('gender') ? (
-                                <td className="whitespace-nowrap px-4 py-3 text-slate-700 min-w-[80px] align-middle">
-                                  {findGenderLabel(member.gender)}
-                                </td>
-                              ) : null}
-                              {isVisible('nationality') ? (
-                                <td className="whitespace-nowrap px-4 py-3 text-slate-700 align-middle">
-                                  {findNationalityLabel(member.nationality)}
-                                </td>
-                              ) : null}
-                              {isVisible('phones') ? (
-                                <td className="px-4 py-3 text-slate-700 align-middle">
-                                  {member.phones?.length ? (
-                                    <div className="space-y-1">
-                                      {member.phones.map((phone, idx) => (
-                                        <div key={`${member.id}-phone-${idx}`} className="whitespace-nowrap">
-                                          {phone}
+                      {filtersOpen ? (
+                        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
+                          <MultiSelectFilter
+                            label={t.table.name}
+                            options={nameFilterOptions}
+                            selected={nameFilters}
+                            onChange={setNameFilters}
+                            {...filterControlProps}
+                          />
+                          <MultiSelectFilter
+                            label={t.table.username}
+                            options={usernameFilterOptions}
+                            selected={usernameFilters}
+                            onChange={setUsernameFilters}
+                            {...filterControlProps}
+                          />
+                          <MultiSelectFilter
+                            label={t.table.gender}
+                            options={genderFilterOptions}
+                            selected={genderFilters}
+                            onChange={setGenderFilters}
+                            {...filterControlProps}
+                          />
+                          <MultiSelectFilter
+                            label={t.table.nationality}
+                            options={nationalityFilterOptions}
+                            selected={nationalityFilters}
+                            onChange={setNationalityFilters}
+                            {...filterControlProps}
+                          />
+                          <MultiSelectFilter
+                            label={t.table.phones}
+                            options={phoneFilterOptions}
+                            selected={phoneFilters}
+                            onChange={setPhoneFilters}
+                            {...filterControlProps}
+                          />
+                          <MultiSelectFilter
+                            label={t.table.joinDate}
+                            options={joinDateFilterOptions}
+                            selected={joinDateFilters}
+                            onChange={setJoinDateFilters}
+                            {...filterControlProps}
+                          />
+                          <MultiSelectFilter
+                            label={t.table.position}
+                            options={positionFilterOptions}
+                            selected={positionFilters}
+                            onChange={setPositionFilters}
+                            {...filterControlProps}
+                          />
+                          <MultiSelectFilter
+                            label={t.table.employmentStatus}
+                            options={statusFilterOptions}
+                            selected={statusFilters}
+                            onChange={setStatusFilters}
+                            {...filterControlProps}
+                          />
+                          {canManageRole ? (
+                            <MultiSelectFilter
+                              label={t.table.roles}
+                              options={roleFilterOptions}
+                              selected={roleFilters}
+                              onChange={setRoleFilters}
+                              {...filterControlProps}
+                            />
+                          ) : null}
+                          <MultiSelectFilter
+                            label={t.table.createdAt}
+                            options={createdAtFilterOptions}
+                            selected={createdAtFilters}
+                            onChange={setCreatedAtFilters}
+                            {...filterControlProps}
+                          />
+                          <MultiSelectFilter
+                            label={t.table.updatedAt}
+                            options={updatedAtFilterOptions}
+                            selected={updatedAtFilters}
+                            onChange={setUpdatedAtFilters}
+                            {...filterControlProps}
+                          />
+                        </div>
+                      ) : null}
+                    </div>
+                    <div className="w-full min-w-0 overflow-x-auto border-t border-slate-100">
+                      {loading ? (
+                        <div className="p-6 text-sm text-slate-500">{t.feedback.loading}</div>
+                      ) : null}
+                      {error ? (
+                        <div className="p-6 text-sm text-rose-600">
+                          {t.feedback.loadError}：{error}
+                        </div>
+                      ) : null}
+                      {filteredMembers.length === 0 && !loading ? (
+                        <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-center text-sm text-slate-500">
+                          {t.feedback.empty}
+                        </div>
+                      ) : (
+                        <>
+                          <table className="w-full table-auto text-left text-base text-slate-900">
+                            <thead className="bg-slate-50 text-sm uppercase tracking-wide text-slate-600">
+                              <tr>
+                                {isVisible('sequence') ? (
+                                  <th className="px-3 py-3 text-center whitespace-nowrap">{t.table.sequence}</th>
+                                ) : null}
+                                {isVisible('name') ? (
+                                  <th
+                                    className="px-3 py-3 whitespace-nowrap cursor-pointer select-none"
+                                    onClick={() => handleSort('name')}
+                                  >
+                                    {t.table.name} {sortIndicator('name')}
+                                  </th>
+                                ) : null}
+                                {isVisible('username') ? (
+                                  <th
+                                    className="px-3 py-3 whitespace-nowrap cursor-pointer select-none"
+                                    onClick={() => handleSort('username')}
+                                  >
+                                    {t.table.username} {sortIndicator('username')}
+                                  </th>
+                                ) : null}
+                                {isVisible('gender') ? (
+                                  <th
+                                    className="px-3 py-3 whitespace-nowrap cursor-pointer select-none"
+                                    onClick={() => handleSort('gender')}
+                                  >
+                                    {t.table.gender} {sortIndicator('gender')}
+                                  </th>
+                                ) : null}
+                                {isVisible('nationality') ? (
+                                  <th
+                                    className="px-3 py-3 whitespace-nowrap cursor-pointer select-none"
+                                    onClick={() => handleSort('nationality')}
+                                  >
+                                    {t.table.nationality} {sortIndicator('nationality')}
+                                  </th>
+                                ) : null}
+                                {isVisible('phones') ? (
+                                  <th
+                                    className="px-3 py-3 whitespace-nowrap cursor-pointer select-none"
+                                    onClick={() => handleSort('phones')}
+                                  >
+                                    {t.table.phones} {sortIndicator('phones')}
+                                  </th>
+                                ) : null}
+                                {isVisible('joinDate') ? (
+                                  <th
+                                    className="px-3 py-3 whitespace-nowrap cursor-pointer select-none"
+                                    onClick={() => handleSort('joinDate')}
+                                  >
+                                    {t.table.joinDate} {sortIndicator('joinDate')}
+                                  </th>
+                                ) : null}
+                                {isVisible('position') ? (
+                                  <th
+                                    className="px-3 py-3 whitespace-nowrap cursor-pointer select-none"
+                                    onClick={() => handleSort('position')}
+                                  >
+                                    {t.table.position} {sortIndicator('position')}
+                                  </th>
+                                ) : null}
+                                {isVisible('employmentStatus') ? (
+                                  <th
+                                    className="px-3 py-3 whitespace-nowrap cursor-pointer select-none"
+                                    onClick={() => handleSort('employmentStatus')}
+                                  >
+                                    {t.table.employmentStatus} {sortIndicator('employmentStatus')}
+                                  </th>
+                                ) : null}
+                                {isVisible('roles') ? (
+                                  <th
+                                    className="min-w-[150px] px-3 py-3 whitespace-nowrap cursor-pointer select-none"
+                                    onClick={() => handleSort('roles')}
+                                  >
+                                    {t.table.roles} {sortIndicator('roles')}
+                                  </th>
+                                ) : null}
+                                {isVisible('createdAt') ? (
+                                  <th
+                                    className="px-3 py-3 whitespace-nowrap cursor-pointer select-none"
+                                    onClick={() => handleSort('createdAt')}
+                                  >
+                                    {t.table.createdAt} {sortIndicator('createdAt')}
+                                  </th>
+                                ) : null}
+                                {isVisible('updatedAt') ? (
+                                  <th
+                                    className="px-3 py-3 whitespace-nowrap cursor-pointer select-none"
+                                    onClick={() => handleSort('updatedAt')}
+                                  >
+                                    {t.table.updatedAt} {sortIndicator('updatedAt')}
+                                  </th>
+                                ) : null}
+                                {isVisible('actions') ? (
+                                  <th className="px-3 py-3 whitespace-nowrap">{t.table.actions}</th>
+                                ) : null}
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 align-middle">
+                              {paginatedMembers.map((member, index) => {
+                                const displayIndex = (page - 1) * pageSize + index + 1
+                                return (
+                                  <tr key={member.id} className="hover:bg-slate-50 align-middle">
+                                    {isVisible('sequence') ? (
+                                      <td className="whitespace-nowrap px-4 py-3 text-center text-slate-700 align-middle">
+                                        {displayIndex}
+                                      </td>
+                                    ) : null}
+                                    {isVisible('name') ? (
+                                      <td className="px-4 py-3 align-middle">
+                                        <p className="max-w-[10rem] text-sm font-semibold text-slate-900 break-words leading-snug">
+                                          {member.name?.length ? member.name : t.labels.empty}
+                                        </p>
+                                      </td>
+                                    ) : null}
+                                    {isVisible('username') ? (
+                                      <td className="whitespace-nowrap px-4 py-3 align-middle">
+                                        <p className="font-semibold text-slate-900">{member.username}</p>
+                                      </td>
+                                    ) : null}
+                                    {isVisible('gender') ? (
+                                      <td className="whitespace-nowrap px-4 py-3 text-slate-700 min-w-[80px] align-middle">
+                                        {findGenderLabel(member.gender)}
+                                      </td>
+                                    ) : null}
+                                    {isVisible('nationality') ? (
+                                      <td className="whitespace-nowrap px-4 py-3 text-slate-700 align-middle">
+                                        {findNationalityLabel(member.nationality)}
+                                      </td>
+                                    ) : null}
+                                    {isVisible('phones') ? (
+                                      <td className="px-4 py-3 text-slate-700 align-middle">
+                                        {member.phones?.length ? (
+                                          <div className="space-y-1">
+                                            {member.phones.map((phone, idx) => (
+                                              <div key={`${member.id}-phone-${idx}`} className="whitespace-nowrap">
+                                                {phone}
+                                              </div>
+                                            ))}
+                                          </div>
+                                        ) : (
+                                          t.labels.empty
+                                        )}
+                                      </td>
+                                    ) : null}
+                                    {isVisible('joinDate') ? (
+                                      <td className="whitespace-nowrap px-4 py-3 text-slate-700 align-middle">
+                                        {member.joinDate
+                                          ? new Date(member.joinDate).toLocaleDateString(locale)
+                                          : t.labels.empty}
+                                      </td>
+                                    ) : null}
+                                    {isVisible('position') ? (
+                                      <td className="whitespace-nowrap px-4 py-3 text-slate-700 align-middle">
+                                        {member.position || t.labels.empty}
+                                      </td>
+                                    ) : null}
+                                    {isVisible('employmentStatus') ? (
+                                      <td className="whitespace-nowrap px-4 py-3 align-middle">
+                                        <span className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-800 ring-1 ring-slate-200">
+                                          {statusLabels[member.employmentStatus] ?? member.employmentStatus}
+                                        </span>
+                                      </td>
+                                    ) : null}
+                                    {isVisible('roles') ? (
+                                      <td className="px-4 py-3 text-slate-700 align-middle min-w-[150px]">
+                                        <div className="flex flex-col gap-1">
+                                          {member.roles.map((roleKey) => {
+                                            const role = rolesData.find(
+                                              (item) => item.id === roleKey.id || item.name === roleKey.name,
+                                            )
+                                            return (
+                                              <div
+                                                key={`${member.id}-${roleKey.id ?? roleKey.name}`}
+                                                className="inline-flex items-center justify-center rounded-full bg-sky-50 px-2.5 py-1 text-[11px] font-semibold text-sky-800 ring-1 ring-sky-100 whitespace-nowrap"
+                                              >
+                                                {role?.name ?? roleKey.name}
+                                              </div>
+                                            )
+                                          })}
                                         </div>
-                                      ))}
-                                    </div>
-                                  ) : (
-                                    t.labels.empty
-                                  )}
-                                </td>
-                              ) : null}
-                              {isVisible('joinDate') ? (
-                                <td className="whitespace-nowrap px-4 py-3 text-slate-700 align-middle">
-                                  {member.joinDate
-                                    ? new Date(member.joinDate).toLocaleDateString(locale)
-                                    : t.labels.empty}
-                                </td>
-                              ) : null}
-                              {isVisible('position') ? (
-                                <td className="whitespace-nowrap px-4 py-3 text-slate-700 align-middle">
-                                  {member.position || t.labels.empty}
-                                </td>
-                              ) : null}
-                              {isVisible('employmentStatus') ? (
-                                <td className="whitespace-nowrap px-4 py-3 align-middle">
-                                  <span className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-800 ring-1 ring-slate-200">
-                                    {statusLabels[member.employmentStatus] ?? member.employmentStatus}
-                                  </span>
-                                </td>
-                              ) : null}
-                              {isVisible('roles') ? (
-                                <td className="px-4 py-3 text-slate-700 align-middle min-w-[150px]">
-                                  <div className="flex flex-col gap-1">
-                                    {member.roles.map((roleKey) => {
-                                      const role = rolesData.find((item) => item.id === roleKey.id || item.name === roleKey.name)
-                                      return (
-                                        <div
-                                          key={`${member.id}-${roleKey.id ?? roleKey.name}`}
-                                          className="inline-flex items-center justify-center rounded-full bg-sky-50 px-2.5 py-1 text-[11px] font-semibold text-sky-800 ring-1 ring-sky-100 whitespace-nowrap"
-                                        >
-                                          {role?.name ?? roleKey.name}
+                                      </td>
+                                    ) : null}
+                                    {isVisible('createdAt') ? (
+                                      <td className="whitespace-nowrap px-4 py-3 text-slate-700 align-middle">
+                                        {new Date(member.createdAt).toLocaleString(locale)}
+                                      </td>
+                                    ) : null}
+                                    {isVisible('updatedAt') ? (
+                                      <td className="whitespace-nowrap px-4 py-3 text-slate-700 align-middle">
+                                        {new Date(member.updatedAt).toLocaleString(locale)}
+                                      </td>
+                                    ) : null}
+                                    {isVisible('actions') ? (
+                                      <td className="whitespace-nowrap px-4 py-3 text-slate-700 align-middle">
+                                        <div className="flex flex-nowrap gap-2">
+                                          <button
+                                            type="button"
+                                            onClick={() => openViewModal(member)}
+                                            className="rounded-full border border-slate-200 px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
+                                          >
+                                            {t.actions.view}
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => openEditModal(member)}
+                                            disabled={!canEditMember}
+                                            className="rounded-full border border-slate-200 px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                          >
+                                            {t.actions.edit}
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => handleDelete(member)}
+                                            className="rounded-full border border-rose-200 px-2.5 py-1 text-[11px] font-semibold text-rose-700 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                            disabled={!canManageMember || submitting}
+                                          >
+                                            {t.actions.delete}
+                                          </button>
                                         </div>
-                                      )
-                                    })}
-                                  </div>
-                                </td>
-                              ) : null}
-                              {isVisible('createdAt') ? (
-                                <td className="whitespace-nowrap px-4 py-3 text-slate-700 align-middle">
-                                  {new Date(member.createdAt).toLocaleString(locale)}
-                                </td>
-                              ) : null}
-                              {isVisible('updatedAt') ? (
-                                <td className="whitespace-nowrap px-4 py-3 text-slate-700 align-middle">
-                                  {new Date(member.updatedAt).toLocaleString(locale)}
-                                </td>
-                              ) : null}
-                              {isVisible('actions') ? (
-                                <td className="whitespace-nowrap px-4 py-3 text-slate-700 align-middle">
-                                  <div className="flex flex-nowrap gap-2">
-                                    <button
-                                      type="button"
-                                      onClick={() => openViewModal(member)}
-                                      className="rounded-full border border-slate-200 px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
-                                    >
-                                      {t.actions.view}
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => openEditModal(member)}
-                                      disabled={!canEditMember}
-                                      className="rounded-full border border-slate-200 px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-                                    >
-                                      {t.actions.edit}
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => handleDelete(member)}
-                                      className="rounded-full border border-rose-200 px-2.5 py-1 text-[11px] font-semibold text-rose-700 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
-                                      disabled={!canManageMember || submitting}
-                                    >
-                                      {t.actions.delete}
-                                    </button>
-                                  </div>
-                                </td>
-                              ) : null}
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                                      </td>
+                                    ) : null}
+                                  </tr>
+                                )
+                              })}
+                            </tbody>
+                        </table>
+                        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 px-5 py-3 text-sm text-slate-600">
+                          <span>{t.pagination.summary(totalMembers, page, totalPages)}</span>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <label className="flex items-center gap-2 text-xs text-slate-500">
+                              <span className="text-slate-400">{t.pagination.pageSizeLabel}</span>
+                              <select
+                                value={pageSize}
+                                onChange={(event) => {
+                                  const value = Number(event.target.value)
+                                  if (!Number.isFinite(value)) return
+                                  setPageSize(value)
+                                  setPage(1)
+                                }}
+                                className="h-8 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 focus:border-sky-400 focus:outline-none"
+                                aria-label={t.pagination.pageSizeLabel}
+                              >
+                                {PAGE_SIZE_OPTIONS.map((size) => (
+                                  <option key={size} value={size}>
+                                    {size}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+                            <button
+                              type="button"
+                              className="rounded-xl border border-slate-200 px-3 py-1 text-xs text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 disabled:opacity-40"
+                              disabled={page <= 1}
+                              onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+                            >
+                              {t.pagination.prev}
+                            </button>
+                            <div className="flex items-center gap-1 text-xs text-slate-600">
+                              <input
+                                type="number"
+                                min={1}
+                                max={totalPages}
+                                value={pageInput}
+                                onChange={(event) => setPageInput(event.target.value)}
+                                onBlur={() => {
+                                  const value = Number(pageInput)
+                                  if (!Number.isFinite(value)) {
+                                    setPageInput(String(page))
+                                    return
+                                  }
+                                  const next = Math.min(totalPages, Math.max(1, Math.round(value)))
+                                  if (next !== page) setPage(next)
+                                  setPageInput(String(next))
+                                }}
+                                onKeyDown={(event) => {
+                                  if (event.key === 'Enter') {
+                                    const value = Number(pageInput)
+                                    const next = Number.isFinite(value)
+                                      ? Math.min(totalPages, Math.max(1, Math.round(value)))
+                                      : page
+                                    if (next !== page) setPage(next)
+                                    setPageInput(String(next))
+                                  }
+                                }}
+                                className="h-8 w-14 rounded-lg border border-slate-200 bg-white px-2 py-1 text-center text-xs text-slate-700 focus:border-sky-400 focus:outline-none"
+                                aria-label={t.pagination.goTo}
+                              />
+                              <span className="text-slate-400">/ {totalPages}</span>
+                            </div>
+                            <button
+                              type="button"
+                              className="rounded-xl border border-slate-200 px-3 py-1 text-xs text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 disabled:opacity-40"
+                              disabled={page >= totalPages}
+                              onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
+                            >
+                              {t.pagination.next}
+                            </button>
+                          </div>
+                        </div>
+                      </>
                     )}
                   </div>
+                  </>
                 )}
               </>
             ) : null}
@@ -1426,30 +2744,32 @@ export default function MembersPage() {
                 </label>
               </div>
 
-              <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
-                <p className="text-xs font-semibold text-slate-600">{t.form.roles}</p>
-                <div className="flex flex-wrap gap-2">
-                  {rolesData.map((role) => (
-                    <label
-                      key={role.id}
-                      className={`flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-semibold ${
-                        formState.roleIds.includes(role.id)
-                          ? 'border-sky-300 bg-sky-50 text-sky-800'
-                          : 'border-slate-200 text-slate-700'
-                      }`}
-                    >
-                      <input
-                        type="checkbox"
-                        className="accent-sky-600"
-                        checked={formState.roleIds.includes(role.id)}
-                        onChange={() => toggleRole(role.id)}
-                        disabled={formMode === 'view'}
-                      />
-                      {role.name}
-                    </label>
-                  ))}
+              {canManageRole ? (
+                <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                  <p className="text-xs font-semibold text-slate-600">{t.form.roles}</p>
+                  <div className="flex flex-wrap gap-2">
+                    {rolesData.map((role) => (
+                      <label
+                        key={role.id}
+                        className={`flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-semibold ${
+                          formState.roleIds.includes(role.id)
+                            ? 'border-sky-300 bg-sky-50 text-sky-800'
+                            : 'border-slate-200 text-slate-700'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          className="accent-sky-600"
+                          checked={formState.roleIds.includes(role.id)}
+                          onChange={() => toggleRole(role.id)}
+                          disabled={formMode === 'view'}
+                        />
+                        {role.name}
+                      </label>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              ) : null}
 
               {actionError ? <p className="text-sm text-rose-600">{actionError}</p> : null}
 
@@ -1526,11 +2846,21 @@ function TabButton({
   )
 }
 
-function ActionButton({ children }: { children: string }) {
+function ActionButton({
+  children,
+  onClick,
+  disabled = false,
+}: {
+  children: string
+  onClick?: () => void
+  disabled?: boolean
+}) {
   return (
     <button
       type="button"
-      className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-800 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md"
+      onClick={onClick}
+      disabled={disabled}
+      className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-800 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-60"
     >
       {children}
     </button>

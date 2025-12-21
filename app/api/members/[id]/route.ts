@@ -14,6 +14,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   if (!(await hasPermission('member:edit'))) {
     return NextResponse.json({ error: '缺少成员编辑权限' }, { status: 403 })
   }
+  const canManageRole = await hasPermission('role:manage')
   const body = await request.json()
   const {
     username,
@@ -44,8 +45,10 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     resolvedPositionName = null
   }
 
-  const roleIdList: number[] = Array.isArray(roleIds)
-    ? roleIds.map((value: unknown) => Number(value)).filter(Boolean)
+  const roleIdList: number[] = canManageRole
+    ? Array.isArray(roleIds)
+      ? roleIds.map((value: unknown) => Number(value)).filter(Boolean)
+      : []
     : []
 
   try {
@@ -61,15 +64,19 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         joinDate: joinDate ? new Date(joinDate) : undefined,
         position: resolvedPositionName,
         employmentStatus: employmentStatus ?? 'ACTIVE',
-        roles:
-          roleIdList.length === 0
-            ? { deleteMany: {} }
-            : {
-                deleteMany: {},
-                create: roleIdList.map((id) => ({
-                  role: { connect: { id } },
-                })),
-              },
+        ...(canManageRole
+          ? {
+              roles:
+                roleIdList.length === 0
+                  ? { deleteMany: {} }
+                  : {
+                      deleteMany: {},
+                      create: roleIdList.map((id) => ({
+                        role: { connect: { id } },
+                      })),
+                    },
+            }
+          : {}),
       },
       include: {
         roles: { include: { role: true } },
@@ -89,7 +96,9 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         employmentStatus: user.employmentStatus,
         createdAt: user.createdAt.toISOString(),
         updatedAt: user.updatedAt.toISOString(),
-        roles: user.roles.map((item) => ({ id: item.role.id, name: item.role.name })),
+        roles: canManageRole
+          ? user.roles.map((item) => ({ id: item.role.id, name: item.role.name }))
+          : [],
       },
     })
   } catch (error) {
