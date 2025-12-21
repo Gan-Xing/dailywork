@@ -257,15 +257,21 @@ export default function MembersPage() {
     return grouped
   }, [])
 
-  const findNationalityLabel = (value: string | null) => {
-    const option = nationalityOptions.find((item) => item.key === value)
-    return option ? option.label[locale] : value || t.labels.empty
-  }
+  const findNationalityLabel = useCallback(
+    (value: string | null) => {
+      const option = nationalityOptions.find((item) => item.key === value)
+      return option ? option.label[locale] : value || t.labels.empty
+    },
+    [locale, t.labels.empty],
+  )
 
-  const findGenderLabel = (value: string | null) => {
-    const option = genderOptions.find((item) => item.value === value)
-    return option ? option.label[locale] : value || t.labels.empty
-  }
+  const findGenderLabel = useCallback(
+    (value: string | null) => {
+      const option = genderOptions.find((item) => item.value === value)
+      return option ? option.label[locale] : value || t.labels.empty
+    },
+    [locale, t.labels.empty],
+  )
 
   const columnOptions: { key: ColumnKey; label: ReactNode }[] = useMemo(() => {
     const baseOptions = [

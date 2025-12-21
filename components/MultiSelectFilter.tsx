@@ -44,17 +44,12 @@ export function MultiSelectFilter({
     const handleClickOutside = (event: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
         setOpen(false)
+        setQuery('')
       }
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
-
-  useEffect(() => {
-    if (!open) {
-      setQuery('')
-    }
-  }, [open])
 
   const filteredOptions = useMemo(() => {
     if (!searchable || query.trim() === '') return options
@@ -78,7 +73,14 @@ export function MultiSelectFilter({
           type="button"
           disabled={disabled}
           aria-expanded={open}
-          onClick={() => setOpen((prev) => !prev)}
+          onClick={() => {
+            if (open) {
+              setOpen(false)
+              setQuery('')
+            } else {
+              setOpen(true)
+            }
+          }}
           className="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2 text-left text-sm text-slate-700 shadow-inner shadow-slate-900/5 transition focus:border-sky-400 focus:outline-none disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400"
         >
           <span className="truncate">{summaryText}</span>
