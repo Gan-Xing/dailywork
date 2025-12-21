@@ -6,7 +6,7 @@ import { hasPermission } from '@/lib/server/authSession'
 import { prisma } from '@/lib/prisma'
 
 const PHONE_PATTERN = /^[+\d][\d\s-]{4,}$/
-const EMPLOYMENT_STATUSES: Set<PrismaEmploymentStatus> = new Set([
+const EMPLOYMENT_STATUSES = new Set<PrismaEmploymentStatus>([
   'ACTIVE',
   'ON_LEAVE',
   'TERMINATED',
