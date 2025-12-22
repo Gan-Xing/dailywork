@@ -11,7 +11,7 @@ import { aggregateEntriesAsListItems } from '@/lib/server/inspectionEntryStore'
 
 export const maxDuration = 60
 
-const MAX_EXPORT_COUNT = 30
+const MAX_EXPORT_COUNT = 50
 const EXPORT_TIMEOUT_MS = 30_000
 const logPrefix = '[pdf-export]'
 const EXECUTABLE_PATH = process.env.CHROMIUM_EXECUTABLE_PATH ?? '/usr/bin/chromium-browser'
@@ -120,7 +120,11 @@ export async function POST(request: Request) {
 
   try {
     // 以 entry id 查询，并按层次聚合同层验收内容到同一 Nature
-    const { items } = await aggregateEntriesAsListItems({ ids: numericIds, groupByLayer: true })
+    const { items } = await aggregateEntriesAsListItems({
+      ids: numericIds,
+      groupByLayer: true,
+      pageSize: Math.min(MAX_EXPORT_COUNT, numericIds.length),
+    })
     if (items.length === 0) {
       return NextResponse.json({ message: '未找到可导出的报检记录' }, { status: 404 })
     }
