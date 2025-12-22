@@ -3,7 +3,14 @@ import type { EmploymentStatus as PrismaEmploymentStatus } from '@prisma/client'
 
 import { hashPassword } from '@/lib/auth/password'
 import { hasPermission } from '@/lib/server/authSession'
-import { hasChineseProfileData, normalizeChineseProfile } from '@/lib/server/memberProfiles'
+import {
+  hasExpatProfileData,
+  hasChineseProfileData,
+  normalizeExpatProfile,
+  normalizeChineseProfile,
+  parseBirthDateInput,
+  parseChineseIdBirthDate,
+} from '@/lib/server/memberProfiles'
 import { prisma } from '@/lib/prisma'
 
 const PHONE_PATTERN = /^[+\d][\d\s-]{4,}$/
@@ -12,6 +19,7 @@ const EMPLOYMENT_STATUSES = new Set<PrismaEmploymentStatus>([
   'ON_LEAVE',
   'TERMINATED',
 ])
+const IMPORT_BATCH_SIZE = 50
 
 type ImportMemberInput = {
   row?: number
@@ -22,9 +30,24 @@ type ImportMemberInput = {
   nationality?: string | null
   phones?: string[] | string | null
   joinDate?: string | null
+  birthDate?: string | null
+  terminationDate?: string | null
+  terminationReason?: string | null
   position?: string | null
   employmentStatus?: string | null
   roleIds?: number[]
+  team?: string | null
+  contractNumber?: string | null
+  contractType?: string | null
+  salaryCategory?: string | null
+  baseSalary?: string | null
+  netMonthly?: string | null
+  maritalStatus?: string | null
+  childrenCount?: number | string | null
+  cnpsNumber?: string | null
+  cnpsDeclarationCode?: string | null
+  provenance?: string | null
+  emergencyContact?: string | null
   frenchName?: string | null
   idNumber?: string | null
   passportNumber?: string | null
@@ -42,14 +65,25 @@ type ImportMemberInput = {
 }
 
 type ImportErrorCode =
+  | 'missing_name'
   | 'missing_username'
   | 'missing_password'
   | 'duplicate_username'
+  | 'duplicate_identity'
   | 'username_exists'
   | 'invalid_gender'
   | 'invalid_phone'
+  | 'invalid_contract_type'
+  | 'invalid_base_salary_unit'
   | 'invalid_status'
   | 'invalid_join_date'
+  | 'missing_birth_date'
+  | 'invalid_birth_date'
+  | 'missing_termination_date'
+  | 'missing_termination_reason'
+  | 'invalid_termination_date'
+  | 'duplicate_contract_number'
+  | 'contract_number_exists'
   | 'role_not_found'
 
 type ImportError = {
@@ -77,19 +111,28 @@ export async function POST(request: Request) {
   const invalidRows = new Set<number>()
   const prepared: Array<{
     row: number
-    username: string
-    password: string
+    username: string | null
+    password: string | null
     name: string
     gender: string | null
     nationality: string | null
     phones: string[]
     joinDate: Date | null
+    birthDate: Date
+    hasBirthDateInput: boolean
+    terminationDate: Date | null
+    terminationReason: string | null
     position: string | null
     employmentStatus: PrismaEmploymentStatus | null
+    hasEmploymentStatusInput: boolean
     roleIds: number[]
     chineseProfile: ReturnType<typeof normalizeChineseProfile>
+    hasChineseProfileData: boolean
+    expatProfile: ReturnType<typeof normalizeExpatProfile>
+    hasExpatProfileData: boolean
   }> = []
   const seenUsernames = new Set<string>()
+  const seenContractNumbers = new Set<string>()
 
   const normalizePhoneList = (value: ImportMemberInput['phones']) => {
     if (Array.isArray(value)) {
@@ -108,6 +151,7 @@ export async function POST(request: Request) {
     const row = Number(member.row) || index + 2
     const username = typeof member.username === 'string' ? member.username.trim().toLowerCase() : ''
     const password = typeof member.password === 'string' ? member.password.trim() : ''
+    const name = typeof member.name === 'string' ? member.name.trim() : ''
     const gender = typeof member.gender === 'string' ? member.gender.trim() : null
     const nationality = typeof member.nationality === 'string' ? member.nationality.trim() : null
     const phones = normalizePhoneList(member.phones)
@@ -117,6 +161,8 @@ export async function POST(request: Request) {
       typeof member.employmentStatus === 'string' && member.employmentStatus.trim().length
         ? (member.employmentStatus.trim() as PrismaEmploymentStatus)
         : null
+    const hasEmploymentStatusInput = Boolean(employmentStatus)
+    const contractTypeInput = typeof member.contractType === 'string' ? member.contractType.trim() : ''
     const roleIds =
       canAssignRole && Array.isArray(member.roleIds)
         ? member.roleIds.map((value: unknown) => Number(value)).filter(Boolean)
@@ -138,23 +184,57 @@ export async function POST(request: Request) {
       medicalHistory: member.medicalHistory,
       healthStatus: member.healthStatus,
     })
+    const expatProfile = normalizeExpatProfile({
+      team: member.team,
+      contractNumber: member.contractNumber,
+      contractType: member.contractType,
+      salaryCategory: member.salaryCategory,
+      baseSalary: member.baseSalary,
+      netMonthly: member.netMonthly,
+      maritalStatus: member.maritalStatus,
+      childrenCount: member.childrenCount,
+      cnpsNumber: member.cnpsNumber,
+      cnpsDeclarationCode: member.cnpsDeclarationCode,
+      provenance: member.provenance,
+      emergencyContact: member.emergencyContact,
+      emergencyContactName: member.emergencyContactName,
+      emergencyContactPhone: member.emergencyContactPhone,
+    })
+    const hasBirthDateInput =
+      member.birthDate !== null &&
+      member.birthDate !== undefined &&
+      String(member.birthDate).trim().length > 0
+    const parsedBirthDate = parseBirthDateInput(member.birthDate)
 
     let hasRowError = false
-    if (!username) {
-      errors.push({ row, code: 'missing_username' })
-      invalidRows.add(row)
-      hasRowError = true
-    } else if (seenUsernames.has(username)) {
-      errors.push({ row, code: 'duplicate_username' })
-      invalidRows.add(row)
-      hasRowError = true
-    } else {
-      seenUsernames.add(username)
+    const terminationReasonText =
+      typeof member.terminationReason === 'string' ? member.terminationReason.trim() : ''
+    const hasTerminationDateInput =
+      typeof member.terminationDate === 'string' && member.terminationDate.trim().length > 0
+    let terminationDateValue: Date | null = null
+    if (hasTerminationDateInput) {
+      const candidate = new Date(member.terminationDate as string)
+      if (!Number.isNaN(candidate.getTime())) {
+        terminationDateValue = candidate
+      } else {
+        errors.push({ row, code: 'invalid_termination_date', value: String(member.terminationDate) })
+        invalidRows.add(row)
+        hasRowError = true
+      }
     }
-    if (!password) {
-      errors.push({ row, code: 'missing_password' })
+    if (!name) {
+      errors.push({ row, code: 'missing_name' })
       invalidRows.add(row)
       hasRowError = true
+    }
+    if (username) {
+      if (seenUsernames.has(username)) {
+        errors.push({ row, code: 'duplicate_username' })
+        invalidRows.add(row)
+        hasRowError = true
+      } else {
+        seenUsernames.add(username)
+      }
     }
     if (gender && gender !== '男' && gender !== '女') {
       errors.push({ row, code: 'invalid_gender', value: gender })
@@ -172,6 +252,35 @@ export async function POST(request: Request) {
       invalidRows.add(row)
       hasRowError = true
     }
+    if (contractTypeInput && nationality !== 'china' && !expatProfile.contractType) {
+      errors.push({ row, code: 'invalid_contract_type', value: contractTypeInput })
+      invalidRows.add(row)
+      hasRowError = true
+    }
+    if (
+      nationality !== 'china' &&
+      expatProfile.contractType === 'CDD' &&
+      expatProfile.baseSalaryUnit === 'HOUR'
+    ) {
+      errors.push({ row, code: 'invalid_base_salary_unit' })
+      invalidRows.add(row)
+      hasRowError = true
+    }
+    if (nationality !== 'china' && expatProfile.contractNumber) {
+      const contractKey = expatProfile.contractNumber.toLowerCase()
+      if (seenContractNumbers.has(contractKey)) {
+        errors.push({ row, code: 'duplicate_contract_number', value: expatProfile.contractNumber })
+        invalidRows.add(row)
+        hasRowError = true
+      } else {
+        seenContractNumbers.add(contractKey)
+      }
+    }
+    if (hasBirthDateInput && !parsedBirthDate) {
+      errors.push({ row, code: 'invalid_birth_date', value: String(member.birthDate ?? '') })
+      invalidRows.add(row)
+      hasRowError = true
+    }
 
     let joinDate: Date | null = null
     if (typeof member.joinDate === 'string' && member.joinDate.trim().length) {
@@ -185,20 +294,57 @@ export async function POST(request: Request) {
       }
     }
 
-    if (!hasRowError) {
+    let resolvedBirthDate = parsedBirthDate
+    if (!resolvedBirthDate && nationality === 'china' && !hasBirthDateInput) {
+      resolvedBirthDate = parseChineseIdBirthDate(chineseProfile.idNumber)
+    }
+    if (!hasRowError && !resolvedBirthDate) {
+      errors.push({ row, code: 'missing_birth_date' })
+      invalidRows.add(row)
+      hasRowError = true
+    }
+    const isTerminated = employmentStatus === 'TERMINATED'
+    let resolvedTerminationDate: Date | null = null
+    let resolvedTerminationReason: string | null = null
+    if (isTerminated) {
+      if (!terminationDateValue) {
+        errors.push({ row, code: 'missing_termination_date' })
+        invalidRows.add(row)
+        hasRowError = true
+      } else {
+        resolvedTerminationDate = terminationDateValue
+      }
+      if (!terminationReasonText) {
+        errors.push({ row, code: 'missing_termination_reason' })
+        invalidRows.add(row)
+        hasRowError = true
+      } else {
+        resolvedTerminationReason = terminationReasonText
+      }
+    }
+
+    if (!hasRowError && resolvedBirthDate) {
       prepared.push({
         row,
-        username,
-        password,
-        name: typeof member.name === 'string' ? member.name.trim() : '',
+        username: username || null,
+        password: password || null,
+        name,
         gender,
         nationality,
         phones,
         joinDate,
+        birthDate: resolvedBirthDate,
+        hasBirthDateInput,
+        terminationDate: resolvedTerminationDate,
+        terminationReason: resolvedTerminationReason,
         position,
         employmentStatus,
+        hasEmploymentStatusInput,
         roleIds: uniqueRoleIds,
         chineseProfile,
+        hasChineseProfileData: hasChineseProfileData(chineseProfile),
+        expatProfile,
+        hasExpatProfileData: hasExpatProfileData(expatProfile),
       })
     }
   })
@@ -210,24 +356,127 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: '缺少导入数据' }, { status: 400 })
   }
 
-  const existingUsers =
-    await prisma.user.findMany({
-      where: {
-        OR: prepared.map((member) => ({
-          username: { equals: member.username, mode: 'insensitive' },
-        })),
-      },
-      select: { username: true },
+  const identityKey = (memberName: string, birthDate: Date) =>
+    `${memberName}\u0000${birthDate.toISOString().slice(0, 10)}`
+  const identityMap = new Map<string, { name: string; birthDate: Date }>()
+  prepared.forEach((member) => {
+    identityMap.set(identityKey(member.name, member.birthDate), {
+      name: member.name,
+      birthDate: member.birthDate,
     })
-  if (existingUsers.length > 0) {
-    const existing = new Set(existingUsers.map((user) => user.username.toLowerCase()))
-    prepared.forEach((member) => {
-      if (existing.has(member.username)) {
+  })
+  const identityFilters = Array.from(identityMap.values())
+  const existingUsers = identityFilters.length
+    ? await prisma.user.findMany({
+        where: {
+          OR: identityFilters.map((identity) => ({
+            name: identity.name,
+            birthDate: identity.birthDate,
+          })),
+        },
+        select: { id: true, name: true, birthDate: true, username: true, nationality: true },
+      })
+    : []
+  const matchesByIdentity = new Map<
+    string,
+    Array<{ id: number; username: string; nationality: string | null }>
+  >()
+  existingUsers.forEach((user) => {
+    if (!user.birthDate) return
+    const key = identityKey(user.name, user.birthDate)
+    const list = matchesByIdentity.get(key) ?? []
+    list.push({ id: user.id, username: user.username, nationality: user.nationality })
+    matchesByIdentity.set(key, list)
+  })
+
+  const usernameValues = Array.from(
+    new Set(
+      prepared
+        .map((member) => member.username)
+        .filter((value): value is string => Boolean(value)),
+    ),
+  )
+  const existingUsernames = usernameValues.length
+    ? await prisma.user.findMany({
+        where: {
+          OR: usernameValues.map((value) => ({
+            username: { equals: value, mode: 'insensitive' },
+          })),
+        },
+        select: { id: true, username: true },
+      })
+    : []
+  const usernamesByValue = new Map(
+    existingUsernames.map((user) => [user.username.toLowerCase(), user.id]),
+  )
+
+  const contractNumberValues = Array.from(
+    new Set(
+      prepared
+        .map((member) => member.expatProfile.contractNumber)
+        .filter((value): value is string => Boolean(value)),
+    ),
+  )
+  const existingContractNumbers = contractNumberValues.length
+    ? await prisma.userExpatProfile.findMany({
+        where: {
+          OR: contractNumberValues.map((value) => ({
+            contractNumber: { equals: value, mode: 'insensitive' },
+          })),
+        },
+        select: { userId: true, contractNumber: true },
+      })
+    : []
+  const contractByValue = new Map(
+    existingContractNumbers.flatMap((item) =>
+      item.contractNumber ? [[item.contractNumber.toLowerCase(), item.userId] as const] : [],
+    ),
+  )
+
+  const matchByRow = new Map<
+    number,
+    { id: number; username: string; nationality: string | null } | null
+  >()
+  prepared.forEach((member) => {
+    const key = identityKey(member.name, member.birthDate)
+    const matches = matchesByIdentity.get(key) ?? []
+    if (matches.length > 1) {
+      errors.push({ row: member.row, code: 'duplicate_identity' })
+      invalidRows.add(member.row)
+      matchByRow.set(member.row, null)
+      return
+    }
+    const match = matches[0] ?? null
+    matchByRow.set(member.row, match)
+    if (!match) {
+      if (!member.username) {
+        errors.push({ row: member.row, code: 'missing_username' })
+        invalidRows.add(member.row)
+      }
+      if (!member.password) {
+        errors.push({ row: member.row, code: 'missing_password' })
+        invalidRows.add(member.row)
+      }
+    }
+    if (member.username) {
+      const existingUserId = usernamesByValue.get(member.username)
+      if (existingUserId && existingUserId !== match?.id) {
         errors.push({ row: member.row, code: 'username_exists', value: member.username })
         invalidRows.add(member.row)
       }
-    })
-  }
+    }
+    if (member.expatProfile.contractNumber) {
+      const existingUserId = contractByValue.get(member.expatProfile.contractNumber.toLowerCase())
+      if (existingUserId && existingUserId !== match?.id) {
+        errors.push({
+          row: member.row,
+          code: 'contract_number_exists',
+          value: member.expatProfile.contractNumber,
+        })
+        invalidRows.add(member.row)
+      }
+    }
+  })
 
   if (canAssignRole) {
     const roleIds = Array.from(new Set(prepared.flatMap((member) => member.roleIds)))
@@ -252,42 +501,211 @@ export async function POST(request: Request) {
   const candidates = ignoreErrors
     ? prepared.filter((member) => !invalidRows.has(member.row))
     : prepared
-  if (candidates.length === 0) {
+  const resolvedCandidates = candidates.map((member) => ({
+    member,
+    match: matchByRow.get(member.row) ?? null,
+    passwordHash: member.password ? hashPassword(member.password) : null,
+  }))
+  if (resolvedCandidates.length === 0) {
     return NextResponse.json({ error: 'IMPORT_VALIDATION_FAILED', errors }, { status: 400 })
   }
 
-  await prisma.$transaction(async (tx) => {
-    for (const member of candidates) {
-      const isChinese = member.nationality === 'china'
-      const shouldCreateChineseProfile = isChinese && hasChineseProfileData(member.chineseProfile)
-      await tx.user.create({
-        data: {
-          username: member.username,
-          passwordHash: hashPassword(member.password),
-          name: member.name ?? '',
-          gender: member.gender ?? null,
-          nationality: member.nationality ?? null,
-          phones: member.phones,
-          joinDate: member.joinDate ?? new Date(),
-          position: member.position ?? null,
-          employmentStatus: member.employmentStatus ?? 'ACTIVE',
-          chineseProfile: shouldCreateChineseProfile
-            ? {
-                create: member.chineseProfile,
-              }
-            : undefined,
-          roles:
-            canAssignRole && member.roleIds.length > 0
-              ? {
-                  create: member.roleIds.map((id) => ({
-                    role: { connect: { id } },
-                  })),
-              }
-            : undefined,
-        },
-      })
-    }
-  })
+  const candidateBatches: typeof resolvedCandidates[] = []
+  for (let i = 0; i < resolvedCandidates.length; i += IMPORT_BATCH_SIZE) {
+    candidateBatches.push(resolvedCandidates.slice(i, i + IMPORT_BATCH_SIZE))
+  }
 
-  return NextResponse.json({ imported: candidates.length, errors: errors.length ? errors : undefined })
+  for (const batch of candidateBatches) {
+    await prisma.$transaction(async (tx) => {
+      for (const { member, match, passwordHash } of batch) {
+        const resolvedNationality = member.nationality ?? match?.nationality ?? null
+        const isChinese = resolvedNationality === 'china'
+        const shouldUpsertChineseProfile = isChinese && member.hasChineseProfileData
+        const shouldUpsertExpatProfile = !isChinese && member.hasExpatProfileData
+        const chineseProfileUpdate = {
+          ...(member.chineseProfile.frenchName
+            ? { frenchName: member.chineseProfile.frenchName }
+            : {}),
+          ...(member.chineseProfile.idNumber ? { idNumber: member.chineseProfile.idNumber } : {}),
+          ...(member.chineseProfile.passportNumber
+            ? { passportNumber: member.chineseProfile.passportNumber }
+            : {}),
+          ...(member.chineseProfile.educationAndMajor
+            ? { educationAndMajor: member.chineseProfile.educationAndMajor }
+            : {}),
+          ...(member.chineseProfile.certifications.length > 0
+            ? { certifications: member.chineseProfile.certifications }
+            : {}),
+          ...(member.chineseProfile.domesticMobile
+            ? { domesticMobile: member.chineseProfile.domesticMobile }
+            : {}),
+          ...(member.chineseProfile.emergencyContactName
+            ? { emergencyContactName: member.chineseProfile.emergencyContactName }
+            : {}),
+          ...(member.chineseProfile.emergencyContactPhone
+            ? { emergencyContactPhone: member.chineseProfile.emergencyContactPhone }
+            : {}),
+          ...(member.chineseProfile.redBookValidYears !== null
+            ? { redBookValidYears: member.chineseProfile.redBookValidYears }
+            : {}),
+          ...(member.chineseProfile.cumulativeAbroadYears !== null
+            ? { cumulativeAbroadYears: member.chineseProfile.cumulativeAbroadYears }
+            : {}),
+          ...(member.chineseProfile.birthplace ? { birthplace: member.chineseProfile.birthplace } : {}),
+          ...(member.chineseProfile.residenceInChina
+            ? { residenceInChina: member.chineseProfile.residenceInChina }
+            : {}),
+          ...(member.chineseProfile.medicalHistory
+            ? { medicalHistory: member.chineseProfile.medicalHistory }
+            : {}),
+          ...(member.chineseProfile.healthStatus
+            ? { healthStatus: member.chineseProfile.healthStatus }
+            : {}),
+        }
+        const expatProfileUpdate = {
+          ...(member.expatProfile.team ? { team: member.expatProfile.team } : {}),
+          ...(member.expatProfile.contractNumber
+            ? { contractNumber: member.expatProfile.contractNumber }
+            : {}),
+          ...(member.expatProfile.contractType
+            ? { contractType: member.expatProfile.contractType }
+            : {}),
+          ...(member.expatProfile.salaryCategory
+            ? { salaryCategory: member.expatProfile.salaryCategory }
+            : {}),
+          ...(member.expatProfile.baseSalaryAmount
+            ? { baseSalaryAmount: member.expatProfile.baseSalaryAmount }
+            : {}),
+          ...(member.expatProfile.baseSalaryUnit
+            ? { baseSalaryUnit: member.expatProfile.baseSalaryUnit }
+            : {}),
+          ...(member.expatProfile.netMonthlyAmount
+            ? { netMonthlyAmount: member.expatProfile.netMonthlyAmount }
+            : {}),
+          ...(member.expatProfile.netMonthlyUnit
+            ? { netMonthlyUnit: member.expatProfile.netMonthlyUnit }
+            : {}),
+          ...(member.expatProfile.maritalStatus
+            ? { maritalStatus: member.expatProfile.maritalStatus }
+            : {}),
+          ...(member.expatProfile.childrenCount !== null
+            ? { childrenCount: member.expatProfile.childrenCount }
+            : {}),
+          ...(member.expatProfile.cnpsNumber
+            ? { cnpsNumber: member.expatProfile.cnpsNumber }
+            : {}),
+          ...(member.expatProfile.cnpsDeclarationCode
+            ? { cnpsDeclarationCode: member.expatProfile.cnpsDeclarationCode }
+            : {}),
+          ...(member.expatProfile.provenance
+            ? { provenance: member.expatProfile.provenance }
+            : {}),
+          ...(member.expatProfile.emergencyContactName
+            ? { emergencyContactName: member.expatProfile.emergencyContactName }
+            : {}),
+          ...(member.expatProfile.emergencyContactPhone
+            ? { emergencyContactPhone: member.expatProfile.emergencyContactPhone }
+            : {}),
+        }
+        if (!match) {
+          const resolvedEmploymentStatus = member.employmentStatus ?? 'ACTIVE'
+          await tx.user.create({
+            data: {
+              username: member.username!,
+              passwordHash: passwordHash!,
+              name: member.name,
+              gender: member.gender ?? null,
+              nationality: member.nationality ?? null,
+              phones: member.phones,
+              joinDate: member.joinDate ?? new Date(),
+              birthDate: member.birthDate,
+              terminationDate:
+                resolvedEmploymentStatus === 'TERMINATED' ? member.terminationDate : null,
+              terminationReason:
+                resolvedEmploymentStatus === 'TERMINATED' ? member.terminationReason : null,
+              position: member.position ?? null,
+              employmentStatus: resolvedEmploymentStatus,
+              chineseProfile: shouldUpsertChineseProfile
+                ? {
+                    create: member.chineseProfile,
+                  }
+                : undefined,
+              expatProfile: shouldUpsertExpatProfile
+                ? {
+                    create: member.expatProfile,
+                  }
+                : undefined,
+              roles:
+                canAssignRole && member.roleIds.length > 0
+                  ? {
+                      create: member.roleIds.map((id) => ({
+                        role: { connect: { id } },
+                      })),
+                    }
+                  : undefined,
+            },
+          })
+          continue
+        }
+
+        const terminationPayload = member.hasEmploymentStatusInput
+          ? member.employmentStatus === 'TERMINATED'
+            ? {
+                terminationDate: member.terminationDate,
+                terminationReason: member.terminationReason,
+              }
+            : { terminationDate: null, terminationReason: null }
+          : {}
+        await tx.user.update({
+          where: { id: match.id },
+          data: {
+            ...(member.username ? { username: member.username } : {}),
+            ...(passwordHash ? { passwordHash } : {}),
+            name: member.name,
+            ...(member.gender ? { gender: member.gender } : {}),
+            ...(member.nationality ? { nationality: member.nationality } : {}),
+            ...(member.phones.length > 0 ? { phones: member.phones } : {}),
+            ...(member.joinDate ? { joinDate: member.joinDate } : {}),
+            ...(member.hasBirthDateInput ? { birthDate: member.birthDate } : {}),
+            ...(member.position ? { position: member.position } : {}),
+            ...(member.hasEmploymentStatusInput
+              ? { employmentStatus: member.employmentStatus ?? 'ACTIVE' }
+              : {}),
+            ...terminationPayload,
+            chineseProfile: shouldUpsertChineseProfile
+              ? {
+                  upsert: {
+                    create: member.chineseProfile,
+                    update: chineseProfileUpdate,
+                  },
+                }
+              : undefined,
+            expatProfile: shouldUpsertExpatProfile
+              ? {
+                  upsert: {
+                    create: member.expatProfile,
+                    update: expatProfileUpdate,
+                  },
+                }
+              : undefined,
+            roles: canAssignRole
+              ? member.roleIds.length > 0
+                ? {
+                    deleteMany: {},
+                    create: member.roleIds.map((id) => ({
+                      role: { connect: { id } },
+                    })),
+                  }
+                : undefined
+              : undefined,
+          },
+        })
+      }
+    })
+  }
+
+  return NextResponse.json({
+    imported: resolvedCandidates.length,
+    errors: errors.length ? errors : undefined,
+  })
 }

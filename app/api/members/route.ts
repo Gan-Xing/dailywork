@@ -3,7 +3,14 @@ import { NextResponse } from 'next/server'
 import { hashPassword } from '@/lib/auth/password'
 import { hasPermission } from '@/lib/server/authSession'
 import { listUsers } from '@/lib/server/authStore'
-import { hasChineseProfileData, normalizeChineseProfile } from '@/lib/server/memberProfiles'
+import {
+  hasExpatProfileData,
+  hasChineseProfileData,
+  normalizeExpatProfile,
+  normalizeChineseProfile,
+  parseBirthDateInput,
+  parseChineseIdBirthDate,
+} from '@/lib/server/memberProfiles'
 import { prisma } from '@/lib/prisma'
 
 export async function GET() {
@@ -36,6 +43,9 @@ export async function POST(request: Request) {
     nationality,
     phones,
     joinDate,
+    birthDate,
+    terminationDate,
+    terminationReason,
     position,
     employmentStatus,
     roleIds,
@@ -60,10 +70,49 @@ export async function POST(request: Request) {
       : []
 
   let resolvedPositionName = typeof position === 'string' && position.trim().length ? position.trim() : null
+  const resolvedEmploymentStatus = employmentStatus ?? 'ACTIVE'
   const isChinese = nationality === 'china'
   const chineseProfileData = normalizeChineseProfile(chineseProfile)
   const shouldCreateChineseProfile = isChinese && hasChineseProfileData(chineseProfileData)
-  const shouldCreateExpatProfile = !isChinese && expatProfile !== null && expatProfile !== undefined
+  const expatProfileData = normalizeExpatProfile(expatProfile)
+  const shouldCreateExpatProfile = !isChinese && hasExpatProfileData(expatProfileData)
+  const hasBirthDateInput =
+    birthDate !== null &&
+    birthDate !== undefined &&
+    (typeof birthDate !== 'string' || birthDate.trim().length > 0)
+  const parsedBirthDate = parseBirthDateInput(birthDate)
+  if (hasBirthDateInput && !parsedBirthDate) {
+    return NextResponse.json({ error: '出生日期格式不正确' }, { status: 400 })
+  }
+  let resolvedBirthDate = parsedBirthDate
+  if (!resolvedBirthDate && isChinese && !hasBirthDateInput) {
+    resolvedBirthDate = parseChineseIdBirthDate(chineseProfileData.idNumber)
+  }
+  if (!resolvedBirthDate) {
+    return NextResponse.json({ error: '缺少出生日期' }, { status: 400 })
+  }
+  if (!isChinese && expatProfileData.contractType === 'CDD' && expatProfileData.baseSalaryUnit === 'HOUR') {
+    return NextResponse.json({ error: 'CDD 合同基础工资必须按月' }, { status: 400 })
+  }
+  const isTerminated = resolvedEmploymentStatus === 'TERMINATED'
+  const terminationReasonText =
+    typeof terminationReason === 'string' ? terminationReason.trim() : ''
+  let resolvedTerminationDate: Date | null = null
+  let resolvedTerminationReason: string | null = null
+  if (isTerminated) {
+    if (!terminationDate || (typeof terminationDate === 'string' && !terminationDate.trim())) {
+      return NextResponse.json({ error: '缺少离职日期' }, { status: 400 })
+    }
+    const parsedTerminationDate = new Date(terminationDate)
+    if (Number.isNaN(parsedTerminationDate.getTime())) {
+      return NextResponse.json({ error: '离职日期格式不正确' }, { status: 400 })
+    }
+    if (!terminationReasonText) {
+      return NextResponse.json({ error: '缺少离职原因' }, { status: 400 })
+    }
+    resolvedTerminationDate = parsedTerminationDate
+    resolvedTerminationReason = terminationReasonText
+  }
 
   const roleIdList: number[] = canAssignRole
     ? Array.isArray(roleIds)
@@ -79,6 +128,15 @@ export async function POST(request: Request) {
     if (existing) {
       return NextResponse.json({ error: '账号已存在（不区分大小写）' }, { status: 409 })
     }
+    if (!isChinese && expatProfileData.contractNumber) {
+      const contractOwner = await prisma.userExpatProfile.findUnique({
+        where: { contractNumber: expatProfileData.contractNumber },
+        select: { userId: true },
+      })
+      if (contractOwner) {
+        return NextResponse.json({ error: '合同编号已存在' }, { status: 409 })
+      }
+    }
 
     const user = await prisma.user.create({
       data: {
@@ -89,8 +147,11 @@ export async function POST(request: Request) {
         nationality: nationality ?? null,
         phones: phoneList,
         joinDate: joinDate ? new Date(joinDate) : new Date(),
+        birthDate: resolvedBirthDate,
         position: resolvedPositionName,
-        employmentStatus: employmentStatus ?? 'ACTIVE',
+        employmentStatus: resolvedEmploymentStatus,
+        terminationDate: resolvedTerminationDate,
+        terminationReason: resolvedTerminationReason,
         chineseProfile: shouldCreateChineseProfile
           ? {
               create: chineseProfileData,
@@ -98,7 +159,7 @@ export async function POST(request: Request) {
           : undefined,
         expatProfile: shouldCreateExpatProfile
           ? {
-              create: {},
+              create: expatProfileData,
             }
           : undefined,
         roles: canAssignRole
@@ -127,8 +188,11 @@ export async function POST(request: Request) {
         nationality: user.nationality,
         phones: user.phones,
         joinDate: user.joinDate?.toISOString() ?? null,
+        birthDate: user.birthDate?.toISOString() ?? null,
         position: user.position,
         employmentStatus: user.employmentStatus,
+        terminationDate: user.terminationDate?.toISOString() ?? null,
+        terminationReason: user.terminationReason ?? null,
         createdAt: user.createdAt.toISOString(),
         updatedAt: user.updatedAt.toISOString(),
         roles: canAssignRole
