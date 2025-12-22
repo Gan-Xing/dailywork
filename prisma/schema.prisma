@@ -40,6 +40,16 @@ enum EmploymentStatus {
   ON_LEAVE
 }
 
+enum ContractType {
+  CTJ
+  CDD
+}
+
+enum SalaryUnit {
+  MONTH
+  HOUR
+}
+
 enum PermissionStatus {
   ACTIVE
   ARCHIVED
@@ -380,6 +390,7 @@ model User {
   nationality  String?
   phones       String[]   @default([])
   joinDate     DateTime?
+  birthDate    DateTime?
   position     String?
   employmentStatus EmploymentStatus @default(ACTIVE)
   terminationDate DateTime?
@@ -455,10 +466,25 @@ model UserChineseProfile {
 }
 
 model UserExpatProfile {
-  userId    Int     @id
-  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  userId             Int          @id
+  user               User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  team               String?
+  contractNumber     String?      @unique
+  contractType       ContractType?
+  salaryCategory     String?
+  baseSalaryAmount   Decimal?     @db.Decimal(18, 2)
+  baseSalaryUnit     SalaryUnit?
+  netMonthlyAmount   Decimal?     @db.Decimal(18, 2)
+  netMonthlyUnit     SalaryUnit?
+  maritalStatus      String?
+  childrenCount      Int?
+  cnpsNumber         String?
+  cnpsDeclarationCode String?
+  provenance         String?
+  emergencyContactName String?
+  emergencyContactPhone String?
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
 }
 
 model Project {

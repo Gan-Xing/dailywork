@@ -158,6 +158,23 @@
 - **用途**：补充以上区域未覆盖的其他信息，例如突发事件、资源调配、临时指令或备注。
 - **格式**：自由文本，支持列表或段落；若无内容可留空。
 
+## 成员管理（Member）
+
+### UserExpatProfile（当地员工/外籍扩展字段）
+
+- `team`（EQUIPE）：班组/队伍名称，字符串，可空。
+- `contractNumber`（MATRICULE）：合同编号，字符串，可空但需唯一。
+- `contractType`（TYPE DE CONTRAT）：枚举 `CTJ` / `CDD`。
+- `salaryCategory`（CATEGORIE）：工资等级，字符串，可空。
+- `baseSalaryAmount` + `baseSalaryUnit`（SALAIRE DE BASE）：基础工资金额与单位；单位枚举 `MONTH` / `HOUR`（业务约束：`CDD` 必须为月单位）。
+- `netMonthlyAmount` + `netMonthlyUnit`（NET MENSUEL）：实发工资金额与单位（仅月单位），可空。
+- `maritalStatus`（SITUATION MATRIMONIALE）：婚姻状态，字符串，可空。
+- `childrenCount`：子女数量，整数，可空。
+- `cnpsNumber`（NUMERO CNPS）：CNPS 编号，字符串，可空。
+- `cnpsDeclarationCode`（CODE DE DECLARATION CNPS）：申报码，字符串，可空。
+- `provenance`（PROVENANCE）：属地/来源，字符串，可空。
+- `emergencyContactName` + `emergencyContactPhone`（EN CAS D'URGENCES）：紧急联系人姓名与电话，字符串，可空。
+
 ## 道路进度元数据（RoadSection）
 
 - **用途**：由管理员维护道路起终点信息，作为报检与分项工程配置的归属入口。
@@ -314,6 +331,7 @@
 - `nationality`：受控下拉（中/法双语标签），候选见下方“国籍列表”。
 - `phones`：字符串数组，不区分主次、不强制国家码。
 - `joinDate`：入职日期（date，创建成员默认当天）。
+- `birthDate`：出生日期（date，必填；中方可由身份证解析补全，身份证号仍可选）。
 - `position`：岗位名称，来源于现有成员岗位去重下拉，可手动新增。
 - `employmentStatus`：枚举，`ACTIVE`（在职）、`TERMINATED`（离职）、`ON_LEAVE`（休假）。
 - `terminationDate?` / `terminationReason?`：离职日期与原因（仅详情展示，不在列表列出）。
