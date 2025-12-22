@@ -50,6 +50,21 @@ type ChineseProfile = {
 }
 
 type ExpatProfile = {
+  team: string | null
+  contractNumber: string | null
+  contractType: 'CTJ' | 'CDD' | null
+  salaryCategory: string | null
+  baseSalaryAmount: string | null
+  baseSalaryUnit: 'MONTH' | 'HOUR' | null
+  netMonthlyAmount: string | null
+  netMonthlyUnit: 'MONTH' | 'HOUR' | null
+  maritalStatus: string | null
+  childrenCount: number | null
+  cnpsNumber: string | null
+  cnpsDeclarationCode: string | null
+  provenance: string | null
+  emergencyContactName: string | null
+  emergencyContactPhone: string | null
   createdAt?: string
   updatedAt?: string
 }
@@ -62,6 +77,9 @@ type Member = {
   nationality: string | null
   phones: string[]
   joinDate: string | null
+  birthDate: string | null
+  terminationDate: string | null
+  terminationReason: string | null
   position: string | null
   employmentStatus: EmploymentStatus
   roles: { id: number; name: string }[]
@@ -93,11 +111,14 @@ type FormState = {
   nationality: string
   phones: string[]
   joinDate: string
+  birthDate: string
+  terminationDate: string
+  terminationReason: string
   position: string
   employmentStatus: EmploymentStatus
   roleIds: number[]
   chineseProfile: ChineseProfileForm
-  expatProfile: Record<string, never>
+  expatProfile: ExpatProfileForm
 }
 
 type ChineseProfileForm = {
@@ -117,6 +138,24 @@ type ChineseProfileForm = {
   healthStatus: string
 }
 
+type ExpatProfileForm = {
+  team: string
+  contractNumber: string
+  contractType: '' | 'CTJ' | 'CDD'
+  salaryCategory: string
+  baseSalaryAmount: string
+  baseSalaryUnit: '' | 'MONTH' | 'HOUR'
+  netMonthlyAmount: string
+  netMonthlyUnit: '' | 'MONTH'
+  maritalStatus: string
+  childrenCount: string
+  cnpsNumber: string
+  cnpsDeclarationCode: string
+  provenance: string
+  emergencyContactName: string
+  emergencyContactPhone: string
+}
+
 type TabKey = 'members' | 'roles' | 'permissions'
 type ColumnKey =
   | 'sequence'
@@ -126,9 +165,23 @@ type ColumnKey =
   | 'nationality'
   | 'phones'
   | 'joinDate'
+  | 'birthDate'
   | 'position'
   | 'employmentStatus'
+  | 'terminationDate'
+  | 'terminationReason'
   | 'roles'
+  | 'team'
+  | 'contractNumber'
+  | 'contractType'
+  | 'salaryCategory'
+  | 'baseSalary'
+  | 'netMonthly'
+  | 'maritalStatus'
+  | 'childrenCount'
+  | 'cnpsNumber'
+  | 'cnpsDeclarationCode'
+  | 'provenance'
   | 'frenchName'
   | 'idNumber'
   | 'passportNumber'
@@ -156,9 +209,24 @@ type TemplateColumnKey =
   | 'nationality'
   | 'phones'
   | 'joinDate'
+  | 'birthDate'
   | 'position'
   | 'employmentStatus'
+  | 'terminationDate'
+  | 'terminationReason'
   | 'roles'
+  | 'team'
+  | 'contractNumber'
+  | 'contractType'
+  | 'salaryCategory'
+  | 'baseSalary'
+  | 'netMonthly'
+  | 'maritalStatus'
+  | 'childrenCount'
+  | 'cnpsNumber'
+  | 'cnpsDeclarationCode'
+  | 'provenance'
+  | 'emergencyContact'
   | 'frenchName'
   | 'idNumber'
   | 'passportNumber'
@@ -174,14 +242,25 @@ type TemplateColumnKey =
   | 'medicalHistory'
   | 'healthStatus'
 type ImportErrorCode =
+  | 'missing_name'
   | 'missing_username'
   | 'missing_password'
   | 'duplicate_username'
+  | 'duplicate_identity'
   | 'username_exists'
   | 'invalid_gender'
   | 'invalid_phone'
+  | 'invalid_contract_type'
+  | 'invalid_base_salary_unit'
   | 'invalid_status'
   | 'invalid_join_date'
+  | 'missing_birth_date'
+  | 'invalid_birth_date'
+  | 'missing_termination_date'
+  | 'invalid_termination_date'
+  | 'missing_termination_reason'
+  | 'duplicate_contract_number'
+  | 'contract_number_exists'
   | 'role_not_found'
 type ImportError = { row: number; code: ImportErrorCode; value?: string }
 type PermissionStatus = 'ACTIVE' | 'ARCHIVED'
@@ -195,6 +274,7 @@ const defaultVisibleColumns: ColumnKey[] = [
   'nationality',
   'phones',
   'joinDate',
+  'birthDate',
   'position',
   'employmentStatus',
   'roles',
@@ -208,9 +288,23 @@ const memberColumnOrder: ColumnKey[] = [
   'nationality',
   'phones',
   'joinDate',
+  'birthDate',
   'position',
   'employmentStatus',
+  'terminationDate',
+  'terminationReason',
   'roles',
+  'team',
+  'contractNumber',
+  'contractType',
+  'salaryCategory',
+  'baseSalary',
+  'netMonthly',
+  'maritalStatus',
+  'childrenCount',
+  'cnpsNumber',
+  'cnpsDeclarationCode',
+  'provenance',
   'frenchName',
   'idNumber',
   'passportNumber',
@@ -241,9 +335,24 @@ const memberTemplateColumns: TemplateColumnKey[] = [
   'nationality',
   'phones',
   'joinDate',
+  'birthDate',
   'position',
   'employmentStatus',
+  'terminationDate',
+  'terminationReason',
   'roles',
+  'team',
+  'contractNumber',
+  'contractType',
+  'salaryCategory',
+  'baseSalary',
+  'netMonthly',
+  'maritalStatus',
+  'childrenCount',
+  'cnpsNumber',
+  'cnpsDeclarationCode',
+  'provenance',
+  'emergencyContact',
   'frenchName',
   'idNumber',
   'passportNumber',
@@ -259,13 +368,53 @@ const memberTemplateColumns: TemplateColumnKey[] = [
   'medicalHistory',
   'healthStatus',
 ]
-const REQUIRED_IMPORT_COLUMNS: TemplateColumnKey[] = ['username', 'password']
+const REQUIRED_IMPORT_COLUMNS: TemplateColumnKey[] = ['name', 'birthDate']
 const PHONE_PATTERN = /^[+\d][\d\s-]{4,}$/
 const EMPTY_FILTER_VALUE = '__EMPTY__'
 const PAGE_SIZE_OPTIONS = [10, 20, 30, 50, 100, 500]
 const PERMISSION_STATUS_OPTIONS: PermissionStatus[] = ['ACTIVE', 'ARCHIVED']
 
 const normalizeText = (value?: string | null) => (value ?? '').trim()
+const toNumberFilterValue = (value?: number | null) =>
+  value === null || value === undefined ? '' : String(value)
+const toSalaryFilterValue = (
+  amount?: string | null,
+  unit?: 'MONTH' | 'HOUR' | null,
+  fallbackUnit?: 'MONTH' | 'HOUR' | null,
+) => {
+  const normalized = normalizeText(amount)
+  if (!normalized) return ''
+  const resolvedUnit = unit ?? fallbackUnit
+  if (!resolvedUnit) return normalized
+  return `${normalized}/${resolvedUnit === 'MONTH' ? 'M' : 'H'}`
+}
+const parseBirthDateFromIdNumber = (value: string) => {
+  const text = value.trim()
+  if (!text) return ''
+  let digits = ''
+  if (/^\d{17}[\dXx]$/.test(text)) {
+    digits = text.slice(6, 14)
+  } else if (/^\d{15}$/.test(text)) {
+    digits = `19${text.slice(6, 12)}`
+  } else {
+    return ''
+  }
+  const year = Number(digits.slice(0, 4))
+  const month = Number(digits.slice(4, 6))
+  const day = Number(digits.slice(6, 8))
+  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) return ''
+  const date = new Date(Date.UTC(year, month - 1, day))
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  ) {
+    return ''
+  }
+  const paddedMonth = String(month).padStart(2, '0')
+  const paddedDay = String(day).padStart(2, '0')
+  return `${year}-${paddedMonth}-${paddedDay}`
+}
 const normalizeProfileNumber = (value: string) => {
   if (!value.trim()) return null
   const parsed = Number.parseInt(value, 10)
@@ -289,6 +438,23 @@ const emptyChineseProfile: ChineseProfileForm = {
   medicalHistory: '',
   healthStatus: '',
 }
+const emptyExpatProfile: ExpatProfileForm = {
+  team: '',
+  contractNumber: '',
+  contractType: '',
+  salaryCategory: '',
+  baseSalaryAmount: '',
+  baseSalaryUnit: '',
+  netMonthlyAmount: '',
+  netMonthlyUnit: '',
+  maritalStatus: '',
+  childrenCount: '',
+  cnpsNumber: '',
+  cnpsDeclarationCode: '',
+  provenance: '',
+  emergencyContactName: '',
+  emergencyContactPhone: '',
+}
 const buildChineseProfileForm = (profile?: ChineseProfile | null): ChineseProfileForm => ({
   frenchName: profile?.frenchName ?? '',
   idNumber: profile?.idNumber ?? '',
@@ -304,6 +470,26 @@ const buildChineseProfileForm = (profile?: ChineseProfile | null): ChineseProfil
   residenceInChina: profile?.residenceInChina ?? '',
   medicalHistory: profile?.medicalHistory ?? '',
   healthStatus: profile?.healthStatus ?? '',
+})
+const buildExpatProfileForm = (profile?: ExpatProfile | null): ExpatProfileForm => ({
+  team: profile?.team ?? '',
+  contractNumber: profile?.contractNumber ?? '',
+  contractType: profile?.contractType ?? '',
+  salaryCategory: profile?.salaryCategory ?? '',
+  baseSalaryAmount: profile?.baseSalaryAmount ?? '',
+  baseSalaryUnit: profile?.baseSalaryUnit ?? '',
+  netMonthlyAmount: profile?.netMonthlyAmount ?? '',
+  netMonthlyUnit: profile?.netMonthlyUnit === 'MONTH' ? 'MONTH' : '',
+  maritalStatus: profile?.maritalStatus ?? '',
+  childrenCount:
+    profile?.childrenCount === null || profile?.childrenCount === undefined
+      ? ''
+      : String(profile.childrenCount),
+  cnpsNumber: profile?.cnpsNumber ?? '',
+  cnpsDeclarationCode: profile?.cnpsDeclarationCode ?? '',
+  provenance: profile?.provenance ?? '',
+  emergencyContactName: profile?.emergencyContactName ?? '',
+  emergencyContactPhone: profile?.emergencyContactPhone ?? '',
 })
 const getMonthKey = (value?: string | null) => {
   if (!value) return null
@@ -331,11 +517,14 @@ export default function MembersPage() {
     nationality: nationalityOptions[0]?.key ?? '',
     phones: [] as string[],
     joinDate: getTodayString(),
+    birthDate: '',
+    terminationDate: '',
+    terminationReason: '',
     position: '',
     employmentStatus: 'ACTIVE' as EmploymentStatus,
     roleIds: [] as number[],
     chineseProfile: { ...emptyChineseProfile },
-    expatProfile: {},
+    expatProfile: { ...emptyExpatProfile },
   })
   const [membersData, setMembersData] = useState<Member[]>([])
   const [rolesData, setRolesData] = useState<Role[]>([])
@@ -384,6 +573,31 @@ export default function MembersPage() {
   const [positionFilters, setPositionFilters] = useState<string[]>([])
   const [statusFilters, setStatusFilters] = useState<string[]>([])
   const [roleFilters, setRoleFilters] = useState<string[]>([])
+  const [teamFilters, setTeamFilters] = useState<string[]>([])
+  const [contractNumberFilters, setContractNumberFilters] = useState<string[]>([])
+  const [contractTypeFilters, setContractTypeFilters] = useState<string[]>([])
+  const [salaryCategoryFilters, setSalaryCategoryFilters] = useState<string[]>([])
+  const [baseSalaryFilters, setBaseSalaryFilters] = useState<string[]>([])
+  const [netMonthlyFilters, setNetMonthlyFilters] = useState<string[]>([])
+  const [maritalStatusFilters, setMaritalStatusFilters] = useState<string[]>([])
+  const [childrenCountFilters, setChildrenCountFilters] = useState<string[]>([])
+  const [cnpsNumberFilters, setCnpsNumberFilters] = useState<string[]>([])
+  const [cnpsDeclarationCodeFilters, setCnpsDeclarationCodeFilters] = useState<string[]>([])
+  const [provenanceFilters, setProvenanceFilters] = useState<string[]>([])
+  const [frenchNameFilters, setFrenchNameFilters] = useState<string[]>([])
+  const [idNumberFilters, setIdNumberFilters] = useState<string[]>([])
+  const [passportNumberFilters, setPassportNumberFilters] = useState<string[]>([])
+  const [educationAndMajorFilters, setEducationAndMajorFilters] = useState<string[]>([])
+  const [certificationsFilters, setCertificationsFilters] = useState<string[]>([])
+  const [domesticMobileFilters, setDomesticMobileFilters] = useState<string[]>([])
+  const [emergencyContactNameFilters, setEmergencyContactNameFilters] = useState<string[]>([])
+  const [emergencyContactPhoneFilters, setEmergencyContactPhoneFilters] = useState<string[]>([])
+  const [redBookValidYearsFilters, setRedBookValidYearsFilters] = useState<string[]>([])
+  const [cumulativeAbroadYearsFilters, setCumulativeAbroadYearsFilters] = useState<string[]>([])
+  const [birthplaceFilters, setBirthplaceFilters] = useState<string[]>([])
+  const [residenceInChinaFilters, setResidenceInChinaFilters] = useState<string[]>([])
+  const [medicalHistoryFilters, setMedicalHistoryFilters] = useState<string[]>([])
+  const [healthStatusFilters, setHealthStatusFilters] = useState<string[]>([])
   const [createdAtFilters, setCreatedAtFilters] = useState<string[]>([])
   const [updatedAtFilters, setUpdatedAtFilters] = useState<string[]>([])
   const [session, setSession] = useState<SessionUser | null>(null)
@@ -457,6 +671,16 @@ export default function MembersPage() {
     (values?: string[] | null) => (values && values.length ? values.join(' / ') : t.labels.empty),
     [t.labels.empty],
   )
+  const formatSalary = useCallback(
+    (amount?: string | null, unit?: 'MONTH' | 'HOUR' | null, fallbackUnit?: 'MONTH' | 'HOUR' | null) => {
+      const normalized = normalizeText(amount)
+      if (!normalized) return t.labels.empty
+      const resolvedUnit = unit ?? fallbackUnit
+      if (!resolvedUnit) return normalized
+      return `${normalized}/${resolvedUnit === 'MONTH' ? 'M' : 'H'}`
+    },
+    [t.labels.empty],
+  )
 
   const columnOptions: { key: ColumnKey; label: ReactNode }[] = useMemo(() => {
     const baseOptions: { key: ColumnKey; label: ReactNode }[] = [
@@ -467,9 +691,23 @@ export default function MembersPage() {
       { key: 'nationality', label: t.table.nationality },
       { key: 'phones', label: t.table.phones },
       { key: 'joinDate', label: t.table.joinDate },
+      { key: 'birthDate', label: t.table.birthDate },
       { key: 'position', label: t.table.position },
       { key: 'employmentStatus', label: t.table.employmentStatus },
+      { key: 'terminationDate', label: t.table.terminationDate },
+      { key: 'terminationReason', label: t.table.terminationReason },
       { key: 'roles', label: t.table.roles },
+      { key: 'team', label: t.table.team },
+      { key: 'contractNumber', label: t.table.contractNumber },
+      { key: 'contractType', label: t.table.contractType },
+      { key: 'salaryCategory', label: t.table.salaryCategory },
+      { key: 'baseSalary', label: t.table.baseSalary },
+      { key: 'netMonthly', label: t.table.netMonthly },
+      { key: 'maritalStatus', label: t.table.maritalStatus },
+      { key: 'childrenCount', label: t.table.childrenCount },
+      { key: 'cnpsNumber', label: t.table.cnpsNumber },
+      { key: 'cnpsDeclarationCode', label: t.table.cnpsDeclarationCode },
+      { key: 'provenance', label: t.table.provenance },
       { key: 'frenchName', label: t.table.frenchName },
       { key: 'idNumber', label: t.table.idNumber },
       { key: 'passportNumber', label: t.table.passportNumber },
@@ -499,9 +737,23 @@ export default function MembersPage() {
       nationality: t.table.nationality,
       phones: t.table.phones,
       joinDate: t.table.joinDate,
+      birthDate: t.table.birthDate,
       position: t.table.position,
       employmentStatus: t.table.employmentStatus,
+      terminationDate: t.table.terminationDate,
+      terminationReason: t.table.terminationReason,
       roles: t.table.roles,
+      team: t.table.team,
+      contractNumber: t.table.contractNumber,
+      contractType: t.table.contractType,
+      salaryCategory: t.table.salaryCategory,
+      baseSalary: t.table.baseSalary,
+      netMonthly: t.table.netMonthly,
+      maritalStatus: t.table.maritalStatus,
+      childrenCount: t.table.childrenCount,
+      cnpsNumber: t.table.cnpsNumber,
+      cnpsDeclarationCode: t.table.cnpsDeclarationCode,
+      provenance: t.table.provenance,
       frenchName: t.table.frenchName,
       idNumber: t.table.idNumber,
       passportNumber: t.table.passportNumber,
@@ -531,9 +783,24 @@ export default function MembersPage() {
       nationality: t.form.nationality,
       phones: t.form.phones,
       joinDate: t.form.joinDate,
+      birthDate: t.form.birthDate,
       position: t.form.position,
       employmentStatus: t.form.status,
+      terminationDate: t.form.terminationDate,
+      terminationReason: t.form.terminationReason,
       roles: t.form.roles,
+      team: t.form.team,
+      contractNumber: t.form.contractNumber,
+      contractType: t.form.contractType,
+      salaryCategory: t.form.salaryCategory,
+      baseSalary: t.form.baseSalary,
+      netMonthly: t.form.netMonthly,
+      maritalStatus: t.form.maritalStatus,
+      childrenCount: t.form.childrenCount,
+      cnpsNumber: t.form.cnpsNumber,
+      cnpsDeclarationCode: t.form.cnpsDeclarationCode,
+      provenance: t.form.provenance,
+      emergencyContact: t.form.emergencyContact,
       frenchName: t.form.frenchName,
       idNumber: t.form.idNumber,
       passportNumber: t.form.passportNumber,
@@ -565,9 +832,24 @@ export default function MembersPage() {
       add(copy.form.nationality, 'nationality')
       add(copy.form.phones, 'phones')
       add(copy.form.joinDate, 'joinDate')
+      add(copy.form.birthDate, 'birthDate')
       add(copy.form.position, 'position')
       add(copy.form.status, 'employmentStatus')
+      add(copy.form.terminationDate, 'terminationDate')
+      add(copy.form.terminationReason, 'terminationReason')
       add(copy.form.roles, 'roles')
+      add(copy.form.team, 'team')
+      add(copy.form.contractNumber, 'contractNumber')
+      add(copy.form.contractType, 'contractType')
+      add(copy.form.salaryCategory, 'salaryCategory')
+      add(copy.form.baseSalary, 'baseSalary')
+      add(copy.form.netMonthly, 'netMonthly')
+      add(copy.form.maritalStatus, 'maritalStatus')
+      add(copy.form.childrenCount, 'childrenCount')
+      add(copy.form.cnpsNumber, 'cnpsNumber')
+      add(copy.form.cnpsDeclarationCode, 'cnpsDeclarationCode')
+      add(copy.form.provenance, 'provenance')
+      add(copy.form.emergencyContact, 'emergencyContact')
       add(copy.form.frenchName, 'frenchName')
       add(copy.form.idNumber, 'idNumber')
       add(copy.form.passportNumber, 'passportNumber')
@@ -660,6 +942,15 @@ export default function MembersPage() {
     const set = new Set<string>()
     membersData.forEach((member) => {
       const value = normalizeText(member.position)
+      if (value) set.add(value)
+    })
+    return Array.from(set).sort(optionCollator.compare)
+  }, [membersData, optionCollator])
+
+  const teamOptions = useMemo(() => {
+    const set = new Set<string>()
+    membersData.forEach((member) => {
+      const value = normalizeText(member.expatProfile?.team)
       if (value) set.add(value)
     })
     return Array.from(set).sort(optionCollator.compare)
@@ -773,6 +1064,398 @@ export default function MembersPage() {
     return unique
   }, [rolesData, membersData, optionCollator, t.labels.empty])
 
+  const teamFilterOptions = useMemo(() => {
+    const values = new Set<string>()
+    let hasEmpty = false
+    membersData.forEach((member) => {
+      const value = normalizeText(member.expatProfile?.team)
+      if (value) values.add(value)
+      else hasEmpty = true
+    })
+    const options = Array.from(values)
+      .sort(optionCollator.compare)
+      .map((value) => ({ value, label: value }))
+    if (hasEmpty) options.unshift({ value: EMPTY_FILTER_VALUE, label: t.labels.empty })
+    return options
+  }, [membersData, optionCollator, t.labels.empty])
+
+  const contractNumberFilterOptions = useMemo(() => {
+    const values = new Set<string>()
+    let hasEmpty = false
+    membersData.forEach((member) => {
+      const value = normalizeText(member.expatProfile?.contractNumber)
+      if (value) values.add(value)
+      else hasEmpty = true
+    })
+    const options = Array.from(values)
+      .sort(optionCollator.compare)
+      .map((value) => ({ value, label: value }))
+    if (hasEmpty) options.unshift({ value: EMPTY_FILTER_VALUE, label: t.labels.empty })
+    return options
+  }, [membersData, optionCollator, t.labels.empty])
+
+  const contractTypeFilterOptions = useMemo(() => {
+    const values = new Set<string>()
+    let hasEmpty = false
+    membersData.forEach((member) => {
+      const value = normalizeText(member.expatProfile?.contractType)
+      if (value) values.add(value)
+      else hasEmpty = true
+    })
+    const options = Array.from(values)
+      .sort(optionCollator.compare)
+      .map((value) => ({ value, label: value }))
+    if (hasEmpty) options.unshift({ value: EMPTY_FILTER_VALUE, label: t.labels.empty })
+    return options
+  }, [membersData, optionCollator, t.labels.empty])
+
+  const salaryCategoryFilterOptions = useMemo(() => {
+    const values = new Set<string>()
+    let hasEmpty = false
+    membersData.forEach((member) => {
+      const value = normalizeText(member.expatProfile?.salaryCategory)
+      if (value) values.add(value)
+      else hasEmpty = true
+    })
+    const options = Array.from(values)
+      .sort(optionCollator.compare)
+      .map((value) => ({ value, label: value }))
+    if (hasEmpty) options.unshift({ value: EMPTY_FILTER_VALUE, label: t.labels.empty })
+    return options
+  }, [membersData, optionCollator, t.labels.empty])
+
+  const baseSalaryFilterOptions = useMemo(() => {
+    const values = new Set<string>()
+    let hasEmpty = false
+    membersData.forEach((member) => {
+      const value = toSalaryFilterValue(
+        member.expatProfile?.baseSalaryAmount,
+        member.expatProfile?.baseSalaryUnit,
+      )
+      if (value) values.add(value)
+      else hasEmpty = true
+    })
+    const options = Array.from(values)
+      .sort(optionCollator.compare)
+      .map((value) => ({ value, label: value }))
+    if (hasEmpty) options.unshift({ value: EMPTY_FILTER_VALUE, label: t.labels.empty })
+    return options
+  }, [membersData, optionCollator, t.labels.empty])
+
+  const netMonthlyFilterOptions = useMemo(() => {
+    const values = new Set<string>()
+    let hasEmpty = false
+    membersData.forEach((member) => {
+      const value = toSalaryFilterValue(
+        member.expatProfile?.netMonthlyAmount,
+        member.expatProfile?.netMonthlyUnit,
+        'MONTH',
+      )
+      if (value) values.add(value)
+      else hasEmpty = true
+    })
+    const options = Array.from(values)
+      .sort(optionCollator.compare)
+      .map((value) => ({ value, label: value }))
+    if (hasEmpty) options.unshift({ value: EMPTY_FILTER_VALUE, label: t.labels.empty })
+    return options
+  }, [membersData, optionCollator, t.labels.empty])
+
+  const maritalStatusFilterOptions = useMemo(() => {
+    const values = new Set<string>()
+    let hasEmpty = false
+    membersData.forEach((member) => {
+      const value = normalizeText(member.expatProfile?.maritalStatus)
+      if (value) values.add(value)
+      else hasEmpty = true
+    })
+    const options = Array.from(values)
+      .sort(optionCollator.compare)
+      .map((value) => ({ value, label: value }))
+    if (hasEmpty) options.unshift({ value: EMPTY_FILTER_VALUE, label: t.labels.empty })
+    return options
+  }, [membersData, optionCollator, t.labels.empty])
+
+  const childrenCountFilterOptions = useMemo(() => {
+    const values = new Set<string>()
+    let hasEmpty = false
+    membersData.forEach((member) => {
+      const value = toNumberFilterValue(member.expatProfile?.childrenCount)
+      if (value) values.add(value)
+      else hasEmpty = true
+    })
+    const options = Array.from(values)
+      .sort(optionCollator.compare)
+      .map((value) => ({ value, label: value }))
+    if (hasEmpty) options.unshift({ value: EMPTY_FILTER_VALUE, label: t.labels.empty })
+    return options
+  }, [membersData, optionCollator, t.labels.empty])
+
+  const cnpsNumberFilterOptions = useMemo(() => {
+    const values = new Set<string>()
+    let hasEmpty = false
+    membersData.forEach((member) => {
+      const value = normalizeText(member.expatProfile?.cnpsNumber)
+      if (value) values.add(value)
+      else hasEmpty = true
+    })
+    const options = Array.from(values)
+      .sort(optionCollator.compare)
+      .map((value) => ({ value, label: value }))
+    if (hasEmpty) options.unshift({ value: EMPTY_FILTER_VALUE, label: t.labels.empty })
+    return options
+  }, [membersData, optionCollator, t.labels.empty])
+
+  const cnpsDeclarationCodeFilterOptions = useMemo(() => {
+    const values = new Set<string>()
+    let hasEmpty = false
+    membersData.forEach((member) => {
+      const value = normalizeText(member.expatProfile?.cnpsDeclarationCode)
+      if (value) values.add(value)
+      else hasEmpty = true
+    })
+    const options = Array.from(values)
+      .sort(optionCollator.compare)
+      .map((value) => ({ value, label: value }))
+    if (hasEmpty) options.unshift({ value: EMPTY_FILTER_VALUE, label: t.labels.empty })
+    return options
+  }, [membersData, optionCollator, t.labels.empty])
+
+  const provenanceFilterOptions = useMemo(() => {
+    const values = new Set<string>()
+    let hasEmpty = false
+    membersData.forEach((member) => {
+      const value = normalizeText(member.expatProfile?.provenance)
+      if (value) values.add(value)
+      else hasEmpty = true
+    })
+    const options = Array.from(values)
+      .sort(optionCollator.compare)
+      .map((value) => ({ value, label: value }))
+    if (hasEmpty) options.unshift({ value: EMPTY_FILTER_VALUE, label: t.labels.empty })
+    return options
+  }, [membersData, optionCollator, t.labels.empty])
+
+  const frenchNameFilterOptions = useMemo(() => {
+    const values = new Set<string>()
+    let hasEmpty = false
+    membersData.forEach((member) => {
+      const value = normalizeText(member.chineseProfile?.frenchName)
+      if (value) values.add(value)
+      else hasEmpty = true
+    })
+    const options = Array.from(values)
+      .sort(optionCollator.compare)
+      .map((value) => ({ value, label: value }))
+    if (hasEmpty) options.unshift({ value: EMPTY_FILTER_VALUE, label: t.labels.empty })
+    return options
+  }, [membersData, optionCollator, t.labels.empty])
+
+  const idNumberFilterOptions = useMemo(() => {
+    const values = new Set<string>()
+    let hasEmpty = false
+    membersData.forEach((member) => {
+      const value = normalizeText(member.chineseProfile?.idNumber)
+      if (value) values.add(value)
+      else hasEmpty = true
+    })
+    const options = Array.from(values)
+      .sort(optionCollator.compare)
+      .map((value) => ({ value, label: value }))
+    if (hasEmpty) options.unshift({ value: EMPTY_FILTER_VALUE, label: t.labels.empty })
+    return options
+  }, [membersData, optionCollator, t.labels.empty])
+
+  const passportNumberFilterOptions = useMemo(() => {
+    const values = new Set<string>()
+    let hasEmpty = false
+    membersData.forEach((member) => {
+      const value = normalizeText(member.chineseProfile?.passportNumber)
+      if (value) values.add(value)
+      else hasEmpty = true
+    })
+    const options = Array.from(values)
+      .sort(optionCollator.compare)
+      .map((value) => ({ value, label: value }))
+    if (hasEmpty) options.unshift({ value: EMPTY_FILTER_VALUE, label: t.labels.empty })
+    return options
+  }, [membersData, optionCollator, t.labels.empty])
+
+  const educationAndMajorFilterOptions = useMemo(() => {
+    const values = new Set<string>()
+    let hasEmpty = false
+    membersData.forEach((member) => {
+      const value = normalizeText(member.chineseProfile?.educationAndMajor)
+      if (value) values.add(value)
+      else hasEmpty = true
+    })
+    const options = Array.from(values)
+      .sort(optionCollator.compare)
+      .map((value) => ({ value, label: value }))
+    if (hasEmpty) options.unshift({ value: EMPTY_FILTER_VALUE, label: t.labels.empty })
+    return options
+  }, [membersData, optionCollator, t.labels.empty])
+
+  const certificationsFilterOptions = useMemo(() => {
+    const values = new Set<string>()
+    let hasEmpty = false
+    membersData.forEach((member) => {
+      const list = member.chineseProfile?.certifications ?? []
+      if (list.length === 0) {
+        hasEmpty = true
+        return
+      }
+      list.forEach((item) => {
+        const value = normalizeText(item)
+        if (value) values.add(value)
+      })
+    })
+    const options = Array.from(values)
+      .sort(optionCollator.compare)
+      .map((value) => ({ value, label: value }))
+    if (hasEmpty) options.unshift({ value: EMPTY_FILTER_VALUE, label: t.labels.empty })
+    return options
+  }, [membersData, optionCollator, t.labels.empty])
+
+  const domesticMobileFilterOptions = useMemo(() => {
+    const values = new Set<string>()
+    let hasEmpty = false
+    membersData.forEach((member) => {
+      const value = normalizeText(member.chineseProfile?.domesticMobile)
+      if (value) values.add(value)
+      else hasEmpty = true
+    })
+    const options = Array.from(values)
+      .sort(optionCollator.compare)
+      .map((value) => ({ value, label: value }))
+    if (hasEmpty) options.unshift({ value: EMPTY_FILTER_VALUE, label: t.labels.empty })
+    return options
+  }, [membersData, optionCollator, t.labels.empty])
+
+  const emergencyContactNameFilterOptions = useMemo(() => {
+    const values = new Set<string>()
+    let hasEmpty = false
+    membersData.forEach((member) => {
+      const value = normalizeText(
+        member.chineseProfile?.emergencyContactName ?? member.expatProfile?.emergencyContactName,
+      )
+      if (value) values.add(value)
+      else hasEmpty = true
+    })
+    const options = Array.from(values)
+      .sort(optionCollator.compare)
+      .map((value) => ({ value, label: value }))
+    if (hasEmpty) options.unshift({ value: EMPTY_FILTER_VALUE, label: t.labels.empty })
+    return options
+  }, [membersData, optionCollator, t.labels.empty])
+
+  const emergencyContactPhoneFilterOptions = useMemo(() => {
+    const values = new Set<string>()
+    let hasEmpty = false
+    membersData.forEach((member) => {
+      const value = normalizeText(
+        member.chineseProfile?.emergencyContactPhone ?? member.expatProfile?.emergencyContactPhone,
+      )
+      if (value) values.add(value)
+      else hasEmpty = true
+    })
+    const options = Array.from(values)
+      .sort(optionCollator.compare)
+      .map((value) => ({ value, label: value }))
+    if (hasEmpty) options.unshift({ value: EMPTY_FILTER_VALUE, label: t.labels.empty })
+    return options
+  }, [membersData, optionCollator, t.labels.empty])
+
+  const redBookValidYearsFilterOptions = useMemo(() => {
+    const values = new Set<string>()
+    let hasEmpty = false
+    membersData.forEach((member) => {
+      const value = toNumberFilterValue(member.chineseProfile?.redBookValidYears)
+      if (value) values.add(value)
+      else hasEmpty = true
+    })
+    const options = Array.from(values)
+      .sort(optionCollator.compare)
+      .map((value) => ({ value, label: value }))
+    if (hasEmpty) options.unshift({ value: EMPTY_FILTER_VALUE, label: t.labels.empty })
+    return options
+  }, [membersData, optionCollator, t.labels.empty])
+
+  const cumulativeAbroadYearsFilterOptions = useMemo(() => {
+    const values = new Set<string>()
+    let hasEmpty = false
+    membersData.forEach((member) => {
+      const value = toNumberFilterValue(member.chineseProfile?.cumulativeAbroadYears)
+      if (value) values.add(value)
+      else hasEmpty = true
+    })
+    const options = Array.from(values)
+      .sort(optionCollator.compare)
+      .map((value) => ({ value, label: value }))
+    if (hasEmpty) options.unshift({ value: EMPTY_FILTER_VALUE, label: t.labels.empty })
+    return options
+  }, [membersData, optionCollator, t.labels.empty])
+
+  const birthplaceFilterOptions = useMemo(() => {
+    const values = new Set<string>()
+    let hasEmpty = false
+    membersData.forEach((member) => {
+      const value = normalizeText(member.chineseProfile?.birthplace)
+      if (value) values.add(value)
+      else hasEmpty = true
+    })
+    const options = Array.from(values)
+      .sort(optionCollator.compare)
+      .map((value) => ({ value, label: value }))
+    if (hasEmpty) options.unshift({ value: EMPTY_FILTER_VALUE, label: t.labels.empty })
+    return options
+  }, [membersData, optionCollator, t.labels.empty])
+
+  const residenceInChinaFilterOptions = useMemo(() => {
+    const values = new Set<string>()
+    let hasEmpty = false
+    membersData.forEach((member) => {
+      const value = normalizeText(member.chineseProfile?.residenceInChina)
+      if (value) values.add(value)
+      else hasEmpty = true
+    })
+    const options = Array.from(values)
+      .sort(optionCollator.compare)
+      .map((value) => ({ value, label: value }))
+    if (hasEmpty) options.unshift({ value: EMPTY_FILTER_VALUE, label: t.labels.empty })
+    return options
+  }, [membersData, optionCollator, t.labels.empty])
+
+  const medicalHistoryFilterOptions = useMemo(() => {
+    const values = new Set<string>()
+    let hasEmpty = false
+    membersData.forEach((member) => {
+      const value = normalizeText(member.chineseProfile?.medicalHistory)
+      if (value) values.add(value)
+      else hasEmpty = true
+    })
+    const options = Array.from(values)
+      .sort(optionCollator.compare)
+      .map((value) => ({ value, label: value }))
+    if (hasEmpty) options.unshift({ value: EMPTY_FILTER_VALUE, label: t.labels.empty })
+    return options
+  }, [membersData, optionCollator, t.labels.empty])
+
+  const healthStatusFilterOptions = useMemo(() => {
+    const values = new Set<string>()
+    let hasEmpty = false
+    membersData.forEach((member) => {
+      const value = normalizeText(member.chineseProfile?.healthStatus)
+      if (value) values.add(value)
+      else hasEmpty = true
+    })
+    const options = Array.from(values)
+      .sort(optionCollator.compare)
+      .map((value) => ({ value, label: value }))
+    if (hasEmpty) options.unshift({ value: EMPTY_FILTER_VALUE, label: t.labels.empty })
+    return options
+  }, [membersData, optionCollator, t.labels.empty])
+
   const createdAtFilterOptions = useMemo(() => {
     const values = new Set<string>()
     membersData.forEach((member) => {
@@ -814,6 +1497,31 @@ export default function MembersPage() {
       positionFilters.length > 0 ||
       statusFilters.length > 0 ||
       (canAssignRole && roleFilters.length > 0) ||
+      teamFilters.length > 0 ||
+      contractNumberFilters.length > 0 ||
+      contractTypeFilters.length > 0 ||
+      salaryCategoryFilters.length > 0 ||
+      baseSalaryFilters.length > 0 ||
+      netMonthlyFilters.length > 0 ||
+      maritalStatusFilters.length > 0 ||
+      childrenCountFilters.length > 0 ||
+      cnpsNumberFilters.length > 0 ||
+      cnpsDeclarationCodeFilters.length > 0 ||
+      provenanceFilters.length > 0 ||
+      frenchNameFilters.length > 0 ||
+      idNumberFilters.length > 0 ||
+      passportNumberFilters.length > 0 ||
+      educationAndMajorFilters.length > 0 ||
+      certificationsFilters.length > 0 ||
+      domesticMobileFilters.length > 0 ||
+      emergencyContactNameFilters.length > 0 ||
+      emergencyContactPhoneFilters.length > 0 ||
+      redBookValidYearsFilters.length > 0 ||
+      cumulativeAbroadYearsFilters.length > 0 ||
+      birthplaceFilters.length > 0 ||
+      residenceInChinaFilters.length > 0 ||
+      medicalHistoryFilters.length > 0 ||
+      healthStatusFilters.length > 0 ||
       createdAtFilters.length > 0 ||
       updatedAtFilters.length > 0,
     [
@@ -826,6 +1534,31 @@ export default function MembersPage() {
       positionFilters,
       statusFilters,
       roleFilters,
+      teamFilters,
+      contractNumberFilters,
+      contractTypeFilters,
+      salaryCategoryFilters,
+      baseSalaryFilters,
+      netMonthlyFilters,
+      maritalStatusFilters,
+      childrenCountFilters,
+      cnpsNumberFilters,
+      cnpsDeclarationCodeFilters,
+      provenanceFilters,
+      frenchNameFilters,
+      idNumberFilters,
+      passportNumberFilters,
+      educationAndMajorFilters,
+      certificationsFilters,
+      domesticMobileFilters,
+      emergencyContactNameFilters,
+      emergencyContactPhoneFilters,
+      redBookValidYearsFilters,
+      cumulativeAbroadYearsFilters,
+      birthplaceFilters,
+      residenceInChinaFilters,
+      medicalHistoryFilters,
+      healthStatusFilters,
       createdAtFilters,
       updatedAtFilters,
       canAssignRole,
@@ -842,6 +1575,31 @@ export default function MembersPage() {
     setPositionFilters([])
     setStatusFilters([])
     setRoleFilters([])
+    setTeamFilters([])
+    setContractNumberFilters([])
+    setContractTypeFilters([])
+    setSalaryCategoryFilters([])
+    setBaseSalaryFilters([])
+    setNetMonthlyFilters([])
+    setMaritalStatusFilters([])
+    setChildrenCountFilters([])
+    setCnpsNumberFilters([])
+    setCnpsDeclarationCodeFilters([])
+    setProvenanceFilters([])
+    setFrenchNameFilters([])
+    setIdNumberFilters([])
+    setPassportNumberFilters([])
+    setEducationAndMajorFilters([])
+    setCertificationsFilters([])
+    setDomesticMobileFilters([])
+    setEmergencyContactNameFilters([])
+    setEmergencyContactPhoneFilters([])
+    setRedBookValidYearsFilters([])
+    setCumulativeAbroadYearsFilters([])
+    setBirthplaceFilters([])
+    setResidenceInChinaFilters([])
+    setMedicalHistoryFilters([])
+    setHealthStatusFilters([])
     setCreatedAtFilters([])
     setUpdatedAtFilters([])
   }
@@ -963,11 +1721,14 @@ export default function MembersPage() {
       nationality: nationalityOptions[0]?.key ?? '',
       phones: [],
       joinDate: getTodayString(),
+      birthDate: '',
+      terminationDate: '',
+      terminationReason: '',
       position: '',
       employmentStatus: 'ACTIVE',
       roleIds: [],
       chineseProfile: { ...emptyChineseProfile },
-      expatProfile: {},
+      expatProfile: { ...emptyExpatProfile },
     })
     setPhoneInput('')
     setProfileExpanded(false)
@@ -1084,11 +1845,14 @@ export default function MembersPage() {
       nationality: member.nationality ?? (nationalityOptions[0]?.key ?? ''),
       phones: member.phones?.length ? member.phones : [],
       joinDate: member.joinDate ? member.joinDate.slice(0, 10) : '',
+      birthDate: member.birthDate ? member.birthDate.slice(0, 10) : '',
+      terminationDate: member.terminationDate ? member.terminationDate.slice(0, 10) : '',
+      terminationReason: member.terminationReason ?? '',
       position: member.position ?? '',
       employmentStatus: member.employmentStatus ?? 'ACTIVE',
       roleIds: member.roles?.map((role) => role.id) ?? [],
       chineseProfile: buildChineseProfileForm(member.chineseProfile),
-      expatProfile: {},
+      expatProfile: buildExpatProfileForm(member.expatProfile),
     })
     setPhoneInput('')
     setProfileExpanded(true)
@@ -1136,6 +1900,15 @@ export default function MembersPage() {
       phoneInput.trim(),
     ].filter(Boolean)
     const joinDateValue = formState.joinDate || getTodayString()
+    const birthDateValue = formState.birthDate.trim()
+    let resolvedBirthDate = birthDateValue
+    if (!resolvedBirthDate && formState.nationality === 'china') {
+      resolvedBirthDate = parseBirthDateFromIdNumber(formState.chineseProfile.idNumber)
+    }
+    const isChinese = formState.nationality === 'china'
+    const isTerminated = formState.employmentStatus === 'TERMINATED'
+    const terminationDateValue = formState.terminationDate.trim()
+    const terminationReasonValue = formState.terminationReason.trim()
     const chineseProfilePayload = {
       frenchName: formState.chineseProfile.frenchName.trim() || null,
       idNumber: formState.chineseProfile.idNumber.trim() || null,
@@ -1152,6 +1925,26 @@ export default function MembersPage() {
       medicalHistory: formState.chineseProfile.medicalHistory.trim() || null,
       healthStatus: formState.chineseProfile.healthStatus.trim() || null,
     }
+    const expatProfilePayload = {
+      team: formState.expatProfile.team.trim() || null,
+      contractNumber: formState.expatProfile.contractNumber.trim() || null,
+      contractType: formState.expatProfile.contractType || null,
+      salaryCategory: formState.expatProfile.salaryCategory.trim() || null,
+      baseSalaryAmount: formState.expatProfile.baseSalaryAmount.trim() || null,
+      baseSalaryUnit: formState.expatProfile.baseSalaryUnit || null,
+      netMonthlyAmount: formState.expatProfile.netMonthlyAmount.trim() || null,
+      netMonthlyUnit: formState.expatProfile.netMonthlyUnit || null,
+      maritalStatus: formState.expatProfile.maritalStatus.trim() || null,
+      childrenCount: formState.expatProfile.childrenCount.trim() || null,
+      cnpsNumber: formState.expatProfile.cnpsNumber.trim() || null,
+      cnpsDeclarationCode: formState.expatProfile.cnpsDeclarationCode.trim() || null,
+      provenance: formState.expatProfile.provenance.trim() || null,
+      emergencyContactName: formState.expatProfile.emergencyContactName.trim() || null,
+      emergencyContactPhone: formState.expatProfile.emergencyContactPhone.trim() || null,
+    }
+    if (expatProfilePayload.netMonthlyAmount && !expatProfilePayload.netMonthlyUnit) {
+      expatProfilePayload.netMonthlyUnit = 'MONTH'
+    }
     const payload: {
       username: string
       password: string
@@ -1160,11 +1953,14 @@ export default function MembersPage() {
       nationality: string
       phones: string[]
       joinDate: string | undefined
+      birthDate: string
+      terminationDate: string | null
+      terminationReason: string | null
       position: string | null
       employmentStatus: EmploymentStatus
       roleIds?: number[]
       chineseProfile: typeof chineseProfilePayload
-      expatProfile: Record<string, never>
+      expatProfile: typeof expatProfilePayload
     } = {
       username: formState.username.trim(),
       password: formState.password,
@@ -1173,10 +1969,13 @@ export default function MembersPage() {
       nationality: formState.nationality,
       phones: phoneList,
       joinDate: joinDateValue,
+      birthDate: resolvedBirthDate,
+      terminationDate: isTerminated ? terminationDateValue : null,
+      terminationReason: isTerminated ? terminationReasonValue : null,
       position: formState.position.trim() || null,
       employmentStatus: formState.employmentStatus,
       chineseProfile: chineseProfilePayload,
-      expatProfile: formState.expatProfile,
+      expatProfile: expatProfilePayload,
     }
     if (canAssignRole) {
       payload.roleIds = formState.roleIds
@@ -1188,6 +1987,22 @@ export default function MembersPage() {
       }
       if (!payload.password) {
         throw new Error(t.errors.passwordRequired)
+      }
+      if (!payload.birthDate) {
+        throw new Error(t.errors.birthDateRequired)
+      }
+      if (isTerminated && !terminationDateValue) {
+        throw new Error(t.errors.terminationDateRequired)
+      }
+      if (isTerminated && !terminationReasonValue) {
+        throw new Error(t.errors.terminationReasonRequired)
+      }
+      if (
+        !isChinese &&
+        expatProfilePayload.contractType === 'CDD' &&
+        expatProfilePayload.baseSalaryUnit === 'HOUR'
+      ) {
+        throw new Error(t.errors.baseSalaryUnitInvalid)
       }
       const res = await fetch('/api/members', {
         method: 'POST',
@@ -1353,6 +2168,9 @@ export default function MembersPage() {
     (error: ImportError) => {
       let message = t.errors.importFailed
       switch (error.code) {
+        case 'missing_name':
+          message = t.errors.nameRequired
+          break
         case 'missing_username':
           message = t.errors.usernameRequired
           break
@@ -1361,6 +2179,9 @@ export default function MembersPage() {
           break
         case 'duplicate_username':
           message = t.errors.importDuplicateUsername
+          break
+        case 'duplicate_identity':
+          message = t.errors.importDuplicateIdentity
           break
         case 'username_exists':
           message = t.errors.importUsernameExists
@@ -1371,11 +2192,38 @@ export default function MembersPage() {
         case 'invalid_phone':
           message = t.errors.importInvalidPhone
           break
+        case 'invalid_contract_type':
+          message = t.errors.importInvalidContractType
+          break
+        case 'invalid_base_salary_unit':
+          message = t.errors.importInvalidBaseSalaryUnit
+          break
         case 'invalid_status':
           message = t.errors.importInvalidStatus
           break
         case 'invalid_join_date':
           message = t.errors.importInvalidJoinDate
+          break
+        case 'missing_birth_date':
+          message = t.errors.importMissingBirthDate
+          break
+        case 'invalid_birth_date':
+          message = t.errors.importInvalidBirthDate
+          break
+        case 'missing_termination_date':
+          message = t.errors.terminationDateRequired
+          break
+        case 'invalid_termination_date':
+          message = t.errors.terminationDateInvalid
+          break
+        case 'missing_termination_reason':
+          message = t.errors.terminationReasonRequired
+          break
+        case 'duplicate_contract_number':
+          message = t.errors.importDuplicateContractNumber
+          break
+        case 'contract_number_exists':
+          message = t.errors.importContractNumberExists
           break
         case 'role_not_found':
           message = t.errors.importRoleNotFound(error.value ?? '')
@@ -1440,16 +2288,31 @@ export default function MembersPage() {
       const errors: ImportError[] = []
       const prepared: Array<{
         row: number
-        username: string
-        password: string
+        username?: string
+        password?: string
         name?: string
         gender?: string | null
         nationality?: string | null
         phones: string[]
         joinDate?: string | null
+        birthDate?: string | null
+        terminationDate?: string | null
+        terminationReason?: string | null
         position?: string | null
         employmentStatus?: EmploymentStatus | null
         roleIds?: number[]
+        team?: string | null
+        contractNumber?: string | null
+        contractType?: string | null
+        salaryCategory?: string | null
+        baseSalary?: string | null
+        netMonthly?: string | null
+        maritalStatus?: string | null
+        childrenCount?: number | string | null
+        cnpsNumber?: string | null
+        cnpsDeclarationCode?: string | null
+        provenance?: string | null
+        emergencyContact?: string | null
         frenchName?: string | null
         idNumber?: string | null
         passportNumber?: string | null
@@ -1523,18 +2386,35 @@ export default function MembersPage() {
         if (isEmpty) return
         const rowNumber = index + 2
         let hasJoinDateValue = false
+        let hasBirthDateValue = false
+        let hasTerminationDateValue = false
         const record: {
           row: number
-          username: string
-          password: string
+          username?: string
+          password?: string
           name?: string
           gender?: string | null
           nationality?: string | null
           phones: string[]
           joinDate?: string | null
+          birthDate?: string | null
+          terminationDate?: string | null
+          terminationReason?: string | null
           position?: string | null
           employmentStatus?: EmploymentStatus | null
           roleIds?: number[]
+          team?: string | null
+          contractNumber?: string | null
+          contractType?: string | null
+          salaryCategory?: string | null
+          baseSalary?: string | null
+          netMonthly?: string | null
+          maritalStatus?: string | null
+          childrenCount?: number | string | null
+          cnpsNumber?: string | null
+          cnpsDeclarationCode?: string | null
+          provenance?: string | null
+          emergencyContact?: string | null
           frenchName?: string | null
           idNumber?: string | null
           passportNumber?: string | null
@@ -1551,8 +2431,6 @@ export default function MembersPage() {
           healthStatus?: string | null
         } = {
           row: rowNumber,
-          username: '',
-          password: '',
           phones: [],
         }
         headerKeys.forEach((key, columnIndex) => {
@@ -1563,10 +2441,20 @@ export default function MembersPage() {
               record.name = String(rawValue ?? '').trim()
               break
             case 'username':
-              record.username = String(rawValue ?? '').trim()
+              {
+                const text = String(rawValue ?? '').trim()
+                if (text) {
+                  record.username = text
+                }
+              }
               break
             case 'password':
-              record.password = String(rawValue ?? '').trim()
+              {
+                const text = String(rawValue ?? '').trim()
+                if (text) {
+                  record.password = text
+                }
+              }
               break
             case 'gender': {
               const text = String(rawValue ?? '').trim()
@@ -1595,6 +2483,12 @@ export default function MembersPage() {
               }
               record.joinDate = normalizeDate(rawValue)
               break
+            case 'birthDate':
+              if (String(rawValue ?? '').trim()) {
+                hasBirthDateValue = true
+              }
+              record.birthDate = normalizeDate(rawValue)
+              break
             case 'position':
               record.position = String(rawValue ?? '').trim()
               break
@@ -1605,6 +2499,15 @@ export default function MembersPage() {
               }
               break
             }
+            case 'terminationDate':
+              if (String(rawValue ?? '').trim()) {
+                hasTerminationDateValue = true
+              }
+              record.terminationDate = normalizeDate(rawValue)
+              break
+            case 'terminationReason':
+              record.terminationReason = String(rawValue ?? '').trim()
+              break
             case 'roles': {
               if (!canAssignRole) break
               const text = String(rawValue ?? '').trim()
@@ -1625,6 +2528,42 @@ export default function MembersPage() {
               }
               break
             }
+            case 'team':
+              record.team = String(rawValue ?? '').trim()
+              break
+            case 'contractNumber':
+              record.contractNumber = String(rawValue ?? '').trim()
+              break
+            case 'contractType':
+              record.contractType = String(rawValue ?? '').trim()
+              break
+            case 'salaryCategory':
+              record.salaryCategory = String(rawValue ?? '').trim()
+              break
+            case 'baseSalary':
+              record.baseSalary = String(rawValue ?? '').trim()
+              break
+            case 'netMonthly':
+              record.netMonthly = String(rawValue ?? '').trim()
+              break
+            case 'maritalStatus':
+              record.maritalStatus = String(rawValue ?? '').trim()
+              break
+            case 'childrenCount':
+              record.childrenCount = String(rawValue ?? '').trim()
+              break
+            case 'cnpsNumber':
+              record.cnpsNumber = String(rawValue ?? '').trim()
+              break
+            case 'cnpsDeclarationCode':
+              record.cnpsDeclarationCode = String(rawValue ?? '').trim()
+              break
+            case 'provenance':
+              record.provenance = String(rawValue ?? '').trim()
+              break
+            case 'emergencyContact':
+              record.emergencyContact = String(rawValue ?? '').trim()
+              break
             case 'frenchName':
               record.frenchName = String(rawValue ?? '').trim()
               break
@@ -1673,19 +2612,19 @@ export default function MembersPage() {
         })
 
         let hasRowError = false
-        const normalizedUsername = record.username.trim().toLowerCase()
-        if (!normalizedUsername) {
-          errors.push({ row: rowNumber, code: 'missing_username' })
+        if (!record.name) {
+          errors.push({ row: rowNumber, code: 'missing_name' })
           hasRowError = true
-        } else if (seenUsernames.has(normalizedUsername)) {
-          errors.push({ row: rowNumber, code: 'duplicate_username' })
-          hasRowError = true
-        } else {
-          seenUsernames.add(normalizedUsername)
         }
-        if (!record.password) {
-          errors.push({ row: rowNumber, code: 'missing_password' })
-          hasRowError = true
+        const normalizedUsername = record.username ? record.username.trim().toLowerCase() : ''
+        record.username = normalizedUsername || undefined
+        if (normalizedUsername) {
+          if (seenUsernames.has(normalizedUsername)) {
+            errors.push({ row: rowNumber, code: 'duplicate_username' })
+            hasRowError = true
+          } else {
+            seenUsernames.add(normalizedUsername)
+          }
         }
         if (record.gender && !['男', '女'].includes(record.gender)) {
           errors.push({ row: rowNumber, code: 'invalid_gender', value: record.gender })
@@ -1703,6 +2642,34 @@ export default function MembersPage() {
         if (hasJoinDateValue && !record.joinDate) {
           errors.push({ row: rowNumber, code: 'invalid_join_date' })
           hasRowError = true
+        }
+        if (hasBirthDateValue && !record.birthDate) {
+          errors.push({ row: rowNumber, code: 'invalid_birth_date' })
+          hasRowError = true
+        }
+        if (hasTerminationDateValue && !record.terminationDate) {
+          errors.push({ row: rowNumber, code: 'invalid_termination_date' })
+          hasRowError = true
+        }
+        if (!record.birthDate && !hasBirthDateValue && record.nationality === 'china') {
+          const derivedBirthDate = parseBirthDateFromIdNumber(record.idNumber ?? '')
+          if (derivedBirthDate) {
+            record.birthDate = derivedBirthDate
+          }
+        }
+        if (!record.birthDate && !hasBirthDateValue) {
+          errors.push({ row: rowNumber, code: 'missing_birth_date' })
+          hasRowError = true
+        }
+        if (record.employmentStatus === 'TERMINATED') {
+          if (!record.terminationDate) {
+            errors.push({ row: rowNumber, code: 'missing_termination_date' })
+            hasRowError = true
+          }
+          if (!record.terminationReason) {
+            errors.push({ row: rowNumber, code: 'missing_termination_reason' })
+            hasRowError = true
+          }
         }
         if (!hasRowError) {
           prepared.push(record)
@@ -1811,6 +2778,13 @@ export default function MembersPage() {
     }
 
     const list = membersData.filter((member) => {
+      const chineseProfile = member.chineseProfile ?? null
+      const expatProfile = member.expatProfile ?? null
+      const emergencyContactName =
+        chineseProfile?.emergencyContactName ?? expatProfile?.emergencyContactName
+      const emergencyContactPhone =
+        chineseProfile?.emergencyContactPhone ?? expatProfile?.emergencyContactPhone
+
       if (!matchesValueFilter(member.name, nameFilters)) return false
       if (!matchesValueFilter(member.username, usernameFilters)) return false
       if (!matchesValueFilter(member.gender, genderFilters)) return false
@@ -1827,6 +2801,59 @@ export default function MembersPage() {
           return false
         }
       }
+      if (!matchesValueFilter(expatProfile?.team, teamFilters)) return false
+      if (!matchesValueFilter(expatProfile?.contractNumber, contractNumberFilters)) return false
+      if (!matchesValueFilter(expatProfile?.contractType, contractTypeFilters)) return false
+      if (!matchesValueFilter(expatProfile?.salaryCategory, salaryCategoryFilters)) return false
+      if (
+        !matchesValueFilter(
+          toSalaryFilterValue(expatProfile?.baseSalaryAmount, expatProfile?.baseSalaryUnit),
+          baseSalaryFilters,
+        )
+      )
+        return false
+      if (
+        !matchesValueFilter(
+          toSalaryFilterValue(expatProfile?.netMonthlyAmount, expatProfile?.netMonthlyUnit, 'MONTH'),
+          netMonthlyFilters,
+        )
+      )
+        return false
+      if (!matchesValueFilter(expatProfile?.maritalStatus, maritalStatusFilters)) return false
+      if (!matchesValueFilter(toNumberFilterValue(expatProfile?.childrenCount), childrenCountFilters))
+        return false
+      if (!matchesValueFilter(expatProfile?.cnpsNumber, cnpsNumberFilters)) return false
+      if (!matchesValueFilter(expatProfile?.cnpsDeclarationCode, cnpsDeclarationCodeFilters))
+        return false
+      if (!matchesValueFilter(expatProfile?.provenance, provenanceFilters)) return false
+      if (!matchesValueFilter(chineseProfile?.frenchName, frenchNameFilters)) return false
+      if (!matchesValueFilter(chineseProfile?.idNumber, idNumberFilters)) return false
+      if (!matchesValueFilter(chineseProfile?.passportNumber, passportNumberFilters)) return false
+      if (!matchesValueFilter(chineseProfile?.educationAndMajor, educationAndMajorFilters))
+        return false
+      if (!matchesListFilter(chineseProfile?.certifications ?? [], certificationsFilters)) return false
+      if (!matchesValueFilter(chineseProfile?.domesticMobile, domesticMobileFilters)) return false
+      if (!matchesValueFilter(emergencyContactName, emergencyContactNameFilters)) return false
+      if (!matchesValueFilter(emergencyContactPhone, emergencyContactPhoneFilters)) return false
+      if (
+        !matchesValueFilter(
+          toNumberFilterValue(chineseProfile?.redBookValidYears),
+          redBookValidYearsFilters,
+        )
+      )
+        return false
+      if (
+        !matchesValueFilter(
+          toNumberFilterValue(chineseProfile?.cumulativeAbroadYears),
+          cumulativeAbroadYearsFilters,
+        )
+      )
+        return false
+      if (!matchesValueFilter(chineseProfile?.birthplace, birthplaceFilters)) return false
+      if (!matchesValueFilter(chineseProfile?.residenceInChina, residenceInChinaFilters))
+        return false
+      if (!matchesValueFilter(chineseProfile?.medicalHistory, medicalHistoryFilters)) return false
+      if (!matchesValueFilter(chineseProfile?.healthStatus, healthStatusFilters)) return false
       if (!matchesMonthFilter(member.createdAt, createdAtFilters)) return false
       if (!matchesMonthFilter(member.updatedAt, updatedAtFilters)) return false
       return true
@@ -1860,10 +2887,19 @@ export default function MembersPage() {
       return Number.isNaN(ts) ? null : ts
     }
     const getTextValue = (value?: string | null) => (value ?? '').trim()
+    const getSalaryValue = (value?: string | null) => {
+      if (!value) return null
+      const normalized = value.replace(/[^\d.-]/g, '')
+      if (!normalized) return null
+      const parsed = Number.parseFloat(normalized)
+      return Number.isFinite(parsed) ? parsed : null
+    }
 
     const compareMembers = (left: Member, right: Member) => {
       const leftProfile = left.nationality === 'china' ? left.chineseProfile : null
       const rightProfile = right.nationality === 'china' ? right.chineseProfile : null
+      const leftExpatProfile = left.nationality === 'china' ? null : left.expatProfile
+      const rightExpatProfile = right.nationality === 'china' ? null : right.expatProfile
       for (const sort of sortStack) {
         let result = 0
         switch (sort.field) {
@@ -1893,6 +2929,9 @@ export default function MembersPage() {
           case 'joinDate':
             result = compareNullable(getDateValue(left.joinDate), getDateValue(right.joinDate), (a, b) => a - b)
             break
+          case 'birthDate':
+            result = compareNullable(getDateValue(left.birthDate), getDateValue(right.birthDate), (a, b) => a - b)
+            break
           case 'position':
             result = compareNullable(getTextValue(left.position), getTextValue(right.position), (a, b) => collator.compare(a, b))
             break
@@ -1903,10 +2942,101 @@ export default function MembersPage() {
               (a, b) => a - b,
             )
             break
+          case 'terminationDate':
+            result = compareNullable(
+              getDateValue(left.terminationDate),
+              getDateValue(right.terminationDate),
+              (a, b) => a - b,
+            )
+            break
+          case 'terminationReason':
+            result = compareNullable(
+              getTextValue(left.terminationReason),
+              getTextValue(right.terminationReason),
+              (a, b) => collator.compare(a, b),
+            )
+            break
           case 'roles':
             result = compareNullable(
               left.roles.map(resolveRoleName).join(' / '),
               right.roles.map(resolveRoleName).join(' / '),
+              (a, b) => collator.compare(a, b),
+            )
+            break
+          case 'team':
+            result = compareNullable(
+              getTextValue(leftExpatProfile?.team),
+              getTextValue(rightExpatProfile?.team),
+              (a, b) => collator.compare(a, b),
+            )
+            break
+          case 'contractNumber':
+            result = compareNullable(
+              getTextValue(leftExpatProfile?.contractNumber),
+              getTextValue(rightExpatProfile?.contractNumber),
+              (a, b) => collator.compare(a, b),
+            )
+            break
+          case 'contractType':
+            result = compareNullable(
+              getTextValue(leftExpatProfile?.contractType),
+              getTextValue(rightExpatProfile?.contractType),
+              (a, b) => collator.compare(a, b),
+            )
+            break
+          case 'salaryCategory':
+            result = compareNullable(
+              getTextValue(leftExpatProfile?.salaryCategory),
+              getTextValue(rightExpatProfile?.salaryCategory),
+              (a, b) => collator.compare(a, b),
+            )
+            break
+          case 'baseSalary':
+            result = compareNullable(
+              getSalaryValue(leftExpatProfile?.baseSalaryAmount),
+              getSalaryValue(rightExpatProfile?.baseSalaryAmount),
+              (a, b) => a - b,
+            )
+            break
+          case 'netMonthly':
+            result = compareNullable(
+              getSalaryValue(leftExpatProfile?.netMonthlyAmount),
+              getSalaryValue(rightExpatProfile?.netMonthlyAmount),
+              (a, b) => a - b,
+            )
+            break
+          case 'maritalStatus':
+            result = compareNullable(
+              getTextValue(leftExpatProfile?.maritalStatus),
+              getTextValue(rightExpatProfile?.maritalStatus),
+              (a, b) => collator.compare(a, b),
+            )
+            break
+          case 'childrenCount':
+            result = compareNullable(
+              leftExpatProfile?.childrenCount ?? null,
+              rightExpatProfile?.childrenCount ?? null,
+              (a, b) => a - b,
+            )
+            break
+          case 'cnpsNumber':
+            result = compareNullable(
+              getTextValue(leftExpatProfile?.cnpsNumber),
+              getTextValue(rightExpatProfile?.cnpsNumber),
+              (a, b) => collator.compare(a, b),
+            )
+            break
+          case 'cnpsDeclarationCode':
+            result = compareNullable(
+              getTextValue(leftExpatProfile?.cnpsDeclarationCode),
+              getTextValue(rightExpatProfile?.cnpsDeclarationCode),
+              (a, b) => collator.compare(a, b),
+            )
+            break
+          case 'provenance':
+            result = compareNullable(
+              getTextValue(leftExpatProfile?.provenance),
+              getTextValue(rightExpatProfile?.provenance),
               (a, b) => collator.compare(a, b),
             )
             break
@@ -1954,15 +3084,15 @@ export default function MembersPage() {
             break
           case 'emergencyContactName':
             result = compareNullable(
-              getTextValue(leftProfile?.emergencyContactName),
-              getTextValue(rightProfile?.emergencyContactName),
+              getTextValue(leftProfile?.emergencyContactName ?? leftExpatProfile?.emergencyContactName),
+              getTextValue(rightProfile?.emergencyContactName ?? rightExpatProfile?.emergencyContactName),
               (a, b) => collator.compare(a, b),
             )
             break
           case 'emergencyContactPhone':
             result = compareNullable(
-              getTextValue(leftProfile?.emergencyContactPhone),
-              getTextValue(rightProfile?.emergencyContactPhone),
+              getTextValue(leftProfile?.emergencyContactPhone ?? leftExpatProfile?.emergencyContactPhone),
+              getTextValue(rightProfile?.emergencyContactPhone ?? rightExpatProfile?.emergencyContactPhone),
               (a, b) => collator.compare(a, b),
             )
             break
@@ -2041,6 +3171,31 @@ export default function MembersPage() {
     positionFilters,
     statusFilters,
     roleFilters,
+    teamFilters,
+    contractNumberFilters,
+    contractTypeFilters,
+    salaryCategoryFilters,
+    baseSalaryFilters,
+    netMonthlyFilters,
+    maritalStatusFilters,
+    childrenCountFilters,
+    cnpsNumberFilters,
+    cnpsDeclarationCodeFilters,
+    provenanceFilters,
+    frenchNameFilters,
+    idNumberFilters,
+    passportNumberFilters,
+    educationAndMajorFilters,
+    certificationsFilters,
+    domesticMobileFilters,
+    emergencyContactNameFilters,
+    emergencyContactPhoneFilters,
+    redBookValidYearsFilters,
+    cumulativeAbroadYearsFilters,
+    birthplaceFilters,
+    residenceInChinaFilters,
+    medicalHistoryFilters,
+    healthStatusFilters,
     createdAtFilters,
     updatedAtFilters,
     canAssignRole,
@@ -2075,6 +3230,31 @@ export default function MembersPage() {
     positionFilters,
     statusFilters,
     roleFilters,
+    teamFilters,
+    contractNumberFilters,
+    contractTypeFilters,
+    salaryCategoryFilters,
+    baseSalaryFilters,
+    netMonthlyFilters,
+    maritalStatusFilters,
+    childrenCountFilters,
+    cnpsNumberFilters,
+    cnpsDeclarationCodeFilters,
+    provenanceFilters,
+    frenchNameFilters,
+    idNumberFilters,
+    passportNumberFilters,
+    educationAndMajorFilters,
+    certificationsFilters,
+    domesticMobileFilters,
+    emergencyContactNameFilters,
+    emergencyContactPhoneFilters,
+    redBookValidYearsFilters,
+    cumulativeAbroadYearsFilters,
+    birthplaceFilters,
+    residenceInChinaFilters,
+    medicalHistoryFilters,
+    healthStatusFilters,
     createdAtFilters,
     updatedAtFilters,
   ])
@@ -2105,6 +3285,7 @@ export default function MembersPage() {
       const dataRows = filteredMembers.map((member, index) =>
         selectedColumns.map((key) => {
           const chineseProfile = member.nationality === 'china' ? member.chineseProfile : null
+          const expatProfile = member.nationality === 'china' ? null : member.expatProfile
           switch (key) {
             case 'sequence':
               return index + 1
@@ -2120,14 +3301,44 @@ export default function MembersPage() {
               return member.phones?.length ? member.phones.join(' / ') : t.labels.empty
             case 'joinDate':
               return member.joinDate ? new Date(member.joinDate).toLocaleDateString(locale) : t.labels.empty
+            case 'birthDate':
+              return member.birthDate ? new Date(member.birthDate).toLocaleDateString(locale) : t.labels.empty
             case 'position':
               return member.position || t.labels.empty
             case 'employmentStatus':
               return statusLabels[member.employmentStatus] ?? member.employmentStatus
+            case 'terminationDate':
+              return member.terminationDate
+                ? new Date(member.terminationDate).toLocaleDateString(locale)
+                : t.labels.empty
+            case 'terminationReason':
+              return member.terminationReason?.length ? member.terminationReason : t.labels.empty
             case 'roles':
               return member.roles.length
                 ? member.roles.map(resolveRoleName).filter(Boolean).join(' / ')
                 : t.labels.empty
+            case 'team':
+              return formatProfileText(expatProfile?.team)
+            case 'contractNumber':
+              return formatProfileText(expatProfile?.contractNumber)
+            case 'contractType':
+              return formatProfileText(expatProfile?.contractType)
+            case 'salaryCategory':
+              return formatProfileText(expatProfile?.salaryCategory)
+            case 'baseSalary':
+              return formatSalary(expatProfile?.baseSalaryAmount, expatProfile?.baseSalaryUnit)
+            case 'netMonthly':
+              return formatSalary(expatProfile?.netMonthlyAmount, expatProfile?.netMonthlyUnit, 'MONTH')
+            case 'maritalStatus':
+              return formatProfileText(expatProfile?.maritalStatus)
+            case 'childrenCount':
+              return formatProfileNumber(expatProfile?.childrenCount ?? null)
+            case 'cnpsNumber':
+              return formatProfileText(expatProfile?.cnpsNumber)
+            case 'cnpsDeclarationCode':
+              return formatProfileText(expatProfile?.cnpsDeclarationCode)
+            case 'provenance':
+              return formatProfileText(expatProfile?.provenance)
             case 'frenchName':
               return formatProfileText(chineseProfile?.frenchName)
             case 'idNumber':
@@ -2141,9 +3352,13 @@ export default function MembersPage() {
             case 'domesticMobile':
               return formatProfileText(chineseProfile?.domesticMobile)
             case 'emergencyContactName':
-              return formatProfileText(chineseProfile?.emergencyContactName)
+              return formatProfileText(
+                chineseProfile?.emergencyContactName ?? expatProfile?.emergencyContactName,
+              )
             case 'emergencyContactPhone':
-              return formatProfileText(chineseProfile?.emergencyContactPhone)
+              return formatProfileText(
+                chineseProfile?.emergencyContactPhone ?? expatProfile?.emergencyContactPhone,
+              )
             case 'redBookValidYears':
               return formatProfileNumber(chineseProfile?.redBookValidYears)
             case 'cumulativeAbroadYears':
@@ -2490,6 +3705,181 @@ export default function MembersPage() {
                             />
                           ) : null}
                           <MultiSelectFilter
+                            label={t.table.team}
+                            options={teamFilterOptions}
+                            selected={teamFilters}
+                            onChange={setTeamFilters}
+                            {...filterControlProps}
+                          />
+                          <MultiSelectFilter
+                            label={t.table.contractNumber}
+                            options={contractNumberFilterOptions}
+                            selected={contractNumberFilters}
+                            onChange={setContractNumberFilters}
+                            {...filterControlProps}
+                          />
+                          <MultiSelectFilter
+                            label={t.table.contractType}
+                            options={contractTypeFilterOptions}
+                            selected={contractTypeFilters}
+                            onChange={setContractTypeFilters}
+                            {...filterControlProps}
+                          />
+                          <MultiSelectFilter
+                            label={t.table.salaryCategory}
+                            options={salaryCategoryFilterOptions}
+                            selected={salaryCategoryFilters}
+                            onChange={setSalaryCategoryFilters}
+                            {...filterControlProps}
+                          />
+                          <MultiSelectFilter
+                            label={t.table.baseSalary}
+                            options={baseSalaryFilterOptions}
+                            selected={baseSalaryFilters}
+                            onChange={setBaseSalaryFilters}
+                            {...filterControlProps}
+                          />
+                          <MultiSelectFilter
+                            label={t.table.netMonthly}
+                            options={netMonthlyFilterOptions}
+                            selected={netMonthlyFilters}
+                            onChange={setNetMonthlyFilters}
+                            {...filterControlProps}
+                          />
+                          <MultiSelectFilter
+                            label={t.table.maritalStatus}
+                            options={maritalStatusFilterOptions}
+                            selected={maritalStatusFilters}
+                            onChange={setMaritalStatusFilters}
+                            {...filterControlProps}
+                          />
+                          <MultiSelectFilter
+                            label={t.table.childrenCount}
+                            options={childrenCountFilterOptions}
+                            selected={childrenCountFilters}
+                            onChange={setChildrenCountFilters}
+                            {...filterControlProps}
+                          />
+                          <MultiSelectFilter
+                            label={t.table.cnpsNumber}
+                            options={cnpsNumberFilterOptions}
+                            selected={cnpsNumberFilters}
+                            onChange={setCnpsNumberFilters}
+                            {...filterControlProps}
+                          />
+                          <MultiSelectFilter
+                            label={t.table.cnpsDeclarationCode}
+                            options={cnpsDeclarationCodeFilterOptions}
+                            selected={cnpsDeclarationCodeFilters}
+                            onChange={setCnpsDeclarationCodeFilters}
+                            {...filterControlProps}
+                          />
+                          <MultiSelectFilter
+                            label={t.table.provenance}
+                            options={provenanceFilterOptions}
+                            selected={provenanceFilters}
+                            onChange={setProvenanceFilters}
+                            {...filterControlProps}
+                          />
+                          <MultiSelectFilter
+                            label={t.table.frenchName}
+                            options={frenchNameFilterOptions}
+                            selected={frenchNameFilters}
+                            onChange={setFrenchNameFilters}
+                            {...filterControlProps}
+                          />
+                          <MultiSelectFilter
+                            label={t.table.idNumber}
+                            options={idNumberFilterOptions}
+                            selected={idNumberFilters}
+                            onChange={setIdNumberFilters}
+                            {...filterControlProps}
+                          />
+                          <MultiSelectFilter
+                            label={t.table.passportNumber}
+                            options={passportNumberFilterOptions}
+                            selected={passportNumberFilters}
+                            onChange={setPassportNumberFilters}
+                            {...filterControlProps}
+                          />
+                          <MultiSelectFilter
+                            label={t.table.educationAndMajor}
+                            options={educationAndMajorFilterOptions}
+                            selected={educationAndMajorFilters}
+                            onChange={setEducationAndMajorFilters}
+                            {...filterControlProps}
+                          />
+                          <MultiSelectFilter
+                            label={t.table.certifications}
+                            options={certificationsFilterOptions}
+                            selected={certificationsFilters}
+                            onChange={setCertificationsFilters}
+                            {...filterControlProps}
+                          />
+                          <MultiSelectFilter
+                            label={t.table.domesticMobile}
+                            options={domesticMobileFilterOptions}
+                            selected={domesticMobileFilters}
+                            onChange={setDomesticMobileFilters}
+                            {...filterControlProps}
+                          />
+                          <MultiSelectFilter
+                            label={t.table.emergencyContactName}
+                            options={emergencyContactNameFilterOptions}
+                            selected={emergencyContactNameFilters}
+                            onChange={setEmergencyContactNameFilters}
+                            {...filterControlProps}
+                          />
+                          <MultiSelectFilter
+                            label={t.table.emergencyContactPhone}
+                            options={emergencyContactPhoneFilterOptions}
+                            selected={emergencyContactPhoneFilters}
+                            onChange={setEmergencyContactPhoneFilters}
+                            {...filterControlProps}
+                          />
+                          <MultiSelectFilter
+                            label={t.table.redBookValidYears}
+                            options={redBookValidYearsFilterOptions}
+                            selected={redBookValidYearsFilters}
+                            onChange={setRedBookValidYearsFilters}
+                            {...filterControlProps}
+                          />
+                          <MultiSelectFilter
+                            label={t.table.cumulativeAbroadYears}
+                            options={cumulativeAbroadYearsFilterOptions}
+                            selected={cumulativeAbroadYearsFilters}
+                            onChange={setCumulativeAbroadYearsFilters}
+                            {...filterControlProps}
+                          />
+                          <MultiSelectFilter
+                            label={t.table.birthplace}
+                            options={birthplaceFilterOptions}
+                            selected={birthplaceFilters}
+                            onChange={setBirthplaceFilters}
+                            {...filterControlProps}
+                          />
+                          <MultiSelectFilter
+                            label={t.table.residenceInChina}
+                            options={residenceInChinaFilterOptions}
+                            selected={residenceInChinaFilters}
+                            onChange={setResidenceInChinaFilters}
+                            {...filterControlProps}
+                          />
+                          <MultiSelectFilter
+                            label={t.table.medicalHistory}
+                            options={medicalHistoryFilterOptions}
+                            selected={medicalHistoryFilters}
+                            onChange={setMedicalHistoryFilters}
+                            {...filterControlProps}
+                          />
+                          <MultiSelectFilter
+                            label={t.table.healthStatus}
+                            options={healthStatusFilterOptions}
+                            selected={healthStatusFilters}
+                            onChange={setHealthStatusFilters}
+                            {...filterControlProps}
+                          />
+                          <MultiSelectFilter
                             label={t.table.createdAt}
                             options={createdAtFilterOptions}
                             selected={createdAtFilters}
@@ -2575,6 +3965,14 @@ export default function MembersPage() {
                                     {t.table.joinDate} {sortIndicator('joinDate')}
                                   </th>
                                 ) : null}
+                                {isVisible('birthDate') ? (
+                                  <th
+                                    className="px-3 py-3 whitespace-nowrap cursor-pointer select-none"
+                                    onClick={() => handleSort('birthDate')}
+                                  >
+                                    {t.table.birthDate} {sortIndicator('birthDate')}
+                                  </th>
+                                ) : null}
                                 {isVisible('position') ? (
                                   <th
                                     className="px-3 py-3 whitespace-nowrap cursor-pointer select-none"
@@ -2591,12 +3989,116 @@ export default function MembersPage() {
                                     {t.table.employmentStatus} {sortIndicator('employmentStatus')}
                                   </th>
                                 ) : null}
+                                {isVisible('terminationDate') ? (
+                                  <th
+                                    className="px-3 py-3 whitespace-nowrap cursor-pointer select-none"
+                                    onClick={() => handleSort('terminationDate')}
+                                  >
+                                    {t.table.terminationDate} {sortIndicator('terminationDate')}
+                                  </th>
+                                ) : null}
+                                {isVisible('terminationReason') ? (
+                                  <th
+                                    className="px-3 py-3 whitespace-nowrap cursor-pointer select-none"
+                                    onClick={() => handleSort('terminationReason')}
+                                  >
+                                    {t.table.terminationReason} {sortIndicator('terminationReason')}
+                                  </th>
+                                ) : null}
                                 {isVisible('roles') ? (
                                   <th
                                     className="min-w-[150px] px-3 py-3 whitespace-nowrap cursor-pointer select-none"
                                     onClick={() => handleSort('roles')}
                                   >
                                     {t.table.roles} {sortIndicator('roles')}
+                                  </th>
+                                ) : null}
+                                {isVisible('team') ? (
+                                  <th
+                                    className="px-3 py-3 whitespace-nowrap cursor-pointer select-none"
+                                    onClick={() => handleSort('team')}
+                                  >
+                                    {t.table.team} {sortIndicator('team')}
+                                  </th>
+                                ) : null}
+                                {isVisible('contractNumber') ? (
+                                  <th
+                                    className="px-3 py-3 whitespace-nowrap cursor-pointer select-none"
+                                    onClick={() => handleSort('contractNumber')}
+                                  >
+                                    {t.table.contractNumber} {sortIndicator('contractNumber')}
+                                  </th>
+                                ) : null}
+                                {isVisible('contractType') ? (
+                                  <th
+                                    className="px-3 py-3 whitespace-nowrap cursor-pointer select-none"
+                                    onClick={() => handleSort('contractType')}
+                                  >
+                                    {t.table.contractType} {sortIndicator('contractType')}
+                                  </th>
+                                ) : null}
+                                {isVisible('salaryCategory') ? (
+                                  <th
+                                    className="px-3 py-3 whitespace-nowrap cursor-pointer select-none"
+                                    onClick={() => handleSort('salaryCategory')}
+                                  >
+                                    {t.table.salaryCategory} {sortIndicator('salaryCategory')}
+                                  </th>
+                                ) : null}
+                                {isVisible('baseSalary') ? (
+                                  <th
+                                    className="px-3 py-3 whitespace-nowrap cursor-pointer select-none"
+                                    onClick={() => handleSort('baseSalary')}
+                                  >
+                                    {t.table.baseSalary} {sortIndicator('baseSalary')}
+                                  </th>
+                                ) : null}
+                                {isVisible('netMonthly') ? (
+                                  <th
+                                    className="px-3 py-3 whitespace-nowrap cursor-pointer select-none"
+                                    onClick={() => handleSort('netMonthly')}
+                                  >
+                                    {t.table.netMonthly} {sortIndicator('netMonthly')}
+                                  </th>
+                                ) : null}
+                                {isVisible('maritalStatus') ? (
+                                  <th
+                                    className="px-3 py-3 whitespace-nowrap cursor-pointer select-none"
+                                    onClick={() => handleSort('maritalStatus')}
+                                  >
+                                    {t.table.maritalStatus} {sortIndicator('maritalStatus')}
+                                  </th>
+                                ) : null}
+                                {isVisible('childrenCount') ? (
+                                  <th
+                                    className="px-3 py-3 whitespace-nowrap cursor-pointer select-none"
+                                    onClick={() => handleSort('childrenCount')}
+                                  >
+                                    {t.table.childrenCount} {sortIndicator('childrenCount')}
+                                  </th>
+                                ) : null}
+                                {isVisible('cnpsNumber') ? (
+                                  <th
+                                    className="px-3 py-3 whitespace-nowrap cursor-pointer select-none"
+                                    onClick={() => handleSort('cnpsNumber')}
+                                  >
+                                    {t.table.cnpsNumber} {sortIndicator('cnpsNumber')}
+                                  </th>
+                                ) : null}
+                                {isVisible('cnpsDeclarationCode') ? (
+                                  <th
+                                    className="px-3 py-3 whitespace-nowrap cursor-pointer select-none"
+                                    onClick={() => handleSort('cnpsDeclarationCode')}
+                                  >
+                                    {t.table.cnpsDeclarationCode} {sortIndicator('cnpsDeclarationCode')}
+                                  </th>
+                                ) : null}
+                                {isVisible('provenance') ? (
+                                  <th
+                                    className="px-3 py-3 whitespace-nowrap cursor-pointer select-none"
+                                    onClick={() => handleSort('provenance')}
+                                  >
+                                    {t.table.provenance} {sortIndicator('provenance')}
                                   </th>
                                 ) : null}
                                 {isVisible('frenchName') ? (
@@ -2737,6 +4239,8 @@ export default function MembersPage() {
                                 const displayIndex = (page - 1) * pageSize + index + 1
                                 const chineseProfile =
                                   member.nationality === 'china' ? member.chineseProfile : null
+                                const expatProfile =
+                                  member.nationality === 'china' ? null : member.expatProfile
                                 return (
                                   <tr key={member.id} className="hover:bg-slate-50 align-middle">
                                     {isVisible('sequence') ? (
@@ -2788,6 +4292,13 @@ export default function MembersPage() {
                                           : t.labels.empty}
                                       </td>
                                     ) : null}
+                                    {isVisible('birthDate') ? (
+                                      <td className="whitespace-nowrap px-4 py-3 text-slate-700 align-middle">
+                                        {member.birthDate
+                                          ? new Date(member.birthDate).toLocaleDateString(locale)
+                                          : t.labels.empty}
+                                      </td>
+                                    ) : null}
                                     {isVisible('position') ? (
                                       <td className="whitespace-nowrap px-4 py-3 text-slate-700 align-middle">
                                         {member.position || t.labels.empty}
@@ -2798,6 +4309,18 @@ export default function MembersPage() {
                                         <span className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-800 ring-1 ring-slate-200">
                                           {statusLabels[member.employmentStatus] ?? member.employmentStatus}
                                         </span>
+                                      </td>
+                                    ) : null}
+                                    {isVisible('terminationDate') ? (
+                                      <td className="whitespace-nowrap px-4 py-3 text-slate-700 align-middle">
+                                        {member.terminationDate
+                                          ? new Date(member.terminationDate).toLocaleDateString(locale)
+                                          : t.labels.empty}
+                                      </td>
+                                    ) : null}
+                                    {isVisible('terminationReason') ? (
+                                      <td className="px-4 py-3 text-slate-700 align-middle">
+                                        {member.terminationReason?.length ? member.terminationReason : t.labels.empty}
                                       </td>
                                     ) : null}
                                     {isVisible('roles') ? (
@@ -2817,6 +4340,68 @@ export default function MembersPage() {
                                             )
                                           })}
                                         </div>
+                                      </td>
+                                    ) : null}
+                                    {isVisible('team') ? (
+                                      <td className="whitespace-nowrap px-4 py-3 text-slate-700 align-middle">
+                                        {formatProfileText(expatProfile?.team)}
+                                      </td>
+                                    ) : null}
+                                    {isVisible('contractNumber') ? (
+                                      <td className="whitespace-nowrap px-4 py-3 text-slate-700 align-middle">
+                                        {formatProfileText(expatProfile?.contractNumber)}
+                                      </td>
+                                    ) : null}
+                                    {isVisible('contractType') ? (
+                                      <td className="whitespace-nowrap px-4 py-3 text-slate-700 align-middle">
+                                        {formatProfileText(expatProfile?.contractType)}
+                                      </td>
+                                    ) : null}
+                                    {isVisible('salaryCategory') ? (
+                                      <td className="whitespace-nowrap px-4 py-3 text-slate-700 align-middle">
+                                        {formatProfileText(expatProfile?.salaryCategory)}
+                                      </td>
+                                    ) : null}
+                                    {isVisible('baseSalary') ? (
+                                      <td className="whitespace-nowrap px-4 py-3 text-slate-700 align-middle">
+                                        {formatSalary(
+                                          expatProfile?.baseSalaryAmount,
+                                          expatProfile?.baseSalaryUnit,
+                                        )}
+                                      </td>
+                                    ) : null}
+                                    {isVisible('netMonthly') ? (
+                                      <td className="whitespace-nowrap px-4 py-3 text-slate-700 align-middle">
+                                        {formatSalary(
+                                          expatProfile?.netMonthlyAmount,
+                                          expatProfile?.netMonthlyUnit,
+                                          'MONTH',
+                                        )}
+                                      </td>
+                                    ) : null}
+                                    {isVisible('maritalStatus') ? (
+                                      <td className="whitespace-nowrap px-4 py-3 text-slate-700 align-middle">
+                                        {formatProfileText(expatProfile?.maritalStatus)}
+                                      </td>
+                                    ) : null}
+                                    {isVisible('childrenCount') ? (
+                                      <td className="whitespace-nowrap px-4 py-3 text-slate-700 align-middle">
+                                        {formatProfileNumber(expatProfile?.childrenCount ?? null)}
+                                      </td>
+                                    ) : null}
+                                    {isVisible('cnpsNumber') ? (
+                                      <td className="whitespace-nowrap px-4 py-3 text-slate-700 align-middle">
+                                        {formatProfileText(expatProfile?.cnpsNumber)}
+                                      </td>
+                                    ) : null}
+                                    {isVisible('cnpsDeclarationCode') ? (
+                                      <td className="whitespace-nowrap px-4 py-3 text-slate-700 align-middle">
+                                        {formatProfileText(expatProfile?.cnpsDeclarationCode)}
+                                      </td>
+                                    ) : null}
+                                    {isVisible('provenance') ? (
+                                      <td className="whitespace-nowrap px-4 py-3 text-slate-700 align-middle">
+                                        {formatProfileText(expatProfile?.provenance)}
                                       </td>
                                     ) : null}
                                     {isVisible('frenchName') ? (
@@ -2851,12 +4436,18 @@ export default function MembersPage() {
                                     ) : null}
                                     {isVisible('emergencyContactName') ? (
                                       <td className="px-4 py-3 text-slate-700 align-middle">
-                                        {formatProfileText(chineseProfile?.emergencyContactName)}
+                                        {formatProfileText(
+                                          chineseProfile?.emergencyContactName ??
+                                            expatProfile?.emergencyContactName,
+                                        )}
                                       </td>
                                     ) : null}
                                     {isVisible('emergencyContactPhone') ? (
                                       <td className="whitespace-nowrap px-4 py-3 text-slate-700 align-middle">
-                                        {formatProfileText(chineseProfile?.emergencyContactPhone)}
+                                        {formatProfileText(
+                                          chineseProfile?.emergencyContactPhone ??
+                                            expatProfile?.emergencyContactPhone,
+                                        )}
                                       </td>
                                     ) : null}
                                     {isVisible('redBookValidYears') ? (
@@ -3522,7 +5113,7 @@ export default function MembersPage() {
                 </label>
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-4 sm:grid-cols-3">
                 <label className="space-y-1 text-sm text-slate-700">
                   <span className="block font-semibold">{t.form.joinDate}</span>
                   <input
@@ -3534,11 +5125,30 @@ export default function MembersPage() {
                   />
                 </label>
                 <label className="space-y-1 text-sm text-slate-700">
+                  <span className="block font-semibold">{t.form.birthDate}</span>
+                  <input
+                    type="date"
+                    value={formState.birthDate}
+                    onChange={(event) => setFormState((prev) => ({ ...prev, birthDate: event.target.value }))}
+                    disabled={formMode === 'view'}
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-rose-400 focus:outline-none focus:ring-2 focus:ring-rose-100"
+                  />
+                </label>
+                <label className="space-y-1 text-sm text-slate-700">
                   <span className="block font-semibold">{t.form.status}</span>
                   <select
                     value={formState.employmentStatus}
                     onChange={(event) =>
-                      setFormState((prev) => ({ ...prev, employmentStatus: event.target.value as EmploymentStatus }))
+                      setFormState((prev) => {
+                        const nextStatus = event.target.value as EmploymentStatus
+                        return {
+                          ...prev,
+                          employmentStatus: nextStatus,
+                          ...(nextStatus === 'TERMINATED'
+                            ? {}
+                            : { terminationDate: '', terminationReason: '' }),
+                        }
+                      })
                     }
                     disabled={formMode === 'view'}
                     className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
@@ -3551,6 +5161,35 @@ export default function MembersPage() {
                   </select>
                 </label>
               </div>
+
+              {formState.employmentStatus === 'TERMINATED' ? (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <label className="space-y-1 text-sm text-slate-700">
+                    <span className="block font-semibold">{t.form.terminationDate}</span>
+                    <input
+                      type="date"
+                      value={formState.terminationDate}
+                      onChange={(event) =>
+                        setFormState((prev) => ({ ...prev, terminationDate: event.target.value }))
+                      }
+                      disabled={formMode === 'view'}
+                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-rose-400 focus:outline-none focus:ring-2 focus:ring-rose-100"
+                    />
+                  </label>
+                  <label className="space-y-1 text-sm text-slate-700">
+                    <span className="block font-semibold">{t.form.terminationReason}</span>
+                    <textarea
+                      rows={2}
+                      value={formState.terminationReason}
+                      onChange={(event) =>
+                        setFormState((prev) => ({ ...prev, terminationReason: event.target.value }))
+                      }
+                      disabled={formMode === 'view'}
+                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-rose-400 focus:outline-none focus:ring-2 focus:ring-rose-100"
+                    />
+                  </label>
+                </div>
+              ) : null}
 
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                 <button
@@ -3594,6 +5233,10 @@ export default function MembersPage() {
                           onChange={(event) =>
                             setFormState((prev) => ({
                               ...prev,
+                              birthDate:
+                                prev.birthDate || prev.nationality !== 'china'
+                                  ? prev.birthDate
+                                  : parseBirthDateFromIdNumber(event.target.value) || prev.birthDate,
                               chineseProfile: { ...prev.chineseProfile, idNumber: event.target.value },
                             }))
                           }
@@ -3788,7 +5431,261 @@ export default function MembersPage() {
                       </label>
                     </div>
                   ) : (
-                    <p className="mt-3 text-xs text-slate-500">{t.form.expatEmpty}</p>
+                    <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                      <label className="space-y-1 text-sm text-slate-700">
+                        <span className="block font-semibold">{t.form.team}</span>
+                        <input
+                          list="team-options"
+                          value={formState.expatProfile.team}
+                          onChange={(event) =>
+                            setFormState((prev) => ({
+                              ...prev,
+                              expatProfile: { ...prev.expatProfile, team: event.target.value },
+                            }))
+                          }
+                          disabled={formMode === 'view'}
+                          className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+                        />
+                        <datalist id="team-options">
+                          {teamOptions.map((name) => (
+                            <option key={name} value={name} />
+                          ))}
+                        </datalist>
+                      </label>
+                      <label className="space-y-1 text-sm text-slate-700">
+                        <span className="block font-semibold">{t.form.contractNumber}</span>
+                        <input
+                          value={formState.expatProfile.contractNumber}
+                          onChange={(event) =>
+                            setFormState((prev) => ({
+                              ...prev,
+                              expatProfile: { ...prev.expatProfile, contractNumber: event.target.value },
+                            }))
+                          }
+                          disabled={formMode === 'view'}
+                          className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+                        />
+                      </label>
+                      <label className="space-y-1 text-sm text-slate-700">
+                        <span className="block font-semibold">{t.form.contractType}</span>
+                        <select
+                          value={formState.expatProfile.contractType}
+                          onChange={(event) =>
+                            setFormState((prev) => {
+                              const nextType = event.target.value as ExpatProfileForm['contractType']
+                              const nextUnit =
+                                nextType === 'CDD' && prev.expatProfile.baseSalaryUnit === 'HOUR'
+                                  ? 'MONTH'
+                                  : prev.expatProfile.baseSalaryUnit
+                              return {
+                                ...prev,
+                                expatProfile: {
+                                  ...prev.expatProfile,
+                                  contractType: nextType,
+                                  baseSalaryUnit: nextUnit,
+                                },
+                              }
+                            })
+                          }
+                          disabled={formMode === 'view'}
+                          className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+                        >
+                          <option value="">{t.labels.empty}</option>
+                          <option value="CTJ">CTJ</option>
+                          <option value="CDD">CDD</option>
+                        </select>
+                      </label>
+                      <label className="space-y-1 text-sm text-slate-700">
+                        <span className="block font-semibold">{t.form.salaryCategory}</span>
+                        <input
+                          value={formState.expatProfile.salaryCategory}
+                          onChange={(event) =>
+                            setFormState((prev) => ({
+                              ...prev,
+                              expatProfile: { ...prev.expatProfile, salaryCategory: event.target.value },
+                            }))
+                          }
+                          disabled={formMode === 'view'}
+                          className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+                        />
+                      </label>
+                      <label className="space-y-1 text-sm text-slate-700">
+                        <span className="block font-semibold">{t.form.baseSalaryAmount}</span>
+                        <input
+                          type="number"
+                          inputMode="decimal"
+                          value={formState.expatProfile.baseSalaryAmount}
+                          onChange={(event) =>
+                            setFormState((prev) => ({
+                              ...prev,
+                              expatProfile: { ...prev.expatProfile, baseSalaryAmount: event.target.value },
+                            }))
+                          }
+                          disabled={formMode === 'view'}
+                          className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+                        />
+                      </label>
+                      <label className="space-y-1 text-sm text-slate-700">
+                        <span className="block font-semibold">{t.form.baseSalaryUnit}</span>
+                        <select
+                          value={formState.expatProfile.baseSalaryUnit}
+                          onChange={(event) =>
+                            setFormState((prev) => ({
+                              ...prev,
+                              expatProfile: {
+                                ...prev.expatProfile,
+                                baseSalaryUnit: event.target.value as ExpatProfileForm['baseSalaryUnit'],
+                              },
+                            }))
+                          }
+                          disabled={formMode === 'view'}
+                          className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+                        >
+                          <option value="">{t.labels.empty}</option>
+                          <option value="MONTH">{t.form.salaryUnitMonth}</option>
+                          <option value="HOUR">{t.form.salaryUnitHour}</option>
+                        </select>
+                      </label>
+                      <label className="space-y-1 text-sm text-slate-700">
+                        <span className="block font-semibold">{t.form.netMonthlyAmount}</span>
+                        <input
+                          type="number"
+                          inputMode="decimal"
+                          value={formState.expatProfile.netMonthlyAmount}
+                          onChange={(event) =>
+                            setFormState((prev) => ({
+                              ...prev,
+                              expatProfile: {
+                                ...prev.expatProfile,
+                                netMonthlyAmount: event.target.value,
+                                netMonthlyUnit: 'MONTH',
+                              },
+                            }))
+                          }
+                          disabled={formMode === 'view'}
+                          className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+                        />
+                      </label>
+                      <label className="space-y-1 text-sm text-slate-700">
+                        <span className="block font-semibold">{t.form.netMonthlyUnit}</span>
+                        <select
+                          value={formState.expatProfile.netMonthlyUnit || 'MONTH'}
+                          onChange={(event) =>
+                            setFormState((prev) => ({
+                              ...prev,
+                              expatProfile: {
+                                ...prev.expatProfile,
+                                netMonthlyUnit: event.target.value as ExpatProfileForm['netMonthlyUnit'],
+                              },
+                            }))
+                          }
+                          disabled
+                          className="w-full rounded-xl border border-slate-200 bg-slate-100 px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+                        >
+                          <option value="MONTH">{t.form.salaryUnitMonth}</option>
+                        </select>
+                      </label>
+                      <label className="space-y-1 text-sm text-slate-700">
+                        <span className="block font-semibold">{t.form.maritalStatus}</span>
+                        <input
+                          value={formState.expatProfile.maritalStatus}
+                          onChange={(event) =>
+                            setFormState((prev) => ({
+                              ...prev,
+                              expatProfile: { ...prev.expatProfile, maritalStatus: event.target.value },
+                            }))
+                          }
+                          disabled={formMode === 'view'}
+                          className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+                        />
+                      </label>
+                      <label className="space-y-1 text-sm text-slate-700">
+                        <span className="block font-semibold">{t.form.childrenCount}</span>
+                        <input
+                          type="number"
+                          min={0}
+                          value={formState.expatProfile.childrenCount}
+                          onChange={(event) =>
+                            setFormState((prev) => ({
+                              ...prev,
+                              expatProfile: { ...prev.expatProfile, childrenCount: event.target.value },
+                            }))
+                          }
+                          disabled={formMode === 'view'}
+                          className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+                        />
+                      </label>
+                      <label className="space-y-1 text-sm text-slate-700">
+                        <span className="block font-semibold">{t.form.cnpsNumber}</span>
+                        <input
+                          value={formState.expatProfile.cnpsNumber}
+                          onChange={(event) =>
+                            setFormState((prev) => ({
+                              ...prev,
+                              expatProfile: { ...prev.expatProfile, cnpsNumber: event.target.value },
+                            }))
+                          }
+                          disabled={formMode === 'view'}
+                          className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+                        />
+                      </label>
+                      <label className="space-y-1 text-sm text-slate-700">
+                        <span className="block font-semibold">{t.form.cnpsDeclarationCode}</span>
+                        <input
+                          value={formState.expatProfile.cnpsDeclarationCode}
+                          onChange={(event) =>
+                            setFormState((prev) => ({
+                              ...prev,
+                              expatProfile: { ...prev.expatProfile, cnpsDeclarationCode: event.target.value },
+                            }))
+                          }
+                          disabled={formMode === 'view'}
+                          className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+                        />
+                      </label>
+                      <label className="space-y-1 text-sm text-slate-700">
+                        <span className="block font-semibold">{t.form.provenance}</span>
+                        <input
+                          value={formState.expatProfile.provenance}
+                          onChange={(event) =>
+                            setFormState((prev) => ({
+                              ...prev,
+                              expatProfile: { ...prev.expatProfile, provenance: event.target.value },
+                            }))
+                          }
+                          disabled={formMode === 'view'}
+                          className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+                        />
+                      </label>
+                      <label className="space-y-1 text-sm text-slate-700">
+                        <span className="block font-semibold">{t.form.emergencyContactName}</span>
+                        <input
+                          value={formState.expatProfile.emergencyContactName}
+                          onChange={(event) =>
+                            setFormState((prev) => ({
+                              ...prev,
+                              expatProfile: { ...prev.expatProfile, emergencyContactName: event.target.value },
+                            }))
+                          }
+                          disabled={formMode === 'view'}
+                          className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+                        />
+                      </label>
+                      <label className="space-y-1 text-sm text-slate-700">
+                        <span className="block font-semibold">{t.form.emergencyContactPhone}</span>
+                        <input
+                          value={formState.expatProfile.emergencyContactPhone}
+                          onChange={(event) =>
+                            setFormState((prev) => ({
+                              ...prev,
+                              expatProfile: { ...prev.expatProfile, emergencyContactPhone: event.target.value },
+                            }))
+                          }
+                          disabled={formMode === 'view'}
+                          className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+                        />
+                      </label>
+                    </div>
                   )
                 ) : null}
               </div>

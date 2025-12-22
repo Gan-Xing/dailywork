@@ -35,6 +35,24 @@ type ChineseProfile = {
   healthStatus: string | null
 }
 
+type ExpatProfile = {
+  team: string | null
+  contractNumber: string | null
+  contractType: 'CTJ' | 'CDD' | null
+  salaryCategory: string | null
+  baseSalaryAmount: string | null
+  baseSalaryUnit: 'MONTH' | 'HOUR' | null
+  netMonthlyAmount: string | null
+  netMonthlyUnit: 'MONTH' | 'HOUR' | null
+  maritalStatus: string | null
+  childrenCount: number | null
+  cnpsNumber: string | null
+  cnpsDeclarationCode: string | null
+  provenance: string | null
+  emergencyContactName: string | null
+  emergencyContactPhone: string | null
+}
+
 type Member = {
   id: number
   name: string | null
@@ -43,15 +61,25 @@ type Member = {
   nationality: string | null
   phones: string[]
   joinDate: string | null
+  birthDate: string | null
+  terminationDate: string | null
+  terminationReason: string | null
   position: string | null
   employmentStatus: EmploymentStatus
   roles: { id: number; name: string }[]
   chineseProfile?: ChineseProfile | null
+  expatProfile?: ExpatProfile | null
 }
 
 type Role = {
   id: number
   name: string
+}
+
+type MemberOption = {
+  expatProfile?: {
+    team?: string | null
+  } | null
 }
 
 type ChineseProfileForm = {
@@ -71,6 +99,24 @@ type ChineseProfileForm = {
   healthStatus: string
 }
 
+type ExpatProfileForm = {
+  team: string
+  contractNumber: string
+  contractType: '' | 'CTJ' | 'CDD'
+  salaryCategory: string
+  baseSalaryAmount: string
+  baseSalaryUnit: '' | 'MONTH' | 'HOUR'
+  netMonthlyAmount: string
+  netMonthlyUnit: '' | 'MONTH'
+  maritalStatus: string
+  childrenCount: string
+  cnpsNumber: string
+  cnpsDeclarationCode: string
+  provenance: string
+  emergencyContactName: string
+  emergencyContactPhone: string
+}
+
 type FormState = {
   username: string
   password: string
@@ -79,11 +125,14 @@ type FormState = {
   nationality: string
   phones: string[]
   joinDate: string
+  birthDate: string
+  terminationDate: string
+  terminationReason: string
   position: string
   employmentStatus: EmploymentStatus
   roleIds: number[]
   chineseProfile: ChineseProfileForm
-  expatProfile: Record<string, never>
+  expatProfile: ExpatProfileForm
 }
 
 type Props = {
@@ -108,6 +157,24 @@ const emptyChineseProfile: ChineseProfileForm = {
   healthStatus: '',
 }
 
+const emptyExpatProfile: ExpatProfileForm = {
+  team: '',
+  contractNumber: '',
+  contractType: '',
+  salaryCategory: '',
+  baseSalaryAmount: '',
+  baseSalaryUnit: '',
+  netMonthlyAmount: '',
+  netMonthlyUnit: '',
+  maritalStatus: '',
+  childrenCount: '',
+  cnpsNumber: '',
+  cnpsDeclarationCode: '',
+  provenance: '',
+  emergencyContactName: '',
+  emergencyContactPhone: '',
+}
+
 const toProfileNumberString = (value?: number | null) =>
   value === null || value === undefined ? '' : String(value)
 
@@ -128,10 +195,61 @@ const buildChineseProfileForm = (profile?: ChineseProfile | null): ChineseProfil
   healthStatus: profile?.healthStatus ?? '',
 })
 
+const buildExpatProfileForm = (profile?: ExpatProfile | null): ExpatProfileForm => ({
+  team: profile?.team ?? '',
+  contractNumber: profile?.contractNumber ?? '',
+  contractType: profile?.contractType ?? '',
+  salaryCategory: profile?.salaryCategory ?? '',
+  baseSalaryAmount: profile?.baseSalaryAmount ?? '',
+  baseSalaryUnit: profile?.baseSalaryUnit ?? '',
+  netMonthlyAmount: profile?.netMonthlyAmount ?? '',
+  netMonthlyUnit: profile?.netMonthlyUnit === 'MONTH' ? 'MONTH' : '',
+  maritalStatus: profile?.maritalStatus ?? '',
+  childrenCount:
+    profile?.childrenCount === null || profile?.childrenCount === undefined
+      ? ''
+      : String(profile.childrenCount),
+  cnpsNumber: profile?.cnpsNumber ?? '',
+  cnpsDeclarationCode: profile?.cnpsDeclarationCode ?? '',
+  provenance: profile?.provenance ?? '',
+  emergencyContactName: profile?.emergencyContactName ?? '',
+  emergencyContactPhone: profile?.emergencyContactPhone ?? '',
+})
+
+const normalizeText = (value?: string | null) => (value ?? '').trim()
+
 const normalizeProfileNumber = (value: string) => {
   if (!value.trim()) return null
   const parsed = Number.parseInt(value, 10)
   return Number.isFinite(parsed) ? parsed : null
+}
+
+const parseBirthDateFromIdNumber = (value: string) => {
+  const text = value.trim()
+  if (!text) return ''
+  let digits = ''
+  if (/^\d{17}[\dXx]$/.test(text)) {
+    digits = text.slice(6, 14)
+  } else if (/^\d{15}$/.test(text)) {
+    digits = `19${text.slice(6, 12)}`
+  } else {
+    return ''
+  }
+  const year = Number(digits.slice(0, 4))
+  const month = Number(digits.slice(4, 6))
+  const day = Number(digits.slice(6, 8))
+  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) return ''
+  const date = new Date(Date.UTC(year, month - 1, day))
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  ) {
+    return ''
+  }
+  const paddedMonth = String(month).padStart(2, '0')
+  const paddedDay = String(day).padStart(2, '0')
+  return `${year}-${paddedMonth}-${paddedDay}`
 }
 
 export function MemberEditClient({ member, canAssignRole }: Props) {
@@ -139,6 +257,7 @@ export function MemberEditClient({ member, canAssignRole }: Props) {
   const t = memberCopy[locale]
   const statusLabels = employmentStatusLabels[locale]
   const [rolesData, setRolesData] = useState<Role[]>([])
+  const [memberOptions, setMemberOptions] = useState<MemberOption[]>([])
   const [submitting, setSubmitting] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
   const [phoneInput, setPhoneInput] = useState('')
@@ -153,11 +272,14 @@ export function MemberEditClient({ member, canAssignRole }: Props) {
     nationality: member.nationality ?? (nationalityOptions[0]?.key ?? ''),
     phones: member.phones ?? [],
     joinDate: member.joinDate ? member.joinDate.slice(0, 10) : '',
+    birthDate: member.birthDate ? member.birthDate.slice(0, 10) : '',
+    terminationDate: member.terminationDate ? member.terminationDate.slice(0, 10) : '',
+    terminationReason: member.terminationReason ?? '',
     position: member.position ?? '',
     employmentStatus: member.employmentStatus ?? 'ACTIVE',
     roleIds: member.roles?.map((role) => role.id) ?? [],
     chineseProfile: buildChineseProfileForm(member.chineseProfile),
-    expatProfile: {},
+    expatProfile: buildExpatProfileForm(member.expatProfile),
   }))
 
   const nationalityByRegion = useMemo(() => {
@@ -171,6 +293,25 @@ export function MemberEditClient({ member, canAssignRole }: Props) {
     })
     return grouped
   }, [])
+
+  const optionCollator = useMemo(() => {
+    const localeId = locale === 'fr' ? 'fr' : ['zh-Hans-u-co-pinyin', 'zh-Hans', 'zh']
+    return new Intl.Collator(localeId, {
+      numeric: true,
+      sensitivity: 'base',
+    })
+  }, [locale])
+
+  const teamOptions = useMemo(() => {
+    const set = new Set<string>()
+    memberOptions.forEach((memberOption) => {
+      const value = normalizeText(memberOption.expatProfile?.team ?? null)
+      if (value) set.add(value)
+    })
+    const currentTeam = normalizeText(formState.expatProfile.team)
+    if (currentTeam) set.add(currentTeam)
+    return Array.from(set).sort(optionCollator.compare)
+  }, [formState.expatProfile.team, memberOptions, optionCollator])
 
   useEffect(() => {
     if (!canAssignRole) {
@@ -189,6 +330,20 @@ export function MemberEditClient({ member, canAssignRole }: Props) {
     }
     void loadRoles()
   }, [canAssignRole])
+
+  useEffect(() => {
+    const loadMembers = async () => {
+      try {
+        const res = await fetch('/api/members')
+        if (!res.ok) return
+        const data = (await res.json()) as { members?: MemberOption[] }
+        setMemberOptions(Array.isArray(data.members) ? data.members : [])
+      } catch {
+        setMemberOptions([])
+      }
+    }
+    void loadMembers()
+  }, [])
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -235,6 +390,14 @@ export function MemberEditClient({ member, canAssignRole }: Props) {
       ...(formState.phones ?? []).map((phone) => phone.trim()).filter(Boolean),
       phoneInput.trim(),
     ].filter(Boolean)
+    const birthDateValue = formState.birthDate.trim()
+    let resolvedBirthDate = birthDateValue
+    if (!resolvedBirthDate && formState.nationality === 'china') {
+      resolvedBirthDate = parseBirthDateFromIdNumber(formState.chineseProfile.idNumber)
+    }
+    const isTerminated = formState.employmentStatus === 'TERMINATED'
+    const terminationDateValue = formState.terminationDate.trim()
+    const terminationReasonValue = formState.terminationReason.trim()
     const chineseProfilePayload = {
       frenchName: formState.chineseProfile.frenchName.trim() || null,
       idNumber: formState.chineseProfile.idNumber.trim() || null,
@@ -251,6 +414,26 @@ export function MemberEditClient({ member, canAssignRole }: Props) {
       medicalHistory: formState.chineseProfile.medicalHistory.trim() || null,
       healthStatus: formState.chineseProfile.healthStatus.trim() || null,
     }
+    const expatProfilePayload = {
+      team: formState.expatProfile.team.trim() || null,
+      contractNumber: formState.expatProfile.contractNumber.trim() || null,
+      contractType: formState.expatProfile.contractType || null,
+      salaryCategory: formState.expatProfile.salaryCategory.trim() || null,
+      baseSalaryAmount: formState.expatProfile.baseSalaryAmount.trim() || null,
+      baseSalaryUnit: formState.expatProfile.baseSalaryUnit || null,
+      netMonthlyAmount: formState.expatProfile.netMonthlyAmount.trim() || null,
+      netMonthlyUnit: formState.expatProfile.netMonthlyUnit || null,
+      maritalStatus: formState.expatProfile.maritalStatus.trim() || null,
+      childrenCount: formState.expatProfile.childrenCount.trim() || null,
+      cnpsNumber: formState.expatProfile.cnpsNumber.trim() || null,
+      cnpsDeclarationCode: formState.expatProfile.cnpsDeclarationCode.trim() || null,
+      provenance: formState.expatProfile.provenance.trim() || null,
+      emergencyContactName: formState.expatProfile.emergencyContactName.trim() || null,
+      emergencyContactPhone: formState.expatProfile.emergencyContactPhone.trim() || null,
+    }
+    if (expatProfilePayload.netMonthlyAmount && !expatProfilePayload.netMonthlyUnit) {
+      expatProfilePayload.netMonthlyUnit = 'MONTH'
+    }
     const payload: {
       username: string
       password: string
@@ -259,11 +442,14 @@ export function MemberEditClient({ member, canAssignRole }: Props) {
       nationality: string
       phones: string[]
       joinDate?: string
+      birthDate: string
+      terminationDate: string | null
+      terminationReason: string | null
       position: string | null
       employmentStatus: EmploymentStatus
       roleIds?: number[]
       chineseProfile: typeof chineseProfilePayload
-      expatProfile: Record<string, never>
+      expatProfile: typeof expatProfilePayload
     } = {
       username: formState.username.trim(),
       password: formState.password,
@@ -272,10 +458,13 @@ export function MemberEditClient({ member, canAssignRole }: Props) {
       nationality: formState.nationality,
       phones: phoneList,
       joinDate: formState.joinDate ? formState.joinDate : undefined,
+      birthDate: resolvedBirthDate,
+      terminationDate: isTerminated ? terminationDateValue : null,
+      terminationReason: isTerminated ? terminationReasonValue : null,
       position: formState.position.trim() || null,
       employmentStatus: formState.employmentStatus,
       chineseProfile: chineseProfilePayload,
-      expatProfile: formState.expatProfile,
+      expatProfile: expatProfilePayload,
     }
     if (canAssignRole) {
       payload.roleIds = formState.roleIds
@@ -283,6 +472,21 @@ export function MemberEditClient({ member, canAssignRole }: Props) {
     try {
       if (!payload.username) {
         throw new Error(t.errors.usernameRequired)
+      }
+      if (!payload.birthDate) {
+        throw new Error(t.errors.birthDateRequired)
+      }
+      if (isTerminated && !terminationDateValue) {
+        throw new Error(t.errors.terminationDateRequired)
+      }
+      if (isTerminated && !terminationReasonValue) {
+        throw new Error(t.errors.terminationReasonRequired)
+      }
+      if (
+        expatProfilePayload.contractType === 'CDD' &&
+        expatProfilePayload.baseSalaryUnit === 'HOUR'
+      ) {
+        throw new Error(t.errors.baseSalaryUnitInvalid)
       }
       const res = await fetch(`/api/members/${member.id}`, {
         method: 'PUT',
@@ -484,7 +688,7 @@ export function MemberEditClient({ member, canAssignRole }: Props) {
               </label>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-4 sm:grid-cols-3">
               <label className="space-y-1 text-sm text-slate-700">
                 <span className="block font-semibold">{t.form.joinDate}</span>
                 <input
@@ -495,14 +699,29 @@ export function MemberEditClient({ member, canAssignRole }: Props) {
                 />
               </label>
               <label className="space-y-1 text-sm text-slate-700">
+                <span className="block font-semibold">{t.form.birthDate}</span>
+                <input
+                  type="date"
+                  value={formState.birthDate}
+                  onChange={(event) => setFormState((prev) => ({ ...prev, birthDate: event.target.value }))}
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-rose-400 focus:outline-none focus:ring-2 focus:ring-rose-100"
+                />
+              </label>
+              <label className="space-y-1 text-sm text-slate-700">
                 <span className="block font-semibold">{t.form.status}</span>
                 <select
                   value={formState.employmentStatus}
                   onChange={(event) =>
-                    setFormState((prev) => ({
-                      ...prev,
-                      employmentStatus: event.target.value as EmploymentStatus,
-                    }))
+                    setFormState((prev) => {
+                      const nextStatus = event.target.value as EmploymentStatus
+                      return {
+                        ...prev,
+                        employmentStatus: nextStatus,
+                        ...(nextStatus === 'TERMINATED'
+                          ? {}
+                          : { terminationDate: '', terminationReason: '' }),
+                      }
+                    })
                   }
                   className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
                 >
@@ -514,6 +733,33 @@ export function MemberEditClient({ member, canAssignRole }: Props) {
                 </select>
               </label>
             </div>
+
+            {formState.employmentStatus === 'TERMINATED' ? (
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="space-y-1 text-sm text-slate-700">
+                  <span className="block font-semibold">{t.form.terminationDate}</span>
+                  <input
+                    type="date"
+                    value={formState.terminationDate}
+                    onChange={(event) =>
+                      setFormState((prev) => ({ ...prev, terminationDate: event.target.value }))
+                    }
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-rose-400 focus:outline-none focus:ring-2 focus:ring-rose-100"
+                  />
+                </label>
+                <label className="space-y-1 text-sm text-slate-700">
+                  <span className="block font-semibold">{t.form.terminationReason}</span>
+                  <textarea
+                    rows={2}
+                    value={formState.terminationReason}
+                    onChange={(event) =>
+                      setFormState((prev) => ({ ...prev, terminationReason: event.target.value }))
+                    }
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-rose-400 focus:outline-none focus:ring-2 focus:ring-rose-100"
+                  />
+                </label>
+              </div>
+            ) : null}
 
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
               <button
@@ -556,6 +802,10 @@ export function MemberEditClient({ member, canAssignRole }: Props) {
                         onChange={(event) =>
                           setFormState((prev) => ({
                             ...prev,
+                            birthDate:
+                              prev.birthDate || prev.nationality !== 'china'
+                                ? prev.birthDate
+                                : parseBirthDateFromIdNumber(event.target.value) || prev.birthDate,
                             chineseProfile: { ...prev.chineseProfile, idNumber: event.target.value },
                           }))
                         }
@@ -737,7 +987,256 @@ export function MemberEditClient({ member, canAssignRole }: Props) {
                     </label>
                   </div>
                 ) : (
-                  <p className="mt-3 text-xs text-slate-500">{t.form.expatEmpty}</p>
+                  <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                    <label className="space-y-1 text-sm text-slate-700">
+                      <span className="block font-semibold">{t.form.team}</span>
+                      <input
+                        list="team-options"
+                        value={formState.expatProfile.team}
+                        onChange={(event) =>
+                          setFormState((prev) => ({
+                            ...prev,
+                            expatProfile: { ...prev.expatProfile, team: event.target.value },
+                          }))
+                        }
+                        className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+                      />
+                      <datalist id="team-options">
+                        {teamOptions.map((name) => (
+                          <option key={name} value={name} />
+                        ))}
+                      </datalist>
+                    </label>
+                    <label className="space-y-1 text-sm text-slate-700">
+                      <span className="block font-semibold">{t.form.contractNumber}</span>
+                      <input
+                        value={formState.expatProfile.contractNumber}
+                        onChange={(event) =>
+                          setFormState((prev) => ({
+                            ...prev,
+                            expatProfile: { ...prev.expatProfile, contractNumber: event.target.value },
+                          }))
+                        }
+                        className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+                      />
+                    </label>
+                    <label className="space-y-1 text-sm text-slate-700">
+                      <span className="block font-semibold">{t.form.contractType}</span>
+                      <select
+                        value={formState.expatProfile.contractType}
+                        onChange={(event) =>
+                          setFormState((prev) => {
+                            const nextType = event.target.value as ExpatProfileForm['contractType']
+                            const nextUnit =
+                              nextType === 'CDD' && prev.expatProfile.baseSalaryUnit === 'HOUR'
+                                ? 'MONTH'
+                                : prev.expatProfile.baseSalaryUnit
+                            return {
+                              ...prev,
+                              expatProfile: {
+                                ...prev.expatProfile,
+                                contractType: nextType,
+                                baseSalaryUnit: nextUnit,
+                              },
+                            }
+                          })
+                        }
+                        className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+                      >
+                        <option value="">{t.labels.empty}</option>
+                        <option value="CTJ">CTJ</option>
+                        <option value="CDD">CDD</option>
+                      </select>
+                    </label>
+                    <label className="space-y-1 text-sm text-slate-700">
+                      <span className="block font-semibold">{t.form.salaryCategory}</span>
+                      <input
+                        value={formState.expatProfile.salaryCategory}
+                        onChange={(event) =>
+                          setFormState((prev) => ({
+                            ...prev,
+                            expatProfile: { ...prev.expatProfile, salaryCategory: event.target.value },
+                          }))
+                        }
+                        className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+                      />
+                    </label>
+                    <label className="space-y-1 text-sm text-slate-700">
+                      <span className="block font-semibold">{t.form.baseSalaryAmount}</span>
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        value={formState.expatProfile.baseSalaryAmount}
+                        onChange={(event) =>
+                          setFormState((prev) => ({
+                            ...prev,
+                            expatProfile: { ...prev.expatProfile, baseSalaryAmount: event.target.value },
+                          }))
+                        }
+                        className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+                      />
+                    </label>
+                    <label className="space-y-1 text-sm text-slate-700">
+                      <span className="block font-semibold">{t.form.baseSalaryUnit}</span>
+                      <select
+                        value={formState.expatProfile.baseSalaryUnit}
+                        onChange={(event) =>
+                          setFormState((prev) => ({
+                            ...prev,
+                            expatProfile: {
+                              ...prev.expatProfile,
+                              baseSalaryUnit: event.target.value as ExpatProfileForm['baseSalaryUnit'],
+                            },
+                          }))
+                        }
+                        className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+                      >
+                        <option value="">{t.labels.empty}</option>
+                        <option value="MONTH">{t.form.salaryUnitMonth}</option>
+                        <option value="HOUR">{t.form.salaryUnitHour}</option>
+                      </select>
+                    </label>
+                    <label className="space-y-1 text-sm text-slate-700">
+                      <span className="block font-semibold">{t.form.netMonthlyAmount}</span>
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        value={formState.expatProfile.netMonthlyAmount}
+                        onChange={(event) =>
+                          setFormState((prev) => ({
+                            ...prev,
+                            expatProfile: {
+                              ...prev.expatProfile,
+                              netMonthlyAmount: event.target.value,
+                              netMonthlyUnit: 'MONTH',
+                            },
+                          }))
+                        }
+                        className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+                      />
+                    </label>
+                    <label className="space-y-1 text-sm text-slate-700">
+                      <span className="block font-semibold">{t.form.netMonthlyUnit}</span>
+                      <select
+                        value={formState.expatProfile.netMonthlyUnit || 'MONTH'}
+                        onChange={(event) =>
+                          setFormState((prev) => ({
+                            ...prev,
+                            expatProfile: {
+                              ...prev.expatProfile,
+                              netMonthlyUnit: event.target.value as ExpatProfileForm['netMonthlyUnit'],
+                            },
+                          }))
+                        }
+                        disabled
+                        className="w-full rounded-xl border border-slate-200 bg-slate-100 px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+                      >
+                        <option value="MONTH">{t.form.salaryUnitMonth}</option>
+                      </select>
+                    </label>
+                    <label className="space-y-1 text-sm text-slate-700">
+                      <span className="block font-semibold">{t.form.maritalStatus}</span>
+                      <input
+                        value={formState.expatProfile.maritalStatus}
+                        onChange={(event) =>
+                          setFormState((prev) => ({
+                            ...prev,
+                            expatProfile: { ...prev.expatProfile, maritalStatus: event.target.value },
+                          }))
+                        }
+                        className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+                      />
+                    </label>
+                    <label className="space-y-1 text-sm text-slate-700">
+                      <span className="block font-semibold">{t.form.childrenCount}</span>
+                      <input
+                        type="number"
+                        min={0}
+                        value={formState.expatProfile.childrenCount}
+                        onChange={(event) =>
+                          setFormState((prev) => ({
+                            ...prev,
+                            expatProfile: { ...prev.expatProfile, childrenCount: event.target.value },
+                          }))
+                        }
+                        className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+                      />
+                    </label>
+                    <label className="space-y-1 text-sm text-slate-700">
+                      <span className="block font-semibold">{t.form.cnpsNumber}</span>
+                      <input
+                        value={formState.expatProfile.cnpsNumber}
+                        onChange={(event) =>
+                          setFormState((prev) => ({
+                            ...prev,
+                            expatProfile: { ...prev.expatProfile, cnpsNumber: event.target.value },
+                          }))
+                        }
+                        className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+                      />
+                    </label>
+                    <label className="space-y-1 text-sm text-slate-700">
+                      <span className="block font-semibold">{t.form.cnpsDeclarationCode}</span>
+                      <input
+                        value={formState.expatProfile.cnpsDeclarationCode}
+                        onChange={(event) =>
+                          setFormState((prev) => ({
+                            ...prev,
+                            expatProfile: {
+                              ...prev.expatProfile,
+                              cnpsDeclarationCode: event.target.value,
+                            },
+                          }))
+                        }
+                        className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+                      />
+                    </label>
+                    <label className="space-y-1 text-sm text-slate-700">
+                      <span className="block font-semibold">{t.form.provenance}</span>
+                      <input
+                        value={formState.expatProfile.provenance}
+                        onChange={(event) =>
+                          setFormState((prev) => ({
+                            ...prev,
+                            expatProfile: { ...prev.expatProfile, provenance: event.target.value },
+                          }))
+                        }
+                        className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+                      />
+                    </label>
+                    <label className="space-y-1 text-sm text-slate-700">
+                      <span className="block font-semibold">{t.form.emergencyContactName}</span>
+                      <input
+                        value={formState.expatProfile.emergencyContactName}
+                        onChange={(event) =>
+                          setFormState((prev) => ({
+                            ...prev,
+                            expatProfile: {
+                              ...prev.expatProfile,
+                              emergencyContactName: event.target.value,
+                            },
+                          }))
+                        }
+                        className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+                      />
+                    </label>
+                    <label className="space-y-1 text-sm text-slate-700">
+                      <span className="block font-semibold">{t.form.emergencyContactPhone}</span>
+                      <input
+                        value={formState.expatProfile.emergencyContactPhone}
+                        onChange={(event) =>
+                          setFormState((prev) => ({
+                            ...prev,
+                            expatProfile: {
+                              ...prev.expatProfile,
+                              emergencyContactPhone: event.target.value,
+                            },
+                          }))
+                        }
+                        className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+                      />
+                    </label>
+                  </div>
                 )
               ) : null}
             </div>

@@ -70,9 +70,21 @@ export const memberCopy: Record<
       | 'nationality'
       | 'phones'
       | 'joinDate'
+      | 'birthDate'
       | 'position'
       | 'employmentStatus'
       | 'roles'
+      | 'team'
+      | 'contractNumber'
+      | 'contractType'
+      | 'salaryCategory'
+      | 'baseSalary'
+      | 'netMonthly'
+      | 'maritalStatus'
+      | 'childrenCount'
+      | 'cnpsNumber'
+      | 'cnpsDeclarationCode'
+      | 'provenance'
       | 'frenchName'
       | 'idNumber'
       | 'passportNumber'
@@ -87,6 +99,8 @@ export const memberCopy: Record<
       | 'residenceInChina'
       | 'medicalHistory'
       | 'healthStatus'
+      | 'terminationDate'
+      | 'terminationReason'
       | 'createdAt'
       | 'updatedAt'
       | 'actions'
@@ -127,8 +141,14 @@ export const memberCopy: Record<
       needMemberDelete: string
       needPermissionUpdate: string
       permissionUpdateFailed: string
+      nameRequired: string
       usernameRequired: string
       passwordRequired: string
+      birthDateRequired: string
+      birthDateInvalid: string
+      terminationDateRequired: string
+      terminationReasonRequired: string
+      terminationDateInvalid: string
       roleNameRequired: string
       roleDeleteConfirm: string
       exportMissingColumns: string
@@ -139,13 +159,21 @@ export const memberCopy: Record<
       importMissingHeaders: string
       importNoData: string
       importDuplicateUsername: string
+      importDuplicateIdentity: string
       importUsernameExists: string
       importInvalidGender: string
       importInvalidPhone: string
+      importInvalidContractType: string
+      importInvalidBaseSalaryUnit: string
       importInvalidStatus: string
       importInvalidJoinDate: string
+      importMissingBirthDate: string
+      importInvalidBirthDate: string
+      importDuplicateContractNumber: string
+      importContractNumberExists: string
       importRoleNotFound: (role: string) => string
       importFailed: string
+      baseSalaryUnitInvalid: string
     }
     template: {
       instructionsSheet: string
@@ -159,9 +187,22 @@ export const memberCopy: Record<
         | 'nationality'
         | 'phones'
         | 'joinDate'
+        | 'birthDate'
         | 'position'
         | 'employmentStatus'
         | 'roles'
+        | 'team'
+        | 'contractNumber'
+        | 'contractType'
+        | 'salaryCategory'
+        | 'baseSalary'
+        | 'netMonthly'
+        | 'maritalStatus'
+        | 'childrenCount'
+        | 'cnpsNumber'
+        | 'cnpsDeclarationCode'
+        | 'provenance'
+        | 'emergencyContact'
         | 'frenchName'
         | 'idNumber'
         | 'passportNumber'
@@ -175,7 +216,9 @@ export const memberCopy: Record<
         | 'birthplace'
         | 'residenceInChina'
         | 'medicalHistory'
-        | 'healthStatus',
+        | 'healthStatus'
+        | 'terminationDate'
+        | 'terminationReason',
         string
       >
     }
@@ -211,6 +254,7 @@ export const memberCopy: Record<
       phonePlaceholder: string
       addPhone: string
       joinDate: string
+      birthDate: string
       position: string
       status: string
       roles: string
@@ -223,6 +267,24 @@ export const memberCopy: Record<
       expand: string
       collapse: string
       expatEmpty: string
+      team: string
+      contractNumber: string
+      contractType: string
+      salaryCategory: string
+      baseSalary: string
+      baseSalaryAmount: string
+      baseSalaryUnit: string
+      netMonthly: string
+      netMonthlyAmount: string
+      netMonthlyUnit: string
+      salaryUnitMonth: string
+      salaryUnitHour: string
+      maritalStatus: string
+      childrenCount: string
+      cnpsNumber: string
+      cnpsDeclarationCode: string
+      provenance: string
+      emergencyContact: string
       frenchName: string
       idNumber: string
       passportNumber: string
@@ -238,6 +300,8 @@ export const memberCopy: Record<
       residenceInChina: string
       medicalHistory: string
       healthStatus: string
+      terminationDate: string
+      terminationReason: string
     }
     feedback: {
       loading: string
@@ -327,9 +391,21 @@ export const memberCopy: Record<
       nationality: '国籍',
       phones: '电话',
       joinDate: '入职',
+      birthDate: '出生日期',
       position: '岗位',
       employmentStatus: '状态',
       roles: '角色',
+      team: '班组',
+      contractNumber: '合同编号',
+      contractType: '合同类型',
+      salaryCategory: '工资等级',
+      baseSalary: '基础工资',
+      netMonthly: '实发工资',
+      maritalStatus: '婚姻状态',
+      childrenCount: '子女数量',
+      cnpsNumber: 'CNPS 编号',
+      cnpsDeclarationCode: 'CNPS 申报码',
+      provenance: '籍贯/属地',
       frenchName: '法语名',
       idNumber: '身份证号',
       passportNumber: '护照号',
@@ -344,6 +420,8 @@ export const memberCopy: Record<
       residenceInChina: '国内常住地',
       medicalHistory: '既往病史',
       healthStatus: '健康状况',
+      terminationDate: '离职日期',
+      terminationReason: '离职原因',
       createdAt: '创建时间',
       updatedAt: '更新时间',
       actions: '操作',
@@ -382,8 +460,14 @@ export const memberCopy: Record<
       needMemberDelete: '缺少成员删除权限',
       needPermissionUpdate: '缺少权限更新权限',
       permissionUpdateFailed: '更新权限状态失败',
+      nameRequired: '姓名必填',
       usernameRequired: '账号必填',
       passwordRequired: '初始密码必填',
+      birthDateRequired: '出生日期必填',
+      birthDateInvalid: '出生日期格式不正确',
+      terminationDateRequired: '离职日期必填',
+      terminationReasonRequired: '离职原因必填',
+      terminationDateInvalid: '离职日期格式不正确',
       roleNameRequired: '角色名称必填',
       roleDeleteConfirm: '确定删除该角色？',
       exportMissingColumns: '请先选择要导出的列。',
@@ -391,32 +475,53 @@ export const memberCopy: Record<
       exportFailed: '导出失败，请稍后重试。',
       templateDownloadFailed: '下载模板失败，请稍后重试。',
       importInvalidFile: '无法识别文件，请上传 CSV 或 Excel 文件。',
-      importMissingHeaders: '缺少必要字段列：账号、初始密码。',
+      importMissingHeaders: '缺少必要字段列：姓名、出生日期。',
       importNoData: '未发现可导入的数据行。',
       importDuplicateUsername: '账号重复（同一文件内）',
+      importDuplicateIdentity: '同名同生日匹配多条成员',
       importUsernameExists: '账号已存在',
       importInvalidGender: '性别必须为男或女',
       importInvalidPhone: '电话号码格式不正确',
+      importInvalidContractType: '合同类型必须为 CTJ 或 CDD',
+      importInvalidBaseSalaryUnit: 'CDD 合同基础工资只能按月',
       importInvalidStatus: '状态必须为 ACTIVE / ON_LEAVE / TERMINATED',
       importInvalidJoinDate: '入职日期格式不正确',
+      importMissingBirthDate: '出生日期必填',
+      importInvalidBirthDate: '出生日期格式不正确',
+      importDuplicateContractNumber: '合同编号重复（同一文件内）',
+      importContractNumberExists: '合同编号已存在',
       importRoleNotFound: (role: string) => `角色不存在：${role}`,
       importFailed: '导入失败，请稍后重试。',
+      baseSalaryUnitInvalid: 'CDD 合同基础工资必须按月填写',
     },
     template: {
       instructionsSheet: '说明',
       columnsHeader: '字段',
       notesHeader: '填写要求与示例',
       notes: {
-        name: '可选；姓名或显示名。',
-        username: '必填且唯一；示例：chen.rong',
-        password: '新建必填；示例：Temp@1234',
+        name: '必填；姓名或显示名。',
+        username: '可选；新建成员需填写，更新留空保留原值；示例：chen.rong',
+        password: '可选；新建成员需填写，更新留空保留原值；示例：Temp@1234',
         gender: '仅允许：男 / 女；示例：男',
         nationality: '示例：中国 / 科特迪瓦 / 马里 / 塞内加尔（使用国家名称）',
         phones: '可写多个，用 "/" 分隔；示例：13900001111 / 13800002222',
         joinDate: '格式：YYYY-MM-DD；示例：2025-01-31',
+        birthDate: '必填；格式：YYYY-MM-DD；示例：1990-05-12',
         position: '自由填写，建议统一用词；示例：工程师',
-        employmentStatus: '固定值：ACTIVE / ON_LEAVE / TERMINATED；留空默认 ACTIVE',
+        employmentStatus: '固定值：ACTIVE / ON_LEAVE / TERMINATED；新建留空默认 ACTIVE，更新留空保留原值',
         roles: '仅 role:update / role:manage 可见；填写角色名称，多个用 "/" 分隔；示例：Admin / Employee',
+        team: '可选；班组或工作组名称。',
+        contractNumber: '可选；合同编号，需唯一。',
+        contractType: '可选；固定值：CTJ / CDD。',
+        salaryCategory: '可选；工资等级/类别。',
+        baseSalary: '可选；金额+单位，如 83333/M 或 433/H；区间取较大值；CDD 必须按月。',
+        netMonthly: '可选；实发工资，仅按月；示例：120000/MOIS net。',
+        maritalStatus: '可选；婚姻状态；示例：CELIBATAIRE。',
+        childrenCount: '可选；子女数量（整数）。',
+        cnpsNumber: '可选；CNPS 号码，支持斜杠分段，自动保留后段数字。',
+        cnpsDeclarationCode: '可选；CNPS 申报码，仅数字，OK 忽略。',
+        provenance: '可选；籍贯/属地。',
+        emergencyContact: '可选；紧急联系人+电话；示例：0170239598 OUMAR FRERE。',
         frenchName: '可选；法语名或法语拼写。',
         idNumber: '可选；身份证号码。',
         passportNumber: '可选；护照号码。',
@@ -431,6 +536,8 @@ export const memberCopy: Record<
         residenceInChina: '可选；国内常住地。',
         medicalHistory: '可选；既往病史。',
         healthStatus: '可选；健康状况。',
+        terminationDate: '离职时必填；格式：YYYY-MM-DD。',
+        terminationReason: '离职时必填；填写离职原因说明。',
       },
     },
     rolePanel: {
@@ -468,6 +575,7 @@ export const memberCopy: Record<
       phonePlaceholder: '输入电话',
       addPhone: '添加电话',
       joinDate: '入职日期',
+      birthDate: '出生日期',
       position: '岗位',
       status: '状态',
       roles: '角色',
@@ -476,10 +584,28 @@ export const memberCopy: Record<
       positionPlaceholder: '选择或输入岗位',
       profileSection: '扩展字段',
       profileChinaHint: '中国籍成员可填写中方扩展信息。',
-      profileExpatHint: '非中国籍成员暂未配置扩展字段。',
+      profileExpatHint: '非中国籍成员可填写当地员工扩展信息。',
       expand: '展开',
       collapse: '收起',
-      expatEmpty: '外籍/当地员工扩展字段暂未配置。',
+      expatEmpty: '暂无可填写的当地员工扩展字段。',
+      team: '班组',
+      contractNumber: '合同编号',
+      contractType: '合同类型',
+      salaryCategory: '工资等级',
+      baseSalary: '基础工资',
+      baseSalaryAmount: '基础工资金额',
+      baseSalaryUnit: '基础工资单位',
+      netMonthly: '实发工资',
+      netMonthlyAmount: '实发工资金额',
+      netMonthlyUnit: '实发工资单位',
+      salaryUnitMonth: '按月',
+      salaryUnitHour: '按小时',
+      maritalStatus: '婚姻状态',
+      childrenCount: '子女数量',
+      cnpsNumber: 'CNPS 编号',
+      cnpsDeclarationCode: 'CNPS 申报码',
+      provenance: '籍贯/属地',
+      emergencyContact: '紧急联系人（合并）',
       frenchName: '法语名',
       idNumber: '身份证号',
       passportNumber: '护照号',
@@ -495,6 +621,8 @@ export const memberCopy: Record<
       residenceInChina: '国内常住地',
       medicalHistory: '既往病史',
       healthStatus: '健康状况',
+      terminationDate: '离职日期',
+      terminationReason: '离职原因',
     },
     feedback: {
       loading: '正在加载成员...',
@@ -587,9 +715,21 @@ export const memberCopy: Record<
       nationality: 'Nationalité',
       phones: 'Téléphones',
       joinDate: 'Arrivée',
+      birthDate: 'Date de naissance',
       position: 'Poste',
       employmentStatus: 'Statut',
       roles: 'Rôles',
+      team: 'Équipe',
+      contractNumber: 'N° contrat',
+      contractType: 'Type de contrat',
+      salaryCategory: 'Catégorie',
+      baseSalary: 'Salaire de base',
+      netMonthly: 'Net mensuel',
+      maritalStatus: 'Statut marital',
+      childrenCount: 'Nb enfants',
+      cnpsNumber: 'N° CNPS',
+      cnpsDeclarationCode: 'Code CNPS',
+      provenance: 'Provenance',
       frenchName: 'Nom français',
       idNumber: 'N° identité',
       passportNumber: 'N° passeport',
@@ -604,6 +744,8 @@ export const memberCopy: Record<
       residenceInChina: 'Résidence en Chine',
       medicalHistory: 'Antécédents médicaux',
       healthStatus: 'État de santé',
+      terminationDate: 'Date de départ',
+      terminationReason: 'Motif de départ',
       createdAt: 'Créé le',
       updatedAt: 'Mis à jour',
       actions: 'Actions',
@@ -642,8 +784,14 @@ export const memberCopy: Record<
       needMemberDelete: 'Droit insuffisant : member:delete',
       needPermissionUpdate: 'Droit insuffisant : permission:update',
       permissionUpdateFailed: 'Échec de la mise à jour du statut',
+      nameRequired: 'Nom requis',
       usernameRequired: "L'identifiant est obligatoire",
       passwordRequired: 'Mot de passe requis',
+      birthDateRequired: 'Date de naissance requise',
+      birthDateInvalid: 'Format de date de naissance invalide',
+      terminationDateRequired: 'Date de départ requise',
+      terminationReasonRequired: 'Motif de départ requis',
+      terminationDateInvalid: 'Format de date de départ invalide',
       roleNameRequired: 'Nom du rôle requis',
       roleDeleteConfirm: 'Confirmer la suppression du rôle ?',
       exportMissingColumns: 'Sélectionnez au moins une colonne à exporter.',
@@ -651,32 +799,54 @@ export const memberCopy: Record<
       exportFailed: "Échec de l'export, réessayez.",
       templateDownloadFailed: "Échec du téléchargement du modèle, réessayez.",
       importInvalidFile: 'Fichier non reconnu, veuillez fournir un CSV ou Excel.',
-      importMissingHeaders: 'Colonnes obligatoires manquantes : Identifiant, Mot de passe initial.',
+      importMissingHeaders: 'Colonnes obligatoires manquantes : Nom, Date de naissance.',
       importNoData: 'Aucune ligne de données à importer.',
       importDuplicateUsername: "Identifiant en double dans le fichier",
+      importDuplicateIdentity: 'Plusieurs membres correspondent au même nom et date de naissance',
       importUsernameExists: "Identifiant déjà utilisé",
       importInvalidGender: 'Genre invalide (男 / 女)',
       importInvalidPhone: 'Format de téléphone invalide',
+      importInvalidContractType: 'Type de contrat invalide (CTJ / CDD)',
+      importInvalidBaseSalaryUnit: 'Le salaire de base CDD doit être mensuel',
       importInvalidStatus: 'Statut invalide : ACTIVE / ON_LEAVE / TERMINATED',
       importInvalidJoinDate: "Date d'arrivée invalide",
+      importMissingBirthDate: 'Date de naissance requise',
+      importInvalidBirthDate: 'Date de naissance invalide',
+      importDuplicateContractNumber: "N° contrat en double dans le fichier",
+      importContractNumberExists: "N° contrat déjà utilisé",
       importRoleNotFound: (role: string) => `Rôle introuvable : ${role}`,
       importFailed: "Échec de l'import, réessayez.",
+      baseSalaryUnitInvalid: 'Le salaire de base CDD doit être mensuel',
     },
     template: {
       instructionsSheet: 'Instructions',
       columnsHeader: 'Champ',
       notesHeader: 'Règles et exemples',
       notes: {
-        name: 'Optionnel ; nom affiché.',
-        username: 'Obligatoire et unique ; ex. chen.rong',
-        password: 'Obligatoire à la création ; ex. Temp@1234',
+        name: 'Obligatoire ; nom affiché.',
+        username: "Optionnel ; requis à la création, sinon conservé ; ex. chen.rong",
+        password: "Optionnel ; requis à la création, sinon conservé ; ex. Temp@1234",
         gender: 'Valeurs : 男 / 女 (Homme / Femme) ; ex. 男',
         nationality: 'Ex. 中国 (Chine) / Côte d’Ivoire / Mali / Sénégal (saisir un nom de pays)',
-        phones: 'Plusieurs numéros séparés par "/" ; ex. 13900001111 / 13800002222',
-        joinDate: 'Format : YYYY-MM-DD ; ex. 2025-01-31',
-        position: 'Texte libre, garder une nomenclature cohérente ; ex. Conducteur de travaux',
-        employmentStatus: 'Valeurs fixes : ACTIVE / ON_LEAVE / TERMINATED ; vide = ACTIVE',
+      phones: 'Plusieurs numéros séparés par "/" ; ex. 13900001111 / 13800002222',
+      joinDate: 'Format : YYYY-MM-DD ; ex. 2025-01-31',
+      birthDate: 'Obligatoire ; format : YYYY-MM-DD ; ex. 1990-05-12',
+      position: 'Texte libre, garder une nomenclature cohérente ; ex. Conducteur de travaux',
+        employmentStatus:
+          'Valeurs fixes : ACTIVE / ON_LEAVE / TERMINATED ; création vide = ACTIVE, sinon conservé',
         roles: 'Visible avec role:update / role:manage ; saisir les noms de rôles, séparés par "/" ; ex. Admin / Employee',
+        team: 'Optionnel ; équipe ou groupe.',
+        contractNumber: 'Optionnel ; numéro de contrat, unique.',
+        contractType: 'Optionnel ; valeurs : CTJ / CDD.',
+        salaryCategory: 'Optionnel ; catégorie salariale.',
+        baseSalary: 'Optionnel ; montant + unité, ex. 83333/M ou 433/H ; intervalle = valeur max ; CDD = mensuel.',
+        netMonthly: 'Optionnel ; net mensuel uniquement ; ex. 120000/MOIS net.',
+        maritalStatus: 'Optionnel ; statut marital ; ex. CELIBATAIRE.',
+        childrenCount: 'Optionnel ; nombre d’enfants (entier).',
+        cnpsNumber: 'Optionnel ; numéro CNPS, segments avec "/", on conserve le dernier.',
+        cnpsDeclarationCode: 'Optionnel ; code CNPS, chiffres uniquement, "OK" ignoré.',
+        provenance: 'Optionnel ; provenance.',
+        emergencyContact: 'Optionnel ; contact + téléphone ; ex. 0170239598 OUMAR FRERE.',
         frenchName: 'Optionnel ; nom en français.',
         idNumber: "Optionnel ; numéro d'identité.",
         passportNumber: 'Optionnel ; numéro de passeport.',
@@ -691,6 +861,8 @@ export const memberCopy: Record<
         residenceInChina: 'Optionnel ; résidence en Chine.',
         medicalHistory: 'Optionnel ; antécédents médicaux.',
         healthStatus: 'Optionnel ; état de santé.',
+        terminationDate: 'Obligatoire si départ ; format : YYYY-MM-DD.',
+        terminationReason: 'Obligatoire si départ ; indiquer le motif.',
       },
     },
     rolePanel: {
@@ -729,6 +901,7 @@ export const memberCopy: Record<
       phonePlaceholder: 'Saisir un numéro',
       addPhone: 'Ajouter un numéro',
       joinDate: "Date d'arrivée",
+      birthDate: 'Date de naissance',
       position: 'Poste',
       status: 'Statut',
       roles: 'Rôles',
@@ -737,10 +910,28 @@ export const memberCopy: Record<
       positionPlaceholder: 'Sélectionner ou saisir',
       profileSection: 'Champs étendus',
       profileChinaHint: 'Champs étendus pour les membres chinois.',
-      profileExpatHint: 'Aucun champ étendu défini pour les non-chinois.',
+      profileExpatHint: 'Champs étendus pour les employés locaux/non chinois.',
       expand: 'Développer',
       collapse: 'Réduire',
-      expatEmpty: 'Aucun champ étendu défini pour les employés locaux/étrangers.',
+      expatEmpty: 'Aucun champ local à renseigner.',
+      team: 'Équipe',
+      contractNumber: 'N° contrat',
+      contractType: 'Type de contrat',
+      salaryCategory: 'Catégorie',
+      baseSalary: 'Salaire de base',
+      baseSalaryAmount: 'Montant salaire de base',
+      baseSalaryUnit: 'Unité salaire de base',
+      netMonthly: 'Net mensuel',
+      netMonthlyAmount: 'Montant net mensuel',
+      netMonthlyUnit: 'Unité net mensuel',
+      salaryUnitMonth: 'Mensuel',
+      salaryUnitHour: 'Horaire',
+      maritalStatus: 'Statut marital',
+      childrenCount: "Nombre d'enfants",
+      cnpsNumber: 'N° CNPS',
+      cnpsDeclarationCode: 'Code CNPS',
+      provenance: 'Provenance',
+      emergencyContact: "Contact d'urgence (combiné)",
       frenchName: 'Nom français',
       idNumber: "N° d'identité",
       passportNumber: 'N° de passeport',
@@ -756,6 +947,8 @@ export const memberCopy: Record<
       residenceInChina: 'Résidence en Chine',
       medicalHistory: 'Antécédents médicaux',
       healthStatus: 'État de santé',
+      terminationDate: 'Date de départ',
+      terminationReason: 'Motif de départ',
     },
     feedback: {
       loading: 'Chargement des membres...',
