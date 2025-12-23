@@ -30,6 +30,7 @@ type Project = { id: number; name: string; code: string | null; isActive: boolea
 type Unit = { id: number; name: string; symbol: string | null; isActive: boolean }
 type PaymentType = { id: number; name: string; isActive: boolean }
 type Handler = { id: number; name: string; username: string }
+type PaymentStatus = 'PENDING' | 'PAID'
 
 type Metadata = {
   projects: Project[]
@@ -56,6 +57,7 @@ type FinanceEntry = {
   handlerName?: string | null
   handlerUsername?: string | null
   paymentDate: string
+  paymentStatus: PaymentStatus
   tva?: number
   remark?: string | null
   isDeleted: boolean
@@ -76,6 +78,7 @@ type FinanceInsights = {
   latestPaymentDate?: string | null
   topCategories: { key: string; label: string; amount: number; count: number; share: number }[]
   paymentBreakdown: { id: number; name: string; amount: number; count: number; share: number }[]
+  paymentStatusBreakdown: { status: PaymentStatus; amount: number; count: number; share: number }[]
   monthlyTrend: { month: string; amount: number; count: number }[]
   categoryBreakdown: {
     key: string
@@ -97,6 +100,7 @@ type EntryForm = {
   paymentTypeId: number | ''
   handlerId: number | ''
   paymentDate: string
+  paymentStatus: PaymentStatus
   tva: string
   remark: string
 }
@@ -105,6 +109,7 @@ type ListFilters = {
   projectIds: number[]
   categoryKeys: string[]
   paymentTypeIds: number[]
+  paymentStatus: '' | PaymentStatus
   handlerIds: number[]
   reasonKeyword: string
   amountMin: string
@@ -149,8 +154,39 @@ const findCategoryNode = (nodes: FinanceCategoryDTO[], key: string): FinanceCate
 const toggleValue = <T,>(list: T[], value: T) =>
   list.includes(value) ? list.filter((item) => item !== value) : [...list, value]
 
+const paymentStatusOptions: { value: PaymentStatus; label: string }[] = [
+  { value: 'PAID', label: '已支付' },
+  { value: 'PENDING', label: '待支付' },
+]
+
+const paymentStatusLabels: Record<PaymentStatus, string> = {
+  PAID: '已支付',
+  PENDING: '待支付',
+}
+
+const paymentStatusBadgeStyles: Record<PaymentStatus, string> = {
+  PAID: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100',
+  PENDING: 'bg-amber-50 text-amber-700 ring-1 ring-amber-100',
+}
+
+const paymentStatusBarStyles: Record<PaymentStatus, string> = {
+  PAID: 'linear-gradient(90deg, rgba(16,185,129,0.85) 0%, rgba(14,165,233,0.6) 100%)',
+  PENDING: 'linear-gradient(90deg, rgba(245,158,11,0.85) 0%, rgba(251,191,36,0.6) 100%)',
+}
+
 const COLUMN_STORAGE_KEY = 'finance-visible-columns'
-const defaultVisibleColumns = ['sequence', 'project', 'paymentDate', 'reason', 'amount', 'handler', 'action'] as const
+const COLUMN_STORAGE_VERSION_KEY = 'finance-visible-columns-version'
+const COLUMN_STORAGE_VERSION = 2
+const defaultVisibleColumns = [
+  'sequence',
+  'project',
+  'paymentDate',
+  'paymentStatus',
+  'reason',
+  'amount',
+  'handler',
+  'action',
+] as const
 
 const SkeletonBar = ({ className }: { className?: string }) => (
   <div className={`h-3 animate-pulse rounded-full bg-slate-200 ${className ?? ''}`} />
@@ -199,6 +235,7 @@ export default function FinancePage() {
     projectIds: [],
     categoryKeys: [],
     paymentTypeIds: [],
+    paymentStatus: '',
     handlerIds: [],
     reasonKeyword: '',
     amountMin: '',
@@ -214,6 +251,7 @@ export default function FinancePage() {
     projectIds: [],
     categoryKeys: [],
     paymentTypeIds: [],
+    paymentStatus: '',
     handlerIds: [],
     reasonKeyword: '',
     amountMin: '',
@@ -244,6 +282,7 @@ export default function FinancePage() {
     setVisibleColumns(next)
     try {
       localStorage.setItem(COLUMN_STORAGE_KEY, JSON.stringify(next))
+      localStorage.setItem(COLUMN_STORAGE_VERSION_KEY, String(COLUMN_STORAGE_VERSION))
     } catch (error) {
       console.error('Failed to persist visible columns', error)
     }
@@ -257,6 +296,7 @@ export default function FinancePage() {
     paymentTypeId: '',
     handlerId: '',
     paymentDate: formatDateInput(new Date().toISOString()),
+    paymentStatus: 'PAID',
     tva: '',
     remark: '',
   })
@@ -404,6 +444,9 @@ export default function FinancePage() {
     if (listFilters.paymentTypeIds.length) {
       result = result.filter((e) => listFilters.paymentTypeIds.includes(e.paymentTypeId))
     }
+    if (listFilters.paymentStatus) {
+      result = result.filter((e) => e.paymentStatus === listFilters.paymentStatus)
+    }
     if (listFilters.handlerIds.length) {
       result = result.filter((e) => (e.handlerId ? listFilters.handlerIds.includes(e.handlerId) : false))
     }
@@ -446,6 +489,11 @@ export default function FinancePage() {
     return result
   }, [entries, listFilters])
 
+  const pendingEntries = useMemo(
+    () => filteredEntries.filter((entry) => entry.paymentStatus === 'PENDING'),
+    [filteredEntries],
+  )
+
   const tableRows = useMemo(() => {
     const offset = (listFilters.page - 1) * listFilters.pageSize
     return filteredEntries.map((entry, index) => ({ entry, displayIndex: offset + index + 1 }))
@@ -465,6 +513,7 @@ export default function FinancePage() {
     { key: 'unit', label: '单位' },
     { key: 'paymentType', label: '支付方式' },
     { key: 'paymentDate', label: '支付日期' },
+    { key: 'paymentStatus', label: '支付状态' },
     { key: 'handler', label: '经办人' },
     { key: 'createdBy', label: '创建人' },
     { key: 'updatedBy', label: '更新人' },
@@ -492,6 +541,7 @@ export default function FinancePage() {
       const next = prev.includes(key) ? prev.filter((item) => item !== key) : [...prev, key]
       try {
         localStorage.setItem(COLUMN_STORAGE_KEY, JSON.stringify(next))
+        localStorage.setItem(COLUMN_STORAGE_VERSION_KEY, String(COLUMN_STORAGE_VERSION))
       } catch (error) {
         console.error('Failed to persist visible columns', error)
       }
@@ -504,6 +554,7 @@ export default function FinancePage() {
     filtersInput.projectIds.forEach((id) => params.append('projectId', String(id)))
     filtersInput.categoryKeys.forEach((key) => params.append('categoryKey', key))
     filtersInput.paymentTypeIds.forEach((id) => params.append('paymentTypeId', String(id)))
+    if (filtersInput.paymentStatus) params.set('paymentStatus', filtersInput.paymentStatus)
     filtersInput.handlerIds.forEach((id) => params.append('handlerId', String(id)))
     if (filtersInput.reasonKeyword.trim()) params.set('reasonKeyword', filtersInput.reasonKeyword.trim())
     if (filtersInput.amountMin !== '') params.set('amountMin', filtersInput.amountMin)
@@ -566,6 +617,7 @@ export default function FinancePage() {
         projectIds: [],
         categoryKeys: [],
         paymentTypeIds: [],
+        paymentStatus: '',
         handlerIds: [],
         reasonKeyword: '',
         amountMin: '',
@@ -652,11 +704,20 @@ export default function FinancePage() {
   useEffect(() => {
     try {
       const stored = localStorage.getItem(COLUMN_STORAGE_KEY)
+      const storedVersion = Number(localStorage.getItem(COLUMN_STORAGE_VERSION_KEY) || 0)
       if (stored) {
         const parsed = JSON.parse(stored) as string[]
         if (Array.isArray(parsed)) {
-          setVisibleColumns(parsed)
+          let nextColumns = parsed
+          if (storedVersion < COLUMN_STORAGE_VERSION && !parsed.includes('paymentStatus')) {
+            nextColumns = [...parsed, 'paymentStatus']
+            localStorage.setItem(COLUMN_STORAGE_KEY, JSON.stringify(nextColumns))
+          }
+          localStorage.setItem(COLUMN_STORAGE_VERSION_KEY, String(COLUMN_STORAGE_VERSION))
+          setVisibleColumns(nextColumns)
         }
+      } else {
+        localStorage.setItem(COLUMN_STORAGE_VERSION_KEY, String(COLUMN_STORAGE_VERSION))
       }
       setColumnsReady(true)
     } catch (error) {
@@ -669,6 +730,7 @@ export default function FinancePage() {
     if (!columnsReady) return
     try {
       localStorage.setItem(COLUMN_STORAGE_KEY, JSON.stringify(visibleColumns))
+      localStorage.setItem(COLUMN_STORAGE_VERSION_KEY, String(COLUMN_STORAGE_VERSION))
     } catch (error) {
       console.error('Failed to persist visible columns', error)
     }
@@ -698,6 +760,7 @@ export default function FinancePage() {
     projectIds: filtersProjectIds,
     categoryKeys: filtersCategoryKeys,
     paymentTypeIds: filtersPaymentTypeIds,
+    paymentStatus: filtersPaymentStatus,
     handlerIds: filtersHandlerIds,
     reasonKeyword: filtersReasonKeyword,
     amountMin: filtersAmountMin,
@@ -716,6 +779,7 @@ export default function FinancePage() {
       projectIds: filtersProjectIds,
       categoryKeys: filtersCategoryKeys,
       paymentTypeIds: filtersPaymentTypeIds,
+      paymentStatus: filtersPaymentStatus,
       handlerIds: filtersHandlerIds,
       reasonKeyword: filtersReasonKeyword,
       amountMin: filtersAmountMin,
@@ -734,6 +798,7 @@ export default function FinancePage() {
     filtersProjectIds,
     filtersCategoryKeys,
     filtersPaymentTypeIds,
+    filtersPaymentStatus,
     filtersHandlerIds,
     filtersReasonKeyword,
     filtersAmountMin,
@@ -753,6 +818,7 @@ export default function FinancePage() {
       projectIds: filtersProjectIds,
       categoryKeys: filtersCategoryKeys,
       paymentTypeIds: filtersPaymentTypeIds,
+      paymentStatus: filtersPaymentStatus,
       handlerIds: filtersHandlerIds,
       reasonKeyword: filtersReasonKeyword,
       amountMin: filtersAmountMin,
@@ -772,6 +838,7 @@ export default function FinancePage() {
     filtersProjectIds,
     filtersCategoryKeys,
     filtersPaymentTypeIds,
+    filtersPaymentStatus,
     filtersHandlerIds,
     filtersReasonKeyword,
     filtersAmountMin,
@@ -856,6 +923,7 @@ export default function FinancePage() {
       paymentTypeId: defaultPayment?.id ?? '',
       handlerId: defaultHandlerId || '',
       paymentDate: formatDateInput(new Date().toISOString()),
+      paymentStatus: 'PAID',
       tva: '',
       remark: '',
     })
@@ -864,7 +932,14 @@ export default function FinancePage() {
 
   const handleSubmit = async () => {
     if (!canEdit) return
-    if (!form.projectId || !form.reason || !form.categoryKey || !form.amount || !form.unitId || !form.paymentTypeId) {
+    if (
+      !form.projectId ||
+      !form.reason ||
+      !form.categoryKey ||
+      !form.amount ||
+      !form.unitId ||
+      !form.paymentTypeId
+    ) {
       setMessage('请填写完整必填字段')
       return
     }
@@ -878,6 +953,7 @@ export default function FinancePage() {
       paymentTypeId: Number(form.paymentTypeId),
       handlerId: form.handlerId ? Number(form.handlerId) : null,
       paymentDate: form.paymentDate || new Date().toISOString(),
+      paymentStatus: form.paymentStatus,
       tva: form.tva ? Number(form.tva) : null,
       remark: form.remark || null,
     }
@@ -921,6 +997,7 @@ export default function FinancePage() {
       paymentTypeId: entry.paymentTypeId,
       handlerId: entry.handlerId ?? '',
       paymentDate: formatDateInput(entry.paymentDate),
+      paymentStatus: entry.paymentStatus,
       tva: entry.tva != null ? String(entry.tva) : '',
       remark: entry.remark ?? '',
     })
@@ -1342,6 +1419,29 @@ export default function FinancePage() {
 
             <div className="min-w-0 md:col-span-6 lg:col-span-4 xl:col-span-3">
               <label className="space-y-1 text-sm">
+                <span className="text-slate-700">支付状态</span>
+                <select
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
+                  value={listDraft.paymentStatus}
+                  onChange={(e) =>
+                    setListDraft((prev) => ({
+                      ...prev,
+                      paymentStatus: e.target.value as PaymentStatus | '',
+                    }))
+                  }
+                >
+                  <option value="">全部状态</option>
+                  {paymentStatusOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
+            <div className="min-w-0 md:col-span-6 lg:col-span-4 xl:col-span-3">
+              <label className="space-y-1 text-sm">
                 <span className="text-slate-700">经办人</span>
                 <div className="relative" ref={handlerRef}>
                   <button
@@ -1674,6 +1774,7 @@ export default function FinancePage() {
                       projectIds: [],
                       categoryKeys: [],
                       paymentTypeIds: [],
+                      paymentStatus: '',
                       handlerIds: [],
                       reasonKeyword: '',
                       amountMin: '',
@@ -1775,6 +1876,7 @@ export default function FinancePage() {
                           支付日期 {listFilters.sortField === 'paymentDate' ? (listFilters.sortDir === 'asc' ? '↑' : '↓') : ''}
                         </th>
                       )}
+                      {visibleColumns.includes('paymentStatus') && <th className="px-3 py-2">支付状态</th>}
                       {visibleColumns.includes('handler') && <th className="px-3 py-2">经办人</th>}
                       {visibleColumns.includes('createdBy') && <th className="px-3 py-2">创建人</th>}
                       {visibleColumns.includes('updatedBy') && <th className="px-3 py-2">更新人</th>}
@@ -1819,6 +1921,15 @@ export default function FinancePage() {
                         )}
                         {visibleColumns.includes('paymentDate') && (
                           <td className="px-3 py-2">{formatDateInput(entry.paymentDate)}</td>
+                        )}
+                        {visibleColumns.includes('paymentStatus') && (
+                          <td className="px-3 py-2">
+                            <span
+                              className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${paymentStatusBadgeStyles[entry.paymentStatus]}`}
+                            >
+                              {paymentStatusLabels[entry.paymentStatus]}
+                            </span>
+                          </td>
                         )}
                         {visibleColumns.includes('handler') && (
                           <td className="px-3 py-2">{entry.handlerName || entry.handlerUsername || '—'}</td>
@@ -2192,7 +2303,60 @@ export default function FinancePage() {
                 </div>
               </div>
 
-              <div className="grid gap-4 min-w-0 md:grid-cols-2">
+              <div className="grid gap-4 min-w-0 md:grid-cols-2 xl:grid-cols-3">
+                <div className="w-full min-w-0 rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900">支付状态分布</p>
+                      <p className="text-xs text-slate-500">含待支付金额，可快速筛选</p>
+                    </div>
+                    <span className="rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-700">
+                      {insights?.paymentStatusBreakdown.length ?? 0} 类
+                    </span>
+                  </div>
+                  {insights?.paymentStatusBreakdown?.length ? (
+                    <div className="mt-3 space-y-2">
+                      {insights.paymentStatusBreakdown.map((item) => (
+                        <button
+                          key={item.status}
+                          onClick={() => {
+                            setListDraft((prev) => ({ ...prev, paymentStatus: item.status, page: 1 }))
+                            setListFilters((prev) => ({ ...prev, paymentStatus: item.status, page: 1 }))
+                            setViewMode('table')
+                            setRefreshKey((prev) => prev + 1)
+                          }}
+                          className="w-full rounded-lg border border-slate-100 px-3 py-2 text-left transition hover:-translate-y-0.5 hover:border-amber-200 hover:shadow-sm"
+                        >
+                          <div className="flex items-center justify-between gap-2 text-sm">
+                            <div className="flex items-center gap-2">
+                              <span
+                                className={`rounded-full px-2 py-0.5 text-xs font-medium ${paymentStatusBadgeStyles[item.status]}`}
+                              >
+                                {paymentStatusLabels[item.status]}
+                              </span>
+                              <span className="text-xs text-slate-500">{item.count} 笔</span>
+                            </div>
+                            <div className="text-right text-xs text-slate-600">
+                              <div>{item.amount.toLocaleString('zh-CN', { minimumFractionDigits: 2 })}</div>
+                              <div>{item.share}%</div>
+                            </div>
+                          </div>
+                          <div className="mt-2 h-2 rounded-full bg-slate-100">
+                            <div
+                              className="h-2 rounded-full"
+                              style={{
+                                width: `${Math.min(item.share, 100)}%`,
+                                background: paymentStatusBarStyles[item.status],
+                              }}
+                            />
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="mt-2 text-sm text-slate-500">暂无状态数据</p>
+                  )}
+                </div>
                 <div className="w-full min-w-0 rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
                   <div className="flex items-center justify-between">
                     <div>
@@ -2249,14 +2413,14 @@ export default function FinancePage() {
                 <div className="w-full min-w-0 rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-semibold text-slate-900">近期待办</p>
-                      <p className="text-xs text-slate-500">高金额条目可快速核查</p>
+                      <p className="text-sm font-semibold text-slate-900">待支付清单</p>
+                      <p className="text-xs text-slate-500">仅展示待支付条目，按金额排序</p>
                     </div>
                     <span className="rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-700">Top 5</span>
                   </div>
-                  {filteredEntries.length ? (
+                  {pendingEntries.length ? (
                     <div className="mt-3 w-full max-w-full space-y-2">
-                      {[...filteredEntries]
+                      {[...pendingEntries]
                         .sort((a, b) => b.amount - a.amount)
                         .slice(0, 5)
                         .map((entry) => (
@@ -2280,7 +2444,7 @@ export default function FinancePage() {
                         ))}
                     </div>
                   ) : (
-                    <p className="mt-2 text-sm text-slate-500">暂无条目</p>
+                    <p className="mt-2 text-sm text-slate-500">暂无待支付条目</p>
                   )}
                 </div>
               </div>
@@ -2438,7 +2602,7 @@ export default function FinancePage() {
                 </label>
               </div>
 
-              <div className="grid gap-3 md:grid-cols-2">
+              <div className="grid gap-3 md:grid-cols-3">
                 <label className="space-y-1">
                   <span className="text-sm font-medium text-slate-700">支付日期</span>
                   <input
@@ -2447,6 +2611,22 @@ export default function FinancePage() {
                     value={form.paymentDate}
                     onChange={(e) => setForm((prev) => ({ ...prev, paymentDate: e.target.value }))}
                   />
+                </label>
+                <label className="space-y-1">
+                  <span className="text-sm font-medium text-slate-700">支付状态</span>
+                  <select
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
+                    value={form.paymentStatus}
+                    onChange={(e) =>
+                      setForm((prev) => ({ ...prev, paymentStatus: e.target.value as PaymentStatus }))
+                    }
+                  >
+                    {paymentStatusOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
                 </label>
                 <label className="space-y-1">
                   <span className="text-sm font-medium text-slate-700">经办人</span>
@@ -2603,7 +2783,14 @@ export default function FinancePage() {
                 <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
                   <p className="text-xs font-semibold text-slate-500">支付方式</p>
                   <p className="mt-1 text-sm font-medium text-slate-900">{viewingEntry.entry.paymentTypeName}</p>
-                  <p className="mt-2 text-xs text-slate-500">支付日期：{formatDateInput(viewingEntry.entry.paymentDate)}</p>
+                  <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                    <span>支付日期：{formatDateInput(viewingEntry.entry.paymentDate)}</span>
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${paymentStatusBadgeStyles[viewingEntry.entry.paymentStatus]}`}
+                    >
+                      {paymentStatusLabels[viewingEntry.entry.paymentStatus]}
+                    </span>
+                  </div>
                 </div>
                 <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
                   <p className="text-xs font-semibold text-slate-500">经办人</p>

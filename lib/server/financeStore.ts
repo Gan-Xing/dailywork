@@ -1,4 +1,4 @@
-import { Prisma } from '@prisma/client'
+import { Prisma, PaymentStatus } from '@prisma/client'
 
 import financeCategories from '@/lib/data/finance-cost-categories.json'
 import { prisma } from '@/lib/prisma'
@@ -47,6 +47,7 @@ export type FinanceEntryDTO = {
   paymentTypeId: number
   paymentTypeName: string
   paymentDate: string
+  paymentStatus: PaymentStatus
   handlerId?: number | null
   handlerName?: string | null
   handlerUsername?: string | null
@@ -71,6 +72,7 @@ type EntryPayload = {
   unitId: number
   paymentTypeId: number
   paymentDate: string
+  paymentStatus: PaymentStatus
   handlerId?: number | null
   tva?: number | null
   remark?: string | null
@@ -80,6 +82,7 @@ export type FinanceEntryFilterOptions = {
   projectIds?: number[]
   categoryKeys?: string[]
   paymentTypeIds?: number[]
+  paymentStatus?: PaymentStatus
   handlerIds?: number[]
   reasonKeyword?: string
   amountMin?: number
@@ -332,6 +335,7 @@ const buildEntryWhere = (options: FinanceEntryFilterOptions): Prisma.FinanceEntr
   const where: Prisma.FinanceEntryWhereInput = {
     projectId: options.projectIds?.length ? { in: options.projectIds } : undefined,
     paymentTypeId: options.paymentTypeIds?.length ? { in: options.paymentTypeIds } : undefined,
+    paymentStatus: options.paymentStatus ?? undefined,
     handlerId: options.handlerIds?.length ? { in: options.handlerIds } : undefined,
     isDeleted: options.includeDeleted ? undefined : false,
     AND: andConditions.length ? andConditions : undefined,
@@ -420,6 +424,7 @@ export const listFinanceEntries = async (options: FinanceEntryFilterOptions): Pr
       paymentTypeId: entry.paymentTypeId,
       paymentTypeName: entry.paymentType.name,
       paymentDate: entry.paymentDate.toISOString(),
+      paymentStatus: entry.paymentStatus,
       handlerId: entry.handlerId ?? null,
       handlerName: entry.handler?.name ?? null,
       handlerUsername: entry.handler?.username ?? null,
@@ -484,6 +489,7 @@ export type FinanceInsights = {
   latestPaymentDate?: string | null
   topCategories: { key: string; label: string; amount: number; count: number; share: number }[]
   paymentBreakdown: { id: number; name: string; amount: number; count: number; share: number }[]
+  paymentStatusBreakdown: { status: PaymentStatus; amount: number; count: number; share: number }[]
   monthlyTrend: { month: string; amount: number; count: number }[]
   categoryBreakdown: {
     key: string
@@ -509,7 +515,7 @@ export const getFinanceInsights = async (options: FinanceEntryFilterOptions) => 
     prisma.paymentType.findMany(),
     prisma.financeEntry.findMany({
       where,
-      select: { amount: true, categoryKey: true, parentKeys: true, paymentTypeId: true, paymentDate: true },
+      select: { amount: true, categoryKey: true, parentKeys: true, paymentTypeId: true, paymentDate: true, paymentStatus: true },
     }),
   ])
 
@@ -609,6 +615,29 @@ export const getFinanceInsights = async (options: FinanceEntryFilterOptions) => 
     }))
     .sort((a, b) => b.amount - a.amount)
 
+  const statusMap = new Map<PaymentStatus, { amount: number; count: number }>()
+  entriesForTrend.forEach((entry) => {
+    const amount = new Prisma.Decimal(entry.amount).toNumber()
+    const existing = statusMap.get(entry.paymentStatus)
+    if (existing) {
+      existing.amount += amount
+      existing.count += 1
+    } else {
+      statusMap.set(entry.paymentStatus, { amount, count: 1 })
+    }
+  })
+  const paymentStatusOrder: PaymentStatus[] = ['PAID', 'PENDING']
+  const paymentStatusBreakdown = paymentStatusOrder.map((status) => {
+    const summary = statusMap.get(status) ?? { amount: 0, count: 0 }
+    const roundedAmount = Math.round(summary.amount * 100) / 100
+    return {
+      status,
+      amount: roundedAmount,
+      count: summary.count,
+      share: totalAmount ? Math.round((summary.amount / totalAmount) * 1000) / 10 : 0,
+    }
+  })
+
   const monthlyMap = new Map<string, { amount: number; count: number }>()
   entriesForTrend.forEach((entry) => {
     const amount = new Prisma.Decimal(entry.amount).toNumber()
@@ -637,6 +666,7 @@ export const getFinanceInsights = async (options: FinanceEntryFilterOptions) => 
     latestPaymentDate,
     topCategories,
     paymentBreakdown,
+    paymentStatusBreakdown,
     monthlyTrend,
     categoryBreakdown,
   } satisfies FinanceInsights
@@ -663,6 +693,7 @@ export const createFinanceEntry = async (payload: EntryPayload, userId?: number 
       unitId: payload.unitId,
       paymentTypeId: payload.paymentTypeId,
       paymentDate: new Date(payload.paymentDate),
+      paymentStatus: payload.paymentStatus,
       tva: tva == null ? null : new Prisma.Decimal(tva),
       remark: payload.remark ?? null,
       handlerId: handler?.id ?? null,
@@ -699,6 +730,7 @@ export const createFinanceEntry = async (payload: EntryPayload, userId?: number 
     paymentTypeId: entry.paymentTypeId,
     paymentTypeName: entry.paymentType.name,
     paymentDate: entry.paymentDate.toISOString(),
+    paymentStatus: entry.paymentStatus,
     handlerId: entry.handlerId ?? null,
     handlerName: entry.handler?.name ?? null,
     handlerUsername: entry.handler?.username ?? null,
@@ -745,6 +777,7 @@ export const updateFinanceEntry = async (id: number, payload: Partial<EntryPaylo
       unitId: payload.unitId ?? existing.unitId,
       paymentTypeId: payload.paymentTypeId ?? existing.paymentTypeId,
       paymentDate: payload.paymentDate ? new Date(payload.paymentDate) : existing.paymentDate,
+      paymentStatus: payload.paymentStatus ?? existing.paymentStatus,
       tva: tva == null ? null : new Prisma.Decimal(tva),
       remark: payload.remark ?? existing.remark,
       handlerId: handler?.id ?? null,
@@ -781,6 +814,7 @@ export const updateFinanceEntry = async (id: number, payload: Partial<EntryPaylo
     paymentTypeId: entry.paymentTypeId,
     paymentTypeName: entry.paymentType.name,
     paymentDate: entry.paymentDate.toISOString(),
+    paymentStatus: entry.paymentStatus,
     handlerId: entry.handlerId ?? null,
     handlerName: entry.handler?.name ?? null,
     handlerUsername: entry.handler?.username ?? null,

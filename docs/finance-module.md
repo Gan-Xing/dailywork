@@ -15,12 +15,13 @@
 - `unit` (text): e.g., 元, 万元.
 - `paymentType` (select): e.g., 现金, 转账, POS, 其他.
 - `paymentDate` (date): when the payment was made.
+- `paymentStatus` (select): PENDING/PAID for expected vs completed payments.
 - `tva` (decimal): tax amount/TVA for the entry.
 - `remark` (text, optional): any supplemental note.
 
 ## UX/Entry Points
 - Homepage adds a “财务记账” module card linking to `/finance` as the third core entry.
-- Future list view: sortable table with filters by project, category, payment type, date range.
+- Future list view: sortable table with filters by project, category, payment type, payment status, date range.
 - Editing: inline row edit or drawer; deletion requires confirm dialog.
 
 ## Cost Categories (大类/小类)

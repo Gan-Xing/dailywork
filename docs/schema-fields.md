@@ -288,14 +288,15 @@
      6. `amount`：金额（decimal，必填）。
      7. `unitId`：关联金额单位字典（必填，可维护列表，初始包含“西法”“美金”“人民币”）。
      8. `paymentTypeId`：关联支付方式字典（必填，可维护列表，初始包含“现金”“现金支票”“转账支票”“办事处代付”“无票据支出”）。
-     9. `paymentDate`：支付日期（日期，必填）。
-    10. `tva`：税费（decimal，可空，默认为 0）。
-    11. `remark`：备注（可空）。
-    12. `isDeleted`：布尔，软删标记，默认 `false`。
-    13. `deletedAt`：软删时间（可空）。
-    14. `deletedBy`：关联 User（可空，软删操作者）。
-    15. `createdAt` / `updatedAt`：时间戳。
-    16. `createdBy`：关联 User（记录填报人）。
+     9. `paymentDate`：支付日期（日期，必填；待支付时可作为预计支付日期）。
+    10. `paymentStatus`：支付状态（枚举 `PENDING`/`PAID`，分别为“待支付/已支付”，默认 `PAID`）。
+    11. `tva`：税费（decimal，可空，默认为 0）。
+    12. `remark`：备注（可空）。
+    13. `isDeleted`：布尔，软删标记，默认 `false`。
+    14. `deletedAt`：软删时间（可空）。
+    15. `deletedBy`：关联 User（可空，软删操作者）。
+    16. `createdAt` / `updatedAt`：时间戳。
+    17. `createdBy`：关联 User（记录填报人）。
 
 ## 财务主数据
 

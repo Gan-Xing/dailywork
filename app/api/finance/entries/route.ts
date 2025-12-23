@@ -1,8 +1,11 @@
+import { PaymentStatus } from '@prisma/client'
 import { NextResponse } from 'next/server'
 
 import { getSessionUser, hasPermission } from '@/lib/server/authSession'
 import { parseFinanceFilters } from '@/lib/server/financeFilters'
 import { createFinanceEntry, listFinanceEntries } from '@/lib/server/financeStore'
+
+const isPaymentStatus = (value: unknown): value is PaymentStatus => value === 'PENDING' || value === 'PAID'
 
 export async function GET(request: Request) {
   if (!(await hasPermission('finance:view'))) {
@@ -37,6 +40,7 @@ export async function POST(request: Request) {
     paymentTypeId?: number
     handlerId?: number | null
     paymentDate?: string
+    paymentStatus?: PaymentStatus
     tva?: number | null
     remark?: string | null
   }
@@ -57,6 +61,9 @@ export async function POST(request: Request) {
   ) {
     return NextResponse.json({ message: '缺少必填字段' }, { status: 400 })
   }
+  if (!payload.paymentStatus || !isPaymentStatus(payload.paymentStatus)) {
+    return NextResponse.json({ message: '无效的支付状态' }, { status: 400 })
+  }
 
   try {
     const session = await getSessionUser()
@@ -70,6 +77,7 @@ export async function POST(request: Request) {
         paymentTypeId: Number(payload.paymentTypeId),
         handlerId: payload.handlerId == null ? null : Number(payload.handlerId),
         paymentDate: payload.paymentDate,
+        paymentStatus: payload.paymentStatus,
         tva: payload.tva == null ? null : Number(payload.tva),
         remark: payload.remark ?? null,
       },

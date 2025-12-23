@@ -1,7 +1,10 @@
+import { PaymentStatus } from '@prisma/client'
 import { NextResponse, type NextRequest } from 'next/server'
 
 import { getSessionUser, hasPermission } from '@/lib/server/authSession'
 import { softDeleteFinanceEntry, updateFinanceEntry } from '@/lib/server/financeStore'
+
+const isPaymentStatus = (value: unknown): value is PaymentStatus => value === 'PENDING' || value === 'PAID'
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id: idParam } = await params
@@ -22,6 +25,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     paymentTypeId?: number
     handlerId?: number | null
     paymentDate?: string
+    paymentStatus?: PaymentStatus
     tva?: number | null
     remark?: string | null
   }
@@ -29,6 +33,10 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     payload = (await request.json()) as typeof payload
   } catch {
     return NextResponse.json({ message: 'Invalid JSON body' }, { status: 400 })
+  }
+
+  if (payload.paymentStatus !== undefined && !isPaymentStatus(payload.paymentStatus)) {
+    return NextResponse.json({ message: '无效的支付状态' }, { status: 400 })
   }
 
   try {

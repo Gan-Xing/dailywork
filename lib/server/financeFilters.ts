@@ -1,3 +1,5 @@
+import { PaymentStatus } from '@prisma/client'
+
 import { FinanceEntryFilterOptions } from '@/lib/server/financeStore'
 
 const toNumber = (value: string | null) => {
@@ -11,10 +13,14 @@ const toNumberArray = (values: string[]) =>
     .map((value) => Number(value))
     .filter((num) => Number.isFinite(num))
 
+const toPaymentStatus = (value: string | null): PaymentStatus | undefined =>
+  value === 'PENDING' || value === 'PAID' ? value : undefined
+
 export const parseFinanceFilters = (searchParams: URLSearchParams): FinanceEntryFilterOptions => {
   const projectIds = toNumberArray(searchParams.getAll('projectId'))
   const paymentTypeIds = toNumberArray(searchParams.getAll('paymentTypeId'))
   const handlerIds = toNumberArray(searchParams.getAll('handlerId'))
+  const paymentStatus = toPaymentStatus(searchParams.get('paymentStatus'))
   const amountMin = toNumber(searchParams.get('amountMin'))
   const amountMax = toNumber(searchParams.get('amountMax'))
   const page = toNumber(searchParams.get('page'))
@@ -33,6 +39,7 @@ export const parseFinanceFilters = (searchParams: URLSearchParams): FinanceEntry
   return {
     projectIds: projectIds.length ? projectIds : undefined,
     paymentTypeIds: paymentTypeIds.length ? paymentTypeIds : undefined,
+    paymentStatus,
     handlerIds: handlerIds.length ? handlerIds : undefined,
     amountMin,
     amountMax,

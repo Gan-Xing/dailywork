@@ -79,6 +79,11 @@ enum DocumentStatus {
   ARCHIVED
 }
 
+enum PaymentStatus {
+  PENDING
+  PAID
+}
+
 model PhaseDefinition {
   id             Int                     @id @default(autoincrement())
   name           String
@@ -545,6 +550,7 @@ model FinanceEntry {
   unitId        Int
   paymentTypeId Int
   paymentDate   DateTime
+  paymentStatus PaymentStatus @default(PAID)
   tva           Decimal?       @db.Decimal(18, 2)
   remark        String?
   handlerId     Int?
@@ -570,6 +576,7 @@ model FinanceEntry {
   @@index([paymentDate])
   @@index([isDeleted])
   @@index([handlerId])
+  @@index([paymentStatus])
 }
 
 model DocumentTemplate {
