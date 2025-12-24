@@ -357,9 +357,20 @@
 - `medicalHistory?`：既往病史。
 - `healthStatus?`：健康状况。
 
-### UserExpatProfile（外籍扩展，预留）
+### UserExpatProfile（外籍扩展）
 - `userId`：关联 `User`。
-- 其他字段暂未定义，保留以便后续无破坏扩展。
+- `team?`：班组/队伍名称。
+- `contractNumber?`：合同编号（可空但需唯一）。
+- `contractType?`：枚举 `CTJ` / `CDD`。
+- `salaryCategory?`：工资等级。
+- `baseSalaryAmount?` + `baseSalaryUnit?`：基础工资金额与单位（单位枚举 `MONTH` / `HOUR`，`CDD` 必须为月单位）。
+- `netMonthlyAmount?` + `netMonthlyUnit?`：实发工资金额与单位（仅月单位）。
+- `maritalStatus?`：婚姻状态。
+- `childrenCount?`：子女数量（整数）。
+- `cnpsNumber?`：CNPS 编号。
+- `cnpsDeclarationCode?`：CNPS 申报码。
+- `provenance?`：属地/来源。
+- `emergencyContactName?` / `emergencyContactPhone?`：紧急联系人及电话。
 
 ### 国籍列表（中文 / Français）
 - 中国 / Chine

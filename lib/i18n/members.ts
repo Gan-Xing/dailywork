@@ -245,6 +245,7 @@ export const memberCopy: Record<
     }
     form: {
       name: string
+      namePlaceholder: string
       username: string
       password: string
       passwordPlaceholder: string
@@ -253,6 +254,7 @@ export const memberCopy: Record<
       phones: string
       phonePlaceholder: string
       addPhone: string
+      phoneSaved: (count: number) => string
       joinDate: string
       birthDate: string
       position: string
@@ -317,6 +319,22 @@ export const memberCopy: Record<
     labels: {
       empty: string
       today: string
+      close: string
+    }
+    drawer: {
+      tabs: Record<'overview' | 'contracts' | 'payroll', string>
+      sections: {
+        basicInfo: string
+        contract: string
+        salary: string
+        personal: string
+        chineseProfile: string
+        emergencyContact: string
+      }
+      comingSoon: {
+        contracts: string
+        payroll: string
+      }
     }
   }
 > = {
@@ -566,6 +584,7 @@ export const memberCopy: Record<
     },
     form: {
       name: '姓名',
+      namePlaceholder: '陈蓉 / Marie Dupont',
       username: '账号',
       password: '初始密码',
       passwordPlaceholder: '设置初始密码（编辑留空不改）',
@@ -574,6 +593,7 @@ export const memberCopy: Record<
       phones: '电话',
       phonePlaceholder: '输入电话',
       addPhone: '添加电话',
+      phoneSaved: (count: number) => `已保存 ${count} 个号码`,
       joinDate: '入职日期',
       birthDate: '出生日期',
       position: '岗位',
@@ -640,6 +660,26 @@ export const memberCopy: Record<
     labels: {
       empty: '无',
       today: '今天',
+      close: '关闭',
+    },
+    drawer: {
+      tabs: {
+        overview: '概览',
+        contracts: '合同',
+        payroll: '薪资',
+      },
+      sections: {
+        basicInfo: '基本信息',
+        contract: '合同信息',
+        salary: '薪资信息',
+        personal: '个人详情',
+        chineseProfile: '中方员工信息',
+        emergencyContact: '紧急联系',
+      },
+      comingSoon: {
+        contracts: '合同变更记录功能即将上线',
+        payroll: '薪资发放记录功能即将上线',
+      },
     },
   },
   fr: {
@@ -892,6 +932,7 @@ export const memberCopy: Record<
     },
     form: {
       name: 'Nom',
+      namePlaceholder: 'Chen Rong / Marie Dupont',
       username: 'Identifiant',
       password: 'Mot de passe initial',
       passwordPlaceholder: 'Définir un mot de passe (vide en édition = inchangé)',
@@ -900,6 +941,7 @@ export const memberCopy: Record<
       phones: 'Téléphone(s)',
       phonePlaceholder: 'Saisir un numéro',
       addPhone: 'Ajouter un numéro',
+      phoneSaved: (count: number) => `${count} numéro(s) enregistré(s)`,
       joinDate: "Date d'arrivée",
       birthDate: 'Date de naissance',
       position: 'Poste',
@@ -966,6 +1008,26 @@ export const memberCopy: Record<
     labels: {
       empty: 'N/A',
       today: "Aujourd'hui",
+      close: 'Fermer',
+    },
+    drawer: {
+      tabs: {
+        overview: 'Aperçu',
+        contracts: 'Contrats',
+        payroll: 'Paie',
+      },
+      sections: {
+        basicInfo: 'Informations de base',
+        contract: 'Contrat',
+        salary: 'Salaire',
+        personal: 'Détails personnels',
+        chineseProfile: 'Profil chinois',
+        emergencyContact: "Contact d'urgence",
+      },
+      comingSoon: {
+        contracts: 'Historique des contrats bientôt disponible',
+        payroll: 'Historique des paiements bientôt disponible',
+      },
     },
   },
 }

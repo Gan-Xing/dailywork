@@ -11,10 +11,8 @@ import {
   type ReactNode,
 } from 'react'
 
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
-import { LocaleSwitcher } from '@/components/LocaleSwitcher'
 import { AccessDenied } from '@/components/AccessDenied'
 import { MultiSelectFilter } from '@/components/MultiSelectFilter'
 import {
@@ -27,476 +25,60 @@ import {
   type NationalityRegion,
   type NationalityOption,
 } from '@/lib/i18n/members'
+import {
+  defaultSortStack,
+  defaultVisibleColumns,
+  EMPTY_FILTER_VALUE,
+  exportableColumnOrder,
+  MEMBER_COLUMN_STORAGE_KEY,
+  memberTemplateColumns,
+  PAGE_SIZE_OPTIONS,
+  PERMISSION_STATUS_OPTIONS,
+  PHONE_PATTERN,
+  REQUIRED_IMPORT_COLUMNS,
+  type ColumnKey,
+  type ImportError,
+  type SortField,
+  type SortOrder,
+  type TemplateColumnKey,
+} from '@/lib/members/constants'
+import {
+  buildChineseProfileForm,
+  buildExpatProfileForm,
+  emptyChineseProfile,
+  emptyExpatProfile,
+  getMonthKey,
+  normalizeProfileNumber,
+  normalizeText,
+  parseBirthDateFromIdNumber,
+  toNumberFilterValue,
+  toSalaryFilterValue,
+} from '@/lib/members/utils'
+import { useMemberTableState } from '@/lib/members/useMemberTableState'
 import { type SessionUser } from '@/lib/server/authSession'
 import { usePreferredLocale } from '@/lib/usePreferredLocale'
+import { MemberDetailDrawer } from '@/components/members/MemberDetailDrawer'
+import { MemberFilterDrawer } from '@/components/members/MemberFilterDrawer'
+import { MembersHeader } from '@/components/members/MembersHeader'
+import { ActionButton, TabButton } from '@/components/members/MemberButtons'
+import type {
+  Member,
+  Role,
+  Permission,
+  MemberFormState as FormState,
+  PermissionStatus,
+  ExpatProfileForm,
+} from '@/types/members'
 
 export const dynamic = 'force-dynamic'
 
-type ChineseProfile = {
-  frenchName: string | null
-  idNumber: string | null
-  passportNumber: string | null
-  educationAndMajor: string | null
-  certifications: string[]
-  domesticMobile: string | null
-  emergencyContactName: string | null
-  emergencyContactPhone: string | null
-  redBookValidYears: number | null
-  cumulativeAbroadYears: number | null
-  birthplace: string | null
-  residenceInChina: string | null
-  medicalHistory: string | null
-  healthStatus: string | null
-}
 
-type ExpatProfile = {
-  team: string | null
-  contractNumber: string | null
-  contractType: 'CTJ' | 'CDD' | null
-  salaryCategory: string | null
-  baseSalaryAmount: string | null
-  baseSalaryUnit: 'MONTH' | 'HOUR' | null
-  netMonthlyAmount: string | null
-  netMonthlyUnit: 'MONTH' | 'HOUR' | null
-  maritalStatus: string | null
-  childrenCount: number | null
-  cnpsNumber: string | null
-  cnpsDeclarationCode: string | null
-  provenance: string | null
-  emergencyContactName: string | null
-  emergencyContactPhone: string | null
-  createdAt?: string
-  updatedAt?: string
-}
 
-type Member = {
-  id: number
-  name: string | null
-  username: string
-  gender: string | null
-  nationality: string | null
-  phones: string[]
-  joinDate: string | null
-  birthDate: string | null
-  terminationDate: string | null
-  terminationReason: string | null
-  position: string | null
-  employmentStatus: EmploymentStatus
-  roles: { id: number; name: string }[]
-  createdAt: string
-  updatedAt: string
-  chineseProfile?: ChineseProfile | null
-  expatProfile?: ExpatProfile | null
-}
 
-type Role = {
-  id: number
-  name: string
-  permissions: { id: number; code: string; name: string; status?: PermissionStatus }[]
-}
 
-type Permission = {
-  id: number
-  code: string
-  name: string
-  status: PermissionStatus
-}
 
-type FormState = {
-  id?: number
-  username: string
-  password: string
-  name: string
-  gender: string
-  nationality: string
-  phones: string[]
-  joinDate: string
-  birthDate: string
-  terminationDate: string
-  terminationReason: string
-  position: string
-  employmentStatus: EmploymentStatus
-  roleIds: number[]
-  chineseProfile: ChineseProfileForm
-  expatProfile: ExpatProfileForm
-}
-
-type ChineseProfileForm = {
-  frenchName: string
-  idNumber: string
-  passportNumber: string
-  educationAndMajor: string
-  certifications: string[]
-  domesticMobile: string
-  emergencyContactName: string
-  emergencyContactPhone: string
-  redBookValidYears: string
-  cumulativeAbroadYears: string
-  birthplace: string
-  residenceInChina: string
-  medicalHistory: string
-  healthStatus: string
-}
-
-type ExpatProfileForm = {
-  team: string
-  contractNumber: string
-  contractType: '' | 'CTJ' | 'CDD'
-  salaryCategory: string
-  baseSalaryAmount: string
-  baseSalaryUnit: '' | 'MONTH' | 'HOUR'
-  netMonthlyAmount: string
-  netMonthlyUnit: '' | 'MONTH'
-  maritalStatus: string
-  childrenCount: string
-  cnpsNumber: string
-  cnpsDeclarationCode: string
-  provenance: string
-  emergencyContactName: string
-  emergencyContactPhone: string
-}
 
 type TabKey = 'members' | 'roles' | 'permissions'
-type ColumnKey =
-  | 'sequence'
-  | 'name'
-  | 'username'
-  | 'gender'
-  | 'nationality'
-  | 'phones'
-  | 'joinDate'
-  | 'birthDate'
-  | 'position'
-  | 'employmentStatus'
-  | 'terminationDate'
-  | 'terminationReason'
-  | 'roles'
-  | 'team'
-  | 'contractNumber'
-  | 'contractType'
-  | 'salaryCategory'
-  | 'baseSalary'
-  | 'netMonthly'
-  | 'maritalStatus'
-  | 'childrenCount'
-  | 'cnpsNumber'
-  | 'cnpsDeclarationCode'
-  | 'provenance'
-  | 'frenchName'
-  | 'idNumber'
-  | 'passportNumber'
-  | 'educationAndMajor'
-  | 'certifications'
-  | 'domesticMobile'
-  | 'emergencyContactName'
-  | 'emergencyContactPhone'
-  | 'redBookValidYears'
-  | 'cumulativeAbroadYears'
-  | 'birthplace'
-  | 'residenceInChina'
-  | 'medicalHistory'
-  | 'healthStatus'
-  | 'createdAt'
-  | 'updatedAt'
-  | 'actions'
-type SortOrder = 'asc' | 'desc'
-type SortField = Exclude<ColumnKey, 'sequence' | 'actions'>
-type TemplateColumnKey =
-  | 'name'
-  | 'username'
-  | 'password'
-  | 'gender'
-  | 'nationality'
-  | 'phones'
-  | 'joinDate'
-  | 'birthDate'
-  | 'position'
-  | 'employmentStatus'
-  | 'terminationDate'
-  | 'terminationReason'
-  | 'roles'
-  | 'team'
-  | 'contractNumber'
-  | 'contractType'
-  | 'salaryCategory'
-  | 'baseSalary'
-  | 'netMonthly'
-  | 'maritalStatus'
-  | 'childrenCount'
-  | 'cnpsNumber'
-  | 'cnpsDeclarationCode'
-  | 'provenance'
-  | 'emergencyContact'
-  | 'frenchName'
-  | 'idNumber'
-  | 'passportNumber'
-  | 'educationAndMajor'
-  | 'certifications'
-  | 'domesticMobile'
-  | 'emergencyContactName'
-  | 'emergencyContactPhone'
-  | 'redBookValidYears'
-  | 'cumulativeAbroadYears'
-  | 'birthplace'
-  | 'residenceInChina'
-  | 'medicalHistory'
-  | 'healthStatus'
-type ImportErrorCode =
-  | 'missing_name'
-  | 'missing_username'
-  | 'missing_password'
-  | 'duplicate_username'
-  | 'duplicate_identity'
-  | 'username_exists'
-  | 'invalid_gender'
-  | 'invalid_phone'
-  | 'invalid_contract_type'
-  | 'invalid_base_salary_unit'
-  | 'invalid_status'
-  | 'invalid_join_date'
-  | 'missing_birth_date'
-  | 'invalid_birth_date'
-  | 'missing_termination_date'
-  | 'invalid_termination_date'
-  | 'missing_termination_reason'
-  | 'duplicate_contract_number'
-  | 'contract_number_exists'
-  | 'role_not_found'
-type ImportError = { row: number; code: ImportErrorCode; value?: string }
-type PermissionStatus = 'ACTIVE' | 'ARCHIVED'
-
-const MEMBER_COLUMN_STORAGE_KEY = 'member-visible-columns'
-const defaultVisibleColumns: ColumnKey[] = [
-  'sequence',
-  'name',
-  'username',
-  'gender',
-  'nationality',
-  'phones',
-  'joinDate',
-  'birthDate',
-  'position',
-  'employmentStatus',
-  'roles',
-  'actions',
-]
-const memberColumnOrder: ColumnKey[] = [
-  'sequence',
-  'name',
-  'username',
-  'gender',
-  'nationality',
-  'phones',
-  'joinDate',
-  'birthDate',
-  'position',
-  'employmentStatus',
-  'terminationDate',
-  'terminationReason',
-  'roles',
-  'team',
-  'contractNumber',
-  'contractType',
-  'salaryCategory',
-  'baseSalary',
-  'netMonthly',
-  'maritalStatus',
-  'childrenCount',
-  'cnpsNumber',
-  'cnpsDeclarationCode',
-  'provenance',
-  'frenchName',
-  'idNumber',
-  'passportNumber',
-  'educationAndMajor',
-  'certifications',
-  'domesticMobile',
-  'emergencyContactName',
-  'emergencyContactPhone',
-  'redBookValidYears',
-  'cumulativeAbroadYears',
-  'birthplace',
-  'residenceInChina',
-  'medicalHistory',
-  'healthStatus',
-  'createdAt',
-  'updatedAt',
-  'actions',
-]
-const exportableColumnOrder = memberColumnOrder.filter((key) => key !== 'actions')
-const defaultSortStack: Array<{ field: SortField; order: SortOrder }> = [
-  { field: 'createdAt', order: 'desc' },
-]
-const memberTemplateColumns: TemplateColumnKey[] = [
-  'name',
-  'username',
-  'password',
-  'gender',
-  'nationality',
-  'phones',
-  'joinDate',
-  'birthDate',
-  'position',
-  'employmentStatus',
-  'terminationDate',
-  'terminationReason',
-  'roles',
-  'team',
-  'contractNumber',
-  'contractType',
-  'salaryCategory',
-  'baseSalary',
-  'netMonthly',
-  'maritalStatus',
-  'childrenCount',
-  'cnpsNumber',
-  'cnpsDeclarationCode',
-  'provenance',
-  'emergencyContact',
-  'frenchName',
-  'idNumber',
-  'passportNumber',
-  'educationAndMajor',
-  'certifications',
-  'domesticMobile',
-  'emergencyContactName',
-  'emergencyContactPhone',
-  'redBookValidYears',
-  'cumulativeAbroadYears',
-  'birthplace',
-  'residenceInChina',
-  'medicalHistory',
-  'healthStatus',
-]
-const REQUIRED_IMPORT_COLUMNS: TemplateColumnKey[] = ['name', 'birthDate']
-const PHONE_PATTERN = /^[+\d][\d\s-]{4,}$/
-const EMPTY_FILTER_VALUE = '__EMPTY__'
-const PAGE_SIZE_OPTIONS = [10, 20, 30, 50, 100, 500]
-const PERMISSION_STATUS_OPTIONS: PermissionStatus[] = ['ACTIVE', 'ARCHIVED']
-
-const normalizeText = (value?: string | null) => (value ?? '').trim()
-const toNumberFilterValue = (value?: number | null) =>
-  value === null || value === undefined ? '' : String(value)
-const toSalaryFilterValue = (
-  amount?: string | null,
-  unit?: 'MONTH' | 'HOUR' | null,
-  fallbackUnit?: 'MONTH' | 'HOUR' | null,
-) => {
-  const normalized = normalizeText(amount)
-  if (!normalized) return ''
-  const resolvedUnit = unit ?? fallbackUnit
-  if (!resolvedUnit) return normalized
-  return `${normalized}/${resolvedUnit === 'MONTH' ? 'M' : 'H'}`
-}
-const parseBirthDateFromIdNumber = (value: string) => {
-  const text = value.trim()
-  if (!text) return ''
-  let digits = ''
-  if (/^\d{17}[\dXx]$/.test(text)) {
-    digits = text.slice(6, 14)
-  } else if (/^\d{15}$/.test(text)) {
-    digits = `19${text.slice(6, 12)}`
-  } else {
-    return ''
-  }
-  const year = Number(digits.slice(0, 4))
-  const month = Number(digits.slice(4, 6))
-  const day = Number(digits.slice(6, 8))
-  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) return ''
-  const date = new Date(Date.UTC(year, month - 1, day))
-  if (
-    date.getUTCFullYear() !== year ||
-    date.getUTCMonth() !== month - 1 ||
-    date.getUTCDate() !== day
-  ) {
-    return ''
-  }
-  const paddedMonth = String(month).padStart(2, '0')
-  const paddedDay = String(day).padStart(2, '0')
-  return `${year}-${paddedMonth}-${paddedDay}`
-}
-const normalizeProfileNumber = (value: string) => {
-  if (!value.trim()) return null
-  const parsed = Number.parseInt(value, 10)
-  return Number.isFinite(parsed) ? parsed : null
-}
-const toProfileNumberString = (value?: number | null) =>
-  value === null || value === undefined ? '' : String(value)
-const emptyChineseProfile: ChineseProfileForm = {
-  frenchName: '',
-  idNumber: '',
-  passportNumber: '',
-  educationAndMajor: '',
-  certifications: [],
-  domesticMobile: '',
-  emergencyContactName: '',
-  emergencyContactPhone: '',
-  redBookValidYears: '',
-  cumulativeAbroadYears: '',
-  birthplace: '',
-  residenceInChina: '',
-  medicalHistory: '',
-  healthStatus: '',
-}
-const emptyExpatProfile: ExpatProfileForm = {
-  team: '',
-  contractNumber: '',
-  contractType: '',
-  salaryCategory: '',
-  baseSalaryAmount: '',
-  baseSalaryUnit: '',
-  netMonthlyAmount: '',
-  netMonthlyUnit: '',
-  maritalStatus: '',
-  childrenCount: '',
-  cnpsNumber: '',
-  cnpsDeclarationCode: '',
-  provenance: '',
-  emergencyContactName: '',
-  emergencyContactPhone: '',
-}
-const buildChineseProfileForm = (profile?: ChineseProfile | null): ChineseProfileForm => ({
-  frenchName: profile?.frenchName ?? '',
-  idNumber: profile?.idNumber ?? '',
-  passportNumber: profile?.passportNumber ?? '',
-  educationAndMajor: profile?.educationAndMajor ?? '',
-  certifications: profile?.certifications ?? [],
-  domesticMobile: profile?.domesticMobile ?? '',
-  emergencyContactName: profile?.emergencyContactName ?? '',
-  emergencyContactPhone: profile?.emergencyContactPhone ?? '',
-  redBookValidYears: toProfileNumberString(profile?.redBookValidYears ?? null),
-  cumulativeAbroadYears: toProfileNumberString(profile?.cumulativeAbroadYears ?? null),
-  birthplace: profile?.birthplace ?? '',
-  residenceInChina: profile?.residenceInChina ?? '',
-  medicalHistory: profile?.medicalHistory ?? '',
-  healthStatus: profile?.healthStatus ?? '',
-})
-const buildExpatProfileForm = (profile?: ExpatProfile | null): ExpatProfileForm => ({
-  team: profile?.team ?? '',
-  contractNumber: profile?.contractNumber ?? '',
-  contractType: profile?.contractType ?? '',
-  salaryCategory: profile?.salaryCategory ?? '',
-  baseSalaryAmount: profile?.baseSalaryAmount ?? '',
-  baseSalaryUnit: profile?.baseSalaryUnit ?? '',
-  netMonthlyAmount: profile?.netMonthlyAmount ?? '',
-  netMonthlyUnit: profile?.netMonthlyUnit === 'MONTH' ? 'MONTH' : '',
-  maritalStatus: profile?.maritalStatus ?? '',
-  childrenCount:
-    profile?.childrenCount === null || profile?.childrenCount === undefined
-      ? ''
-      : String(profile.childrenCount),
-  cnpsNumber: profile?.cnpsNumber ?? '',
-  cnpsDeclarationCode: profile?.cnpsDeclarationCode ?? '',
-  provenance: profile?.provenance ?? '',
-  emergencyContactName: profile?.emergencyContactName ?? '',
-  emergencyContactPhone: profile?.emergencyContactPhone ?? '',
-})
-const getMonthKey = (value?: string | null) => {
-  if (!value) return null
-  const parsed = new Date(value)
-  if (Number.isNaN(parsed.getTime())) return null
-  return parsed.toISOString().slice(0, 7)
-}
 
 export default function MembersPage() {
   const { locale, setLocale } = usePreferredLocale()
@@ -506,6 +88,8 @@ export default function MembersPage() {
 
   const getTodayString = useCallback(() => new Date().toISOString().slice(0, 10), [])
   const [activeTab, setActiveTab] = useState<TabKey>('members')
+  const [selectedMember, setSelectedMember] = useState<Member | null>(null)
+  const [showFilterDrawer, setShowFilterDrawer] = useState(false)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [formMode, setFormMode] = useState<'create' | 'view'>('create')
   const [formState, setFormState] = useState<FormState>({
@@ -557,49 +141,97 @@ export default function MembersPage() {
   const [profileExpanded, setProfileExpanded] = useState(false)
   const [editingRoleId, setEditingRoleId] = useState<number | null>(null)
   const importInputRef = useRef<HTMLInputElement | null>(null)
-  const [sortStack, setSortStack] = useState<Array<{ field: SortField; order: SortOrder }>>(
-    defaultSortStack,
-  )
-  const [filtersOpen, setFiltersOpen] = useState(true)
-  const [page, setPage] = useState(1)
-  const [pageInput, setPageInput] = useState('1')
-  const [pageSize, setPageSize] = useState(20)
-  const [nameFilters, setNameFilters] = useState<string[]>([])
-  const [usernameFilters, setUsernameFilters] = useState<string[]>([])
-  const [genderFilters, setGenderFilters] = useState<string[]>([])
-  const [nationalityFilters, setNationalityFilters] = useState<string[]>([])
-  const [phoneFilters, setPhoneFilters] = useState<string[]>([])
-  const [joinDateFilters, setJoinDateFilters] = useState<string[]>([])
-  const [positionFilters, setPositionFilters] = useState<string[]>([])
-  const [statusFilters, setStatusFilters] = useState<string[]>([])
-  const [roleFilters, setRoleFilters] = useState<string[]>([])
-  const [teamFilters, setTeamFilters] = useState<string[]>([])
-  const [contractNumberFilters, setContractNumberFilters] = useState<string[]>([])
-  const [contractTypeFilters, setContractTypeFilters] = useState<string[]>([])
-  const [salaryCategoryFilters, setSalaryCategoryFilters] = useState<string[]>([])
-  const [baseSalaryFilters, setBaseSalaryFilters] = useState<string[]>([])
-  const [netMonthlyFilters, setNetMonthlyFilters] = useState<string[]>([])
-  const [maritalStatusFilters, setMaritalStatusFilters] = useState<string[]>([])
-  const [childrenCountFilters, setChildrenCountFilters] = useState<string[]>([])
-  const [cnpsNumberFilters, setCnpsNumberFilters] = useState<string[]>([])
-  const [cnpsDeclarationCodeFilters, setCnpsDeclarationCodeFilters] = useState<string[]>([])
-  const [provenanceFilters, setProvenanceFilters] = useState<string[]>([])
-  const [frenchNameFilters, setFrenchNameFilters] = useState<string[]>([])
-  const [idNumberFilters, setIdNumberFilters] = useState<string[]>([])
-  const [passportNumberFilters, setPassportNumberFilters] = useState<string[]>([])
-  const [educationAndMajorFilters, setEducationAndMajorFilters] = useState<string[]>([])
-  const [certificationsFilters, setCertificationsFilters] = useState<string[]>([])
-  const [domesticMobileFilters, setDomesticMobileFilters] = useState<string[]>([])
-  const [emergencyContactNameFilters, setEmergencyContactNameFilters] = useState<string[]>([])
-  const [emergencyContactPhoneFilters, setEmergencyContactPhoneFilters] = useState<string[]>([])
-  const [redBookValidYearsFilters, setRedBookValidYearsFilters] = useState<string[]>([])
-  const [cumulativeAbroadYearsFilters, setCumulativeAbroadYearsFilters] = useState<string[]>([])
-  const [birthplaceFilters, setBirthplaceFilters] = useState<string[]>([])
-  const [residenceInChinaFilters, setResidenceInChinaFilters] = useState<string[]>([])
-  const [medicalHistoryFilters, setMedicalHistoryFilters] = useState<string[]>([])
-  const [healthStatusFilters, setHealthStatusFilters] = useState<string[]>([])
-  const [createdAtFilters, setCreatedAtFilters] = useState<string[]>([])
-  const [updatedAtFilters, setUpdatedAtFilters] = useState<string[]>([])
+  const {
+    filters,
+    filterActions,
+    filtersOpen,
+    setFiltersOpen,
+    page,
+    setPage,
+    pageInput,
+    setPageInput,
+    pageSize,
+    setPageSize,
+    sortStack,
+    setSortStack,
+    resetFilters,
+  } = useMemberTableState({ defaultPageSize: 20, defaultSortStack })
+  const {
+    nameFilters,
+    usernameFilters,
+    genderFilters,
+    nationalityFilters,
+    phoneFilters,
+    joinDateFilters,
+    positionFilters,
+    statusFilters,
+    roleFilters,
+    teamFilters,
+    contractNumberFilters,
+    contractTypeFilters,
+    salaryCategoryFilters,
+    baseSalaryFilters,
+    netMonthlyFilters,
+    maritalStatusFilters,
+    childrenCountFilters,
+    cnpsNumberFilters,
+    cnpsDeclarationCodeFilters,
+    provenanceFilters,
+    frenchNameFilters,
+    idNumberFilters,
+    passportNumberFilters,
+    educationAndMajorFilters,
+    certificationsFilters,
+    domesticMobileFilters,
+    emergencyContactNameFilters,
+    emergencyContactPhoneFilters,
+    redBookValidYearsFilters,
+    cumulativeAbroadYearsFilters,
+    birthplaceFilters,
+    residenceInChinaFilters,
+    medicalHistoryFilters,
+    healthStatusFilters,
+    createdAtFilters,
+    updatedAtFilters,
+  } = filters
+  const {
+    setNameFilters,
+    setUsernameFilters,
+    setGenderFilters,
+    setNationalityFilters,
+    setPhoneFilters,
+    setJoinDateFilters,
+    setPositionFilters,
+    setStatusFilters,
+    setRoleFilters,
+    setTeamFilters,
+    setContractNumberFilters,
+    setContractTypeFilters,
+    setSalaryCategoryFilters,
+    setBaseSalaryFilters,
+    setNetMonthlyFilters,
+    setMaritalStatusFilters,
+    setChildrenCountFilters,
+    setCnpsNumberFilters,
+    setCnpsDeclarationCodeFilters,
+    setProvenanceFilters,
+    setFrenchNameFilters,
+    setIdNumberFilters,
+    setPassportNumberFilters,
+    setEducationAndMajorFilters,
+    setCertificationsFilters,
+    setDomesticMobileFilters,
+    setEmergencyContactNameFilters,
+    setEmergencyContactPhoneFilters,
+    setRedBookValidYearsFilters,
+    setCumulativeAbroadYearsFilters,
+    setBirthplaceFilters,
+    setResidenceInChinaFilters,
+    setMedicalHistoryFilters,
+    setHealthStatusFilters,
+    setCreatedAtFilters,
+    setUpdatedAtFilters,
+  } = filterActions
   const [session, setSession] = useState<SessionUser | null>(null)
   const [authLoaded, setAuthLoaded] = useState(false)
   const sessionPermissions = session?.permissions ?? []
@@ -1564,44 +1196,87 @@ export default function MembersPage() {
       canAssignRole,
     ],
   )
+  const activeFilterCount = useMemo(() => {
+    const count =
+      nameFilters.length +
+      usernameFilters.length +
+      genderFilters.length +
+      nationalityFilters.length +
+      phoneFilters.length +
+      joinDateFilters.length +
+      positionFilters.length +
+      statusFilters.length +
+      (canAssignRole ? roleFilters.length : 0) +
+      teamFilters.length +
+      contractNumberFilters.length +
+      contractTypeFilters.length +
+      salaryCategoryFilters.length +
+      baseSalaryFilters.length +
+      netMonthlyFilters.length +
+      maritalStatusFilters.length +
+      childrenCountFilters.length +
+      cnpsNumberFilters.length +
+      cnpsDeclarationCodeFilters.length +
+      provenanceFilters.length +
+      frenchNameFilters.length +
+      idNumberFilters.length +
+      passportNumberFilters.length +
+      educationAndMajorFilters.length +
+      certificationsFilters.length +
+      domesticMobileFilters.length +
+      emergencyContactNameFilters.length +
+      emergencyContactPhoneFilters.length +
+      redBookValidYearsFilters.length +
+      cumulativeAbroadYearsFilters.length +
+      birthplaceFilters.length +
+      residenceInChinaFilters.length +
+      medicalHistoryFilters.length +
+      healthStatusFilters.length +
+      createdAtFilters.length +
+      updatedAtFilters.length
+    return count
+  }, [
+    nameFilters,
+    usernameFilters,
+    genderFilters,
+    nationalityFilters,
+    phoneFilters,
+    joinDateFilters,
+    positionFilters,
+    statusFilters,
+    roleFilters,
+    teamFilters,
+    contractNumberFilters,
+    contractTypeFilters,
+    salaryCategoryFilters,
+    baseSalaryFilters,
+    netMonthlyFilters,
+    maritalStatusFilters,
+    childrenCountFilters,
+    cnpsNumberFilters,
+    cnpsDeclarationCodeFilters,
+    provenanceFilters,
+    frenchNameFilters,
+    idNumberFilters,
+    passportNumberFilters,
+    educationAndMajorFilters,
+    certificationsFilters,
+    domesticMobileFilters,
+    emergencyContactNameFilters,
+    emergencyContactPhoneFilters,
+    redBookValidYearsFilters,
+    cumulativeAbroadYearsFilters,
+    birthplaceFilters,
+    residenceInChinaFilters,
+    medicalHistoryFilters,
+    healthStatusFilters,
+    createdAtFilters,
+    updatedAtFilters,
+    canAssignRole,
+  ])
 
   const clearFilters = () => {
-    setNameFilters([])
-    setUsernameFilters([])
-    setGenderFilters([])
-    setNationalityFilters([])
-    setPhoneFilters([])
-    setJoinDateFilters([])
-    setPositionFilters([])
-    setStatusFilters([])
-    setRoleFilters([])
-    setTeamFilters([])
-    setContractNumberFilters([])
-    setContractTypeFilters([])
-    setSalaryCategoryFilters([])
-    setBaseSalaryFilters([])
-    setNetMonthlyFilters([])
-    setMaritalStatusFilters([])
-    setChildrenCountFilters([])
-    setCnpsNumberFilters([])
-    setCnpsDeclarationCodeFilters([])
-    setProvenanceFilters([])
-    setFrenchNameFilters([])
-    setIdNumberFilters([])
-    setPassportNumberFilters([])
-    setEducationAndMajorFilters([])
-    setCertificationsFilters([])
-    setDomesticMobileFilters([])
-    setEmergencyContactNameFilters([])
-    setEmergencyContactPhoneFilters([])
-    setRedBookValidYearsFilters([])
-    setCumulativeAbroadYearsFilters([])
-    setBirthplaceFilters([])
-    setResidenceInChinaFilters([])
-    setMedicalHistoryFilters([])
-    setHealthStatusFilters([])
-    setCreatedAtFilters([])
-    setUpdatedAtFilters([])
+    resetFilters()
   }
 
   const modalTitle = formMode === 'view' ? t.actions.view : t.actions.create
@@ -1773,10 +1448,10 @@ export default function MembersPage() {
     }
   }, [columnOptions])
 
-  useEffect(() => {
-    if (canAssignRole) return
-    setSortStack((prev) => prev.filter((item) => item.field !== 'roles'))
-  }, [canAssignRole])
+useEffect(() => {
+  if (canAssignRole) return
+  setSortStack((prev) => prev.filter((item) => item.field !== 'roles'))
+}, [canAssignRole, setSortStack])
 
   const persistVisibleColumns = (next: ColumnKey[]) => {
     setVisibleColumns(next)
@@ -3210,13 +2885,13 @@ export default function MembersPage() {
     return filteredMembers.slice(startIndex, startIndex + pageSize)
   }, [filteredMembers, page, pageSize])
 
-  useEffect(() => {
-    setPageInput(String(page))
-  }, [page])
+useEffect(() => {
+  setPageInput(String(page))
+}, [page, setPageInput])
 
-  useEffect(() => {
-    setPage((prev) => Math.min(totalPages, Math.max(1, prev)))
-  }, [totalPages])
+useEffect(() => {
+  setPage((prev) => Math.min(totalPages, Math.max(1, prev)))
+}, [totalPages, setPage])
 
   useEffect(() => {
     setPage(1)
@@ -3257,6 +2932,7 @@ export default function MembersPage() {
     healthStatusFilters,
     createdAtFilters,
     updatedAtFilters,
+    setPage,
   ])
 
   const handleExportMembers = async () => {
@@ -3443,6 +3119,22 @@ export default function MembersPage() {
   const activeCount = membersData.filter((member) => member.employmentStatus === 'ACTIVE').length
   const roleCount = rolesData.length
   const permissionCoverage = permissions.length
+  const headerStats = [
+    { label: t.stats.headcount, value: headcount, accent: 'from-sky-400 to-cyan-300' },
+    {
+      label: t.stats.active,
+      value: activeCount,
+      accent: 'from-emerald-400 to-lime-300',
+      helper: headcount ? `${Math.round((activeCount / headcount) * 100)}%` : undefined,
+    },
+    { label: t.stats.roles, value: roleCount, accent: 'from-indigo-400 to-blue-300', helper: 'RBAC' },
+    {
+      label: t.stats.coverage,
+      value: permissionCoverage,
+      accent: 'from-amber-400 to-orange-300',
+      helper: t.helpers.permissionCoverage,
+    },
+  ]
   const permissionGroups = useMemo(() => {
     const grouped = new Map<string, typeof permissions>()
     permissions.forEach((permission) => {
@@ -3468,49 +3160,15 @@ export default function MembersPage() {
 
   return (
     <main className="min-h-screen bg-slate-50">
-      <section className="relative bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 pb-14 pt-12 text-white">
-        <div className="absolute inset-0 opacity-60" style={{ backgroundImage: 'radial-gradient(circle at 20% 20%, rgba(14,165,233,0.2), transparent 40%), radial-gradient(circle at 80% 0%, rgba(94,234,212,0.18), transparent 36%)' }} />
-        <div className="relative mx-auto flex max-w-6xl flex-col gap-8 px-6 sm:px-8 xl:max-w-[1500px] xl:px-12 2xl:max-w-[1700px] 2xl:px-14">
-          <div className="flex flex-col justify-between gap-6 sm:flex-row sm:items-center">
-            <div className="flex flex-col gap-4">
-              <div>
-                <p className="text-sm uppercase tracking-[0.35em] text-slate-200">RBAC · MEMBER</p>
-                <h1 className="mt-2 text-3xl font-bold sm:text-4xl">{t.title}</h1>
-                <p className="mt-3 max-w-3xl text-sm text-slate-200 sm:text-base">{t.subtitle}</p>
-              </div>
-              <nav className="flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-100">
-                <Link
-                  href="/"
-                  className="rounded-full border border-white/20 bg-white/10 px-3 py-1 transition hover:border-white/40 hover:bg-white/20"
-                >
-                  {breadcrumbHome}
-                </Link>
-                <span className="text-slate-300">/</span>
-                <span className="rounded-full border border-white/10 bg-white/10 px-3 py-1">
-                  {breadcrumbMembers}
-                </span>
-              </nav>
-            </div>
-            <LocaleSwitcher locale={locale} onChange={setLocale} />
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:gap-6 2xl:gap-8">
-            <StatCard label={t.stats.headcount} value={headcount} accent="from-sky-400 to-cyan-300" />
-            <StatCard label={t.stats.active} value={activeCount} accent="from-emerald-400 to-lime-300" helper={headcount ? `${Math.round((activeCount / headcount) * 100)}%` : undefined} />
-            <StatCard
-              label={t.stats.roles}
-              value={roleCount}
-              accent="from-indigo-400 to-blue-300"
-              helper="RBAC"
-            />
-            <StatCard
-              label={t.stats.coverage}
-              value={permissionCoverage}
-              accent="from-amber-400 to-orange-300"
-              helper={t.helpers.permissionCoverage}
-            />
-          </div>
-        </div>
-      </section>
+      <MembersHeader
+        title={t.title}
+        subtitle={t.subtitle}
+        breadcrumbHome={breadcrumbHome}
+        breadcrumbMembers={breadcrumbMembers}
+        locale={locale}
+        onLocaleChange={setLocale}
+        stats={headerStats}
+      />
 
       <section className="w-full bg-slate-50">
         <div className="mx-auto grid max-w-6xl gap-8 px-6 pb-14 pt-6 sm:px-8 sm:pt-10 xl:max-w-[1500px] xl:gap-10 xl:px-12 xl:pt-12 2xl:max-w-[1700px] 2xl:gap-12 2xl:px-14 min-w-0">
@@ -3632,13 +3290,21 @@ export default function MembersPage() {
                           <ActionButton onClick={clearFilters} disabled={!hasActiveFilters}>
                             {t.filters.reset}
                           </ActionButton>
-                          <ActionButton onClick={() => setFiltersOpen((prev) => !prev)}>
-                            {filtersOpen ? t.filters.collapse : t.filters.expand}
+                          <ActionButton onClick={() => setShowFilterDrawer(true)}>
+                            {t.filters.expand}
                           </ActionButton>
                         </div>
                       </div>
-                      {filtersOpen ? (
-                        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
+                      <MemberFilterDrawer
+                        open={showFilterDrawer}
+                        onClose={() => setShowFilterDrawer(false)}
+                        onClearAll={clearFilters}
+                        title={t.filters.title}
+                        clearLabel={t.filters.clear}
+                        closeLabel={t.labels.close}
+                        clearHint={t.filters.selected(hasActiveFilters ? activeFilterCount : 0)}
+                      >
+                        <div className="grid grid-cols-1 gap-3">
                           <MultiSelectFilter
                             label={t.table.name}
                             options={nameFilterOptions}
@@ -3894,7 +3560,7 @@ export default function MembersPage() {
                             {...filterControlProps}
                           />
                         </div>
-                      ) : null}
+                      </MemberFilterDrawer>
                     </div>
                     <div className="w-full min-w-0 overflow-x-auto border-t border-slate-100">
                       {loading ? (
@@ -4495,7 +4161,7 @@ export default function MembersPage() {
                                         <div className="flex flex-nowrap gap-2">
                                           <button
                                             type="button"
-                                            onClick={() => openViewModal(member)}
+                                            onClick={() => setSelectedMember(member)}
                                             className="rounded-full border border-slate-200 px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
                                           >
                                             {t.actions.view}
@@ -4957,7 +4623,7 @@ export default function MembersPage() {
                     onChange={(event) => setFormState((prev) => ({ ...prev, name: event.target.value }))}
                     disabled={formMode === 'view'}
                     className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
-                    placeholder="陈蓉 / Marie Dupont"
+                    placeholder={t.form.namePlaceholder}
                   />
                 </label>
                 <label className="space-y-1 text-sm text-slate-700">
@@ -5052,7 +4718,9 @@ export default function MembersPage() {
                       onClick={() => setShowPhonePicker((prev) => !prev)}
                       className="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-semibold text-slate-800 shadow-sm transition hover:border-slate-300 hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                      <span>{formState.phones.length ? `已保存 ${formState.phones.length} 个号码` : t.form.phonePlaceholder}</span>
+                      <span>
+                        {formState.phones.length ? t.form.phoneSaved(formState.phones.length) : t.form.phonePlaceholder}
+                      </span>
                       <span className="text-xs text-slate-500" aria-hidden>
                         ⌵
                       </span>
@@ -5101,7 +4769,7 @@ export default function MembersPage() {
                                   onClick={() => removePhone(index)}
                                   className="text-xs font-semibold text-rose-600 hover:text-rose-700"
                                 >
-                                  删除
+                                  {t.actions.delete}
                                 </button>
                               </div>
                             ))
@@ -5741,74 +5409,17 @@ export default function MembersPage() {
           </div>
         </div>
       ) : null}
-    </main>
-  )
-}
-
-function StatCard({
-  label,
-  value,
-  helper,
-  accent,
-}: {
-  label: string
-  value: number | string
-  helper?: string
-  accent: string
-}) {
-  return (
-    <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/10 p-4 shadow-lg shadow-slate-900/50 backdrop-blur">
-      <div
-        className={`absolute -right-10 -top-10 h-24 w-24 rounded-full bg-gradient-to-br ${accent} opacity-40 blur-3xl`}
-      />
-      <p className="text-sm text-slate-200">{label}</p>
-      <p className="mt-1 text-3xl font-semibold">{value}</p>
-      {helper ? <p className="text-xs text-slate-200">{helper}</p> : null}
-    </div>
-  )
-}
-
-function TabButton({
-  children,
-  active,
-  onClick,
-}: {
-  children: ReactNode
-  active: boolean
-  onClick: () => void
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`rounded-full px-4 py-2 text-xs font-semibold transition ${
-        active
-          ? 'bg-slate-900 text-white shadow-sm shadow-slate-300/40 ring-1 ring-slate-900'
-          : 'bg-slate-100 text-slate-700 ring-1 ring-transparent hover:bg-slate-200'
-      }`}
-    >
-      {children}
-    </button>
-  )
-}
-
-function ActionButton({
-  children,
-  onClick,
-  disabled = false,
-}: {
-  children: string
-  onClick?: () => void
-  disabled?: boolean
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-800 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-60"
-    >
-      {children}
-    </button>
+              {/* Member Detail Drawer */}
+              <MemberDetailDrawer
+                key={selectedMember?.id ?? 'member-detail-drawer'}
+                member={selectedMember}
+                open={!!selectedMember}
+                onClose={() => setSelectedMember(null)}
+                onEdit={(m) => {
+                   setSelectedMember(null)
+                   openEditPage(m)
+                }}
+              />
+            </main>
   )
 }
