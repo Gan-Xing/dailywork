@@ -18,6 +18,7 @@ export type ColumnKey =
   | 'contractNumber'
   | 'contractType'
   | 'salaryCategory'
+  | 'prime'
   | 'baseSalary'
   | 'netMonthly'
   | 'maritalStatus'
@@ -64,6 +65,7 @@ export type TemplateColumnKey =
   | 'contractNumber'
   | 'contractType'
   | 'salaryCategory'
+  | 'prime'
   | 'baseSalary'
   | 'netMonthly'
   | 'maritalStatus'
@@ -144,6 +146,7 @@ export const memberColumnOrder: ColumnKey[] = [
   'contractNumber',
   'contractType',
   'salaryCategory',
+  'prime',
   'baseSalary',
   'netMonthly',
   'maritalStatus',
@@ -191,6 +194,7 @@ export const memberTemplateColumns: TemplateColumnKey[] = [
   'contractNumber',
   'contractType',
   'salaryCategory',
+  'prime',
   'baseSalary',
   'netMonthly',
   'maritalStatus',

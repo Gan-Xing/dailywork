@@ -40,6 +40,7 @@ type ImportMemberInput = {
   contractNumber?: string | null
   contractType?: string | null
   salaryCategory?: string | null
+  prime?: string | null
   baseSalary?: string | null
   netMonthly?: string | null
   maritalStatus?: string | null
@@ -189,6 +190,7 @@ export async function POST(request: Request) {
       contractNumber: member.contractNumber,
       contractType: member.contractType,
       salaryCategory: member.salaryCategory,
+      prime: member.prime,
       baseSalary: member.baseSalary,
       netMonthly: member.netMonthly,
       maritalStatus: member.maritalStatus,
@@ -573,6 +575,7 @@ export async function POST(request: Request) {
           ...(member.expatProfile.salaryCategory
             ? { salaryCategory: member.expatProfile.salaryCategory }
             : {}),
+          ...(member.expatProfile.prime ? { prime: member.expatProfile.prime } : {}),
           ...(member.expatProfile.baseSalaryAmount
             ? { baseSalaryAmount: member.expatProfile.baseSalaryAmount }
             : {}),

@@ -166,6 +166,7 @@
 - `contractNumber`（MATRICULE）：合同编号，字符串，可空但需唯一。
 - `contractType`（TYPE DE CONTRAT）：枚举 `CTJ` / `CDD`。
 - `salaryCategory`（CATEGORIE）：工资等级，字符串，可空。
+- `prime`（PRIME）：奖金/补贴金额，数字，可空。
 - `baseSalaryAmount` + `baseSalaryUnit`（SALAIRE DE BASE）：基础工资金额与单位；单位枚举 `MONTH` / `HOUR`（业务约束：`CDD` 必须为月单位）。
 - `netMonthlyAmount` + `netMonthlyUnit`（NET MENSUEL）：实发工资金额与单位（仅月单位），可空。
 - `maritalStatus`（SITUATION MATRIMONIALE）：婚姻状态，字符串，可空。
@@ -363,6 +364,7 @@
 - `contractNumber?`：合同编号（可空但需唯一）。
 - `contractType?`：枚举 `CTJ` / `CDD`。
 - `salaryCategory?`：工资等级。
+- `prime?`：奖金/补贴金额。
 - `baseSalaryAmount?` + `baseSalaryUnit?`：基础工资金额与单位（单位枚举 `MONTH` / `HOUR`，`CDD` 必须为月单位）。
 - `netMonthlyAmount?` + `netMonthlyUnit?`：实发工资金额与单位（仅月单位）。
 - `maritalStatus?`：婚姻状态。

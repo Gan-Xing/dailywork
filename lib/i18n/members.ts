@@ -78,6 +78,7 @@ export const memberCopy: Record<
       | 'contractNumber'
       | 'contractType'
       | 'salaryCategory'
+      | 'prime'
       | 'baseSalary'
       | 'netMonthly'
       | 'maritalStatus'
@@ -195,6 +196,7 @@ export const memberCopy: Record<
         | 'contractNumber'
         | 'contractType'
         | 'salaryCategory'
+        | 'prime'
         | 'baseSalary'
         | 'netMonthly'
         | 'maritalStatus'
@@ -273,6 +275,7 @@ export const memberCopy: Record<
       contractNumber: string
       contractType: string
       salaryCategory: string
+      prime: string
       baseSalary: string
       baseSalaryAmount: string
       baseSalaryUnit: string
@@ -417,6 +420,7 @@ export const memberCopy: Record<
       contractNumber: '合同编号',
       contractType: '合同类型',
       salaryCategory: '工资等级',
+      prime: '奖金',
       baseSalary: '基础工资',
       netMonthly: '实发工资',
       maritalStatus: '婚姻状态',
@@ -532,6 +536,7 @@ export const memberCopy: Record<
         contractNumber: '可选；合同编号，需唯一。',
         contractType: '可选；固定值：CTJ / CDD。',
         salaryCategory: '可选；工资等级/类别。',
+        prime: '可选；奖金/补贴金额。',
         baseSalary: '可选；金额+单位，如 83333/M 或 433/H；区间取较大值；CDD 必须按月。',
         netMonthly: '可选；实发工资，仅按月；示例：120000/MOIS net。',
         maritalStatus: '可选；婚姻状态；示例：CELIBATAIRE。',
@@ -612,6 +617,7 @@ export const memberCopy: Record<
       contractNumber: '合同编号',
       contractType: '合同类型',
       salaryCategory: '工资等级',
+      prime: '奖金',
       baseSalary: '基础工资',
       baseSalaryAmount: '基础工资金额',
       baseSalaryUnit: '基础工资单位',
@@ -763,6 +769,7 @@ export const memberCopy: Record<
       contractNumber: 'N° contrat',
       contractType: 'Type de contrat',
       salaryCategory: 'Catégorie',
+      prime: 'Prime',
       baseSalary: 'Salaire de base',
       netMonthly: 'Net mensuel',
       maritalStatus: 'Statut marital',
@@ -879,6 +886,7 @@ export const memberCopy: Record<
         contractNumber: 'Optionnel ; numéro de contrat, unique.',
         contractType: 'Optionnel ; valeurs : CTJ / CDD.',
         salaryCategory: 'Optionnel ; catégorie salariale.',
+        prime: 'Optionnel ; montant prime/bonus.',
         baseSalary: 'Optionnel ; montant + unité, ex. 83333/M ou 433/H ; intervalle = valeur max ; CDD = mensuel.',
         netMonthly: 'Optionnel ; net mensuel uniquement ; ex. 120000/MOIS net.',
         maritalStatus: 'Optionnel ; statut marital ; ex. CELIBATAIRE.',
@@ -960,6 +968,7 @@ export const memberCopy: Record<
       contractNumber: 'N° contrat',
       contractType: 'Type de contrat',
       salaryCategory: 'Catégorie',
+      prime: 'Prime',
       baseSalary: 'Salaire de base',
       baseSalaryAmount: 'Montant salaire de base',
       baseSalaryUnit: 'Unité salaire de base',

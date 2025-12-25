@@ -1,6 +1,4 @@
-import { type EmploymentStatus } from '@/lib/i18n/members'
-
-export type PermissionStatus = 'ACTIVE' | 'ARCHIVED'
+import type { EmploymentStatus } from '@/lib/i18n/members'
 
 export type ChineseProfile = {
   frenchName: string | null
@@ -36,8 +34,6 @@ export type ExpatProfile = {
   provenance: string | null
   emergencyContactName: string | null
   emergencyContactPhone: string | null
-  createdAt?: string
-  updatedAt?: string
 }
 
 export type Member = {
@@ -54,8 +50,6 @@ export type Member = {
   position: string | null
   employmentStatus: EmploymentStatus
   roles: { id: number; name: string }[]
-  createdAt: string
-  updatedAt: string
   chineseProfile?: ChineseProfile | null
   expatProfile?: ExpatProfile | null
 }
@@ -63,14 +57,12 @@ export type Member = {
 export type Role = {
   id: number
   name: string
-  permissions: { id: number; code: string; name: string; status?: PermissionStatus }[]
 }
 
-export type Permission = {
-  id: number
-  code: string
-  name: string
-  status: PermissionStatus
+export type MemberOption = {
+  expatProfile?: {
+    team?: string | null
+  } | null
 }
 
 export type ChineseProfileForm = {
@@ -109,8 +101,7 @@ export type ExpatProfileForm = {
   emergencyContactPhone: string
 }
 
-export type MemberFormState = {
-  id?: number
+export type FormState = {
   username: string
   password: string
   name: string

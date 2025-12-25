@@ -22,6 +22,7 @@ export type NormalizedExpatProfile = {
   contractNumber: string | null
   contractType: ContractType | null
   salaryCategory: string | null
+  prime: string | null
   baseSalaryAmount: string | null
   baseSalaryUnit: SalaryUnit | null
   netMonthlyAmount: string | null
@@ -295,6 +296,7 @@ export const normalizeExpatProfile = (raw: unknown): NormalizedExpatProfile => {
     contractNumber: normalizeString(source.contractNumber),
     contractType: parseContractType(source.contractType),
     salaryCategory: normalizeString(source.salaryCategory),
+    prime: normalizeString(String(source.prime ?? '')),
     baseSalaryAmount,
     baseSalaryUnit,
     netMonthlyAmount,
@@ -315,6 +317,7 @@ export const hasExpatProfileData = (profile: NormalizedExpatProfile) => {
     Boolean(profile.contractNumber) ||
     Boolean(profile.contractType) ||
     Boolean(profile.salaryCategory) ||
+    Boolean(profile.prime) ||
     Boolean(profile.baseSalaryAmount) ||
     Boolean(profile.baseSalaryUnit) ||
     Boolean(profile.netMonthlyAmount) ||

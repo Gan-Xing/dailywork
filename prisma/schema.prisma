@@ -477,6 +477,7 @@ model UserExpatProfile {
   contractNumber     String?      @unique
   contractType       ContractType?
   salaryCategory     String?
+  prime              Decimal?     @db.Decimal(18, 2)
   baseSalaryAmount   Decimal?     @db.Decimal(18, 2)
   baseSalaryUnit     SalaryUnit?
   netMonthlyAmount   Decimal?     @db.Decimal(18, 2)

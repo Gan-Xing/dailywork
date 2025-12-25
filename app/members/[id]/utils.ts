@@ -1,25 +1,11 @@
-import type {
-  ChineseProfile,
-  ChineseProfileForm,
-  ExpatProfile,
-  ExpatProfileForm,
-} from '@/types/members'
+import type { ChineseProfile, ChineseProfileForm, ExpatProfile, ExpatProfileForm } from './types'
 
 export const normalizeText = (value?: string | null) => (value ?? '').trim()
 
-export const toNumberFilterValue = (value?: number | null) =>
-  value === null || value === undefined ? '' : String(value)
-
-export const toSalaryFilterValue = (
-  amount?: string | null,
-  unit?: 'MONTH' | 'HOUR' | null,
-  fallbackUnit?: 'MONTH' | 'HOUR' | null,
-) => {
-  const normalized = normalizeText(amount)
-  if (!normalized) return ''
-  const resolvedUnit = unit ?? fallbackUnit
-  if (!resolvedUnit) return normalized
-  return `${normalized}/${resolvedUnit === 'MONTH' ? 'M' : 'H'}`
+export const normalizeProfileNumber = (value: string) => {
+  if (!value.trim()) return null
+  const parsed = Number.parseInt(value, 10)
+  return Number.isFinite(parsed) ? parsed : null
 }
 
 export const parseBirthDateFromIdNumber = (value: string) => {
@@ -50,50 +36,8 @@ export const parseBirthDateFromIdNumber = (value: string) => {
   return `${year}-${paddedMonth}-${paddedDay}`
 }
 
-export const normalizeProfileNumber = (value: string) => {
-  if (!value.trim()) return null
-  const parsed = Number.parseInt(value, 10)
-  return Number.isFinite(parsed) ? parsed : null
-}
-
 export const toProfileNumberString = (value?: number | null) =>
   value === null || value === undefined ? '' : String(value)
-
-export const emptyChineseProfile: ChineseProfileForm = {
-  frenchName: '',
-  idNumber: '',
-  passportNumber: '',
-  educationAndMajor: '',
-  certifications: [],
-  domesticMobile: '',
-  emergencyContactName: '',
-  emergencyContactPhone: '',
-  redBookValidYears: '',
-  cumulativeAbroadYears: '',
-  birthplace: '',
-  residenceInChina: '',
-  medicalHistory: '',
-  healthStatus: '',
-}
-
-export const emptyExpatProfile: ExpatProfileForm = {
-  team: '',
-  contractNumber: '',
-  contractType: '',
-  salaryCategory: '',
-  prime: '',
-  baseSalaryAmount: '',
-  baseSalaryUnit: '',
-  netMonthlyAmount: '',
-  netMonthlyUnit: '',
-  maritalStatus: '',
-  childrenCount: '',
-  cnpsNumber: '',
-  cnpsDeclarationCode: '',
-  provenance: '',
-  emergencyContactName: '',
-  emergencyContactPhone: '',
-}
 
 export const buildChineseProfileForm = (profile?: ChineseProfile | null): ChineseProfileForm => ({
   frenchName: profile?.frenchName ?? '',
@@ -133,10 +77,3 @@ export const buildExpatProfileForm = (profile?: ExpatProfile | null): ExpatProfi
   emergencyContactName: profile?.emergencyContactName ?? '',
   emergencyContactPhone: profile?.emergencyContactPhone ?? '',
 })
-
-export const getMonthKey = (value?: string | null) => {
-  if (!value) return null
-  const parsed = new Date(value)
-  if (Number.isNaN(parsed.getTime())) return null
-  return parsed.toISOString().slice(0, 7)
-}
