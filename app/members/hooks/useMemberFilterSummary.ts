@@ -11,6 +11,7 @@ export type MemberFiltersSummaryInput = {
   statusFilters: string[]
   roleFilters: string[]
   teamFilters: string[]
+  chineseSupervisorFilters: string[]
   contractNumberFilters: string[]
   contractTypeFilters: string[]
   salaryCategoryFilters: string[]
@@ -50,9 +51,10 @@ export function useMemberFilterSummary(filters: MemberFiltersSummaryInput) {
     joinDateFilters,
     positionFilters,
     statusFilters,
-    roleFilters,
-    teamFilters,
-    contractNumberFilters,
+  roleFilters,
+  teamFilters,
+  chineseSupervisorFilters,
+  contractNumberFilters,
     contractTypeFilters,
     salaryCategoryFilters,
     baseSalaryFilters,
@@ -93,6 +95,7 @@ export function useMemberFilterSummary(filters: MemberFiltersSummaryInput) {
       statusFilters.length > 0 ||
       (canAssignRole && roleFilters.length > 0) ||
       teamFilters.length > 0 ||
+      chineseSupervisorFilters.length > 0 ||
       contractNumberFilters.length > 0 ||
       contractTypeFilters.length > 0 ||
       salaryCategoryFilters.length > 0 ||
@@ -130,6 +133,7 @@ export function useMemberFilterSummary(filters: MemberFiltersSummaryInput) {
       statusFilters,
       roleFilters,
       teamFilters,
+      chineseSupervisorFilters,
       contractNumberFilters,
       contractTypeFilters,
       salaryCategoryFilters,
@@ -172,6 +176,7 @@ export function useMemberFilterSummary(filters: MemberFiltersSummaryInput) {
       statusFilters.length +
       (canAssignRole ? roleFilters.length : 0) +
       teamFilters.length +
+      chineseSupervisorFilters.length +
       contractNumberFilters.length +
       contractTypeFilters.length +
       salaryCategoryFilters.length +
@@ -208,9 +213,10 @@ export function useMemberFilterSummary(filters: MemberFiltersSummaryInput) {
     joinDateFilters,
     positionFilters,
     statusFilters,
-    roleFilters,
-    teamFilters,
-    contractNumberFilters,
+      roleFilters,
+      teamFilters,
+      chineseSupervisorFilters,
+      contractNumberFilters,
     contractTypeFilters,
     salaryCategoryFilters,
     baseSalaryFilters,

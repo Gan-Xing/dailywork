@@ -127,6 +127,18 @@ export const listUsers = async () => {
       },
       expatProfile: {
         select: {
+          chineseSupervisorId: true,
+          chineseSupervisor: {
+            select: {
+              id: true,
+              username: true,
+              chineseProfile: {
+                select: {
+                  frenchName: true,
+                },
+              },
+            },
+          },
           team: true,
           contractNumber: true,
           contractType: true,
@@ -184,6 +196,18 @@ export const listUsers = async () => {
       : null,
     expatProfile: user.expatProfile
       ? {
+          chineseSupervisorId: user.expatProfile.chineseSupervisorId ?? null,
+          chineseSupervisor: user.expatProfile.chineseSupervisor
+            ? {
+                id: user.expatProfile.chineseSupervisor.id,
+                username: user.expatProfile.chineseSupervisor.username,
+                chineseProfile: user.expatProfile.chineseSupervisor.chineseProfile
+                  ? {
+                      frenchName: user.expatProfile.chineseSupervisor.chineseProfile.frenchName,
+                    }
+                  : null,
+              }
+            : null,
           team: user.expatProfile.team,
           contractNumber: user.expatProfile.contractNumber,
           contractType: user.expatProfile.contractType,
@@ -247,6 +271,18 @@ export const getUserById = async (userId: number) => {
       },
       expatProfile: {
         select: {
+          chineseSupervisorId: true,
+          chineseSupervisor: {
+            select: {
+              id: true,
+              username: true,
+              chineseProfile: {
+                select: {
+                  frenchName: true,
+                },
+              },
+            },
+          },
           team: true,
           contractNumber: true,
           contractType: true,
@@ -305,6 +341,18 @@ export const getUserById = async (userId: number) => {
       : null,
     expatProfile: user.expatProfile
       ? {
+          chineseSupervisorId: user.expatProfile.chineseSupervisorId ?? null,
+          chineseSupervisor: user.expatProfile.chineseSupervisor
+            ? {
+                id: user.expatProfile.chineseSupervisor.id,
+                username: user.expatProfile.chineseSupervisor.username,
+                chineseProfile: user.expatProfile.chineseSupervisor.chineseProfile
+                  ? {
+                      frenchName: user.expatProfile.chineseSupervisor.chineseProfile.frenchName,
+                    }
+                  : null,
+              }
+            : null,
           team: user.expatProfile.team,
           contractNumber: user.expatProfile.contractNumber,
           contractType: user.expatProfile.contractType,

@@ -23,6 +23,7 @@ type UseFilteredMembersParams = {
   statusFilters: string[]
   roleFilters: string[]
   teamFilters: string[]
+  chineseSupervisorFilters: string[]
   contractNumberFilters: string[]
   contractTypeFilters: string[]
   salaryCategoryFilters: string[]
@@ -69,6 +70,7 @@ export function useFilteredMembers({
   statusFilters,
   roleFilters,
   teamFilters,
+  chineseSupervisorFilters,
   contractNumberFilters,
   contractTypeFilters,
   salaryCategoryFilters,
@@ -140,7 +142,12 @@ export function useFilteredMembers({
           return false
         }
       }
+      const supervisorLabel = normalizeText(
+        expatProfile?.chineseSupervisor?.chineseProfile?.frenchName ||
+          expatProfile?.chineseSupervisor?.username,
+      )
       if (!matchesValueFilter(expatProfile?.team, teamFilters)) return false
+      if (!matchesValueFilter(supervisorLabel, chineseSupervisorFilters)) return false
       if (!matchesValueFilter(expatProfile?.contractNumber, contractNumberFilters)) return false
       if (!matchesValueFilter(expatProfile?.contractType, contractTypeFilters)) return false
       if (!matchesValueFilter(expatProfile?.salaryCategory, salaryCategoryFilters)) return false
@@ -235,13 +242,18 @@ export function useFilteredMembers({
     }
 
     const compareMembers = (left: Member, right: Member) => {
-      const leftProfile = left.nationality === 'china' ? left.chineseProfile : null
-      const rightProfile = right.nationality === 'china' ? right.chineseProfile : null
-      const leftExpatProfile = left.nationality === 'china' ? null : left.expatProfile
-      const rightExpatProfile = right.nationality === 'china' ? null : right.expatProfile
-      for (const sort of sortStack) {
-        let result = 0
-        switch (sort.field) {
+        const leftProfile = left.nationality === 'china' ? left.chineseProfile : null
+        const rightProfile = right.nationality === 'china' ? right.chineseProfile : null
+        const leftExpatProfile = left.nationality === 'china' ? null : left.expatProfile
+        const rightExpatProfile = right.nationality === 'china' ? null : right.expatProfile
+        const getSupervisorLabel = (profile?: typeof leftExpatProfile | null) => {
+          if (!profile?.chineseSupervisor) return ''
+          const frenchName = profile.chineseSupervisor.chineseProfile?.frenchName?.trim()
+          return frenchName || profile.chineseSupervisor.username || ''
+        }
+        for (const sort of sortStack) {
+          let result = 0
+          switch (sort.field) {
           case 'name':
             result = compareNullable(getTextValue(left.name), getTextValue(right.name), (a, b) => collator.compare(a, b))
             break
@@ -306,6 +318,13 @@ export function useFilteredMembers({
             result = compareNullable(
               getTextValue(leftExpatProfile?.team),
               getTextValue(rightExpatProfile?.team),
+              (a, b) => collator.compare(a, b),
+            )
+            break
+          case 'chineseSupervisor':
+            result = compareNullable(
+              getTextValue(getSupervisorLabel(leftExpatProfile)),
+              getTextValue(getSupervisorLabel(rightExpatProfile)),
               (a, b) => collator.compare(a, b),
             )
             break
@@ -518,6 +537,7 @@ export function useFilteredMembers({
     statusFilters,
     roleFilters,
     teamFilters,
+    chineseSupervisorFilters,
     contractNumberFilters,
     contractTypeFilters,
     salaryCategoryFilters,

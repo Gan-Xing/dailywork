@@ -76,6 +76,15 @@ export async function POST(request: Request) {
   const shouldCreateChineseProfile = isChinese && hasChineseProfileData(chineseProfileData)
   const expatProfileData = normalizeExpatProfile(expatProfile)
   const shouldCreateExpatProfile = !isChinese && hasExpatProfileData(expatProfileData)
+  if (!isChinese && expatProfileData.chineseSupervisorId) {
+    const supervisor = await prisma.user.findUnique({
+      where: { id: expatProfileData.chineseSupervisorId },
+      select: { nationality: true },
+    })
+    if (!supervisor || supervisor.nationality !== 'china') {
+      return NextResponse.json({ error: '中方负责人必须为中国籍成员' }, { status: 400 })
+    }
+  }
   const hasBirthDateInput =
     birthDate !== null &&
     birthDate !== undefined &&

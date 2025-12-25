@@ -109,6 +109,9 @@ export function useMemberEditForm({ member, canAssignRole, t }: UseMemberEditFor
     }
     const expatProfilePayload = {
       team: formState.expatProfile.team.trim() || null,
+      chineseSupervisorId: formState.expatProfile.chineseSupervisorId
+        ? Number(formState.expatProfile.chineseSupervisorId)
+        : null,
       contractNumber: formState.expatProfile.contractNumber.trim() || null,
       contractType: formState.expatProfile.contractType || null,
       salaryCategory: formState.expatProfile.salaryCategory.trim() || null,

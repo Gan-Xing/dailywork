@@ -75,6 +75,7 @@ export const memberCopy: Record<
       | 'employmentStatus'
       | 'roles'
       | 'team'
+      | 'chineseSupervisor'
       | 'contractNumber'
       | 'contractType'
       | 'salaryCategory'
@@ -170,6 +171,7 @@ export const memberCopy: Record<
       importInvalidJoinDate: string
       importMissingBirthDate: string
       importInvalidBirthDate: string
+      importInvalidChineseSupervisor: string
       importDuplicateContractNumber: string
       importContractNumberExists: string
       importRoleNotFound: (role: string) => string
@@ -193,6 +195,7 @@ export const memberCopy: Record<
         | 'employmentStatus'
         | 'roles'
         | 'team'
+        | 'chineseSupervisor'
         | 'contractNumber'
         | 'contractType'
         | 'salaryCategory'
@@ -272,6 +275,7 @@ export const memberCopy: Record<
       collapse: string
       expatEmpty: string
       team: string
+      chineseSupervisor: string
       contractNumber: string
       contractType: string
       salaryCategory: string
@@ -417,6 +421,7 @@ export const memberCopy: Record<
       employmentStatus: '状态',
       roles: '角色',
       team: '班组',
+      chineseSupervisor: '中方负责人',
       contractNumber: '合同编号',
       contractType: '合同类型',
       salaryCategory: '工资等级',
@@ -510,6 +515,7 @@ export const memberCopy: Record<
       importInvalidJoinDate: '入职日期格式不正确',
       importMissingBirthDate: '出生日期必填',
       importInvalidBirthDate: '出生日期格式不正确',
+      importInvalidChineseSupervisor: '中方负责人账号不存在或非中国籍成员',
       importDuplicateContractNumber: '合同编号重复（同一文件内）',
       importContractNumberExists: '合同编号已存在',
       importRoleNotFound: (role: string) => `角色不存在：${role}`,
@@ -533,6 +539,7 @@ export const memberCopy: Record<
         employmentStatus: '固定值：ACTIVE / ON_LEAVE / TERMINATED；新建留空默认 ACTIVE，更新留空保留原值',
         roles: '仅 role:update / role:manage 可见；填写角色名称，多个用 "/" 分隔；示例：Admin / Employee',
         team: '可选；班组或工作组名称。',
+        chineseSupervisor: '可选；填写中方负责人账号（username）。',
         contractNumber: '可选；合同编号，需唯一。',
         contractType: '可选；固定值：CTJ / CDD。',
         salaryCategory: '可选；工资等级/类别。',
@@ -614,6 +621,7 @@ export const memberCopy: Record<
       collapse: '收起',
       expatEmpty: '暂无可填写的当地员工扩展字段。',
       team: '班组',
+      chineseSupervisor: '中方负责人',
       contractNumber: '合同编号',
       contractType: '合同类型',
       salaryCategory: '工资等级',
@@ -766,6 +774,7 @@ export const memberCopy: Record<
       employmentStatus: 'Statut',
       roles: 'Rôles',
       team: 'Équipe',
+      chineseSupervisor: 'Responsable chinois',
       contractNumber: 'N° contrat',
       contractType: 'Type de contrat',
       salaryCategory: 'Catégorie',
@@ -859,6 +868,7 @@ export const memberCopy: Record<
       importInvalidJoinDate: "Date d'arrivée invalide",
       importMissingBirthDate: 'Date de naissance requise',
       importInvalidBirthDate: 'Date de naissance invalide',
+      importInvalidChineseSupervisor: 'Identifiant du responsable chinois invalide',
       importDuplicateContractNumber: "N° contrat en double dans le fichier",
       importContractNumberExists: "N° contrat déjà utilisé",
       importRoleNotFound: (role: string) => `Rôle introuvable : ${role}`,
@@ -883,6 +893,7 @@ export const memberCopy: Record<
           'Valeurs fixes : ACTIVE / ON_LEAVE / TERMINATED ; création vide = ACTIVE, sinon conservé',
         roles: 'Visible avec role:update / role:manage ; saisir les noms de rôles, séparés par "/" ; ex. Admin / Employee',
         team: 'Optionnel ; équipe ou groupe.',
+        chineseSupervisor: 'Optionnel ; identifiant du responsable chinois (username).',
         contractNumber: 'Optionnel ; numéro de contrat, unique.',
         contractType: 'Optionnel ; valeurs : CTJ / CDD.',
         salaryCategory: 'Optionnel ; catégorie salariale.',
@@ -965,6 +976,7 @@ export const memberCopy: Record<
       collapse: 'Réduire',
       expatEmpty: 'Aucun champ local à renseigner.',
       team: 'Équipe',
+      chineseSupervisor: 'Responsable chinois',
       contractNumber: 'N° contrat',
       contractType: 'Type de contrat',
       salaryCategory: 'Catégorie',

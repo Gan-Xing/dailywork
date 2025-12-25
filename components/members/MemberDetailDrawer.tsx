@@ -60,6 +60,11 @@ export function MemberDetailDrawer({ member, open, onClose, onEdit }: Props) {
     const unitLabel = resolvedUnit === 'MONTH' ? t.form.salaryUnitMonth : t.form.salaryUnitHour
     return `${formattedAmount} / ${unitLabel}`
   }
+  const formatSupervisor = () => {
+    const supervisor = member.expatProfile?.chineseSupervisor
+    const frenchName = supervisor?.chineseProfile?.frenchName?.trim()
+    return frenchName || supervisor?.username || t.labels.empty
+  }
 
   const sections = [
     { key: 'overview', label: t.drawer.tabs.overview },
@@ -167,6 +172,7 @@ export function MemberDetailDrawer({ member, open, onClose, onEdit }: Props) {
                             emptyLabel={t.labels.empty}
                           />
                           <DetailItem label={t.table.team} value={member.expatProfile?.team ?? ''} emptyLabel={t.labels.empty} />
+                          <DetailItem label={t.table.chineseSupervisor} value={formatSupervisor()} emptyLabel={t.labels.empty} />
                         </dl>
                       </section>
 

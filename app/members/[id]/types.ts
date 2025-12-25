@@ -19,6 +19,12 @@ export type ChineseProfile = {
 
 export type ExpatProfile = {
   team: string | null
+  chineseSupervisorId?: number | null
+  chineseSupervisor?: {
+    id: number
+    username: string
+    chineseProfile?: { frenchName: string | null } | null
+  } | null
   contractNumber: string | null
   contractType: 'CTJ' | 'CDD' | null
   salaryCategory: string | null
@@ -60,6 +66,12 @@ export type Role = {
 }
 
 export type MemberOption = {
+  id: number
+  username: string
+  nationality: string | null
+  chineseProfile?: {
+    frenchName?: string | null
+  } | null
   expatProfile?: {
     team?: string | null
   } | null
@@ -84,6 +96,7 @@ export type ChineseProfileForm = {
 
 export type ExpatProfileForm = {
   team: string
+  chineseSupervisorId: string
   contractNumber: string
   contractType: '' | 'CTJ' | 'CDD'
   salaryCategory: string

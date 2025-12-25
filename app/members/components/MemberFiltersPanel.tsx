@@ -28,6 +28,7 @@ type MemberFiltersPanelProps = {
   statusFilterOptions: Option[]
   roleFilterOptions: Option[]
   teamFilterOptions: Option[]
+  chineseSupervisorFilterOptions: Option[]
   contractNumberFilterOptions: Option[]
   contractTypeFilterOptions: Option[]
   salaryCategoryFilterOptions: Option[]
@@ -64,6 +65,7 @@ type MemberFiltersPanelProps = {
   statusFilters: string[]
   roleFilters: string[]
   teamFilters: string[]
+  chineseSupervisorFilters: string[]
   contractNumberFilters: string[]
   contractTypeFilters: string[]
   salaryCategoryFilters: string[]
@@ -100,6 +102,7 @@ type MemberFiltersPanelProps = {
   setStatusFilters: (value: string[]) => void
   setRoleFilters: (value: string[]) => void
   setTeamFilters: (value: string[]) => void
+  setChineseSupervisorFilters: (value: string[]) => void
   setContractNumberFilters: (value: string[]) => void
   setContractTypeFilters: (value: string[]) => void
   setSalaryCategoryFilters: (value: string[]) => void
@@ -142,6 +145,7 @@ export function MemberFiltersPanel({
   statusFilterOptions,
   roleFilterOptions,
   teamFilterOptions,
+  chineseSupervisorFilterOptions,
   contractNumberFilterOptions,
   contractTypeFilterOptions,
   salaryCategoryFilterOptions,
@@ -178,6 +182,7 @@ export function MemberFiltersPanel({
   statusFilters,
   roleFilters,
   teamFilters,
+  chineseSupervisorFilters,
   contractNumberFilters,
   contractTypeFilters,
   salaryCategoryFilters,
@@ -214,6 +219,7 @@ export function MemberFiltersPanel({
   setStatusFilters,
   setRoleFilters,
   setTeamFilters,
+  setChineseSupervisorFilters,
   setContractNumberFilters,
   setContractTypeFilters,
   setSalaryCategoryFilters,
@@ -313,6 +319,13 @@ export function MemberFiltersPanel({
         options={teamFilterOptions}
         selected={teamFilters}
         onChange={setTeamFilters}
+        {...filterControlProps}
+      />
+      <MultiSelectFilter
+        label={t.table.chineseSupervisor}
+        options={chineseSupervisorFilterOptions}
+        selected={chineseSupervisorFilters}
+        onChange={setChineseSupervisorFilters}
         {...filterControlProps}
       />
       <MultiSelectFilter

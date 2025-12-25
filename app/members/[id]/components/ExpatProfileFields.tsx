@@ -11,6 +11,7 @@ type ExpatProfileFieldsProps = {
   formState: FormState
   setFormState: Dispatch<SetStateAction<FormState>>
   teamOptions: string[]
+  chineseSupervisorOptions: { value: string; label: string }[]
 }
 
 export function ExpatProfileFields({
@@ -18,6 +19,7 @@ export function ExpatProfileFields({
   formState,
   setFormState,
   teamOptions,
+  chineseSupervisorOptions,
 }: ExpatProfileFieldsProps) {
   return (
     <div className="mt-4 grid gap-4 sm:grid-cols-2">
@@ -39,6 +41,26 @@ export function ExpatProfileFields({
             <option key={name} value={name} />
           ))}
         </datalist>
+      </label>
+      <label className="space-y-1 text-sm text-slate-700">
+        <span className="block font-semibold">{t.form.chineseSupervisor}</span>
+        <select
+          value={formState.expatProfile.chineseSupervisorId}
+          onChange={(event) =>
+            setFormState((prev) => ({
+              ...prev,
+              expatProfile: { ...prev.expatProfile, chineseSupervisorId: event.target.value },
+            }))
+          }
+          className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+        >
+          <option value="">{t.labels.empty}</option>
+          {chineseSupervisorOptions.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
       </label>
       <label className="space-y-1 text-sm text-slate-700">
         <span className="block font-semibold">{t.form.contractNumber}</span>

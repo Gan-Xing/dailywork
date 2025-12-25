@@ -30,6 +30,7 @@ type MemberFormModalProps = {
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
   positionOptions: string[]
   teamOptions: string[]
+  chineseSupervisorOptions: { value: string; label: string }[]
   nationalityByRegion: Map<NationalityRegion, NationalityOption[]>
   statusLabels: Record<EmploymentStatus, string>
   isChineseForm: boolean
@@ -62,6 +63,7 @@ export function MemberFormModal({
   onSubmit,
   positionOptions,
   teamOptions,
+  chineseSupervisorOptions,
   nationalityByRegion,
   statusLabels,
   isChineseForm,
@@ -604,6 +606,30 @@ export function MemberFormModal({
                         <option key={name} value={name} />
                       ))}
                     </datalist>
+                  </label>
+                  <label className="space-y-1 text-sm text-slate-700">
+                    <span className="block font-semibold">{t.form.chineseSupervisor}</span>
+                    <select
+                      value={formState.expatProfile.chineseSupervisorId}
+                      onChange={(event) =>
+                        setFormState((prev) => ({
+                          ...prev,
+                          expatProfile: {
+                            ...prev.expatProfile,
+                            chineseSupervisorId: event.target.value,
+                          },
+                        }))
+                      }
+                      disabled={formMode === 'view'}
+                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+                    >
+                      <option value="">{t.labels.empty}</option>
+                      {chineseSupervisorOptions.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
                   </label>
                   <label className="space-y-1 text-sm text-slate-700">
                     <span className="block font-semibold">{t.form.contractNumber}</span>

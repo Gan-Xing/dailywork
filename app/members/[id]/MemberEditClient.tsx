@@ -47,7 +47,7 @@ export function MemberEditClient({ member, canAssignRole }: Props) {
     removePhone,
     handleSubmit,
   } = useMemberEditForm({ member, canAssignRole, t })
-  const { rolesData, teamOptions } = useMemberEditData({
+  const { rolesData, teamOptions, chineseSupervisorOptions } = useMemberEditData({
     locale,
     canAssignRole,
     currentTeam: formState.expatProfile.team,
@@ -114,6 +114,7 @@ export function MemberEditClient({ member, canAssignRole }: Props) {
               formState={formState}
               setFormState={setFormState}
               teamOptions={teamOptions}
+              chineseSupervisorOptions={chineseSupervisorOptions}
             />
 
             <RoleSelector

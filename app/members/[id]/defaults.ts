@@ -19,6 +19,7 @@ export const emptyChineseProfile: ChineseProfileForm = {
 
 export const emptyExpatProfile: ExpatProfileForm = {
   team: '',
+  chineseSupervisorId: '',
   contractNumber: '',
   contractType: '',
   salaryCategory: '',

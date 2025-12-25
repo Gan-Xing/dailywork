@@ -37,6 +37,7 @@ type ImportMemberInput = {
   employmentStatus?: string | null
   roleIds?: number[]
   team?: string | null
+  chineseSupervisor?: string | null
   contractNumber?: string | null
   contractType?: string | null
   salaryCategory?: string | null
@@ -83,6 +84,7 @@ type ImportErrorCode =
   | 'missing_termination_date'
   | 'missing_termination_reason'
   | 'invalid_termination_date'
+  | 'invalid_chinese_supervisor'
   | 'duplicate_contract_number'
   | 'contract_number_exists'
   | 'role_not_found'
@@ -106,6 +108,33 @@ export async function POST(request: Request) {
   const members = Array.isArray(body?.members) ? (body?.members as ImportMemberInput[]) : []
   if (members.length === 0) {
     return NextResponse.json({ error: '缺少导入数据' }, { status: 400 })
+  }
+
+  const supervisorUsernames = Array.from(
+    new Set(
+      members
+        .map((member) =>
+          typeof member.chineseSupervisor === 'string' ? member.chineseSupervisor.trim().toLowerCase() : '',
+        )
+        .filter(Boolean),
+    ),
+  )
+  const supervisorsByUsername = new Map<string, { id: number; nationality: string | null }>()
+  if (supervisorUsernames.length > 0) {
+    const supervisors = await prisma.user.findMany({
+      where: {
+        OR: supervisorUsernames.map((username) => ({
+          username: { equals: username, mode: 'insensitive' },
+        })),
+      },
+      select: { id: true, username: true, nationality: true },
+    })
+    supervisors.forEach((supervisor) => {
+      supervisorsByUsername.set(supervisor.username.toLowerCase(), {
+        id: supervisor.id,
+        nationality: supervisor.nationality,
+      })
+    })
   }
 
   const errors: ImportError[] = []
@@ -155,6 +184,13 @@ export async function POST(request: Request) {
     const name = typeof member.name === 'string' ? member.name.trim() : ''
     const gender = typeof member.gender === 'string' ? member.gender.trim() : null
     const nationality = typeof member.nationality === 'string' ? member.nationality.trim() : null
+    const supervisorUsername =
+      typeof member.chineseSupervisor === 'string' ? member.chineseSupervisor.trim() : ''
+    const supervisorRecord = supervisorUsername
+      ? supervisorsByUsername.get(supervisorUsername.toLowerCase())
+      : null
+    const chineseSupervisorId =
+      supervisorRecord && supervisorRecord.nationality === 'china' ? supervisorRecord.id : null
     const phones = normalizePhoneList(member.phones)
     const position =
       typeof member.position === 'string' && member.position.trim().length ? member.position.trim() : null
@@ -187,6 +223,7 @@ export async function POST(request: Request) {
     })
     const expatProfile = normalizeExpatProfile({
       team: member.team,
+      chineseSupervisorId,
       contractNumber: member.contractNumber,
       contractType: member.contractType,
       salaryCategory: member.salaryCategory,
@@ -226,6 +263,11 @@ export async function POST(request: Request) {
     }
     if (!name) {
       errors.push({ row, code: 'missing_name' })
+      invalidRows.add(row)
+      hasRowError = true
+    }
+    if (nationality !== 'china' && supervisorUsername && !chineseSupervisorId) {
+      errors.push({ row, code: 'invalid_chinese_supervisor', value: supervisorUsername })
       invalidRows.add(row)
       hasRowError = true
     }
@@ -565,6 +607,9 @@ export async function POST(request: Request) {
             : {}),
         }
         const expatProfileUpdate = {
+          ...(member.expatProfile.chineseSupervisorId !== null
+            ? { chineseSupervisorId: member.expatProfile.chineseSupervisorId }
+            : {}),
           ...(member.expatProfile.team ? { team: member.expatProfile.team } : {}),
           ...(member.expatProfile.contractNumber
             ? { contractNumber: member.expatProfile.contractNumber }

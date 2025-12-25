@@ -88,6 +88,7 @@ export function useMemberImportExport({
       add(copy.form.terminationReason, 'terminationReason')
       add(copy.form.roles, 'roles')
       add(copy.form.team, 'team')
+      add(copy.form.chineseSupervisor, 'chineseSupervisor')
       add(copy.form.contractNumber, 'contractNumber')
       add(copy.form.contractType, 'contractType')
       add(copy.form.salaryCategory, 'salaryCategory')
@@ -231,6 +232,9 @@ export function useMemberImportExport({
         case 'role_not_found':
           message = t.errors.importRoleNotFound(error.value ?? '')
           break
+        case 'invalid_chinese_supervisor':
+          message = t.errors.importInvalidChineseSupervisor
+          break
         default:
           message = t.errors.importFailed
       }
@@ -305,6 +309,7 @@ export function useMemberImportExport({
           netMonthly?: string | null
           maritalStatus?: string | null
           childrenCount?: number | string | null
+          chineseSupervisor?: string | null
           cnpsNumber?: string | null
           cnpsDeclarationCode?: string | null
           provenance?: string | null
@@ -407,7 +412,8 @@ export function useMemberImportExport({
             baseSalary?: string | null
             netMonthly?: string | null
             maritalStatus?: string | null
-            childrenCount?: number | string | null
+          childrenCount?: number | string | null
+          chineseSupervisor?: string | null
             cnpsNumber?: string | null
             cnpsDeclarationCode?: string | null
             provenance?: string | null
@@ -550,15 +556,18 @@ export function useMemberImportExport({
               case 'childrenCount':
                 record.childrenCount = String(rawValue ?? '').trim()
                 break
+              case 'chineseSupervisor':
+                record.chineseSupervisor = String(rawValue ?? '').trim()
+                break
               case 'cnpsNumber':
                 record.cnpsNumber = String(rawValue ?? '').trim()
                 break
               case 'cnpsDeclarationCode':
                 record.cnpsDeclarationCode = String(rawValue ?? '').trim()
                 break
-              case 'provenance':
-                record.provenance = String(rawValue ?? '').trim()
-                break
+            case 'provenance':
+              record.provenance = String(rawValue ?? '').trim()
+              break
               case 'emergencyContact':
                 record.emergencyContact = String(rawValue ?? '').trim()
                 break
@@ -802,6 +811,8 @@ export function useMemberImportExport({
                 : t.labels.empty
             case 'team':
               return formatProfileText(expatProfile?.team)
+            case 'chineseSupervisor':
+              return expatProfile?.chineseSupervisor?.username ?? t.labels.empty
             case 'contractNumber':
               return formatProfileText(expatProfile?.contractNumber)
             case 'contractType':

@@ -16,6 +16,7 @@ type ProfileSectionProps = {
   formState: FormState
   setFormState: Dispatch<SetStateAction<FormState>>
   teamOptions: string[]
+  chineseSupervisorOptions: { value: string; label: string }[]
 }
 
 export function ProfileSection({
@@ -26,6 +27,7 @@ export function ProfileSection({
   formState,
   setFormState,
   teamOptions,
+  chineseSupervisorOptions,
 }: ProfileSectionProps) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
@@ -55,6 +57,7 @@ export function ProfileSection({
             formState={formState}
             setFormState={setFormState}
             teamOptions={teamOptions}
+            chineseSupervisorOptions={chineseSupervisorOptions}
           />
         )
       ) : null}

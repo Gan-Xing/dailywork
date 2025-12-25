@@ -15,6 +15,7 @@ export type MemberFiltersState = {
   statusFilters: string[]
   roleFilters: string[]
   teamFilters: string[]
+  chineseSupervisorFilters: string[]
   contractNumberFilters: string[]
   contractTypeFilters: string[]
   salaryCategoryFilters: string[]
@@ -58,6 +59,7 @@ const initialFiltersState: MemberFiltersState = {
   statusFilters: [],
   roleFilters: [],
   teamFilters: [],
+  chineseSupervisorFilters: [],
   contractNumberFilters: [],
   contractTypeFilters: [],
   salaryCategoryFilters: [],
@@ -130,6 +132,8 @@ export function useMemberTableState(options: Options = {}) {
       setStatusFilters: (value: string[]) => setFilter('statusFilters', value),
       setRoleFilters: (value: string[]) => setFilter('roleFilters', value),
       setTeamFilters: (value: string[]) => setFilter('teamFilters', value),
+      setChineseSupervisorFilters: (value: string[]) =>
+        setFilter('chineseSupervisorFilters', value),
       setContractNumberFilters: (value: string[]) => setFilter('contractNumberFilters', value),
       setContractTypeFilters: (value: string[]) => setFilter('contractTypeFilters', value),
       setSalaryCategoryFilters: (value: string[]) => setFilter('salaryCategoryFilters', value),

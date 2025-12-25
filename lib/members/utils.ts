@@ -78,6 +78,7 @@ export const emptyChineseProfile: ChineseProfileForm = {
 
 export const emptyExpatProfile: ExpatProfileForm = {
   team: '',
+  chineseSupervisorId: '',
   contractNumber: '',
   contractType: '',
   salaryCategory: '',
@@ -114,6 +115,7 @@ export const buildChineseProfileForm = (profile?: ChineseProfile | null): Chines
 
 export const buildExpatProfileForm = (profile?: ExpatProfile | null): ExpatProfileForm => ({
   team: profile?.team ?? '',
+  chineseSupervisorId: profile?.chineseSupervisorId ? String(profile.chineseSupervisorId) : '',
   contractNumber: profile?.contractNumber ?? '',
   contractType: profile?.contractType ?? '',
   salaryCategory: profile?.salaryCategory ?? '',

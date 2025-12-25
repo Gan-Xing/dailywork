@@ -164,6 +164,14 @@ export function MembersTable({
               {t.table.team} {sortIndicator('team')}
             </th>
           ) : null}
+          {isVisible('chineseSupervisor') ? (
+            <th
+              className="px-3 py-3 whitespace-nowrap cursor-pointer select-none"
+              onClick={() => handleSort('chineseSupervisor')}
+            >
+              {t.table.chineseSupervisor} {sortIndicator('chineseSupervisor')}
+            </th>
+          ) : null}
           {isVisible('contractNumber') ? (
             <th
               className="px-3 py-3 whitespace-nowrap cursor-pointer select-none"
@@ -390,6 +398,10 @@ export function MembersTable({
           const displayIndex = (page - 1) * pageSize + index + 1
           const chineseProfile = member.nationality === 'china' ? member.chineseProfile : null
           const expatProfile = member.nationality === 'china' ? null : member.expatProfile
+          const supervisorLabel =
+            expatProfile?.chineseSupervisor?.chineseProfile?.frenchName?.trim() ||
+            expatProfile?.chineseSupervisor?.username ||
+            t.labels.empty
           return (
             <tr key={member.id} className="hover:bg-slate-50 align-middle">
               {isVisible('sequence') ? (
@@ -494,6 +506,11 @@ export function MembersTable({
               {isVisible('team') ? (
                 <td className="whitespace-nowrap px-4 py-3 text-slate-700 align-middle">
                   {formatProfileText(expatProfile?.team)}
+                </td>
+              ) : null}
+              {isVisible('chineseSupervisor') ? (
+                <td className="whitespace-nowrap px-4 py-3 text-slate-700 align-middle">
+                  {formatProfileText(supervisorLabel)}
                 </td>
               ) : null}
               {isVisible('contractNumber') ? (

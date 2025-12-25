@@ -15,6 +15,7 @@ export type ColumnKey =
   | 'terminationReason'
   | 'roles'
   | 'team'
+  | 'chineseSupervisor'
   | 'contractNumber'
   | 'contractType'
   | 'salaryCategory'
@@ -62,6 +63,7 @@ export type TemplateColumnKey =
   | 'terminationReason'
   | 'roles'
   | 'team'
+  | 'chineseSupervisor'
   | 'contractNumber'
   | 'contractType'
   | 'salaryCategory'
@@ -107,6 +109,7 @@ export type ImportErrorCode =
   | 'missing_termination_date'
   | 'invalid_termination_date'
   | 'missing_termination_reason'
+  | 'invalid_chinese_supervisor'
   | 'duplicate_contract_number'
   | 'contract_number_exists'
   | 'role_not_found'
@@ -125,6 +128,7 @@ export const defaultVisibleColumns: ColumnKey[] = [
   'birthDate',
   'position',
   'employmentStatus',
+  'chineseSupervisor',
   'roles',
   'actions',
 ]
@@ -143,6 +147,7 @@ export const memberColumnOrder: ColumnKey[] = [
   'terminationReason',
   'roles',
   'team',
+  'chineseSupervisor',
   'contractNumber',
   'contractType',
   'salaryCategory',
@@ -191,6 +196,7 @@ export const memberTemplateColumns: TemplateColumnKey[] = [
   'terminationReason',
   'roles',
   'team',
+  'chineseSupervisor',
   'contractNumber',
   'contractType',
   'salaryCategory',

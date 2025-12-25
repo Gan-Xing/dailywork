@@ -163,6 +163,7 @@
 ### UserExpatProfile（当地员工/外籍扩展字段）
 
 - `team`（EQUIPE）：班组/队伍名称，字符串，可空。
+- `chineseSupervisorId`（RESPONSABLE CHINOIS）：中方负责人绑定用户 ID，仅允许中国籍成员，可空。
 - `contractNumber`（MATRICULE）：合同编号，字符串，可空但需唯一。
 - `contractType`（TYPE DE CONTRAT）：枚举 `CTJ` / `CDD`。
 - `salaryCategory`（CATEGORIE）：工资等级，字符串，可空。

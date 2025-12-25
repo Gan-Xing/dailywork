@@ -415,6 +415,7 @@ model User {
   updatedFinances FinanceEntry[] @relation("FinanceEntryUpdater")
   chineseProfile UserChineseProfile?
   expatProfile UserExpatProfile?
+  expatSupervisees UserExpatProfile[] @relation("ExpatChineseSupervisor")
   createdById  Int?
   updatedById  Int?
   createdBy    User?      @relation("UserCreator", fields: [createdById], references: [id])
@@ -473,6 +474,8 @@ model UserChineseProfile {
 model UserExpatProfile {
   userId             Int          @id
   user               User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  chineseSupervisorId Int?
+  chineseSupervisor  User?        @relation("ExpatChineseSupervisor", fields: [chineseSupervisorId], references: [id], onDelete: SetNull)
   team               String?
   contractNumber     String?      @unique
   contractType       ContractType?

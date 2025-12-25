@@ -19,6 +19,7 @@ export type NormalizedChineseProfile = {
 
 export type NormalizedExpatProfile = {
   team: string | null
+  chineseSupervisorId: number | null
   contractNumber: string | null
   contractType: ContractType | null
   salaryCategory: string | null
@@ -293,6 +294,7 @@ export const normalizeExpatProfile = (raw: unknown): NormalizedExpatProfile => {
 
   return {
     team: normalizeString(source.team),
+    chineseSupervisorId: parseOptionalInt(source.chineseSupervisorId),
     contractNumber: normalizeString(source.contractNumber),
     contractType: parseContractType(source.contractType),
     salaryCategory: normalizeString(source.salaryCategory),
@@ -314,6 +316,7 @@ export const normalizeExpatProfile = (raw: unknown): NormalizedExpatProfile => {
 export const hasExpatProfileData = (profile: NormalizedExpatProfile) => {
   return (
     Boolean(profile.team) ||
+    profile.chineseSupervisorId !== null ||
     Boolean(profile.contractNumber) ||
     Boolean(profile.contractType) ||
     Boolean(profile.salaryCategory) ||

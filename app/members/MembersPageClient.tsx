@@ -32,6 +32,7 @@ import {
   buildExpatProfileForm,
   emptyChineseProfile,
   emptyExpatProfile,
+  normalizeText,
   normalizeProfileNumber,
   parseBirthDateFromIdNumber,
 } from '@/lib/members/utils'
@@ -132,6 +133,7 @@ export function MembersPageClient() {
     statusFilters,
     roleFilters,
     teamFilters,
+    chineseSupervisorFilters,
     contractNumberFilters,
     contractTypeFilters,
     salaryCategoryFilters,
@@ -170,6 +172,7 @@ export function MembersPageClient() {
     setStatusFilters,
     setRoleFilters,
     setTeamFilters,
+    setChineseSupervisorFilters,
     setContractNumberFilters,
     setContractTypeFilters,
     setSalaryCategoryFilters,
@@ -238,6 +241,17 @@ export function MembersPageClient() {
     canAssignRole,
     loadErrorMessage: t.feedback.loadError,
   })
+  const chineseSupervisorOptions = useMemo(() => {
+    const localeId = locale === 'fr' ? 'fr' : ['zh-Hans-u-co-pinyin', 'zh-Hans', 'zh']
+    const collator = new Intl.Collator(localeId, { numeric: true, sensitivity: 'base' })
+    return membersData
+      .filter((member) => member.nationality === 'china')
+      .map((member) => ({
+        value: String(member.id),
+        label: normalizeText(member.chineseProfile?.frenchName) || member.username,
+      }))
+      .sort((a, b) => collator.compare(a.label, b.label))
+  }, [membersData, locale])
   const {
     showRoleModal,
     roleSubmitting,
@@ -289,6 +303,7 @@ export function MembersPageClient() {
     statusFilterOptions,
     roleFilterOptions,
     teamFilterOptions,
+    chineseSupervisorFilterOptions,
     contractNumberFilterOptions,
     contractTypeFilterOptions,
     salaryCategoryFilterOptions,
@@ -353,6 +368,7 @@ export function MembersPageClient() {
     statusFilters,
     roleFilters,
     teamFilters,
+    chineseSupervisorFilters,
     contractNumberFilters,
     contractTypeFilters,
     salaryCategoryFilters,
@@ -391,6 +407,7 @@ export function MembersPageClient() {
     statusFilters,
     roleFilters,
     teamFilters,
+    chineseSupervisorFilters,
     contractNumberFilters,
     contractTypeFilters,
     salaryCategoryFilters,
@@ -678,6 +695,9 @@ export function MembersPageClient() {
     }
     const expatProfilePayload = {
       team: formState.expatProfile.team.trim() || null,
+      chineseSupervisorId: formState.expatProfile.chineseSupervisorId
+        ? Number(formState.expatProfile.chineseSupervisorId)
+        : null,
       contractNumber: formState.expatProfile.contractNumber.trim() || null,
       contractType: formState.expatProfile.contractType || null,
       salaryCategory: formState.expatProfile.salaryCategory.trim() || null,
@@ -1001,6 +1021,7 @@ export function MembersPageClient() {
                 statusFilterOptions={statusFilterOptions}
                 roleFilterOptions={roleFilterOptions}
                 teamFilterOptions={teamFilterOptions}
+                chineseSupervisorFilterOptions={chineseSupervisorFilterOptions}
                 contractNumberFilterOptions={contractNumberFilterOptions}
                 contractTypeFilterOptions={contractTypeFilterOptions}
                 salaryCategoryFilterOptions={salaryCategoryFilterOptions}
@@ -1037,6 +1058,7 @@ export function MembersPageClient() {
                 statusFilters={statusFilters}
                 roleFilters={roleFilters}
                 teamFilters={teamFilters}
+                chineseSupervisorFilters={chineseSupervisorFilters}
                 contractNumberFilters={contractNumberFilters}
                 contractTypeFilters={contractTypeFilters}
                 salaryCategoryFilters={salaryCategoryFilters}
@@ -1073,6 +1095,7 @@ export function MembersPageClient() {
                 setStatusFilters={setStatusFilters}
                 setRoleFilters={setRoleFilters}
                 setTeamFilters={setTeamFilters}
+                setChineseSupervisorFilters={setChineseSupervisorFilters}
                 setContractNumberFilters={setContractNumberFilters}
                 setContractTypeFilters={setContractTypeFilters}
                 setSalaryCategoryFilters={setSalaryCategoryFilters}
@@ -1211,6 +1234,7 @@ export function MembersPageClient() {
         onSubmit={handleSubmit}
         positionOptions={positionOptions}
         teamOptions={teamOptions}
+        chineseSupervisorOptions={chineseSupervisorOptions}
         nationalityByRegion={nationalityByRegion}
         statusLabels={statusLabels}
         isChineseForm={isChineseForm}

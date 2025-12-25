@@ -38,6 +38,16 @@ export function useMemberEditData({
     return Array.from(set).sort(optionCollator.compare)
   }, [currentTeam, memberOptions, optionCollator])
 
+  const chineseSupervisorOptions = useMemo(() => {
+    return memberOptions
+      .filter((memberOption) => memberOption.nationality === 'china')
+      .map((memberOption) => ({
+        value: String(memberOption.id),
+        label: normalizeText(memberOption.chineseProfile?.frenchName) || memberOption.username,
+      }))
+      .sort((a, b) => optionCollator.compare(a.label, b.label))
+  }, [memberOptions, optionCollator])
+
   useEffect(() => {
     if (!canAssignRole) return
     const loadRoles = async () => {
@@ -69,5 +79,5 @@ export function useMemberEditData({
 
   const resolvedRolesData = canAssignRole ? rolesData : []
 
-  return { rolesData: resolvedRolesData, teamOptions }
+  return { rolesData: resolvedRolesData, teamOptions, chineseSupervisorOptions }
 }

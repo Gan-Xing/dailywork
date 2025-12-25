@@ -57,6 +57,7 @@ type MembersTabProps = {
   statusFilterOptions: Option[]
   roleFilterOptions: Option[]
   teamFilterOptions: Option[]
+  chineseSupervisorFilterOptions: Option[]
   contractNumberFilterOptions: Option[]
   contractTypeFilterOptions: Option[]
   salaryCategoryFilterOptions: Option[]
@@ -93,6 +94,7 @@ type MembersTabProps = {
   statusFilters: string[]
   roleFilters: string[]
   teamFilters: string[]
+  chineseSupervisorFilters: string[]
   contractNumberFilters: string[]
   contractTypeFilters: string[]
   salaryCategoryFilters: string[]
@@ -129,6 +131,7 @@ type MembersTabProps = {
   setStatusFilters: (value: string[]) => void
   setRoleFilters: (value: string[]) => void
   setTeamFilters: (value: string[]) => void
+  setChineseSupervisorFilters: (value: string[]) => void
   setContractNumberFilters: (value: string[]) => void
   setContractTypeFilters: (value: string[]) => void
   setSalaryCategoryFilters: (value: string[]) => void
@@ -232,6 +235,7 @@ export function MembersTab(props: MembersTabProps) {
     statusFilterOptions,
     roleFilterOptions,
     teamFilterOptions,
+    chineseSupervisorFilterOptions,
     contractNumberFilterOptions,
     contractTypeFilterOptions,
     salaryCategoryFilterOptions,
@@ -268,6 +272,7 @@ export function MembersTab(props: MembersTabProps) {
     statusFilters,
     roleFilters,
     teamFilters,
+    chineseSupervisorFilters,
     contractNumberFilters,
     contractTypeFilters,
     salaryCategoryFilters,
@@ -304,6 +309,7 @@ export function MembersTab(props: MembersTabProps) {
     setStatusFilters,
     setRoleFilters,
     setTeamFilters,
+    setChineseSupervisorFilters,
     setContractNumberFilters,
     setContractTypeFilters,
     setSalaryCategoryFilters,
@@ -503,6 +509,7 @@ export function MembersTab(props: MembersTabProps) {
                 statusFilterOptions={statusFilterOptions}
                 roleFilterOptions={roleFilterOptions}
                 teamFilterOptions={teamFilterOptions}
+                chineseSupervisorFilterOptions={chineseSupervisorFilterOptions}
                 contractNumberFilterOptions={contractNumberFilterOptions}
                 contractTypeFilterOptions={contractTypeFilterOptions}
                 salaryCategoryFilterOptions={salaryCategoryFilterOptions}
@@ -539,6 +546,7 @@ export function MembersTab(props: MembersTabProps) {
                 statusFilters={statusFilters}
                 roleFilters={roleFilters}
                 teamFilters={teamFilters}
+                chineseSupervisorFilters={chineseSupervisorFilters}
                 contractNumberFilters={contractNumberFilters}
                 contractTypeFilters={contractTypeFilters}
                 salaryCategoryFilters={salaryCategoryFilters}
@@ -575,6 +583,7 @@ export function MembersTab(props: MembersTabProps) {
                 setStatusFilters={setStatusFilters}
                 setRoleFilters={setRoleFilters}
                 setTeamFilters={setTeamFilters}
+                setChineseSupervisorFilters={setChineseSupervisorFilters}
                 setContractNumberFilters={setContractNumberFilters}
                 setContractTypeFilters={setContractTypeFilters}
                 setSalaryCategoryFilters={setSalaryCategoryFilters}
