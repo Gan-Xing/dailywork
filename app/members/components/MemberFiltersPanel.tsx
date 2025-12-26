@@ -136,22 +136,21 @@ const sectionBaseClasses =
 const sectionGridClasses = 'grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
 
 const themes = {
-  emerald: 'bg-emerald-50 text-emerald-700 ring-emerald-600/20',
-  blue: 'bg-blue-50 text-blue-700 ring-blue-700/10',
-  amber: 'bg-amber-50 text-amber-700 ring-amber-600/20',
-  purple: 'bg-purple-50 text-purple-700 ring-purple-600/20',
-  rose: 'bg-rose-50 text-rose-700 ring-rose-600/20',
+  emerald: { wrapper: 'bg-emerald-50 border-l-emerald-500', text: 'text-emerald-900' },
+  blue: { wrapper: 'bg-blue-50 border-l-blue-500', text: 'text-blue-900' },
+  amber: { wrapper: 'bg-amber-50 border-l-amber-500', text: 'text-amber-900' },
+  purple: { wrapper: 'bg-purple-50 border-l-purple-500', text: 'text-purple-900' },
+  rose: { wrapper: 'bg-rose-50 border-l-rose-500', text: 'text-rose-900' },
 }
 
-const SectionTitle = ({ label, theme }: { label: string; theme: keyof typeof themes }) => (
-  <div className="mb-4 flex items-center border-b border-slate-100 pb-3">
-    <span
-      className={`inline-flex items-center rounded-md px-2.5 py-1 text-xs font-bold uppercase tracking-wider ring-1 ring-inset ${themes[theme]}`}
-    >
-      {label}
-    </span>
-  </div>
-)
+const SectionTitle = ({ label, theme }: { label: string; theme: keyof typeof themes }) => {
+  const style = themes[theme]
+  return (
+    <div className={`mb-4 rounded-r-lg border-l-4 px-3 py-2 ${style.wrapper}`}>
+      <h3 className={`text-sm font-bold tracking-wide ${style.text}`}>{label}</h3>
+    </div>
+  )
+}
 
 export function MemberFiltersPanel({
   t,
