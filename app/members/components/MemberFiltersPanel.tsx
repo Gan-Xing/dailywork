@@ -131,6 +131,20 @@ type MemberFiltersPanelProps = {
   setUpdatedAtFilters: (value: string[]) => void
 }
 
+const sectionBaseClasses =
+  'rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition-shadow hover:shadow-md'
+const sectionTitleClasses =
+  'text-sm font-bold uppercase tracking-wider text-slate-800'
+const sectionHeaderClasses = 'flex items-center gap-3 mb-4 border-b border-slate-100 pb-3'
+const sectionGridClasses = 'grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
+
+const SectionTitle = ({ label, colorClass }: { label: string; colorClass: string }) => (
+  <div className={sectionHeaderClasses}>
+    <div className={`h-4 w-1.5 rounded-full ${colorClass}`} />
+    <h3 className={sectionTitleClasses}>{label}</h3>
+  </div>
+)
+
 export function MemberFiltersPanel({
   t,
   filterControlProps,
@@ -247,24 +261,13 @@ export function MemberFiltersPanel({
   setCreatedAtFilters,
   setUpdatedAtFilters,
 }: MemberFiltersPanelProps) {
-  const sectionBaseClasses =
-    'rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-sm shadow-slate-900/5'
-  const sectionTitleClasses =
-    'text-sm font-semibold uppercase tracking-[0.22em] text-slate-800'
-  const sectionHeaderClasses = 'flex items-center gap-3'
-  const sectionRuleClasses = 'h-px flex-1 bg-slate-200'
-  const sectionRowClasses = 'mt-3 flex flex-wrap items-start gap-3'
-  const filterItemClasses = 'min-w-[220px] flex-1'
-  const sharedFilterProps = { ...filterControlProps, className: filterItemClasses }
+  const sharedFilterProps = { ...filterControlProps, className: 'w-full' }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-6">
       <section className={sectionBaseClasses}>
-        <div className={sectionHeaderClasses}>
-          <p className={sectionTitleClasses}>{t.fieldGroups.basicInfo}</p>
-          <span aria-hidden className={sectionRuleClasses} />
-        </div>
-        <div className={sectionRowClasses}>
+        <SectionTitle label={t.fieldGroups.basicInfo} colorClass="bg-emerald-500" />
+        <div className={sectionGridClasses}>
           <MultiSelectFilter
             label={t.table.name}
             options={nameFilterOptions}
@@ -348,11 +351,8 @@ export function MemberFiltersPanel({
       </section>
 
       <section className={sectionBaseClasses}>
-        <div className={sectionHeaderClasses}>
-          <p className={sectionTitleClasses}>{t.fieldGroups.contract}</p>
-          <span aria-hidden className={sectionRuleClasses} />
-        </div>
-        <div className={sectionRowClasses}>
+        <SectionTitle label={t.fieldGroups.contract} colorClass="bg-blue-500" />
+        <div className={sectionGridClasses}>
           <MultiSelectFilter
             label={t.table.contractNumber}
             options={contractNumberFilterOptions}
@@ -371,11 +371,8 @@ export function MemberFiltersPanel({
       </section>
 
       <section className={sectionBaseClasses}>
-        <div className={sectionHeaderClasses}>
-          <p className={sectionTitleClasses}>{t.fieldGroups.salary}</p>
-          <span aria-hidden className={sectionRuleClasses} />
-        </div>
-        <div className={sectionRowClasses}>
+        <SectionTitle label={t.fieldGroups.salary} colorClass="bg-amber-500" />
+        <div className={sectionGridClasses}>
           <MultiSelectFilter
             label={t.table.salaryCategory}
             options={salaryCategoryFilterOptions}
@@ -401,11 +398,8 @@ export function MemberFiltersPanel({
       </section>
 
       <section className={sectionBaseClasses}>
-        <div className={sectionHeaderClasses}>
-          <p className={sectionTitleClasses}>{t.fieldGroups.localProfile}</p>
-          <span aria-hidden className={sectionRuleClasses} />
-        </div>
-        <div className={sectionRowClasses}>
+        <SectionTitle label={t.fieldGroups.localProfile} colorClass="bg-purple-500" />
+        <div className={sectionGridClasses}>
           <MultiSelectFilter
             label={t.table.team}
             options={teamFilterOptions}
@@ -473,11 +467,8 @@ export function MemberFiltersPanel({
       </section>
 
       <section className={sectionBaseClasses}>
-        <div className={sectionHeaderClasses}>
-          <p className={sectionTitleClasses}>{t.fieldGroups.chineseProfile}</p>
-          <span aria-hidden className={sectionRuleClasses} />
-        </div>
-        <div className={sectionRowClasses}>
+        <SectionTitle label={t.fieldGroups.chineseProfile} colorClass="bg-rose-500" />
+        <div className={sectionGridClasses}>
           <MultiSelectFilter
             label={t.table.frenchName}
             options={frenchNameFilterOptions}
