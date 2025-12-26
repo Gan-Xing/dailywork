@@ -7,9 +7,10 @@ type MembersTabsHeaderProps = {
   t: MemberCopy
   activeTab: 'members' | 'roles' | 'permissions'
   onChangeTab: (tab: 'members' | 'roles' | 'permissions') => void
+  tabs: Array<'members' | 'roles' | 'permissions'>
 }
 
-export function MembersTabsHeader({ t, activeTab, onChangeTab }: MembersTabsHeaderProps) {
+export function MembersTabsHeader({ t, activeTab, onChangeTab, tabs }: MembersTabsHeaderProps) {
   return (
     <div className="flex flex-col gap-4 border-b border-slate-100 p-6 sm:flex-row sm:items-center sm:justify-between">
       <div>
@@ -17,7 +18,7 @@ export function MembersTabsHeader({ t, activeTab, onChangeTab }: MembersTabsHead
         <p className="text-sm text-slate-500">{t.tabDescriptions[activeTab]}</p>
       </div>
       <div className="flex flex-wrap gap-2">
-        {(['members', 'roles', 'permissions'] as const).map((tab) => (
+        {tabs.map((tab) => (
           <TabButton key={tab} active={activeTab === tab} onClick={() => onChangeTab(tab)}>
             {t.tabs[tab]}
           </TabButton>

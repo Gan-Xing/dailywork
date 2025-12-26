@@ -215,6 +215,11 @@ export function MembersPageClient() {
     canUpdatePermissions,
     shouldShowAccessDenied,
   } = useSessionPermissions()
+  useEffect(() => {
+    if (activeTab === 'permissions' && !canViewPermissions) {
+      setActiveTab('members')
+    }
+  }, [activeTab, canViewPermissions])
   const statusLabels = employmentStatusLabels[locale]
   const {
     nationalityByRegion,
@@ -950,13 +955,21 @@ export function MembersPageClient() {
       helper: headcount ? `${Math.round((activeCount / headcount) * 100)}%` : undefined,
     },
     { label: t.stats.roles, value: roleCount, accent: 'from-indigo-400 to-blue-300', helper: 'RBAC' },
-    {
-      label: t.stats.coverage,
-      value: permissionCoverage,
-      accent: 'from-amber-400 to-orange-300',
-      helper: t.helpers.permissionCoverage,
-    },
+    ...(canViewPermissions
+      ? [
+          {
+            label: t.stats.coverage,
+            value: permissionCoverage,
+            accent: 'from-amber-400 to-orange-300',
+            helper: t.helpers.permissionCoverage,
+          },
+        ]
+      : []),
   ]
+  const availableTabs = useMemo<TabKey[]>(
+    () => (canViewPermissions ? ['members', 'roles', 'permissions'] : ['members', 'roles']),
+    [canViewPermissions],
+  )
   const permissionGroups = useMemo(() => {
     const grouped = new Map<string, typeof permissions>()
     permissions.forEach((permission) => {
@@ -995,7 +1008,12 @@ export function MembersPageClient() {
       <section className="w-full bg-slate-50">
         <div className="mx-auto grid max-w-6xl gap-8 px-6 pb-14 pt-6 sm:px-8 sm:pt-10 xl:max-w-[1500px] xl:gap-10 xl:px-12 xl:pt-12 2xl:max-w-[1700px] 2xl:gap-12 2xl:px-14 min-w-0">
           <div className="min-w-0 w-full rounded-3xl border border-slate-200 bg-white shadow-xl shadow-slate-900/5">
-            <MembersTabsHeader t={t} activeTab={activeTab} onChangeTab={setActiveTab} />
+            <MembersTabsHeader
+              t={t}
+              activeTab={activeTab}
+              onChangeTab={setActiveTab}
+              tabs={availableTabs}
+            />
 
             {activeTab === 'members' ? (
               <MembersTab
@@ -1194,7 +1212,7 @@ export function MembersPageClient() {
               />
             ) : null}
 
-            {activeTab === 'permissions' ? (
+            {activeTab === 'permissions' && canViewPermissions ? (
               <PermissionsTab
                 t={t}
                 permissions={permissions}

@@ -253,7 +253,7 @@ export function MemberFiltersPanel({
     'text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500'
 
   return (
-    <div className="grid gap-4">
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
       <section className={sectionBaseClasses}>
         <div className="flex items-center justify-between">
           <p className={sectionTitleClasses}>{t.fieldGroups.basicInfo}</p>
