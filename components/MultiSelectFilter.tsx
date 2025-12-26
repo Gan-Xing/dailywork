@@ -12,6 +12,7 @@ type Props = {
   options: MultiSelectOption[]
   selected: string[]
   onChange: (next: string[]) => void
+  className?: string
   allLabel: string
   selectedLabel: (count: number) => string
   selectAllLabel: string
@@ -27,6 +28,7 @@ export function MultiSelectFilter({
   options,
   selected,
   onChange,
+  className,
   allLabel,
   selectedLabel,
   selectAllLabel,
@@ -64,8 +66,11 @@ export function MultiSelectFilter({
   const summaryText = selected.length === 0 ? allLabel : selectedLabel(selected.length)
 
   return (
-    <div className="flex flex-col gap-1 text-xs text-slate-500" ref={containerRef}>
-      <span className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+    <div
+      className={`flex flex-col gap-1 text-xs text-slate-600${className ? ` ${className}` : ''}`}
+      ref={containerRef}
+    >
+      <span className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-600">
         {label}
       </span>
       <div className="relative">

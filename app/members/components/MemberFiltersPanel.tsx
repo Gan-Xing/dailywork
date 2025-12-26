@@ -250,70 +250,76 @@ export function MemberFiltersPanel({
   const sectionBaseClasses =
     'rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-sm shadow-slate-900/5'
   const sectionTitleClasses =
-    'text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500'
+    'text-sm font-semibold uppercase tracking-[0.22em] text-slate-800'
+  const sectionHeaderClasses = 'flex items-center gap-3'
+  const sectionRuleClasses = 'h-px flex-1 bg-slate-200'
+  const sectionRowClasses = 'mt-3 flex flex-wrap items-start gap-3'
+  const filterItemClasses = 'min-w-[220px] flex-1'
+  const sharedFilterProps = { ...filterControlProps, className: filterItemClasses }
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+    <div className="flex flex-col gap-4">
       <section className={sectionBaseClasses}>
-        <div className="flex items-center justify-between">
+        <div className={sectionHeaderClasses}>
           <p className={sectionTitleClasses}>{t.fieldGroups.basicInfo}</p>
+          <span aria-hidden className={sectionRuleClasses} />
         </div>
-        <div className="mt-3 grid gap-3">
+        <div className={sectionRowClasses}>
           <MultiSelectFilter
             label={t.table.name}
             options={nameFilterOptions}
             selected={nameFilters}
             onChange={setNameFilters}
-            {...filterControlProps}
+            {...sharedFilterProps}
           />
           <MultiSelectFilter
             label={t.table.username}
             options={usernameFilterOptions}
             selected={usernameFilters}
             onChange={setUsernameFilters}
-            {...filterControlProps}
+            {...sharedFilterProps}
           />
           <MultiSelectFilter
             label={t.table.gender}
             options={genderFilterOptions}
             selected={genderFilters}
             onChange={setGenderFilters}
-            {...filterControlProps}
+            {...sharedFilterProps}
           />
           <MultiSelectFilter
             label={t.table.nationality}
             options={nationalityFilterOptions}
             selected={nationalityFilters}
             onChange={setNationalityFilters}
-            {...filterControlProps}
+            {...sharedFilterProps}
           />
           <MultiSelectFilter
             label={t.table.phones}
             options={phoneFilterOptions}
             selected={phoneFilters}
             onChange={setPhoneFilters}
-            {...filterControlProps}
+            {...sharedFilterProps}
           />
           <MultiSelectFilter
             label={t.table.joinDate}
             options={joinDateFilterOptions}
             selected={joinDateFilters}
             onChange={setJoinDateFilters}
-            {...filterControlProps}
+            {...sharedFilterProps}
           />
           <MultiSelectFilter
             label={t.table.position}
             options={positionFilterOptions}
             selected={positionFilters}
             onChange={setPositionFilters}
-            {...filterControlProps}
+            {...sharedFilterProps}
           />
           <MultiSelectFilter
             label={t.table.employmentStatus}
             options={statusFilterOptions}
             selected={statusFilters}
             onChange={setStatusFilters}
-            {...filterControlProps}
+            {...sharedFilterProps}
           />
           {canAssignRole ? (
             <MultiSelectFilter
@@ -321,7 +327,7 @@ export function MemberFiltersPanel({
               options={roleFilterOptions}
               selected={roleFilters}
               onChange={setRoleFilters}
-              {...filterControlProps}
+              {...sharedFilterProps}
             />
           ) : null}
           <MultiSelectFilter
@@ -329,228 +335,232 @@ export function MemberFiltersPanel({
             options={createdAtFilterOptions}
             selected={createdAtFilters}
             onChange={setCreatedAtFilters}
-            {...filterControlProps}
+            {...sharedFilterProps}
           />
           <MultiSelectFilter
             label={t.table.updatedAt}
             options={updatedAtFilterOptions}
             selected={updatedAtFilters}
             onChange={setUpdatedAtFilters}
-            {...filterControlProps}
+            {...sharedFilterProps}
           />
         </div>
       </section>
 
       <section className={sectionBaseClasses}>
-        <div className="flex items-center justify-between">
+        <div className={sectionHeaderClasses}>
           <p className={sectionTitleClasses}>{t.fieldGroups.contract}</p>
+          <span aria-hidden className={sectionRuleClasses} />
         </div>
-        <div className="mt-3 grid gap-3">
+        <div className={sectionRowClasses}>
           <MultiSelectFilter
             label={t.table.contractNumber}
             options={contractNumberFilterOptions}
             selected={contractNumberFilters}
             onChange={setContractNumberFilters}
-            {...filterControlProps}
+            {...sharedFilterProps}
           />
           <MultiSelectFilter
             label={t.table.contractType}
             options={contractTypeFilterOptions}
             selected={contractTypeFilters}
             onChange={setContractTypeFilters}
-            {...filterControlProps}
+            {...sharedFilterProps}
           />
         </div>
       </section>
 
       <section className={sectionBaseClasses}>
-        <div className="flex items-center justify-between">
+        <div className={sectionHeaderClasses}>
           <p className={sectionTitleClasses}>{t.fieldGroups.salary}</p>
+          <span aria-hidden className={sectionRuleClasses} />
         </div>
-        <div className="mt-3 grid gap-3">
+        <div className={sectionRowClasses}>
           <MultiSelectFilter
             label={t.table.salaryCategory}
             options={salaryCategoryFilterOptions}
             selected={salaryCategoryFilters}
             onChange={setSalaryCategoryFilters}
-            {...filterControlProps}
+            {...sharedFilterProps}
           />
           <MultiSelectFilter
             label={t.table.baseSalary}
             options={baseSalaryFilterOptions}
             selected={baseSalaryFilters}
             onChange={setBaseSalaryFilters}
-            {...filterControlProps}
+            {...sharedFilterProps}
           />
           <MultiSelectFilter
             label={t.table.netMonthly}
             options={netMonthlyFilterOptions}
             selected={netMonthlyFilters}
             onChange={setNetMonthlyFilters}
-            {...filterControlProps}
+            {...sharedFilterProps}
           />
         </div>
       </section>
 
       <section className={sectionBaseClasses}>
-        <div className="flex items-center justify-between">
+        <div className={sectionHeaderClasses}>
           <p className={sectionTitleClasses}>{t.fieldGroups.localProfile}</p>
+          <span aria-hidden className={sectionRuleClasses} />
         </div>
-        <div className="mt-3 grid gap-3">
+        <div className={sectionRowClasses}>
           <MultiSelectFilter
             label={t.table.team}
             options={teamFilterOptions}
             selected={teamFilters}
             onChange={setTeamFilters}
-            {...filterControlProps}
+            {...sharedFilterProps}
           />
           <MultiSelectFilter
             label={t.table.chineseSupervisor}
             options={chineseSupervisorFilterOptions}
             selected={chineseSupervisorFilters}
             onChange={setChineseSupervisorFilters}
-            {...filterControlProps}
+            {...sharedFilterProps}
           />
           <MultiSelectFilter
             label={t.table.maritalStatus}
             options={maritalStatusFilterOptions}
             selected={maritalStatusFilters}
             onChange={setMaritalStatusFilters}
-            {...filterControlProps}
+            {...sharedFilterProps}
           />
           <MultiSelectFilter
             label={t.table.childrenCount}
             options={childrenCountFilterOptions}
             selected={childrenCountFilters}
             onChange={setChildrenCountFilters}
-            {...filterControlProps}
+            {...sharedFilterProps}
           />
           <MultiSelectFilter
             label={t.table.cnpsNumber}
             options={cnpsNumberFilterOptions}
             selected={cnpsNumberFilters}
             onChange={setCnpsNumberFilters}
-            {...filterControlProps}
+            {...sharedFilterProps}
           />
           <MultiSelectFilter
             label={t.table.cnpsDeclarationCode}
             options={cnpsDeclarationCodeFilterOptions}
             selected={cnpsDeclarationCodeFilters}
             onChange={setCnpsDeclarationCodeFilters}
-            {...filterControlProps}
+            {...sharedFilterProps}
           />
           <MultiSelectFilter
             label={t.table.provenance}
             options={provenanceFilterOptions}
             selected={provenanceFilters}
             onChange={setProvenanceFilters}
-            {...filterControlProps}
+            {...sharedFilterProps}
           />
           <MultiSelectFilter
             label={t.table.emergencyContactName}
             options={emergencyContactNameFilterOptions}
             selected={emergencyContactNameFilters}
             onChange={setEmergencyContactNameFilters}
-            {...filterControlProps}
+            {...sharedFilterProps}
           />
           <MultiSelectFilter
             label={t.table.emergencyContactPhone}
             options={emergencyContactPhoneFilterOptions}
             selected={emergencyContactPhoneFilters}
             onChange={setEmergencyContactPhoneFilters}
-            {...filterControlProps}
+            {...sharedFilterProps}
           />
         </div>
       </section>
 
       <section className={sectionBaseClasses}>
-        <div className="flex items-center justify-between">
+        <div className={sectionHeaderClasses}>
           <p className={sectionTitleClasses}>{t.fieldGroups.chineseProfile}</p>
+          <span aria-hidden className={sectionRuleClasses} />
         </div>
-        <div className="mt-3 grid gap-3">
+        <div className={sectionRowClasses}>
           <MultiSelectFilter
             label={t.table.frenchName}
             options={frenchNameFilterOptions}
             selected={frenchNameFilters}
             onChange={setFrenchNameFilters}
-            {...filterControlProps}
+            {...sharedFilterProps}
           />
           <MultiSelectFilter
             label={t.table.idNumber}
             options={idNumberFilterOptions}
             selected={idNumberFilters}
             onChange={setIdNumberFilters}
-            {...filterControlProps}
+            {...sharedFilterProps}
           />
           <MultiSelectFilter
             label={t.table.passportNumber}
             options={passportNumberFilterOptions}
             selected={passportNumberFilters}
             onChange={setPassportNumberFilters}
-            {...filterControlProps}
+            {...sharedFilterProps}
           />
           <MultiSelectFilter
             label={t.table.educationAndMajor}
             options={educationAndMajorFilterOptions}
             selected={educationAndMajorFilters}
             onChange={setEducationAndMajorFilters}
-            {...filterControlProps}
+            {...sharedFilterProps}
           />
           <MultiSelectFilter
             label={t.table.certifications}
             options={certificationsFilterOptions}
             selected={certificationsFilters}
             onChange={setCertificationsFilters}
-            {...filterControlProps}
+            {...sharedFilterProps}
           />
           <MultiSelectFilter
             label={t.table.domesticMobile}
             options={domesticMobileFilterOptions}
             selected={domesticMobileFilters}
             onChange={setDomesticMobileFilters}
-            {...filterControlProps}
+            {...sharedFilterProps}
           />
           <MultiSelectFilter
             label={t.table.redBookValidYears}
             options={redBookValidYearsFilterOptions}
             selected={redBookValidYearsFilters}
             onChange={setRedBookValidYearsFilters}
-            {...filterControlProps}
+            {...sharedFilterProps}
           />
           <MultiSelectFilter
             label={t.table.cumulativeAbroadYears}
             options={cumulativeAbroadYearsFilterOptions}
             selected={cumulativeAbroadYearsFilters}
             onChange={setCumulativeAbroadYearsFilters}
-            {...filterControlProps}
+            {...sharedFilterProps}
           />
           <MultiSelectFilter
             label={t.table.birthplace}
             options={birthplaceFilterOptions}
             selected={birthplaceFilters}
             onChange={setBirthplaceFilters}
-            {...filterControlProps}
+            {...sharedFilterProps}
           />
           <MultiSelectFilter
             label={t.table.residenceInChina}
             options={residenceInChinaFilterOptions}
             selected={residenceInChinaFilters}
             onChange={setResidenceInChinaFilters}
-            {...filterControlProps}
+            {...sharedFilterProps}
           />
           <MultiSelectFilter
             label={t.table.medicalHistory}
             options={medicalHistoryFilterOptions}
             selected={medicalHistoryFilters}
             onChange={setMedicalHistoryFilters}
-            {...filterControlProps}
+            {...sharedFilterProps}
           />
           <MultiSelectFilter
             label={t.table.healthStatus}
             options={healthStatusFilterOptions}
             selected={healthStatusFilters}
             onChange={setHealthStatusFilters}
-            {...filterControlProps}
+            {...sharedFilterProps}
           />
         </div>
       </section>
