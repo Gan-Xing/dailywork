@@ -133,15 +133,23 @@ type MemberFiltersPanelProps = {
 
 const sectionBaseClasses =
   'rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition-shadow hover:shadow-md'
-const sectionTitleClasses =
-  'text-sm font-bold uppercase tracking-wider text-slate-800'
-const sectionHeaderClasses = 'flex items-center gap-3 mb-4 border-b border-slate-100 pb-3'
 const sectionGridClasses = 'grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
 
-const SectionTitle = ({ label, colorClass }: { label: string; colorClass: string }) => (
-  <div className={sectionHeaderClasses}>
-    <div className={`h-4 w-1.5 rounded-full ${colorClass}`} />
-    <h3 className={sectionTitleClasses}>{label}</h3>
+const themes = {
+  emerald: 'bg-emerald-50 text-emerald-700 ring-emerald-600/20',
+  blue: 'bg-blue-50 text-blue-700 ring-blue-700/10',
+  amber: 'bg-amber-50 text-amber-700 ring-amber-600/20',
+  purple: 'bg-purple-50 text-purple-700 ring-purple-600/20',
+  rose: 'bg-rose-50 text-rose-700 ring-rose-600/20',
+}
+
+const SectionTitle = ({ label, theme }: { label: string; theme: keyof typeof themes }) => (
+  <div className="mb-4 flex items-center border-b border-slate-100 pb-3">
+    <span
+      className={`inline-flex items-center rounded-md px-2.5 py-1 text-xs font-bold uppercase tracking-wider ring-1 ring-inset ${themes[theme]}`}
+    >
+      {label}
+    </span>
   </div>
 )
 
@@ -266,7 +274,7 @@ export function MemberFiltersPanel({
   return (
     <div className="flex flex-col gap-6">
       <section className={sectionBaseClasses}>
-        <SectionTitle label={t.fieldGroups.basicInfo} colorClass="bg-emerald-500" />
+        <SectionTitle label={t.fieldGroups.basicInfo} theme="emerald" />
         <div className={sectionGridClasses}>
           <MultiSelectFilter
             label={t.table.name}
@@ -351,7 +359,7 @@ export function MemberFiltersPanel({
       </section>
 
       <section className={sectionBaseClasses}>
-        <SectionTitle label={t.fieldGroups.contract} colorClass="bg-blue-500" />
+        <SectionTitle label={t.fieldGroups.contract} theme="blue" />
         <div className={sectionGridClasses}>
           <MultiSelectFilter
             label={t.table.contractNumber}
@@ -371,7 +379,7 @@ export function MemberFiltersPanel({
       </section>
 
       <section className={sectionBaseClasses}>
-        <SectionTitle label={t.fieldGroups.salary} colorClass="bg-amber-500" />
+        <SectionTitle label={t.fieldGroups.salary} theme="amber" />
         <div className={sectionGridClasses}>
           <MultiSelectFilter
             label={t.table.salaryCategory}
@@ -398,7 +406,7 @@ export function MemberFiltersPanel({
       </section>
 
       <section className={sectionBaseClasses}>
-        <SectionTitle label={t.fieldGroups.localProfile} colorClass="bg-purple-500" />
+        <SectionTitle label={t.fieldGroups.localProfile} theme="purple" />
         <div className={sectionGridClasses}>
           <MultiSelectFilter
             label={t.table.team}
@@ -467,7 +475,7 @@ export function MemberFiltersPanel({
       </section>
 
       <section className={sectionBaseClasses}>
-        <SectionTitle label={t.fieldGroups.chineseProfile} colorClass="bg-rose-500" />
+        <SectionTitle label={t.fieldGroups.chineseProfile} theme="rose" />
         <div className={sectionGridClasses}>
           <MultiSelectFilter
             label={t.table.frenchName}
