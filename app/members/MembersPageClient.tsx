@@ -38,11 +38,10 @@ import {
 } from '@/lib/members/utils'
 import { useMemberTableState } from '@/lib/members/useMemberTableState'
 import { usePreferredLocale } from '@/lib/usePreferredLocale'
-import { MembersHeader } from '@/components/members/MembersHeader'
 import { MemberDetailDrawerMount } from './components/MemberDetailDrawerMount'
 import { MemberFormModal } from './components/MemberFormModal'
 import { MembersTab } from './components/MembersTab'
-import { MembersTabsHeader } from './components/MembersTabsHeader'
+import { MembersPageHeader } from './components/MembersPageHeader'
 import { PermissionsTab } from './components/PermissionsTab'
 import { RoleModal } from './components/RoleModal'
 import { RolesTab } from './components/RolesTab'
@@ -995,26 +994,20 @@ export function MembersPageClient() {
 
   return (
     <main className="min-h-screen bg-slate-50">
-      <MembersHeader
-        title={t.title}
-        subtitle={t.subtitle}
+      <MembersPageHeader
+        t={t}
+        activeTab={activeTab}
+        onChangeTab={setActiveTab}
+        tabs={availableTabs}
         breadcrumbHome={breadcrumbHome}
         breadcrumbMembers={breadcrumbMembers}
         locale={locale}
         onLocaleChange={setLocale}
-        stats={headerStats}
       />
 
       <section className="w-full bg-slate-50">
-        <div className="mx-auto grid max-w-6xl gap-8 px-6 pb-14 pt-6 sm:px-8 sm:pt-10 xl:max-w-[1500px] xl:gap-10 xl:px-12 xl:pt-12 2xl:max-w-[1700px] 2xl:gap-12 2xl:px-14 min-w-0">
+        <div className="mx-auto grid max-w-[1700px] gap-8 px-6 pb-14 pt-6 sm:px-8 xl:px-12 2xl:px-14 min-w-0">
           <div className="min-w-0 w-full rounded-3xl border border-slate-200 bg-white shadow-xl shadow-slate-900/5">
-            <MembersTabsHeader
-              t={t}
-              activeTab={activeTab}
-              onChangeTab={setActiveTab}
-              tabs={availableTabs}
-            />
-
             {activeTab === 'members' ? (
               <MembersTab
                 t={t}
@@ -1195,6 +1188,7 @@ export function MembersPageClient() {
                   setPageSize(value)
                   setPage(1)
                 }}
+                stats={headerStats}
               />
             ) : null}
 

@@ -117,6 +117,7 @@ export type ImportErrorCode =
 export type ImportError = { row: number; code: ImportErrorCode; value?: string }
 
 export const MEMBER_COLUMN_STORAGE_KEY = 'member-visible-columns'
+export const MEMBER_FILTER_STORAGE_KEY = 'member-filters'
 export const defaultVisibleColumns: ColumnKey[] = [
   'sequence',
   'name',

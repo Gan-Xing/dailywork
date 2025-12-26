@@ -1,6 +1,6 @@
-import { useCallback, useMemo, useReducer, useState } from 'react'
+import { useCallback, useEffect, useMemo, useReducer, useState } from 'react'
 
-import type { SortField, SortOrder } from '@/lib/members/constants'
+import { MEMBER_FILTER_STORAGE_KEY, type SortField, type SortOrder } from '@/lib/members/constants'
 
 type SortSpec = { field: SortField; order: SortOrder }
 
@@ -47,6 +47,7 @@ export type MemberFiltersState = {
 type FilterAction =
   | { type: 'set'; key: keyof MemberFiltersState; value: string[] }
   | { type: 'reset' }
+  | { type: 'hydrate'; value: Partial<MemberFiltersState> }
 
 const initialFiltersState: MemberFiltersState = {
   nameFilters: [],
@@ -88,6 +89,20 @@ const initialFiltersState: MemberFiltersState = {
   updatedAtFilters: [],
 }
 
+const filterKeys = Object.keys(initialFiltersState) as Array<keyof MemberFiltersState>
+
+const getStoredFilters = (value: unknown): Partial<MemberFiltersState> => {
+  if (!value || typeof value !== 'object') return {}
+  const record = value as Record<string, unknown>
+  return filterKeys.reduce((acc, key) => {
+    const entry = record[key]
+    if (Array.isArray(entry) && entry.every((item) => typeof item === 'string')) {
+      acc[key] = entry as string[]
+    }
+    return acc
+  }, {} as Partial<MemberFiltersState>)
+}
+
 const filterReducer = (state: MemberFiltersState, action: FilterAction): MemberFiltersState => {
   switch (action.type) {
     case 'set':
@@ -95,6 +110,8 @@ const filterReducer = (state: MemberFiltersState, action: FilterAction): MemberF
       return { ...state, [action.key]: action.value }
     case 'reset':
       return initialFiltersState
+    case 'hydrate':
+      return { ...initialFiltersState, ...action.value }
     default:
       return state
   }
@@ -107,6 +124,7 @@ type Options = {
 
 export function useMemberTableState(options: Options = {}) {
   const [filters, dispatch] = useReducer(filterReducer, initialFiltersState)
+  const [filtersHydrated, setFiltersHydrated] = useState(false)
   const [filtersOpen, setFiltersOpen] = useState(true)
   const [page, setPage] = useState(1)
   const [pageInput, setPageInput] = useState('1')
@@ -119,6 +137,33 @@ export function useMemberTableState(options: Options = {}) {
   const resetFilters = useCallback(() => {
     dispatch({ type: 'reset' })
   }, [])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      const stored = window.localStorage.getItem(MEMBER_FILTER_STORAGE_KEY)
+      if (!stored) return
+      const parsed = JSON.parse(stored)
+      const next = getStoredFilters(parsed)
+      if (Object.keys(next).length > 0) {
+        dispatch({ type: 'hydrate', value: next })
+      }
+    } catch (error) {
+      console.error('Failed to load member filters', error)
+    } finally {
+      setFiltersHydrated(true)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!filtersHydrated) return
+    if (typeof window === 'undefined') return
+    try {
+      window.localStorage.setItem(MEMBER_FILTER_STORAGE_KEY, JSON.stringify(filters))
+    } catch (error) {
+      console.error('Failed to persist member filters', error)
+    }
+  }, [filters, filtersHydrated])
 
   const filterActions = useMemo(
     () => ({

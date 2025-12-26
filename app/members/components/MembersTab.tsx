@@ -199,6 +199,7 @@ type MembersTabProps = {
   onPageChange: (next: number) => void
   onPageInputChange: (next: string) => void
   onPageSizeChange: (next: number) => void
+  stats: { label: string; value: number | string; accent: string; helper?: string }[]
 }
 
 export function MembersTab(props: MembersTabProps) {
@@ -378,6 +379,7 @@ export function MembersTab(props: MembersTabProps) {
     onPageChange,
     onPageInputChange,
     onPageSizeChange,
+    stats,
   } = props
 
   const columnGroups = [
@@ -457,7 +459,33 @@ export function MembersTab(props: MembersTabProps) {
 
   return (
     <>
-      <div className="flex flex-col gap-6 border-b border-slate-100 px-6 pb-6 pt-4 sm:flex-row sm:items-center sm:justify-between">
+      {/* Mini Stats Dashboard */}
+      <div className="grid grid-cols-2 gap-4 px-6 pt-6 sm:grid-cols-4">
+        {stats.map((stat) => (
+          <div
+            key={stat.label}
+            className="flex flex-col gap-1 rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:shadow-md"
+          >
+            <div className="flex items-center gap-2">
+              <span
+                className={`h-2 w-2 rounded-full bg-gradient-to-br ${stat.accent}`}
+              />
+              <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">
+                {stat.label}
+              </span>
+            </div>
+            <div className="flex items-baseline gap-2">
+              <span className="text-2xl font-bold text-slate-900">{stat.value}</span>
+              {stat.helper && (
+                <span className="text-xs font-medium text-emerald-600">{stat.helper}</span>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="flex flex-col gap-6 border-b border-slate-100 px-6 pb-6 pt-6 sm:flex-row sm:items-center sm:justify-between">
+
         <div>
           <p className="text-sm font-medium uppercase tracking-[0.22em] text-slate-500">
             {t.listHeading}
