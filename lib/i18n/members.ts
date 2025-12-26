@@ -328,6 +328,37 @@ export const memberCopy: Record<
       today: string
       close: string
     }
+    compensation: {
+      title: string
+      contractChanges: string
+      payrollChanges: string
+      payrollPayouts: string
+      addContractChange: string
+      addPayrollChange: string
+      addPayrollPayout: string
+      editContractChange: string
+      editPayrollChange: string
+      editPayrollPayout: string
+      fields: {
+        changeDate: string
+        startDate: string
+        endDate: string
+        reason: string
+        payoutDate: string
+        amount: string
+        currency: string
+        note: string
+        team: string
+        chineseSupervisor: string
+      }
+      actions: {
+        save: string
+        cancel: string
+        edit: string
+        delete: string
+        refresh: string
+      }
+    }
     drawer: {
       tabs: Record<'overview' | 'contracts' | 'payroll', string>
       sections: {
@@ -675,6 +706,37 @@ export const memberCopy: Record<
       empty: '无',
       today: '今天',
       close: '关闭',
+    },
+    compensation: {
+      title: '合同与薪酬管理',
+      contractChanges: '合同变更',
+      payrollChanges: '工资变更',
+      payrollPayouts: '工资发放',
+      addContractChange: '新增合同变更',
+      addPayrollChange: '新增工资变更',
+      addPayrollPayout: '新增发放记录',
+      editContractChange: '编辑合同变更',
+      editPayrollChange: '编辑工资变更',
+      editPayrollPayout: '编辑发放记录',
+      fields: {
+        changeDate: '变更日期',
+        startDate: '开始日期',
+        endDate: '结束日期',
+        reason: '变更原因',
+        payoutDate: '发放日期',
+        amount: '发放金额',
+        currency: '币种',
+        note: '备注',
+        team: '班组',
+        chineseSupervisor: '中方负责人',
+      },
+      actions: {
+        save: '保存',
+        cancel: '取消',
+        edit: '编辑',
+        delete: '删除',
+        refresh: '刷新',
+      },
     },
     drawer: {
       tabs: {
@@ -1030,6 +1092,37 @@ export const memberCopy: Record<
       empty: 'N/A',
       today: "Aujourd'hui",
       close: 'Fermer',
+    },
+    compensation: {
+      title: 'Contrats et rémunération',
+      contractChanges: 'Historique des contrats',
+      payrollChanges: 'Historique des salaires',
+      payrollPayouts: 'Versements',
+      addContractChange: 'Ajouter un contrat',
+      addPayrollChange: 'Ajouter un changement',
+      addPayrollPayout: 'Ajouter un versement',
+      editContractChange: 'Modifier le contrat',
+      editPayrollChange: 'Modifier le changement',
+      editPayrollPayout: 'Modifier le versement',
+      fields: {
+        changeDate: 'Date de changement',
+        startDate: 'Date de début',
+        endDate: 'Date de fin',
+        reason: 'Motif',
+        payoutDate: 'Date de versement',
+        amount: 'Montant',
+        currency: 'Devise',
+        note: 'Note',
+        team: 'Équipe',
+        chineseSupervisor: 'Responsable chinois',
+      },
+      actions: {
+        save: 'Enregistrer',
+        cancel: 'Annuler',
+        edit: 'Éditer',
+        delete: 'Supprimer',
+        refresh: 'Actualiser',
+      },
     },
     drawer: {
       tabs: {

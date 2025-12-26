@@ -66,6 +66,19 @@ export type Member = {
   expatProfile?: ExpatProfile | null
 }
 
+export type MemberOption = {
+  id: number
+  username: string
+  name?: string | null
+  nationality: string | null
+  chineseProfile?: {
+    frenchName?: string | null
+  } | null
+  expatProfile?: {
+    team?: string | null
+  } | null
+}
+
 export type Role = {
   id: number
   name: string

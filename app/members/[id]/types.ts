@@ -68,6 +68,7 @@ export type Role = {
 export type MemberOption = {
   id: number
   username: string
+  name?: string | null
   nationality: string | null
   chineseProfile?: {
     frenchName?: string | null

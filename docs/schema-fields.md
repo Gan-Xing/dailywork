@@ -177,6 +177,44 @@
 - `provenance`（PROVENANCE）：属地/来源，字符串，可空。
 - `emergencyContactName` + `emergencyContactPhone`（EN CAS D'URGENCES）：紧急联系人姓名与电话，字符串，可空。
 
+### UserContractChange（合同变更历史）
+
+- `userId`：关联成员 ID。
+- `chineseSupervisorId`（RESPONSABLE CHINOIS）：中方负责人 ID，可空。
+- `chineseSupervisorName`：中方负责人快照名（`name + frenchName`），可空。
+- `contractNumber`（MATRICULE）：合同编号，可空。
+- `contractType`（TYPE DE CONTRAT）：枚举 `CTJ` / `CDD`。
+- `salaryCategory`（CATEGORIE）：工资等级，可空。
+- `salaryAmount` + `salaryUnit`（SALAIRE DE BASE）：基础工资金额与单位，可空。
+- `prime`（PRIME）：奖金/补贴金额，可空。
+- `startDate` / `endDate`：合同起止日期，可空。
+- `changeDate`：变更执行日期。
+- `reason`：变更原因，可空。
+
+### UserPayrollChange（工资变更历史）
+
+- `userId`：关联成员 ID。
+- `team`（EQUIPE）：当时班组快照，可空。
+- `chineseSupervisorId`（RESPONSABLE CHINOIS）：中方负责人 ID，可空。
+- `chineseSupervisorName`：中方负责人快照名（`name + frenchName`），可空。
+- `salaryCategory`（CATEGORIE）：工资等级，可空。
+- `salaryAmount` + `salaryUnit`：工资金额与单位，可空。
+- `prime`（PRIME）：奖金/补贴金额，可空。
+- `baseSalaryAmount` + `baseSalaryUnit`：基础工资金额与单位，可空。
+- `netMonthlyAmount` + `netMonthlyUnit`：实发工资金额与单位，可空。
+- `changeDate`：变更执行日期。
+
+### UserPayrollPayout（工资发放记录）
+
+- `userId`：关联成员 ID。
+- `team`（EQUIPE）：当时班组快照，可空。
+- `chineseSupervisorId`（RESPONSABLE CHINOIS）：中方负责人 ID，可空。
+- `chineseSupervisorName`：中方负责人快照名（`name + frenchName`），可空。
+- `payoutDate`：发放日期。
+- `amount`：发放金额。
+- `currency`：币种（默认 `XOF`）。
+- `note`：备注，可空。
+
 ## 道路进度元数据（RoadSection）
 
 - **用途**：由管理员维护道路起终点信息，作为报检与分项工程配置的归属入口。

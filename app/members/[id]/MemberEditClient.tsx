@@ -19,6 +19,7 @@ import { ProfileSection } from './components/ProfileSection'
 import { RoleSelector } from './components/RoleSelector'
 import { useMemberEditData } from './hooks/useMemberEditData'
 import { useMemberEditForm } from './hooks/useMemberEditForm'
+import { CompensationSection } from './modules/compensation/CompensationSection'
 import type { Member } from './types'
 
 type Props = {
@@ -116,6 +117,16 @@ export function MemberEditClient({ member, canAssignRole }: Props) {
               teamOptions={teamOptions}
               chineseSupervisorOptions={chineseSupervisorOptions}
             />
+
+            {!isChineseForm ? (
+              <CompensationSection
+                t={t}
+                userId={member.id}
+                formState={formState}
+                teamOptions={teamOptions}
+                chineseSupervisorOptions={chineseSupervisorOptions}
+              />
+            ) : null}
 
             <RoleSelector
               t={t}

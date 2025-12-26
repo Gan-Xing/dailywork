@@ -416,6 +416,12 @@ model User {
   chineseProfile UserChineseProfile?
   expatProfile UserExpatProfile?
   expatSupervisees UserExpatProfile[] @relation("ExpatChineseSupervisor")
+  contractChangeSupervisees UserContractChange[] @relation("ContractChangeSupervisor")
+  payrollChangeSupervisees UserPayrollChange[] @relation("PayrollChangeSupervisor")
+  payrollPayoutSupervisees UserPayrollPayout[] @relation("PayrollPayoutSupervisor")
+  contractChanges UserContractChange[]
+  payrollChanges UserPayrollChange[]
+  payrollPayouts UserPayrollPayout[]
   createdById  Int?
   updatedById  Int?
   createdBy    User?      @relation("UserCreator", fields: [createdById], references: [id])
@@ -494,6 +500,73 @@ model UserExpatProfile {
   emergencyContactPhone String?
   createdAt          DateTime     @default(now())
   updatedAt          DateTime     @updatedAt
+}
+
+model UserContractChange {
+  id                   Int          @id @default(autoincrement())
+  userId               Int
+  user                 User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  chineseSupervisorId  Int?
+  chineseSupervisor    User?        @relation("ContractChangeSupervisor", fields: [chineseSupervisorId], references: [id], onDelete: SetNull)
+  chineseSupervisorName String?
+  contractNumber       String?
+  contractType         ContractType?
+  salaryCategory       String?
+  salaryAmount         Decimal?     @db.Decimal(18, 2)
+  salaryUnit           SalaryUnit?
+  prime                Decimal?     @db.Decimal(18, 2)
+  startDate            DateTime?
+  endDate              DateTime?
+  changeDate           DateTime     @default(now())
+  reason               String?
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
+
+  @@index([userId])
+  @@index([changeDate])
+}
+
+model UserPayrollChange {
+  id                   Int          @id @default(autoincrement())
+  userId               Int
+  user                 User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  team                 String?
+  chineseSupervisorId  Int?
+  chineseSupervisor    User?        @relation("PayrollChangeSupervisor", fields: [chineseSupervisorId], references: [id], onDelete: SetNull)
+  chineseSupervisorName String?
+  salaryCategory       String?
+  salaryAmount         Decimal?     @db.Decimal(18, 2)
+  salaryUnit           SalaryUnit?
+  prime                Decimal?     @db.Decimal(18, 2)
+  baseSalaryAmount     Decimal?     @db.Decimal(18, 2)
+  baseSalaryUnit       SalaryUnit?
+  netMonthlyAmount     Decimal?     @db.Decimal(18, 2)
+  netMonthlyUnit       SalaryUnit?
+  changeDate           DateTime     @default(now())
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
+
+  @@index([userId])
+  @@index([changeDate])
+}
+
+model UserPayrollPayout {
+  id                   Int          @id @default(autoincrement())
+  userId               Int
+  user                 User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  team                 String?
+  chineseSupervisorId  Int?
+  chineseSupervisor    User?        @relation("PayrollPayoutSupervisor", fields: [chineseSupervisorId], references: [id], onDelete: SetNull)
+  chineseSupervisorName String?
+  payoutDate           DateTime
+  amount               Decimal      @db.Decimal(18, 2)
+  currency             String       @default("XOF")
+  note                 String?
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
+
+  @@index([userId])
+  @@index([payoutDate])
 }
 
 model Project {

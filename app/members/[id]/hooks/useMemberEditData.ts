@@ -43,7 +43,10 @@ export function useMemberEditData({
       .filter((memberOption) => memberOption.nationality === 'china')
       .map((memberOption) => ({
         value: String(memberOption.id),
-        label: normalizeText(memberOption.chineseProfile?.frenchName) || memberOption.username,
+        label:
+          [normalizeText(memberOption.name), normalizeText(memberOption.chineseProfile?.frenchName)]
+            .filter(Boolean)
+            .join(' / ') || memberOption.username,
       }))
       .sort((a, b) => optionCollator.compare(a.label, b.label))
   }, [memberOptions, optionCollator])

@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { hashPassword } from '@/lib/auth/password'
 import { hasPermission } from '@/lib/server/authSession'
 import { listUsers } from '@/lib/server/authStore'
+import { resolveSupervisorSnapshot } from '@/lib/server/compensation'
 import {
   hasExpatProfileData,
   hasChineseProfileData,
@@ -76,6 +77,16 @@ export async function POST(request: Request) {
   const shouldCreateChineseProfile = isChinese && hasChineseProfileData(chineseProfileData)
   const expatProfileData = normalizeExpatProfile(expatProfile)
   const shouldCreateExpatProfile = !isChinese && hasExpatProfileData(expatProfileData)
+  const shouldCreateContractChange =
+    !isChinese && (expatProfileData.contractNumber || expatProfileData.contractType)
+  const shouldCreatePayrollChange =
+    !isChinese &&
+    (expatProfileData.salaryCategory ||
+      expatProfileData.prime ||
+      expatProfileData.baseSalaryAmount ||
+      expatProfileData.baseSalaryUnit ||
+      expatProfileData.netMonthlyAmount ||
+      expatProfileData.netMonthlyUnit)
   if (!isChinese && expatProfileData.chineseSupervisorId) {
     const supervisor = await prisma.user.findUnique({
       where: { id: expatProfileData.chineseSupervisorId },
@@ -147,45 +158,87 @@ export async function POST(request: Request) {
       }
     }
 
-    const user = await prisma.user.create({
-      data: {
-        username: normalizedUsername,
-        passwordHash: hashPassword(password),
-        name: name ?? '',
-        gender: gender ?? null,
-        nationality: nationality ?? null,
-        phones: phoneList,
-        joinDate: joinDate ? new Date(joinDate) : new Date(),
-        birthDate: resolvedBirthDate,
-        position: resolvedPositionName,
-        employmentStatus: resolvedEmploymentStatus,
-        terminationDate: resolvedTerminationDate,
-        terminationReason: resolvedTerminationReason,
-        chineseProfile: shouldCreateChineseProfile
-          ? {
-              create: chineseProfileData,
-            }
-          : undefined,
-        expatProfile: shouldCreateExpatProfile
-          ? {
-              create: expatProfileData,
-            }
-          : undefined,
-        roles: canAssignRole
-          ? roleIdList.length === 0
-            ? undefined
-            : {
-                create: roleIdList.map((id) => ({
-                  role: { connect: { id } },
-                })),
+    const supervisorSnapshot = await resolveSupervisorSnapshot(
+      expatProfileData.chineseSupervisorId ?? null,
+    )
+    const user = await prisma.$transaction(async (tx) => {
+      const createdUser = await tx.user.create({
+        data: {
+          username: normalizedUsername,
+          passwordHash: hashPassword(password),
+          name: name ?? '',
+          gender: gender ?? null,
+          nationality: nationality ?? null,
+          phones: phoneList,
+          joinDate: joinDate ? new Date(joinDate) : new Date(),
+          birthDate: resolvedBirthDate,
+          position: resolvedPositionName,
+          employmentStatus: resolvedEmploymentStatus,
+          terminationDate: resolvedTerminationDate,
+          terminationReason: resolvedTerminationReason,
+          chineseProfile: shouldCreateChineseProfile
+            ? {
+                create: chineseProfileData,
               }
-          : undefined,
-      },
-      include: {
-        roles: { include: { role: true } },
-        chineseProfile: true,
-        expatProfile: true,
-      },
+            : undefined,
+          expatProfile: shouldCreateExpatProfile
+            ? {
+                create: expatProfileData,
+              }
+            : undefined,
+          roles: canAssignRole
+            ? roleIdList.length === 0
+              ? undefined
+              : {
+                  create: roleIdList.map((id) => ({
+                    role: { connect: { id } },
+                  })),
+                }
+            : undefined,
+        },
+        include: {
+          roles: { include: { role: true } },
+          chineseProfile: true,
+          expatProfile: true,
+        },
+      })
+
+      if (shouldCreateContractChange) {
+        await tx.userContractChange.create({
+          data: {
+            userId: createdUser.id,
+            chineseSupervisorId: supervisorSnapshot.id,
+            chineseSupervisorName: supervisorSnapshot.name,
+            contractNumber: expatProfileData.contractNumber,
+            contractType: expatProfileData.contractType,
+            salaryCategory: expatProfileData.salaryCategory,
+            salaryAmount: expatProfileData.baseSalaryAmount,
+            salaryUnit: expatProfileData.baseSalaryUnit,
+            prime: expatProfileData.prime,
+          },
+        })
+      }
+
+      if (shouldCreatePayrollChange) {
+        await tx.userPayrollChange.create({
+          data: {
+            userId: createdUser.id,
+            team: expatProfileData.team,
+            chineseSupervisorId: supervisorSnapshot.id,
+            chineseSupervisorName: supervisorSnapshot.name,
+            salaryCategory: expatProfileData.salaryCategory,
+            salaryAmount: expatProfileData.baseSalaryAmount,
+            salaryUnit: expatProfileData.baseSalaryUnit,
+            prime: expatProfileData.prime,
+            baseSalaryAmount: expatProfileData.baseSalaryAmount,
+            baseSalaryUnit: expatProfileData.baseSalaryUnit,
+            netMonthlyAmount: expatProfileData.netMonthlyAmount,
+            netMonthlyUnit: expatProfileData.netMonthlyUnit,
+          },
+        })
+      }
+
+      return createdUser
     })
 
     return NextResponse.json({

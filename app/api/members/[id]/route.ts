@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 
 import { hashPassword } from '@/lib/auth/password'
 import { hasPermission } from '@/lib/server/authSession'
+import { isDecimalEqual, resolveSupervisorSnapshot } from '@/lib/server/compensation'
 import {
   hasExpatProfileData,
   normalizeChineseProfile,
@@ -66,6 +67,29 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   const chineseProfileData = normalizeChineseProfile(chineseProfile)
   const expatProfileData = normalizeExpatProfile(expatProfile)
   const shouldUpsertExpatProfile = !isChinese && hasExpatProfileData(expatProfileData)
+  const existingUser = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      nationality: true,
+      expatProfile: {
+        select: {
+          chineseSupervisorId: true,
+          team: true,
+          contractNumber: true,
+          contractType: true,
+          salaryCategory: true,
+          prime: true,
+          baseSalaryAmount: true,
+          baseSalaryUnit: true,
+          netMonthlyAmount: true,
+          netMonthlyUnit: true,
+        },
+      },
+    },
+  })
+  if (!existingUser) {
+    return NextResponse.json({ error: '成员不存在' }, { status: 404 })
+  }
   if (!isChinese && expatProfileData.chineseSupervisorId) {
     const supervisor = await prisma.user.findUnique({
       where: { id: expatProfileData.chineseSupervisorId },
@@ -120,6 +144,27 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     : []
 
   try {
+    const existingExpat = existingUser.expatProfile
+    const contractNumberChanged =
+      existingExpat?.contractNumber !== expatProfileData.contractNumber ||
+      existingExpat?.contractType !== expatProfileData.contractType
+    const payrollChanged =
+      existingExpat?.salaryCategory !== expatProfileData.salaryCategory ||
+      !isDecimalEqual(existingExpat?.prime?.toString() ?? null, expatProfileData.prime) ||
+      !isDecimalEqual(
+        existingExpat?.baseSalaryAmount?.toString() ?? null,
+        expatProfileData.baseSalaryAmount,
+      ) ||
+      existingExpat?.baseSalaryUnit !== expatProfileData.baseSalaryUnit ||
+      !isDecimalEqual(
+        existingExpat?.netMonthlyAmount?.toString() ?? null,
+        expatProfileData.netMonthlyAmount,
+      ) ||
+      existingExpat?.netMonthlyUnit !== expatProfileData.netMonthlyUnit
+    const supervisorSnapshot = await resolveSupervisorSnapshot(
+      expatProfileData.chineseSupervisorId ?? null,
+    )
+
     if (!isChinese && expatProfileData.contractNumber) {
       const contractOwner = await prisma.userExpatProfile.findUnique({
         where: { contractNumber: expatProfileData.contractNumber },
@@ -129,56 +174,95 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         return NextResponse.json({ error: '合同编号已存在' }, { status: 409 })
       }
     }
-    const user = await prisma.user.update({
-      where: { id: userId },
-      data: {
-        ...(normalizedUsername ? { username: normalizedUsername } : {}),
-        ...(password ? { passwordHash: hashPassword(password) } : {}),
-        name: name ?? '',
-        gender: gender ?? null,
-        nationality: nationality ?? null,
-        phones: phoneList,
-        joinDate: joinDate ? new Date(joinDate) : undefined,
-        birthDate: resolvedBirthDate,
-        position: resolvedPositionName,
-        employmentStatus: resolvedEmploymentStatus,
-        terminationDate: resolvedTerminationDate,
-        terminationReason: resolvedTerminationReason,
-        chineseProfile: isChinese
-          ? {
-              upsert: {
-                create: chineseProfileData,
-                update: chineseProfileData,
-              },
-            }
-          : undefined,
-        expatProfile: shouldUpsertExpatProfile
-          ? {
-              upsert: {
-                create: expatProfileData,
-                update: expatProfileData,
-              },
-            }
-          : undefined,
-        ...(canAssignRole
-          ? {
-              roles:
-                roleIdList.length === 0
-                  ? { deleteMany: {} }
-                  : {
-                      deleteMany: {},
-                      create: roleIdList.map((id) => ({
-                        role: { connect: { id } },
-                      })),
-                    },
-            }
-          : {}),
-      },
-      include: {
-        roles: { include: { role: true } },
-        chineseProfile: true,
-        expatProfile: true,
-      },
+    const user = await prisma.$transaction(async (tx) => {
+      const updatedUser = await tx.user.update({
+        where: { id: userId },
+        data: {
+          ...(normalizedUsername ? { username: normalizedUsername } : {}),
+          ...(password ? { passwordHash: hashPassword(password) } : {}),
+          name: name ?? '',
+          gender: gender ?? null,
+          nationality: nationality ?? null,
+          phones: phoneList,
+          joinDate: joinDate ? new Date(joinDate) : undefined,
+          birthDate: resolvedBirthDate,
+          position: resolvedPositionName,
+          employmentStatus: resolvedEmploymentStatus,
+          terminationDate: resolvedTerminationDate,
+          terminationReason: resolvedTerminationReason,
+          chineseProfile: isChinese
+            ? {
+                upsert: {
+                  create: chineseProfileData,
+                  update: chineseProfileData,
+                },
+              }
+            : undefined,
+          expatProfile: shouldUpsertExpatProfile
+            ? {
+                upsert: {
+                  create: expatProfileData,
+                  update: expatProfileData,
+                },
+              }
+            : undefined,
+          ...(canAssignRole
+            ? {
+                roles:
+                  roleIdList.length === 0
+                    ? { deleteMany: {} }
+                    : {
+                        deleteMany: {},
+                        create: roleIdList.map((id) => ({
+                          role: { connect: { id } },
+                        })),
+                      },
+              }
+            : {}),
+        },
+        include: {
+          roles: { include: { role: true } },
+          chineseProfile: true,
+          expatProfile: true,
+        },
+      })
+
+      if (!isChinese && contractNumberChanged) {
+        await tx.userContractChange.create({
+          data: {
+            userId,
+            chineseSupervisorId: supervisorSnapshot.id,
+            chineseSupervisorName: supervisorSnapshot.name,
+            contractNumber: expatProfileData.contractNumber,
+            contractType: expatProfileData.contractType,
+            salaryCategory: expatProfileData.salaryCategory,
+            salaryAmount: expatProfileData.baseSalaryAmount,
+            salaryUnit: expatProfileData.baseSalaryUnit,
+            prime: expatProfileData.prime,
+          },
+        })
+      }
+
+      if (!isChinese && payrollChanged) {
+        await tx.userPayrollChange.create({
+          data: {
+            userId,
+            team: expatProfileData.team,
+            chineseSupervisorId: supervisorSnapshot.id,
+            chineseSupervisorName: supervisorSnapshot.name,
+            salaryCategory: expatProfileData.salaryCategory,
+            salaryAmount: expatProfileData.baseSalaryAmount,
+            salaryUnit: expatProfileData.baseSalaryUnit,
+            prime: expatProfileData.prime,
+            baseSalaryAmount: expatProfileData.baseSalaryAmount,
+            baseSalaryUnit: expatProfileData.baseSalaryUnit,
+            netMonthlyAmount: expatProfileData.netMonthlyAmount,
+            netMonthlyUnit: expatProfileData.netMonthlyUnit,
+          },
+        })
+      }
+
+      return updatedUser
     })
 
     return NextResponse.json({
