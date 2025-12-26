@@ -162,6 +162,7 @@ type MembersTabProps = {
   visibleColumns: ColumnKey[]
   showColumnSelector: boolean
   onToggleColumn: (key: ColumnKey) => void
+  onToggleColumnGroup: (keys: ColumnKey[]) => void
   onSelectAllColumns: () => void
   onRestoreDefaultColumns: () => void
   onClearColumns: () => void
@@ -340,6 +341,7 @@ export function MembersTab(props: MembersTabProps) {
     visibleColumns,
     showColumnSelector,
     onToggleColumn,
+    onToggleColumnGroup,
     onSelectAllColumns,
     onRestoreDefaultColumns,
     onClearColumns,
@@ -377,6 +379,81 @@ export function MembersTab(props: MembersTabProps) {
     onPageInputChange,
     onPageSizeChange,
   } = props
+
+  const columnGroups = [
+    {
+      key: 'basic',
+      label: t.fieldGroups.basicInfo,
+      keys: [
+        'sequence',
+        'name',
+        'username',
+        'gender',
+        'nationality',
+        'phones',
+        'joinDate',
+        'birthDate',
+        'position',
+        'employmentStatus',
+        'terminationDate',
+        'terminationReason',
+        'roles',
+        'createdAt',
+        'updatedAt',
+        'actions',
+      ] as ColumnKey[],
+    },
+    {
+      key: 'contract',
+      label: t.fieldGroups.contract,
+      keys: ['contractNumber', 'contractType'] as ColumnKey[],
+    },
+    {
+      key: 'salary',
+      label: t.fieldGroups.salary,
+      keys: ['salaryCategory', 'prime', 'baseSalary', 'netMonthly'] as ColumnKey[],
+    },
+    {
+      key: 'local',
+      label: t.fieldGroups.localProfile,
+      keys: [
+        'team',
+        'chineseSupervisor',
+        'maritalStatus',
+        'childrenCount',
+        'cnpsNumber',
+        'cnpsDeclarationCode',
+        'provenance',
+        'emergencyContactName',
+        'emergencyContactPhone',
+      ] as ColumnKey[],
+    },
+    {
+      key: 'chinese',
+      label: t.fieldGroups.chineseProfile,
+      keys: [
+        'frenchName',
+        'idNumber',
+        'passportNumber',
+        'educationAndMajor',
+        'certifications',
+        'domesticMobile',
+        'redBookValidYears',
+        'cumulativeAbroadYears',
+        'birthplace',
+        'residenceInChina',
+        'medicalHistory',
+        'healthStatus',
+      ] as ColumnKey[],
+    },
+  ]
+    .map((group) => ({
+      ...group,
+      options: group.keys
+        .map((key) => columnOptions.find((option) => option.key === key))
+        .filter((option): option is { key: ColumnKey; label: ReactNode } => Boolean(option)),
+    }))
+    .filter((group) => group.options.length > 0)
 
   return (
     <>
@@ -421,30 +498,115 @@ export function MembersTab(props: MembersTabProps) {
               <span aria-hidden>⌵</span>
             </button>
             {showColumnSelector ? (
-              <div className="absolute right-0 z-10 mt-2 w-60 rounded-2xl border border-slate-200 bg-white p-3 text-xs text-slate-700 shadow-xl shadow-slate-900/10">
-                <div className="flex items-center justify-between text-[11px] text-slate-500">
-                  <button type="button" className="hover:text-slate-800" onClick={onSelectAllColumns}>
-                    {t.columnSelector.selectAll}
-                  </button>
-                  <button type="button" className="hover:text-slate-800" onClick={onRestoreDefaultColumns}>
-                    {t.columnSelector.restore}
-                  </button>
-                  <button type="button" className="text-rose-600 hover:text-rose-700" onClick={onClearColumns}>
-                    {t.columnSelector.clear}
-                  </button>
-                </div>
-                <div className="mt-2 max-h-64 space-y-1 overflow-y-auto">
-                  {columnOptions.map((option) => (
-                    <label key={option.key} className="flex items-center gap-2 rounded-lg px-2 py-1 hover:bg-slate-50">
-                      <input
-                        type="checkbox"
-                        checked={visibleColumns.includes(option.key)}
-                        onChange={() => onToggleColumn(option.key)}
-                        className="accent-emerald-500"
-                      />
-                      <span className="truncate">{option.label}</span>
-                    </label>
-                  ))}
+              <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-6">
+                <div
+                  className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+                  onClick={onToggleColumnSelector}
+                />
+                <div
+                  className="relative w-full max-w-4xl overflow-hidden rounded-3xl bg-white shadow-2xl shadow-slate-900/30"
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  <div className="flex items-start justify-between border-b border-slate-200 px-6 py-4">
+                    <div>
+                      <p className="text-base font-semibold text-slate-900">{t.columnSelector.label}</p>
+                      <p className="text-xs text-slate-500">
+                        {t.filters.selected(visibleColumns.length)} / {columnOptions.length}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={onToggleColumnSelector}
+                      className="rounded-full border border-slate-200 px-2 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                    >
+                      {t.labels.close}
+                    </button>
+                  </div>
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-6 py-3 text-xs text-slate-500">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        className="rounded-full border border-slate-200 px-3 py-1 font-semibold text-slate-600 hover:bg-slate-50"
+                        onClick={onSelectAllColumns}
+                      >
+                        {t.columnSelector.selectAll}
+                      </button>
+                      <button
+                        type="button"
+                        className="rounded-full border border-slate-200 px-3 py-1 font-semibold text-slate-600 hover:bg-slate-50"
+                        onClick={onRestoreDefaultColumns}
+                      >
+                        {t.columnSelector.restore}
+                      </button>
+                      <button
+                        type="button"
+                        className="rounded-full border border-rose-200 bg-rose-50 px-3 py-1 font-semibold text-rose-700 hover:border-rose-300 hover:bg-rose-100"
+                        onClick={onClearColumns}
+                      >
+                        {t.columnSelector.clear}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="max-h-[60vh] overflow-y-auto px-6 py-5">
+                    <div className="grid gap-4">
+                      {columnGroups.map((group) => {
+                        const keys = group.options.map((option) => option.key)
+                        const selectedCount = keys.filter((key) => visibleColumns.includes(key)).length
+                        const isAllSelected = selectedCount === keys.length
+                        return (
+                          <section
+                            key={group.key}
+                            className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4"
+                          >
+                            <div className="flex flex-wrap items-center justify-between gap-3">
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-semibold text-slate-800">{group.label}</span>
+                                <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-500 ring-1 ring-slate-200">
+                                  {selectedCount}/{keys.length}
+                                </span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => onToggleColumnGroup(keys)}
+                                className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                                  isAllSelected
+                                    ? 'border border-rose-200 bg-rose-50 text-rose-700 hover:border-rose-300 hover:bg-rose-100'
+                                    : 'border border-sky-200 bg-sky-50 text-sky-700 hover:border-sky-300 hover:bg-sky-100'
+                                }`}
+                              >
+                                {isAllSelected ? t.columnSelector.clearGroup : t.columnSelector.selectGroup}
+                              </button>
+                            </div>
+                            <div className="mt-3 grid gap-2 [grid-template-columns:repeat(auto-fit,minmax(180px,1fr))]">
+                              {group.options.map((option) => (
+                                <label
+                                  key={option.key}
+                                  className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[11px] font-semibold text-slate-700 hover:border-slate-300 hover:bg-slate-50"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={visibleColumns.includes(option.key)}
+                                    onChange={() => onToggleColumn(option.key)}
+                                    className="accent-emerald-500"
+                                  />
+                                  <span className="truncate">{option.label}</span>
+                                </label>
+                              ))}
+                            </div>
+                          </section>
+                        )
+                      })}
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-end border-t border-slate-200 px-6 py-3">
+                    <button
+                      type="button"
+                      onClick={onToggleColumnSelector}
+                      className="rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                    >
+                      {t.labels.close}
+                    </button>
+                  </div>
                 </div>
               </div>
             ) : null}

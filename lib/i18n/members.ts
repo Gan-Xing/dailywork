@@ -40,6 +40,15 @@ export const memberCopy: Record<
       selectAll: string
       restore: string
       clear: string
+      selectGroup: string
+      clearGroup: string
+    }
+    fieldGroups: {
+      basicInfo: string
+      contract: string
+      salary: string
+      localProfile: string
+      chineseProfile: string
     }
     filters: {
       title: string
@@ -412,6 +421,15 @@ export const memberCopy: Record<
       selectAll: '全选',
       restore: '恢复默认',
       clear: '清空',
+      selectGroup: '选中本组',
+      clearGroup: '取消本组',
+    },
+    fieldGroups: {
+      basicInfo: '基本信息',
+      contract: '合同',
+      salary: '工资',
+      localProfile: '当地员工',
+      chineseProfile: '中方人员',
     },
     filters: {
       title: '筛选',
@@ -796,6 +814,15 @@ export const memberCopy: Record<
       selectAll: 'Tout sélectionner',
       restore: 'Rétablir par défaut',
       clear: 'Tout effacer',
+      selectGroup: 'Sélectionner le groupe',
+      clearGroup: 'Désélectionner le groupe',
+    },
+    fieldGroups: {
+      basicInfo: 'Informations de base',
+      contract: 'Contrat',
+      salary: 'Salaire',
+      localProfile: 'Profil local',
+      chineseProfile: 'Profil chinois',
     },
     filters: {
       title: 'Filtres',

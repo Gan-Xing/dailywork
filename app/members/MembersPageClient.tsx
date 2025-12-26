@@ -574,6 +574,17 @@ export function MembersPageClient() {
     )
   }
 
+  const toggleColumnGroup = (keys: ColumnKey[]) => {
+    if (keys.length === 0) return
+    const hasAll = keys.every((key) => visibleColumns.includes(key))
+    if (hasAll) {
+      persistVisibleColumns(visibleColumns.filter((key) => !keys.includes(key)))
+      return
+    }
+    const next = Array.from(new Set([...visibleColumns, ...keys]))
+    persistVisibleColumns(next)
+  }
+
   const selectAllColumns = () => persistVisibleColumns(columnOptions.map((item) => item.key))
   const restoreDefaultColumns = () => persistVisibleColumns([...defaultVisibleColumns])
   const clearColumns = () => persistVisibleColumns([])
@@ -1126,6 +1137,7 @@ export function MembersPageClient() {
                 visibleColumns={visibleColumns}
                 showColumnSelector={showColumnSelector}
                 onToggleColumn={toggleColumn}
+                onToggleColumnGroup={toggleColumnGroup}
                 onSelectAllColumns={selectAllColumns}
                 onRestoreDefaultColumns={restoreDefaultColumns}
                 onClearColumns={clearColumns}
