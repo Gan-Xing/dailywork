@@ -121,16 +121,10 @@ export const MEMBER_FILTER_STORAGE_KEY = 'member-filters'
 export const defaultVisibleColumns: ColumnKey[] = [
   'sequence',
   'name',
-  'username',
-  'gender',
-  'nationality',
   'phones',
-  'joinDate',
-  'birthDate',
   'position',
-  'employmentStatus',
-  'chineseSupervisor',
-  'roles',
+  'team',
+  'contractNumber',
   'actions',
 ]
 export const memberColumnOrder: ColumnKey[] = [

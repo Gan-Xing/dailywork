@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useReducer, useState } from 'react'
 
+import { nationalityOptions } from '@/lib/i18n/members'
 import { MEMBER_FILTER_STORAGE_KEY, type SortField, type SortOrder } from '@/lib/members/constants'
 
 type SortSpec = { field: SortField; order: SortOrder }
@@ -49,15 +50,19 @@ type FilterAction =
   | { type: 'reset' }
   | { type: 'hydrate'; value: Partial<MemberFiltersState> }
 
+const defaultNonChineseNationalities = nationalityOptions
+  .filter((opt) => opt.key !== 'china')
+  .map((opt) => opt.key)
+
 const initialFiltersState: MemberFiltersState = {
   nameFilters: [],
   usernameFilters: [],
   genderFilters: [],
-  nationalityFilters: [],
+  nationalityFilters: defaultNonChineseNationalities,
   phoneFilters: [],
   joinDateFilters: [],
   positionFilters: [],
-  statusFilters: [],
+  statusFilters: ['ACTIVE'],
   roleFilters: [],
   teamFilters: [],
   chineseSupervisorFilters: [],
