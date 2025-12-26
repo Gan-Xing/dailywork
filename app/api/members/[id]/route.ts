@@ -4,6 +4,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { hashPassword } from '@/lib/auth/password'
 import { hasPermission } from '@/lib/server/authSession'
 import { isDecimalEqual, resolveSupervisorSnapshot } from '@/lib/server/compensation'
+import { normalizeTagsInput } from '@/lib/members/utils'
 import {
   hasExpatProfileData,
   normalizeChineseProfile,
@@ -43,6 +44,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     position,
     employmentStatus,
     roleIds,
+    tags,
     chineseProfile,
     expatProfile,
   } = body ?? {}
@@ -66,17 +68,20 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   const isChinese = nationality === 'china'
   const chineseProfileData = normalizeChineseProfile(chineseProfile)
   const expatProfileData = normalizeExpatProfile(expatProfile)
-  const shouldUpsertExpatProfile = !isChinese && hasExpatProfileData(expatProfileData)
+  const shouldUpsertExpatProfile = !isChinese || hasExpatProfileData(expatProfileData)
   const existingUser = await prisma.user.findUnique({
     where: { id: userId },
     select: {
       nationality: true,
+      joinDate: true,
       expatProfile: {
         select: {
           chineseSupervisorId: true,
           team: true,
           contractNumber: true,
           contractType: true,
+          contractStartDate: true,
+          contractEndDate: true,
           salaryCategory: true,
           prime: true,
           baseSalaryAmount: true,
@@ -145,9 +150,29 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
   try {
     const existingExpat = existingUser.expatProfile
-    const contractNumberChanged =
+    const isSameDate = (left?: Date | null, right?: Date | null) => {
+      if (!left && !right) return true
+      if (!left || !right) return false
+      return left.getTime() === right.getTime()
+    }
+    const resolvedJoinDate = joinDate ? new Date(joinDate) : existingUser.joinDate ?? null
+    const addOneYear = (date: Date) => {
+      const next = new Date(date)
+      next.setFullYear(next.getFullYear() + 1)
+      return next
+    }
+    const resolvedContractStartDate =
+      !isChinese ? expatProfileData.contractStartDate ?? resolvedJoinDate : null
+    const resolvedContractEndDate =
+      !isChinese
+        ? expatProfileData.contractEndDate ??
+          (resolvedContractStartDate ? addOneYear(resolvedContractStartDate) : null)
+        : null
+    const contractChanged =
       existingExpat?.contractNumber !== expatProfileData.contractNumber ||
-      existingExpat?.contractType !== expatProfileData.contractType
+      existingExpat?.contractType !== expatProfileData.contractType ||
+      !isSameDate(existingExpat?.contractStartDate, resolvedContractStartDate) ||
+      !isSameDate(existingExpat?.contractEndDate, resolvedContractEndDate)
     const payrollChanged =
       existingExpat?.salaryCategory !== expatProfileData.salaryCategory ||
       !isDecimalEqual(existingExpat?.prime?.toString() ?? null, expatProfileData.prime) ||
@@ -164,6 +189,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const supervisorSnapshot = await resolveSupervisorSnapshot(
       expatProfileData.chineseSupervisorId ?? null,
     )
+    const normalizedTags = normalizeTagsInput(tags)
 
     if (!isChinese && expatProfileData.contractNumber) {
       const contractOwner = await prisma.userExpatProfile.findUnique({
@@ -190,6 +216,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
           employmentStatus: resolvedEmploymentStatus,
           terminationDate: resolvedTerminationDate,
           terminationReason: resolvedTerminationReason,
+          tags: normalizedTags,
           chineseProfile: isChinese
             ? {
                 upsert: {
@@ -201,8 +228,16 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
           expatProfile: shouldUpsertExpatProfile
             ? {
                 upsert: {
-                  create: expatProfileData,
-                  update: expatProfileData,
+                  create: {
+                    ...expatProfileData,
+                    contractStartDate: resolvedContractStartDate,
+                    contractEndDate: resolvedContractEndDate,
+                  },
+                  update: {
+                    ...expatProfileData,
+                    contractStartDate: resolvedContractStartDate,
+                    contractEndDate: resolvedContractEndDate,
+                  },
                 },
               }
             : undefined,
@@ -227,7 +262,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         },
       })
 
-      if (!isChinese && contractNumberChanged) {
+      if (!isChinese && contractChanged) {
         await tx.userContractChange.create({
           data: {
             userId,
@@ -239,6 +274,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
             salaryAmount: expatProfileData.baseSalaryAmount,
             salaryUnit: expatProfileData.baseSalaryUnit,
             prime: expatProfileData.prime,
+            startDate: resolvedContractStartDate,
+            endDate: resolvedContractEndDate,
           },
         })
       }
@@ -281,6 +318,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         terminationReason: user.terminationReason ?? null,
         createdAt: user.createdAt.toISOString(),
         updatedAt: user.updatedAt.toISOString(),
+        tags: user.tags ?? [],
         roles: canAssignRole
           ? user.roles.map((item) => ({ id: item.role.id, name: item.role.name }))
           : [],

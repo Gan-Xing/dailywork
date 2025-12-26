@@ -104,6 +104,34 @@ export function ExpatProfileFields({
         </select>
       </label>
       <label className="space-y-1 text-sm text-slate-700">
+        <span className="block font-semibold">{t.form.contractStartDate}</span>
+        <input
+          type="date"
+          value={formState.expatProfile.contractStartDate}
+          onChange={(event) =>
+            setFormState((prev) => ({
+              ...prev,
+              expatProfile: { ...prev.expatProfile, contractStartDate: event.target.value },
+            }))
+          }
+          className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+        />
+      </label>
+      <label className="space-y-1 text-sm text-slate-700">
+        <span className="block font-semibold">{t.form.contractEndDate}</span>
+        <input
+          type="date"
+          value={formState.expatProfile.contractEndDate}
+          onChange={(event) =>
+            setFormState((prev) => ({
+              ...prev,
+              expatProfile: { ...prev.expatProfile, contractEndDate: event.target.value },
+            }))
+          }
+          className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+        />
+      </label>
+      <label className="space-y-1 text-sm text-slate-700">
         <span className="block font-semibold">{t.form.salaryCategory}</span>
         <input
           value={formState.expatProfile.salaryCategory}

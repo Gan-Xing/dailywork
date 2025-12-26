@@ -83,10 +83,13 @@ export const memberCopy: Record<
       | 'position'
       | 'employmentStatus'
       | 'roles'
+      | 'tags'
       | 'team'
       | 'chineseSupervisor'
       | 'contractNumber'
       | 'contractType'
+      | 'contractStartDate'
+      | 'contractEndDate'
       | 'salaryCategory'
       | 'prime'
       | 'baseSalary'
@@ -274,6 +277,8 @@ export const memberCopy: Record<
       position: string
       status: string
       roles: string
+      tags: string
+      tagsPlaceholder: string
       nationalityPlaceholder: string
       roleName: string
       positionPlaceholder: string
@@ -287,6 +292,8 @@ export const memberCopy: Record<
       chineseSupervisor: string
       contractNumber: string
       contractType: string
+      contractStartDate: string
+      contractEndDate: string
       salaryCategory: string
       prime: string
       baseSalary: string
@@ -469,10 +476,13 @@ export const memberCopy: Record<
       position: '岗位',
       employmentStatus: '状态',
       roles: '角色',
+      tags: '标签',
       team: '班组',
       chineseSupervisor: '中方负责人',
       contractNumber: '合同编号',
       contractType: '合同类型',
+      contractStartDate: '合同开始日期',
+      contractEndDate: '合同结束日期',
       salaryCategory: '工资等级',
       prime: '奖金',
       baseSalary: '基础工资',
@@ -582,6 +592,7 @@ export const memberCopy: Record<
         gender: '仅允许：男 / 女；示例：男',
         nationality: '示例：中国 / 科特迪瓦 / 马里 / 塞内加尔（使用国家名称）',
         phones: '可写多个，用 "/" 分隔；示例：13900001111 / 13800002222',
+        tags: '可选；自定义标签，多个用 "/" 或换行分隔。',
         joinDate: '格式：YYYY-MM-DD；示例：2025-01-31',
         birthDate: '必填；格式：YYYY-MM-DD；示例：1990-05-12',
         position: '自由填写，建议统一用词；示例：工程师',
@@ -591,6 +602,8 @@ export const memberCopy: Record<
         chineseSupervisor: '可选；填写中方负责人账号（username）。',
         contractNumber: '可选；合同编号，需唯一。',
         contractType: '可选；固定值：CTJ / CDD。',
+        contractStartDate: '可选；合同开始日期，格式：YYYY-MM-DD。',
+        contractEndDate: '可选；合同结束日期，格式：YYYY-MM-DD。',
         salaryCategory: '可选；工资等级/类别。',
         prime: '可选；奖金/补贴金额。',
         baseSalary: '可选；金额+单位，如 83333/M 或 433/H；区间取较大值；CDD 必须按月。',
@@ -655,6 +668,8 @@ export const memberCopy: Record<
       phonePlaceholder: '输入电话',
       addPhone: '添加电话',
       phoneSaved: (count: number) => `已保存 ${count} 个号码`,
+      tags: '标签',
+      tagsPlaceholder: '多个标签可换行或用 / 分隔',
       joinDate: '入职日期',
       birthDate: '出生日期',
       position: '岗位',
@@ -673,6 +688,8 @@ export const memberCopy: Record<
       chineseSupervisor: '中方负责人',
       contractNumber: '合同编号',
       contractType: '合同类型',
+      contractStartDate: '合同开始日期',
+      contractEndDate: '合同结束日期',
       salaryCategory: '工资等级',
       prime: '奖金',
       baseSalary: '基础工资',
@@ -862,10 +879,13 @@ export const memberCopy: Record<
       position: 'Poste',
       employmentStatus: 'Statut',
       roles: 'Rôles',
+      tags: 'Tags',
       team: 'Équipe',
       chineseSupervisor: 'Responsable chinois',
       contractNumber: 'N° contrat',
       contractType: 'Type de contrat',
+      contractStartDate: 'Début de contrat',
+      contractEndDate: 'Fin de contrat',
       salaryCategory: 'Catégorie',
       prime: 'Prime',
       baseSalary: 'Salaire de base',
@@ -974,10 +994,11 @@ export const memberCopy: Record<
         password: "Optionnel ; requis à la création, sinon conservé ; ex. Temp@1234",
         gender: 'Valeurs : 男 / 女 (Homme / Femme) ; ex. 男',
         nationality: 'Ex. 中国 (Chine) / Côte d’Ivoire / Mali / Sénégal (saisir un nom de pays)',
-      phones: 'Plusieurs numéros séparés par "/" ; ex. 13900001111 / 13800002222',
-      joinDate: 'Format : YYYY-MM-DD ; ex. 2025-01-31',
-      birthDate: 'Obligatoire ; format : YYYY-MM-DD ; ex. 1990-05-12',
-      position: 'Texte libre, garder une nomenclature cohérente ; ex. Conducteur de travaux',
+        phones: 'Plusieurs numéros séparés par "/" ; ex. 13900001111 / 13800002222',
+        tags: 'Optionnel ; tags personnalisés, séparés par "/" ou retour ligne.',
+        joinDate: 'Format : YYYY-MM-DD ; ex. 2025-01-31',
+        birthDate: 'Obligatoire ; format : YYYY-MM-DD ; ex. 1990-05-12',
+        position: 'Texte libre, garder une nomenclature cohérente ; ex. Conducteur de travaux',
         employmentStatus:
           'Valeurs fixes : ACTIVE / ON_LEAVE / TERMINATED ; création vide = ACTIVE, sinon conservé',
         roles: 'Visible avec role:update / role:manage ; saisir les noms de rôles, séparés par "/" ; ex. Admin / Employee',
@@ -985,6 +1006,8 @@ export const memberCopy: Record<
         chineseSupervisor: 'Optionnel ; identifiant du responsable chinois (username).',
         contractNumber: 'Optionnel ; numéro de contrat, unique.',
         contractType: 'Optionnel ; valeurs : CTJ / CDD.',
+        contractStartDate: 'Optionnel ; date de début de contrat (YYYY-MM-DD).',
+        contractEndDate: 'Optionnel ; date de fin de contrat (YYYY-MM-DD).',
         salaryCategory: 'Optionnel ; catégorie salariale.',
         prime: 'Optionnel ; montant prime/bonus.',
         baseSalary: 'Optionnel ; montant + unité, ex. 83333/M ou 433/H ; intervalle = valeur max ; CDD = mensuel.',
@@ -1050,6 +1073,8 @@ export const memberCopy: Record<
       phonePlaceholder: 'Saisir un numéro',
       addPhone: 'Ajouter un numéro',
       phoneSaved: (count: number) => `${count} numéro(s) enregistré(s)`,
+      tags: 'Tags',
+      tagsPlaceholder: 'Séparer les tags par lignes ou "/"',
       joinDate: "Date d'arrivée",
       birthDate: 'Date de naissance',
       position: 'Poste',
@@ -1068,6 +1093,8 @@ export const memberCopy: Record<
       chineseSupervisor: 'Responsable chinois',
       contractNumber: 'N° contrat',
       contractType: 'Type de contrat',
+      contractStartDate: 'Début de contrat',
+      contractEndDate: 'Fin de contrat',
       salaryCategory: 'Catégorie',
       prime: 'Prime',
       baseSalary: 'Salaire de base',

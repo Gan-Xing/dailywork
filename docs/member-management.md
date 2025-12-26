@@ -15,6 +15,7 @@
 ## 数据模型概览
 - `User`（主表/共有字段）
   - 基础：`id`、`name`、`gender?`、`nationality`（自由填）、`phones`（string[]，不区分主次、不强制国家码）、`joinDate`（date）、`birthDate`（date，必填；中方可由身份证解析补全，身份证仍可选）。
+  - 标签：`tags`（string[]，大小写不敏感去重，用于自定义分类）。
   - 职务与状态：`position`（自由文本，岗位可由管理员新增）、`employmentStatus`（枚举：在职 `ACTIVE` / 离职 `TERMINATED` / 休假 `ON_LEAVE`），`terminationDate?`、`terminationReason?`。
   - 账号：`username`、`passwordHash`（仅存储哈希，沿用现有账户体系）。
   - 关联：`roles` 多对多（用户-角色）；`createdAt/updatedAt`、`createdBy/updatedBy`。
@@ -24,7 +25,7 @@
   - 联系：`domesticMobile`、`emergencyContactName`、`emergencyContactPhone`。
   - 其他：`redBookValidYears`（整数，手动输入；每个自然年末递减，至 0 为止）、`cumulativeAbroadYears`（手动输入，2025-12-31 之后每年自动 +1）、`birthplace`、`residenceInChina`、`medicalHistory`、`healthStatus`。
 - `UserExpatProfile`（当地员工/外籍扩展）
-  - 组织与合同：`team`（EQUIPE 班组）、`contractNumber`（MATRICULE 合同编号，唯一）、`contractType`（枚举：`CTJ` / `CDD`）。
+  - 组织与合同：`team`（EQUIPE 班组）、`contractNumber`（MATRICULE 合同编号，唯一）、`contractType`（枚举：`CTJ` / `CDD`）、`contractStartDate`（合同开始日期，默认等于入职日期）、`contractEndDate`（合同结束日期，默认入职日期 + 1 年）。
   - 薪资：`salaryCategory`（CATEGORIE 工资等级）、`baseSalaryAmount` + `baseSalaryUnit`（SALAIRE DE BASE 金额与单位）、`netMonthlyAmount` + `netMonthlyUnit`（NET MENSUEL 实发工资与单位，仅月）。
   - 个人情况：`maritalStatus`（婚姻状态）、`childrenCount`（子女数量）。
   - CNPS：`cnpsNumber`（NUMERO CNPS）、`cnpsDeclarationCode`（CODE DE DECLARATION CNPS）。

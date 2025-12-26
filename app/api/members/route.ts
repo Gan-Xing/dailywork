@@ -4,6 +4,7 @@ import { hashPassword } from '@/lib/auth/password'
 import { hasPermission } from '@/lib/server/authSession'
 import { listUsers } from '@/lib/server/authStore'
 import { resolveSupervisorSnapshot } from '@/lib/server/compensation'
+import { normalizeTagsInput } from '@/lib/members/utils'
 import {
   hasExpatProfileData,
   hasChineseProfileData,
@@ -50,6 +51,7 @@ export async function POST(request: Request) {
     position,
     employmentStatus,
     roleIds,
+    tags,
     chineseProfile,
     expatProfile,
   } = body ?? {}
@@ -76,7 +78,7 @@ export async function POST(request: Request) {
   const chineseProfileData = normalizeChineseProfile(chineseProfile)
   const shouldCreateChineseProfile = isChinese && hasChineseProfileData(chineseProfileData)
   const expatProfileData = normalizeExpatProfile(expatProfile)
-  const shouldCreateExpatProfile = !isChinese && hasExpatProfileData(expatProfileData)
+  const shouldCreateExpatProfile = !isChinese || hasExpatProfileData(expatProfileData)
   const shouldCreateContractChange =
     !isChinese && (expatProfileData.contractNumber || expatProfileData.contractType)
   const shouldCreatePayrollChange =
@@ -140,6 +142,21 @@ export async function POST(request: Request) {
       : []
     : []
 
+  const resolvedJoinDate = joinDate ? new Date(joinDate) : new Date()
+  const addOneYear = (date: Date) => {
+    const next = new Date(date)
+    next.setFullYear(next.getFullYear() + 1)
+    return next
+  }
+  const resolvedContractStartDate =
+    !isChinese ? expatProfileData.contractStartDate ?? resolvedJoinDate : null
+  const resolvedContractEndDate =
+    !isChinese
+      ? expatProfileData.contractEndDate ??
+        (resolvedContractStartDate ? addOneYear(resolvedContractStartDate) : null)
+      : null
+  const normalizedTags = normalizeTagsInput(tags)
+
   try {
     const existing = await prisma.user.findFirst({
       where: { username: { equals: normalizedUsername, mode: 'insensitive' } },
@@ -170,12 +187,13 @@ export async function POST(request: Request) {
           gender: gender ?? null,
           nationality: nationality ?? null,
           phones: phoneList,
-          joinDate: joinDate ? new Date(joinDate) : new Date(),
+          joinDate: resolvedJoinDate,
           birthDate: resolvedBirthDate,
           position: resolvedPositionName,
           employmentStatus: resolvedEmploymentStatus,
           terminationDate: resolvedTerminationDate,
           terminationReason: resolvedTerminationReason,
+          tags: normalizedTags,
           chineseProfile: shouldCreateChineseProfile
             ? {
                 create: chineseProfileData,
@@ -183,7 +201,11 @@ export async function POST(request: Request) {
             : undefined,
           expatProfile: shouldCreateExpatProfile
             ? {
-                create: expatProfileData,
+                create: {
+                  ...expatProfileData,
+                  contractStartDate: resolvedContractStartDate,
+                  contractEndDate: resolvedContractEndDate,
+                },
               }
             : undefined,
           roles: canAssignRole
@@ -215,6 +237,8 @@ export async function POST(request: Request) {
             salaryAmount: expatProfileData.baseSalaryAmount,
             salaryUnit: expatProfileData.baseSalaryUnit,
             prime: expatProfileData.prime,
+            startDate: resolvedContractStartDate,
+            endDate: resolvedContractEndDate,
           },
         })
       }
@@ -257,6 +281,7 @@ export async function POST(request: Request) {
         terminationReason: user.terminationReason ?? null,
         createdAt: user.createdAt.toISOString(),
         updatedAt: user.updatedAt.toISOString(),
+        tags: user.tags ?? [],
         roles: canAssignRole
           ? user.roles.map((item) => ({ id: item.role.id, name: item.role.name }))
           : [],

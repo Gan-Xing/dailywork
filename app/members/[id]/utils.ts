@@ -61,6 +61,8 @@ export const buildExpatProfileForm = (profile?: ExpatProfile | null): ExpatProfi
   chineseSupervisorId: profile?.chineseSupervisorId ? String(profile.chineseSupervisorId) : '',
   contractNumber: profile?.contractNumber ?? '',
   contractType: profile?.contractType ?? '',
+  contractStartDate: profile?.contractStartDate ? profile.contractStartDate.slice(0, 10) : '',
+  contractEndDate: profile?.contractEndDate ? profile.contractEndDate.slice(0, 10) : '',
   salaryCategory: profile?.salaryCategory ?? '',
   prime: profile?.prime ?? '',
   baseSalaryAmount: profile?.baseSalaryAmount ?? '',

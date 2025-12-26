@@ -8,6 +8,7 @@ import {
 } from '@/lib/i18n/members'
 import type { Locale } from '@/lib/i18n'
 import { memberCopy } from '@/lib/i18n/members'
+import { normalizeTagsInput } from '@/lib/members/utils'
 
 import type { FormState } from '../types'
 import { PhonePicker } from './PhonePicker'
@@ -142,6 +143,21 @@ export function BasicInfoSection({
             onTogglePicker={onTogglePhonePicker}
             phonePickerRef={phonePickerRef}
             phoneSummary={phoneSummary}
+          />
+        </label>
+        <label className="space-y-1 text-sm text-slate-700 sm:col-span-2">
+          <span className="block font-semibold">{t.form.tags}</span>
+          <textarea
+            rows={2}
+            value={formState.tags.join('\n')}
+            onChange={(event) =>
+              setFormState((prev) => ({
+                ...prev,
+                tags: normalizeTagsInput(event.target.value),
+              }))
+            }
+            className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+            placeholder={t.form.tagsPlaceholder}
           />
         </label>
       </div>

@@ -46,6 +46,7 @@ export function useMembersData({
                 ...member,
                 employmentStatus: (member.employmentStatus ?? 'ACTIVE') as EmploymentStatus,
                 phones: member.phones ?? [],
+                tags: member.tags ?? [],
               })),
             ),
           )

@@ -32,6 +32,7 @@ import {
   buildExpatProfileForm,
   emptyChineseProfile,
   emptyExpatProfile,
+  normalizeTagsInput,
   normalizeText,
   normalizeProfileNumber,
   parseBirthDateFromIdNumber,
@@ -85,6 +86,7 @@ export function MembersPageClient() {
     gender: genderOptions[0]?.value ?? '',
     nationality: nationalityOptions[0]?.key ?? '',
     phones: [] as string[],
+    tags: [],
     joinDate: getTodayString(),
     birthDate: '',
     terminationDate: '',
@@ -131,6 +133,7 @@ export function MembersPageClient() {
     positionFilters,
     statusFilters,
     roleFilters,
+    tagFilters,
     teamFilters,
     chineseSupervisorFilters,
     contractNumberFilters,
@@ -170,6 +173,7 @@ export function MembersPageClient() {
     setPositionFilters,
     setStatusFilters,
     setRoleFilters,
+    setTagFilters,
     setTeamFilters,
     setChineseSupervisorFilters,
     setContractNumberFilters,
@@ -302,6 +306,7 @@ export function MembersPageClient() {
     genderFilterOptions,
     nationalityFilterOptions,
     phoneFilterOptions,
+    tagFilterOptions,
     joinDateFilterOptions,
     positionFilterOptions,
     statusFilterOptions,
@@ -371,6 +376,7 @@ export function MembersPageClient() {
     positionFilters,
     statusFilters,
     roleFilters,
+    tagFilters,
     teamFilters,
     chineseSupervisorFilters,
     contractNumberFilters,
@@ -410,6 +416,7 @@ export function MembersPageClient() {
     positionFilters,
     statusFilters,
     roleFilters,
+    tagFilters,
     teamFilters,
     chineseSupervisorFilters,
     contractNumberFilters,
@@ -507,6 +514,7 @@ export function MembersPageClient() {
       gender: genderOptions[0]?.value ?? '',
       nationality: nationalityOptions[0]?.key ?? '',
       phones: [],
+      tags: [],
       joinDate: getTodayString(),
       birthDate: '',
       terminationDate: '',
@@ -627,6 +635,7 @@ export function MembersPageClient() {
       gender: member.gender ?? (genderOptions[0]?.value ?? ''),
       nationality: member.nationality ?? (nationalityOptions[0]?.key ?? ''),
       phones: member.phones?.length ? member.phones : [],
+      tags: member.tags ?? [],
       joinDate: member.joinDate ? member.joinDate.slice(0, 10) : '',
       birthDate: member.birthDate ? member.birthDate.slice(0, 10) : '',
       terminationDate: member.terminationDate ? member.terminationDate.slice(0, 10) : '',
@@ -682,6 +691,7 @@ export function MembersPageClient() {
       ...(formState.phones ?? []).map((phone) => phone.trim()).filter(Boolean),
       phoneInput.trim(),
     ].filter(Boolean)
+    const normalizedTags = normalizeTagsInput(formState.tags)
     const joinDateValue = formState.joinDate || getTodayString()
     const birthDateValue = formState.birthDate.trim()
     let resolvedBirthDate = birthDateValue
@@ -715,6 +725,8 @@ export function MembersPageClient() {
         : null,
       contractNumber: formState.expatProfile.contractNumber.trim() || null,
       contractType: formState.expatProfile.contractType || null,
+      contractStartDate: formState.expatProfile.contractStartDate.trim() || null,
+      contractEndDate: formState.expatProfile.contractEndDate.trim() || null,
       salaryCategory: formState.expatProfile.salaryCategory.trim() || null,
       prime: formState.expatProfile.prime.trim() || null,
       baseSalaryAmount: formState.expatProfile.baseSalaryAmount.trim() || null,
@@ -739,6 +751,7 @@ export function MembersPageClient() {
       gender: string
       nationality: string
       phones: string[]
+      tags: string[]
       joinDate: string | undefined
       birthDate: string
       terminationDate: string | null
@@ -755,6 +768,7 @@ export function MembersPageClient() {
       gender: formState.gender,
       nationality: formState.nationality,
       phones: phoneList,
+      tags: normalizedTags,
       joinDate: joinDateValue,
       birthDate: resolvedBirthDate,
       terminationDate: isTerminated ? terminationDateValue : null,
@@ -890,6 +904,7 @@ export function MembersPageClient() {
     positionFilters,
     statusFilters,
     roleFilters,
+    tagFilters,
     teamFilters,
     contractNumberFilters,
     contractTypeFilters,
@@ -1038,6 +1053,7 @@ export function MembersPageClient() {
                 genderFilterOptions={genderFilterOptions}
                 nationalityFilterOptions={nationalityFilterOptions}
                 phoneFilterOptions={phoneFilterOptions}
+                tagFilterOptions={tagFilterOptions}
                 joinDateFilterOptions={joinDateFilterOptions}
                 positionFilterOptions={positionFilterOptions}
                 statusFilterOptions={statusFilterOptions}
@@ -1075,6 +1091,7 @@ export function MembersPageClient() {
                 genderFilters={genderFilters}
                 nationalityFilters={nationalityFilters}
                 phoneFilters={phoneFilters}
+                tagFilters={tagFilters}
                 joinDateFilters={joinDateFilters}
                 positionFilters={positionFilters}
                 statusFilters={statusFilters}
@@ -1112,6 +1129,7 @@ export function MembersPageClient() {
                 setGenderFilters={setGenderFilters}
                 setNationalityFilters={setNationalityFilters}
                 setPhoneFilters={setPhoneFilters}
+                setTagFilters={setTagFilters}
                 setJoinDateFilters={setJoinDateFilters}
                 setPositionFilters={setPositionFilters}
                 setStatusFilters={setStatusFilters}

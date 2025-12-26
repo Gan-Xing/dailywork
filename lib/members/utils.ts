@@ -7,6 +7,25 @@ import type {
 
 export const normalizeText = (value?: string | null) => (value ?? '').trim()
 
+export const normalizeTagKey = (value?: string | null) => normalizeText(value).toLowerCase()
+
+export const normalizeTagsInput = (value?: string[] | string | null) => {
+  const rawList = Array.isArray(value)
+    ? value
+    : typeof value === 'string'
+      ? value.split(/[\/,，;\n]+/)
+      : []
+  const tagsByKey = new Map<string, string>()
+  rawList.forEach((item) => {
+    const trimmed = String(item ?? '').trim()
+    if (!trimmed) return
+    const key = normalizeTagKey(trimmed)
+    if (!key || tagsByKey.has(key)) return
+    tagsByKey.set(key, trimmed)
+  })
+  return Array.from(tagsByKey.values())
+}
+
 export const toNumberFilterValue = (value?: number | null) =>
   value === null || value === undefined ? '' : String(value)
 
@@ -81,6 +100,8 @@ export const emptyExpatProfile: ExpatProfileForm = {
   chineseSupervisorId: '',
   contractNumber: '',
   contractType: '',
+  contractStartDate: '',
+  contractEndDate: '',
   salaryCategory: '',
   prime: '',
   baseSalaryAmount: '',
@@ -118,6 +139,8 @@ export const buildExpatProfileForm = (profile?: ExpatProfile | null): ExpatProfi
   chineseSupervisorId: profile?.chineseSupervisorId ? String(profile.chineseSupervisorId) : '',
   contractNumber: profile?.contractNumber ?? '',
   contractType: profile?.contractType ?? '',
+  contractStartDate: profile?.contractStartDate ? profile.contractStartDate.slice(0, 10) : '',
+  contractEndDate: profile?.contractEndDate ? profile.contractEndDate.slice(0, 10) : '',
   salaryCategory: profile?.salaryCategory ?? '',
   prime: profile?.prime ?? '',
   baseSalaryAmount: profile?.baseSalaryAmount ?? '',

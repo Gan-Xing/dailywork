@@ -394,6 +394,7 @@ model User {
   gender       String?
   nationality  String?
   phones       String[]   @default([])
+  tags         String[]   @default([])
   joinDate     DateTime?
   birthDate    DateTime?
   position     String?
@@ -485,6 +486,8 @@ model UserExpatProfile {
   team               String?
   contractNumber     String?      @unique
   contractType       ContractType?
+  contractStartDate  DateTime?
+  contractEndDate    DateTime?
   salaryCategory     String?
   prime              Decimal?     @db.Decimal(18, 2)
   baseSalaryAmount   Decimal?     @db.Decimal(18, 2)

@@ -92,7 +92,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     Boolean(salaryCategory) ||
     Boolean(salaryAmount) ||
     Boolean(salaryUnit) ||
-    Boolean(prime)
+    Boolean(prime) ||
+    Boolean(startDate) ||
+    Boolean(endDate)
   if (!hasPayload) {
     return NextResponse.json({ error: '缺少合同变更字段' }, { status: 400 })
   }
@@ -141,6 +143,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         prime,
         baseSalaryAmount: salaryAmount,
         baseSalaryUnit: salaryUnit,
+        contractStartDate: startDate,
+        contractEndDate: endDate,
       },
       update: {
         chineseSupervisorId: supervisorSnapshot.id,
@@ -150,6 +154,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         prime,
         baseSalaryAmount: salaryAmount,
         baseSalaryUnit: salaryUnit,
+        contractStartDate: startDate,
+        contractEndDate: endDate,
       },
     })
 

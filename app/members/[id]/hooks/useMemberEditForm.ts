@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 
 import { genderOptions, memberCopy, nationalityOptions, type EmploymentStatus } from '@/lib/i18n/members'
+import { normalizeTagsInput } from '@/lib/members/utils'
 
 import type { FormState, Member } from '../types'
 import { buildChineseProfileForm, buildExpatProfileForm, normalizeProfileNumber, parseBirthDateFromIdNumber } from '../utils'
@@ -27,6 +28,7 @@ export function useMemberEditForm({ member, canAssignRole, t }: UseMemberEditFor
     gender: member.gender ?? (genderOptions[0]?.value ?? ''),
     nationality: member.nationality ?? (nationalityOptions[0]?.key ?? ''),
     phones: member.phones ?? [],
+    tags: member.tags ?? [],
     joinDate: member.joinDate ? member.joinDate.slice(0, 10) : '',
     birthDate: member.birthDate ? member.birthDate.slice(0, 10) : '',
     terminationDate: member.terminationDate ? member.terminationDate.slice(0, 10) : '',
@@ -83,6 +85,7 @@ export function useMemberEditForm({ member, canAssignRole, t }: UseMemberEditFor
       ...(formState.phones ?? []).map((phone) => phone.trim()).filter(Boolean),
       phoneInput.trim(),
     ].filter(Boolean)
+    const normalizedTags = normalizeTagsInput(formState.tags)
     const birthDateValue = formState.birthDate.trim()
     let resolvedBirthDate = birthDateValue
     if (!resolvedBirthDate && formState.nationality === 'china') {
@@ -114,6 +117,8 @@ export function useMemberEditForm({ member, canAssignRole, t }: UseMemberEditFor
         : null,
       contractNumber: formState.expatProfile.contractNumber.trim() || null,
       contractType: formState.expatProfile.contractType || null,
+      contractStartDate: formState.expatProfile.contractStartDate.trim() || null,
+      contractEndDate: formState.expatProfile.contractEndDate.trim() || null,
       salaryCategory: formState.expatProfile.salaryCategory.trim() || null,
       prime: formState.expatProfile.prime.trim() || null,
       baseSalaryAmount: formState.expatProfile.baseSalaryAmount.trim() || null,
@@ -138,6 +143,7 @@ export function useMemberEditForm({ member, canAssignRole, t }: UseMemberEditFor
       gender: string
       nationality: string
       phones: string[]
+      tags: string[]
       joinDate?: string
       birthDate: string
       terminationDate: string | null
@@ -154,6 +160,7 @@ export function useMemberEditForm({ member, canAssignRole, t }: UseMemberEditFor
       gender: formState.gender,
       nationality: formState.nationality,
       phones: phoneList,
+      tags: normalizedTags,
       joinDate: formState.joinDate ? formState.joinDate : undefined,
       birthDate: resolvedBirthDate,
       terminationDate: isTerminated ? terminationDateValue : null,

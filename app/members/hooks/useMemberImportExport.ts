@@ -9,7 +9,7 @@ import {
   type TemplateColumnKey,
   type ColumnKey,
 } from '@/lib/members/constants'
-import { parseBirthDateFromIdNumber } from '@/lib/members/utils'
+import { normalizeTagsInput, parseBirthDateFromIdNumber } from '@/lib/members/utils'
 import type { Member, Role } from '@/types/members'
 
 type MemberCopy = (typeof memberCopy)[keyof typeof memberCopy]
@@ -80,6 +80,7 @@ export function useMemberImportExport({
       add(copy.form.gender, 'gender')
       add(copy.form.nationality, 'nationality')
       add(copy.form.phones, 'phones')
+      add(copy.form.tags, 'tags')
       add(copy.form.joinDate, 'joinDate')
       add(copy.form.birthDate, 'birthDate')
       add(copy.form.position, 'position')
@@ -91,6 +92,8 @@ export function useMemberImportExport({
       add(copy.form.chineseSupervisor, 'chineseSupervisor')
       add(copy.form.contractNumber, 'contractNumber')
       add(copy.form.contractType, 'contractType')
+      add(copy.form.contractStartDate, 'contractStartDate')
+      add(copy.form.contractEndDate, 'contractEndDate')
       add(copy.form.salaryCategory, 'salaryCategory')
       add(copy.form.prime, 'prime')
       add(copy.form.baseSalary, 'baseSalary')
@@ -293,6 +296,7 @@ export function useMemberImportExport({
           gender?: string | null
           nationality?: string | null
           phones: string[]
+          tags?: string[] | null
           joinDate?: string | null
           birthDate?: string | null
           terminationDate?: string | null
@@ -303,6 +307,8 @@ export function useMemberImportExport({
           team?: string | null
           contractNumber?: string | null
           contractType?: string | null
+          contractStartDate?: string | null
+          contractEndDate?: string | null
           salaryCategory?: string | null
           prime?: string | null
           baseSalary?: string | null
@@ -397,6 +403,7 @@ export function useMemberImportExport({
             gender?: string | null
             nationality?: string | null
             phones: string[]
+            tags?: string[] | null
             joinDate?: string | null
             birthDate?: string | null
             terminationDate?: string | null
@@ -407,6 +414,8 @@ export function useMemberImportExport({
             team?: string | null
             contractNumber?: string | null
             contractType?: string | null
+            contractStartDate?: string | null
+            contractEndDate?: string | null
             salaryCategory?: string | null
             prime?: string | null
             baseSalary?: string | null
@@ -478,6 +487,11 @@ export function useMemberImportExport({
               case 'phones':
                 record.phones = normalizePhones(rawValue)
                 break
+              case 'tags':
+                record.tags = normalizeTagsInput(
+                  Array.isArray(rawValue) ? rawValue : String(rawValue ?? ''),
+                )
+                break
               case 'joinDate':
                 if (String(rawValue ?? '').trim()) {
                   hasJoinDateValue = true
@@ -537,6 +551,12 @@ export function useMemberImportExport({
                 break
               case 'contractType':
                 record.contractType = String(rawValue ?? '').trim()
+                break
+              case 'contractStartDate':
+                record.contractStartDate = normalizeDate(rawValue)
+                break
+              case 'contractEndDate':
+                record.contractEndDate = normalizeDate(rawValue)
                 break
               case 'salaryCategory':
                 record.salaryCategory = String(rawValue ?? '').trim()
@@ -809,6 +829,8 @@ export function useMemberImportExport({
               return member.roles.length
                 ? member.roles.map(resolveRoleName).filter(Boolean).join(' / ')
                 : t.labels.empty
+            case 'tags':
+              return formatProfileList(member.tags)
             case 'team':
               return formatProfileText(expatProfile?.team)
             case 'chineseSupervisor':
@@ -817,6 +839,14 @@ export function useMemberImportExport({
               return formatProfileText(expatProfile?.contractNumber)
             case 'contractType':
               return formatProfileText(expatProfile?.contractType)
+            case 'contractStartDate':
+              return expatProfile?.contractStartDate
+                ? new Date(expatProfile.contractStartDate).toLocaleDateString(locale)
+                : t.labels.empty
+            case 'contractEndDate':
+              return expatProfile?.contractEndDate
+                ? new Date(expatProfile.contractEndDate).toLocaleDateString(locale)
+                : t.labels.empty
             case 'salaryCategory':
               return formatProfileText(expatProfile?.salaryCategory)
             case 'prime':

@@ -134,6 +134,8 @@ export async function PUT(
         prime,
         baseSalaryAmount: salaryAmount,
         baseSalaryUnit: salaryUnit,
+        contractStartDate: startDate,
+        contractEndDate: endDate,
       },
     })
 

@@ -22,6 +22,8 @@ export const emptyExpatProfile: ExpatProfileForm = {
   chineseSupervisorId: '',
   contractNumber: '',
   contractType: '',
+  contractStartDate: '',
+  contractEndDate: '',
   salaryCategory: '',
   prime: '',
   baseSalaryAmount: '',

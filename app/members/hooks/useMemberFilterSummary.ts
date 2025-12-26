@@ -10,6 +10,7 @@ export type MemberFiltersSummaryInput = {
   positionFilters: string[]
   statusFilters: string[]
   roleFilters: string[]
+  tagFilters: string[]
   teamFilters: string[]
   chineseSupervisorFilters: string[]
   contractNumberFilters: string[]
@@ -51,10 +52,11 @@ export function useMemberFilterSummary(filters: MemberFiltersSummaryInput) {
     joinDateFilters,
     positionFilters,
     statusFilters,
-  roleFilters,
-  teamFilters,
-  chineseSupervisorFilters,
-  contractNumberFilters,
+    roleFilters,
+    tagFilters,
+    teamFilters,
+    chineseSupervisorFilters,
+    contractNumberFilters,
     contractTypeFilters,
     salaryCategoryFilters,
     baseSalaryFilters,
@@ -94,6 +96,7 @@ export function useMemberFilterSummary(filters: MemberFiltersSummaryInput) {
       positionFilters.length > 0 ||
       statusFilters.length > 0 ||
       (canAssignRole && roleFilters.length > 0) ||
+      tagFilters.length > 0 ||
       teamFilters.length > 0 ||
       chineseSupervisorFilters.length > 0 ||
       contractNumberFilters.length > 0 ||
@@ -132,6 +135,7 @@ export function useMemberFilterSummary(filters: MemberFiltersSummaryInput) {
       positionFilters,
       statusFilters,
       roleFilters,
+      tagFilters,
       teamFilters,
       chineseSupervisorFilters,
       contractNumberFilters,
@@ -175,6 +179,7 @@ export function useMemberFilterSummary(filters: MemberFiltersSummaryInput) {
       positionFilters.length +
       statusFilters.length +
       (canAssignRole ? roleFilters.length : 0) +
+      tagFilters.length +
       teamFilters.length +
       chineseSupervisorFilters.length +
       contractNumberFilters.length +
@@ -213,10 +218,11 @@ export function useMemberFilterSummary(filters: MemberFiltersSummaryInput) {
     joinDateFilters,
     positionFilters,
     statusFilters,
-      roleFilters,
-      teamFilters,
-      chineseSupervisorFilters,
-      contractNumberFilters,
+    roleFilters,
+    tagFilters,
+    teamFilters,
+    chineseSupervisorFilters,
+    contractNumberFilters,
     contractTypeFilters,
     salaryCategoryFilters,
     baseSalaryFilters,

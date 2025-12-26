@@ -52,6 +52,7 @@ type MembersTabProps = {
   genderFilterOptions: Option[]
   nationalityFilterOptions: Option[]
   phoneFilterOptions: Option[]
+  tagFilterOptions: Option[]
   joinDateFilterOptions: Option[]
   positionFilterOptions: Option[]
   statusFilterOptions: Option[]
@@ -89,6 +90,7 @@ type MembersTabProps = {
   genderFilters: string[]
   nationalityFilters: string[]
   phoneFilters: string[]
+  tagFilters: string[]
   joinDateFilters: string[]
   positionFilters: string[]
   statusFilters: string[]
@@ -126,6 +128,7 @@ type MembersTabProps = {
   setGenderFilters: (value: string[]) => void
   setNationalityFilters: (value: string[]) => void
   setPhoneFilters: (value: string[]) => void
+  setTagFilters: (value: string[]) => void
   setJoinDateFilters: (value: string[]) => void
   setPositionFilters: (value: string[]) => void
   setStatusFilters: (value: string[]) => void
@@ -232,6 +235,7 @@ export function MembersTab(props: MembersTabProps) {
     genderFilterOptions,
     nationalityFilterOptions,
     phoneFilterOptions,
+    tagFilterOptions,
     joinDateFilterOptions,
     positionFilterOptions,
     statusFilterOptions,
@@ -269,6 +273,7 @@ export function MembersTab(props: MembersTabProps) {
     genderFilters,
     nationalityFilters,
     phoneFilters,
+    tagFilters,
     joinDateFilters,
     positionFilters,
     statusFilters,
@@ -306,6 +311,7 @@ export function MembersTab(props: MembersTabProps) {
     setGenderFilters,
     setNationalityFilters,
     setPhoneFilters,
+    setTagFilters,
     setJoinDateFilters,
     setPositionFilters,
     setStatusFilters,
@@ -400,6 +406,7 @@ export function MembersTab(props: MembersTabProps) {
         'terminationDate',
         'terminationReason',
         'roles',
+        'tags',
         'createdAt',
         'updatedAt',
         'actions',
@@ -408,7 +415,7 @@ export function MembersTab(props: MembersTabProps) {
     {
       key: 'contract',
       label: t.fieldGroups.contract,
-      keys: ['contractNumber', 'contractType'] as ColumnKey[],
+      keys: ['contractNumber', 'contractType', 'contractStartDate', 'contractEndDate'] as ColumnKey[],
     },
     {
       key: 'salary',
@@ -677,20 +684,21 @@ export function MembersTab(props: MembersTabProps) {
             closeLabel={t.labels.close}
             clearHint={t.filters.selected(hasActiveFilters ? activeFilterCount : 0)}
           >
-            <MemberFiltersPanel
-              t={t}
-              filterControlProps={filterControlProps}
-              canAssignRole={canAssignRole}
-              nameFilterOptions={nameFilterOptions}
-              usernameFilterOptions={usernameFilterOptions}
-              genderFilterOptions={genderFilterOptions}
-              nationalityFilterOptions={nationalityFilterOptions}
-              phoneFilterOptions={phoneFilterOptions}
-              joinDateFilterOptions={joinDateFilterOptions}
-              positionFilterOptions={positionFilterOptions}
-              statusFilterOptions={statusFilterOptions}
-              roleFilterOptions={roleFilterOptions}
-              teamFilterOptions={teamFilterOptions}
+          <MemberFiltersPanel
+            t={t}
+            filterControlProps={filterControlProps}
+            canAssignRole={canAssignRole}
+            nameFilterOptions={nameFilterOptions}
+            usernameFilterOptions={usernameFilterOptions}
+            genderFilterOptions={genderFilterOptions}
+            nationalityFilterOptions={nationalityFilterOptions}
+            phoneFilterOptions={phoneFilterOptions}
+            tagFilterOptions={tagFilterOptions}
+            joinDateFilterOptions={joinDateFilterOptions}
+            positionFilterOptions={positionFilterOptions}
+            statusFilterOptions={statusFilterOptions}
+            roleFilterOptions={roleFilterOptions}
+            teamFilterOptions={teamFilterOptions}
               chineseSupervisorFilterOptions={chineseSupervisorFilterOptions}
               contractNumberFilterOptions={contractNumberFilterOptions}
               contractTypeFilterOptions={contractTypeFilterOptions}
@@ -720,14 +728,15 @@ export function MembersTab(props: MembersTabProps) {
               updatedAtFilterOptions={updatedAtFilterOptions}
               nameFilters={nameFilters}
               usernameFilters={usernameFilters}
-              genderFilters={genderFilters}
-              nationalityFilters={nationalityFilters}
-              phoneFilters={phoneFilters}
-              joinDateFilters={joinDateFilters}
-              positionFilters={positionFilters}
-              statusFilters={statusFilters}
-              roleFilters={roleFilters}
-              teamFilters={teamFilters}
+            genderFilters={genderFilters}
+            nationalityFilters={nationalityFilters}
+            phoneFilters={phoneFilters}
+            tagFilters={tagFilters}
+            joinDateFilters={joinDateFilters}
+            positionFilters={positionFilters}
+            statusFilters={statusFilters}
+            roleFilters={roleFilters}
+            teamFilters={teamFilters}
               chineseSupervisorFilters={chineseSupervisorFilters}
               contractNumberFilters={contractNumberFilters}
               contractTypeFilters={contractTypeFilters}
@@ -757,12 +766,13 @@ export function MembersTab(props: MembersTabProps) {
               updatedAtFilters={updatedAtFilters}
               setNameFilters={setNameFilters}
               setUsernameFilters={setUsernameFilters}
-              setGenderFilters={setGenderFilters}
-              setNationalityFilters={setNationalityFilters}
-              setPhoneFilters={setPhoneFilters}
-              setJoinDateFilters={setJoinDateFilters}
-              setPositionFilters={setPositionFilters}
-              setStatusFilters={setStatusFilters}
+            setGenderFilters={setGenderFilters}
+            setNationalityFilters={setNationalityFilters}
+            setPhoneFilters={setPhoneFilters}
+            setTagFilters={setTagFilters}
+            setJoinDateFilters={setJoinDateFilters}
+            setPositionFilters={setPositionFilters}
+            setStatusFilters={setStatusFilters}
               setRoleFilters={setRoleFilters}
               setTeamFilters={setTeamFilters}
               setChineseSupervisorFilters={setChineseSupervisorFilters}

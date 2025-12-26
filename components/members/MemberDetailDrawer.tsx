@@ -171,6 +171,7 @@ export function MemberDetailDrawer({ member, open, onClose, onEdit }: Props) {
                             value={member.roles.map((role) => role.name).join(', ') || t.labels.empty}
                             emptyLabel={t.labels.empty}
                           />
+                          <DetailItem label={t.table.tags} value={formatList(member.tags)} emptyLabel={t.labels.empty} />
                           <DetailItem label={t.table.team} value={member.expatProfile?.team ?? ''} emptyLabel={t.labels.empty} />
                           <DetailItem label={t.table.chineseSupervisor} value={formatSupervisor()} emptyLabel={t.labels.empty} />
                         </dl>
@@ -190,6 +191,16 @@ export function MemberDetailDrawer({ member, open, onClose, onEdit }: Props) {
                             <DetailItem
                               label={t.table.contractType}
                               value={member.expatProfile?.contractType ?? ''}
+                              emptyLabel={t.labels.empty}
+                            />
+                            <DetailItem
+                              label={t.table.contractStartDate}
+                              value={formatDate(member.expatProfile?.contractStartDate)}
+                              emptyLabel={t.labels.empty}
+                            />
+                            <DetailItem
+                              label={t.table.contractEndDate}
+                              value={formatDate(member.expatProfile?.contractEndDate)}
                               emptyLabel={t.labels.empty}
                             />
                             <DetailItem

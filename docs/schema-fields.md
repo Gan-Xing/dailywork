@@ -371,6 +371,7 @@
 - `gender?`：枚举（男/女）。
 - `nationality`：受控下拉（中/法双语标签），候选见下方“国籍列表”。
 - `phones`：字符串数组，不区分主次、不强制国家码。
+- `tags`：成员标签数组（大小写不敏感去重）。
 - `joinDate`：入职日期（date，创建成员默认当天）。
 - `birthDate`：出生日期（date，必填；中方可由身份证解析补全，身份证号仍可选）。
 - `position`：岗位名称，来源于现有成员岗位去重下拉，可手动新增。
@@ -402,6 +403,8 @@
 - `team?`：班组/队伍名称。
 - `contractNumber?`：合同编号（可空但需唯一）。
 - `contractType?`：枚举 `CTJ` / `CDD`。
+- `contractStartDate?`：合同开始日期（非中国籍成员默认等于入职日期）。
+- `contractEndDate?`：合同结束日期（非中国籍成员默认等于入职日期 + 1 年）。
 - `salaryCategory?`：工资等级。
 - `prime?`：奖金/补贴金额。
 - `baseSalaryAmount?` + `baseSalaryUnit?`：基础工资金额与单位（单位枚举 `MONTH` / `HOUR`，`CDD` 必须为月单位）。

@@ -97,6 +97,7 @@ export const listUsers = async () => {
       gender: true,
       nationality: true,
       phones: true,
+      tags: true,
       joinDate: true,
       birthDate: true,
       terminationDate: true,
@@ -142,6 +143,8 @@ export const listUsers = async () => {
           team: true,
           contractNumber: true,
           contractType: true,
+          contractStartDate: true,
+          contractEndDate: true,
           salaryCategory: true,
           prime: true,
           baseSalaryAmount: true,
@@ -175,6 +178,7 @@ export const listUsers = async () => {
     gender: user.gender,
     nationality: user.nationality,
     phones: user.phones,
+    tags: user.tags ?? [],
     joinDate: user.joinDate ? user.joinDate.toISOString() : null,
     birthDate: user.birthDate ? user.birthDate.toISOString() : null,
     terminationDate: user.terminationDate ? user.terminationDate.toISOString() : null,
@@ -211,6 +215,12 @@ export const listUsers = async () => {
           team: user.expatProfile.team,
           contractNumber: user.expatProfile.contractNumber,
           contractType: user.expatProfile.contractType,
+          contractStartDate: user.expatProfile.contractStartDate
+            ? user.expatProfile.contractStartDate.toISOString()
+            : null,
+          contractEndDate: user.expatProfile.contractEndDate
+            ? user.expatProfile.contractEndDate.toISOString()
+            : null,
           salaryCategory: user.expatProfile.salaryCategory,
           prime: user.expatProfile.prime?.toString() ?? null,
           baseSalaryAmount: user.expatProfile.baseSalaryAmount?.toString() ?? null,
@@ -241,6 +251,7 @@ export const getUserById = async (userId: number) => {
       gender: true,
       nationality: true,
       phones: true,
+      tags: true,
       joinDate: true,
       birthDate: true,
       terminationDate: true,
@@ -286,6 +297,8 @@ export const getUserById = async (userId: number) => {
           team: true,
           contractNumber: true,
           contractType: true,
+          contractStartDate: true,
+          contractEndDate: true,
           salaryCategory: true,
           prime: true,
           baseSalaryAmount: true,
@@ -320,6 +333,7 @@ export const getUserById = async (userId: number) => {
     gender: user.gender,
     nationality: user.nationality,
     phones: user.phones,
+    tags: user.tags ?? [],
     joinDate: user.joinDate ? user.joinDate.toISOString() : null,
     birthDate: user.birthDate ? user.birthDate.toISOString() : null,
     terminationDate: user.terminationDate ? user.terminationDate.toISOString() : null,
@@ -356,6 +370,12 @@ export const getUserById = async (userId: number) => {
           team: user.expatProfile.team,
           contractNumber: user.expatProfile.contractNumber,
           contractType: user.expatProfile.contractType,
+          contractStartDate: user.expatProfile.contractStartDate
+            ? user.expatProfile.contractStartDate.toISOString()
+            : null,
+          contractEndDate: user.expatProfile.contractEndDate
+            ? user.expatProfile.contractEndDate.toISOString()
+            : null,
           salaryCategory: user.expatProfile.salaryCategory,
           prime: user.expatProfile.prime?.toString() ?? null,
           baseSalaryAmount: user.expatProfile.baseSalaryAmount?.toString() ?? null,

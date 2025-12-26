@@ -156,6 +156,14 @@ export function MembersTable({
               {t.table.roles} {sortIndicator('roles')}
             </th>
           ) : null}
+          {isVisible('tags') ? (
+            <th
+              className="min-w-[160px] px-3 py-3 whitespace-nowrap cursor-pointer select-none"
+              onClick={() => handleSort('tags')}
+            >
+              {t.table.tags} {sortIndicator('tags')}
+            </th>
+          ) : null}
           {isVisible('team') ? (
             <th
               className="px-3 py-3 whitespace-nowrap cursor-pointer select-none"
@@ -186,6 +194,22 @@ export function MembersTable({
               onClick={() => handleSort('contractType')}
             >
               {t.table.contractType} {sortIndicator('contractType')}
+            </th>
+          ) : null}
+          {isVisible('contractStartDate') ? (
+            <th
+              className="px-3 py-3 whitespace-nowrap cursor-pointer select-none"
+              onClick={() => handleSort('contractStartDate')}
+            >
+              {t.table.contractStartDate} {sortIndicator('contractStartDate')}
+            </th>
+          ) : null}
+          {isVisible('contractEndDate') ? (
+            <th
+              className="px-3 py-3 whitespace-nowrap cursor-pointer select-none"
+              onClick={() => handleSort('contractEndDate')}
+            >
+              {t.table.contractEndDate} {sortIndicator('contractEndDate')}
             </th>
           ) : null}
           {isVisible('salaryCategory') ? (
@@ -503,6 +527,11 @@ export function MembersTable({
                   </div>
                 </td>
               ) : null}
+              {isVisible('tags') ? (
+                <td className="px-4 py-3 text-slate-700 align-middle">
+                  {formatProfileList(member.tags)}
+                </td>
+              ) : null}
               {isVisible('team') ? (
                 <td className="whitespace-nowrap px-4 py-3 text-slate-700 align-middle">
                   {formatProfileText(expatProfile?.team)}
@@ -521,6 +550,20 @@ export function MembersTable({
               {isVisible('contractType') ? (
                 <td className="whitespace-nowrap px-4 py-3 text-slate-700 align-middle">
                   {formatProfileText(expatProfile?.contractType)}
+                </td>
+              ) : null}
+              {isVisible('contractStartDate') ? (
+                <td className="whitespace-nowrap px-4 py-3 text-slate-700 align-middle">
+                  {expatProfile?.contractStartDate
+                    ? new Date(expatProfile.contractStartDate).toLocaleDateString(locale)
+                    : t.labels.empty}
+                </td>
+              ) : null}
+              {isVisible('contractEndDate') ? (
+                <td className="whitespace-nowrap px-4 py-3 text-slate-700 align-middle">
+                  {expatProfile?.contractEndDate
+                    ? new Date(expatProfile.contractEndDate).toLocaleDateString(locale)
+                    : t.labels.empty}
                 </td>
               ) : null}
               {isVisible('salaryCategory') ? (

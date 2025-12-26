@@ -11,6 +11,7 @@ import {
   parseBirthDateInput,
   parseChineseIdBirthDate,
 } from '@/lib/server/memberProfiles'
+import { normalizeTagsInput } from '@/lib/members/utils'
 import { prisma } from '@/lib/prisma'
 
 const PHONE_PATTERN = /^[+\d][\d\s-]{4,}$/
@@ -33,6 +34,7 @@ type ImportMemberInput = {
   phones?: string[] | string | null
   joinDate?: string | null
   birthDate?: string | null
+  tags?: string[] | string | null
   terminationDate?: string | null
   terminationReason?: string | null
   position?: string | null
@@ -42,6 +44,8 @@ type ImportMemberInput = {
   chineseSupervisor?: string | null
   contractNumber?: string | null
   contractType?: string | null
+  contractStartDate?: string | null
+  contractEndDate?: string | null
   salaryCategory?: string | null
   prime?: string | null
   baseSalary?: string | null
@@ -152,6 +156,8 @@ export async function POST(request: Request) {
     joinDate: Date | null
     birthDate: Date
     hasBirthDateInput: boolean
+    tags?: string[] | null
+    hasTagsInput: boolean
     terminationDate: Date | null
     terminationReason: string | null
     position: string | null
@@ -228,6 +234,8 @@ export async function POST(request: Request) {
       chineseSupervisorId,
       contractNumber: member.contractNumber,
       contractType: member.contractType,
+      contractStartDate: member.contractStartDate,
+      contractEndDate: member.contractEndDate,
       salaryCategory: member.salaryCategory,
       prime: member.prime,
       baseSalary: member.baseSalary,
@@ -386,6 +394,8 @@ export async function POST(request: Request) {
         position,
         employmentStatus,
         hasEmploymentStatusInput,
+        tags: normalizeTagsInput(member.tags),
+        hasTagsInput: member.tags !== undefined,
         roleIds: uniqueRoleIds,
         chineseProfile,
         hasChineseProfileData: hasChineseProfileData(chineseProfile),
@@ -420,18 +430,30 @@ export async function POST(request: Request) {
             birthDate: identity.birthDate,
           })),
         },
-        select: { id: true, name: true, birthDate: true, username: true, nationality: true },
+      select: {
+        id: true,
+        name: true,
+        birthDate: true,
+        username: true,
+        nationality: true,
+        joinDate: true,
+      },
       })
     : []
   const matchesByIdentity = new Map<
     string,
-    Array<{ id: number; username: string; nationality: string | null }>
+    Array<{ id: number; username: string; nationality: string | null; joinDate: Date | null }>
   >()
   existingUsers.forEach((user) => {
     if (!user.birthDate) return
     const key = identityKey(user.name, user.birthDate)
     const list = matchesByIdentity.get(key) ?? []
-    list.push({ id: user.id, username: user.username, nationality: user.nationality })
+    list.push({
+      id: user.id,
+      username: user.username,
+      nationality: user.nationality,
+      joinDate: user.joinDate,
+    })
     matchesByIdentity.set(key, list)
   })
 
@@ -481,7 +503,7 @@ export async function POST(request: Request) {
 
   const matchByRow = new Map<
     number,
-    { id: number; username: string; nationality: string | null } | null
+    { id: number; username: string; nationality: string | null; joinDate: Date | null } | null
   >()
   prepared.forEach((member) => {
     const key = identityKey(member.name, member.birthDate)
@@ -568,7 +590,23 @@ export async function POST(request: Request) {
         const resolvedNationality = member.nationality ?? match?.nationality ?? null
         const isChinese = resolvedNationality === 'china'
         const shouldUpsertChineseProfile = isChinese && member.hasChineseProfileData
-        const shouldUpsertExpatProfile = !isChinese && member.hasExpatProfileData
+        const shouldUpsertExpatProfile = !isChinese || member.hasExpatProfileData
+        const addOneYear = (date: Date) => {
+          const next = new Date(date)
+          next.setFullYear(next.getFullYear() + 1)
+          return next
+        }
+        const resolvedJoinDate = member.joinDate ?? match?.joinDate ?? null
+        const resolvedContractStartDate =
+          !isChinese ? member.expatProfile.contractStartDate ?? resolvedJoinDate : null
+        const resolvedContractEndDate =
+          !isChinese
+            ? member.expatProfile.contractEndDate ??
+              (resolvedContractStartDate ? addOneYear(resolvedContractStartDate) : null)
+            : null
+        const shouldUpdateContractDates =
+          member.expatProfile.contractStartDate !== null ||
+          member.expatProfile.contractEndDate !== null
         const chineseProfileUpdate = {
           ...(member.chineseProfile.frenchName
             ? { frenchName: member.chineseProfile.frenchName }
@@ -620,6 +658,12 @@ export async function POST(request: Request) {
           ...(member.expatProfile.contractType
             ? { contractType: member.expatProfile.contractType }
             : {}),
+          ...(shouldUpdateContractDates
+            ? {
+                contractStartDate: resolvedContractStartDate,
+                contractEndDate: resolvedContractEndDate,
+              }
+            : {}),
           ...(member.expatProfile.salaryCategory
             ? { salaryCategory: member.expatProfile.salaryCategory }
             : {}),
@@ -670,6 +714,7 @@ export async function POST(request: Request) {
               phones: member.phones,
               joinDate: member.joinDate ?? new Date(),
               birthDate: member.birthDate,
+              tags: member.tags ?? [],
               terminationDate:
                 resolvedEmploymentStatus === 'TERMINATED' ? member.terminationDate : null,
               terminationReason:
@@ -683,7 +728,11 @@ export async function POST(request: Request) {
                 : undefined,
               expatProfile: shouldUpsertExpatProfile
                 ? {
-                    create: member.expatProfile,
+                    create: {
+                      ...member.expatProfile,
+                      contractStartDate: resolvedContractStartDate,
+                      contractEndDate: resolvedContractEndDate,
+                    },
                   }
                 : undefined,
               roles:
@@ -717,6 +766,7 @@ export async function POST(request: Request) {
             ...(member.nationality ? { nationality: member.nationality } : {}),
             ...(member.phones.length > 0 ? { phones: member.phones } : {}),
             ...(member.joinDate ? { joinDate: member.joinDate } : {}),
+            ...(member.hasTagsInput ? { tags: member.tags ?? [] } : {}),
             ...(member.hasBirthDateInput ? { birthDate: member.birthDate } : {}),
             ...(member.position ? { position: member.position } : {}),
             ...(member.hasEmploymentStatusInput

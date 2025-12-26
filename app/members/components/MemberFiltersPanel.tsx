@@ -23,6 +23,7 @@ type MemberFiltersPanelProps = {
   genderFilterOptions: Option[]
   nationalityFilterOptions: Option[]
   phoneFilterOptions: Option[]
+  tagFilterOptions: Option[]
   joinDateFilterOptions: Option[]
   positionFilterOptions: Option[]
   statusFilterOptions: Option[]
@@ -60,6 +61,7 @@ type MemberFiltersPanelProps = {
   genderFilters: string[]
   nationalityFilters: string[]
   phoneFilters: string[]
+  tagFilters: string[]
   joinDateFilters: string[]
   positionFilters: string[]
   statusFilters: string[]
@@ -97,6 +99,7 @@ type MemberFiltersPanelProps = {
   setGenderFilters: (value: string[]) => void
   setNationalityFilters: (value: string[]) => void
   setPhoneFilters: (value: string[]) => void
+  setTagFilters: (value: string[]) => void
   setJoinDateFilters: (value: string[]) => void
   setPositionFilters: (value: string[]) => void
   setStatusFilters: (value: string[]) => void
@@ -161,6 +164,7 @@ export function MemberFiltersPanel({
   genderFilterOptions,
   nationalityFilterOptions,
   phoneFilterOptions,
+  tagFilterOptions,
   joinDateFilterOptions,
   positionFilterOptions,
   statusFilterOptions,
@@ -198,6 +202,7 @@ export function MemberFiltersPanel({
   genderFilters,
   nationalityFilters,
   phoneFilters,
+  tagFilters,
   joinDateFilters,
   positionFilters,
   statusFilters,
@@ -235,6 +240,7 @@ export function MemberFiltersPanel({
   setGenderFilters,
   setNationalityFilters,
   setPhoneFilters,
+  setTagFilters,
   setJoinDateFilters,
   setPositionFilters,
   setStatusFilters,
@@ -308,6 +314,13 @@ export function MemberFiltersPanel({
             options={phoneFilterOptions}
             selected={phoneFilters}
             onChange={setPhoneFilters}
+            {...sharedFilterProps}
+          />
+          <MultiSelectFilter
+            label={t.table.tags}
+            options={tagFilterOptions}
+            selected={tagFilters}
+            onChange={setTagFilters}
             {...sharedFilterProps}
           />
           <MultiSelectFilter

@@ -22,6 +22,8 @@ export type NormalizedExpatProfile = {
   chineseSupervisorId: number | null
   contractNumber: string | null
   contractType: ContractType | null
+  contractStartDate: Date | null
+  contractEndDate: Date | null
   salaryCategory: string | null
   prime: string | null
   baseSalaryAmount: string | null
@@ -190,6 +192,19 @@ const parseDateParts = (year: number, month: number, day: number) => {
   return date
 }
 
+const parseOptionalDate = (value: unknown) => {
+  if (!value) return null
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return value
+  }
+  if (typeof value !== 'string') return null
+  const text = value.trim()
+  if (!text) return null
+  const parsed = new Date(text)
+  if (Number.isNaN(parsed.getTime())) return null
+  return parsed
+}
+
 export const parseBirthDateInput = (value: unknown) => {
   if (value instanceof Date && !Number.isNaN(value.getTime())) {
     return value
@@ -297,6 +312,8 @@ export const normalizeExpatProfile = (raw: unknown): NormalizedExpatProfile => {
     chineseSupervisorId: parseOptionalInt(source.chineseSupervisorId),
     contractNumber: normalizeString(source.contractNumber),
     contractType: parseContractType(source.contractType),
+    contractStartDate: parseOptionalDate(source.contractStartDate),
+    contractEndDate: parseOptionalDate(source.contractEndDate),
     salaryCategory: normalizeString(source.salaryCategory),
     prime: normalizeString(String(source.prime ?? '')),
     baseSalaryAmount,
@@ -319,6 +336,8 @@ export const hasExpatProfileData = (profile: NormalizedExpatProfile) => {
     profile.chineseSupervisorId !== null ||
     Boolean(profile.contractNumber) ||
     Boolean(profile.contractType) ||
+    profile.contractStartDate !== null ||
+    profile.contractEndDate !== null ||
     Boolean(profile.salaryCategory) ||
     Boolean(profile.prime) ||
     Boolean(profile.baseSalaryAmount) ||

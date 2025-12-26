@@ -2,7 +2,13 @@ import { useMemo } from 'react'
 
 import { type EmploymentStatus } from '@/lib/i18n/members'
 import { EMPTY_FILTER_VALUE, type SortField, type SortOrder } from '@/lib/members/constants'
-import { getMonthKey, normalizeText, toNumberFilterValue, toSalaryFilterValue } from '@/lib/members/utils'
+import {
+  getMonthKey,
+  normalizeTagKey,
+  normalizeText,
+  toNumberFilterValue,
+  toSalaryFilterValue,
+} from '@/lib/members/utils'
 import type { Member } from '@/types/members'
 
 type UseFilteredMembersParams = {
@@ -22,6 +28,7 @@ type UseFilteredMembersParams = {
   positionFilters: string[]
   statusFilters: string[]
   roleFilters: string[]
+  tagFilters: string[]
   teamFilters: string[]
   chineseSupervisorFilters: string[]
   contractNumberFilters: string[]
@@ -69,6 +76,7 @@ export function useFilteredMembers({
   positionFilters,
   statusFilters,
   roleFilters,
+  tagFilters,
   teamFilters,
   chineseSupervisorFilters,
   contractNumberFilters,
@@ -117,6 +125,18 @@ export function useFilteredMembers({
       if (!key) return filters.includes(EMPTY_FILTER_VALUE)
       return filters.includes(key)
     }
+    const matchesTagFilter = (values: string[] | null | undefined, filters: string[]) => {
+      if (filters.length === 0) return true
+      const wantsEmpty = filters.includes(EMPTY_FILTER_VALUE)
+      const filterKeys = filters
+        .filter((value) => value !== EMPTY_FILTER_VALUE)
+        .map(normalizeTagKey)
+        .filter(Boolean)
+      const normalized = (values ?? []).map(normalizeTagKey).filter(Boolean)
+      if (normalized.length === 0) return wantsEmpty
+      if (filterKeys.length === 0) return true
+      return normalized.some((value) => filterKeys.includes(value))
+    }
 
     const list = membersData.filter((member) => {
       const chineseProfile = member.chineseProfile ?? null
@@ -142,6 +162,7 @@ export function useFilteredMembers({
           return false
         }
       }
+      if (!matchesTagFilter(member.tags, tagFilters)) return false
       const supervisorLabel = normalizeText(
         expatProfile?.chineseSupervisor?.chineseProfile?.frenchName ||
           expatProfile?.chineseSupervisor?.username,
@@ -314,6 +335,13 @@ export function useFilteredMembers({
               (a, b) => collator.compare(a, b),
             )
             break
+          case 'tags':
+            result = compareNullable(
+              left.tags?.join(' / '),
+              right.tags?.join(' / '),
+              (a, b) => collator.compare(a, b),
+            )
+            break
           case 'team':
             result = compareNullable(
               getTextValue(leftExpatProfile?.team),
@@ -340,6 +368,20 @@ export function useFilteredMembers({
               getTextValue(leftExpatProfile?.contractType),
               getTextValue(rightExpatProfile?.contractType),
               (a, b) => collator.compare(a, b),
+            )
+            break
+          case 'contractStartDate':
+            result = compareNullable(
+              getDateValue(leftExpatProfile?.contractStartDate),
+              getDateValue(rightExpatProfile?.contractStartDate),
+              (a, b) => a - b,
+            )
+            break
+          case 'contractEndDate':
+            result = compareNullable(
+              getDateValue(leftExpatProfile?.contractEndDate),
+              getDateValue(rightExpatProfile?.contractEndDate),
+              (a, b) => a - b,
             )
             break
           case 'salaryCategory':
@@ -536,6 +578,7 @@ export function useFilteredMembers({
     positionFilters,
     statusFilters,
     roleFilters,
+    tagFilters,
     teamFilters,
     chineseSupervisorFilters,
     contractNumberFilters,

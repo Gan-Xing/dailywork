@@ -29,6 +29,8 @@ export type ExpatProfile = {
   } | null
   contractNumber: string | null
   contractType: 'CTJ' | 'CDD' | null
+  contractStartDate: string | null
+  contractEndDate: string | null
   salaryCategory: string | null
   prime: string | null
   baseSalaryAmount: string | null
@@ -53,6 +55,7 @@ export type Member = {
   gender: string | null
   nationality: string | null
   phones: string[]
+  tags: string[]
   joinDate: string | null
   birthDate: string | null
   terminationDate: string | null
@@ -114,6 +117,8 @@ export type ExpatProfileForm = {
   chineseSupervisorId: string
   contractNumber: string
   contractType: '' | 'CTJ' | 'CDD'
+  contractStartDate: string
+  contractEndDate: string
   salaryCategory: string
   prime: string
   baseSalaryAmount: string
@@ -137,6 +142,7 @@ export type MemberFormState = {
   gender: string
   nationality: string
   phones: string[]
+  tags: string[]
   joinDate: string
   birthDate: string
   terminationDate: string

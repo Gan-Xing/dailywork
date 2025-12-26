@@ -18,6 +18,8 @@ export type ColumnKey =
   | 'chineseSupervisor'
   | 'contractNumber'
   | 'contractType'
+  | 'contractStartDate'
+  | 'contractEndDate'
   | 'salaryCategory'
   | 'prime'
   | 'baseSalary'
@@ -43,6 +45,7 @@ export type ColumnKey =
   | 'healthStatus'
   | 'createdAt'
   | 'updatedAt'
+  | 'tags'
   | 'actions'
 
 export type SortOrder = 'asc' | 'desc'
@@ -66,6 +69,8 @@ export type TemplateColumnKey =
   | 'chineseSupervisor'
   | 'contractNumber'
   | 'contractType'
+  | 'contractStartDate'
+  | 'contractEndDate'
   | 'salaryCategory'
   | 'prime'
   | 'baseSalary'
@@ -90,6 +95,7 @@ export type TemplateColumnKey =
   | 'residenceInChina'
   | 'medicalHistory'
   | 'healthStatus'
+  | 'tags'
 
 export type ImportErrorCode =
   | 'missing_name'
@@ -125,6 +131,9 @@ export const defaultVisibleColumns: ColumnKey[] = [
   'position',
   'team',
   'contractNumber',
+  'contractStartDate',
+  'contractEndDate',
+  'tags',
   'actions',
 ]
 export const memberColumnOrder: ColumnKey[] = [
@@ -141,10 +150,13 @@ export const memberColumnOrder: ColumnKey[] = [
   'terminationDate',
   'terminationReason',
   'roles',
+  'tags',
   'team',
   'chineseSupervisor',
   'contractNumber',
   'contractType',
+  'contractStartDate',
+  'contractEndDate',
   'salaryCategory',
   'prime',
   'baseSalary',
@@ -183,6 +195,7 @@ export const memberTemplateColumns: TemplateColumnKey[] = [
   'gender',
   'nationality',
   'phones',
+  'tags',
   'joinDate',
   'birthDate',
   'position',
@@ -194,6 +207,8 @@ export const memberTemplateColumns: TemplateColumnKey[] = [
   'chineseSupervisor',
   'contractNumber',
   'contractType',
+  'contractStartDate',
+  'contractEndDate',
   'salaryCategory',
   'prime',
   'baseSalary',

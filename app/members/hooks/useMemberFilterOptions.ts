@@ -8,6 +8,7 @@ import {
 import { EMPTY_FILTER_VALUE } from '@/lib/members/constants'
 import {
   getMonthKey,
+  normalizeTagKey,
   normalizeText,
   toNumberFilterValue,
   toSalaryFilterValue,
@@ -122,6 +123,30 @@ export function useMemberFilterOptions({
     if (membersData.some((member) => !member.phones || member.phones.length === 0)) {
       options.unshift({ value: EMPTY_FILTER_VALUE, label: t.labels.empty })
     }
+    return options
+  }, [membersData, optionCollator, t.labels.empty])
+
+  const tagFilterOptions = useMemo(() => {
+    const tagsByKey = new Map<string, string>()
+    let hasEmpty = false
+    membersData.forEach((member) => {
+      const tags = member.tags ?? []
+      if (tags.length === 0) {
+        hasEmpty = true
+        return
+      }
+      tags.forEach((tag) => {
+        const trimmed = normalizeText(tag)
+        if (!trimmed) return
+        const key = normalizeTagKey(trimmed)
+        if (!key || tagsByKey.has(key)) return
+        tagsByKey.set(key, trimmed)
+      })
+    })
+    const options = Array.from(tagsByKey.values())
+      .sort(optionCollator.compare)
+      .map((value) => ({ value, label: value }))
+    if (hasEmpty) options.unshift({ value: EMPTY_FILTER_VALUE, label: t.labels.empty })
     return options
   }, [membersData, optionCollator, t.labels.empty])
 
@@ -618,6 +643,7 @@ export function useMemberFilterOptions({
     genderFilterOptions,
     nationalityFilterOptions,
     phoneFilterOptions,
+    tagFilterOptions,
     joinDateFilterOptions,
     positionFilterOptions,
     statusFilterOptions,
