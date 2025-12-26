@@ -19,7 +19,9 @@ const EMPLOYMENT_STATUSES = new Set<PrismaEmploymentStatus>([
   'ON_LEAVE',
   'TERMINATED',
 ])
-const IMPORT_BATCH_SIZE = 50
+const IMPORT_BATCH_SIZE = 20
+const IMPORT_TRANSACTION_MAX_WAIT_MS = 5_000
+const IMPORT_TRANSACTION_TIMEOUT_MS = 120_000
 
 type ImportMemberInput = {
   row?: number
@@ -560,7 +562,8 @@ export async function POST(request: Request) {
   }
 
   for (const batch of candidateBatches) {
-    await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(
+      async (tx) => {
       for (const { member, match, passwordHash } of batch) {
         const resolvedNationality = member.nationality ?? match?.nationality ?? null
         const isChinese = resolvedNationality === 'china'
@@ -749,7 +752,12 @@ export async function POST(request: Request) {
           },
         })
       }
-    })
+      },
+      {
+        maxWait: IMPORT_TRANSACTION_MAX_WAIT_MS,
+        timeout: IMPORT_TRANSACTION_TIMEOUT_MS,
+      },
+    )
   }
 
   return NextResponse.json({
