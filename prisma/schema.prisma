@@ -553,10 +553,28 @@ model UserPayrollChange {
   @@index([changeDate])
 }
 
+model PayrollRun {
+  id         Int       @id @default(autoincrement())
+  year       Int
+  month      Int
+  sequence   Int
+  payoutDate DateTime
+  note       String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  payouts    UserPayrollPayout[]
+
+  @@unique([year, month, sequence])
+  @@index([year, month])
+  @@index([payoutDate])
+}
+
 model UserPayrollPayout {
   id                   Int          @id @default(autoincrement())
   userId               Int
   user                 User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  runId                Int
+  run                  PayrollRun   @relation(fields: [runId], references: [id], onDelete: Cascade)
   team                 String?
   chineseSupervisorId  Int?
   chineseSupervisor    User?        @relation("PayrollPayoutSupervisor", fields: [chineseSupervisorId], references: [id], onDelete: SetNull)
@@ -569,7 +587,9 @@ model UserPayrollPayout {
   updatedAt            DateTime     @updatedAt
 
   @@index([userId])
+  @@index([runId])
   @@index([payoutDate])
+  @@unique([runId, userId])
 }
 
 model Project {

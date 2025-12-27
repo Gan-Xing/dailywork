@@ -204,9 +204,17 @@
 - `netMonthlyAmount` + `netMonthlyUnit`：实发工资金额与单位，可空。
 - `changeDate`：变更执行日期。
 
+### PayrollRun（工资发放批次）
+
+- `year` / `month`：发放月份（两次发放都落在同一月）。
+- `sequence`：发放序号（1 = 当月第 1 次，2 = 当月第 2 次）。
+- `payoutDate`：发放日期（可根据实际发放日调整）。
+- `note`：批次备注，可空。
+
 ### UserPayrollPayout（工资发放记录）
 
 - `userId`：关联成员 ID。
+- `runId`：关联发放批次 ID（同一批次内每人最多一条记录）。
 - `team`（EQUIPE）：当时班组快照，可空。
 - `chineseSupervisorId`（RESPONSABLE CHINOIS）：中方负责人 ID，可空。
 - `chineseSupervisorName`：中方负责人快照名（`name + frenchName`），可空。
@@ -353,6 +361,7 @@
   - 日报：`report:view`、`report:edit`
   - 文档管理（提交单/模板）：`submission:view`、`submission:create`、`submission:update`、`submission:delete`、`submission:manage`、`template:view`、`template:create`、`template:update`、`template:delete`
   - 财务：`finance:view`、`finance:edit`、`finance:manage`
+  - 工资发放：`payroll:view`、`payroll:manage`
   - 产值计量：`value:view`、`value:create`、`value:update`、`value:delete`
   - 开发路线：`roadmap:view`、`roadmap:create`、`roadmap:update`、`roadmap:delete`
 - **备注**：`status=ARCHIVED` 表示归档权限，不再参与鉴权，也不允许继续绑定角色。

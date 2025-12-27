@@ -39,6 +39,7 @@ export type PayrollChange = {
 export type PayrollPayout = {
   id: number
   userId: number
+  runId?: number
   team: string | null
   chineseSupervisorId: number | null
   chineseSupervisorName: string | null

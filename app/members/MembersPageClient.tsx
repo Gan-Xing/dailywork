@@ -9,7 +9,7 @@ import {
   type FormEvent,
 } from 'react'
 
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 
 import { AccessDenied } from '@/components/AccessDenied'
 import {
@@ -43,6 +43,7 @@ import { MemberDetailDrawerMount } from './components/MemberDetailDrawerMount'
 import { MemberFormModal } from './components/MemberFormModal'
 import { MembersTab } from './components/MembersTab'
 import { MembersPageHeader } from './components/MembersPageHeader'
+import { PayrollPayoutsTab } from './components/PayrollPayoutsTab'
 import { PermissionsTab } from './components/PermissionsTab'
 import { RoleModal } from './components/RoleModal'
 import { RolesTab } from './components/RolesTab'
@@ -64,12 +65,13 @@ import type { Member, MemberFormState as FormState } from '@/types/members'
 
 
 
-type TabKey = 'members' | 'roles' | 'permissions'
+type TabKey = 'members' | 'roles' | 'permissions' | 'payroll'
 
 export function MembersPageClient() {
   const { locale, setLocale } = usePreferredLocale()
   const t = memberCopy[locale]
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { home: breadcrumbHome, members: breadcrumbMembers } = t.breadcrumbs
 
   const getTodayString = useCallback(() => new Date().toISOString().slice(0, 10), [])
@@ -216,13 +218,38 @@ export function MembersPageClient() {
     canAssignRole,
     canViewPermissions,
     canUpdatePermissions,
+    canViewPayroll,
+    canManagePayroll,
     shouldShowAccessDenied,
   } = useSessionPermissions()
   useEffect(() => {
     if (activeTab === 'permissions' && !canViewPermissions) {
       setActiveTab('members')
     }
-  }, [activeTab, canViewPermissions])
+    if (activeTab === 'payroll' && !canViewPayroll) {
+      setActiveTab('members')
+    }
+  }, [activeTab, canViewPermissions, canViewPayroll])
+
+  useEffect(() => {
+    const tabParam = searchParams?.get('tab')
+    if (!tabParam) return
+    if (tabParam === 'payroll' && canViewPayroll) {
+      setActiveTab('payroll')
+      return
+    }
+    if (tabParam === 'permissions' && canViewPermissions) {
+      setActiveTab('permissions')
+      return
+    }
+    if (tabParam === 'roles') {
+      setActiveTab('roles')
+      return
+    }
+    if (tabParam === 'members') {
+      setActiveTab('members')
+    }
+  }, [searchParams, canViewPayroll, canViewPermissions])
   const statusLabels = employmentStatusLabels[locale]
   const {
     nationalityByRegion,
@@ -980,10 +1007,12 @@ export function MembersPageClient() {
         ]
       : []),
   ]
-  const availableTabs = useMemo<TabKey[]>(
-    () => (canViewPermissions ? ['members', 'roles', 'permissions'] : ['members', 'roles']),
-    [canViewPermissions],
-  )
+  const availableTabs = useMemo<TabKey[]>(() => {
+    const tabs: TabKey[] = ['members', 'roles']
+    if (canViewPermissions) tabs.push('permissions')
+    if (canViewPayroll) tabs.push('payroll')
+    return tabs
+  }, [canViewPermissions, canViewPayroll])
   const permissionGroups = useMemo(() => {
     const grouped = new Map<string, typeof permissions>()
     permissions.forEach((permission) => {
@@ -1239,6 +1268,20 @@ export function MembersPageClient() {
                 onCancelEdit={cancelEditPermission}
                 onSave={savePermissionStatus}
                 onChangeDraft={setPermissionStatusDraft}
+              />
+            ) : null}
+
+            {activeTab === 'payroll' ? (
+              <PayrollPayoutsTab
+                t={t}
+                locale={locale}
+                members={membersData}
+                membersLoading={loading}
+                membersError={error}
+                teamOptions={teamOptions}
+                chineseSupervisorOptions={chineseSupervisorOptions}
+                canViewPayroll={canViewPayroll}
+                canManagePayroll={canManagePayroll}
               />
             ) : null}
           </div>

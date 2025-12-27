@@ -28,8 +28,8 @@ export const memberCopy: Record<
       members: string
       memberEdit: string
     }
-    tabs: Record<'members' | 'roles' | 'permissions', string>
-    tabDescriptions: Record<'members' | 'roles' | 'permissions', string>
+    tabs: Record<'members' | 'roles' | 'permissions' | 'payroll', string>
+    tabDescriptions: Record<'members' | 'roles' | 'permissions' | 'payroll', string>
     stats: Record<'headcount' | 'active' | 'roles' | 'coverage', string>
     helpers: {
       permissionCoverage: string
@@ -145,6 +145,7 @@ export const memberCopy: Record<
       needMemberView: string
       needRoleView: string
       needPermissionView: string
+      needPayrollView: string
     }
     errors: {
       needRoleCreate: string
@@ -378,6 +379,46 @@ export const memberCopy: Record<
         refresh: string
       }
     }
+    payroll: {
+      title: string
+      subtitle: string
+      monthLabel: string
+      viewModes: {
+        entry: string
+        report: string
+      }
+      runLabels: {
+        first: string
+        second: string
+      }
+      actions: {
+        useToday: string
+        saveDate: string
+        saveRun: string
+        bulkPaste: string
+        applyPaste: string
+        clearPaste: string
+      }
+      bulkHint: string
+      filters: {
+        keyword: string
+        includeInactive: string
+      }
+      stats: {
+        total: string
+        ctj: string
+        cdd: string
+      }
+      table: {
+        runEmpty: string
+      }
+      empty: string
+      errors: {
+        loadFailed: string
+        saveFailed: string
+        missingAmount: (count: number) => string
+      }
+    }
     drawer: {
       tabs: Record<'overview' | 'contracts' | 'payroll', string>
       sections: {
@@ -410,11 +451,13 @@ export const memberCopy: Record<
       members: '成员列表',
       roles: '角色管理',
       permissions: '权限管理',
+      payroll: '工资发放',
     },
     tabDescriptions: {
       members: '筛选成员、导入导出与审计记录视图。',
       roles: '梳理角色职责并查看成员覆盖与权限绑定。',
       permissions: '审视权限编码、描述与角色覆盖范围。',
+      payroll: '按月两次批量录入并生成发放报表。',
     },
     stats: {
       headcount: '成员总数',
@@ -539,6 +582,7 @@ export const memberCopy: Record<
       needMemberView: '缺少 member:view 权限，无法查看成员列表。',
       needRoleView: '缺少 role:view 权限，无法查看角色列表。',
       needPermissionView: '缺少 permission:view 权限，无法查看权限列表。',
+      needPayrollView: '缺少 payroll:view 权限，无法查看工资发放。',
     },
     errors: {
       needRoleCreate: '缺少角色创建权限',
@@ -776,6 +820,46 @@ export const memberCopy: Record<
         refresh: '刷新',
       },
     },
+    payroll: {
+      title: '工资发放',
+      subtitle: '每月两次批量录入，生成同表报表给领导查看。',
+      monthLabel: '发放月份',
+      viewModes: {
+        entry: '录入',
+        report: '报表',
+      },
+      runLabels: {
+        first: '第 1 次',
+        second: '第 2 次',
+      },
+      actions: {
+        useToday: '用今天',
+        saveDate: '保存日期',
+        saveRun: '保存发放',
+        bulkPaste: '批量粘贴',
+        applyPaste: '应用',
+        clearPaste: '清空',
+      },
+      bulkHint: '每行对应当前筛选列表顺序的金额',
+      filters: {
+        keyword: '姓名/账号',
+        includeInactive: '含离职',
+      },
+      stats: {
+        total: '当前筛选',
+        ctj: 'CTJ',
+        cdd: 'CDD',
+      },
+      table: {
+        runEmpty: '本次不发放',
+      },
+      empty: '暂无可发放成员',
+      errors: {
+        loadFailed: '加载工资发放失败',
+        saveFailed: '保存工资发放失败',
+        missingAmount: (count: number) => `仍有 ${count} 人未填写金额`,
+      },
+    },
     drawer: {
       tabs: {
         overview: '概览',
@@ -792,7 +876,7 @@ export const memberCopy: Record<
       },
       comingSoon: {
         contracts: '合同变更记录功能即将上线',
-        payroll: '薪资发放记录功能即将上线',
+        payroll: '工资发放请使用成员管理中的“工资发放”模块。',
       },
     },
   },
@@ -812,11 +896,13 @@ export const memberCopy: Record<
       members: 'Liste des membres',
       roles: 'Gestion des rôles',
       permissions: 'Permissions',
+      payroll: 'Versements',
     },
     tabDescriptions: {
       members: 'Filtrer les membres, importer/exporter et consulter les audits.',
       roles: 'Clarifier les rôles, leurs membres et permissions liées.',
       permissions: 'Consulter chaque permission, sa description et sa couverture.',
+      payroll: 'Saisie en lot et reporting mensuel des versements.',
     },
     stats: {
       headcount: 'Effectif',
@@ -942,6 +1028,7 @@ export const memberCopy: Record<
       needMemberView: 'Droit insuffisant : member:view',
       needRoleView: 'Droit insuffisant : role:view pour afficher les rôles.',
       needPermissionView: 'Droit insuffisant : permission:view pour afficher les permissions.',
+      needPayrollView: 'Droit insuffisant : payroll:view',
     },
     errors: {
       needRoleCreate: 'Droit insuffisant : role:create',
@@ -1181,6 +1268,46 @@ export const memberCopy: Record<
         refresh: 'Actualiser',
       },
     },
+    payroll: {
+      title: 'Versements de salaire',
+      subtitle: 'Deux versements mensuels, saisie en lot et rapport.',
+      monthLabel: 'Mois de versement',
+      viewModes: {
+        entry: 'Saisie',
+        report: 'Rapport',
+      },
+      runLabels: {
+        first: '1er versement',
+        second: '2e versement',
+      },
+      actions: {
+        useToday: "Aujourd'hui",
+        saveDate: 'Enregistrer la date',
+        saveRun: 'Enregistrer les montants',
+        bulkPaste: 'Coller en lot',
+        applyPaste: 'Appliquer',
+        clearPaste: 'Effacer',
+      },
+      bulkHint: 'Une ligne par montant, selon la liste filtrée.',
+      filters: {
+        keyword: 'Nom / identifiant',
+        includeInactive: 'Inclure les sortis',
+      },
+      stats: {
+        total: 'Filtre actuel',
+        ctj: 'CTJ',
+        cdd: 'CDD',
+      },
+      table: {
+        runEmpty: 'Non versé',
+      },
+      empty: 'Aucun membre à afficher',
+      errors: {
+        loadFailed: 'Échec du chargement des versements',
+        saveFailed: "Échec de l'enregistrement",
+        missingAmount: (count: number) => `Montant manquant pour ${count} personne(s)`,
+      },
+    },
     drawer: {
       tabs: {
         overview: 'Aperçu',
@@ -1197,7 +1324,7 @@ export const memberCopy: Record<
       },
       comingSoon: {
         contracts: 'Historique des contrats bientôt disponible',
-        payroll: 'Historique des paiements bientôt disponible',
+        payroll: 'Utilisez l’onglet Versements dans Gestion des membres.',
       },
     },
   },

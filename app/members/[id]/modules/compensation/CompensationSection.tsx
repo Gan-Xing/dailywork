@@ -1,12 +1,13 @@
+import Link from 'next/link'
 import { useCallback, useEffect, useState } from 'react'
 
 import { memberCopy } from '@/lib/i18n/members'
 
 import type { FormState } from '../../types'
+
 import { ContractChangeTable } from './ContractChangeTable'
 import { PayrollChangeTable } from './PayrollChangeTable'
-import { PayrollPayoutsTable } from './PayrollPayoutsTable'
-import type { ContractChange, PayrollChange, PayrollPayout, SupervisorOption } from './types'
+import type { ContractChange, PayrollChange, SupervisorOption } from './types'
 
 type MemberCopy = (typeof memberCopy)[keyof typeof memberCopy]
 
@@ -29,7 +30,6 @@ export function CompensationSection({
   const [error, setError] = useState<string | null>(null)
   const [contractChanges, setContractChanges] = useState<ContractChange[]>([])
   const [payrollChanges, setPayrollChanges] = useState<PayrollChange[]>([])
-  const [payrollPayouts, setPayrollPayouts] = useState<PayrollPayout[]>([])
 
   const loadCompensation = useCallback(async () => {
     setLoading(true)
@@ -43,11 +43,9 @@ export function CompensationSection({
       const data = (await res.json()) as {
         contractChanges?: ContractChange[]
         payrollChanges?: PayrollChange[]
-        payrollPayouts?: PayrollPayout[]
       }
       setContractChanges(Array.isArray(data.contractChanges) ? data.contractChanges : [])
       setPayrollChanges(Array.isArray(data.payrollChanges) ? data.payrollChanges : [])
-      setPayrollPayouts(Array.isArray(data.payrollPayouts) ? data.payrollPayouts : [])
     } catch (err) {
       setError(err instanceof Error ? err.message : t.feedback.loadError)
     } finally {
@@ -103,16 +101,20 @@ export function CompensationSection({
           teamOptions={teamOptions}
           chineseSupervisorOptions={chineseSupervisorOptions}
         />
-        <PayrollPayoutsTable
-          t={t}
-          userId={userId}
-          loading={loading}
-          records={payrollPayouts}
-          onRefresh={loadCompensation}
-          expatProfile={formState.expatProfile}
-          teamOptions={teamOptions}
-          chineseSupervisorOptions={chineseSupervisorOptions}
-        />
+        <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h4 className="text-sm font-semibold text-slate-800">{t.compensation.payrollPayouts}</h4>
+              <p className="text-xs text-slate-500">{t.payroll.subtitle}</p>
+            </div>
+            <Link
+              href="/members?tab=payroll"
+              className="rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white"
+            >
+              {t.payroll.title}
+            </Link>
+          </div>
+        </div>
       </div>
     </section>
   )

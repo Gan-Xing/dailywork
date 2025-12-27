@@ -76,6 +76,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
     payrollPayouts: payrollPayouts.map((item) => ({
       id: item.id,
       userId: item.userId,
+      runId: item.runId,
       team: item.team,
       chineseSupervisorId: item.chineseSupervisorId,
       chineseSupervisorName: item.chineseSupervisorName,

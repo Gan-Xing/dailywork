@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 
 import {
-  normalizeOptionalDate,
   normalizeOptionalDecimal,
   normalizeOptionalText,
   resolveSupervisorSnapshot,
@@ -53,7 +52,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const body = await request.json()
   const hasField = (key: string) => Object.prototype.hasOwnProperty.call(body, key)
 
-  const payoutDate = normalizeOptionalDate(body.payoutDate)
+  const runId = Number(body.runId)
+  if (!runId) {
+    return NextResponse.json({ error: '缺少发放批次' }, { status: 400 })
+  }
+  const run = await prisma.payrollRun.findUnique({ where: { id: runId } })
+  if (!run) {
+    return NextResponse.json({ error: '发放批次不存在' }, { status: 404 })
+  }
+
+  const payoutDate = run.payoutDate
   const amount = normalizeOptionalDecimal(body.amount)
   if (!payoutDate || !amount) {
     return NextResponse.json({ error: '缺少发放日期或金额' }, { status: 400 })
@@ -71,6 +79,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const result = await prisma.userPayrollPayout.create({
     data: {
       userId,
+      runId,
       team,
       chineseSupervisorId: supervisorSnapshot.id,
       chineseSupervisorName: supervisorSnapshot.name,
@@ -85,6 +94,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     payrollPayout: {
       id: result.id,
       userId: result.userId,
+      runId: result.runId,
       team: result.team,
       chineseSupervisorId: result.chineseSupervisorId,
       chineseSupervisorName: result.chineseSupervisorName,

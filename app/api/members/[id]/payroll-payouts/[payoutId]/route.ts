@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 
 import {
-  normalizeOptionalDate,
   normalizeOptionalDecimal,
   normalizeOptionalText,
   resolveSupervisorSnapshot,
@@ -52,9 +51,13 @@ export async function PUT(
   const body = await request.json()
   const hasField = (key: string) => Object.prototype.hasOwnProperty.call(body, key)
 
-  const payoutDate = hasField('payoutDate')
-    ? normalizeOptionalDate(body.payoutDate) ?? record.payoutDate
-    : record.payoutDate
+  const nextRunId = hasField('runId') ? Number(body.runId) || record.runId : record.runId
+  const run = await prisma.payrollRun.findUnique({ where: { id: nextRunId } })
+  if (!run) {
+    return NextResponse.json({ error: '发放批次不存在' }, { status: 404 })
+  }
+
+  const payoutDate = run.payoutDate
   const amount = hasField('amount')
     ? normalizeOptionalDecimal(body.amount) ?? record.amount.toString()
     : record.amount.toString()
@@ -72,6 +75,7 @@ export async function PUT(
   const updated = await prisma.userPayrollPayout.update({
     where: { id: recordId },
     data: {
+      runId: run.id,
       team,
       chineseSupervisorId: supervisorSnapshot.id,
       chineseSupervisorName: supervisorSnapshot.name,
@@ -86,6 +90,7 @@ export async function PUT(
     payrollPayout: {
       id: updated.id,
       userId: updated.userId,
+      runId: updated.runId,
       team: updated.team,
       chineseSupervisorId: updated.chineseSupervisorId,
       chineseSupervisorName: updated.chineseSupervisorName,

@@ -41,6 +41,9 @@ export function useSessionPermissions() {
   const canAssignRole = canUpdateRole
   const canViewPermissions = hasSessionPermission('permission:view')
   const canUpdatePermissions = hasSessionPermission('permission:update')
+  const canViewPayroll =
+    hasSessionPermission('payroll:view') || hasSessionPermission('payroll:manage')
+  const canManagePayroll = hasSessionPermission('payroll:manage')
   const shouldShowAccessDenied = authLoaded && !canViewMembers
 
   return {
@@ -56,6 +59,8 @@ export function useSessionPermissions() {
     canAssignRole,
     canViewPermissions,
     canUpdatePermissions,
+    canViewPayroll,
+    canManagePayroll,
     shouldShowAccessDenied,
   }
 }
