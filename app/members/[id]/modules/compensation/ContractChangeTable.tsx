@@ -33,20 +33,30 @@ type ContractChangeTableProps = {
 }
 
 const formatDate = (value?: string | null) => (value ? value.slice(0, 10) : '')
+const addOneYear = (date: Date) => {
+  const next = new Date(date)
+  next.setFullYear(next.getFullYear() + 1)
+  return next
+}
 
-const buildDefaults = (profile: ExpatProfileForm): ContractChangeForm => ({
-  contractNumber: profile.contractNumber,
-  contractType: profile.contractType,
-  salaryCategory: profile.salaryCategory,
-  salaryAmount: profile.baseSalaryAmount,
-  salaryUnit: profile.baseSalaryUnit,
-  prime: profile.prime,
-  startDate: '',
-  endDate: '',
-  changeDate: formatDate(new Date().toISOString()),
-  reason: '',
-  chineseSupervisorId: profile.chineseSupervisorId,
-})
+const buildDefaults = (profile: ExpatProfileForm): ContractChangeForm => {
+  const now = new Date()
+  const startDate = formatDate(now.toISOString())
+  const endDate = formatDate(addOneYear(now).toISOString())
+  return {
+    contractNumber: profile.contractNumber,
+    contractType: profile.contractType,
+    salaryCategory: profile.salaryCategory,
+    salaryAmount: profile.baseSalaryAmount,
+    salaryUnit: profile.baseSalaryUnit,
+    prime: profile.prime,
+    startDate,
+    endDate,
+    changeDate: startDate,
+    reason: '',
+    chineseSupervisorId: profile.chineseSupervisorId,
+  }
+}
 
 export function ContractChangeTable({
   t,

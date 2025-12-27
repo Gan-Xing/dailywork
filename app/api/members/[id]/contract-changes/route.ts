@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 
 import {
+  isDecimalEqual,
   normalizeOptionalDate,
   normalizeOptionalDecimal,
   normalizeOptionalText,
@@ -36,12 +37,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       expatProfile: {
         select: {
           chineseSupervisorId: true,
+          team: true,
           contractNumber: true,
           contractType: true,
           salaryCategory: true,
           baseSalaryAmount: true,
           baseSalaryUnit: true,
           prime: true,
+          netMonthlyAmount: true,
+          netMonthlyUnit: true,
         },
       },
     },
@@ -78,8 +82,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const prime = hasField('prime')
     ? normalizeOptionalDecimal(body.prime)
     : expatProfile.prime?.toString() ?? null
-  const startDate = normalizeOptionalDate(body.startDate)
-  const endDate = normalizeOptionalDate(body.endDate)
+  const startDateInput = normalizeOptionalDate(body.startDate)
+  const endDateInput = normalizeOptionalDate(body.endDate)
   const changeDate = normalizeOptionalDate(body.changeDate) ?? new Date()
   const reason = normalizeOptionalText(body.reason)
   const nextSupervisorId = hasField('chineseSupervisorId')
@@ -93,8 +97,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     Boolean(salaryAmount) ||
     Boolean(salaryUnit) ||
     Boolean(prime) ||
-    Boolean(startDate) ||
-    Boolean(endDate)
+    Boolean(startDateInput) ||
+    Boolean(endDateInput)
   if (!hasPayload) {
     return NextResponse.json({ error: '缺少合同变更字段' }, { status: 400 })
   }
@@ -112,6 +116,18 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }
 
   const supervisorSnapshot = await resolveSupervisorSnapshot(nextSupervisorId)
+  const salaryChanged =
+    salaryCategory !== expatProfile.salaryCategory ||
+    !isDecimalEqual(expatProfile.baseSalaryAmount, salaryAmount) ||
+    expatProfile.baseSalaryUnit !== salaryUnit ||
+    !isDecimalEqual(expatProfile.prime, prime)
+  const addOneYear = (date: Date) => {
+    const next = new Date(date)
+    next.setFullYear(next.getFullYear() + 1)
+    return next
+  }
+  const resolvedStartDate = startDateInput ?? changeDate
+  const resolvedEndDate = endDateInput ?? addOneYear(resolvedStartDate)
 
   const result = await prisma.$transaction(async (tx) => {
     const change = await tx.userContractChange.create({
@@ -125,8 +141,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         salaryAmount,
         salaryUnit,
         prime,
-        startDate,
-        endDate,
+        startDate: resolvedStartDate,
+        endDate: resolvedEndDate,
         changeDate,
         reason,
       },
@@ -143,8 +159,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         prime,
         baseSalaryAmount: salaryAmount,
         baseSalaryUnit: salaryUnit,
-        contractStartDate: startDate,
-        contractEndDate: endDate,
+        contractStartDate: resolvedStartDate,
+        contractEndDate: resolvedEndDate,
       },
       update: {
         chineseSupervisorId: supervisorSnapshot.id,
@@ -154,10 +170,30 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         prime,
         baseSalaryAmount: salaryAmount,
         baseSalaryUnit: salaryUnit,
-        contractStartDate: startDate,
-        contractEndDate: endDate,
+        contractStartDate: resolvedStartDate,
+        contractEndDate: resolvedEndDate,
       },
     })
+
+    if (salaryChanged) {
+      await tx.userPayrollChange.create({
+        data: {
+          userId,
+          team: expatProfile.team,
+          chineseSupervisorId: supervisorSnapshot.id,
+          chineseSupervisorName: supervisorSnapshot.name,
+          salaryCategory,
+          salaryAmount,
+          salaryUnit,
+          prime,
+          baseSalaryAmount: salaryAmount,
+          baseSalaryUnit: salaryUnit,
+          netMonthlyAmount: expatProfile.netMonthlyAmount?.toString() ?? null,
+          netMonthlyUnit: expatProfile.netMonthlyUnit,
+          changeDate,
+        },
+      })
+    }
 
     return change
   })
