@@ -1,4 +1,4 @@
-import type { Dispatch, RefObject, SetStateAction } from 'react'
+import { useState, type Dispatch, type RefObject, type SetStateAction } from 'react'
 
 import {
   genderOptions,
@@ -46,6 +46,8 @@ export function BasicInfoSection({
   onTogglePhonePicker,
   phonePickerRef,
 }: BasicInfoSectionProps) {
+  const [tagsInput, setTagsInput] = useState(() => formState.tags.join('\n'))
+
   return (
     <>
       <div className="grid gap-4 sm:grid-cols-2">
@@ -149,13 +151,15 @@ export function BasicInfoSection({
           <span className="block font-semibold">{t.form.tags}</span>
           <textarea
             rows={2}
-            value={formState.tags.join('\n')}
-            onChange={(event) =>
+            value={tagsInput}
+            onChange={(event) => {
+              const nextValue = event.target.value
+              setTagsInput(nextValue)
               setFormState((prev) => ({
                 ...prev,
-                tags: normalizeTagsInput(event.target.value),
+                tags: normalizeTagsInput(nextValue),
               }))
-            }
+            }}
             className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
             placeholder={t.form.tagsPlaceholder}
           />

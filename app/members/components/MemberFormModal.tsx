@@ -1,4 +1,4 @@
-import type { Dispatch, FormEvent, RefObject, SetStateAction } from 'react'
+import { useState, type Dispatch, type FormEvent, type RefObject, type SetStateAction } from 'react'
 
 import type { Locale } from '@/lib/i18n'
 import {
@@ -79,6 +79,8 @@ export function MemberFormModal({
   actionError,
   submitting,
 }: MemberFormModalProps) {
+  const [tagsInput, setTagsInput] = useState(() => formState.tags.join('\n'))
+
   if (!open) return null
 
   return (
@@ -270,13 +272,15 @@ export function MemberFormModal({
               <span className="block font-semibold">{t.form.tags}</span>
               <textarea
                 rows={2}
-                value={formState.tags.join('\n')}
-                onChange={(event) =>
+                value={tagsInput}
+                onChange={(event) => {
+                  const nextValue = event.target.value
+                  setTagsInput(nextValue)
                   setFormState((prev) => ({
                     ...prev,
-                    tags: normalizeTagsInput(event.target.value),
+                    tags: normalizeTagsInput(nextValue),
                   }))
-                }
+                }}
                 disabled={formMode === 'view'}
                 className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
                 placeholder={t.form.tagsPlaceholder}

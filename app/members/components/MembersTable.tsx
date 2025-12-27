@@ -529,7 +529,20 @@ export function MembersTable({
               ) : null}
               {isVisible('tags') ? (
                 <td className="px-4 py-3 text-slate-700 align-middle">
-                  {formatProfileList(member.tags)}
+                  {member.tags?.length ? (
+                    <div className="flex flex-wrap gap-1.5">
+                      {member.tags.map((tag) => (
+                        <span
+                          key={`${member.id}-tag-${tag}`}
+                          className="rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-800 ring-1 ring-amber-100"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    t.labels.empty
+                  )}
                 </td>
               ) : null}
               {isVisible('team') ? (

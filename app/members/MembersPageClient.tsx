@@ -1303,38 +1303,40 @@ export function MembersPageClient() {
         onTogglePermission={togglePermission}
       />
 
-      <MemberFormModal
-        t={t}
-        open={showCreateModal}
-        modalTitle={modalTitle}
-        modalSubtitle={modalSubtitle}
-        locale={locale}
-        formMode={formMode}
-        formState={formState}
-        setFormState={setFormState}
-        rolesData={rolesData}
-        canAssignRole={canAssignRole}
-        onToggleRole={toggleRole}
-        onClose={() => setShowCreateModal(false)}
-        onSubmit={handleSubmit}
-        positionOptions={positionOptions}
-        teamOptions={teamOptions}
-        chineseSupervisorOptions={chineseSupervisorOptions}
-        nationalityByRegion={nationalityByRegion}
-        statusLabels={statusLabels}
-        isChineseForm={isChineseForm}
-        profileExpanded={profileExpanded}
-        setProfileExpanded={setProfileExpanded}
-        showPhonePicker={showPhonePicker}
-        setShowPhonePicker={setShowPhonePicker}
-        phoneInput={phoneInput}
-        setPhoneInput={setPhoneInput}
-        addPhoneFromInput={addPhoneFromInput}
-        removePhone={removePhone}
-        phonePickerRef={phonePickerRef}
-        actionError={actionError}
-        submitting={submitting}
-      />
+      {showCreateModal ? (
+        <MemberFormModal
+          t={t}
+          open={showCreateModal}
+          modalTitle={modalTitle}
+          modalSubtitle={modalSubtitle}
+          locale={locale}
+          formMode={formMode}
+          formState={formState}
+          setFormState={setFormState}
+          rolesData={rolesData}
+          canAssignRole={canAssignRole}
+          onToggleRole={toggleRole}
+          onClose={() => setShowCreateModal(false)}
+          onSubmit={handleSubmit}
+          positionOptions={positionOptions}
+          teamOptions={teamOptions}
+          chineseSupervisorOptions={chineseSupervisorOptions}
+          nationalityByRegion={nationalityByRegion}
+          statusLabels={statusLabels}
+          isChineseForm={isChineseForm}
+          profileExpanded={profileExpanded}
+          setProfileExpanded={setProfileExpanded}
+          showPhonePicker={showPhonePicker}
+          setShowPhonePicker={setShowPhonePicker}
+          phoneInput={phoneInput}
+          setPhoneInput={setPhoneInput}
+          addPhoneFromInput={addPhoneFromInput}
+          removePhone={removePhone}
+          phonePickerRef={phonePickerRef}
+          actionError={actionError}
+          submitting={submitting}
+        />
+      ) : null}
 
       <MemberDetailDrawerMount
         selectedMember={selectedMember}
