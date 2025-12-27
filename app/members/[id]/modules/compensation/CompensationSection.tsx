@@ -1,4 +1,3 @@
-import Link from 'next/link'
 import { useCallback, useEffect, useState } from 'react'
 
 import { memberCopy } from '@/lib/i18n/members'
@@ -7,7 +6,8 @@ import type { FormState } from '../../types'
 
 import { ContractChangeTable } from './ContractChangeTable'
 import { PayrollChangeTable } from './PayrollChangeTable'
-import type { ContractChange, PayrollChange, SupervisorOption } from './types'
+import { PayrollPayoutTable } from './PayrollPayoutTable'
+import type { ContractChange, PayrollChange, PayrollPayout, SupervisorOption } from './types'
 
 type MemberCopy = (typeof memberCopy)[keyof typeof memberCopy]
 
@@ -28,8 +28,10 @@ export function CompensationSection({
 }: CompensationSectionProps) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [isExpanded, setIsExpanded] = useState(true)
   const [contractChanges, setContractChanges] = useState<ContractChange[]>([])
   const [payrollChanges, setPayrollChanges] = useState<PayrollChange[]>([])
+  const [payrollPayouts, setPayrollPayouts] = useState<PayrollPayout[]>([])
 
   const loadCompensation = useCallback(async () => {
     setLoading(true)
@@ -43,9 +45,11 @@ export function CompensationSection({
       const data = (await res.json()) as {
         contractChanges?: ContractChange[]
         payrollChanges?: PayrollChange[]
+        payrollPayouts?: PayrollPayout[]
       }
       setContractChanges(Array.isArray(data.contractChanges) ? data.contractChanges : [])
       setPayrollChanges(Array.isArray(data.payrollChanges) ? data.payrollChanges : [])
+      setPayrollPayouts(Array.isArray(data.payrollPayouts) ? data.payrollPayouts : [])
     } catch (err) {
       setError(err instanceof Error ? err.message : t.feedback.loadError)
     } finally {
@@ -59,20 +63,32 @@ export function CompensationSection({
 
   return (
     <section className="rounded-2xl border border-slate-200 bg-white p-5">
-      <div className="flex items-center justify-between gap-4">
+      <div
+        role="button"
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="flex cursor-pointer items-center justify-between gap-4"
+      >
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">
             {t.compensation.title}
           </p>
           <p className="text-xs text-slate-500">{t.editSubtitle}</p>
         </div>
-        <button
-          type="button"
-          onClick={loadCompensation}
-          className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600 hover:border-slate-300 hover:text-slate-900"
-        >
-          {t.compensation.actions.refresh}
-        </button>
+        <div className="flex items-center gap-2">
+          <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600">
+            {isExpanded ? t.form.collapse : t.form.expand}
+          </span>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              loadCompensation()
+            }}
+            className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 hover:border-slate-300 hover:text-slate-900"
+          >
+            {t.compensation.actions.refresh}
+          </button>
+        </div>
       </div>
 
       {error ? (
@@ -81,41 +97,30 @@ export function CompensationSection({
         </div>
       ) : null}
 
-      <div className="mt-6 grid gap-6">
-        <ContractChangeTable
-          t={t}
-          userId={userId}
-          loading={loading}
-          records={contractChanges}
-          onRefresh={loadCompensation}
-          expatProfile={formState.expatProfile}
-          chineseSupervisorOptions={chineseSupervisorOptions}
-        />
-        <PayrollChangeTable
-          t={t}
-          userId={userId}
-          loading={loading}
-          records={payrollChanges}
-          onRefresh={loadCompensation}
-          expatProfile={formState.expatProfile}
-          teamOptions={teamOptions}
-          chineseSupervisorOptions={chineseSupervisorOptions}
-        />
-        <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h4 className="text-sm font-semibold text-slate-800">{t.compensation.payrollPayouts}</h4>
-              <p className="text-xs text-slate-500">{t.payroll.subtitle}</p>
-            </div>
-            <Link
-              href="/members?tab=payroll"
-              className="rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white"
-            >
-              {t.payroll.title}
-            </Link>
-          </div>
+      {isExpanded ? (
+        <div className="mt-6 grid gap-6">
+          <ContractChangeTable
+            t={t}
+            userId={userId}
+            loading={loading}
+            records={contractChanges}
+            onRefresh={loadCompensation}
+            expatProfile={formState.expatProfile}
+            chineseSupervisorOptions={chineseSupervisorOptions}
+          />
+          <PayrollChangeTable
+            t={t}
+            userId={userId}
+            loading={loading}
+            records={payrollChanges}
+            onRefresh={loadCompensation}
+            expatProfile={formState.expatProfile}
+            teamOptions={teamOptions}
+            chineseSupervisorOptions={chineseSupervisorOptions}
+          />
+          <PayrollPayoutTable t={t} loading={loading} records={payrollPayouts} />
         </div>
-      </div>
+      ) : null}
     </section>
   )
 }

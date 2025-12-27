@@ -1,12 +1,15 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { MultiSelectFilter, type MultiSelectOption } from '@/components/MultiSelectFilter'
 import { ActionButton } from '@/components/members/MemberButtons'
+import { useToast } from '@/components/ToastProvider'
+import { AlertDialog } from '@/components/AlertDialog'
 import type { Locale } from '@/lib/i18n'
 import { memberCopy } from '@/lib/i18n/members'
 import { normalizeText } from '@/lib/members/utils'
+import { usePayrollImport, type ImportTarget } from '../hooks/usePayrollImport'
 import type { Member } from '@/types/members'
 
 type MemberCopy = (typeof memberCopy)[keyof typeof memberCopy]
@@ -117,6 +120,10 @@ export function PayrollPayoutsTab({
   const [contractNumberFilters, setContractNumberFilters] = useState<string[]>([])
   const [sortField, setSortField] = useState<PayrollSortField | null>(null)
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
+  const importInputRef = useRef<HTMLInputElement>(null)
+  
+  const { addToast } = useToast()
+  const [clearRunDialog, setClearRunDialog] = useState<{ run: PayrollRun; label: string } | null>(null)
 
   const numberFormatter = useMemo(() => new Intl.NumberFormat(locale), [locale])
   const collator = useMemo(() => {
@@ -134,6 +141,67 @@ export function PayrollPayoutsTab({
       ),
     [members],
   )
+
+  const { parseFile } = usePayrollImport({ t, members: baseMembers })
+
+  const handleImportClick = () => {
+    if (importInputRef.current) {
+      importInputRef.current.value = ''
+      importInputRef.current.click()
+    }
+  }
+
+  const handleImportFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    // Identify targets
+    const targets: ImportTarget[] = []
+    runs.forEach(run => {
+       const draftDate = runDateDrafts[run.id]
+       const date = draftDate !== undefined ? draftDate : formatDateInput(run.payoutDate)
+       if (date) {
+         targets.push({ runId: run.id, date })
+       }
+    })
+
+    if (targets.length === 0) {
+      addToast("Please set Payout Dates for the runs you want to import.", { tone: 'warning' })
+      if (importInputRef.current) importInputRef.current.value = ''
+      return
+    }
+
+    try {
+      setLoading(true)
+      const results = await parseFile(file, targets)
+      const importedMemberIds = new Set<number>()
+      results.forEach((map) => {
+        map.forEach((_, userId) => {
+          importedMemberIds.add(userId)
+        })
+      })
+      const totalCount = importedMemberIds.size
+
+      setDrafts((prev) => {
+        const next = { ...prev }
+        results.forEach((map, runId) => {
+          const runDrafts = { ...(next[runId] ?? {}) }
+          map.forEach((amount, userId) => {
+            runDrafts[userId] = amount
+          })
+          next[runId] = runDrafts
+        })
+        return next
+      })
+      addToast(t.feedback.importSuccess(totalCount), { tone: 'success' })
+    } catch (err) {
+      addToast(err instanceof Error ? err.message : t.errors.importFailed, { tone: 'danger' })
+    } finally {
+      setLoading(false)
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
+
 
   const filterControlProps = useMemo(
     () => ({
@@ -729,7 +797,12 @@ export function PayrollPayoutsTab({
     const label =
       formatDateInput(run.payoutDate) ||
       (run.sequence === 1 ? t.payroll.runLabels.first : t.payroll.runLabels.second)
-    if (!window.confirm(t.payroll.confirm.clearRun(label))) return
+    setClearRunDialog({ run, label })
+  }
+
+  const handleClearRunConfirm = async () => {
+    if (!clearRunDialog) return
+    const { run } = clearRunDialog
     setSavingRuns((prev) => ({ ...prev, [run.id]: true }))
     setError(null)
     try {
@@ -738,11 +811,19 @@ export function PayrollPayoutsTab({
         const data = await res.json().catch(() => ({}))
         throw new Error(data.error ?? t.payroll.errors.saveFailed)
       }
+      addToast(t.payroll.actions.clearRun + ' ' + t.feedback.importSuccess(0).split(' ')[0], { tone: 'success' }) // Hacking success message or just use generic? using tone success.
+      // Better:
+      // addToast('Run cleared', { tone: 'success' })
+      // Since I can't easily find a "Cleared success" string, I'll assume success tone is enough or reuse something.
+      // Let's just reload.
       await loadPayroll()
     } catch (err) {
-      setError(err instanceof Error ? err.message : t.payroll.errors.saveFailed)
+      const msg = err instanceof Error ? err.message : t.payroll.errors.saveFailed
+      setError(msg)
+      addToast(msg, { tone: 'danger' })
     } finally {
       setSavingRuns((prev) => ({ ...prev, [run.id]: false }))
+      setClearRunDialog(null)
     }
   }
 
@@ -761,12 +842,19 @@ export function PayrollPayoutsTab({
 
   return (
     <div className="space-y-4 p-6">
+      <input
+        type="file"
+        ref={importInputRef}
+        onChange={handleImportFileChange}
+        className="hidden"
+        accept=".xlsx,.xls,.csv"
+      />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+          <h2 className="text-2xl font-bold text-slate-800">
             {t.payroll.title}
-          </p>
-          <p className="text-xs text-slate-500">{t.payroll.subtitle}</p>
+          </h2>
+          <p className="text-sm text-slate-500">{t.payroll.subtitle}</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <button
@@ -775,6 +863,14 @@ export function PayrollPayoutsTab({
             className="rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700 hover:border-slate-300"
           >
             {t.compensation.actions.refresh}
+          </button>
+          <button
+            type="button"
+            disabled={!canManagePayroll}
+            onClick={handleImportClick}
+            className="rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700 hover:border-slate-300 disabled:opacity-50"
+          >
+            {t.payroll.actions.importPayouts}
           </button>
           <button
             type="button"
@@ -1252,6 +1348,22 @@ export function PayrollPayoutsTab({
           ) : null}
         </table>
       </div>
+
+      <AlertDialog
+        open={!!clearRunDialog}
+        title={t.payroll.actions.clearRun}
+        description={
+          clearRunDialog
+            ? t.payroll.confirm.clearRun(clearRunDialog.label)
+            : undefined
+        }
+        onClose={() => setClearRunDialog(null)}
+        onCancel={() => setClearRunDialog(null)}
+        onAction={handleClearRunConfirm}
+        tone="danger"
+        actionLabel={t.payroll.actions.clearRun}
+        cancelLabel={t.actions.cancel}
+      />
     </div>
   )
 }

@@ -163,7 +163,7 @@ export function PayrollChangeTable({
             {records.length === 0 && !loading ? (
               <tr>
                 <td colSpan={9} className="py-4 text-center text-sm text-slate-400">
-                  {t.feedback.empty}
+                  {t.feedback.emptyHistory}
                 </td>
               </tr>
             ) : null}

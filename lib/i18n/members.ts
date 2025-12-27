@@ -336,6 +336,7 @@ export const memberCopy: Record<
       loading: string
       loadError: string
       empty: string
+      emptyHistory: string
       submitError: string
       deleteConfirm: (username: string) => string
       importSuccess: (count: number) => string
@@ -399,6 +400,7 @@ export const memberCopy: Record<
         saveDate: string
         saveRun: string
         clearRun: string
+        importPayouts: string
         bulkPaste: string
         applyPaste: string
         clearPaste: string
@@ -425,6 +427,8 @@ export const memberCopy: Record<
         loadFailed: string
         saveFailed: string
         missingAmount: (count: number) => string
+        importMissingHeaders: string
+        importContractNotFound: (contract: string) => string
       }
     }
     drawer: {
@@ -783,6 +787,7 @@ export const memberCopy: Record<
       loading: '正在加载成员...',
       loadError: '加载失败',
       empty: '暂无成员，试试新增一位。',
+      emptyHistory: '暂无记录。',
       submitError: '提交失败',
       deleteConfirm: (username: string) => `确认删除成员 ${username} 吗？`,
       importSuccess: (count: number) => `已成功导入 ${count} 条成员。`,
@@ -830,7 +835,7 @@ export const memberCopy: Record<
     },
     payroll: {
       title: '工资发放',
-      subtitle: '每月两次批量录入，生成同表报表给领导查看。',
+      subtitle: '',
       monthLabel: '发放月份',
       viewModes: {
         entry: '录入',
@@ -848,6 +853,7 @@ export const memberCopy: Record<
         saveDate: '保存日期',
         saveRun: '保存发放',
         clearRun: '清空记录',
+        importPayouts: '导入工资',
         bulkPaste: '批量粘贴',
         applyPaste: '应用',
         clearPaste: '清空',
@@ -874,6 +880,8 @@ export const memberCopy: Record<
         loadFailed: '加载工资发放失败',
         saveFailed: '保存工资发放失败',
         missingAmount: (count: number) => `仍有 ${count} 人未填写金额`,
+        importMissingHeaders: '缺少必要字段：合同编号、发放金额',
+        importContractNotFound: (contract: string) => `找不到合同编号：${contract}`,
       },
     },
     drawer: {
@@ -1239,6 +1247,7 @@ export const memberCopy: Record<
       loading: 'Chargement des membres...',
       loadError: 'Échec du chargement',
       empty: 'Aucun membre pour le moment.',
+      emptyHistory: 'Aucun enregistrement.',
       submitError: 'Échec de la soumission',
       deleteConfirm: (username: string) => `Supprimer le membre ${username} ?`,
       importSuccess: (count: number) => `Import réussi : ${count} membres.`,
@@ -1304,6 +1313,7 @@ export const memberCopy: Record<
         saveDate: 'Enregistrer la date',
         saveRun: 'Enregistrer les montants',
         clearRun: 'Effacer les versements',
+        importPayouts: 'Importer Salaires',
         bulkPaste: 'Coller en lot',
         applyPaste: 'Appliquer',
         clearPaste: 'Effacer',
@@ -1331,6 +1341,8 @@ export const memberCopy: Record<
         loadFailed: 'Échec du chargement des versements',
         saveFailed: "Échec de l'enregistrement",
         missingAmount: (count: number) => `Montant manquant pour ${count} personne(s)`,
+        importMissingHeaders: 'Colonnes manquantes: N° contrat, Montant',
+        importContractNotFound: (contract: string) => `Contrat introuvable : ${contract}`,
       },
     },
     drawer: {
