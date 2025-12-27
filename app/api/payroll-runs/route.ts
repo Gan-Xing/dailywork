@@ -43,6 +43,7 @@ export async function GET(request: Request) {
       month: run.month,
       sequence: run.sequence,
       payoutDate: run.payoutDate.toISOString(),
+      attendanceCutoffDate: run.attendanceCutoffDate.toISOString(),
       note: run.note,
       createdAt: run.createdAt.toISOString(),
       updatedAt: run.updatedAt.toISOString(),

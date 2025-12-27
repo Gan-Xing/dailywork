@@ -391,6 +391,9 @@ export const memberCopy: Record<
         first: string
         second: string
       }
+      fields: {
+        attendanceCutoffDate: string
+      }
       actions: {
         useToday: string
         saveDate: string
@@ -411,6 +414,7 @@ export const memberCopy: Record<
       }
       table: {
         runEmpty: string
+        total: string
       }
       empty: string
       errors: {
@@ -832,6 +836,9 @@ export const memberCopy: Record<
         first: '第 1 次',
         second: '第 2 次',
       },
+      fields: {
+        attendanceCutoffDate: '考勤截止日期',
+      },
       actions: {
         useToday: '用今天',
         saveDate: '保存日期',
@@ -840,7 +847,7 @@ export const memberCopy: Record<
         applyPaste: '应用',
         clearPaste: '清空',
       },
-      bulkHint: '每行对应当前筛选列表顺序的金额',
+      bulkHint: '按当前表格顺序逐行粘贴金额',
       filters: {
         keyword: '姓名/账号',
         includeInactive: '含离职',
@@ -852,6 +859,7 @@ export const memberCopy: Record<
       },
       table: {
         runEmpty: '本次不发放',
+        total: '合计',
       },
       empty: '暂无可发放成员',
       errors: {
@@ -1280,6 +1288,9 @@ export const memberCopy: Record<
         first: '1er versement',
         second: '2e versement',
       },
+      fields: {
+        attendanceCutoffDate: 'Date de clôture de présence',
+      },
       actions: {
         useToday: "Aujourd'hui",
         saveDate: 'Enregistrer la date',
@@ -1288,7 +1299,7 @@ export const memberCopy: Record<
         applyPaste: 'Appliquer',
         clearPaste: 'Effacer',
       },
-      bulkHint: 'Une ligne par montant, selon la liste filtrée.',
+      bulkHint: 'Une ligne par montant, selon l’ordre du tableau.',
       filters: {
         keyword: 'Nom / identifiant',
         includeInactive: 'Inclure les sortis',
@@ -1300,6 +1311,7 @@ export const memberCopy: Record<
       },
       table: {
         runEmpty: 'Non versé',
+        total: 'Total',
       },
       empty: 'Aucun membre à afficher',
       errors: {

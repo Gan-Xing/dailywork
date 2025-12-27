@@ -45,6 +45,7 @@ export const ensurePayrollRuns = async (year: number, month: number) => {
           month,
           sequence: item.sequence,
           payoutDate: item.payoutDate,
+          attendanceCutoffDate: item.payoutDate,
         })),
         skipDuplicates: true,
       })

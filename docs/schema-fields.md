@@ -209,6 +209,7 @@
 - `year` / `month`：发放月份（两次发放都落在同一月）。
 - `sequence`：发放序号（1 = 当月第 1 次，2 = 当月第 2 次）。
 - `payoutDate`：发放日期（可根据实际发放日调整）。
+- `attendanceCutoffDate`：考勤截止日期（用于判断离职人员是否需要发放）。
 - `note`：批次备注，可空。
 
 ### UserPayrollPayout（工资发放记录）

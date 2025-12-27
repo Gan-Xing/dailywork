@@ -17,6 +17,7 @@ type PayrollRun = {
   month: number
   sequence: number
   payoutDate: string
+  attendanceCutoffDate: string
   note?: string | null
   createdAt: string
   updatedAt: string
@@ -53,6 +54,25 @@ const formatDateInput = (value?: string | null) => (value ? value.slice(0, 10) :
 
 const toMonthValue = (date: Date) => date.toISOString().slice(0, 7)
 
+const parseDateValue = (value?: string | null) => {
+  if (!value) return null
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return null
+  return parsed
+}
+
+const isAfterCutoff = (terminationDate: Date | null, cutoffDate: Date | null) => {
+  if (!terminationDate) return true
+  if (!cutoffDate) return true
+  return terminationDate.getTime() > cutoffDate.getTime()
+}
+
+const toAmountNumber = (value?: string | null) => {
+  if (value === null || value === undefined || value === '') return null
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
 export function PayrollPayoutsTab({
   t,
   locale,
@@ -68,10 +88,12 @@ export function PayrollPayoutsTab({
   const [viewMode, setViewMode] = useState<'entry' | 'report'>('entry')
   const [runs, setRuns] = useState<PayrollRun[]>([])
   const [payouts, setPayouts] = useState<PayrollPayout[]>([])
+  const [prevCutoffDate, setPrevCutoffDate] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [drafts, setDrafts] = useState<Record<number, Record<number, string>>>({})
   const [runDateDrafts, setRunDateDrafts] = useState<Record<number, string>>({})
+  const [runCutoffDrafts, setRunCutoffDrafts] = useState<Record<number, string>>({})
   const [savingRuns, setSavingRuns] = useState<Record<number, boolean>>({})
   const [savingDates, setSavingDates] = useState<Record<number, boolean>>({})
   const [bulkOpen, setBulkOpen] = useState<Record<number, boolean>>({})
@@ -80,7 +102,6 @@ export function PayrollPayoutsTab({
   const [teamFilter, setTeamFilter] = useState('')
   const [supervisorFilter, setSupervisorFilter] = useState('')
   const [contractTypeFilter, setContractTypeFilter] = useState<'ALL' | 'CTJ' | 'CDD'>('ALL')
-  const [includeInactive, setIncludeInactive] = useState(false)
 
   const numberFormatter = useMemo(() => new Intl.NumberFormat(locale), [locale])
   const collator = useMemo(() => {
@@ -91,7 +112,10 @@ export function PayrollPayoutsTab({
   const baseMembers = useMemo(
     () =>
       members.filter(
-        (member) => member.nationality !== 'china' && member.expatProfile,
+        (member) =>
+          member.nationality !== 'china' &&
+          member.expatProfile &&
+          normalizeText(member.expatProfile.team),
       ),
     [members],
   )
@@ -99,7 +123,6 @@ export function PayrollPayoutsTab({
   const filteredMembers = useMemo(() => {
     const search = normalizeText(keyword).toLowerCase()
     return baseMembers.filter((member) => {
-      if (!includeInactive && member.employmentStatus !== 'ACTIVE') return false
       if (teamFilter && normalizeText(member.expatProfile?.team) !== teamFilter) return false
       if (supervisorFilter) {
         const supervisorId = member.expatProfile?.chineseSupervisorId
@@ -113,10 +136,43 @@ export function PayrollPayoutsTab({
       const username = normalizeText(member.username).toLowerCase()
       return name.includes(search) || username.includes(search)
     })
-  }, [baseMembers, keyword, includeInactive, teamFilter, supervisorFilter, contractTypeFilter])
+  }, [baseMembers, keyword, teamFilter, supervisorFilter, contractTypeFilter])
+
+  const runOneCutoffDate = useMemo(() => {
+    const runOne = runs.find((run) => run.sequence === 1)
+    if (!runOne) return null
+    const draft = normalizeText(runCutoffDrafts[runOne.id])
+    return draft || formatDateInput(runOne.attendanceCutoffDate)
+  }, [runs, runCutoffDrafts])
+
+  const { visibleMembers, eligibilityById } = useMemo(() => {
+    const prevCutoff = parseDateValue(prevCutoffDate)
+    const runOneCutoff = parseDateValue(runOneCutoffDate)
+    const nextMembers: Member[] = []
+    const nextEligibility = new Map<number, { run1Editable: boolean; run2Editable: boolean }>()
+
+    filteredMembers.forEach((member) => {
+      const terminationDate = parseDateValue(member.terminationDate)
+      const isVisible = isAfterCutoff(terminationDate, prevCutoff)
+      if (!isVisible) return
+
+      const isCdd = member.expatProfile?.contractType === 'CDD'
+      if (isCdd) {
+        nextEligibility.set(member.id, { run1Editable: false, run2Editable: true })
+        nextMembers.push(member)
+        return
+      }
+
+      const run2Editable = isAfterCutoff(terminationDate, runOneCutoff)
+      nextEligibility.set(member.id, { run1Editable: true, run2Editable })
+      nextMembers.push(member)
+    })
+
+    return { visibleMembers: nextMembers, eligibilityById: nextEligibility }
+  }, [filteredMembers, prevCutoffDate, runOneCutoffDate])
 
   const sortedMembers = useMemo(() => {
-    const list = [...filteredMembers]
+    const list = [...visibleMembers]
     list.sort((left, right) => {
       const leftSupervisor =
         normalizeText(left.expatProfile?.chineseSupervisor?.chineseProfile?.frenchName) ||
@@ -139,7 +195,7 @@ export function PayrollPayoutsTab({
       return left.id - right.id
     })
     return list
-  }, [collator, filteredMembers])
+  }, [collator, visibleMembers])
 
   const runMap = useMemo(() => {
     const map = new Map<number, PayrollRun>()
@@ -170,12 +226,17 @@ export function PayrollPayoutsTab({
 
   const loadPayroll = useCallback(async () => {
     if (!canViewPayroll) return
-    const [year, month] = selectedMonth.split('-')
-    if (!year || !month) return
+    const [yearValue, monthValue] = selectedMonth.split('-').map((part) => Number(part))
+    if (!yearValue || !monthValue) return
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch(`/api/payroll-runs?year=${year}&month=${Number(month)}`)
+      const prevMonthValue = monthValue === 1 ? 12 : monthValue - 1
+      const prevYearValue = monthValue === 1 ? yearValue - 1 : yearValue
+      const [res, prevRes] = await Promise.all([
+        fetch(`/api/payroll-runs?year=${yearValue}&month=${monthValue}`),
+        fetch(`/api/payroll-runs?year=${prevYearValue}&month=${prevMonthValue}`),
+      ])
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
         throw new Error(data.error ?? t.payroll.errors.loadFailed)
@@ -183,8 +244,16 @@ export function PayrollPayoutsTab({
       const data = (await res.json()) as { runs?: PayrollRun[]; payouts?: PayrollPayout[] }
       const nextRuns = Array.isArray(data.runs) ? data.runs : []
       const nextPayouts = Array.isArray(data.payouts) ? data.payouts : []
+      let nextPrevCutoff: string | null = null
+      if (prevRes.ok) {
+        const prevData = (await prevRes.json().catch(() => ({}))) as { runs?: PayrollRun[] }
+        const prevRuns = Array.isArray(prevData.runs) ? prevData.runs : []
+        nextPrevCutoff =
+          prevRuns.find((run) => run.sequence === 2)?.attendanceCutoffDate ?? null
+      }
       setRuns(nextRuns)
       setPayouts(nextPayouts)
+      setPrevCutoffDate(nextPrevCutoff)
       const nextDrafts: Record<number, Record<number, string>> = {}
       nextPayouts.forEach((payout) => {
         if (!nextDrafts[payout.runId]) nextDrafts[payout.runId] = {}
@@ -192,10 +261,13 @@ export function PayrollPayoutsTab({
       })
       setDrafts(nextDrafts)
       const nextRunDrafts: Record<number, string> = {}
+      const nextRunCutoffDrafts: Record<number, string> = {}
       nextRuns.forEach((run) => {
         nextRunDrafts[run.id] = formatDateInput(run.payoutDate)
+        nextRunCutoffDrafts[run.id] = formatDateInput(run.attendanceCutoffDate)
       })
       setRunDateDrafts(nextRunDrafts)
+      setRunCutoffDrafts(nextRunCutoffDrafts)
     } catch (err) {
       setError(err instanceof Error ? err.message : t.payroll.errors.loadFailed)
     } finally {
@@ -241,11 +313,20 @@ export function PayrollPayoutsTab({
     return normalizeText(member.expatProfile?.team) || t.labels.empty
   }
 
+  const runOneEligibleMembers = useMemo(
+    () =>
+      sortedMembers.filter((member) => eligibilityById.get(member.id)?.run1Editable),
+    [sortedMembers, eligibilityById],
+  )
+
+  const runTwoEligibleMembers = useMemo(
+    () =>
+      sortedMembers.filter((member) => eligibilityById.get(member.id)?.run2Editable),
+    [sortedMembers, eligibilityById],
+  )
+
   const getEligibleMembers = (sequence: number) => {
-    if (sequence === 1) {
-      return sortedMembers.filter((member) => member.expatProfile?.contractType !== 'CDD')
-    }
-    return sortedMembers
+    return sequence === 1 ? runOneEligibleMembers : runTwoEligibleMembers
   }
 
   const saveRun = async (run: PayrollRun) => {
@@ -290,15 +371,19 @@ export function PayrollPayoutsTab({
 
   const saveRunDate = async (run: PayrollRun) => {
     if (!canManagePayroll) return
-    const draft = runDateDrafts[run.id]
-    if (!draft) return
+    const payoutDraft = normalizeText(runDateDrafts[run.id])
+    const cutoffDraft = normalizeText(runCutoffDrafts[run.id])
+    if (!payoutDraft && !cutoffDraft) return
     setSavingDates((prev) => ({ ...prev, [run.id]: true }))
     setError(null)
     try {
       const res = await fetch(`/api/payroll-runs/${run.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ payoutDate: draft }),
+        body: JSON.stringify({
+          ...(payoutDraft ? { payoutDate: payoutDraft } : {}),
+          ...(cutoffDraft ? { attendanceCutoffDate: cutoffDraft } : {}),
+        }),
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
@@ -336,35 +421,62 @@ export function PayrollPayoutsTab({
       t.table.chineseSupervisor,
       t.table.team,
       t.table.name,
+      t.table.contractNumber,
       t.table.contractType,
       runOne ? formatDateInput(runOne.payoutDate) : t.payroll.runLabels.first,
       runTwo ? formatDateInput(runTwo.payoutDate) : t.payroll.runLabels.second,
+      t.payroll.table.total,
     ]
 
     const rows = sortedMembers.map((member) => {
-      const runOneAmount = runOne ? payoutMap.get(runOne.id)?.get(member.id)?.amount ?? '' : ''
-      const runTwoAmount = runTwo ? payoutMap.get(runTwo.id)?.get(member.id)?.amount ?? '' : ''
+      const eligibility = eligibilityById.get(member.id)
+      const runOneEligible = Boolean(eligibility?.run1Editable)
+      const runTwoEligible = Boolean(eligibility?.run2Editable)
+      const runOneAmount =
+        runOne && runOneEligible
+          ? payoutMap.get(runOne.id)?.get(member.id)?.amount ?? ''
+          : ''
+      const runTwoAmount =
+        runTwo && runTwoEligible
+          ? payoutMap.get(runTwo.id)?.get(member.id)?.amount ?? ''
+          : ''
+      const runOneNumber = toAmountNumber(runOneAmount)
+      const runTwoNumber = toAmountNumber(runTwoAmount)
+      const hasTotal = runOneNumber !== null || runTwoNumber !== null
+      const rowTotal = (runOneNumber ?? 0) + (runTwoNumber ?? 0)
       return [
         getSupervisorLabel(member, runTwo?.id ?? runOne?.id),
         getTeamLabel(member, runTwo?.id ?? runOne?.id),
         normalizeText(member.name) || normalizeText(member.username),
+        normalizeText(member.expatProfile?.contractNumber),
         member.expatProfile?.contractType ?? t.labels.empty,
         runOneAmount,
         runTwoAmount,
+        hasTotal ? rowTotal : '',
       ]
     })
 
     const XLSX = await import('xlsx')
-    const worksheet = XLSX.utils.aoa_to_sheet([header, ...rows])
+    const totalRow = [
+      t.payroll.table.total,
+      '',
+      '',
+      '',
+      '',
+      runOne ? runOneTotal : '',
+      runTwo ? runTwoTotal : '',
+      runOne || runTwo ? runOneTotal + runTwoTotal : '',
+    ]
+    const worksheet = XLSX.utils.aoa_to_sheet([header, ...rows, totalRow])
     const workbook = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(workbook, worksheet, t.payroll.title)
     const filename = `payroll-payouts-${selectedMonth}.xlsx`
     XLSX.writeFile(workbook, filename, { bookType: 'xlsx' })
   }
 
-  const sumRun = (runId?: number) => {
+  const sumRun = (runId: number | undefined, eligibleMembers: Member[]) => {
     if (!runId) return 0
-    return sortedMembers.reduce((total, member) => {
+    return eligibleMembers.reduce((total, member) => {
       const value = payoutMap.get(runId)?.get(member.id)?.amount
       const parsed = Number(value)
       return Number.isFinite(parsed) ? total + parsed : total
@@ -379,8 +491,10 @@ export function PayrollPayoutsTab({
 
   const runOne = runMap.get(1)
   const runTwo = runMap.get(2)
-  const runOneTotal = sumRun(runOne?.id)
-  const runTwoTotal = sumRun(runTwo?.id)
+  const runOneTotal = sumRun(runOne?.id, runOneEligibleMembers)
+  const runTwoTotal = sumRun(runTwo?.id, runTwoEligibleMembers)
+  const grandTotal = runOneTotal + runTwoTotal
+  const columnCount = viewMode === 'report' ? 8 : 7
 
   return (
     <div className="space-y-4 p-6">
@@ -453,6 +567,8 @@ export function PayrollPayoutsTab({
             )
           }
           const draftDate = runDateDrafts[run.id] ?? formatDateInput(run.payoutDate)
+          const draftCutoff =
+            runCutoffDrafts[run.id] ?? formatDateInput(run.attendanceCutoffDate)
           const isSavingDate = savingDates[run.id]
           const isSavingRun = savingRuns[run.id]
           const isBulkOpen = bulkOpen[run.id]
@@ -489,15 +605,38 @@ export function PayrollPayoutsTab({
                   </button>
                 </div>
               </div>
+              <div className="mt-3 grid gap-3 md:grid-cols-2">
+                <label className="text-sm text-slate-600">
+                  <span className="block text-xs font-semibold text-slate-500">
+                    {t.compensation.fields.payoutDate}
+                  </span>
+                  <input
+                    type="date"
+                    value={draftDate}
+                    onChange={(event) =>
+                      setRunDateDrafts((prev) => ({ ...prev, [run.id]: event.target.value }))
+                    }
+                    className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+                  />
+                </label>
+                <label className="text-sm text-slate-600">
+                  <span className="block text-xs font-semibold text-slate-500">
+                    {t.payroll.fields.attendanceCutoffDate}
+                  </span>
+                  <input
+                    type="date"
+                    value={draftCutoff}
+                    onChange={(event) =>
+                      setRunCutoffDrafts((prev) => ({
+                        ...prev,
+                        [run.id]: event.target.value,
+                      }))
+                    }
+                    className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+                  />
+                </label>
+              </div>
               <div className="mt-3 flex flex-wrap items-center gap-3">
-                <input
-                  type="date"
-                  value={draftDate}
-                  onChange={(event) =>
-                    setRunDateDrafts((prev) => ({ ...prev, [run.id]: event.target.value }))
-                  }
-                  className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
-                />
                 <button
                   type="button"
                   disabled={!canManagePayroll || isSavingRun}
@@ -553,7 +692,7 @@ export function PayrollPayoutsTab({
       </div>
 
       <div className="rounded-2xl border border-slate-200 bg-white p-4">
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <label className="text-sm text-slate-600">
             <span className="block text-xs font-semibold text-slate-500">{t.table.name}</span>
             <input
@@ -607,15 +746,6 @@ export function PayrollPayoutsTab({
               <option value="CDD">CDD</option>
             </select>
           </label>
-          <label className="flex items-center gap-2 text-sm text-slate-600">
-            <input
-              type="checkbox"
-              checked={includeInactive}
-              onChange={(event) => setIncludeInactive(event.target.checked)}
-              className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-400"
-            />
-            <span>{t.payroll.filters.includeInactive}</span>
-          </label>
         </div>
       </div>
 
@@ -637,6 +767,7 @@ export function PayrollPayoutsTab({
               <th className="px-4 py-3">{t.table.chineseSupervisor}</th>
               <th className="px-4 py-3">{t.table.team}</th>
               <th className="px-4 py-3">{t.table.name}</th>
+              <th className="px-4 py-3">{t.table.contractNumber}</th>
               <th className="px-4 py-3">{t.table.contractType}</th>
               <th className="px-4 py-3">
                 <div className="flex flex-col gap-1">
@@ -658,34 +789,62 @@ export function PayrollPayoutsTab({
                   ) : null}
                 </div>
               </th>
+              {viewMode === 'report' ? (
+                <th className="px-4 py-3">
+                  <div className="flex flex-col gap-1">
+                    <span>{t.payroll.table.total}</span>
+                    <span className="text-[11px] font-semibold text-slate-400">
+                      {numberFormatter.format(grandTotal)}
+                    </span>
+                  </div>
+                </th>
+              ) : null}
             </tr>
           </thead>
           <tbody>
             {membersLoading || loading ? (
               <tr>
-                <td colSpan={6} className="px-4 py-6 text-center text-sm text-slate-400">
+                <td colSpan={columnCount} className="px-4 py-6 text-center text-sm text-slate-400">
                   {t.feedback.loading}
                 </td>
               </tr>
             ) : null}
             {!membersLoading && !loading && sortedMembers.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-4 py-6 text-center text-sm text-slate-400">
+                <td colSpan={columnCount} className="px-4 py-6 text-center text-sm text-slate-400">
                   {t.payroll.empty}
                 </td>
               </tr>
             ) : null}
             {!membersLoading && !loading
               ? sortedMembers.map((member) => {
-                  const runOneValue = runOne ? getDraftAmount(runOne.id, member.id) : ''
+                  const eligibility = eligibilityById.get(member.id)
+                  const runOneEligible = Boolean(runOne && eligibility?.run1Editable)
+                  const runTwoEligible = Boolean(runTwo && eligibility?.run2Editable)
+                  const runOneValue =
+                    runOne && runOneEligible ? getDraftAmount(runOne.id, member.id) : ''
                   const runTwoValue = runTwo ? getDraftAmount(runTwo.id, member.id) : ''
-                  const isCdd = member.expatProfile?.contractType === 'CDD'
+                  const runOneReportValue =
+                    runOne && runOneEligible
+                      ? payoutMap.get(runOne.id)?.get(member.id)?.amount ?? ''
+                      : ''
+                  const runTwoReportValue =
+                    runTwo && runTwoEligible
+                      ? payoutMap.get(runTwo.id)?.get(member.id)?.amount ?? ''
+                      : ''
+                  const runOneNumber = toAmountNumber(runOneReportValue)
+                  const runTwoNumber = toAmountNumber(runTwoReportValue)
+                  const hasRowTotal = runOneNumber !== null || runTwoNumber !== null
+                  const rowTotal = (runOneNumber ?? 0) + (runTwoNumber ?? 0)
                   return (
                     <tr key={member.id} className="border-b border-slate-100 last:border-0">
                       <td className="px-4 py-3">{getSupervisorLabel(member, runTwo?.id ?? runOne?.id)}</td>
                       <td className="px-4 py-3">{getTeamLabel(member, runTwo?.id ?? runOne?.id)}</td>
                       <td className="px-4 py-3">
                         {normalizeText(member.name) || normalizeText(member.username) || t.labels.empty}
+                      </td>
+                      <td className="px-4 py-3">
+                        {normalizeText(member.expatProfile?.contractNumber) || t.labels.empty}
                       </td>
                       <td className="px-4 py-3">{member.expatProfile?.contractType ?? t.labels.empty}</td>
                       <td className="px-4 py-3">
@@ -694,16 +853,20 @@ export function PayrollPayoutsTab({
                             type="number"
                             inputMode="decimal"
                             value={runOneValue}
-                            disabled={!runOne || !canManagePayroll || isCdd}
+                            disabled={!runOne || !canManagePayroll || !runOneEligible}
                             onChange={(event) =>
                               runOne && updateDraft(runOne.id, member.id, event.target.value)
                             }
-                            placeholder={isCdd ? t.payroll.table.runEmpty : t.compensation.fields.amount}
+                            placeholder={
+                              runOneEligible ? t.compensation.fields.amount : t.payroll.table.runEmpty
+                            }
                             className="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100 disabled:bg-slate-100 disabled:text-slate-400"
                           />
                         ) : (
                           <span className="text-sm">
-                            {runOne ? payoutMap.get(runOne.id)?.get(member.id)?.amount ?? (isCdd ? t.payroll.table.runEmpty : t.labels.empty) : t.labels.empty}
+                            {runOneEligible
+                              ? runOneReportValue || t.labels.empty
+                              : ''}
                           </span>
                         )}
                       </td>
@@ -713,24 +876,53 @@ export function PayrollPayoutsTab({
                             type="number"
                             inputMode="decimal"
                             value={runTwoValue}
-                            disabled={!runTwo || !canManagePayroll}
+                            disabled={!runTwo || !canManagePayroll || !runTwoEligible}
                             onChange={(event) =>
                               runTwo && updateDraft(runTwo.id, member.id, event.target.value)
                             }
-                            placeholder={t.compensation.fields.amount}
+                            placeholder={
+                              runTwoEligible ? t.compensation.fields.amount : t.payroll.table.runEmpty
+                            }
                             className="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100 disabled:bg-slate-100 disabled:text-slate-400"
                           />
                         ) : (
                           <span className="text-sm">
-                            {runTwo ? payoutMap.get(runTwo.id)?.get(member.id)?.amount ?? t.labels.empty : t.labels.empty}
+                            {runTwoEligible
+                              ? runTwoReportValue || t.labels.empty
+                              : ''}
                           </span>
                         )}
                       </td>
+                      {viewMode === 'report' ? (
+                        <td className="px-4 py-3">
+                          {hasRowTotal ? numberFormatter.format(rowTotal) : t.labels.empty}
+                        </td>
+                      ) : null}
                     </tr>
                   )
                 })
               : null}
           </tbody>
+          {viewMode === 'report' && sortedMembers.length > 0 ? (
+            <tfoot className="border-t border-slate-200 bg-slate-50 text-sm text-slate-600">
+              <tr>
+                <td className="px-4 py-3 font-semibold">{t.payroll.table.total}</td>
+                <td className="px-4 py-3" />
+                <td className="px-4 py-3" />
+                <td className="px-4 py-3" />
+                <td className="px-4 py-3" />
+                <td className="px-4 py-3 font-semibold">
+                  {numberFormatter.format(runOneTotal)}
+                </td>
+                <td className="px-4 py-3 font-semibold">
+                  {numberFormatter.format(runTwoTotal)}
+                </td>
+                <td className="px-4 py-3 font-semibold">
+                  {numberFormatter.format(grandTotal)}
+                </td>
+              </tr>
+            </tfoot>
+          ) : null}
         </table>
       </div>
     </div>
