@@ -180,3 +180,27 @@ export async function POST(
     removed: deleteUserIds.length,
   })
 }
+
+export async function DELETE(
+  _: Request,
+  { params }: { params: Promise<{ runId: string }> },
+) {
+  if (!(await canManagePayroll())) {
+    return NextResponse.json({ error: '缺少工资发放管理权限' }, { status: 403 })
+  }
+
+  const { runId } = await params
+  const id = Number(runId)
+  if (!id) {
+    return NextResponse.json({ error: '缺少发放批次 ID' }, { status: 400 })
+  }
+
+  const run = await prisma.payrollRun.findUnique({ where: { id } })
+  if (!run) {
+    return NextResponse.json({ error: '发放批次不存在' }, { status: 404 })
+  }
+
+  const result = await prisma.userPayrollPayout.deleteMany({ where: { runId: id } })
+
+  return NextResponse.json({ ok: true, removed: result.count })
+}

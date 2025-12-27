@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
+import { MultiSelectFilter, type MultiSelectOption } from '@/components/MultiSelectFilter'
+import { ActionButton } from '@/components/members/MemberButtons'
 import type { Locale } from '@/lib/i18n'
 import { memberCopy } from '@/lib/i18n/members'
 import { normalizeText } from '@/lib/members/utils'
@@ -10,6 +12,16 @@ import type { Member } from '@/types/members'
 type MemberCopy = (typeof memberCopy)[keyof typeof memberCopy]
 
 type SupervisorOption = { value: string; label: string }
+
+type PayrollSortField =
+  | 'supervisor'
+  | 'team'
+  | 'name'
+  | 'contractNumber'
+  | 'contractType'
+  | 'run1'
+  | 'run2'
+  | 'total'
 
 type PayrollRun = {
   id: number
@@ -98,10 +110,13 @@ export function PayrollPayoutsTab({
   const [savingDates, setSavingDates] = useState<Record<number, boolean>>({})
   const [bulkOpen, setBulkOpen] = useState<Record<number, boolean>>({})
   const [bulkInputs, setBulkInputs] = useState<Record<number, string>>({})
-  const [keyword, setKeyword] = useState('')
-  const [teamFilter, setTeamFilter] = useState('')
-  const [supervisorFilter, setSupervisorFilter] = useState('')
-  const [contractTypeFilter, setContractTypeFilter] = useState<'ALL' | 'CTJ' | 'CDD'>('ALL')
+  const [nameFilters, setNameFilters] = useState<string[]>([])
+  const [teamFilters, setTeamFilters] = useState<string[]>([])
+  const [supervisorFilters, setSupervisorFilters] = useState<string[]>([])
+  const [contractTypeFilters, setContractTypeFilters] = useState<string[]>([])
+  const [contractNumberFilters, setContractNumberFilters] = useState<string[]>([])
+  const [sortField, setSortField] = useState<PayrollSortField | null>(null)
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
 
   const numberFormatter = useMemo(() => new Intl.NumberFormat(locale), [locale])
   const collator = useMemo(() => {
@@ -120,23 +135,103 @@ export function PayrollPayoutsTab({
     [members],
   )
 
-  const filteredMembers = useMemo(() => {
-    const search = normalizeText(keyword).toLowerCase()
-    return baseMembers.filter((member) => {
-      if (teamFilter && normalizeText(member.expatProfile?.team) !== teamFilter) return false
-      if (supervisorFilter) {
-        const supervisorId = member.expatProfile?.chineseSupervisorId
-        if (String(supervisorId ?? '') !== supervisorFilter) return false
-      }
-      if (contractTypeFilter !== 'ALL') {
-        if (member.expatProfile?.contractType !== contractTypeFilter) return false
-      }
-      if (!search) return true
-      const name = normalizeText(member.name).toLowerCase()
-      const username = normalizeText(member.username).toLowerCase()
-      return name.includes(search) || username.includes(search)
+  const filterControlProps = useMemo(
+    () => ({
+      allLabel: t.filters.all,
+      selectedLabel: t.filters.selected,
+      selectAllLabel: t.filters.selectAll,
+      clearLabel: t.filters.clear,
+      noOptionsLabel: t.filters.noOptions,
+      searchPlaceholder: t.filters.searchPlaceholder,
+      className: 'w-full',
+    }),
+    [t],
+  )
+
+  const nameFilterOptions = useMemo(() => {
+    const map = new Map<string, string>()
+    baseMembers.forEach((member) => {
+      const name = normalizeText(member.name)
+      if (!name || map.has(name)) return
+      map.set(name, name)
     })
-  }, [baseMembers, keyword, teamFilter, supervisorFilter, contractTypeFilter])
+    return Array.from(map.entries())
+      .map(([value, label]) => ({ value, label }))
+      .sort((left, right) => collator.compare(left.label, right.label))
+  }, [baseMembers, collator])
+
+  const teamFilterOptions = useMemo(() => {
+    const map = new Map<string, string>()
+    teamOptions.forEach((team) => {
+      const value = normalizeText(team)
+      if (!value || map.has(value)) return
+      map.set(value, team)
+    })
+    return Array.from(map.entries())
+      .map(([value, label]) => ({ value, label }))
+      .sort((left, right) => collator.compare(left.label, right.label))
+  }, [teamOptions, collator])
+
+  const supervisorFilterOptions = useMemo(() => {
+    const list = chineseSupervisorOptions
+      .map((option) => ({ value: option.value, label: option.label }))
+      .filter((option) => normalizeText(option.value))
+    list.sort((left, right) => collator.compare(left.label, right.label))
+    return list
+  }, [chineseSupervisorOptions, collator])
+
+  const contractTypeFilterOptions = useMemo<MultiSelectOption[]>(
+    () => [
+      { value: 'CTJ', label: 'CTJ' },
+      { value: 'CDD', label: 'CDD' },
+    ],
+    [],
+  )
+
+  const contractNumberFilterOptions = useMemo(() => {
+    const map = new Map<string, string>()
+    baseMembers.forEach((member) => {
+      const contractNumber = normalizeText(member.expatProfile?.contractNumber)
+      if (!contractNumber || map.has(contractNumber)) return
+      map.set(contractNumber, contractNumber)
+    })
+    return Array.from(map.entries())
+      .map(([value, label]) => ({ value, label }))
+      .sort((left, right) => collator.compare(left.label, right.label))
+  }, [baseMembers, collator])
+
+  const filteredMembers = useMemo(() => {
+    return baseMembers.filter((member) => {
+      if (nameFilters.length > 0) {
+        const name = normalizeText(member.name)
+        if (!name || !nameFilters.includes(name)) return false
+      }
+      if (teamFilters.length > 0) {
+        const team = normalizeText(member.expatProfile?.team)
+        if (!teamFilters.includes(team)) return false
+      }
+      if (supervisorFilters.length > 0) {
+        const supervisorId = member.expatProfile?.chineseSupervisorId
+        if (!supervisorFilters.includes(String(supervisorId ?? ''))) return false
+      }
+      if (contractTypeFilters.length > 0) {
+        if (!member.expatProfile?.contractType) return false
+        if (!contractTypeFilters.includes(member.expatProfile.contractType)) return false
+      }
+      if (contractNumberFilters.length > 0) {
+        const contractNumber = normalizeText(member.expatProfile?.contractNumber)
+        if (!contractNumber || !contractNumberFilters.includes(contractNumber)) return false
+      }
+      return true
+    })
+  }, [
+    baseMembers,
+    nameFilters,
+    teamFilters,
+    supervisorFilters,
+    contractTypeFilters,
+    contractNumberFilters,
+  ])
 
   const runOneCutoffDate = useMemo(() => {
     const runOne = runs.find((run) => run.sequence === 1)
@@ -171,32 +266,6 @@ export function PayrollPayoutsTab({
     return { visibleMembers: nextMembers, eligibilityById: nextEligibility }
   }, [filteredMembers, prevCutoffDate, runOneCutoffDate])
 
-  const sortedMembers = useMemo(() => {
-    const list = [...visibleMembers]
-    list.sort((left, right) => {
-      const leftSupervisor =
-        normalizeText(left.expatProfile?.chineseSupervisor?.chineseProfile?.frenchName) ||
-        normalizeText(left.expatProfile?.chineseSupervisor?.username)
-      const rightSupervisor =
-        normalizeText(right.expatProfile?.chineseSupervisor?.chineseProfile?.frenchName) ||
-        normalizeText(right.expatProfile?.chineseSupervisor?.username)
-      const supervisorCompare = collator.compare(leftSupervisor, rightSupervisor)
-      if (supervisorCompare !== 0) return supervisorCompare
-      const teamCompare = collator.compare(
-        normalizeText(left.expatProfile?.team),
-        normalizeText(right.expatProfile?.team),
-      )
-      if (teamCompare !== 0) return teamCompare
-      const nameCompare = collator.compare(
-        normalizeText(left.name) || normalizeText(left.username),
-        normalizeText(right.name) || normalizeText(right.username),
-      )
-      if (nameCompare !== 0) return nameCompare
-      return left.id - right.id
-    })
-    return list
-  }, [collator, visibleMembers])
-
   const runMap = useMemo(() => {
     const map = new Map<number, PayrollRun>()
     runs.forEach((run) => {
@@ -216,6 +285,146 @@ export function PayrollPayoutsTab({
     return map
   }, [payouts])
 
+  const sortedMembers = useMemo(() => {
+    const list = [...visibleMembers]
+    const direction = sortDir === 'asc' ? 1 : -1
+    const runOne = runMap.get(1)
+    const runTwo = runMap.get(2)
+
+    const compareText = (leftValue: string, rightValue: string) => {
+      if (!leftValue && !rightValue) return 0
+      if (!leftValue) return 1
+      if (!rightValue) return -1
+      return collator.compare(leftValue, rightValue) * direction
+    }
+
+    const compareNumber = (leftValue: number | null, rightValue: number | null) => {
+      if (leftValue === null && rightValue === null) return 0
+      if (leftValue === null) return 1
+      if (rightValue === null) return -1
+      return (leftValue - rightValue) * direction
+    }
+
+    const getRunAmount = (member: Member, run: PayrollRun | undefined, eligible: boolean) => {
+      if (!run || !eligible) return null
+      const value =
+        viewMode === 'report'
+          ? payoutMap.get(run.id)?.get(member.id)?.amount
+          : drafts[run.id]?.[member.id]
+      return toAmountNumber(value)
+    }
+
+    const getTotalAmount = (member: Member) => {
+      const eligibility = eligibilityById.get(member.id)
+      const runOneAmount = getRunAmount(member, runOne, Boolean(eligibility?.run1Editable))
+      const runTwoAmount = getRunAmount(member, runTwo, Boolean(eligibility?.run2Editable))
+      if (runOneAmount === null && runTwoAmount === null) return null
+      return (runOneAmount ?? 0) + (runTwoAmount ?? 0)
+    }
+
+    const defaultCompare = (left: Member, right: Member) => {
+      const leftSupervisor =
+        normalizeText(left.expatProfile?.chineseSupervisor?.chineseProfile?.frenchName) ||
+        normalizeText(left.expatProfile?.chineseSupervisor?.username)
+      const rightSupervisor =
+        normalizeText(right.expatProfile?.chineseSupervisor?.chineseProfile?.frenchName) ||
+        normalizeText(right.expatProfile?.chineseSupervisor?.username)
+      const supervisorCompare = collator.compare(leftSupervisor, rightSupervisor)
+      if (supervisorCompare !== 0) return supervisorCompare
+      const teamCompare = collator.compare(
+        normalizeText(left.expatProfile?.team),
+        normalizeText(right.expatProfile?.team),
+      )
+      if (teamCompare !== 0) return teamCompare
+      const nameCompare = collator.compare(
+        normalizeText(left.name) || normalizeText(left.username),
+        normalizeText(right.name) || normalizeText(right.username),
+      )
+      if (nameCompare !== 0) return nameCompare
+      return left.id - right.id
+    }
+
+    const compareByField = (left: Member, right: Member) => {
+      switch (sortField) {
+        case 'supervisor':
+          return compareText(
+            normalizeText(left.expatProfile?.chineseSupervisor?.chineseProfile?.frenchName) ||
+              normalizeText(left.expatProfile?.chineseSupervisor?.username),
+            normalizeText(right.expatProfile?.chineseSupervisor?.chineseProfile?.frenchName) ||
+              normalizeText(right.expatProfile?.chineseSupervisor?.username),
+          )
+        case 'team':
+          return compareText(
+            normalizeText(left.expatProfile?.team),
+            normalizeText(right.expatProfile?.team),
+          )
+        case 'name':
+          return compareText(
+            normalizeText(left.name) || normalizeText(left.username),
+            normalizeText(right.name) || normalizeText(right.username),
+          )
+        case 'contractNumber':
+          return compareText(
+            normalizeText(left.expatProfile?.contractNumber),
+            normalizeText(right.expatProfile?.contractNumber),
+          )
+        case 'contractType':
+          return compareText(
+            left.expatProfile?.contractType ?? '',
+            right.expatProfile?.contractType ?? '',
+          )
+        case 'run1': {
+          const leftAmount = getRunAmount(
+            left,
+            runOne,
+            Boolean(eligibilityById.get(left.id)?.run1Editable),
+          )
+          const rightAmount = getRunAmount(
+            right,
+            runOne,
+            Boolean(eligibilityById.get(right.id)?.run1Editable),
+          )
+          return compareNumber(leftAmount, rightAmount)
+        }
+        case 'run2': {
+          const leftAmount = getRunAmount(
+            left,
+            runTwo,
+            Boolean(eligibilityById.get(left.id)?.run2Editable),
+          )
+          const rightAmount = getRunAmount(
+            right,
+            runTwo,
+            Boolean(eligibilityById.get(right.id)?.run2Editable),
+          )
+          return compareNumber(leftAmount, rightAmount)
+        }
+        case 'total':
+          return compareNumber(getTotalAmount(left), getTotalAmount(right))
+        default:
+          return 0
+      }
+    }
+
+    list.sort((left, right) => {
+      if (!sortField) return defaultCompare(left, right)
+      const result = compareByField(left, right)
+      if (result !== 0) return result
+      return defaultCompare(left, right)
+    })
+    return list
+  }, [
+    visibleMembers,
+    sortDir,
+    sortField,
+    runMap,
+    viewMode,
+    payoutMap,
+    drafts,
+    eligibilityById,
+    collator,
+  ])
+
   const selectedStats = useMemo(() => {
     const ctjCount = sortedMembers.filter((member) => member.expatProfile?.contractType === 'CTJ')
       .length
@@ -223,6 +432,22 @@ export function PayrollPayoutsTab({
       .length
     return { total: sortedMembers.length, ctj: ctjCount, cdd: cddCount }
   }, [sortedMembers])
+
+  const activeFilterCount =
+    nameFilters.length +
+    teamFilters.length +
+    supervisorFilters.length +
+    contractTypeFilters.length +
+    contractNumberFilters.length
+  const hasActiveFilters = activeFilterCount > 0
+
+  const clearFilters = () => {
+    setNameFilters([])
+    setTeamFilters([])
+    setSupervisorFilters([])
+    setContractTypeFilters([])
+    setContractNumberFilters([])
+  }
 
   const loadPayroll = useCallback(async () => {
     if (!canViewPayroll) return
@@ -483,6 +708,44 @@ export function PayrollPayoutsTab({
     }, 0)
   }
 
+  const handleSort = (field: PayrollSortField) => {
+    setSortField((prev) => {
+      if (prev === field) {
+        setSortDir((dir) => (dir === 'asc' ? 'desc' : 'asc'))
+        return prev
+      }
+      setSortDir('asc')
+      return field
+    })
+  }
+
+  const sortIndicator = (field: PayrollSortField) => {
+    if (sortField !== field) return ''
+    return sortDir === 'asc' ? '↑' : '↓'
+  }
+
+  const clearRun = async (run: PayrollRun) => {
+    if (!canManagePayroll) return
+    const label =
+      formatDateInput(run.payoutDate) ||
+      (run.sequence === 1 ? t.payroll.runLabels.first : t.payroll.runLabels.second)
+    if (!window.confirm(t.payroll.confirm.clearRun(label))) return
+    setSavingRuns((prev) => ({ ...prev, [run.id]: true }))
+    setError(null)
+    try {
+      const res = await fetch(`/api/payroll-runs/${run.id}/payouts`, { method: 'DELETE' })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error ?? t.payroll.errors.saveFailed)
+      }
+      await loadPayroll()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t.payroll.errors.saveFailed)
+    } finally {
+      setSavingRuns((prev) => ({ ...prev, [run.id]: false }))
+    }
+  }
+
   if (!canViewPayroll) {
     return (
       <div className="p-6 text-sm text-rose-600">{t.access.needPayrollView}</div>
@@ -647,6 +910,14 @@ export function PayrollPayoutsTab({
                 </button>
                 <button
                   type="button"
+                  disabled={!canManagePayroll || isSavingRun}
+                  onClick={() => clearRun(run)}
+                  className="rounded-full border border-rose-200 px-4 py-2 text-xs font-semibold text-rose-600 disabled:opacity-60"
+                >
+                  {t.payroll.actions.clearRun}
+                </button>
+                <button
+                  type="button"
                   onClick={() =>
                     setBulkOpen((prev) => ({ ...prev, [run.id]: !isBulkOpen }))
                   }
@@ -692,60 +963,50 @@ export function PayrollPayoutsTab({
       </div>
 
       <div className="rounded-2xl border border-slate-200 bg-white p-4">
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <label className="text-sm text-slate-600">
-            <span className="block text-xs font-semibold text-slate-500">{t.table.name}</span>
-            <input
-              value={keyword}
-              onChange={(event) => setKeyword(event.target.value)}
-              placeholder={t.payroll.filters.keyword}
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
-            />
-          </label>
-          <label className="text-sm text-slate-600">
-            <span className="block text-xs font-semibold text-slate-500">{t.table.team}</span>
-            <select
-              value={teamFilter}
-              onChange={(event) => setTeamFilter(event.target.value)}
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
-            >
-              <option value="">{t.filters.all}</option>
-              {teamOptions.map((name) => (
-                <option key={name} value={name}>
-                  {name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="text-sm text-slate-600">
-            <span className="block text-xs font-semibold text-slate-500">{t.table.chineseSupervisor}</span>
-            <select
-              value={supervisorFilter}
-              onChange={(event) => setSupervisorFilter(event.target.value)}
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
-            >
-              <option value="">{t.filters.all}</option>
-              {chineseSupervisorOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="text-sm text-slate-600">
-            <span className="block text-xs font-semibold text-slate-500">{t.table.contractType}</span>
-            <select
-              value={contractTypeFilter}
-              onChange={(event) =>
-                setContractTypeFilter(event.target.value as 'ALL' | 'CTJ' | 'CDD')
-              }
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
-            >
-              <option value="ALL">{t.filters.all}</option>
-              <option value="CTJ">CTJ</option>
-              <option value="CDD">CDD</option>
-            </select>
-          </label>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="text-xs text-slate-500">
+            {t.filters.selected(hasActiveFilters ? activeFilterCount : 0)}
+          </div>
+          <ActionButton onClick={clearFilters} disabled={!hasActiveFilters}>
+            {t.filters.reset}
+          </ActionButton>
+        </div>
+        <div className="mt-4 grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+          <MultiSelectFilter
+            label={t.table.name}
+            options={nameFilterOptions}
+            selected={nameFilters}
+            onChange={setNameFilters}
+            {...filterControlProps}
+          />
+          <MultiSelectFilter
+            label={t.table.team}
+            options={teamFilterOptions}
+            selected={teamFilters}
+            onChange={setTeamFilters}
+            {...filterControlProps}
+          />
+          <MultiSelectFilter
+            label={t.table.chineseSupervisor}
+            options={supervisorFilterOptions}
+            selected={supervisorFilters}
+            onChange={setSupervisorFilters}
+            {...filterControlProps}
+          />
+          <MultiSelectFilter
+            label={t.table.contractNumber}
+            options={contractNumberFilterOptions}
+            selected={contractNumberFilters}
+            onChange={setContractNumberFilters}
+            {...filterControlProps}
+          />
+          <MultiSelectFilter
+            label={t.table.contractType}
+            options={contractTypeFilterOptions}
+            selected={contractTypeFilters}
+            onChange={setContractTypeFilters}
+            {...filterControlProps}
+          />
         </div>
       </div>
 
@@ -764,14 +1025,66 @@ export function PayrollPayoutsTab({
         <table className="min-w-full text-left text-sm text-slate-700">
           <thead className="border-b border-slate-200 text-xs uppercase tracking-widest text-slate-500">
             <tr>
-              <th className="px-4 py-3">{t.table.chineseSupervisor}</th>
-              <th className="px-4 py-3">{t.table.team}</th>
-              <th className="px-4 py-3">{t.table.name}</th>
-              <th className="px-4 py-3">{t.table.contractNumber}</th>
-              <th className="px-4 py-3">{t.table.contractType}</th>
+              <th className="px-4 py-3">
+                <button
+                  type="button"
+                  onClick={() => handleSort('supervisor')}
+                  className="flex items-center gap-1 text-left"
+                >
+                  <span>{t.table.chineseSupervisor}</span>
+                  <span className="text-slate-400">{sortIndicator('supervisor')}</span>
+                </button>
+              </th>
+              <th className="px-4 py-3">
+                <button
+                  type="button"
+                  onClick={() => handleSort('team')}
+                  className="flex items-center gap-1 text-left"
+                >
+                  <span>{t.table.team}</span>
+                  <span className="text-slate-400">{sortIndicator('team')}</span>
+                </button>
+              </th>
+              <th className="px-4 py-3">
+                <button
+                  type="button"
+                  onClick={() => handleSort('name')}
+                  className="flex items-center gap-1 text-left"
+                >
+                  <span>{t.table.name}</span>
+                  <span className="text-slate-400">{sortIndicator('name')}</span>
+                </button>
+              </th>
+              <th className="px-4 py-3">
+                <button
+                  type="button"
+                  onClick={() => handleSort('contractNumber')}
+                  className="flex items-center gap-1 text-left"
+                >
+                  <span>{t.table.contractNumber}</span>
+                  <span className="text-slate-400">{sortIndicator('contractNumber')}</span>
+                </button>
+              </th>
+              <th className="px-4 py-3">
+                <button
+                  type="button"
+                  onClick={() => handleSort('contractType')}
+                  className="flex items-center gap-1 text-left"
+                >
+                  <span>{t.table.contractType}</span>
+                  <span className="text-slate-400">{sortIndicator('contractType')}</span>
+                </button>
+              </th>
               <th className="px-4 py-3">
                 <div className="flex flex-col gap-1">
-                  <span>{runOne ? formatDateInput(runOne.payoutDate) : t.payroll.runLabels.first}</span>
+                  <button
+                    type="button"
+                    onClick={() => handleSort('run1')}
+                    className="flex items-center gap-1 text-left"
+                  >
+                    <span>{runOne ? formatDateInput(runOne.payoutDate) : t.payroll.runLabels.first}</span>
+                    <span className="text-slate-400">{sortIndicator('run1')}</span>
+                  </button>
                   {viewMode === 'report' && runOne ? (
                     <span className="text-[11px] font-semibold text-slate-400">
                       {numberFormatter.format(runOneTotal)}
@@ -781,7 +1094,14 @@ export function PayrollPayoutsTab({
               </th>
               <th className="px-4 py-3">
                 <div className="flex flex-col gap-1">
-                  <span>{runTwo ? formatDateInput(runTwo.payoutDate) : t.payroll.runLabels.second}</span>
+                  <button
+                    type="button"
+                    onClick={() => handleSort('run2')}
+                    className="flex items-center gap-1 text-left"
+                  >
+                    <span>{runTwo ? formatDateInput(runTwo.payoutDate) : t.payroll.runLabels.second}</span>
+                    <span className="text-slate-400">{sortIndicator('run2')}</span>
+                  </button>
                   {viewMode === 'report' && runTwo ? (
                     <span className="text-[11px] font-semibold text-slate-400">
                       {numberFormatter.format(runTwoTotal)}
@@ -792,7 +1112,14 @@ export function PayrollPayoutsTab({
               {viewMode === 'report' ? (
                 <th className="px-4 py-3">
                   <div className="flex flex-col gap-1">
-                    <span>{t.payroll.table.total}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleSort('total')}
+                      className="flex items-center gap-1 text-left"
+                    >
+                      <span>{t.payroll.table.total}</span>
+                      <span className="text-slate-400">{sortIndicator('total')}</span>
+                    </button>
                     <span className="text-[11px] font-semibold text-slate-400">
                       {numberFormatter.format(grandTotal)}
                     </span>

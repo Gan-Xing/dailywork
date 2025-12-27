@@ -398,9 +398,13 @@ export const memberCopy: Record<
         useToday: string
         saveDate: string
         saveRun: string
+        clearRun: string
         bulkPaste: string
         applyPaste: string
         clearPaste: string
+      }
+      confirm: {
+        clearRun: (label: string) => string
       }
       bulkHint: string
       filters: {
@@ -843,9 +847,13 @@ export const memberCopy: Record<
         useToday: '用今天',
         saveDate: '保存日期',
         saveRun: '保存发放',
+        clearRun: '清空记录',
         bulkPaste: '批量粘贴',
         applyPaste: '应用',
         clearPaste: '清空',
+      },
+      confirm: {
+        clearRun: (label: string) => `确认清空 ${label} 的发放记录吗？此操作不可恢复。`,
       },
       bulkHint: '按当前表格顺序逐行粘贴金额',
       filters: {
@@ -1295,9 +1303,14 @@ export const memberCopy: Record<
         useToday: "Aujourd'hui",
         saveDate: 'Enregistrer la date',
         saveRun: 'Enregistrer les montants',
+        clearRun: 'Effacer les versements',
         bulkPaste: 'Coller en lot',
         applyPaste: 'Appliquer',
         clearPaste: 'Effacer',
+      },
+      confirm: {
+        clearRun: (label: string) =>
+          `Effacer les versements du ${label} ? Cette action est irréversible.`,
       },
       bulkHint: 'Une ligne par montant, selon l’ordre du tableau.',
       filters: {
