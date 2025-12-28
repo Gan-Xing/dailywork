@@ -139,6 +139,8 @@ export const memberCopy: Record<
       saveChanges: string
       cancel: string
       createRole: string
+      bulkEdit: string
+      clearValue: string
     }
     access: {
       hint: string
@@ -343,11 +345,15 @@ export const memberCopy: Record<
       importRowError: (row: number, message: string) => string
       importSkipConfirm: (validCount: number, errorCount: number) => string
       importPartialSuccess: (imported: number, skipped: number) => string
+      bulkSaveSuccess: (count: number) => string
+      bulkSavePartial: (success: number, failed: number) => string
+      bulkSaveEmpty: string
     }
     labels: {
       empty: string
       today: string
       close: string
+      cleared: string
     }
     compensation: {
       title: string
@@ -588,6 +594,8 @@ export const memberCopy: Record<
       saveChanges: '保存修改',
       cancel: '取消',
       createRole: '新增角色',
+      bulkEdit: '批量修改',
+      clearValue: '清空',
     },
     access: {
       hint: '请先登录并开通 member:view 权限后再试。',
@@ -796,11 +804,16 @@ export const memberCopy: Record<
         `发现 ${errorCount} 行错误，仍有 ${validCount} 行可导入。是否忽略错误行继续导入？`,
       importPartialSuccess: (imported: number, skipped: number) =>
         `已导入 ${imported} 条，已跳过 ${skipped} 条错误数据。`,
+      bulkSaveSuccess: (count: number) => `已保存 ${count} 条修改。`,
+      bulkSavePartial: (success: number, failed: number) =>
+        `已保存 ${success} 条，${failed} 条失败。`,
+      bulkSaveEmpty: '没有可保存的修改。',
     },
     labels: {
       empty: '无',
       today: '今天',
       close: '关闭',
+      cleared: '已清空',
     },
     compensation: {
       title: '合同与薪酬管理',
@@ -1046,6 +1059,8 @@ export const memberCopy: Record<
       saveChanges: 'Enregistrer',
       cancel: 'Annuler',
       createRole: 'Ajouter un rôle',
+      bulkEdit: 'Modification en lot',
+      clearValue: 'Vider',
     },
     access: {
       hint: 'Connectez-vous puis obtenez member:view pour accéder à la liste.',
@@ -1256,11 +1271,16 @@ export const memberCopy: Record<
         `${errorCount} lignes en erreur, ${validCount} lignes valides. Ignorer les erreurs et continuer ?`,
       importPartialSuccess: (imported: number, skipped: number) =>
         `Import partiel : ${imported} ok, ${skipped} ignorées.`,
+      bulkSaveSuccess: (count: number) => `${count} modification(s) enregistrée(s).`,
+      bulkSavePartial: (success: number, failed: number) =>
+        `${success} enregistrée(s), ${failed} échouée(s).`,
+      bulkSaveEmpty: 'Aucune modification à enregistrer.',
     },
     labels: {
       empty: 'N/A',
       today: "Aujourd'hui",
       close: 'Fermer',
+      cleared: 'Vidé',
     },
     compensation: {
       title: 'Contrats et rémunération',

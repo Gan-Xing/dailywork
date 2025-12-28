@@ -153,3 +153,49 @@ export type MemberFormState = {
   chineseProfile: ChineseProfileForm
   expatProfile: ExpatProfileForm
 }
+
+export type MemberBulkPatch = {
+  gender?: string | null
+  nationality?: string | null
+  phones?: string[] | string | null
+  tags?: string[] | string | null
+  joinDate?: string | null
+  position?: string | null
+  employmentStatus?: EmploymentStatus
+  terminationDate?: string | null
+  terminationReason?: string | null
+  expatProfile?: Partial<{
+    team: string | null
+    chineseSupervisorId: string | number | null
+    contractType: 'CTJ' | 'CDD' | '' | null
+    contractStartDate: string | null
+    contractEndDate: string | null
+    salaryCategory: string | null
+    prime: string | null
+    baseSalary: string | null
+    netMonthly: string | null
+    maritalStatus: string | null
+    childrenCount: string | number | null
+    cnpsNumber: string | null
+    cnpsDeclarationCode: string | null
+    provenance: string | null
+    emergencyContactName: string | null
+    emergencyContactPhone: string | null
+  }>
+  chineseProfile?: Partial<{
+    frenchName: string | null
+    idNumber: string | null
+    passportNumber: string | null
+    educationAndMajor: string | null
+    certifications: string[] | string | null
+    domesticMobile: string | null
+    emergencyContactName: string | null
+    emergencyContactPhone: string | null
+    redBookValidYears: string | number | null
+    cumulativeAbroadYears: string | number | null
+    birthplace: string | null
+    residenceInChina: string | null
+    medicalHistory: string | null
+    healthStatus: string | null
+  }>
+}

@@ -57,7 +57,7 @@ import { useMembersData } from './hooks/useMembersData'
 import { usePermissionStatus } from './hooks/usePermissionStatus'
 import { useRoleManagement } from './hooks/useRoleManagement'
 import { useSessionPermissions } from './hooks/useSessionPermissions'
-import type { Member, MemberFormState as FormState } from '@/types/members'
+import type { Member, MemberBulkPatch, MemberFormState as FormState } from '@/types/members'
 
 
 
@@ -102,10 +102,32 @@ export function MembersPageClient() {
   const [submitting, setSubmitting] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
   const [actionNotice, setActionNotice] = useState<string | null>(null)
+  const [bulkEditMode, setBulkEditMode] = useState(false)
+  const [bulkDrafts, setBulkDrafts] = useState<Record<number, MemberBulkPatch>>({})
+  const [bulkSaving, setBulkSaving] = useState(false)
   const [phoneInput, setPhoneInput] = useState('')
   const [visibleColumns, setVisibleColumns] = useState<ColumnKey[]>(() => [...defaultVisibleColumns])
   const [showColumnSelector, setShowColumnSelector] = useState(false)
   const columnSelectorRef = useRef<HTMLDivElement | null>(null)
+  const bulkReadOnlyColumns = useMemo(
+    () =>
+      new Set<ColumnKey>([
+        'sequence',
+        'name',
+        'username',
+        'birthDate',
+        'contractNumber',
+        'roles',
+        'createdAt',
+        'updatedAt',
+        'actions',
+      ]),
+    [],
+  )
+  const bulkEditableColumns = useMemo(
+    () => visibleColumns.filter((key) => !bulkReadOnlyColumns.has(key)),
+    [visibleColumns, bulkReadOnlyColumns],
+  )
   const [showPhonePicker, setShowPhonePicker] = useState(false)
   const phonePickerRef = useRef<HTMLDivElement | null>(null)
   const [profileExpanded, setProfileExpanded] = useState(false)
@@ -872,6 +894,126 @@ export function MembersPageClient() {
     }
   }
 
+  const updateBulkDraftField = useCallback(
+    (memberId: number, path: string, value: string | null | undefined) => {
+      setBulkDrafts((prev) => {
+        const next = { ...prev }
+        const current = { ...(next[memberId] ?? {}) } as Record<string, unknown>
+        const segments = path.split('.')
+        if (segments.length === 1) {
+          const key = segments[0] as keyof MemberBulkPatch
+          if (value === undefined) {
+            delete current[key]
+          } else {
+            current[key] = value
+          }
+        } else {
+          const [scope, field] = segments
+          const nested = { ...((current[scope] as Record<string, unknown>) ?? {}) }
+          if (value === undefined) {
+            delete nested[field]
+          } else {
+            nested[field] = value
+          }
+          if (Object.keys(nested).length === 0) {
+            delete current[scope]
+          } else {
+            current[scope] = nested
+          }
+        }
+        if (Object.keys(current).length === 0) {
+          delete next[memberId]
+          return next
+        }
+        next[memberId] = current as MemberBulkPatch
+        return next
+      })
+    },
+    [],
+  )
+
+  const isBulkPatchEmpty = (patch: MemberBulkPatch | undefined) => {
+    if (!patch) return true
+    const { expatProfile, chineseProfile, ...rest } = patch
+    if (Object.keys(rest).length > 0) return false
+    if (expatProfile && Object.keys(expatProfile).length > 0) return false
+    if (chineseProfile && Object.keys(chineseProfile).length > 0) return false
+    return true
+  }
+
+  const startBulkEdit = () => {
+    setActionError(null)
+    setActionNotice(null)
+    setBulkEditMode(true)
+  }
+
+  const cancelBulkEdit = () => {
+    setBulkDrafts({})
+    setBulkSaving(false)
+    setBulkEditMode(false)
+  }
+
+  const saveBulkEdits = async () => {
+    if (!canUpdateMember) {
+      setActionError(t.errors.needMemberUpdate)
+      return
+    }
+    const pageIds = new Set(paginatedMembers.map((member) => member.id))
+    const items = Object.entries(bulkDrafts)
+      .filter(([id, patch]) => pageIds.has(Number(id)) && !isBulkPatchEmpty(patch))
+      .map(([id, patch]) => ({ id: Number(id), patch }))
+    if (items.length === 0) {
+      setActionNotice(t.feedback.bulkSaveEmpty)
+      setActionError(null)
+      return
+    }
+    setBulkSaving(true)
+    setActionError(null)
+    setActionNotice(null)
+    try {
+      const res = await fetch('/api/members/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error ?? t.feedback.submitError)
+      }
+      const data = await res.json().catch(() => ({}))
+      const results = Array.isArray(data.results) ? data.results : []
+      const failed = results.filter((result: { ok: boolean }) => !result.ok)
+      const successCount = results.length - failed.length
+      if (failed.length > 0) {
+        const failedIds = new Set(failed.map((result: { id: number }) => result.id))
+        setBulkDrafts((prev) => {
+          const next: Record<number, MemberBulkPatch> = {}
+          Object.entries(prev).forEach(([id, patch]) => {
+            if (failedIds.has(Number(id))) {
+              next[Number(id)] = patch
+            }
+          })
+          return next
+        })
+        setActionError(
+          failed[0]?.error ? String(failed[0].error) : t.feedback.submitError,
+        )
+        setActionNotice(t.feedback.bulkSavePartial(successCount, failed.length))
+      } else {
+        setActionNotice(t.feedback.bulkSaveSuccess(successCount))
+        setBulkDrafts({})
+        setBulkEditMode(false)
+      }
+      if (successCount > 0) {
+        await loadData()
+      }
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : t.feedback.submitError)
+    } finally {
+      setBulkSaving(false)
+    }
+  }
+
   const handleImportClick = () => {
     if (!canCreateMember) {
       setActionError(t.errors.needMemberCreate)
@@ -910,6 +1052,13 @@ export function MembersPageClient() {
     const startIndex = (page - 1) * pageSize
     return filteredMembers.slice(startIndex, startIndex + pageSize)
   }, [filteredMembers, page, pageSize])
+  const bulkPageDrafts = useMemo(() => {
+    const pageIds = new Set(paginatedMembers.map((member) => member.id))
+    return Object.entries(bulkDrafts).filter(
+      ([id, patch]) => pageIds.has(Number(id)) && !isBulkPatchEmpty(patch),
+    )
+  }, [bulkDrafts, paginatedMembers])
+  const bulkHasChanges = bulkPageDrafts.length > 0
 
   useEffect(() => {
     setPageInput(String(page))
@@ -1060,6 +1209,17 @@ export function MembersPageClient() {
                 canUpdateMember={canUpdateMember}
                 canDeleteMember={canDeleteMember}
                 submitting={submitting}
+                bulkEditMode={bulkEditMode}
+                bulkSaving={bulkSaving}
+                bulkHasChanges={bulkHasChanges}
+                bulkDrafts={bulkDrafts}
+                bulkEditableColumns={bulkEditableColumns}
+                teamOptions={teamOptions}
+                chineseSupervisorOptions={chineseSupervisorOptions}
+                onStartBulkEdit={startBulkEdit}
+                onCancelBulkEdit={cancelBulkEdit}
+                onSaveBulkEdit={saveBulkEdits}
+                onBulkFieldChange={updateBulkDraftField}
                 canAssignRole={canAssignRole}
                 loading={loading}
                 error={error}

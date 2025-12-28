@@ -2,9 +2,10 @@ import type { ChangeEvent, ReactNode, RefObject } from 'react'
 
 import { MemberFilterDrawer } from '@/components/members/MemberFilterDrawer'
 import { ActionButton } from '@/components/members/MemberButtons'
+import type { Locale } from '@/lib/i18n'
 import { memberCopy } from '@/lib/i18n/members'
 import type { ColumnKey, SortField } from '@/lib/members/constants'
-import type { Member, Role } from '@/types/members'
+import type { Member, MemberBulkPatch, Role } from '@/types/members'
 
 import { MemberFiltersPanel } from './MemberFiltersPanel'
 import { MembersTable } from './MembersTable'
@@ -30,6 +31,17 @@ type MembersTabProps = {
   canUpdateMember: boolean
   canDeleteMember: boolean
   submitting: boolean
+  bulkEditMode: boolean
+  bulkSaving: boolean
+  bulkHasChanges: boolean
+  bulkDrafts: Record<number, MemberBulkPatch>
+  bulkEditableColumns: ColumnKey[]
+  teamOptions: string[]
+  chineseSupervisorOptions: { value: string; label: string }[]
+  onStartBulkEdit: () => void
+  onCancelBulkEdit: () => void
+  onSaveBulkEdit: () => void
+  onBulkFieldChange: (memberId: number, path: string, value: string | null | undefined) => void
   canAssignRole: boolean
   loading: boolean
   error: string | null
@@ -183,7 +195,7 @@ type MembersTabProps = {
   sortIndicator: (field: SortField) => string
   members: Member[]
   rolesData: Role[]
-  locale: string
+  locale: Locale
   statusLabels: Record<string, string>
   formatProfileText: (value?: string | null) => string
   formatProfileNumber: (value?: number | null) => string
@@ -213,6 +225,17 @@ export function MembersTab(props: MembersTabProps) {
     canUpdateMember,
     canDeleteMember,
     submitting,
+    bulkEditMode,
+    bulkSaving,
+    bulkHasChanges,
+    bulkDrafts,
+    bulkEditableColumns,
+    teamOptions,
+    chineseSupervisorOptions,
+    onStartBulkEdit,
+    onCancelBulkEdit,
+    onSaveBulkEdit,
+    onBulkFieldChange,
     canAssignRole,
     loading,
     error,
@@ -516,6 +539,20 @@ export function MembersTab(props: MembersTabProps) {
           <ActionButton onClick={onDownloadTemplate} disabled={templateDownloading}>
             {t.actions.template}
           </ActionButton>
+          {!bulkEditMode ? (
+            <ActionButton onClick={onStartBulkEdit} disabled={!canUpdateMember || loading}>
+              {t.actions.bulkEdit}
+            </ActionButton>
+          ) : (
+            <>
+              <ActionButton onClick={onSaveBulkEdit} disabled={!bulkHasChanges || bulkSaving}>
+                {t.actions.saveChanges}
+              </ActionButton>
+              <ActionButton onClick={onCancelBulkEdit} disabled={bulkSaving}>
+                {t.actions.cancel}
+              </ActionButton>
+            </>
+          )}
           <input
             ref={importInputRef}
             type="file"
@@ -832,6 +869,12 @@ export function MembersTab(props: MembersTabProps) {
                   canUpdateMember={canUpdateMember}
                   canDeleteMember={canDeleteMember}
                   submitting={submitting}
+                  bulkEditMode={bulkEditMode}
+                  bulkDrafts={bulkDrafts}
+                  bulkEditableColumns={bulkEditableColumns}
+                  teamOptions={teamOptions}
+                  chineseSupervisorOptions={chineseSupervisorOptions}
+                  onBulkFieldChange={onBulkFieldChange}
                   onViewMember={onViewMember}
                   onEditMember={onEditMember}
                   onDeleteMember={onDeleteMember}

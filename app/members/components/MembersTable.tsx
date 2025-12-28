@@ -1,6 +1,8 @@
-import { memberCopy } from '@/lib/i18n/members'
+import type { Locale } from '@/lib/i18n'
+import { genderOptions, memberCopy, nationalityOptions } from '@/lib/i18n/members'
 import type { ColumnKey, SortField } from '@/lib/members/constants'
-import type { Member, Role } from '@/types/members'
+import { normalizeText, toSalaryFilterValue } from '@/lib/members/utils'
+import type { Member, MemberBulkPatch, Role } from '@/types/members'
 
 type MemberCopy = (typeof memberCopy)[keyof typeof memberCopy]
 
@@ -8,7 +10,7 @@ type MembersTableProps = {
   members: Member[]
   page: number
   pageSize: number
-  locale: string
+  locale: Locale
   t: MemberCopy
   isVisible: (key: ColumnKey) => boolean
   handleSort: (field: SortField) => void
@@ -17,6 +19,12 @@ type MembersTableProps = {
   canUpdateMember: boolean
   canDeleteMember: boolean
   submitting: boolean
+  bulkEditMode: boolean
+  bulkDrafts: Record<number, MemberBulkPatch>
+  bulkEditableColumns: ColumnKey[]
+  teamOptions: string[]
+  chineseSupervisorOptions: { value: string; label: string }[]
+  onBulkFieldChange: (memberId: number, path: string, value: string | null | undefined) => void
   onViewMember: (member: Member) => void
   onEditMember: (member: Member) => void
   onDeleteMember: (member: Member) => void
@@ -42,6 +50,12 @@ export function MembersTable({
   canUpdateMember,
   canDeleteMember,
   submitting,
+  bulkEditMode,
+  bulkDrafts,
+  bulkEditableColumns,
+  teamOptions,
+  chineseSupervisorOptions,
+  onBulkFieldChange,
   onViewMember,
   onEditMember,
   onDeleteMember,
@@ -53,8 +67,155 @@ export function MembersTable({
   findGenderLabel,
   findNationalityLabel,
 }: MembersTableProps) {
+  const isEditable = (key: ColumnKey) => bulkEditMode && bulkEditableColumns.includes(key)
+
+  const resolveDraftValue = (memberId: number, path: string) => {
+    const draft = bulkDrafts[memberId]
+    if (!draft) return undefined
+    const segments = path.split('.')
+    if (segments.length === 1) {
+      return draft[segments[0] as keyof MemberBulkPatch] as string | null | undefined
+    }
+    const nested = draft[segments[0] as keyof MemberBulkPatch]
+    if (nested && typeof nested === 'object' && !Array.isArray(nested)) {
+      return (nested as Record<string, unknown>)[segments[1]] as string | null | undefined
+    }
+    return undefined
+  }
+
+  const resolveInputValue = (draftValue: string | null | undefined, currentValue: string) => {
+    if (draftValue === null) return ''
+    if (draftValue === undefined) return currentValue
+    return draftValue
+  }
+
+  const handleBulkChange = (
+    memberId: number,
+    path: string,
+    value: string,
+    currentValue: string,
+  ) => {
+    const normalizedNext = normalizeText(value)
+    const normalizedCurrent = normalizeText(currentValue)
+    if (!normalizedNext || normalizedNext === normalizedCurrent) {
+      onBulkFieldChange(memberId, path, undefined)
+      return
+    }
+    onBulkFieldChange(memberId, path, value)
+  }
+
+  const renderBulkInput = ({
+    memberId,
+    path,
+    currentValue,
+    type = 'text',
+    inputMode,
+    placeholder,
+    listId,
+    disabled,
+  }: {
+    memberId: number
+    path: string
+    currentValue: string
+    type?: 'text' | 'number' | 'date'
+    inputMode?: 'text' | 'decimal' | 'numeric'
+    placeholder?: string
+    listId?: string
+    disabled?: boolean
+  }) => {
+    if (disabled) {
+      return <span className="text-slate-400">{normalizeText(currentValue) || t.labels.empty}</span>
+    }
+    const draftValue = resolveDraftValue(memberId, path)
+    const isCleared = draftValue === null
+    const value = resolveInputValue(draftValue, currentValue)
+    return (
+      <div className="flex items-center gap-2">
+        <input
+          type={type}
+          inputMode={inputMode}
+          list={listId}
+          value={value}
+          onChange={(event) =>
+            handleBulkChange(memberId, path, event.target.value, currentValue)
+          }
+          placeholder={isCleared ? t.labels.cleared : placeholder}
+          className={`w-full rounded-lg border px-2 py-1 text-xs text-slate-700 shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100 ${
+            isCleared ? 'border-amber-300 bg-amber-50' : 'border-slate-200'
+          }`}
+        />
+        <button
+          type="button"
+          onClick={() => onBulkFieldChange(memberId, path, null)}
+          className="rounded-full border border-slate-200 px-2.5 py-1 text-[10px] font-semibold text-slate-600 hover:bg-slate-50"
+        >
+          {t.actions.clearValue}
+        </button>
+      </div>
+    )
+  }
+
+  const renderBulkSelect = ({
+    memberId,
+    path,
+    currentValue,
+    options,
+    disabled,
+    allowClear = true,
+  }: {
+    memberId: number
+    path: string
+    currentValue: string
+    options: Array<{ value: string; label: string }>
+    disabled?: boolean
+    allowClear?: boolean
+  }) => {
+    if (disabled) {
+      const label = options.find((option) => option.value === currentValue)?.label
+      return <span className="text-slate-400">{label ?? t.labels.empty}</span>
+    }
+    const draftValue = resolveDraftValue(memberId, path)
+    const isCleared = draftValue === null
+    const value = resolveInputValue(draftValue, currentValue)
+    return (
+      <div className="flex items-center gap-2">
+        <select
+          value={value}
+          onChange={(event) => handleBulkChange(memberId, path, event.target.value, currentValue)}
+          className={`w-full rounded-lg border px-2 py-1 text-xs text-slate-700 shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100 ${
+            isCleared ? 'border-amber-300 bg-amber-50' : 'border-slate-200'
+          }`}
+        >
+          {allowClear ? <option value="">{t.labels.empty}</option> : null}
+          {options.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+        {allowClear ? (
+          <button
+            type="button"
+            onClick={() => onBulkFieldChange(memberId, path, null)}
+            className="rounded-full border border-slate-200 px-2.5 py-1 text-[10px] font-semibold text-slate-600 hover:bg-slate-50"
+          >
+            {t.actions.clearValue}
+          </button>
+        ) : null}
+      </div>
+    )
+  }
+
   return (
-    <table className="w-full table-auto text-left text-base text-slate-900">
+    <>
+      {teamOptions.length > 0 ? (
+        <datalist id="bulk-team-options">
+          {teamOptions.map((team) => (
+            <option key={team} value={team} />
+          ))}
+        </datalist>
+      ) : null}
+      <table className="w-full table-auto text-left text-base text-slate-900">
       <thead className="bg-slate-50 text-sm uppercase tracking-wide text-slate-600">
         <tr>
           {isVisible('sequence') ? (
@@ -447,34 +608,70 @@ export function MembersTable({
               ) : null}
               {isVisible('gender') ? (
                 <td className="whitespace-nowrap px-4 py-3 text-slate-700 min-w-[80px] align-middle">
-                  {findGenderLabel(member.gender)}
+                  {isEditable('gender')
+                    ? renderBulkSelect({
+                        memberId: member.id,
+                        path: 'gender',
+                        currentValue: member.gender ?? '',
+                        options: genderOptions.map((option) => ({
+                          value: option.value,
+                          label: option.label[locale] ?? option.value,
+                        })),
+                      })
+                    : findGenderLabel(member.gender)}
                 </td>
               ) : null}
               {isVisible('nationality') ? (
                 <td className="whitespace-nowrap px-4 py-3 text-slate-700 align-middle">
-                  {findNationalityLabel(member.nationality)}
+                  {isEditable('nationality')
+                    ? renderBulkSelect({
+                        memberId: member.id,
+                        path: 'nationality',
+                        currentValue: member.nationality ?? '',
+                        options: nationalityOptions.map((option) => ({
+                          value: option.key,
+                          label: option.label[locale] ?? option.key,
+                        })),
+                      })
+                    : findNationalityLabel(member.nationality)}
                 </td>
               ) : null}
               {isVisible('phones') ? (
                 <td className="px-4 py-3 text-slate-700 align-middle">
-                  {member.phones?.length ? (
-                    <div className="space-y-1">
-                      {member.phones.map((phone, idx) => (
-                        <div key={`${member.id}-phone-${idx}`} className="whitespace-nowrap">
-                          {phone}
+                  {isEditable('phones')
+                    ? renderBulkInput({
+                        memberId: member.id,
+                        path: 'phones',
+                        currentValue: member.phones?.join(' / ') ?? '',
+                        placeholder: t.form.phonePlaceholder,
+                      })
+                    : member.phones?.length
+                      ? (
+                        <div className="space-y-1">
+                          {member.phones.map((phone, idx) => (
+                            <div key={`${member.id}-phone-${idx}`} className="whitespace-nowrap">
+                              {phone}
+                            </div>
+                          ))}
                         </div>
-                      ))}
-                    </div>
-                  ) : (
-                    t.labels.empty
-                  )}
+                      )
+                      : (
+                        t.labels.empty
+                      )}
                 </td>
               ) : null}
               {isVisible('joinDate') ? (
                 <td className="whitespace-nowrap px-4 py-3 text-slate-700 align-middle">
-                  {member.joinDate
-                    ? new Date(member.joinDate).toLocaleDateString(locale)
-                    : t.labels.empty}
+                  {isEditable('joinDate')
+                    ? renderBulkInput({
+                        memberId: member.id,
+                        path: 'joinDate',
+                        currentValue: member.joinDate ? member.joinDate.slice(0, 10) : '',
+                        type: 'date',
+                      })
+                    : member.joinDate
+                      ? new Date(member.joinDate).toLocaleDateString(locale)
+                      : t.labels.empty}
                 </td>
               ) : null}
               {isVisible('birthDate') ? (
@@ -486,26 +683,63 @@ export function MembersTable({
               ) : null}
               {isVisible('position') ? (
                 <td className="whitespace-nowrap px-4 py-3 text-slate-700 align-middle">
-                  {member.position || t.labels.empty}
+                  {isEditable('position')
+                    ? renderBulkInput({
+                        memberId: member.id,
+                        path: 'position',
+                        currentValue: member.position ?? '',
+                        placeholder: t.form.positionPlaceholder,
+                      })
+                    : member.position || t.labels.empty}
                 </td>
               ) : null}
               {isVisible('employmentStatus') ? (
                 <td className="whitespace-nowrap px-4 py-3 align-middle">
-                  <span className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-800 ring-1 ring-slate-200">
-                    {statusLabels[member.employmentStatus] ?? member.employmentStatus}
-                  </span>
+                  {isEditable('employmentStatus')
+                    ? renderBulkSelect({
+                        memberId: member.id,
+                        path: 'employmentStatus',
+                        currentValue: member.employmentStatus ?? '',
+                        options: (['ACTIVE', 'ON_LEAVE', 'TERMINATED'] as const).map((status) => ({
+                          value: status,
+                          label: statusLabels[status] ?? status,
+                        })),
+                        allowClear: false,
+                      })
+                    : (
+                      <span className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-800 ring-1 ring-slate-200">
+                        {statusLabels[member.employmentStatus] ?? member.employmentStatus}
+                      </span>
+                    )}
                 </td>
               ) : null}
               {isVisible('terminationDate') ? (
                 <td className="whitespace-nowrap px-4 py-3 text-slate-700 align-middle">
-                  {member.terminationDate
-                    ? new Date(member.terminationDate).toLocaleDateString(locale)
-                    : t.labels.empty}
+                  {isEditable('terminationDate')
+                    ? renderBulkInput({
+                        memberId: member.id,
+                        path: 'terminationDate',
+                        currentValue: member.terminationDate
+                          ? member.terminationDate.slice(0, 10)
+                          : '',
+                        type: 'date',
+                      })
+                    : member.terminationDate
+                      ? new Date(member.terminationDate).toLocaleDateString(locale)
+                      : t.labels.empty}
                 </td>
               ) : null}
               {isVisible('terminationReason') ? (
                 <td className="px-4 py-3 text-slate-700 align-middle">
-                  {member.terminationReason?.length ? member.terminationReason : t.labels.empty}
+                  {isEditable('terminationReason')
+                    ? renderBulkInput({
+                        memberId: member.id,
+                        path: 'terminationReason',
+                        currentValue: member.terminationReason ?? '',
+                      })
+                    : member.terminationReason?.length
+                      ? member.terminationReason
+                      : t.labels.empty}
                 </td>
               ) : null}
               {isVisible('roles') ? (
@@ -529,30 +763,57 @@ export function MembersTable({
               ) : null}
               {isVisible('tags') ? (
                 <td className="px-4 py-3 text-slate-700 align-middle">
-                  {member.tags?.length ? (
-                    <div className="flex flex-wrap gap-1.5">
-                      {member.tags.map((tag) => (
-                        <span
-                          key={`${member.id}-tag-${tag}`}
-                          className="rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-800 ring-1 ring-amber-100"
-                        >
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                  ) : (
-                    t.labels.empty
-                  )}
+                  {isEditable('tags')
+                    ? renderBulkInput({
+                        memberId: member.id,
+                        path: 'tags',
+                        currentValue: member.tags?.join(' / ') ?? '',
+                        placeholder: t.form.tagsPlaceholder,
+                      })
+                    : member.tags?.length
+                      ? (
+                        <div className="flex flex-wrap gap-1.5">
+                          {member.tags.map((tag) => (
+                            <span
+                              key={`${member.id}-tag-${tag}`}
+                              className="rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-800 ring-1 ring-amber-100"
+                            >
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      )
+                      : (
+                        t.labels.empty
+                      )}
                 </td>
               ) : null}
               {isVisible('team') ? (
                 <td className="whitespace-nowrap px-4 py-3 text-slate-700 align-middle">
-                  {formatProfileText(expatProfile?.team)}
+                  {isEditable('team')
+                    ? renderBulkInput({
+                        memberId: member.id,
+                        path: 'expatProfile.team',
+                        currentValue: expatProfile?.team ?? '',
+                        listId: 'bulk-team-options',
+                        disabled: member.nationality === 'china',
+                      })
+                    : formatProfileText(expatProfile?.team)}
                 </td>
               ) : null}
               {isVisible('chineseSupervisor') ? (
                 <td className="whitespace-nowrap px-4 py-3 text-slate-700 align-middle">
-                  {formatProfileText(supervisorLabel)}
+                  {isEditable('chineseSupervisor')
+                    ? renderBulkSelect({
+                        memberId: member.id,
+                        path: 'expatProfile.chineseSupervisorId',
+                        currentValue: expatProfile?.chineseSupervisorId
+                          ? String(expatProfile.chineseSupervisorId)
+                          : '',
+                        options: chineseSupervisorOptions,
+                        disabled: member.nationality === 'china',
+                      })
+                    : formatProfileText(supervisorLabel)}
                 </td>
               ) : null}
               {isVisible('contractNumber') ? (
@@ -562,144 +823,376 @@ export function MembersTable({
               ) : null}
               {isVisible('contractType') ? (
                 <td className="whitespace-nowrap px-4 py-3 text-slate-700 align-middle">
-                  {formatProfileText(expatProfile?.contractType)}
+                  {isEditable('contractType')
+                    ? renderBulkSelect({
+                        memberId: member.id,
+                        path: 'expatProfile.contractType',
+                        currentValue: expatProfile?.contractType ?? '',
+                        options: [
+                          { value: 'CTJ', label: 'CTJ' },
+                          { value: 'CDD', label: 'CDD' },
+                        ],
+                        disabled: member.nationality === 'china',
+                      })
+                    : formatProfileText(expatProfile?.contractType)}
                 </td>
               ) : null}
               {isVisible('contractStartDate') ? (
                 <td className="whitespace-nowrap px-4 py-3 text-slate-700 align-middle">
-                  {expatProfile?.contractStartDate
-                    ? new Date(expatProfile.contractStartDate).toLocaleDateString(locale)
-                    : t.labels.empty}
+                  {isEditable('contractStartDate')
+                    ? renderBulkInput({
+                        memberId: member.id,
+                        path: 'expatProfile.contractStartDate',
+                        currentValue: expatProfile?.contractStartDate
+                          ? expatProfile.contractStartDate.slice(0, 10)
+                          : '',
+                        type: 'date',
+                        disabled: member.nationality === 'china',
+                      })
+                    : expatProfile?.contractStartDate
+                      ? new Date(expatProfile.contractStartDate).toLocaleDateString(locale)
+                      : t.labels.empty}
                 </td>
               ) : null}
               {isVisible('contractEndDate') ? (
                 <td className="whitespace-nowrap px-4 py-3 text-slate-700 align-middle">
-                  {expatProfile?.contractEndDate
-                    ? new Date(expatProfile.contractEndDate).toLocaleDateString(locale)
-                    : t.labels.empty}
+                  {isEditable('contractEndDate')
+                    ? renderBulkInput({
+                        memberId: member.id,
+                        path: 'expatProfile.contractEndDate',
+                        currentValue: expatProfile?.contractEndDate
+                          ? expatProfile.contractEndDate.slice(0, 10)
+                          : '',
+                        type: 'date',
+                        disabled: member.nationality === 'china',
+                      })
+                    : expatProfile?.contractEndDate
+                      ? new Date(expatProfile.contractEndDate).toLocaleDateString(locale)
+                      : t.labels.empty}
                 </td>
               ) : null}
               {isVisible('salaryCategory') ? (
                 <td className="whitespace-nowrap px-4 py-3 text-slate-700 align-middle">
-                  {formatProfileText(expatProfile?.salaryCategory)}
+                  {isEditable('salaryCategory')
+                    ? renderBulkInput({
+                        memberId: member.id,
+                        path: 'expatProfile.salaryCategory',
+                        currentValue: expatProfile?.salaryCategory ?? '',
+                        disabled: member.nationality === 'china',
+                      })
+                    : formatProfileText(expatProfile?.salaryCategory)}
                 </td>
               ) : null}
               {isVisible('prime') ? (
                 <td className="whitespace-nowrap px-4 py-3 text-slate-700 align-middle">
-                  {formatProfileText(expatProfile?.prime)}
+                  {isEditable('prime')
+                    ? renderBulkInput({
+                        memberId: member.id,
+                        path: 'expatProfile.prime',
+                        currentValue: expatProfile?.prime ?? '',
+                        type: 'number',
+                        inputMode: 'decimal',
+                        disabled: member.nationality === 'china',
+                      })
+                    : formatProfileText(expatProfile?.prime)}
                 </td>
               ) : null}
               {isVisible('baseSalary') ? (
                 <td className="whitespace-nowrap px-4 py-3 text-slate-700 align-middle">
-                  {formatSalary(expatProfile?.baseSalaryAmount, expatProfile?.baseSalaryUnit)}
+                  {isEditable('baseSalary')
+                    ? renderBulkInput({
+                        memberId: member.id,
+                        path: 'expatProfile.baseSalary',
+                        currentValue: toSalaryFilterValue(
+                          expatProfile?.baseSalaryAmount,
+                          expatProfile?.baseSalaryUnit,
+                        ),
+                        placeholder: '1000/M',
+                        disabled: member.nationality === 'china',
+                      })
+                    : formatSalary(expatProfile?.baseSalaryAmount, expatProfile?.baseSalaryUnit)}
                 </td>
               ) : null}
               {isVisible('netMonthly') ? (
                 <td className="whitespace-nowrap px-4 py-3 text-slate-700 align-middle">
-                  {formatSalary(
-                    expatProfile?.netMonthlyAmount,
-                    expatProfile?.netMonthlyUnit,
-                    'MONTH',
-                  )}
+                  {isEditable('netMonthly')
+                    ? renderBulkInput({
+                        memberId: member.id,
+                        path: 'expatProfile.netMonthly',
+                        currentValue: toSalaryFilterValue(
+                          expatProfile?.netMonthlyAmount,
+                          expatProfile?.netMonthlyUnit,
+                          'MONTH',
+                        ),
+                        placeholder: '900/M',
+                        disabled: member.nationality === 'china',
+                      })
+                    : formatSalary(
+                        expatProfile?.netMonthlyAmount,
+                        expatProfile?.netMonthlyUnit,
+                        'MONTH',
+                      )}
                 </td>
               ) : null}
               {isVisible('maritalStatus') ? (
                 <td className="whitespace-nowrap px-4 py-3 text-slate-700 align-middle">
-                  {formatProfileText(expatProfile?.maritalStatus)}
+                  {isEditable('maritalStatus')
+                    ? renderBulkInput({
+                        memberId: member.id,
+                        path: 'expatProfile.maritalStatus',
+                        currentValue: expatProfile?.maritalStatus ?? '',
+                        disabled: member.nationality === 'china',
+                      })
+                    : formatProfileText(expatProfile?.maritalStatus)}
                 </td>
               ) : null}
               {isVisible('childrenCount') ? (
                 <td className="whitespace-nowrap px-4 py-3 text-slate-700 align-middle">
-                  {formatProfileNumber(expatProfile?.childrenCount ?? null)}
+                  {isEditable('childrenCount')
+                    ? renderBulkInput({
+                        memberId: member.id,
+                        path: 'expatProfile.childrenCount',
+                        currentValue:
+                          expatProfile?.childrenCount === null ||
+                          expatProfile?.childrenCount === undefined
+                            ? ''
+                            : String(expatProfile.childrenCount),
+                        type: 'number',
+                        inputMode: 'numeric',
+                        disabled: member.nationality === 'china',
+                      })
+                    : formatProfileNumber(expatProfile?.childrenCount ?? null)}
                 </td>
               ) : null}
               {isVisible('cnpsNumber') ? (
                 <td className="whitespace-nowrap px-4 py-3 text-slate-700 align-middle">
-                  {formatProfileText(expatProfile?.cnpsNumber)}
+                  {isEditable('cnpsNumber')
+                    ? renderBulkInput({
+                        memberId: member.id,
+                        path: 'expatProfile.cnpsNumber',
+                        currentValue: expatProfile?.cnpsNumber ?? '',
+                        disabled: member.nationality === 'china',
+                      })
+                    : formatProfileText(expatProfile?.cnpsNumber)}
                 </td>
               ) : null}
               {isVisible('cnpsDeclarationCode') ? (
                 <td className="whitespace-nowrap px-4 py-3 text-slate-700 align-middle">
-                  {formatProfileText(expatProfile?.cnpsDeclarationCode)}
+                  {isEditable('cnpsDeclarationCode')
+                    ? renderBulkInput({
+                        memberId: member.id,
+                        path: 'expatProfile.cnpsDeclarationCode',
+                        currentValue: expatProfile?.cnpsDeclarationCode ?? '',
+                        disabled: member.nationality === 'china',
+                      })
+                    : formatProfileText(expatProfile?.cnpsDeclarationCode)}
                 </td>
               ) : null}
               {isVisible('provenance') ? (
                 <td className="whitespace-nowrap px-4 py-3 text-slate-700 align-middle">
-                  {formatProfileText(expatProfile?.provenance)}
+                  {isEditable('provenance')
+                    ? renderBulkInput({
+                        memberId: member.id,
+                        path: 'expatProfile.provenance',
+                        currentValue: expatProfile?.provenance ?? '',
+                        disabled: member.nationality === 'china',
+                      })
+                    : formatProfileText(expatProfile?.provenance)}
                 </td>
               ) : null}
               {isVisible('frenchName') ? (
                 <td className="whitespace-nowrap px-4 py-3 text-slate-700 align-middle">
-                  {formatProfileText(chineseProfile?.frenchName)}
+                  {isEditable('frenchName')
+                    ? renderBulkInput({
+                        memberId: member.id,
+                        path: 'chineseProfile.frenchName',
+                        currentValue: chineseProfile?.frenchName ?? '',
+                        disabled: member.nationality !== 'china',
+                      })
+                    : formatProfileText(chineseProfile?.frenchName)}
                 </td>
               ) : null}
               {isVisible('idNumber') ? (
                 <td className="whitespace-nowrap px-4 py-3 text-slate-700 align-middle">
-                  {formatProfileText(chineseProfile?.idNumber)}
+                  {isEditable('idNumber')
+                    ? renderBulkInput({
+                        memberId: member.id,
+                        path: 'chineseProfile.idNumber',
+                        currentValue: chineseProfile?.idNumber ?? '',
+                        disabled: member.nationality !== 'china',
+                      })
+                    : formatProfileText(chineseProfile?.idNumber)}
                 </td>
               ) : null}
               {isVisible('passportNumber') ? (
                 <td className="whitespace-nowrap px-4 py-3 text-slate-700 align-middle">
-                  {formatProfileText(chineseProfile?.passportNumber)}
+                  {isEditable('passportNumber')
+                    ? renderBulkInput({
+                        memberId: member.id,
+                        path: 'chineseProfile.passportNumber',
+                        currentValue: chineseProfile?.passportNumber ?? '',
+                        disabled: member.nationality !== 'china',
+                      })
+                    : formatProfileText(chineseProfile?.passportNumber)}
                 </td>
               ) : null}
               {isVisible('educationAndMajor') ? (
                 <td className="px-4 py-3 text-slate-700 align-middle">
-                  {formatProfileText(chineseProfile?.educationAndMajor)}
+                  {isEditable('educationAndMajor')
+                    ? renderBulkInput({
+                        memberId: member.id,
+                        path: 'chineseProfile.educationAndMajor',
+                        currentValue: chineseProfile?.educationAndMajor ?? '',
+                        disabled: member.nationality !== 'china',
+                      })
+                    : formatProfileText(chineseProfile?.educationAndMajor)}
                 </td>
               ) : null}
               {isVisible('certifications') ? (
                 <td className="px-4 py-3 text-slate-700 align-middle">
-                  {formatProfileList(chineseProfile?.certifications)}
+                  {isEditable('certifications')
+                    ? renderBulkInput({
+                        memberId: member.id,
+                        path: 'chineseProfile.certifications',
+                        currentValue: chineseProfile?.certifications?.join(' / ') ?? '',
+                        placeholder: t.form.certificationsPlaceholder,
+                        disabled: member.nationality !== 'china',
+                      })
+                    : formatProfileList(chineseProfile?.certifications)}
                 </td>
               ) : null}
               {isVisible('domesticMobile') ? (
                 <td className="whitespace-nowrap px-4 py-3 text-slate-700 align-middle">
-                  {formatProfileText(chineseProfile?.domesticMobile)}
+                  {isEditable('domesticMobile')
+                    ? renderBulkInput({
+                        memberId: member.id,
+                        path: 'chineseProfile.domesticMobile',
+                        currentValue: chineseProfile?.domesticMobile ?? '',
+                        disabled: member.nationality !== 'china',
+                      })
+                    : formatProfileText(chineseProfile?.domesticMobile)}
                 </td>
               ) : null}
               {isVisible('emergencyContactName') ? (
                 <td className="px-4 py-3 text-slate-700 align-middle">
-                  {formatProfileText(
-                    chineseProfile?.emergencyContactName ?? expatProfile?.emergencyContactName,
-                  )}
+                  {isEditable('emergencyContactName')
+                    ? renderBulkInput({
+                        memberId: member.id,
+                        path:
+                          member.nationality === 'china'
+                            ? 'chineseProfile.emergencyContactName'
+                            : 'expatProfile.emergencyContactName',
+                        currentValue:
+                          member.nationality === 'china'
+                            ? chineseProfile?.emergencyContactName ?? ''
+                            : expatProfile?.emergencyContactName ?? '',
+                      })
+                    : formatProfileText(
+                        chineseProfile?.emergencyContactName ?? expatProfile?.emergencyContactName,
+                      )}
                 </td>
               ) : null}
               {isVisible('emergencyContactPhone') ? (
                 <td className="whitespace-nowrap px-4 py-3 text-slate-700 align-middle">
-                  {formatProfileText(
-                    chineseProfile?.emergencyContactPhone ?? expatProfile?.emergencyContactPhone,
-                  )}
+                  {isEditable('emergencyContactPhone')
+                    ? renderBulkInput({
+                        memberId: member.id,
+                        path:
+                          member.nationality === 'china'
+                            ? 'chineseProfile.emergencyContactPhone'
+                            : 'expatProfile.emergencyContactPhone',
+                        currentValue:
+                          member.nationality === 'china'
+                            ? chineseProfile?.emergencyContactPhone ?? ''
+                            : expatProfile?.emergencyContactPhone ?? '',
+                      })
+                    : formatProfileText(
+                        chineseProfile?.emergencyContactPhone ?? expatProfile?.emergencyContactPhone,
+                      )}
                 </td>
               ) : null}
               {isVisible('redBookValidYears') ? (
                 <td className="whitespace-nowrap px-4 py-3 text-slate-700 align-middle">
-                  {formatProfileNumber(chineseProfile?.redBookValidYears)}
+                  {isEditable('redBookValidYears')
+                    ? renderBulkInput({
+                        memberId: member.id,
+                        path: 'chineseProfile.redBookValidYears',
+                        currentValue:
+                          chineseProfile?.redBookValidYears === null ||
+                          chineseProfile?.redBookValidYears === undefined
+                            ? ''
+                            : String(chineseProfile.redBookValidYears),
+                        type: 'number',
+                        inputMode: 'numeric',
+                        disabled: member.nationality !== 'china',
+                      })
+                    : formatProfileNumber(chineseProfile?.redBookValidYears)}
                 </td>
               ) : null}
               {isVisible('cumulativeAbroadYears') ? (
                 <td className="whitespace-nowrap px-4 py-3 text-slate-700 align-middle">
-                  {formatProfileNumber(chineseProfile?.cumulativeAbroadYears)}
+                  {isEditable('cumulativeAbroadYears')
+                    ? renderBulkInput({
+                        memberId: member.id,
+                        path: 'chineseProfile.cumulativeAbroadYears',
+                        currentValue:
+                          chineseProfile?.cumulativeAbroadYears === null ||
+                          chineseProfile?.cumulativeAbroadYears === undefined
+                            ? ''
+                            : String(chineseProfile.cumulativeAbroadYears),
+                        type: 'number',
+                        inputMode: 'numeric',
+                        disabled: member.nationality !== 'china',
+                      })
+                    : formatProfileNumber(chineseProfile?.cumulativeAbroadYears)}
                 </td>
               ) : null}
               {isVisible('birthplace') ? (
                 <td className="px-4 py-3 text-slate-700 align-middle">
-                  {formatProfileText(chineseProfile?.birthplace)}
+                  {isEditable('birthplace')
+                    ? renderBulkInput({
+                        memberId: member.id,
+                        path: 'chineseProfile.birthplace',
+                        currentValue: chineseProfile?.birthplace ?? '',
+                        disabled: member.nationality !== 'china',
+                      })
+                    : formatProfileText(chineseProfile?.birthplace)}
                 </td>
               ) : null}
               {isVisible('residenceInChina') ? (
                 <td className="px-4 py-3 text-slate-700 align-middle">
-                  {formatProfileText(chineseProfile?.residenceInChina)}
+                  {isEditable('residenceInChina')
+                    ? renderBulkInput({
+                        memberId: member.id,
+                        path: 'chineseProfile.residenceInChina',
+                        currentValue: chineseProfile?.residenceInChina ?? '',
+                        disabled: member.nationality !== 'china',
+                      })
+                    : formatProfileText(chineseProfile?.residenceInChina)}
                 </td>
               ) : null}
               {isVisible('medicalHistory') ? (
                 <td className="px-4 py-3 text-slate-700 align-middle">
-                  {formatProfileText(chineseProfile?.medicalHistory)}
+                  {isEditable('medicalHistory')
+                    ? renderBulkInput({
+                        memberId: member.id,
+                        path: 'chineseProfile.medicalHistory',
+                        currentValue: chineseProfile?.medicalHistory ?? '',
+                        disabled: member.nationality !== 'china',
+                      })
+                    : formatProfileText(chineseProfile?.medicalHistory)}
                 </td>
               ) : null}
               {isVisible('healthStatus') ? (
                 <td className="px-4 py-3 text-slate-700 align-middle">
-                  {formatProfileText(chineseProfile?.healthStatus)}
+                  {isEditable('healthStatus')
+                    ? renderBulkInput({
+                        memberId: member.id,
+                        path: 'chineseProfile.healthStatus',
+                        currentValue: chineseProfile?.healthStatus ?? '',
+                        disabled: member.nationality !== 'china',
+                      })
+                    : formatProfileText(chineseProfile?.healthStatus)}
                 </td>
               ) : null}
               {isVisible('createdAt') ? (
@@ -745,6 +1238,7 @@ export function MembersTable({
           )
         })}
       </tbody>
-    </table>
+      </table>
+    </>
   )
 }
