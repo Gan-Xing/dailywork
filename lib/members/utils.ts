@@ -7,6 +7,23 @@ import type {
 
 export const normalizeText = (value?: string | null) => (value ?? '').trim()
 
+export const formatSupervisorLabel = (value: {
+  name?: string | null
+  frenchName?: string | null
+  username?: string | null
+}) => {
+  const name = normalizeText(value.name)
+  const frenchName = normalizeText(value.frenchName)
+  const username = normalizeText(value.username)
+  if (name) {
+    if (frenchName) return `${name} / ${frenchName}`
+    if (username) return `${name} / ${username}`
+    return name
+  }
+  if (frenchName) return frenchName
+  return username
+}
+
 export const normalizeTagKey = (value?: string | null) => normalizeText(value).toLowerCase()
 
 export const normalizeTagsInput = (value?: string[] | string | null) => {

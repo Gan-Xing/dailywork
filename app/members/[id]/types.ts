@@ -22,6 +22,7 @@ export type ExpatProfile = {
   chineseSupervisorId?: number | null
   chineseSupervisor?: {
     id: number
+    name: string | null
     username: string
     chineseProfile?: { frenchName: string | null } | null
   } | null

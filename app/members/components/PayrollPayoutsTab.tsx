@@ -8,7 +8,7 @@ import { useToast } from '@/components/ToastProvider'
 import { AlertDialog } from '@/components/AlertDialog'
 import type { Locale } from '@/lib/i18n'
 import { memberCopy } from '@/lib/i18n/members'
-import { normalizeText } from '@/lib/members/utils'
+import { formatSupervisorLabel, normalizeText } from '@/lib/members/utils'
 import { usePayrollImport, type ImportTarget } from '../hooks/usePayrollImport'
 import type { Member } from '@/types/members'
 
@@ -76,10 +76,19 @@ const parseDateValue = (value?: string | null) => {
   return parsed
 }
 
+const toDateKey = (value: Date) =>
+  Date.UTC(value.getUTCFullYear(), value.getUTCMonth(), value.getUTCDate())
+
 const isAfterCutoff = (terminationDate: Date | null, cutoffDate: Date | null) => {
   if (!terminationDate) return true
   if (!cutoffDate) return true
   return terminationDate.getTime() > cutoffDate.getTime()
+}
+
+const isOnOrBeforeCutoff = (date: Date | null, cutoffDate: Date | null) => {
+  if (!date) return true
+  if (!cutoffDate) return true
+  return toDateKey(date) <= toDateKey(cutoffDate)
 }
 
 const toAmountNumber = (value?: string | null) => {
@@ -308,31 +317,49 @@ export function PayrollPayoutsTab({
     return draft || formatDateInput(runOne.attendanceCutoffDate)
   }, [runs, runCutoffDrafts])
 
+  const runTwoCutoffDate = useMemo(() => {
+    const runTwo = runs.find((run) => run.sequence === 2)
+    if (!runTwo) return null
+    const draft = normalizeText(runCutoffDrafts[runTwo.id])
+    return draft || formatDateInput(runTwo.attendanceCutoffDate)
+  }, [runs, runCutoffDrafts])
+
   const { visibleMembers, eligibilityById } = useMemo(() => {
     const prevCutoff = parseDateValue(prevCutoffDate)
     const runOneCutoff = parseDateValue(runOneCutoffDate)
+    const runTwoCutoff = parseDateValue(runTwoCutoffDate)
     const nextMembers: Member[] = []
     const nextEligibility = new Map<number, { run1Editable: boolean; run2Editable: boolean }>()
 
     filteredMembers.forEach((member) => {
       const terminationDate = parseDateValue(member.terminationDate)
+      const joinDate = parseDateValue(member.joinDate)
+      const canRunOneByJoinDate = isOnOrBeforeCutoff(joinDate, runOneCutoff)
+      const canRunTwoByJoinDate = isOnOrBeforeCutoff(joinDate, runTwoCutoff)
       const isVisible = isAfterCutoff(terminationDate, prevCutoff)
       if (!isVisible) return
 
       const isCdd = member.expatProfile?.contractType === 'CDD'
       if (isCdd) {
-        nextEligibility.set(member.id, { run1Editable: false, run2Editable: true })
+        const run1Editable =
+          Boolean(terminationDate) &&
+          isOnOrBeforeCutoff(terminationDate, runOneCutoff) &&
+          canRunOneByJoinDate
+        const run2Editable =
+          isAfterCutoff(terminationDate, runOneCutoff) && canRunTwoByJoinDate
+        nextEligibility.set(member.id, { run1Editable, run2Editable })
         nextMembers.push(member)
         return
       }
 
-      const run2Editable = isAfterCutoff(terminationDate, runOneCutoff)
-      nextEligibility.set(member.id, { run1Editable: true, run2Editable })
+      const run1Editable = canRunOneByJoinDate
+      const run2Editable = isAfterCutoff(terminationDate, runOneCutoff) && canRunTwoByJoinDate
+      nextEligibility.set(member.id, { run1Editable, run2Editable })
       nextMembers.push(member)
     })
 
     return { visibleMembers: nextMembers, eligibilityById: nextEligibility }
-  }, [filteredMembers, prevCutoffDate, runOneCutoffDate])
+  }, [filteredMembers, prevCutoffDate, runOneCutoffDate, runTwoCutoffDate])
 
   const runMap = useMemo(() => {
     const map = new Map<number, PayrollRun>()
@@ -359,6 +386,15 @@ export function PayrollPayoutsTab({
     const runOne = runMap.get(1)
     const runTwo = runMap.get(2)
 
+    const getSupervisorText = (member: Member) =>
+      normalizeText(
+        formatSupervisorLabel({
+          name: member.expatProfile?.chineseSupervisor?.name ?? null,
+          frenchName: member.expatProfile?.chineseSupervisor?.chineseProfile?.frenchName ?? null,
+          username: member.expatProfile?.chineseSupervisor?.username ?? null,
+        }),
+      )
+
     const compareText = (leftValue: string, rightValue: string) => {
       if (!leftValue && !rightValue) return 0
       if (!leftValue) return 1
@@ -371,6 +407,22 @@ export function PayrollPayoutsTab({
       if (leftValue === null) return 1
       if (rightValue === null) return -1
       return (leftValue - rightValue) * direction
+    }
+
+    const isMissingAmount = (member: Member, run: PayrollRun | undefined, eligible: boolean) => {
+      if (!run || !eligible) return false
+      if (viewMode !== 'entry') return false
+      return !normalizeText(drafts[run.id]?.[member.id])
+    }
+
+    const compareAmountWithMissing = (
+      leftMissing: boolean,
+      rightMissing: boolean,
+      leftValue: number | null,
+      rightValue: number | null,
+    ) => {
+      if (leftMissing !== rightMissing) return leftMissing ? -1 : 1
+      return compareNumber(leftValue, rightValue)
     }
 
     const getRunAmount = (member: Member, run: PayrollRun | undefined, eligible: boolean) => {
@@ -391,12 +443,8 @@ export function PayrollPayoutsTab({
     }
 
     const defaultCompare = (left: Member, right: Member) => {
-      const leftSupervisor =
-        normalizeText(left.expatProfile?.chineseSupervisor?.chineseProfile?.frenchName) ||
-        normalizeText(left.expatProfile?.chineseSupervisor?.username)
-      const rightSupervisor =
-        normalizeText(right.expatProfile?.chineseSupervisor?.chineseProfile?.frenchName) ||
-        normalizeText(right.expatProfile?.chineseSupervisor?.username)
+      const leftSupervisor = getSupervisorText(left)
+      const rightSupervisor = getSupervisorText(right)
       const supervisorCompare = collator.compare(leftSupervisor, rightSupervisor)
       if (supervisorCompare !== 0) return supervisorCompare
       const teamCompare = collator.compare(
@@ -415,12 +463,7 @@ export function PayrollPayoutsTab({
     const compareByField = (left: Member, right: Member) => {
       switch (sortField) {
         case 'supervisor':
-          return compareText(
-            normalizeText(left.expatProfile?.chineseSupervisor?.chineseProfile?.frenchName) ||
-              normalizeText(left.expatProfile?.chineseSupervisor?.username),
-            normalizeText(right.expatProfile?.chineseSupervisor?.chineseProfile?.frenchName) ||
-              normalizeText(right.expatProfile?.chineseSupervisor?.username),
-          )
+          return compareText(getSupervisorText(left), getSupervisorText(right))
         case 'team':
           return compareText(
             normalizeText(left.expatProfile?.team),
@@ -442,33 +485,39 @@ export function PayrollPayoutsTab({
             right.expatProfile?.contractType ?? '',
           )
         case 'run1': {
-          const leftAmount = getRunAmount(
-            left,
-            runOne,
-            Boolean(eligibilityById.get(left.id)?.run1Editable),
-          )
-          const rightAmount = getRunAmount(
-            right,
-            runOne,
-            Boolean(eligibilityById.get(right.id)?.run1Editable),
-          )
-          return compareNumber(leftAmount, rightAmount)
+          const leftEligible = Boolean(eligibilityById.get(left.id)?.run1Editable)
+          const rightEligible = Boolean(eligibilityById.get(right.id)?.run1Editable)
+          const leftMissing = isMissingAmount(left, runOne, leftEligible)
+          const rightMissing = isMissingAmount(right, runOne, rightEligible)
+          const leftAmount = getRunAmount(left, runOne, leftEligible)
+          const rightAmount = getRunAmount(right, runOne, rightEligible)
+          return compareAmountWithMissing(leftMissing, rightMissing, leftAmount, rightAmount)
         }
         case 'run2': {
-          const leftAmount = getRunAmount(
-            left,
-            runTwo,
-            Boolean(eligibilityById.get(left.id)?.run2Editable),
-          )
-          const rightAmount = getRunAmount(
-            right,
-            runTwo,
-            Boolean(eligibilityById.get(right.id)?.run2Editable),
-          )
-          return compareNumber(leftAmount, rightAmount)
+          const leftEligible = Boolean(eligibilityById.get(left.id)?.run2Editable)
+          const rightEligible = Boolean(eligibilityById.get(right.id)?.run2Editable)
+          const leftMissing = isMissingAmount(left, runTwo, leftEligible)
+          const rightMissing = isMissingAmount(right, runTwo, rightEligible)
+          const leftAmount = getRunAmount(left, runTwo, leftEligible)
+          const rightAmount = getRunAmount(right, runTwo, rightEligible)
+          return compareAmountWithMissing(leftMissing, rightMissing, leftAmount, rightAmount)
         }
-        case 'total':
-          return compareNumber(getTotalAmount(left), getTotalAmount(right))
+        case 'total': {
+          const leftEligibility = eligibilityById.get(left.id)
+          const rightEligibility = eligibilityById.get(right.id)
+          const leftMissing =
+            isMissingAmount(left, runOne, Boolean(leftEligibility?.run1Editable)) ||
+            isMissingAmount(left, runTwo, Boolean(leftEligibility?.run2Editable))
+          const rightMissing =
+            isMissingAmount(right, runOne, Boolean(rightEligibility?.run1Editable)) ||
+            isMissingAmount(right, runTwo, Boolean(rightEligibility?.run2Editable))
+          return compareAmountWithMissing(
+            leftMissing,
+            rightMissing,
+            getTotalAmount(left),
+            getTotalAmount(right),
+          )
+        }
         default:
           return 0
       }
@@ -591,11 +640,12 @@ export function PayrollPayoutsTab({
       if (payout?.chineseSupervisorName) return payout.chineseSupervisorName
     }
     const supervisor = member.expatProfile?.chineseSupervisor
-    return (
-      normalizeText(supervisor?.chineseProfile?.frenchName) ||
-      normalizeText(supervisor?.username) ||
-      t.labels.empty
-    )
+    const label = formatSupervisorLabel({
+      name: supervisor?.name ?? null,
+      frenchName: supervisor?.chineseProfile?.frenchName ?? null,
+      username: supervisor?.username ?? null,
+    })
+    return label || t.labels.empty
   }
 
   const getTeamLabel = (member: Member, runId?: number) => {
@@ -1246,7 +1296,12 @@ export function PayrollPayoutsTab({
                   const runTwoEligible = Boolean(runTwo && eligibility?.run2Editable)
                   const runOneValue =
                     runOne && runOneEligible ? getDraftAmount(runOne.id, member.id) : ''
-                  const runTwoValue = runTwo ? getDraftAmount(runTwo.id, member.id) : ''
+                  const runTwoValue =
+                    runTwo && runTwoEligible ? getDraftAmount(runTwo.id, member.id) : ''
+                  const runOneMissing =
+                    viewMode === 'entry' && runOneEligible && !normalizeText(runOneValue)
+                  const runTwoMissing =
+                    viewMode === 'entry' && runTwoEligible && !normalizeText(runTwoValue)
                   const runOneReportValue =
                     runOne && runOneEligible
                       ? payoutMap.get(runOne.id)?.get(member.id)?.amount ?? ''
@@ -1270,7 +1325,7 @@ export function PayrollPayoutsTab({
                         {normalizeText(member.expatProfile?.contractNumber) || t.labels.empty}
                       </td>
                       <td className="px-4 py-3">{member.expatProfile?.contractType ?? t.labels.empty}</td>
-                      <td className="px-4 py-3">
+                      <td className={`px-4 py-3 ${runOneMissing ? 'bg-rose-50' : ''}`}>
                         {viewMode === 'entry' ? (
                           <input
                             type="number"
@@ -1283,7 +1338,7 @@ export function PayrollPayoutsTab({
                             placeholder={
                               runOneEligible ? t.compensation.fields.amount : t.payroll.table.runEmpty
                             }
-                            className="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100 disabled:bg-slate-100 disabled:text-slate-400"
+                            className={`w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100 disabled:bg-slate-100 disabled:text-slate-400 ${runOneMissing ? 'bg-rose-50 border-rose-200' : ''}`}
                           />
                         ) : (
                           <span className="text-sm">
@@ -1293,7 +1348,7 @@ export function PayrollPayoutsTab({
                           </span>
                         )}
                       </td>
-                      <td className="px-4 py-3">
+                      <td className={`px-4 py-3 ${runTwoMissing ? 'bg-rose-50' : ''}`}>
                         {viewMode === 'entry' ? (
                           <input
                             type="number"
@@ -1306,7 +1361,7 @@ export function PayrollPayoutsTab({
                             placeholder={
                               runTwoEligible ? t.compensation.fields.amount : t.payroll.table.runEmpty
                             }
-                            className="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100 disabled:bg-slate-100 disabled:text-slate-400"
+                            className={`w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100 disabled:bg-slate-100 disabled:text-slate-400 ${runTwoMissing ? 'bg-rose-50 border-rose-200' : ''}`}
                           />
                         ) : (
                           <span className="text-sm">

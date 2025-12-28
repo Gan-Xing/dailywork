@@ -132,6 +132,7 @@ export const listUsers = async () => {
           chineseSupervisor: {
             select: {
               id: true,
+              name: true,
               username: true,
               chineseProfile: {
                 select: {
@@ -204,6 +205,7 @@ export const listUsers = async () => {
           chineseSupervisor: user.expatProfile.chineseSupervisor
             ? {
                 id: user.expatProfile.chineseSupervisor.id,
+                name: user.expatProfile.chineseSupervisor.name,
                 username: user.expatProfile.chineseSupervisor.username,
                 chineseProfile: user.expatProfile.chineseSupervisor.chineseProfile
                   ? {
@@ -286,6 +288,7 @@ export const getUserById = async (userId: number) => {
           chineseSupervisor: {
             select: {
               id: true,
+              name: true,
               username: true,
               chineseProfile: {
                 select: {
@@ -359,6 +362,7 @@ export const getUserById = async (userId: number) => {
           chineseSupervisor: user.expatProfile.chineseSupervisor
             ? {
                 id: user.expatProfile.chineseSupervisor.id,
+                name: user.expatProfile.chineseSupervisor.name,
                 username: user.expatProfile.chineseSupervisor.username,
                 chineseProfile: user.expatProfile.chineseSupervisor.chineseProfile
                   ? {

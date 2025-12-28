@@ -9,6 +9,14 @@ import {
 } from '@/lib/server/compensation'
 import { canManagePayroll } from '@/lib/server/payrollRuns'
 
+const toDateKey = (value: Date) =>
+  Date.UTC(value.getUTCFullYear(), value.getUTCMonth(), value.getUTCDate())
+
+const isDateAfterCutoff = (date: Date | null, cutoffDate: Date | null) => {
+  if (!date || !cutoffDate) return false
+  return toDateKey(date) > toDateKey(cutoffDate)
+}
+
 type PayrollPayoutInput = {
   userId: number
   amount?: string | number | null
@@ -52,6 +60,8 @@ export async function POST(
     where: { id: { in: userIds } },
     select: {
       id: true,
+      joinDate: true,
+      terminationDate: true,
       nationality: true,
       expatProfile: {
         select: {
@@ -66,6 +76,7 @@ export async function POST(
 
   const invalidUsers: number[] = []
   const invalidCdd: number[] = []
+  const invalidJoinDates: number[] = []
   const payloads: Array<{
     userId: number
     amount: string
@@ -92,7 +103,17 @@ export async function POST(
     }
 
     if (run.sequence === 1 && user.expatProfile.contractType === 'CDD') {
-      invalidCdd.push(userId)
+      const canRunOneCdd =
+        Boolean(user.terminationDate) &&
+        !isDateAfterCutoff(user.terminationDate, run.attendanceCutoffDate)
+      if (!canRunOneCdd) {
+        invalidCdd.push(userId)
+        continue
+      }
+    }
+
+    if (isDateAfterCutoff(user.joinDate, run.attendanceCutoffDate)) {
+      invalidJoinDates.push(userId)
       continue
     }
 
@@ -125,7 +146,13 @@ export async function POST(
   }
   if (invalidCdd.length > 0) {
     return NextResponse.json(
-      { error: `CDD 成员不允许录入第 1 次发放: ${invalidCdd.join(', ')}` },
+      { error: `CDD 成员仅在当月第一次考勤截止前离职时可录入第 1 次发放: ${invalidCdd.join(', ')}` },
+      { status: 400 },
+    )
+  }
+  if (invalidJoinDates.length > 0) {
+    return NextResponse.json(
+      { error: `入职日期晚于考勤截止日期，无法录入本次发放: ${invalidJoinDates.join(', ')}` },
       { status: 400 },
     )
   }

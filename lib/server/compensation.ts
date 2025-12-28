@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma'
+import { formatSupervisorLabel } from '@/lib/members/utils'
 
 type SupervisorSnapshot = {
   id: number | null
@@ -10,11 +11,12 @@ const formatSupervisorName = (user: {
   username: string
   chineseProfile?: { frenchName: string | null } | null
 }) => {
-  const name = user.name?.trim() ?? ''
-  const frenchName = user.chineseProfile?.frenchName?.trim() ?? ''
-  const parts = [name, frenchName].filter(Boolean)
-  if (parts.length > 0) return parts.join(' / ')
-  return user.username?.trim() || null
+  const label = formatSupervisorLabel({
+    name: user.name,
+    frenchName: user.chineseProfile?.frenchName ?? null,
+    username: user.username,
+  })
+  return label || null
 }
 
 export const resolveSupervisorSnapshot = async (

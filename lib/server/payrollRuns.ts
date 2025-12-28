@@ -18,6 +18,12 @@ export const getDefaultRunDates = (year: number, month: number) => {
   return [first, second]
 }
 
+const getDefaultAttendanceCutoffDates = (year: number, month: number) => {
+  const first = toUtcDate(year, month, 5)
+  const second = toUtcDate(year, month, 20)
+  return [first, second]
+}
+
 export const canViewPayroll = async () =>
   (await hasPermission('payroll:view')) || (await hasPermission('payroll:manage'))
 
@@ -30,12 +36,25 @@ export const ensurePayrollRuns = async (year: number, month: number) => {
   })
   const existingSequences = new Set(existing.map((run) => run.sequence))
   const [firstDate, secondDate] = getDefaultRunDates(year, month)
-  const createPayload: Array<{ sequence: number; payoutDate: Date }> = []
+  const [firstCutoff, secondCutoff] = getDefaultAttendanceCutoffDates(year, month)
+  const createPayload: Array<{
+    sequence: number
+    payoutDate: Date
+    attendanceCutoffDate: Date
+  }> = []
   if (!existingSequences.has(1)) {
-    createPayload.push({ sequence: 1, payoutDate: firstDate })
+    createPayload.push({
+      sequence: 1,
+      payoutDate: firstDate,
+      attendanceCutoffDate: firstCutoff,
+    })
   }
   if (!existingSequences.has(2)) {
-    createPayload.push({ sequence: 2, payoutDate: secondDate })
+    createPayload.push({
+      sequence: 2,
+      payoutDate: secondDate,
+      attendanceCutoffDate: secondCutoff,
+    })
   }
   if (createPayload.length > 0) {
     try {
@@ -45,7 +64,7 @@ export const ensurePayrollRuns = async (year: number, month: number) => {
           month,
           sequence: item.sequence,
           payoutDate: item.payoutDate,
-          attendanceCutoffDate: item.payoutDate,
+          attendanceCutoffDate: item.attendanceCutoffDate,
         })),
         skipDuplicates: true,
       })

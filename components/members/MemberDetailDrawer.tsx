@@ -7,6 +7,7 @@ import {
   memberCopy,
   nationalityOptions,
 } from '@/lib/i18n/members'
+import { formatSupervisorLabel } from '@/lib/members/utils'
 import { usePreferredLocale } from '@/lib/usePreferredLocale'
 import type { Member } from '@/types/members'
 
@@ -62,8 +63,12 @@ export function MemberDetailDrawer({ member, open, onClose, onEdit }: Props) {
   }
   const formatSupervisor = () => {
     const supervisor = member.expatProfile?.chineseSupervisor
-    const frenchName = supervisor?.chineseProfile?.frenchName?.trim()
-    return frenchName || supervisor?.username || t.labels.empty
+    const label = formatSupervisorLabel({
+      name: supervisor?.name ?? null,
+      frenchName: supervisor?.chineseProfile?.frenchName ?? null,
+      username: supervisor?.username ?? null,
+    })
+    return label || t.labels.empty
   }
 
   const sections = [

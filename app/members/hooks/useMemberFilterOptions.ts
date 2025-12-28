@@ -7,6 +7,7 @@ import {
 } from '@/lib/i18n/members'
 import { EMPTY_FILTER_VALUE } from '@/lib/members/constants'
 import {
+  formatSupervisorLabel,
   getMonthKey,
   normalizeTagKey,
   normalizeText,
@@ -216,7 +217,13 @@ export function useMemberFilterOptions({
     let hasEmpty = false
     membersData.forEach((member) => {
       const supervisor = member.expatProfile?.chineseSupervisor
-      const label = normalizeText(supervisor?.chineseProfile?.frenchName || supervisor?.username)
+      const label = normalizeText(
+        formatSupervisorLabel({
+          name: supervisor?.name ?? null,
+          frenchName: supervisor?.chineseProfile?.frenchName ?? null,
+          username: supervisor?.username ?? null,
+        }),
+      )
       if (label) values.add(label)
       else hasEmpty = true
     })

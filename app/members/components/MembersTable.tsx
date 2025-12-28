@@ -1,7 +1,7 @@
 import type { Locale } from '@/lib/i18n'
 import { genderOptions, memberCopy, nationalityOptions } from '@/lib/i18n/members'
 import type { ColumnKey, SortField } from '@/lib/members/constants'
-import { normalizeText, toSalaryFilterValue } from '@/lib/members/utils'
+import { formatSupervisorLabel, normalizeText, toSalaryFilterValue } from '@/lib/members/utils'
 import type { Member, MemberBulkPatch, Role } from '@/types/members'
 
 type MemberCopy = (typeof memberCopy)[keyof typeof memberCopy]
@@ -584,9 +584,11 @@ export function MembersTable({
           const chineseProfile = member.nationality === 'china' ? member.chineseProfile : null
           const expatProfile = member.nationality === 'china' ? null : member.expatProfile
           const supervisorLabel =
-            expatProfile?.chineseSupervisor?.chineseProfile?.frenchName?.trim() ||
-            expatProfile?.chineseSupervisor?.username ||
-            t.labels.empty
+            formatSupervisorLabel({
+              name: expatProfile?.chineseSupervisor?.name ?? null,
+              frenchName: expatProfile?.chineseSupervisor?.chineseProfile?.frenchName ?? null,
+              username: expatProfile?.chineseSupervisor?.username ?? null,
+            }) || t.labels.empty
           return (
             <tr key={member.id} className="hover:bg-slate-50 align-middle">
               {isVisible('sequence') ? (

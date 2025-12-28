@@ -4,6 +4,7 @@ import { type EmploymentStatus } from '@/lib/i18n/members'
 import { EMPTY_FILTER_VALUE, type SortField, type SortOrder } from '@/lib/members/constants'
 import {
   getMonthKey,
+  formatSupervisorLabel,
   normalizeTagKey,
   normalizeText,
   toNumberFilterValue,
@@ -164,8 +165,11 @@ export function useFilteredMembers({
       }
       if (!matchesTagFilter(member.tags, tagFilters)) return false
       const supervisorLabel = normalizeText(
-        expatProfile?.chineseSupervisor?.chineseProfile?.frenchName ||
-          expatProfile?.chineseSupervisor?.username,
+        formatSupervisorLabel({
+          name: expatProfile?.chineseSupervisor?.name ?? null,
+          frenchName: expatProfile?.chineseSupervisor?.chineseProfile?.frenchName ?? null,
+          username: expatProfile?.chineseSupervisor?.username ?? null,
+        }),
       )
       if (!matchesValueFilter(expatProfile?.team, teamFilters)) return false
       if (!matchesValueFilter(supervisorLabel, chineseSupervisorFilters)) return false
@@ -269,8 +273,11 @@ export function useFilteredMembers({
         const rightExpatProfile = right.nationality === 'china' ? null : right.expatProfile
         const getSupervisorLabel = (profile?: typeof leftExpatProfile | null) => {
           if (!profile?.chineseSupervisor) return ''
-          const frenchName = profile.chineseSupervisor.chineseProfile?.frenchName?.trim()
-          return frenchName || profile.chineseSupervisor.username || ''
+          return formatSupervisorLabel({
+            name: profile.chineseSupervisor.name,
+            frenchName: profile.chineseSupervisor.chineseProfile?.frenchName ?? null,
+            username: profile.chineseSupervisor.username,
+          })
         }
         for (const sort of sortStack) {
           let result = 0

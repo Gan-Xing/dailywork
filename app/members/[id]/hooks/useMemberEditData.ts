@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { Locale } from '@/lib/i18n'
 
 import type { MemberOption, Role } from '../types'
-import { normalizeText } from '../utils'
+import { formatSupervisorLabel, normalizeText } from '@/lib/members/utils'
 
 type UseMemberEditDataParams = {
   locale: Locale
@@ -44,9 +44,11 @@ export function useMemberEditData({
       .map((memberOption) => ({
         value: String(memberOption.id),
         label:
-          [normalizeText(memberOption.name), normalizeText(memberOption.chineseProfile?.frenchName)]
-            .filter(Boolean)
-            .join(' / ') || memberOption.username,
+          formatSupervisorLabel({
+            name: memberOption.name,
+            frenchName: memberOption.chineseProfile?.frenchName ?? null,
+            username: memberOption.username,
+          }) || memberOption.username,
       }))
       .sort((a, b) => optionCollator.compare(a.label, b.label))
   }, [memberOptions, optionCollator])

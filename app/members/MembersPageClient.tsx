@@ -32,6 +32,7 @@ import {
   buildExpatProfileForm,
   emptyChineseProfile,
   emptyExpatProfile,
+  formatSupervisorLabel,
   normalizeTagsInput,
   normalizeText,
   normalizeProfileNumber,
@@ -305,7 +306,12 @@ export function MembersPageClient() {
       .filter((member) => member.nationality === 'china')
       .map((member) => ({
         value: String(member.id),
-        label: normalizeText(member.chineseProfile?.frenchName) || member.username,
+        label:
+          formatSupervisorLabel({
+            name: member.name,
+            frenchName: member.chineseProfile?.frenchName ?? null,
+            username: member.username,
+          }) || member.username,
       }))
       .sort((a, b) => collator.compare(a.label, b.label))
   }, [membersData, locale])
