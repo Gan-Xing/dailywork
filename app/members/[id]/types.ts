@@ -136,6 +136,7 @@ export type FormState = {
   position: string
   employmentStatus: EmploymentStatus
   roleIds: number[]
+  skipChangeHistory: boolean
   chineseProfile: ChineseProfileForm
   expatProfile: ExpatProfileForm
 }

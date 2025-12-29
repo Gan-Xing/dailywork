@@ -364,6 +364,7 @@ export const memberCopy: Record<
       healthStatus: string
       terminationDate: string
       terminationReason: string
+      skipChangeHistory: string
     }
     feedback: {
       loading: string
@@ -855,6 +856,7 @@ export const memberCopy: Record<
       healthStatus: '健康状况',
       terminationDate: '离职日期',
       terminationReason: '离职原因',
+      skipChangeHistory: '不记录合同/工资变更历史',
     },
     feedback: {
       loading: '正在加载成员...',
@@ -1357,6 +1359,7 @@ export const memberCopy: Record<
       healthStatus: 'État de santé',
       terminationDate: 'Date de départ',
       terminationReason: 'Motif de départ',
+      skipChangeHistory: "Ne pas enregistrer l'historique contrat/salaire",
     },
     feedback: {
       loading: 'Chargement des membres...',

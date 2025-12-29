@@ -36,6 +36,7 @@ export function useMemberEditForm({ member, canAssignRole, t }: UseMemberEditFor
     position: member.position ?? '',
     employmentStatus: member.employmentStatus ?? 'ACTIVE',
     roleIds: member.roles?.map((role) => role.id) ?? [],
+    skipChangeHistory: false,
     chineseProfile: buildChineseProfileForm(member.chineseProfile),
     expatProfile: buildExpatProfileForm(member.expatProfile),
   }))
@@ -151,6 +152,7 @@ export function useMemberEditForm({ member, canAssignRole, t }: UseMemberEditFor
       position: string | null
       employmentStatus: EmploymentStatus
       roleIds?: number[]
+      skipChangeHistory: boolean
       chineseProfile: typeof chineseProfilePayload
       expatProfile: typeof expatProfilePayload
     } = {
@@ -167,6 +169,7 @@ export function useMemberEditForm({ member, canAssignRole, t }: UseMemberEditFor
       terminationReason: isTerminated ? terminationReasonValue : null,
       position: formState.position.trim() || null,
       employmentStatus: formState.employmentStatus,
+      skipChangeHistory: formState.skipChangeHistory,
       chineseProfile: chineseProfilePayload,
       expatProfile: expatProfilePayload,
     }

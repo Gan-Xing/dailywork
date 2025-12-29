@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server'
-import type { EmploymentStatus as PrismaEmploymentStatus } from '@prisma/client'
+import type { ContractType, EmploymentStatus as PrismaEmploymentStatus, SalaryUnit } from '@prisma/client'
 
 import { hashPassword } from '@/lib/auth/password'
 import { hasPermission } from '@/lib/server/authSession'
+import { isDecimalEqual, resolveSupervisorSnapshot } from '@/lib/server/compensation'
+import { createInitialContractChangeIfMissing } from '@/lib/server/contractChanges'
 import {
   hasExpatProfileData,
   hasChineseProfileData,
@@ -101,6 +103,21 @@ type ImportError = {
   value?: string
 }
 
+type ExistingExpatProfile = {
+  team: string | null
+  chineseSupervisorId: number | null
+  contractNumber: string | null
+  contractType: ContractType | null
+  contractStartDate: Date | null
+  contractEndDate: Date | null
+  salaryCategory: string | null
+  prime: { toString: () => string } | string | null
+  baseSalaryAmount: { toString: () => string } | string | null
+  baseSalaryUnit: SalaryUnit | null
+  netMonthlyAmount: { toString: () => string } | string | null
+  netMonthlyUnit: SalaryUnit | null
+}
+
 export async function POST(request: Request) {
   const canCreateMember =
     (await hasPermission('member:create')) || (await hasPermission('member:manage'))
@@ -111,6 +128,8 @@ export async function POST(request: Request) {
     (await hasPermission('role:update')) || (await hasPermission('role:manage'))
   const body = await request.json().catch(() => null)
   const ignoreErrors = Boolean(body?.ignoreErrors)
+  const skipChangeHistory = Boolean(body?.skipChangeHistory)
+  const shouldRecordHistory = !skipChangeHistory
   const members = Array.isArray(body?.members) ? (body?.members as ImportMemberInput[]) : []
   if (members.length === 0) {
     return NextResponse.json({ error: '缺少导入数据' }, { status: 400 })
@@ -430,19 +449,41 @@ export async function POST(request: Request) {
             birthDate: identity.birthDate,
           })),
         },
-      select: {
-        id: true,
-        name: true,
-        birthDate: true,
-        username: true,
-        nationality: true,
-        joinDate: true,
-      },
+        select: {
+          id: true,
+          name: true,
+          birthDate: true,
+          username: true,
+          nationality: true,
+          joinDate: true,
+          expatProfile: {
+            select: {
+              team: true,
+              chineseSupervisorId: true,
+              contractNumber: true,
+              contractType: true,
+              contractStartDate: true,
+              contractEndDate: true,
+              salaryCategory: true,
+              prime: true,
+              baseSalaryAmount: true,
+              baseSalaryUnit: true,
+              netMonthlyAmount: true,
+              netMonthlyUnit: true,
+            },
+          },
+        },
       })
     : []
   const matchesByIdentity = new Map<
     string,
-    Array<{ id: number; username: string; nationality: string | null; joinDate: Date | null }>
+    Array<{
+      id: number
+      username: string
+      nationality: string | null
+      joinDate: Date | null
+      expatProfile: ExistingExpatProfile | null
+    }>
   >()
   existingUsers.forEach((user) => {
     if (!user.birthDate) return
@@ -453,6 +494,7 @@ export async function POST(request: Request) {
       username: user.username,
       nationality: user.nationality,
       joinDate: user.joinDate,
+      expatProfile: user.expatProfile,
     })
     matchesByIdentity.set(key, list)
   })
@@ -503,7 +545,13 @@ export async function POST(request: Request) {
 
   const matchByRow = new Map<
     number,
-    { id: number; username: string; nationality: string | null; joinDate: Date | null } | null
+    {
+      id: number
+      username: string
+      nationality: string | null
+      joinDate: Date | null
+      expatProfile: ExistingExpatProfile | null
+    } | null
   >()
   prepared.forEach((member) => {
     const key = identityKey(member.name, member.birthDate)
@@ -581,6 +629,12 @@ export async function POST(request: Request) {
   const candidateBatches: typeof resolvedCandidates[] = []
   for (let i = 0; i < resolvedCandidates.length; i += IMPORT_BATCH_SIZE) {
     candidateBatches.push(resolvedCandidates.slice(i, i + IMPORT_BATCH_SIZE))
+  }
+
+  const isSameDate = (left?: Date | null, right?: Date | null) => {
+    if (!left && !right) return true
+    if (!left || !right) return false
+    return left.getTime() === right.getTime()
   }
 
   for (const batch of candidateBatches) {
@@ -702,6 +756,67 @@ export async function POST(request: Request) {
             ? { emergencyContactPhone: member.expatProfile.emergencyContactPhone }
             : {}),
         }
+        const normalizeDecimal = (
+          value: ExistingExpatProfile['prime'] | null | undefined,
+        ) => {
+          if (value === null || value === undefined) return null
+          return typeof value === 'string' ? value : value.toString()
+        }
+        const existingExpat = match?.expatProfile ?? null
+        const existingExpatSnapshot = existingExpat
+          ? {
+              chineseSupervisorId: existingExpat.chineseSupervisorId,
+              contractNumber: existingExpat.contractNumber,
+              contractType: existingExpat.contractType,
+              salaryCategory: existingExpat.salaryCategory,
+              baseSalaryAmount: normalizeDecimal(existingExpat.baseSalaryAmount),
+              baseSalaryUnit: existingExpat.baseSalaryUnit,
+              prime: normalizeDecimal(existingExpat.prime),
+              contractStartDate: existingExpat.contractStartDate,
+              contractEndDate: existingExpat.contractEndDate,
+            }
+          : null
+        const nextExpat = {
+          team: member.expatProfile.team ?? existingExpat?.team ?? null,
+          chineseSupervisorId:
+            member.expatProfile.chineseSupervisorId !== null
+              ? member.expatProfile.chineseSupervisorId
+              : existingExpat?.chineseSupervisorId ?? null,
+          contractNumber: member.expatProfile.contractNumber ?? existingExpat?.contractNumber ?? null,
+          contractType: member.expatProfile.contractType ?? existingExpat?.contractType ?? null,
+          salaryCategory: member.expatProfile.salaryCategory ?? existingExpat?.salaryCategory ?? null,
+          prime: member.expatProfile.prime ?? normalizeDecimal(existingExpat?.prime),
+          baseSalaryAmount:
+            member.expatProfile.baseSalaryAmount ??
+            normalizeDecimal(existingExpat?.baseSalaryAmount),
+          baseSalaryUnit: member.expatProfile.baseSalaryUnit ?? existingExpat?.baseSalaryUnit ?? null,
+          netMonthlyAmount:
+            member.expatProfile.netMonthlyAmount ??
+            normalizeDecimal(existingExpat?.netMonthlyAmount),
+          netMonthlyUnit: member.expatProfile.netMonthlyUnit ?? existingExpat?.netMonthlyUnit ?? null,
+          contractStartDate: shouldUpdateContractDates
+            ? resolvedContractStartDate
+            : existingExpat?.contractStartDate ?? null,
+          contractEndDate: shouldUpdateContractDates
+            ? resolvedContractEndDate
+            : existingExpat?.contractEndDate ?? null,
+        }
+        const shouldTrackExpatChanges =
+          !isChinese && (member.hasExpatProfileData || Boolean(existingExpat))
+        const contractChanged =
+          shouldTrackExpatChanges &&
+          (existingExpat?.contractNumber !== nextExpat.contractNumber ||
+            existingExpat?.contractType !== nextExpat.contractType ||
+            !isSameDate(existingExpat?.contractStartDate, nextExpat.contractStartDate) ||
+            !isSameDate(existingExpat?.contractEndDate, nextExpat.contractEndDate))
+        const payrollChanged =
+          shouldTrackExpatChanges &&
+          (existingExpat?.salaryCategory !== nextExpat.salaryCategory ||
+            !isDecimalEqual(existingExpat?.prime ?? null, nextExpat.prime ?? null) ||
+            !isDecimalEqual(existingExpat?.baseSalaryAmount ?? null, nextExpat.baseSalaryAmount ?? null) ||
+            existingExpat?.baseSalaryUnit !== nextExpat.baseSalaryUnit ||
+            !isDecimalEqual(existingExpat?.netMonthlyAmount ?? null, nextExpat.netMonthlyAmount ?? null) ||
+            existingExpat?.netMonthlyUnit !== nextExpat.netMonthlyUnit)
         if (!match) {
           const resolvedEmploymentStatus = member.employmentStatus ?? 'ACTIVE'
           await tx.user.create({
@@ -801,6 +916,50 @@ export async function POST(request: Request) {
               : undefined,
           },
         })
+        if (shouldRecordHistory && shouldTrackExpatChanges && (contractChanged || payrollChanged)) {
+          const supervisorSnapshot = await resolveSupervisorSnapshot(nextExpat.chineseSupervisorId)
+          if (contractChanged) {
+            await createInitialContractChangeIfMissing(tx, {
+              userId: match.id,
+              expatProfile: existingExpatSnapshot,
+              joinDate: match.joinDate ?? null,
+              fallbackChangeDate: new Date(),
+            })
+            await tx.userContractChange.create({
+              data: {
+                userId: match.id,
+                chineseSupervisorId: supervisorSnapshot.id,
+                chineseSupervisorName: supervisorSnapshot.name,
+                contractNumber: nextExpat.contractNumber,
+                contractType: nextExpat.contractType,
+                salaryCategory: nextExpat.salaryCategory,
+                salaryAmount: nextExpat.baseSalaryAmount,
+                salaryUnit: nextExpat.baseSalaryUnit,
+                prime: nextExpat.prime,
+                startDate: nextExpat.contractStartDate,
+                endDate: nextExpat.contractEndDate,
+              },
+            })
+          }
+          if (payrollChanged) {
+            await tx.userPayrollChange.create({
+              data: {
+                userId: match.id,
+                team: nextExpat.team,
+                chineseSupervisorId: supervisorSnapshot.id,
+                chineseSupervisorName: supervisorSnapshot.name,
+                salaryCategory: nextExpat.salaryCategory,
+                salaryAmount: nextExpat.baseSalaryAmount,
+                salaryUnit: nextExpat.baseSalaryUnit,
+                prime: nextExpat.prime,
+                baseSalaryAmount: nextExpat.baseSalaryAmount,
+                baseSalaryUnit: nextExpat.baseSalaryUnit,
+                netMonthlyAmount: nextExpat.netMonthlyAmount,
+                netMonthlyUnit: nextExpat.netMonthlyUnit,
+              },
+            })
+          }
+        }
       }
       },
       {

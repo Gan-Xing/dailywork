@@ -37,6 +37,7 @@ type UseMemberImportExportParams = {
   loadData: () => Promise<void>
   setActionError: (value: string | null) => void
   setActionNotice: (value: string | null) => void
+  skipChangeHistory?: boolean
 }
 
 export function useMemberImportExport({
@@ -62,6 +63,7 @@ export function useMemberImportExport({
   loadData,
   setActionError,
   setActionNotice,
+  skipChangeHistory,
 }: UseMemberImportExportParams) {
   const [importing, setImporting] = useState(false)
   const [exporting, setExporting] = useState(false)
@@ -722,7 +724,11 @@ export function useMemberImportExport({
         const res = await fetch('/api/members/import', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ members: prepared, ignoreErrors: errors.length > 0 }),
+          body: JSON.stringify({
+            members: prepared,
+            ignoreErrors: errors.length > 0,
+            skipChangeHistory: Boolean(skipChangeHistory),
+          }),
         })
         const payload = (await res.json().catch(() => ({}))) as {
           imported?: number
@@ -767,6 +773,7 @@ export function useMemberImportExport({
       loadData,
       setActionError,
       setActionNotice,
+      skipChangeHistory,
       t,
     ],
   )

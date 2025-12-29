@@ -48,6 +48,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     tags,
     chineseProfile,
     expatProfile,
+    skipChangeHistory,
   } = body ?? {}
 
   const normalizedUsername = typeof username === 'string' ? username.trim() : undefined
@@ -67,6 +68,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   }
   const resolvedEmploymentStatus = employmentStatus ?? 'ACTIVE'
   const isChinese = nationality === 'china'
+  const shouldRecordHistory = !skipChangeHistory
   const chineseProfileData = normalizeChineseProfile(chineseProfile)
   const expatProfileData = normalizeExpatProfile(expatProfile)
   const shouldUpsertExpatProfile = !isChinese || hasExpatProfileData(expatProfileData)
@@ -263,7 +265,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         },
       })
 
-      if (!isChinese && contractChanged) {
+      if (!isChinese && contractChanged && shouldRecordHistory) {
         await createInitialContractChangeIfMissing(tx, {
           userId,
           expatProfile: existingUser.expatProfile,
@@ -287,7 +289,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         })
       }
 
-      if (!isChinese && payrollChanged) {
+      if (!isChinese && payrollChanged && shouldRecordHistory) {
         await tx.userPayrollChange.create({
           data: {
             userId,

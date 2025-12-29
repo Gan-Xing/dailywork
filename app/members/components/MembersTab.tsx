@@ -52,6 +52,8 @@ type MembersTabProps = {
   contractChangeTemplateDownloading: boolean
   exporting: boolean
   templateDownloading: boolean
+  skipImportHistory: boolean
+  onToggleSkipImportHistory: (next: boolean) => void
   onImportFileChange: (event: ChangeEvent<HTMLInputElement>) => void
   onContractChangeImportFileChange: (event: ChangeEvent<HTMLInputElement>) => void
   onContractChangeTemplateDownload: () => void
@@ -247,14 +249,16 @@ export function MembersTab(props: MembersTabProps) {
     error,
     actionError,
     actionNotice,
-  importing,
-  contractChangeImporting,
-  contractChangeTemplateDownloading,
-  exporting,
-  templateDownloading,
-  onImportFileChange,
-  onContractChangeImportFileChange,
-  onContractChangeTemplateDownload,
+    importing,
+    contractChangeImporting,
+    contractChangeTemplateDownloading,
+    exporting,
+    templateDownloading,
+    skipImportHistory,
+    onToggleSkipImportHistory,
+    onImportFileChange,
+    onContractChangeImportFileChange,
+    onContractChangeTemplateDownload,
     showCreateModal,
     showFilterDrawer,
     onOpenFilterDrawer,
@@ -545,6 +549,20 @@ export function MembersTab(props: MembersTabProps) {
           <ActionButton onClick={onImportClick} disabled={!canCreateMember || importing}>
             {t.actions.import}
           </ActionButton>
+          <label
+            className={`inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-[11px] font-semibold text-slate-600 ${
+              !canCreateMember ? 'cursor-not-allowed opacity-60' : 'hover:bg-slate-50'
+            }`}
+          >
+            <input
+              type="checkbox"
+              checked={skipImportHistory}
+              onChange={(event) => onToggleSkipImportHistory(event.target.checked)}
+              disabled={!canCreateMember}
+              className="accent-emerald-500"
+            />
+            <span>{t.form.skipChangeHistory}</span>
+          </label>
           <ActionButton
             onClick={onContractChangeImportClick}
             disabled={!canUpdateMember || contractChangeImporting}

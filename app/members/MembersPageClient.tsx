@@ -133,6 +133,7 @@ export function MembersPageClient() {
   const [showPhonePicker, setShowPhonePicker] = useState(false)
   const phonePickerRef = useRef<HTMLDivElement | null>(null)
   const [profileExpanded, setProfileExpanded] = useState(false)
+  const [skipImportHistory, setSkipImportHistory] = useState(false)
   const importInputRef = useRef<HTMLInputElement | null>(null)
   const contractChangeImportInputRef = useRef<HTMLInputElement | null>(null)
   const {
@@ -534,6 +535,7 @@ export function MembersPageClient() {
     loadData,
     setActionError,
     setActionNotice,
+    skipChangeHistory: skipImportHistory,
   })
   const {
     importing: contractChangeImporting,
@@ -1264,6 +1266,8 @@ export function MembersPageClient() {
                 contractChangeTemplateDownloading={contractChangeTemplateDownloading}
                 exporting={exporting}
                 templateDownloading={templateDownloading}
+                skipImportHistory={skipImportHistory}
+                onToggleSkipImportHistory={setSkipImportHistory}
                 onImportFileChange={handleImportFileChange}
                 onContractChangeImportFileChange={handleContractChangeImportFileChange}
                 onContractChangeTemplateDownload={handleContractChangeTemplateDownload}

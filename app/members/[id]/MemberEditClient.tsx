@@ -142,7 +142,15 @@ export function MemberEditClient({ member, canAssignRole }: Props) {
               canAssignRole={canAssignRole}
             />
 
-            <FormActions t={t} submitting={submitting} actionError={actionError} />
+            <FormActions
+              t={t}
+              submitting={submitting}
+              actionError={actionError}
+              skipChangeHistory={formState.skipChangeHistory}
+              onToggleSkipChangeHistory={(value) =>
+                setFormState((prev) => ({ ...prev, skipChangeHistory: value }))
+              }
+            />
           </form>
         </div>
       </div>
