@@ -4,6 +4,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { hashPassword } from '@/lib/auth/password'
 import { hasPermission } from '@/lib/server/authSession'
 import { isDecimalEqual, resolveSupervisorSnapshot } from '@/lib/server/compensation'
+import { createInitialContractChangeIfMissing } from '@/lib/server/contractChanges'
 import { normalizeTagsInput } from '@/lib/members/utils'
 import {
   hasExpatProfileData,
@@ -263,6 +264,12 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       })
 
       if (!isChinese && contractChanged) {
+        await createInitialContractChangeIfMissing(tx, {
+          userId,
+          expatProfile: existingUser.expatProfile,
+          joinDate: existingUser.joinDate,
+          fallbackChangeDate: new Date(),
+        })
         await tx.userContractChange.create({
           data: {
             userId,

@@ -17,6 +17,7 @@ type CompensationSectionProps = {
   formState: FormState
   teamOptions: string[]
   chineseSupervisorOptions: SupervisorOption[]
+  onApplyExpatProfile: (patch: Partial<FormState['expatProfile']>) => void
 }
 
 export function CompensationSection({
@@ -25,6 +26,7 @@ export function CompensationSection({
   formState,
   teamOptions,
   chineseSupervisorOptions,
+  onApplyExpatProfile,
 }: CompensationSectionProps) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -107,6 +109,7 @@ export function CompensationSection({
             onRefresh={loadCompensation}
             expatProfile={formState.expatProfile}
             chineseSupervisorOptions={chineseSupervisorOptions}
+            onApplyExpatProfile={onApplyExpatProfile}
           />
           <PayrollChangeTable
             t={t}
@@ -117,6 +120,7 @@ export function CompensationSection({
             expatProfile={formState.expatProfile}
             teamOptions={teamOptions}
             chineseSupervisorOptions={chineseSupervisorOptions}
+            onApplyExpatProfile={onApplyExpatProfile}
           />
           <PayrollPayoutTable t={t} loading={loading} records={payrollPayouts} />
         </div>

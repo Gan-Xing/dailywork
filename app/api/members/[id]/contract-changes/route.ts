@@ -9,6 +9,7 @@ import {
   parseSalaryUnit,
   resolveSupervisorSnapshot,
 } from '@/lib/server/compensation'
+import { createInitialContractChangeIfMissing } from '@/lib/server/contractChanges'
 import { hasPermission } from '@/lib/server/authSession'
 import { prisma } from '@/lib/prisma'
 
@@ -34,12 +35,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     where: { id: userId },
     select: {
       nationality: true,
+      joinDate: true,
       expatProfile: {
         select: {
           chineseSupervisorId: true,
           team: true,
           contractNumber: true,
           contractType: true,
+          contractStartDate: true,
+          contractEndDate: true,
           salaryCategory: true,
           baseSalaryAmount: true,
           baseSalaryUnit: true,
@@ -130,6 +134,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const resolvedEndDate = endDateInput ?? addOneYear(resolvedStartDate)
 
   const result = await prisma.$transaction(async (tx) => {
+    await createInitialContractChangeIfMissing(tx, {
+      userId,
+      expatProfile,
+      joinDate: user.joinDate,
+      fallbackChangeDate: changeDate,
+    })
     const change = await tx.userContractChange.create({
       data: {
         userId,

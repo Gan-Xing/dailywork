@@ -4,6 +4,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { normalizeTagsInput } from '@/lib/members/utils'
 import { hasPermission } from '@/lib/server/authSession'
 import { isDecimalEqual, resolveSupervisorSnapshot } from '@/lib/server/compensation'
+import { createInitialContractChangeIfMissing } from '@/lib/server/contractChanges'
 import {
   normalizeChineseProfile,
   normalizeExpatProfile,
@@ -541,6 +542,12 @@ export async function POST(request: NextRequest) {
         })
 
         if (!isChinese && shouldTrackExpatChanges && contractChanged) {
+          await createInitialContractChangeIfMissing(tx, {
+            userId,
+            expatProfile: existingExpat,
+            joinDate: existingUser.joinDate ?? null,
+            fallbackChangeDate: new Date(),
+          })
           await tx.userContractChange.create({
             data: {
               userId,

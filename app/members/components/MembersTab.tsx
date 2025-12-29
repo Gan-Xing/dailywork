@@ -48,9 +48,13 @@ type MembersTabProps = {
   actionError: string | null
   actionNotice: string | null
   importing: boolean
+  contractChangeImporting: boolean
+  contractChangeTemplateDownloading: boolean
   exporting: boolean
   templateDownloading: boolean
   onImportFileChange: (event: ChangeEvent<HTMLInputElement>) => void
+  onContractChangeImportFileChange: (event: ChangeEvent<HTMLInputElement>) => void
+  onContractChangeTemplateDownload: () => void
   showCreateModal: boolean
   showFilterDrawer: boolean
   onOpenFilterDrawer: () => void
@@ -187,9 +191,11 @@ type MembersTabProps = {
   onClearSort: () => void
   onOpenCreateModal: () => void
   onImportClick: () => void
+  onContractChangeImportClick: () => void
   onExport: () => void
   onDownloadTemplate: () => void
   importInputRef: RefObject<HTMLInputElement>
+  contractChangeImportInputRef: RefObject<HTMLInputElement>
   columnSelectorRef: RefObject<HTMLDivElement>
   handleSort: (field: SortField) => void
   sortIndicator: (field: SortField) => string
@@ -241,10 +247,14 @@ export function MembersTab(props: MembersTabProps) {
     error,
     actionError,
     actionNotice,
-    importing,
-    exporting,
-    templateDownloading,
-    onImportFileChange,
+  importing,
+  contractChangeImporting,
+  contractChangeTemplateDownloading,
+  exporting,
+  templateDownloading,
+  onImportFileChange,
+  onContractChangeImportFileChange,
+  onContractChangeTemplateDownload,
     showCreateModal,
     showFilterDrawer,
     onOpenFilterDrawer,
@@ -381,9 +391,11 @@ export function MembersTab(props: MembersTabProps) {
     onClearSort,
     onOpenCreateModal,
     onImportClick,
+    onContractChangeImportClick,
     onExport,
     onDownloadTemplate,
     importInputRef,
+    contractChangeImportInputRef,
     columnSelectorRef,
     handleSort,
     sortIndicator,
@@ -533,6 +545,18 @@ export function MembersTab(props: MembersTabProps) {
           <ActionButton onClick={onImportClick} disabled={!canCreateMember || importing}>
             {t.actions.import}
           </ActionButton>
+          <ActionButton
+            onClick={onContractChangeImportClick}
+            disabled={!canUpdateMember || contractChangeImporting}
+          >
+            {t.actions.importContractChanges}
+          </ActionButton>
+          <ActionButton
+            onClick={onContractChangeTemplateDownload}
+            disabled={contractChangeTemplateDownloading}
+          >
+            {t.actions.contractChangeTemplate}
+          </ActionButton>
           <ActionButton onClick={onExport} disabled={!canViewMembers || exporting}>
             {t.actions.export}
           </ActionButton>
@@ -558,6 +582,13 @@ export function MembersTab(props: MembersTabProps) {
             type="file"
             accept=".xlsx,.xls,.csv"
             onChange={onImportFileChange}
+            className="hidden"
+          />
+          <input
+            ref={contractChangeImportInputRef}
+            type="file"
+            accept=".xlsx,.xls,.csv"
+            onChange={onContractChangeImportFileChange}
             className="hidden"
           />
           <ActionButton onClick={onClearFilters} disabled={!hasActiveFilters}>

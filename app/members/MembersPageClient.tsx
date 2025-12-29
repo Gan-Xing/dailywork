@@ -54,6 +54,7 @@ import { useMemberFilterOptions } from './hooks/useMemberFilterOptions'
 import { useMemberFilterSummary } from './hooks/useMemberFilterSummary'
 import { useMemberFormatters } from './hooks/useMemberFormatters'
 import { useMemberImportExport } from './hooks/useMemberImportExport'
+import { useContractChangeImport } from './hooks/useContractChangeImport'
 import { useMembersData } from './hooks/useMembersData'
 import { usePermissionStatus } from './hooks/usePermissionStatus'
 import { useRoleManagement } from './hooks/useRoleManagement'
@@ -133,6 +134,7 @@ export function MembersPageClient() {
   const phonePickerRef = useRef<HTMLDivElement | null>(null)
   const [profileExpanded, setProfileExpanded] = useState(false)
   const importInputRef = useRef<HTMLInputElement | null>(null)
+  const contractChangeImportInputRef = useRef<HTMLInputElement | null>(null)
   const {
     filters,
     filterActions,
@@ -529,6 +531,18 @@ export function MembersPageClient() {
     findGenderLabel,
     findNationalityLabel,
     resolveRoleName,
+    loadData,
+    setActionError,
+    setActionNotice,
+  })
+  const {
+    importing: contractChangeImporting,
+    handleImportFileChange: handleContractChangeImportFileChange,
+    templateDownloading: contractChangeTemplateDownloading,
+    handleDownloadTemplate: handleContractChangeTemplateDownload,
+  } = useContractChangeImport({
+    t,
+    canUpdateMember,
     loadData,
     setActionError,
     setActionNotice,
@@ -1026,7 +1040,21 @@ export function MembersPageClient() {
       setActionNotice(null)
       return
     }
-    importInputRef.current?.click()
+    if (importInputRef.current) {
+      importInputRef.current.value = ''
+      importInputRef.current.click()
+    }
+  }
+  const handleContractChangeImportClick = () => {
+    if (!canUpdateMember) {
+      setActionError(t.errors.needMemberUpdate)
+      setActionNotice(null)
+      return
+    }
+    if (contractChangeImportInputRef.current) {
+      contractChangeImportInputRef.current.value = ''
+      contractChangeImportInputRef.current.click()
+    }
   }
 
   const handleSort = (field: SortField) => {
@@ -1232,9 +1260,13 @@ export function MembersPageClient() {
                 actionError={actionError}
                 actionNotice={actionNotice}
                 importing={importing}
+                contractChangeImporting={contractChangeImporting}
+                contractChangeTemplateDownloading={contractChangeTemplateDownloading}
                 exporting={exporting}
                 templateDownloading={templateDownloading}
                 onImportFileChange={handleImportFileChange}
+                onContractChangeImportFileChange={handleContractChangeImportFileChange}
+                onContractChangeTemplateDownload={handleContractChangeTemplateDownload}
                 showCreateModal={showCreateModal}
                 showFilterDrawer={showFilterDrawer}
                 onOpenFilterDrawer={() => setShowFilterDrawer(true)}
@@ -1371,9 +1403,11 @@ export function MembersPageClient() {
                 onClearSort={clearSort}
                 onOpenCreateModal={openCreateModal}
                 onImportClick={handleImportClick}
+                onContractChangeImportClick={handleContractChangeImportClick}
                 onExport={handleExportMembers}
                 onDownloadTemplate={handleDownloadTemplate}
                 importInputRef={importInputRef}
+                contractChangeImportInputRef={contractChangeImportInputRef}
                 columnSelectorRef={columnSelectorRef}
                 handleSort={handleSort}
                 sortIndicator={sortIndicator}

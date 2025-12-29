@@ -38,6 +38,14 @@ type PayrollRun = {
   updatedAt: string
 }
 
+type ContractSnapshot = {
+  contractNumber: string | null
+  contractType: 'CTJ' | 'CDD' | null
+  ctjOverlap?: boolean
+}
+
+type ContractSnapshotsByRun = Record<number, Record<number, ContractSnapshot>>
+
 type PayrollPayout = {
   id: number
   runId: number
@@ -112,6 +120,7 @@ export function PayrollPayoutsTab({
   const [viewMode, setViewMode] = useState<'entry' | 'report'>('entry')
   const [runs, setRuns] = useState<PayrollRun[]>([])
   const [payouts, setPayouts] = useState<PayrollPayout[]>([])
+  const [contractSnapshotsByRunId, setContractSnapshotsByRunId] = useState<ContractSnapshotsByRun>({})
   const [prevCutoffDate, setPrevCutoffDate] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -130,7 +139,7 @@ export function PayrollPayoutsTab({
   const [sortField, setSortField] = useState<PayrollSortField | null>(null)
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
   const importInputRef = useRef<HTMLInputElement>(null)
-  
+
   const { addToast } = useToast()
   const [clearRunDialog, setClearRunDialog] = useState<{ run: PayrollRun; label: string } | null>(null)
 
@@ -140,18 +149,79 @@ export function PayrollPayoutsTab({
     return new Intl.Collator(localeId, { numeric: true, sensitivity: 'base' })
   }, [locale])
 
-  const baseMembers = useMemo(
-    () =>
-      members.filter(
-        (member) =>
-          member.nationality !== 'china' &&
-          member.expatProfile &&
-          normalizeText(member.expatProfile.team),
-      ),
+  const payrollMembers = useMemo(
+    () => members.filter((member) => member.nationality !== 'china' && member.expatProfile),
     [members],
   )
 
-  const { parseFile } = usePayrollImport({ t, members: baseMembers })
+  const baseMembers = useMemo(
+    () =>
+      payrollMembers.filter((member) => normalizeText(member.expatProfile?.team)),
+    [payrollMembers],
+  )
+
+  const primaryRunId = useMemo(() => {
+    const runTwo = runs.find((run) => run.sequence === 2)
+    const runOne = runs.find((run) => run.sequence === 1)
+    return runTwo?.id ?? runOne?.id ?? null
+  }, [runs])
+
+  const primaryContractsByMemberId = useMemo(() => {
+    const contracts: Record<number, ContractSnapshot> = {}
+    if (!primaryRunId) return contracts
+    const snapshotMap = contractSnapshotsByRunId[primaryRunId] ?? {}
+    payrollMembers.forEach((member) => {
+      const snapshot = snapshotMap[member.id]
+      contracts[member.id] = {
+        contractNumber: snapshot?.contractNumber ?? member.expatProfile?.contractNumber ?? null,
+        contractType: snapshot?.contractType ?? member.expatProfile?.contractType ?? null,
+      }
+    })
+    return contracts
+  }, [primaryRunId, contractSnapshotsByRunId, payrollMembers])
+
+  const getPrimaryContractSnapshot = useCallback(
+    (member: Member) =>
+      primaryContractsByMemberId[member.id] ?? {
+        contractNumber: member.expatProfile?.contractNumber ?? null,
+        contractType: member.expatProfile?.contractType ?? null,
+      },
+    [primaryContractsByMemberId],
+  )
+
+  const contractNumbersByMemberId = useMemo(() => {
+    const map: Record<number, string[]> = {}
+    const addNumber = (userId: number, value?: string | null) => {
+      const normalized = normalizeText(value)
+      if (!normalized) return
+      if (!map[userId]) map[userId] = []
+      if (!map[userId].includes(normalized)) {
+        map[userId].push(normalized)
+      }
+    }
+
+    runs.forEach((run) => {
+      const snapshotMap = contractSnapshotsByRunId[run.id]
+      if (!snapshotMap) return
+      Object.entries(snapshotMap).forEach(([userId, snapshot]) => {
+        const id = Number(userId)
+        if (Number.isNaN(id)) return
+        addNumber(id, snapshot.contractNumber)
+      })
+    })
+
+    payrollMembers.forEach((member) => {
+      addNumber(member.id, member.expatProfile?.contractNumber ?? null)
+    })
+
+    return map
+  }, [runs, contractSnapshotsByRunId, payrollMembers])
+
+  const { parseFile } = usePayrollImport({
+    t,
+    members: payrollMembers,
+    contractNumbersByMemberId,
+  })
 
   const handleImportClick = () => {
     if (importInputRef.current) {
@@ -166,16 +236,16 @@ export function PayrollPayoutsTab({
 
     // Identify targets
     const targets: ImportTarget[] = []
-    runs.forEach(run => {
-       const draftDate = runDateDrafts[run.id]
-       const date = draftDate !== undefined ? draftDate : formatDateInput(run.payoutDate)
-       if (date) {
-         targets.push({ runId: run.id, date })
-       }
+    runs.forEach((run) => {
+      const draftDate = runDateDrafts[run.id]
+      const date = draftDate !== undefined ? draftDate : formatDateInput(run.payoutDate)
+      if (date) {
+        targets.push({ runId: run.id, date })
+      }
     })
 
     if (targets.length === 0) {
-      addToast("Please set Payout Dates for the runs you want to import.", { tone: 'warning' })
+      addToast('Please set Payout Dates for the runs you want to import.', { tone: 'warning' })
       if (importInputRef.current) importInputRef.current.value = ''
       return
     }
@@ -210,7 +280,6 @@ export function PayrollPayoutsTab({
       if (importInputRef.current) importInputRef.current.value = ''
     }
   }
-
 
   const filterControlProps = useMemo(
     () => ({
@@ -268,17 +337,18 @@ export function PayrollPayoutsTab({
   const contractNumberFilterOptions = useMemo(() => {
     const map = new Map<string, string>()
     baseMembers.forEach((member) => {
-      const contractNumber = normalizeText(member.expatProfile?.contractNumber)
+      const contractNumber = normalizeText(getPrimaryContractSnapshot(member).contractNumber)
       if (!contractNumber || map.has(contractNumber)) return
       map.set(contractNumber, contractNumber)
     })
     return Array.from(map.entries())
       .map(([value, label]) => ({ value, label }))
       .sort((left, right) => collator.compare(left.label, right.label))
-  }, [baseMembers, collator])
+  }, [baseMembers, collator, getPrimaryContractSnapshot])
 
-  const filteredMembers = useMemo(() => {
-    return baseMembers.filter((member) => {
+  const matchesFilters = useCallback(
+    (member: Member) => {
+      const contractSnapshot = getPrimaryContractSnapshot(member)
       if (nameFilters.length > 0) {
         const name = normalizeText(member.name)
         if (!name || !nameFilters.includes(name)) return false
@@ -292,23 +362,49 @@ export function PayrollPayoutsTab({
         if (!supervisorFilters.includes(String(supervisorId ?? ''))) return false
       }
       if (contractTypeFilters.length > 0) {
-        if (!member.expatProfile?.contractType) return false
-        if (!contractTypeFilters.includes(member.expatProfile.contractType)) return false
+        if (!contractSnapshot.contractType) return false
+        if (!contractTypeFilters.includes(contractSnapshot.contractType)) return false
       }
       if (contractNumberFilters.length > 0) {
-        const contractNumber = normalizeText(member.expatProfile?.contractNumber)
+        const contractNumber = normalizeText(contractSnapshot.contractNumber)
         if (!contractNumber || !contractNumberFilters.includes(contractNumber)) return false
       }
       return true
+    },
+    [
+      nameFilters,
+      teamFilters,
+      supervisorFilters,
+      contractTypeFilters,
+      contractNumberFilters,
+      getPrimaryContractSnapshot,
+    ],
+  )
+
+  const filteredMembers = useMemo(
+    () => baseMembers.filter(matchesFilters),
+    [baseMembers, matchesFilters],
+  )
+
+  const forcedMemberIds = useMemo(() => {
+    const ids = new Set<number>()
+    runs.forEach((run) => {
+      const runDrafts = drafts[run.id]
+      if (!runDrafts) return
+      Object.entries(runDrafts).forEach(([userId, value]) => {
+        if (normalizeText(value)) ids.add(Number(userId))
+      })
     })
-  }, [
-    baseMembers,
-    nameFilters,
-    teamFilters,
-    supervisorFilters,
-    contractTypeFilters,
-    contractNumberFilters,
-  ])
+    return ids
+  }, [runs, drafts])
+
+  const forcedMembers = useMemo(
+    () =>
+      payrollMembers.filter(
+        (member) => forcedMemberIds.has(member.id) && matchesFilters(member),
+      ),
+    [payrollMembers, forcedMemberIds, matchesFilters],
+  )
 
   const runOneCutoffDate = useMemo(() => {
     const runOne = runs.find((run) => run.sequence === 1)
@@ -328,38 +424,79 @@ export function PayrollPayoutsTab({
     const prevCutoff = parseDateValue(prevCutoffDate)
     const runOneCutoff = parseDateValue(runOneCutoffDate)
     const runTwoCutoff = parseDateValue(runTwoCutoffDate)
+    const runOneId = runs.find((run) => run.sequence === 1)?.id ?? null
+    const runTwoId = runs.find((run) => run.sequence === 2)?.id ?? null
     const nextMembers: Member[] = []
     const nextEligibility = new Map<number, { run1Editable: boolean; run2Editable: boolean }>()
+    const addedIds = new Set<number>()
 
-    filteredMembers.forEach((member) => {
+    const addMember = (member: Member, forceVisible: boolean) => {
       const terminationDate = parseDateValue(member.terminationDate)
       const joinDate = parseDateValue(member.joinDate)
       const canRunOneByJoinDate = isOnOrBeforeCutoff(joinDate, runOneCutoff)
       const canRunTwoByJoinDate = isOnOrBeforeCutoff(joinDate, runTwoCutoff)
       const isVisible = isAfterCutoff(terminationDate, prevCutoff)
-      if (!isVisible) return
+      if (!isVisible && !forceVisible) return
 
-      const isCdd = member.expatProfile?.contractType === 'CDD'
-      if (isCdd) {
+      const runOneSnapshot = runOneId
+        ? contractSnapshotsByRunId[runOneId]?.[member.id]
+        : undefined
+      const runOneContractType =
+        runOneSnapshot?.contractType ?? member.expatProfile?.contractType ?? null
+      const isCddForRunOne = runOneContractType === 'CDD' && !runOneSnapshot?.ctjOverlap
+      const runOneDraft = runOneId ? normalizeText(drafts[runOneId]?.[member.id]) : ''
+      const runTwoDraft = runTwoId ? normalizeText(drafts[runTwoId]?.[member.id]) : ''
+      if (isCddForRunOne) {
         const run1Editable =
           Boolean(terminationDate) &&
           isOnOrBeforeCutoff(terminationDate, runOneCutoff) &&
           canRunOneByJoinDate
         const run2Editable =
           isAfterCutoff(terminationDate, runOneCutoff) && canRunTwoByJoinDate
-        nextEligibility.set(member.id, { run1Editable, run2Editable })
+        const resolvedRun1Editable = run1Editable || Boolean(runOneDraft)
+        const resolvedRun2Editable = run2Editable || Boolean(runTwoDraft)
+        if (addedIds.has(member.id)) return
+        addedIds.add(member.id)
+        nextEligibility.set(member.id, {
+          run1Editable: resolvedRun1Editable,
+          run2Editable: resolvedRun2Editable,
+        })
         nextMembers.push(member)
         return
       }
 
       const run1Editable = canRunOneByJoinDate
       const run2Editable = isAfterCutoff(terminationDate, runOneCutoff) && canRunTwoByJoinDate
-      nextEligibility.set(member.id, { run1Editable, run2Editable })
+      const resolvedRun1Editable = run1Editable || Boolean(runOneDraft)
+      const resolvedRun2Editable = run2Editable || Boolean(runTwoDraft)
+      if (addedIds.has(member.id)) return
+      addedIds.add(member.id)
+      nextEligibility.set(member.id, {
+        run1Editable: resolvedRun1Editable,
+        run2Editable: resolvedRun2Editable,
+      })
       nextMembers.push(member)
+    }
+
+    filteredMembers.forEach((member) => {
+      addMember(member, false)
+    })
+
+    forcedMembers.forEach((member) => {
+      addMember(member, true)
     })
 
     return { visibleMembers: nextMembers, eligibilityById: nextEligibility }
-  }, [filteredMembers, prevCutoffDate, runOneCutoffDate, runTwoCutoffDate])
+  }, [
+    filteredMembers,
+    forcedMembers,
+    prevCutoffDate,
+    runOneCutoffDate,
+    runTwoCutoffDate,
+    runs,
+    contractSnapshotsByRunId,
+    drafts,
+  ])
 
   const runMap = useMemo(() => {
     const map = new Map<number, PayrollRun>()
@@ -394,6 +531,17 @@ export function PayrollPayoutsTab({
           username: member.expatProfile?.chineseSupervisor?.username ?? null,
         }),
       )
+
+    const getContractNumber = (member: Member) =>
+      normalizeText(
+        primaryContractsByMemberId[member.id]?.contractNumber ??
+          member.expatProfile?.contractNumber,
+      )
+
+    const getContractType = (member: Member) =>
+      primaryContractsByMemberId[member.id]?.contractType ??
+      member.expatProfile?.contractType ??
+      ''
 
     const compareText = (leftValue: string, rightValue: string) => {
       if (!leftValue && !rightValue) return 0
@@ -475,15 +623,9 @@ export function PayrollPayoutsTab({
             normalizeText(right.name) || normalizeText(right.username),
           )
         case 'contractNumber':
-          return compareText(
-            normalizeText(left.expatProfile?.contractNumber),
-            normalizeText(right.expatProfile?.contractNumber),
-          )
+          return compareText(getContractNumber(left), getContractNumber(right))
         case 'contractType':
-          return compareText(
-            left.expatProfile?.contractType ?? '',
-            right.expatProfile?.contractType ?? '',
-          )
+          return compareText(getContractType(left), getContractType(right))
         case 'run1': {
           const leftEligible = Boolean(eligibilityById.get(left.id)?.run1Editable)
           const rightEligible = Boolean(eligibilityById.get(right.id)?.run1Editable)
@@ -539,16 +681,21 @@ export function PayrollPayoutsTab({
     payoutMap,
     drafts,
     eligibilityById,
+    primaryContractsByMemberId,
     collator,
   ])
 
   const selectedStats = useMemo(() => {
-    const ctjCount = sortedMembers.filter((member) => member.expatProfile?.contractType === 'CTJ')
+    const ctjCount = sortedMembers.filter(
+      (member) => getPrimaryContractSnapshot(member).contractType === 'CTJ',
+    )
       .length
-    const cddCount = sortedMembers.filter((member) => member.expatProfile?.contractType === 'CDD')
+    const cddCount = sortedMembers.filter(
+      (member) => getPrimaryContractSnapshot(member).contractType === 'CDD',
+    )
       .length
     return { total: sortedMembers.length, ctj: ctjCount, cdd: cddCount }
-  }, [sortedMembers])
+  }, [sortedMembers, getPrimaryContractSnapshot])
 
   const activeFilterCount =
     nameFilters.length +
@@ -583,9 +730,25 @@ export function PayrollPayoutsTab({
         const data = await res.json().catch(() => ({}))
         throw new Error(data.error ?? t.payroll.errors.loadFailed)
       }
-      const data = (await res.json()) as { runs?: PayrollRun[]; payouts?: PayrollPayout[] }
+      const data = (await res.json()) as {
+        runs?: PayrollRun[]
+        payouts?: PayrollPayout[]
+        contractSnapshots?: Array<{
+          runId: number
+          contracts?: Record<string, ContractSnapshot>
+        }>
+      }
       const nextRuns = Array.isArray(data.runs) ? data.runs : []
       const nextPayouts = Array.isArray(data.payouts) ? data.payouts : []
+      const nextContractSnapshots: ContractSnapshotsByRun = {}
+      data.contractSnapshots?.forEach((snapshot) => {
+        const contracts: Record<number, ContractSnapshot> = {}
+        Object.entries(snapshot.contracts ?? {}).forEach(([userId, contract]) => {
+          const id = Number(userId)
+          if (!Number.isNaN(id)) contracts[id] = contract
+        })
+        nextContractSnapshots[snapshot.runId] = contracts
+      })
       let nextPrevCutoff: string | null = null
       if (prevRes.ok) {
         const prevData = (await prevRes.json().catch(() => ({}))) as { runs?: PayrollRun[] }
@@ -595,6 +758,7 @@ export function PayrollPayoutsTab({
       }
       setRuns(nextRuns)
       setPayouts(nextPayouts)
+      setContractSnapshotsByRunId(nextContractSnapshots)
       setPrevCutoffDate(nextPrevCutoff)
       const nextDrafts: Record<number, Record<number, string>> = {}
       nextPayouts.forEach((payout) => {
@@ -773,6 +937,7 @@ export function PayrollPayoutsTab({
 
     const rows = sortedMembers.map((member) => {
       const eligibility = eligibilityById.get(member.id)
+      const contractSnapshot = getPrimaryContractSnapshot(member)
       const runOneEligible = Boolean(eligibility?.run1Editable)
       const runTwoEligible = Boolean(eligibility?.run2Editable)
       const runOneAmount =
@@ -791,8 +956,8 @@ export function PayrollPayoutsTab({
         getSupervisorLabel(member, runTwo?.id ?? runOne?.id),
         getTeamLabel(member, runTwo?.id ?? runOne?.id),
         normalizeText(member.name) || normalizeText(member.username),
-        normalizeText(member.expatProfile?.contractNumber),
-        member.expatProfile?.contractType ?? t.labels.empty,
+        normalizeText(contractSnapshot.contractNumber),
+        contractSnapshot.contractType ?? t.labels.empty,
         runOneAmount,
         runTwoAmount,
         hasTotal ? rowTotal : '',
@@ -1302,6 +1467,7 @@ export function PayrollPayoutsTab({
                     viewMode === 'entry' && runOneEligible && !normalizeText(runOneValue)
                   const runTwoMissing =
                     viewMode === 'entry' && runTwoEligible && !normalizeText(runTwoValue)
+                  const contractSnapshot = getPrimaryContractSnapshot(member)
                   const runOneReportValue =
                     runOne && runOneEligible
                       ? payoutMap.get(runOne.id)?.get(member.id)?.amount ?? ''
@@ -1322,9 +1488,9 @@ export function PayrollPayoutsTab({
                         {normalizeText(member.name) || normalizeText(member.username) || t.labels.empty}
                       </td>
                       <td className="px-4 py-3">
-                        {normalizeText(member.expatProfile?.contractNumber) || t.labels.empty}
+                        {normalizeText(contractSnapshot.contractNumber) || t.labels.empty}
                       </td>
-                      <td className="px-4 py-3">{member.expatProfile?.contractType ?? t.labels.empty}</td>
+                      <td className="px-4 py-3">{contractSnapshot.contractType ?? t.labels.empty}</td>
                       <td className={`px-4 py-3 ${runOneMissing ? 'bg-rose-50' : ''}`}>
                         {viewMode === 'entry' ? (
                           <input

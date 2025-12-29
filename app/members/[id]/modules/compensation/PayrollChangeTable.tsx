@@ -29,6 +29,7 @@ type PayrollChangeTableProps = {
   teamOptions: string[]
   chineseSupervisorOptions: SupervisorOption[]
   onRefresh: () => void
+  onApplyExpatProfile: (patch: Partial<FormState['expatProfile']>) => void
 }
 
 const formatDate = (value?: string | null) => (value ? value.slice(0, 10) : '')
@@ -54,6 +55,7 @@ export function PayrollChangeTable({
   teamOptions,
   chineseSupervisorOptions,
   onRefresh,
+  onApplyExpatProfile,
 }: PayrollChangeTableProps) {
   const defaultForm = useMemo(() => buildDefaults(expatProfile), [expatProfile])
   const [open, setOpen] = useState(false)
@@ -104,8 +106,27 @@ export function PayrollChangeTable({
           body: JSON.stringify(payload),
         },
       )
+      const data = (await res.json().catch(() => ({}))) as {
+        payrollChange?: PayrollChange
+        error?: string
+      }
       if (!res.ok) {
-        throw new Error((await res.json()).error ?? t.feedback.submitError)
+        throw new Error(data.error ?? t.feedback.submitError)
+      }
+      if (data.payrollChange) {
+        const change = data.payrollChange
+        const netMonthlyUnit =
+          change.netMonthlyUnit === 'MONTH' ? 'MONTH' : ''
+        onApplyExpatProfile({
+          salaryCategory: change.salaryCategory ?? '',
+          prime: change.prime ?? '',
+          baseSalaryAmount: change.baseSalaryAmount ?? change.salaryAmount ?? '',
+          baseSalaryUnit: (change.baseSalaryUnit ?? change.salaryUnit ?? '') as FormState['expatProfile']['baseSalaryUnit'],
+          netMonthlyAmount: change.netMonthlyAmount ?? '',
+          netMonthlyUnit,
+          team: change.team ?? '',
+          chineseSupervisorId: change.chineseSupervisorId ? String(change.chineseSupervisorId) : '',
+        })
       }
       await onRefresh()
       setOpen(false)

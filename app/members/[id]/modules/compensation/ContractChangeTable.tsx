@@ -30,6 +30,7 @@ type ContractChangeTableProps = {
   expatProfile: FormState['expatProfile']
   chineseSupervisorOptions: SupervisorOption[]
   onRefresh: () => void
+  onApplyExpatProfile: (patch: Partial<FormState['expatProfile']>) => void
 }
 
 const formatDate = (value?: string | null) => (value ? value.slice(0, 10) : '')
@@ -66,6 +67,7 @@ export function ContractChangeTable({
   expatProfile,
   chineseSupervisorOptions,
   onRefresh,
+  onApplyExpatProfile,
 }: ContractChangeTableProps) {
   const defaultForm = useMemo(() => buildDefaults(expatProfile), [expatProfile])
   const [open, setOpen] = useState(false)
@@ -118,8 +120,26 @@ export function ContractChangeTable({
           body: JSON.stringify(payload),
         },
       )
+      const data = (await res.json().catch(() => ({}))) as {
+        contractChange?: ContractChange
+        error?: string
+      }
       if (!res.ok) {
-        throw new Error((await res.json()).error ?? t.feedback.submitError)
+        throw new Error(data.error ?? t.feedback.submitError)
+      }
+      if (data.contractChange) {
+        const change = data.contractChange
+        onApplyExpatProfile({
+          contractNumber: change.contractNumber ?? '',
+          contractType: (change.contractType ?? '') as FormState['expatProfile']['contractType'],
+          salaryCategory: change.salaryCategory ?? '',
+          prime: change.prime ?? '',
+          baseSalaryAmount: change.salaryAmount ?? '',
+          baseSalaryUnit: (change.salaryUnit ?? '') as FormState['expatProfile']['baseSalaryUnit'],
+          contractStartDate: formatDate(change.startDate),
+          contractEndDate: formatDate(change.endDate),
+          chineseSupervisorId: change.chineseSupervisorId ? String(change.chineseSupervisorId) : '',
+        })
       }
       await onRefresh()
       setOpen(false)

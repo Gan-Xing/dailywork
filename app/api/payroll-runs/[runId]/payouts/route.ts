@@ -17,6 +17,12 @@ const isDateAfterCutoff = (date: Date | null, cutoffDate: Date | null) => {
   return toDateKey(date) > toDateKey(cutoffDate)
 }
 
+const addUtcDays = (value: Date, days: number) => {
+  const next = new Date(value)
+  next.setUTCDate(next.getUTCDate() + days)
+  return next
+}
+
 type PayrollPayoutInput = {
   userId: number
   amount?: string | number | null
@@ -67,16 +73,105 @@ export async function POST(
         select: {
           team: true,
           chineseSupervisorId: true,
+          contractNumber: true,
           contractType: true,
         },
       },
     },
   })
   const userMap = new Map(users.map((user) => [user.id, user]))
+  const contractChanges = await prisma.userContractChange.findMany({
+    where: { userId: { in: userIds } },
+    select: {
+      userId: true,
+      contractNumber: true,
+      contractType: true,
+      startDate: true,
+      endDate: true,
+      changeDate: true,
+    },
+  })
+  const contractChangesByUser = new Map<number, typeof contractChanges>()
+  contractChanges.forEach((change) => {
+    const list = contractChangesByUser.get(change.userId) ?? []
+    list.push(change)
+    contractChangesByUser.set(change.userId, list)
+  })
+  const resolveContractSnapshot = (
+    changes: typeof contractChanges,
+    cutoffDate: Date,
+    fallback: { contractType: string | null; contractNumber: string | null },
+  ): { contractType: string | null; contractNumber: string | null } => {
+    if (changes.length === 0) return fallback
+    const cutoffTime = cutoffDate.getTime()
+    const byPeriod = changes
+      .filter((change) => change.startDate && change.startDate.getTime() <= cutoffTime)
+      .filter((change) => !change.endDate || change.endDate.getTime() >= cutoffTime)
+      .sort((a, b) => (b.startDate?.getTime() ?? 0) - (a.startDate?.getTime() ?? 0))
+    const match = byPeriod[0]
+    if (match?.contractType || match?.contractNumber) {
+      return {
+        contractType: match?.contractType ?? fallback.contractType,
+        contractNumber: match?.contractNumber ?? fallback.contractNumber,
+      }
+    }
+    const byChangeDate = changes
+      .filter((change) => change.changeDate.getTime() <= cutoffTime)
+      .sort((a, b) => b.changeDate.getTime() - a.changeDate.getTime())
+    const fallbackChange = byChangeDate[0]
+    return {
+      contractType: fallbackChange?.contractType ?? fallback.contractType,
+      contractNumber: fallbackChange?.contractNumber ?? fallback.contractNumber,
+    }
+  }
+  const contractSnapshotByUserId = new Map<
+    number,
+    { contractType: string | null; contractNumber: string | null }
+  >()
+  users.forEach((user) => {
+    const changes = contractChangesByUser.get(user.id) ?? []
+    const fallbackSnapshot = {
+      contractType: user.expatProfile?.contractType ?? null,
+      contractNumber: user.expatProfile?.contractNumber ?? null,
+    }
+    contractSnapshotByUserId.set(
+      user.id,
+      resolveContractSnapshot(changes, run.attendanceCutoffDate, fallbackSnapshot),
+    )
+  })
+
+  let runStartDate: Date | null = null
+  if (run.sequence === 1) {
+    const prevMonth = run.month === 1 ? 12 : run.month - 1
+    const prevYear = run.month === 1 ? run.year - 1 : run.year
+    const prevRun = await prisma.payrollRun.findFirst({
+      where: { year: prevYear, month: prevMonth, sequence: 2 },
+      select: { attendanceCutoffDate: true },
+    })
+    if (prevRun?.attendanceCutoffDate) {
+      runStartDate = addUtcDays(prevRun.attendanceCutoffDate, 1)
+    }
+  }
+
+  const hasCtjOverlap = (userId: number) => {
+    if (!runStartDate) return false
+    const changes = contractChangesByUser.get(userId) ?? []
+    const periodStart = runStartDate.getTime()
+    const periodEnd = run.attendanceCutoffDate.getTime()
+    return changes.some((change) => {
+      if (change.contractType !== 'CTJ') return false
+      const start = change.startDate ?? change.changeDate
+      const end = change.endDate ?? null
+      if (!start) return false
+      const startTime = start.getTime()
+      const endTime = end ? end.getTime() : Number.POSITIVE_INFINITY
+      return startTime <= periodEnd && endTime >= periodStart
+    })
+  }
 
   const invalidUsers: number[] = []
-  const invalidCdd: number[] = []
-  const invalidJoinDates: number[] = []
+  const invalidCdd: string[] = []
+  const invalidJoinDates: string[] = []
   const payloads: Array<{
     userId: number
     amount: string
@@ -102,18 +197,23 @@ export async function POST(
       continue
     }
 
-    if (run.sequence === 1 && user.expatProfile.contractType === 'CDD') {
+    const contractSnapshot = contractSnapshotByUserId.get(userId)
+    const resolvedContractType =
+      contractSnapshot?.contractType ?? user.expatProfile.contractType ?? null
+    const resolvedContractNumber =
+      contractSnapshot?.contractNumber ?? user.expatProfile.contractNumber ?? null
+    if (run.sequence === 1 && resolvedContractType === 'CDD') {
       const canRunOneCdd =
         Boolean(user.terminationDate) &&
         !isDateAfterCutoff(user.terminationDate, run.attendanceCutoffDate)
-      if (!canRunOneCdd) {
-        invalidCdd.push(userId)
+      if (!canRunOneCdd && !hasCtjOverlap(userId)) {
+        invalidCdd.push(resolvedContractNumber || '未填写合同编号')
         continue
       }
     }
 
     if (isDateAfterCutoff(user.joinDate, run.attendanceCutoffDate)) {
-      invalidJoinDates.push(userId)
+      invalidJoinDates.push(resolvedContractNumber || '未填写合同编号')
       continue
     }
 
@@ -152,7 +252,9 @@ export async function POST(
   }
   if (invalidJoinDates.length > 0) {
     return NextResponse.json(
-      { error: `入职日期晚于考勤截止日期，无法录入本次发放: ${invalidJoinDates.join(', ')}` },
+      {
+        error: `入职日期晚于考勤截止日期，无法录入本次发放: ${invalidJoinDates.join(', ')}`,
+      },
       { status: 400 },
     )
   }

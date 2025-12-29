@@ -128,8 +128,10 @@ export const memberCopy: Record<
     actions: {
       create: string
       import: string
+      importContractChanges: string
       export: string
       template: string
+      contractChangeTemplate: string
       clearSort: string
       auditTrail: string
       view: string
@@ -177,18 +179,25 @@ export const memberCopy: Record<
       importNoData: string
       importDuplicateUsername: string
       importDuplicateIdentity: string
+      importMemberNotFound: string
+      importChineseMember: string
       importUsernameExists: string
       importInvalidGender: string
       importInvalidPhone: string
       importInvalidContractType: string
+      importInvalidSalaryUnit: string
       importInvalidBaseSalaryUnit: string
       importInvalidStatus: string
       importInvalidJoinDate: string
+      importInvalidStartDate: string
+      importInvalidEndDate: string
+      importInvalidChangeDate: string
       importMissingBirthDate: string
       importInvalidBirthDate: string
       importInvalidChineseSupervisor: string
       importDuplicateContractNumber: string
       importContractNumberExists: string
+      importContractChangeMissingFields: string
       importRoleNotFound: (role: string) => string
       importFailed: string
       baseSalaryUnitInvalid: string
@@ -242,6 +251,28 @@ export const memberCopy: Record<
         | 'healthStatus'
         | 'terminationDate'
         | 'terminationReason',
+        string
+      >
+    }
+    contractChangeTemplate: {
+      instructionsSheet: string
+      columnsHeader: string
+      notesHeader: string
+      notes: Record<
+        | 'name'
+        | 'birthDate'
+        | 'contractNumber'
+        | 'contractType'
+        | 'salaryCategory'
+        | 'salaryAmount'
+        | 'salaryUnit'
+        | 'baseSalary'
+        | 'prime'
+        | 'startDate'
+        | 'endDate'
+        | 'changeDate'
+        | 'reason'
+        | 'chineseSupervisor',
         string
       >
     }
@@ -342,6 +373,7 @@ export const memberCopy: Record<
       submitError: string
       deleteConfirm: (username: string) => string
       importSuccess: (count: number) => string
+      importContractChangesSuccess: (count: number) => string
       importRowError: (row: number, message: string) => string
       importSkipConfirm: (validCount: number, errorCount: number) => string
       importPartialSuccess: (imported: number, skipped: number) => string
@@ -583,8 +615,10 @@ export const memberCopy: Record<
     actions: {
       create: '新增成员',
       import: '导入成员',
+      importContractChanges: '导入合同变更',
       export: '导出 Excel/CSV',
-      template: '下载模板',
+      template: '成员导入模板',
+      contractChangeTemplate: '合同变更模板',
       clearSort: '清空排序',
       auditTrail: '审计日志',
       view: '详情',
@@ -632,18 +666,25 @@ export const memberCopy: Record<
       importNoData: '未发现可导入的数据行。',
       importDuplicateUsername: '账号重复（同一文件内）',
       importDuplicateIdentity: '同名同生日匹配多条成员',
+      importMemberNotFound: '找不到对应成员（姓名 + 出生日期）',
+      importChineseMember: '中国籍成员无需合同变更记录',
       importUsernameExists: '账号已存在',
       importInvalidGender: '性别必须为男或女',
       importInvalidPhone: '电话号码格式不正确',
       importInvalidContractType: '合同类型必须为 CTJ 或 CDD',
+      importInvalidSalaryUnit: '基础工资单位必须为 MONTH 或 HOUR',
       importInvalidBaseSalaryUnit: 'CDD 合同基础工资只能按月',
       importInvalidStatus: '状态必须为 ACTIVE / ON_LEAVE / TERMINATED',
       importInvalidJoinDate: '入职日期格式不正确',
+      importInvalidStartDate: '合同开始日期格式不正确',
+      importInvalidEndDate: '合同结束日期格式不正确',
+      importInvalidChangeDate: '变更日期格式不正确',
       importMissingBirthDate: '出生日期必填',
       importInvalidBirthDate: '出生日期格式不正确',
       importInvalidChineseSupervisor: '中方负责人账号不存在或非中国籍成员',
       importDuplicateContractNumber: '合同编号重复（同一文件内）',
       importContractNumberExists: '合同编号已存在',
+      importContractChangeMissingFields: '缺少合同变更字段',
       importRoleNotFound: (role: string) => `角色不存在：${role}`,
       importFailed: '导入失败，请稍后重试。',
       baseSalaryUnitInvalid: 'CDD 合同基础工资必须按月填写',
@@ -697,6 +738,27 @@ export const memberCopy: Record<
         healthStatus: '可选；健康状况。',
         terminationDate: '离职时必填；格式：YYYY-MM-DD。',
         terminationReason: '离职时必填；填写离职原因说明。',
+      },
+    },
+    contractChangeTemplate: {
+      instructionsSheet: '合同变更说明',
+      columnsHeader: '字段',
+      notesHeader: '填写要求与示例',
+      notes: {
+        name: '必填；用于定位成员。',
+        birthDate: '必填；格式：YYYY-MM-DD。',
+        contractNumber: '可选；合同编号需唯一。',
+        contractType: '可选；固定值：CTJ / CDD。',
+        salaryCategory: '可选；工资等级。',
+        salaryAmount: '可选；基础工资金额。',
+        salaryUnit: '可选；MONTH / HOUR（CDD 只能按月）。',
+        baseSalary: '可选；金额/单位，如 83333/M（与金额+单位二选一）。',
+        prime: '可选；奖金/补贴金额。',
+        startDate: '可选；合同开始日期，格式：YYYY-MM-DD，默认变更日期。',
+        endDate: '可选；合同结束日期，格式：YYYY-MM-DD，默认开始日期 + 1 年。',
+        changeDate: '可选；变更日期，格式：YYYY-MM-DD，默认导入当天。',
+        reason: '可选；变更原因。',
+        chineseSupervisor: '可选；中方负责人姓名或账号（拼音），必须为中国籍成员。',
       },
     },
     rolePanel: {
@@ -799,6 +861,7 @@ export const memberCopy: Record<
       submitError: '提交失败',
       deleteConfirm: (username: string) => `确认删除成员 ${username} 吗？`,
       importSuccess: (count: number) => `已成功导入 ${count} 条成员。`,
+      importContractChangesSuccess: (count: number) => `已成功导入 ${count} 条合同变更记录。`,
       importRowError: (row: number, message: string) => `第 ${row} 行：${message}`,
       importSkipConfirm: (validCount: number, errorCount: number) =>
         `发现 ${errorCount} 行错误，仍有 ${validCount} 行可导入。是否忽略错误行继续导入？`,
@@ -1048,8 +1111,10 @@ export const memberCopy: Record<
     actions: {
       create: 'Ajouter un membre',
       import: 'Importer',
+      importContractChanges: 'Importer changements de contrat',
       export: 'Exporter Excel/CSV',
-      template: 'Télécharger le modèle',
+      template: "Modèle d'import membres",
+      contractChangeTemplate: 'Modèle changement de contrat',
       clearSort: 'Réinitialiser le tri',
       auditTrail: "Journal d'audit",
       view: 'Détails',
@@ -1097,18 +1162,25 @@ export const memberCopy: Record<
       importNoData: 'Aucune ligne de données à importer.',
       importDuplicateUsername: "Identifiant en double dans le fichier",
       importDuplicateIdentity: 'Plusieurs membres correspondent au même nom et date de naissance',
+      importMemberNotFound: 'Membre introuvable (nom + date de naissance)',
+      importChineseMember: 'Les membres chinois ne nécessitent pas de changement de contrat',
       importUsernameExists: "Identifiant déjà utilisé",
       importInvalidGender: 'Genre invalide (男 / 女)',
       importInvalidPhone: 'Format de téléphone invalide',
       importInvalidContractType: 'Type de contrat invalide (CTJ / CDD)',
+      importInvalidSalaryUnit: 'Unité du salaire de base invalide (MONTH / HOUR)',
       importInvalidBaseSalaryUnit: 'Le salaire de base CDD doit être mensuel',
       importInvalidStatus: 'Statut invalide : ACTIVE / ON_LEAVE / TERMINATED',
       importInvalidJoinDate: "Date d'arrivée invalide",
+      importInvalidStartDate: 'Date de début de contrat invalide',
+      importInvalidEndDate: 'Date de fin de contrat invalide',
+      importInvalidChangeDate: 'Date de changement invalide',
       importMissingBirthDate: 'Date de naissance requise',
       importInvalidBirthDate: 'Date de naissance invalide',
       importInvalidChineseSupervisor: 'Identifiant du responsable chinois invalide',
       importDuplicateContractNumber: "N° contrat en double dans le fichier",
       importContractNumberExists: "N° contrat déjà utilisé",
+      importContractChangeMissingFields: 'Champs de changement de contrat manquants',
       importRoleNotFound: (role: string) => `Rôle introuvable : ${role}`,
       importFailed: "Échec de l'import, réessayez.",
       baseSalaryUnitInvalid: 'Le salaire de base CDD doit être mensuel',
@@ -1163,6 +1235,28 @@ export const memberCopy: Record<
         healthStatus: 'Optionnel ; état de santé.',
         terminationDate: 'Obligatoire si départ ; format : YYYY-MM-DD.',
         terminationReason: 'Obligatoire si départ ; indiquer le motif.',
+      },
+    },
+    contractChangeTemplate: {
+      instructionsSheet: 'Instructions changement de contrat',
+      columnsHeader: 'Champ',
+      notesHeader: 'Règles et exemples',
+      notes: {
+        name: 'Obligatoire ; utilisé pour retrouver le membre.',
+        birthDate: 'Obligatoire ; format : YYYY-MM-DD.',
+        contractNumber: 'Optionnel ; n° contrat unique.',
+        contractType: 'Optionnel ; CTJ / CDD.',
+        salaryCategory: 'Optionnel ; catégorie.',
+        salaryAmount: 'Optionnel ; montant du salaire de base.',
+        salaryUnit: 'Optionnel ; MONTH / HOUR (CDD = mensuel uniquement).',
+        baseSalary: 'Optionnel ; montant/unité, ex. 83333/M (au choix avec montant + unité).',
+        prime: 'Optionnel ; prime / allocation.',
+        startDate: 'Optionnel ; début de contrat (YYYY-MM-DD), défaut = date de changement.',
+        endDate: 'Optionnel ; fin de contrat (YYYY-MM-DD), défaut = début + 1 an.',
+        changeDate: "Optionnel ; date de changement (YYYY-MM-DD), défaut = aujourd’hui.",
+        reason: 'Optionnel ; motif.',
+        chineseSupervisor:
+          'Optionnel ; nom ou identifiant (pinyin), doit être un membre chinois.',
       },
     },
     rolePanel: {
@@ -1266,6 +1360,8 @@ export const memberCopy: Record<
       submitError: 'Échec de la soumission',
       deleteConfirm: (username: string) => `Supprimer le membre ${username} ?`,
       importSuccess: (count: number) => `Import réussi : ${count} membres.`,
+      importContractChangesSuccess: (count: number) =>
+        `Import réussi : ${count} changement(s) de contrat.`,
       importRowError: (row: number, message: string) => `Ligne ${row} : ${message}`,
       importSkipConfirm: (validCount: number, errorCount: number) =>
         `${errorCount} lignes en erreur, ${validCount} lignes valides. Ignorer les erreurs et continuer ?`,

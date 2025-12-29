@@ -125,6 +125,12 @@ export function MemberEditClient({ member, canAssignRole }: Props) {
                 formState={formState}
                 teamOptions={teamOptions}
                 chineseSupervisorOptions={chineseSupervisorOptions}
+                onApplyExpatProfile={(patch) =>
+                  setFormState((prev) => ({
+                    ...prev,
+                    expatProfile: { ...prev.expatProfile, ...patch },
+                  }))
+                }
               />
             ) : null}
 

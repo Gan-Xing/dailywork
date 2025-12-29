@@ -8,6 +8,7 @@ type MemberCopy = (typeof memberCopy)[keyof typeof memberCopy]
 type UsePayrollImportParams = {
   t: MemberCopy
   members: Member[]
+  contractNumbersByMemberId?: Record<number, string[]>
 }
 
 export type ImportTarget = {
@@ -71,7 +72,7 @@ function normalizeDate(input: unknown): string | null {
   return null
 }
 
-export function usePayrollImport({ t, members }: UsePayrollImportParams) {
+export function usePayrollImport({ t, members, contractNumbersByMemberId }: UsePayrollImportParams) {
   const parseFile = useCallback(
     async (file: File, targets: ImportTarget[]): Promise<Map<number, Map<number, string>>> => {
       if (targets.length === 0) {
@@ -145,9 +146,20 @@ export function usePayrollImport({ t, members }: UsePayrollImportParams) {
 
       const contractMap = new Map<string, Member>()
       members.forEach((m) => {
-        const cn = normalizeText(m.expatProfile?.contractNumber)
-        // Store upper case for case-insensitive matching
-        if (cn) contractMap.set(cn.toUpperCase(), m)
+        const contractNumbers = contractNumbersByMemberId?.[m.id] ?? []
+        const fallbackContract = normalizeText(m.expatProfile?.contractNumber)
+        const candidates = new Set<string>()
+        contractNumbers.forEach((value) => {
+          const normalized = normalizeText(value)
+          if (normalized) candidates.add(normalized)
+        })
+        if (fallbackContract) candidates.add(fallbackContract)
+        candidates.forEach((value) => {
+          const key = value.toUpperCase()
+          if (!contractMap.has(key)) {
+            contractMap.set(key, m)
+          }
+        })
       })
 
       const errors: string[] = []
@@ -191,7 +203,7 @@ export function usePayrollImport({ t, members }: UsePayrollImportParams) {
 
       return result
     },
-    [t, members],
+    [t, members, contractNumbersByMemberId],
   )
 
   return { parseFile }
