@@ -16,6 +16,13 @@ export type ImportTarget = {
   date: string
 }
 
+export type PayrollImportErrorItem = {
+  row?: number
+  contractNumber?: string
+  name?: string
+  message: string
+}
+
 // Helper to convert various date inputs to YYYY-MM-DD string
 function normalizeDate(input: unknown): string | null {
   if (!input) return null
@@ -74,16 +81,25 @@ function normalizeDate(input: unknown): string | null {
 
 export function usePayrollImport({ t, members, contractNumbersByMemberId }: UsePayrollImportParams) {
   const parseFile = useCallback(
-    async (file: File, targets: ImportTarget[]): Promise<Map<number, Map<number, string>>> => {
+    async (
+      file: File,
+      targets: ImportTarget[],
+    ): Promise<{ data: Map<number, Map<number, string>>; errors: PayrollImportErrorItem[] }> => {
+      const errors: PayrollImportErrorItem[] = []
       if (targets.length === 0) {
-        throw new Error("No import targets defined")
+        return {
+          data: new Map(),
+          errors: [{ message: t.payroll.errors.importInvalidTargets }],
+        }
       }
 
       const XLSX = await import('xlsx')
       const buffer = await file.arrayBuffer()
       const workbook = XLSX.read(buffer, { type: 'array', cellDates: true })
       const sheetName = workbook.SheetNames[0]
-      if (!sheetName) throw new Error(t.errors.importInvalidFile)
+      if (!sheetName) {
+        return { data: new Map(), errors: [{ message: t.errors.importInvalidFile }] }
+      }
       const worksheet = workbook.Sheets[sheetName]
       
       const jsonData = XLSX.utils.sheet_to_json<any[]>(worksheet, {
@@ -91,9 +107,28 @@ export function usePayrollImport({ t, members, contractNumbersByMemberId }: UseP
         defval: '',
       })
 
-      if (jsonData.length < 2) throw new Error(t.errors.importNoData)
+      if (jsonData.length < 2) {
+        return { data: new Map(), errors: [{ message: t.errors.importNoData }] }
+      }
 
       const headers = jsonData[0]
+      const normalizeHeader = (value: unknown) => String(value ?? '').trim().toLowerCase()
+      const nameHeaderTokens = new Set(
+        [
+          t.form.name,
+          memberCopy.zh.form.name,
+          memberCopy.fr.form.name,
+          'name',
+          'nom',
+          '姓名',
+          '名字',
+        ]
+          .map((value) => normalizeHeader(value))
+          .filter(Boolean),
+      )
+      const nameIdx = headers.findIndex((header) =>
+        nameHeaderTokens.has(normalizeHeader(header)),
+      )
 
       // 1. Contract Number (Required)
       let contractIdx = headers.findIndex((h) => {
@@ -115,7 +150,10 @@ export function usePayrollImport({ t, members, contractNumbersByMemberId }: UseP
         .filter(t => t.date !== null) as { runId: number, date: string }[]
 
       if (normalizedTargets.length === 0) {
-         throw new Error("No valid dates found in targets")
+         return {
+           data: new Map(),
+           errors: [{ message: t.payroll.errors.importInvalidTargets }],
+         }
       }
 
       for (let i = 0; i < headers.length; i++) {
@@ -134,7 +172,14 @@ export function usePayrollImport({ t, members, contractNumbersByMemberId }: UseP
 
       if (runColumnMap.size === 0) {
          const searchedDates = normalizedTargets.map(t => t.date).join(', ')
-         throw new Error(`${t.payroll.errors.importMissingHeaders} (Searched for dates: ${searchedDates})`)
+         return {
+           data: new Map(),
+           errors: [
+             {
+               message: `${t.payroll.errors.importMissingHeaders} (Searched for dates: ${searchedDates})`,
+             },
+           ],
+         }
       }
 
       const rows = jsonData.slice(1)
@@ -162,9 +207,7 @@ export function usePayrollImport({ t, members, contractNumbersByMemberId }: UseP
         })
       })
 
-      const errors: string[] = []
-
-      rows.forEach((row: any) => {
+      rows.forEach((row: any, index: number) => {
         if (!row) return
         
         const rawContract = String(row[contractIdx] || '').trim()
@@ -181,7 +224,13 @@ export function usePayrollImport({ t, members, contractNumbersByMemberId }: UseP
            })
            
            if (hasData) {
-             errors.push(t.payroll.errors.importContractNotFound(rawContract))
+             const nameValue = nameIdx >= 0 ? normalizeText(row[nameIdx]) : ''
+             errors.push({
+               row: index + 2,
+               contractNumber: rawContract,
+               name: nameValue || undefined,
+               message: t.payroll.errors.importContractNotFound(rawContract),
+             })
            }
            return
         }
@@ -197,11 +246,7 @@ export function usePayrollImport({ t, members, contractNumbersByMemberId }: UseP
         })
       })
 
-      if (errors.length > 0) {
-        throw new Error(errors[0])
-      }
-
-      return result
+      return { data: result, errors }
     },
     [t, members, contractNumbersByMemberId],
   )

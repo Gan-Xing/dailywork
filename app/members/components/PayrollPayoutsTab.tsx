@@ -9,7 +9,11 @@ import { AlertDialog } from '@/components/AlertDialog'
 import type { Locale } from '@/lib/i18n'
 import { memberCopy } from '@/lib/i18n/members'
 import { formatSupervisorLabel, normalizeText } from '@/lib/members/utils'
-import { usePayrollImport, type ImportTarget } from '../hooks/usePayrollImport'
+import {
+  usePayrollImport,
+  type ImportTarget,
+  type PayrollImportErrorItem,
+} from '../hooks/usePayrollImport'
 import type { Member } from '@/types/members'
 
 type MemberCopy = (typeof memberCopy)[keyof typeof memberCopy]
@@ -142,6 +146,7 @@ export function PayrollPayoutsTab({
 
   const { addToast } = useToast()
   const [clearRunDialog, setClearRunDialog] = useState<{ run: PayrollRun; label: string } | null>(null)
+  const [importErrorDialog, setImportErrorDialog] = useState<PayrollImportErrorItem[] | null>(null)
 
   const numberFormatter = useMemo(() => new Intl.NumberFormat(locale), [locale])
   const collator = useMemo(() => {
@@ -245,14 +250,19 @@ export function PayrollPayoutsTab({
     })
 
     if (targets.length === 0) {
-      addToast('Please set Payout Dates for the runs you want to import.', { tone: 'warning' })
+      addToast(t.payroll.errors.importInvalidTargets, { tone: 'warning' })
       if (importInputRef.current) importInputRef.current.value = ''
       return
     }
 
     try {
       setLoading(true)
-      const results = await parseFile(file, targets)
+      setImportErrorDialog(null)
+      const { data: results, errors } = await parseFile(file, targets)
+      if (errors.length > 0) {
+        setImportErrorDialog(errors)
+        return
+      }
       const importedMemberIds = new Set<number>()
       results.forEach((map) => {
         map.forEach((_, userId) => {
@@ -274,12 +284,24 @@ export function PayrollPayoutsTab({
       })
       addToast(t.feedback.importSuccess(totalCount), { tone: 'success' })
     } catch (err) {
-      addToast(err instanceof Error ? err.message : t.errors.importFailed, { tone: 'danger' })
+      const message = err instanceof Error ? err.message : t.errors.importFailed
+      setImportErrorDialog([{ message }])
     } finally {
       setLoading(false)
       if (importInputRef.current) importInputRef.current.value = ''
     }
   }
+
+  const formatImportErrorLine = useCallback(
+    (error: PayrollImportErrorItem) => {
+      if (!error.row) return error.message
+      const contractLabel = `${t.form.contractNumber}: ${error.contractNumber ?? t.labels.empty}`
+      const nameLabel = `${t.form.name}: ${error.name ?? t.labels.empty}`
+      const detail = [contractLabel, nameLabel, error.message].filter(Boolean).join(' · ')
+      return t.feedback.importRowError(error.row, detail)
+    },
+    [t],
+  )
 
   const filterControlProps = useMemo(
     () => ({
@@ -1569,6 +1591,33 @@ export function PayrollPayoutsTab({
           ) : null}
         </table>
       </div>
+
+      <AlertDialog
+        open={!!importErrorDialog}
+        title={t.payroll.errors.importErrorTitle}
+        description={
+          importErrorDialog
+            ? t.payroll.errors.importErrorSummary(importErrorDialog.length)
+            : undefined
+        }
+        body={
+          importErrorDialog ? (
+            <ul className="space-y-2">
+              {importErrorDialog.map((error, index) => (
+                <li
+                  key={`${error.row ?? 'general'}-${error.contractNumber ?? 'unknown'}-${index}`}
+                  className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-100/90"
+                >
+                  {formatImportErrorLine(error)}
+                </li>
+              ))}
+            </ul>
+          ) : null
+        }
+        onClose={() => setImportErrorDialog(null)}
+        tone="danger"
+        actionLabel={t.labels.close}
+      />
 
       <AlertDialog
         open={!!clearRunDialog}

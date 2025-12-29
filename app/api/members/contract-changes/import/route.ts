@@ -330,8 +330,6 @@ export async function POST(request: Request) {
               baseSalaryAmount: true,
               baseSalaryUnit: true,
               prime: true,
-              contractStartDate: true,
-              contractEndDate: true,
             },
           },
         },
@@ -534,7 +532,12 @@ export async function POST(request: Request) {
 
   let imported = 0
 
-  for (const [userId, rows] of rowsByUserId) {
+  const rowsByUserEntries: Array<[number, PreparedRow[]]> = []
+  rowsByUserId.forEach((rows, userId) => {
+    rowsByUserEntries.push([userId, rows])
+  })
+
+  for (const [userId, rows] of rowsByUserEntries) {
     const user = existingUsers.find((item) => item.id === userId)
     if (!user) continue
     const sorted = [...rows].sort(

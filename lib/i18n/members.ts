@@ -465,6 +465,9 @@ export const memberCopy: Record<
         loadFailed: string
         saveFailed: string
         missingAmount: (count: number) => string
+        importInvalidTargets: string
+        importErrorTitle: string
+        importErrorSummary: (count: number) => string
         importMissingHeaders: string
         importContractNotFound: (contract: string) => string
       }
@@ -956,6 +959,9 @@ export const memberCopy: Record<
         loadFailed: '加载工资发放失败',
         saveFailed: '保存工资发放失败',
         missingAmount: (count: number) => `仍有 ${count} 人未填写金额`,
+        importInvalidTargets: '没有可用的发放日期',
+        importErrorTitle: '导入错误',
+        importErrorSummary: (count: number) => `发现 ${count} 条错误，请修正后重试。`,
         importMissingHeaders: '缺少必要字段：合同编号、发放金额',
         importContractNotFound: (contract: string) => `找不到合同编号：${contract}`,
       },
@@ -1457,6 +1463,10 @@ export const memberCopy: Record<
         loadFailed: 'Échec du chargement des versements',
         saveFailed: "Échec de l'enregistrement",
         missingAmount: (count: number) => `Montant manquant pour ${count} personne(s)`,
+        importInvalidTargets: 'Aucune date de versement valide',
+        importErrorTitle: "Erreurs d'import",
+        importErrorSummary: (count: number) =>
+          `${count} erreur(s) détectée(s). Corrigez puis réessayez.`,
         importMissingHeaders: 'Colonnes manquantes: N° contrat, Montant',
         importContractNotFound: (contract: string) => `Contrat introuvable : ${contract}`,
       },

@@ -8,6 +8,7 @@ type AlertDialogProps = {
   open: boolean
   title: string
   description?: ReactNode
+  body?: ReactNode
   onClose: () => void
   tone?: AlertTone
   actionLabel?: string
@@ -55,6 +56,7 @@ export function AlertDialog({
   open,
   title,
   description,
+  body,
   onClose,
   tone = 'info',
   actionLabel = '好的',
@@ -93,6 +95,11 @@ export function AlertDialog({
           {description ? <p className="mt-1 text-sm text-slate-50/90">{description}</p> : null}
         </div>
         <div className="p-5">
+          {body ? (
+            <div className="mb-4 max-h-64 overflow-y-auto pr-1 text-sm text-slate-100/90">
+              {body}
+            </div>
+          ) : null}
           <div className={cancelLabel ? 'grid grid-cols-1 gap-3 sm:grid-cols-2' : 'space-y-3'}>
             {cancelLabel ? (
               <button
