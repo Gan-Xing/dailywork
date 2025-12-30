@@ -5,6 +5,7 @@ import { hasPermission } from '@/lib/server/authSession'
 import { listUsers } from '@/lib/server/authStore'
 import { resolveSupervisorSnapshot } from '@/lib/server/compensation'
 import { normalizeTagsInput } from '@/lib/members/utils'
+import { resolveTeamSupervisorId } from '@/lib/server/teamSupervisors'
 import {
   hasExpatProfileData,
   hasChineseProfileData,
@@ -78,6 +79,13 @@ export async function POST(request: Request) {
   const chineseProfileData = normalizeChineseProfile(chineseProfile)
   const shouldCreateChineseProfile = isChinese && hasChineseProfileData(chineseProfileData)
   const expatProfileData = normalizeExpatProfile(expatProfile)
+  const resolvedSupervisorId = expatProfileData.team
+    ? await resolveTeamSupervisorId(expatProfileData.team)
+    : expatProfileData.chineseSupervisorId ?? null
+  if (expatProfileData.team && !resolvedSupervisorId) {
+    return NextResponse.json({ error: '班组未绑定中方负责人' }, { status: 400 })
+  }
+  expatProfileData.chineseSupervisorId = resolvedSupervisorId
   const shouldCreateExpatProfile = !isChinese || hasExpatProfileData(expatProfileData)
   const shouldCreateContractChange =
     !isChinese && (expatProfileData.contractNumber || expatProfileData.contractType)
@@ -89,15 +97,6 @@ export async function POST(request: Request) {
       expatProfileData.baseSalaryUnit ||
       expatProfileData.netMonthlyAmount ||
       expatProfileData.netMonthlyUnit)
-  if (!isChinese && expatProfileData.chineseSupervisorId) {
-    const supervisor = await prisma.user.findUnique({
-      where: { id: expatProfileData.chineseSupervisorId },
-      select: { nationality: true },
-    })
-    if (!supervisor || supervisor.nationality !== 'china') {
-      return NextResponse.json({ error: '中方负责人必须为中国籍成员' }, { status: 400 })
-    }
-  }
   const hasBirthDateInput =
     birthDate !== null &&
     birthDate !== undefined &&

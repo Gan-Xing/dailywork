@@ -5,6 +5,7 @@ import { EMPTY_FILTER_VALUE, type SortField, type SortOrder } from '@/lib/member
 import {
   getMonthKey,
   formatSupervisorLabel,
+  collectContractNumbers,
   normalizeTagKey,
   normalizeText,
   toNumberFilterValue,
@@ -173,7 +174,8 @@ export function useFilteredMembers({
       )
       if (!matchesValueFilter(expatProfile?.team, teamFilters)) return false
       if (!matchesValueFilter(supervisorLabel, chineseSupervisorFilters)) return false
-      if (!matchesValueFilter(expatProfile?.contractNumber, contractNumberFilters)) return false
+      if (!matchesListFilter(collectContractNumbers(expatProfile), contractNumberFilters))
+        return false
       if (!matchesValueFilter(expatProfile?.contractType, contractTypeFilters)) return false
       if (!matchesValueFilter(expatProfile?.salaryCategory, salaryCategoryFilters)) return false
       if (

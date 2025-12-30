@@ -1,10 +1,12 @@
 import { useMemo, useState } from 'react'
 
 import { memberCopy } from '@/lib/i18n/members'
+import { normalizeTeamKey } from '@/lib/members/utils'
 
 import type { ExpatProfileForm, FormState } from '../../types'
+import type { TeamSupervisorItem } from '../../../hooks/useTeamSupervisors'
 import { CompensationModal } from './CompensationModal'
-import type { ContractChange, SupervisorOption } from './types'
+import type { ContractChange } from './types'
 
 type MemberCopy = (typeof memberCopy)[keyof typeof memberCopy]
 
@@ -28,7 +30,7 @@ type ContractChangeTableProps = {
   loading: boolean
   records: ContractChange[]
   expatProfile: FormState['expatProfile']
-  chineseSupervisorOptions: SupervisorOption[]
+  teamSupervisorMap: Map<string, TeamSupervisorItem>
   onRefresh: () => void
   onApplyExpatProfile: (patch: Partial<FormState['expatProfile']>) => void
 }
@@ -40,10 +42,15 @@ const addOneYear = (date: Date) => {
   return next
 }
 
-const buildDefaults = (profile: ExpatProfileForm): ContractChangeForm => {
+const buildDefaults = (
+  profile: ExpatProfileForm,
+  teamSupervisorMap: Map<string, TeamSupervisorItem>,
+): ContractChangeForm => {
   const now = new Date()
   const startDate = formatDate(now.toISOString())
   const endDate = formatDate(addOneYear(now).toISOString())
+  const teamKey = normalizeTeamKey(profile.team)
+  const binding = teamKey ? teamSupervisorMap.get(teamKey) : null
   return {
     contractNumber: profile.contractNumber,
     contractType: profile.contractType,
@@ -55,7 +62,7 @@ const buildDefaults = (profile: ExpatProfileForm): ContractChangeForm => {
     endDate,
     changeDate: startDate,
     reason: '',
-    chineseSupervisorId: profile.chineseSupervisorId,
+    chineseSupervisorId: binding ? String(binding.supervisorId) : profile.chineseSupervisorId,
   }
 }
 
@@ -65,15 +72,22 @@ export function ContractChangeTable({
   loading,
   records,
   expatProfile,
-  chineseSupervisorOptions,
+  teamSupervisorMap,
   onRefresh,
   onApplyExpatProfile,
 }: ContractChangeTableProps) {
-  const defaultForm = useMemo(() => buildDefaults(expatProfile), [expatProfile])
+  const defaultForm = useMemo(
+    () => buildDefaults(expatProfile, teamSupervisorMap),
+    [expatProfile, teamSupervisorMap],
+  )
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<ContractChange | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [formState, setFormState] = useState<ContractChangeForm>(defaultForm)
+  const teamSupervisorBinding = teamSupervisorMap.get(normalizeTeamKey(expatProfile.team))
+  const supervisorLabel = teamSupervisorBinding?.supervisorLabel ?? ''
+  const showMissingSupervisor =
+    Boolean(normalizeTeamKey(expatProfile.team)) && !teamSupervisorBinding
 
   const openCreate = () => {
     setEditing(null)
@@ -83,6 +97,7 @@ export function ContractChangeTable({
 
   const openEdit = (record: ContractChange) => {
     setEditing(record)
+    const binding = teamSupervisorMap.get(normalizeTeamKey(expatProfile.team))
     setFormState({
       contractNumber: record.contractNumber ?? '',
       contractType: record.contractType ?? '',
@@ -94,7 +109,11 @@ export function ContractChangeTable({
       endDate: formatDate(record.endDate),
       changeDate: formatDate(record.changeDate),
       reason: record.reason ?? '',
-      chineseSupervisorId: record.chineseSupervisorId ? String(record.chineseSupervisorId) : '',
+      chineseSupervisorId: binding
+        ? String(binding.supervisorId)
+        : record.chineseSupervisorId
+          ? String(record.chineseSupervisorId)
+          : '',
     })
     setOpen(true)
   }
@@ -361,23 +380,15 @@ export function ContractChangeTable({
           </label>
           <label className="space-y-1 text-sm text-slate-700">
             <span className="block font-semibold">{t.compensation.fields.chineseSupervisor}</span>
-            <select
-              value={formState.chineseSupervisorId}
-              onChange={(event) =>
-                setFormState((prev) => ({
-                  ...prev,
-                  chineseSupervisorId: event.target.value,
-                }))
-              }
-              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+            <div
+              className={`w-full rounded-xl border px-3 py-2 text-sm shadow-sm ${
+                showMissingSupervisor
+                  ? 'border-rose-200 bg-rose-50 text-rose-600'
+                  : 'border-slate-200 bg-slate-50 text-slate-700'
+              }`}
             >
-              <option value="">{t.labels.empty}</option>
-              {chineseSupervisorOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
+              {showMissingSupervisor ? t.teamSupervisor.missing : supervisorLabel || t.labels.empty}
+            </div>
           </label>
           <label className="space-y-1 text-sm text-slate-700 sm:col-span-2">
             <span className="block font-semibold">{t.compensation.fields.reason}</span>

@@ -48,12 +48,14 @@ import { PayrollPayoutsTab } from './components/PayrollPayoutsTab'
 import { PermissionsTab } from './components/PermissionsTab'
 import { RoleModal } from './components/RoleModal'
 import { RolesTab } from './components/RolesTab'
+import { TeamSupervisorDialog } from './components/TeamSupervisorDialog'
 import { useMemberColumns } from './hooks/useMemberColumns'
 import { useFilteredMembers } from './hooks/useFilteredMembers'
 import { useMemberFilterOptions } from './hooks/useMemberFilterOptions'
 import { useMemberFilterSummary } from './hooks/useMemberFilterSummary'
 import { useMemberFormatters } from './hooks/useMemberFormatters'
 import { useMemberImportExport } from './hooks/useMemberImportExport'
+import { useTeamSupervisors } from './hooks/useTeamSupervisors'
 import { useContractChangeImport } from './hooks/useContractChangeImport'
 import { useMembersData } from './hooks/useMembersData'
 import { usePermissionStatus } from './hooks/usePermissionStatus'
@@ -118,6 +120,7 @@ export function MembersPageClient() {
         'name',
         'username',
         'birthDate',
+        'chineseSupervisor',
         'contractNumber',
         'roles',
         'createdAt',
@@ -134,6 +137,7 @@ export function MembersPageClient() {
   const phonePickerRef = useRef<HTMLDivElement | null>(null)
   const [profileExpanded, setProfileExpanded] = useState(false)
   const [skipImportHistory, setSkipImportHistory] = useState(false)
+  const [showTeamSupervisorDialog, setShowTeamSupervisorDialog] = useState(false)
   const importInputRef = useRef<HTMLInputElement | null>(null)
   const contractChangeImportInputRef = useRef<HTMLInputElement | null>(null)
   const {
@@ -318,6 +322,14 @@ export function MembersPageClient() {
       }))
       .sort((a, b) => collator.compare(a.label, b.label))
   }, [membersData, locale])
+  const canViewTeamSupervisors = canViewMembers || canCreateMember || canUpdateMember
+  const {
+    teamSupervisors,
+    teamSupervisorMap,
+    loading: teamSupervisorLoading,
+    error: teamSupervisorError,
+    refresh: refreshTeamSupervisors,
+  } = useTeamSupervisors({ enabled: canViewTeamSupervisors })
   const {
     showRoleModal,
     roleSubmitting,
@@ -1268,6 +1280,7 @@ export function MembersPageClient() {
                 templateDownloading={templateDownloading}
                 skipImportHistory={skipImportHistory}
                 onToggleSkipImportHistory={setSkipImportHistory}
+                onOpenTeamSupervisorDialog={() => setShowTeamSupervisorDialog(true)}
                 onImportFileChange={handleImportFileChange}
                 onContractChangeImportFileChange={handleContractChangeImportFileChange}
                 onContractChangeTemplateDownload={handleContractChangeTemplateDownload}
@@ -1507,6 +1520,18 @@ export function MembersPageClient() {
         onTogglePermission={togglePermission}
       />
 
+      <TeamSupervisorDialog
+        t={t}
+        open={showTeamSupervisorDialog}
+        canManage={canCreateMember}
+        loading={teamSupervisorLoading}
+        error={teamSupervisorError}
+        teamSupervisors={teamSupervisors}
+        supervisorOptions={chineseSupervisorOptions}
+        onClose={() => setShowTeamSupervisorDialog(false)}
+        onRefresh={refreshTeamSupervisors}
+      />
+
       {showCreateModal ? (
         <MemberFormModal
           t={t}
@@ -1524,7 +1549,7 @@ export function MembersPageClient() {
           onSubmit={handleSubmit}
           positionOptions={positionOptions}
           teamOptions={teamOptions}
-          chineseSupervisorOptions={chineseSupervisorOptions}
+          teamSupervisorMap={teamSupervisorMap}
           nationalityByRegion={nationalityByRegion}
           statusLabels={statusLabels}
           isChineseForm={isChineseForm}

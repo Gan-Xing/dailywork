@@ -10,7 +10,10 @@ import {
   parseContractType,
   parseSalaryUnit,
 } from '@/lib/server/compensation'
-import { createInitialContractChangeIfMissing } from '@/lib/server/contractChanges'
+import {
+  applyLatestContractSnapshot,
+  createInitialContractChangeIfMissing,
+} from '@/lib/server/contractChanges'
 import { formatSupervisorLabel } from '@/lib/members/utils'
 
 const canManageCompensation = async () => {
@@ -615,32 +618,7 @@ export async function POST(request: Request) {
           created += 1
         }
 
-        await tx.userExpatProfile.upsert({
-          where: { userId },
-          create: {
-            userId,
-            chineseSupervisorId: snapshot.chineseSupervisorId,
-            contractNumber: snapshot.contractNumber,
-            contractType: snapshot.contractType,
-            salaryCategory: snapshot.salaryCategory,
-            prime: snapshot.prime,
-            baseSalaryAmount: snapshot.baseSalaryAmount,
-            baseSalaryUnit: snapshot.baseSalaryUnit,
-            contractStartDate: snapshot.contractStartDate,
-            contractEndDate: snapshot.contractEndDate,
-          },
-          update: {
-            chineseSupervisorId: snapshot.chineseSupervisorId,
-            contractNumber: snapshot.contractNumber,
-            contractType: snapshot.contractType,
-            salaryCategory: snapshot.salaryCategory,
-            prime: snapshot.prime,
-            baseSalaryAmount: snapshot.baseSalaryAmount,
-            baseSalaryUnit: snapshot.baseSalaryUnit,
-            contractStartDate: snapshot.contractStartDate,
-            contractEndDate: snapshot.contractEndDate,
-          },
-        })
+        await applyLatestContractSnapshot(tx, userId)
       })
       imported += created
     } catch {

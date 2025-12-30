@@ -8,6 +8,7 @@ import {
   resolveSupervisorSnapshot,
 } from '@/lib/server/compensation'
 import { hasPermission } from '@/lib/server/authSession'
+import { resolveTeamSupervisorId } from '@/lib/server/teamSupervisors'
 import { prisma } from '@/lib/prisma'
 
 const canManageCompensation = async () => {
@@ -80,9 +81,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     : expatProfile.netMonthlyUnit
   const team = hasField('team') ? normalizeOptionalText(body.team) : expatProfile.team
   const changeDate = normalizeOptionalDate(body.changeDate) ?? new Date()
-  const nextSupervisorId = hasField('chineseSupervisorId')
-    ? Number(body.chineseSupervisorId) || null
+  const nextSupervisorId = team
+    ? await resolveTeamSupervisorId(team)
     : expatProfile.chineseSupervisorId ?? null
+  if (team && !nextSupervisorId) {
+    return NextResponse.json({ error: '班组未绑定中方负责人' }, { status: 400 })
+  }
 
   const hasPayload =
     Boolean(salaryCategory) ||

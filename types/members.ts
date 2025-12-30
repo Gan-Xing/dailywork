@@ -29,6 +29,7 @@ export type ExpatProfile = {
     chineseProfile?: { frenchName: string | null } | null
   } | null
   contractNumber: string | null
+  contractNumbers?: string[]
   contractType: 'CTJ' | 'CDD' | null
   contractStartDate: string | null
   contractEndDate: string | null

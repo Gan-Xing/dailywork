@@ -417,6 +417,7 @@ model User {
   chineseProfile UserChineseProfile?
   expatProfile UserExpatProfile?
   expatSupervisees UserExpatProfile[] @relation("ExpatChineseSupervisor")
+  teamSupervisorBindings TeamSupervisor[]
   contractChangeSupervisees UserContractChange[] @relation("ContractChangeSupervisor")
   payrollChangeSupervisees UserPayrollChange[] @relation("PayrollChangeSupervisor")
   payrollPayoutSupervisees UserPayrollPayout[] @relation("PayrollPayoutSupervisor")
@@ -503,6 +504,20 @@ model UserExpatProfile {
   emergencyContactPhone String?
   createdAt          DateTime     @default(now())
   updatedAt          DateTime     @updatedAt
+}
+
+model TeamSupervisor {
+  id              Int      @id @default(autoincrement())
+  team            String
+  teamKey         String   @unique
+  supervisorId    Int
+  supervisor      User     @relation(fields: [supervisorId], references: [id], onDelete: Cascade)
+  supervisorName  String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([team])
+  @@index([supervisorId])
 }
 
 model UserContractChange {

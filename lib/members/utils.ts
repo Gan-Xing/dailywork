@@ -7,6 +7,9 @@ import type {
 
 export const normalizeText = (value?: string | null) => (value ?? '').trim()
 
+export const normalizeTeamKey = (value?: string | null) =>
+  normalizeText(value).toLowerCase()
+
 export const formatSupervisorLabel = (value: {
   name?: string | null
   frenchName?: string | null
@@ -25,6 +28,23 @@ export const formatSupervisorLabel = (value: {
 }
 
 export const normalizeTagKey = (value?: string | null) => normalizeText(value).toLowerCase()
+
+export const collectContractNumbers = (
+  profile?: {
+    contractNumber?: string | null
+    contractNumbers?: Array<string | null | undefined> | null
+  } | null,
+) => {
+  const values = new Set<string>()
+  const current = normalizeText(profile?.contractNumber ?? null)
+  if (current) values.add(current)
+  const history = profile?.contractNumbers ?? []
+  history.forEach((value) => {
+    const normalized = normalizeText(value ?? null)
+    if (normalized) values.add(normalized)
+  })
+  return Array.from(values)
+}
 
 export const normalizeTagsInput = (value?: string[] | string | null) => {
   const rawList = Array.isArray(value)

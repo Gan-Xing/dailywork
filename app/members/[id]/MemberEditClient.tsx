@@ -19,6 +19,7 @@ import { ProfileSection } from './components/ProfileSection'
 import { RoleSelector } from './components/RoleSelector'
 import { useMemberEditData } from './hooks/useMemberEditData'
 import { useMemberEditForm } from './hooks/useMemberEditForm'
+import { useTeamSupervisors } from '../hooks/useTeamSupervisors'
 import { CompensationSection } from './modules/compensation/CompensationSection'
 import type { Member } from './types'
 
@@ -48,11 +49,12 @@ export function MemberEditClient({ member, canAssignRole }: Props) {
     removePhone,
     handleSubmit,
   } = useMemberEditForm({ member, canAssignRole, t })
-  const { rolesData, teamOptions, chineseSupervisorOptions } = useMemberEditData({
+  const { rolesData, teamOptions } = useMemberEditData({
     locale,
     canAssignRole,
     currentTeam: formState.expatProfile.team,
   })
+  const { teamSupervisorMap } = useTeamSupervisors()
 
   const nationalityByRegion = useMemo(() => {
     const grouped = new Map<NationalityRegion, NationalityOption[]>()
@@ -115,7 +117,7 @@ export function MemberEditClient({ member, canAssignRole }: Props) {
               formState={formState}
               setFormState={setFormState}
               teamOptions={teamOptions}
-              chineseSupervisorOptions={chineseSupervisorOptions}
+              teamSupervisorMap={teamSupervisorMap}
             />
 
             {!isChineseForm ? (
@@ -124,7 +126,7 @@ export function MemberEditClient({ member, canAssignRole }: Props) {
                 userId={member.id}
                 formState={formState}
                 teamOptions={teamOptions}
-                chineseSupervisorOptions={chineseSupervisorOptions}
+                teamSupervisorMap={teamSupervisorMap}
                 onApplyExpatProfile={(patch) =>
                   setFormState((prev) => ({
                     ...prev,

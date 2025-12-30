@@ -116,6 +116,7 @@ export type ImportErrorCode =
   | 'invalid_termination_date'
   | 'missing_termination_reason'
   | 'invalid_chinese_supervisor'
+  | 'missing_team_supervisor'
   | 'duplicate_contract_number'
   | 'contract_number_exists'
   | 'role_not_found'

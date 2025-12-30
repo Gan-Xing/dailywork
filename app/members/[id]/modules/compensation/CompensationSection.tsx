@@ -3,11 +3,12 @@ import { useCallback, useEffect, useState } from 'react'
 import { memberCopy } from '@/lib/i18n/members'
 
 import type { FormState } from '../../types'
+import type { TeamSupervisorItem } from '../../../hooks/useTeamSupervisors'
 
 import { ContractChangeTable } from './ContractChangeTable'
 import { PayrollChangeTable } from './PayrollChangeTable'
 import { PayrollPayoutTable } from './PayrollPayoutTable'
-import type { ContractChange, PayrollChange, PayrollPayout, SupervisorOption } from './types'
+import type { ContractChange, PayrollChange, PayrollPayout } from './types'
 
 type MemberCopy = (typeof memberCopy)[keyof typeof memberCopy]
 
@@ -16,7 +17,7 @@ type CompensationSectionProps = {
   userId: number
   formState: FormState
   teamOptions: string[]
-  chineseSupervisorOptions: SupervisorOption[]
+  teamSupervisorMap: Map<string, TeamSupervisorItem>
   onApplyExpatProfile: (patch: Partial<FormState['expatProfile']>) => void
 }
 
@@ -25,7 +26,7 @@ export function CompensationSection({
   userId,
   formState,
   teamOptions,
-  chineseSupervisorOptions,
+  teamSupervisorMap,
   onApplyExpatProfile,
 }: CompensationSectionProps) {
   const [loading, setLoading] = useState(true)
@@ -108,7 +109,7 @@ export function CompensationSection({
             records={contractChanges}
             onRefresh={loadCompensation}
             expatProfile={formState.expatProfile}
-            chineseSupervisorOptions={chineseSupervisorOptions}
+            teamSupervisorMap={teamSupervisorMap}
             onApplyExpatProfile={onApplyExpatProfile}
           />
           <PayrollChangeTable
@@ -119,7 +120,7 @@ export function CompensationSection({
             onRefresh={loadCompensation}
             expatProfile={formState.expatProfile}
             teamOptions={teamOptions}
-            chineseSupervisorOptions={chineseSupervisorOptions}
+            teamSupervisorMap={teamSupervisorMap}
             onApplyExpatProfile={onApplyExpatProfile}
           />
           <PayrollPayoutTable t={t} loading={loading} records={payrollPayouts} />

@@ -5,6 +5,7 @@ import { memberCopy } from '@/lib/i18n/members'
 import type { FormState } from '../types'
 import { ChineseProfileFields } from './ChineseProfileFields'
 import { ExpatProfileFields } from './ExpatProfileFields'
+import type { TeamSupervisorItem } from '../../hooks/useTeamSupervisors'
 
 type MemberCopy = (typeof memberCopy)[keyof typeof memberCopy]
 
@@ -16,7 +17,7 @@ type ProfileSectionProps = {
   formState: FormState
   setFormState: Dispatch<SetStateAction<FormState>>
   teamOptions: string[]
-  chineseSupervisorOptions: { value: string; label: string }[]
+  teamSupervisorMap: Map<string, TeamSupervisorItem>
 }
 
 export function ProfileSection({
@@ -27,7 +28,7 @@ export function ProfileSection({
   formState,
   setFormState,
   teamOptions,
-  chineseSupervisorOptions,
+  teamSupervisorMap,
 }: ProfileSectionProps) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
@@ -57,7 +58,7 @@ export function ProfileSection({
             formState={formState}
             setFormState={setFormState}
             teamOptions={teamOptions}
-            chineseSupervisorOptions={chineseSupervisorOptions}
+            teamSupervisorMap={teamSupervisorMap}
           />
         )
       ) : null}

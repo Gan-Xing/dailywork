@@ -6,6 +6,7 @@ import { hasPermission } from '@/lib/server/authSession'
 import { isDecimalEqual, resolveSupervisorSnapshot } from '@/lib/server/compensation'
 import { createInitialContractChangeIfMissing } from '@/lib/server/contractChanges'
 import { normalizeTagsInput } from '@/lib/members/utils'
+import { resolveTeamSupervisorId } from '@/lib/server/teamSupervisors'
 import {
   hasExpatProfileData,
   normalizeChineseProfile,
@@ -98,15 +99,15 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   if (!existingUser) {
     return NextResponse.json({ error: '成员不存在' }, { status: 404 })
   }
-  if (!isChinese && expatProfileData.chineseSupervisorId) {
-    const supervisor = await prisma.user.findUnique({
-      where: { id: expatProfileData.chineseSupervisorId },
-      select: { nationality: true },
-    })
-    if (!supervisor || supervisor.nationality !== 'china') {
-      return NextResponse.json({ error: '中方负责人必须为中国籍成员' }, { status: 400 })
-    }
+  const resolvedSupervisorId = expatProfileData.team
+    ? await resolveTeamSupervisorId(expatProfileData.team)
+    : expatProfileData.chineseSupervisorId ??
+      existingUser.expatProfile?.chineseSupervisorId ??
+      null
+  if (expatProfileData.team && !resolvedSupervisorId) {
+    return NextResponse.json({ error: '班组未绑定中方负责人' }, { status: 400 })
   }
+  expatProfileData.chineseSupervisorId = resolvedSupervisorId
   const hasBirthDateInput =
     birthDate !== null &&
     birthDate !== undefined &&

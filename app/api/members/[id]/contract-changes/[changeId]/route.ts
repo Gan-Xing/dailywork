@@ -9,6 +9,8 @@ import {
   resolveSupervisorSnapshot,
 } from '@/lib/server/compensation'
 import { hasPermission } from '@/lib/server/authSession'
+import { applyLatestContractSnapshot } from '@/lib/server/contractChanges'
+import { resolveTeamSupervisorId } from '@/lib/server/teamSupervisors'
 import { prisma } from '@/lib/prisma'
 
 const canManageCompensation = async () => {
@@ -43,6 +45,7 @@ export async function PUT(
   const expatProfile = await prisma.userExpatProfile.findUnique({
     where: { userId },
     select: {
+      team: true,
       chineseSupervisorId: true,
       contractNumber: true,
       contractType: true,
@@ -85,9 +88,12 @@ export async function PUT(
     ? normalizeOptionalDate(body.changeDate) ?? record.changeDate
     : record.changeDate
   const reason = hasField('reason') ? normalizeOptionalText(body.reason) : record.reason
-  const nextSupervisorId = hasField('chineseSupervisorId')
-    ? Number(body.chineseSupervisorId) || null
-    : record.chineseSupervisorId
+  const nextSupervisorId = expatProfile.team
+    ? await resolveTeamSupervisorId(expatProfile.team)
+    : record.chineseSupervisorId ?? expatProfile.chineseSupervisorId ?? null
+  if (expatProfile.team && !nextSupervisorId) {
+    return NextResponse.json({ error: '班组未绑定中方负责人' }, { status: 400 })
+  }
 
   if (contractType === 'CDD' && salaryUnit === 'HOUR') {
     return NextResponse.json({ error: 'CDD 合同基础工资必须按月' }, { status: 400 })
@@ -124,20 +130,7 @@ export async function PUT(
       },
     })
 
-    await tx.userExpatProfile.update({
-      where: { userId },
-      data: {
-        chineseSupervisorId: supervisorSnapshot.id,
-        contractNumber,
-        contractType,
-        salaryCategory,
-        prime,
-        baseSalaryAmount: salaryAmount,
-        baseSalaryUnit: salaryUnit,
-        contractStartDate: startDate,
-        contractEndDate: endDate,
-      },
-    })
+    await applyLatestContractSnapshot(tx, userId)
 
     return updatedRecord
   })
@@ -186,6 +179,9 @@ export async function DELETE(
     return NextResponse.json({ error: '合同变更记录不存在' }, { status: 404 })
   }
 
-  await prisma.userContractChange.delete({ where: { id: recordId } })
+  await prisma.$transaction(async (tx) => {
+    await tx.userContractChange.delete({ where: { id: recordId } })
+    await applyLatestContractSnapshot(tx, userId)
+  })
   return NextResponse.json({ ok: true })
 }

@@ -240,6 +240,9 @@ export function useMemberImportExport({
         case 'invalid_chinese_supervisor':
           message = t.errors.importInvalidChineseSupervisor
           break
+        case 'missing_team_supervisor':
+          message = t.errors.importMissingTeamSupervisor
+          break
         default:
           message = t.errors.importFailed
       }

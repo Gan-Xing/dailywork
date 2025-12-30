@@ -6,6 +6,7 @@ import {
   resolveSupervisorSnapshot,
 } from '@/lib/server/compensation'
 import { hasPermission } from '@/lib/server/authSession'
+import { resolveTeamSupervisorId } from '@/lib/server/teamSupervisors'
 import { prisma } from '@/lib/prisma'
 
 const canManageCompensation = async () => {
@@ -61,14 +62,19 @@ export async function PUT(
   const amount = hasField('amount')
     ? normalizeOptionalDecimal(body.amount) ?? record.amount.toString()
     : record.amount.toString()
-  const team = hasField('team') ? normalizeOptionalText(body.team) : record.team
+  const team = hasField('team')
+    ? normalizeOptionalText(body.team)
+    : record.team ?? expatProfile.team
   const currency = hasField('currency')
     ? normalizeOptionalText(body.currency) ?? record.currency
     : record.currency
   const note = hasField('note') ? normalizeOptionalText(body.note) : record.note
-  const nextSupervisorId = hasField('chineseSupervisorId')
-    ? Number(body.chineseSupervisorId) || null
+  const nextSupervisorId = team
+    ? await resolveTeamSupervisorId(team)
     : record.chineseSupervisorId ?? expatProfile.chineseSupervisorId ?? null
+  if (team && !nextSupervisorId) {
+    return NextResponse.json({ error: '班组未绑定中方负责人' }, { status: 400 })
+  }
 
   const supervisorSnapshot = await resolveSupervisorSnapshot(nextSupervisorId)
 

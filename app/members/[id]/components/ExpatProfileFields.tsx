@@ -1,8 +1,10 @@
-import type { Dispatch, SetStateAction } from 'react'
+import { useEffect, type Dispatch, type SetStateAction } from 'react'
 
 import { memberCopy } from '@/lib/i18n/members'
+import { normalizeTeamKey } from '@/lib/members/utils'
 
 import type { FormState } from '../types'
+import type { TeamSupervisorItem } from '../../hooks/useTeamSupervisors'
 
 type MemberCopy = (typeof memberCopy)[keyof typeof memberCopy]
 
@@ -11,7 +13,7 @@ type ExpatProfileFieldsProps = {
   formState: FormState
   setFormState: Dispatch<SetStateAction<FormState>>
   teamOptions: string[]
-  chineseSupervisorOptions: { value: string; label: string }[]
+  teamSupervisorMap: Map<string, TeamSupervisorItem>
 }
 
 export function ExpatProfileFields({
@@ -19,8 +21,32 @@ export function ExpatProfileFields({
   formState,
   setFormState,
   teamOptions,
-  chineseSupervisorOptions,
+  teamSupervisorMap,
 }: ExpatProfileFieldsProps) {
+  useEffect(() => {
+    const teamKey = normalizeTeamKey(formState.expatProfile.team)
+    if (!teamKey) return
+    const binding = teamSupervisorMap.get(teamKey)
+    if (!binding) return
+    const nextSupervisorId = String(binding.supervisorId)
+    if (formState.expatProfile.chineseSupervisorId === nextSupervisorId) return
+    setFormState((prev) => ({
+      ...prev,
+      expatProfile: {
+        ...prev.expatProfile,
+        chineseSupervisorId: nextSupervisorId,
+      },
+    }))
+  }, [formState.expatProfile.team, formState.expatProfile.chineseSupervisorId, setFormState, teamSupervisorMap])
+
+  const teamSupervisorBinding = teamSupervisorMap.get(
+    normalizeTeamKey(formState.expatProfile.team),
+  )
+  const supervisorLabel = teamSupervisorBinding?.supervisorLabel ?? ''
+  const hasTeamSupervisor = Boolean(teamSupervisorBinding)
+  const showMissingSupervisor =
+    Boolean(normalizeTeamKey(formState.expatProfile.team)) && !hasTeamSupervisor
+
   return (
     <div className="mt-4 grid gap-4 sm:grid-cols-2">
       <label className="space-y-1 text-sm text-slate-700">
@@ -28,12 +54,18 @@ export function ExpatProfileFields({
         <input
           list="team-options"
           value={formState.expatProfile.team}
-          onChange={(event) =>
+          onChange={(event) => {
+            const nextTeam = event.target.value
+            const binding = teamSupervisorMap.get(normalizeTeamKey(nextTeam))
             setFormState((prev) => ({
               ...prev,
-              expatProfile: { ...prev.expatProfile, team: event.target.value },
+              expatProfile: {
+                ...prev.expatProfile,
+                team: nextTeam,
+                chineseSupervisorId: binding ? String(binding.supervisorId) : '',
+              },
             }))
-          }
+          }}
           className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
         />
         <datalist id="team-options">
@@ -44,23 +76,15 @@ export function ExpatProfileFields({
       </label>
       <label className="space-y-1 text-sm text-slate-700">
         <span className="block font-semibold">{t.form.chineseSupervisor}</span>
-        <select
-          value={formState.expatProfile.chineseSupervisorId}
-          onChange={(event) =>
-            setFormState((prev) => ({
-              ...prev,
-              expatProfile: { ...prev.expatProfile, chineseSupervisorId: event.target.value },
-            }))
-          }
-          className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+        <div
+          className={`w-full rounded-xl border px-3 py-2 text-sm shadow-sm ${
+            showMissingSupervisor
+              ? 'border-rose-200 bg-rose-50 text-rose-600'
+              : 'border-slate-200 bg-slate-50 text-slate-700'
+          }`}
         >
-          <option value="">{t.labels.empty}</option>
-          {chineseSupervisorOptions.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
+          {showMissingSupervisor ? t.teamSupervisor.missing : supervisorLabel || t.labels.empty}
+        </div>
       </label>
       <label className="space-y-1 text-sm text-slate-700">
         <span className="block font-semibold">{t.form.contractNumber}</span>

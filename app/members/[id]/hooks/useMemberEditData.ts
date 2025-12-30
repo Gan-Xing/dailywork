@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { Locale } from '@/lib/i18n'
 
 import type { MemberOption, Role } from '../types'
-import { formatSupervisorLabel, normalizeText } from '@/lib/members/utils'
+import { normalizeText } from '@/lib/members/utils'
 
 type UseMemberEditDataParams = {
   locale: Locale
@@ -38,20 +38,6 @@ export function useMemberEditData({
     return Array.from(set).sort(optionCollator.compare)
   }, [currentTeam, memberOptions, optionCollator])
 
-  const chineseSupervisorOptions = useMemo(() => {
-    return memberOptions
-      .filter((memberOption) => memberOption.nationality === 'china')
-      .map((memberOption) => ({
-        value: String(memberOption.id),
-        label:
-          formatSupervisorLabel({
-            name: memberOption.name,
-            frenchName: memberOption.chineseProfile?.frenchName ?? null,
-            username: memberOption.username,
-          }) || memberOption.username,
-      }))
-      .sort((a, b) => optionCollator.compare(a.label, b.label))
-  }, [memberOptions, optionCollator])
 
   useEffect(() => {
     if (!canAssignRole) return
@@ -84,5 +70,5 @@ export function useMemberEditData({
 
   const resolvedRolesData = canAssignRole ? rolesData : []
 
-  return { rolesData: resolvedRolesData, teamOptions, chineseSupervisorOptions }
+  return { rolesData: resolvedRolesData, teamOptions }
 }

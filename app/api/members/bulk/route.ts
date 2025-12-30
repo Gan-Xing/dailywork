@@ -5,6 +5,7 @@ import { normalizeTagsInput } from '@/lib/members/utils'
 import { hasPermission } from '@/lib/server/authSession'
 import { isDecimalEqual, resolveSupervisorSnapshot } from '@/lib/server/compensation'
 import { createInitialContractChangeIfMissing } from '@/lib/server/contractChanges'
+import { resolveTeamSupervisorId } from '@/lib/server/teamSupervisors'
 import {
   normalizeChineseProfile,
   normalizeExpatProfile,
@@ -306,10 +307,6 @@ export async function POST(request: NextRequest) {
           expatUpdates.team = normalizedExpat.team
           nextExpat.team = normalizedExpat.team
         }
-        if (expatHas('chineseSupervisorId')) {
-          expatUpdates.chineseSupervisorId = normalizedExpat.chineseSupervisorId
-          nextExpat.chineseSupervisorId = normalizedExpat.chineseSupervisorId
-        }
         if (expatHas('contractType')) {
           expatUpdates.contractType = normalizedExpat.contractType
           nextExpat.contractType = normalizedExpat.contractType
@@ -344,6 +341,15 @@ export async function POST(request: NextRequest) {
           expatUpdates.netMonthlyUnit = normalizedExpat.netMonthlyUnit
           nextExpat.netMonthlyAmount = normalizedExpat.netMonthlyAmount
           nextExpat.netMonthlyUnit = normalizedExpat.netMonthlyUnit
+        }
+        if (nextExpat.team) {
+          const mappedSupervisorId = await resolveTeamSupervisorId(nextExpat.team)
+          if (!mappedSupervisorId) {
+            results.push({ id: userId, ok: false, error: '班组未绑定中方负责人' })
+            continue
+          }
+          expatUpdates.chineseSupervisorId = mappedSupervisorId
+          nextExpat.chineseSupervisorId = mappedSupervisorId
         }
 
         const addOneYear = (date: Date) => {
@@ -397,7 +403,7 @@ export async function POST(request: NextRequest) {
 
         expatCreateData = {
           team: normalizedExpat.team,
-          chineseSupervisorId: normalizedExpat.chineseSupervisorId,
+          chineseSupervisorId: nextExpat.chineseSupervisorId,
           contractNumber: existingExpat?.contractNumber ?? null,
           contractType: normalizedExpat.contractType,
           contractStartDate: resolvedContractStartDate,
@@ -417,20 +423,6 @@ export async function POST(request: NextRequest) {
           emergencyContactPhone: normalizedExpat.emergencyContactPhone,
         }
 
-        if (normalizedExpat.chineseSupervisorId) {
-          const supervisor = await prisma.user.findUnique({
-            where: { id: normalizedExpat.chineseSupervisorId },
-            select: { nationality: true },
-          })
-          if (!supervisor || supervisor.nationality !== 'china') {
-            results.push({
-              id: userId,
-              ok: false,
-              error: 'Chinese supervisor must be a Chinese national',
-            })
-            continue
-          }
-        }
       }
 
       let chineseCreateData: Prisma.UserChineseProfileCreateWithoutUserInput | null = null

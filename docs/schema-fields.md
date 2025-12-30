@@ -177,6 +177,13 @@
 - `provenance`（PROVENANCE）：属地/来源，字符串，可空。
 - `emergencyContactName` + `emergencyContactPhone`（EN CAS D'URGENCES）：紧急联系人姓名与电话，字符串，可空。
 
+### TeamSupervisor（班组负责人绑定）
+
+- `team`（EQUIPE）：班组名称，字符串，必填。
+- `teamKey`：班组标准化键（去空格 + 小写），用于唯一约束。
+- `supervisorId`（RESPONSABLE CHINOIS）：绑定的中方负责人用户 ID（仅中国籍成员）。
+- `supervisorName`：中方负责人快照名（`name + frenchName`），可空。
+
 ### UserContractChange（合同变更历史）
 
 - `userId`：关联成员 ID。

@@ -54,6 +54,7 @@ type MembersTabProps = {
   templateDownloading: boolean
   skipImportHistory: boolean
   onToggleSkipImportHistory: (next: boolean) => void
+  onOpenTeamSupervisorDialog: () => void
   onImportFileChange: (event: ChangeEvent<HTMLInputElement>) => void
   onContractChangeImportFileChange: (event: ChangeEvent<HTMLInputElement>) => void
   onContractChangeTemplateDownload: () => void
@@ -256,6 +257,7 @@ export function MembersTab(props: MembersTabProps) {
     templateDownloading,
     skipImportHistory,
     onToggleSkipImportHistory,
+    onOpenTeamSupervisorDialog,
     onImportFileChange,
     onContractChangeImportFileChange,
     onContractChangeTemplateDownload,
@@ -563,6 +565,9 @@ export function MembersTab(props: MembersTabProps) {
             />
             <span>{t.form.skipChangeHistory}</span>
           </label>
+          <ActionButton onClick={onOpenTeamSupervisorDialog} disabled={!canCreateMember}>
+            {t.actions.teamSupervisors}
+          </ActionButton>
           <ActionButton
             onClick={onContractChangeImportClick}
             disabled={!canUpdateMember || contractChangeImporting}

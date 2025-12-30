@@ -22,6 +22,48 @@ type InitialContractChangeParams = {
   reason?: string | null
 }
 
+const resolveLatestContractChange = async (tx: Prisma.TransactionClient, userId: number) => {
+  return tx.userContractChange.findFirst({
+    where: { userId },
+    orderBy: [{ startDate: 'desc' }, { changeDate: 'desc' }, { id: 'desc' }],
+  })
+}
+
+export const applyLatestContractSnapshot = async (
+  tx: Prisma.TransactionClient,
+  userId: number,
+) => {
+  const latest = await resolveLatestContractChange(tx, userId)
+  if (!latest) return null
+  await tx.userExpatProfile.upsert({
+    where: { userId },
+    create: {
+      userId,
+      chineseSupervisorId: latest.chineseSupervisorId,
+      contractNumber: latest.contractNumber,
+      contractType: latest.contractType,
+      salaryCategory: latest.salaryCategory,
+      prime: latest.prime,
+      baseSalaryAmount: latest.salaryAmount,
+      baseSalaryUnit: latest.salaryUnit,
+      contractStartDate: latest.startDate,
+      contractEndDate: latest.endDate,
+    },
+    update: {
+      chineseSupervisorId: latest.chineseSupervisorId,
+      contractNumber: latest.contractNumber,
+      contractType: latest.contractType,
+      salaryCategory: latest.salaryCategory,
+      prime: latest.prime,
+      baseSalaryAmount: latest.salaryAmount,
+      baseSalaryUnit: latest.salaryUnit,
+      contractStartDate: latest.startDate,
+      contractEndDate: latest.endDate,
+    },
+  })
+  return latest
+}
+
 const addOneYear = (date: Date) => {
   const next = new Date(date)
   next.setFullYear(next.getFullYear() + 1)

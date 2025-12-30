@@ -9,6 +9,7 @@ import { EMPTY_FILTER_VALUE } from '@/lib/members/constants'
 import {
   formatSupervisorLabel,
   getMonthKey,
+  collectContractNumbers,
   normalizeTagKey,
   normalizeText,
   toNumberFilterValue,
@@ -238,9 +239,12 @@ export function useMemberFilterOptions({
     const values = new Set<string>()
     let hasEmpty = false
     membersData.forEach((member) => {
-      const value = normalizeText(member.expatProfile?.contractNumber)
-      if (value) values.add(value)
-      else hasEmpty = true
+      const contractNumbers = collectContractNumbers(member.expatProfile ?? null)
+      if (contractNumbers.length === 0) {
+        hasEmpty = true
+        return
+      }
+      contractNumbers.forEach((value) => values.add(value))
     })
     const options = Array.from(values)
       .sort(optionCollator.compare)

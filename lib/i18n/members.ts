@@ -143,6 +143,7 @@ export const memberCopy: Record<
       createRole: string
       bulkEdit: string
       clearValue: string
+      teamSupervisors: string
     }
     access: {
       hint: string
@@ -197,6 +198,7 @@ export const memberCopy: Record<
       importInvalidChineseSupervisor: string
       importDuplicateContractNumber: string
       importContractNumberExists: string
+      importMissingTeamSupervisor: string
       importContractChangeMissingFields: string
       importRoleNotFound: (role: string) => string
       importFailed: string
@@ -296,6 +298,23 @@ export const memberCopy: Record<
       edit: string
       statusLabels: Record<'ACTIVE' | 'ARCHIVED', string>
       helper: string
+    }
+    teamSupervisor: {
+      title: string
+      subtitle: string
+      add: string
+      team: string
+      supervisor: string
+      edit: string
+      delete: string
+      confirm: string
+      cancel: string
+      empty: string
+      missing: string
+      teamRequired: string
+      supervisorRequired: string
+      teamPlaceholder: string
+      deleteConfirm: (team: string) => string
     }
     form: {
       name: string
@@ -634,6 +653,7 @@ export const memberCopy: Record<
       createRole: '新增角色',
       bulkEdit: '批量修改',
       clearValue: '清空',
+      teamSupervisors: '班组负责人',
     },
     access: {
       hint: '请先登录并开通 member:view 权限后再试。',
@@ -688,6 +708,7 @@ export const memberCopy: Record<
       importInvalidChineseSupervisor: '中方负责人账号不存在或非中国籍成员',
       importDuplicateContractNumber: '合同编号重复（同一文件内）',
       importContractNumberExists: '合同编号已存在',
+      importMissingTeamSupervisor: '班组未绑定中方负责人',
       importContractChangeMissingFields: '缺少合同变更字段',
       importRoleNotFound: (role: string) => `角色不存在：${role}`,
       importFailed: '导入失败，请稍后重试。',
@@ -788,6 +809,23 @@ export const memberCopy: Record<
         ARCHIVED: '归档',
       },
       helper: '权限遵循资源-动作编码，可直接复用到 API 鉴权策略。',
+    },
+    teamSupervisor: {
+      title: '班组负责人',
+      subtitle: '维护班组与中方负责人绑定。',
+      add: '新增班组',
+      team: '班组',
+      supervisor: '中方负责人',
+      edit: '编辑',
+      delete: '删除',
+      confirm: '确认',
+      cancel: '取消',
+      empty: '暂无班组绑定',
+      missing: '该班组未绑定中方负责人',
+      teamRequired: '班组必填',
+      supervisorRequired: '中方负责人必填',
+      teamPlaceholder: '输入班组名称',
+      deleteConfirm: (team: string) => `确定删除班组 ${team} 吗？`,
     },
     form: {
       name: '姓名',
@@ -1134,6 +1172,7 @@ export const memberCopy: Record<
       createRole: 'Ajouter un rôle',
       bulkEdit: 'Modification en lot',
       clearValue: 'Vider',
+      teamSupervisors: "Responsables d'équipe",
     },
     access: {
       hint: 'Connectez-vous puis obtenez member:view pour accéder à la liste.',
@@ -1188,6 +1227,7 @@ export const memberCopy: Record<
       importInvalidChineseSupervisor: 'Identifiant du responsable chinois invalide',
       importDuplicateContractNumber: "N° contrat en double dans le fichier",
       importContractNumberExists: "N° contrat déjà utilisé",
+      importMissingTeamSupervisor: "Équipe sans responsable chinois",
       importContractChangeMissingFields: 'Champs de changement de contrat manquants',
       importRoleNotFound: (role: string) => `Rôle introuvable : ${role}`,
       importFailed: "Échec de l'import, réessayez.",
@@ -1291,6 +1331,23 @@ export const memberCopy: Record<
       },
       helper:
         'Les permissions suivent le format ressource:action et peuvent être réutilisées côté API.',
+    },
+    teamSupervisor: {
+      title: "Responsables d'équipe",
+      subtitle: "Lier chaque équipe à un responsable chinois.",
+      add: 'Ajouter une équipe',
+      team: 'Équipe',
+      supervisor: 'Responsable chinois',
+      edit: 'Éditer',
+      delete: 'Supprimer',
+      confirm: 'Confirmer',
+      cancel: 'Annuler',
+      empty: "Aucune équipe associée",
+      missing: "Cette équipe n'a pas de responsable chinois",
+      teamRequired: "L'équipe est obligatoire",
+      supervisorRequired: 'Responsable chinois requis',
+      teamPlaceholder: "Saisir le nom de l'équipe",
+      deleteConfirm: (team: string) => `Supprimer l'équipe ${team} ?`,
     },
     form: {
       name: 'Nom',

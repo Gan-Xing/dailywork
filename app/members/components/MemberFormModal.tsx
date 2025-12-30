@@ -1,4 +1,4 @@
-import { useState, type Dispatch, type FormEvent, type RefObject, type SetStateAction } from 'react'
+import { useEffect, useState, type Dispatch, type FormEvent, type RefObject, type SetStateAction } from 'react'
 
 import type { Locale } from '@/lib/i18n'
 import {
@@ -9,8 +9,9 @@ import {
   type NationalityRegion,
   type NationalityOption,
 } from '@/lib/i18n/members'
-import { normalizeTagsInput, parseBirthDateFromIdNumber } from '@/lib/members/utils'
+import { normalizeTagsInput, normalizeTeamKey, parseBirthDateFromIdNumber } from '@/lib/members/utils'
 import type { ExpatProfileForm, MemberFormState as FormState, Role } from '@/types/members'
+import type { TeamSupervisorItem } from '../hooks/useTeamSupervisors'
 
 type MemberCopy = (typeof memberCopy)[keyof typeof memberCopy]
 
@@ -30,7 +31,7 @@ type MemberFormModalProps = {
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
   positionOptions: string[]
   teamOptions: string[]
-  chineseSupervisorOptions: { value: string; label: string }[]
+  teamSupervisorMap: Map<string, TeamSupervisorItem>
   nationalityByRegion: Map<NationalityRegion, NationalityOption[]>
   statusLabels: Record<EmploymentStatus, string>
   isChineseForm: boolean
@@ -63,7 +64,7 @@ export function MemberFormModal({
   onSubmit,
   positionOptions,
   teamOptions,
-  chineseSupervisorOptions,
+  teamSupervisorMap,
   nationalityByRegion,
   statusLabels,
   isChineseForm,
@@ -80,6 +81,29 @@ export function MemberFormModal({
   submitting,
 }: MemberFormModalProps) {
   const [tagsInput, setTagsInput] = useState(() => formState.tags.join('\n'))
+  useEffect(() => {
+    const teamKey = normalizeTeamKey(formState.expatProfile.team)
+    if (!teamKey) return
+    const binding = teamSupervisorMap.get(teamKey)
+    if (!binding) return
+    const nextSupervisorId = String(binding.supervisorId)
+    if (formState.expatProfile.chineseSupervisorId === nextSupervisorId) return
+    setFormState((prev) => ({
+      ...prev,
+      expatProfile: {
+        ...prev.expatProfile,
+        chineseSupervisorId: nextSupervisorId,
+      },
+    }))
+  }, [formState.expatProfile.team, formState.expatProfile.chineseSupervisorId, teamSupervisorMap, setFormState])
+
+  const teamSupervisorBinding = teamSupervisorMap.get(
+    normalizeTeamKey(formState.expatProfile.team),
+  )
+  const supervisorLabel = teamSupervisorBinding?.supervisorLabel ?? ''
+  const hasTeamSupervisor = Boolean(teamSupervisorBinding)
+  const showMissingSupervisor =
+    Boolean(normalizeTeamKey(formState.expatProfile.team)) && !hasTeamSupervisor
 
   if (!open) return null
 
@@ -612,12 +636,18 @@ export function MemberFormModal({
                     <input
                       list="team-options"
                       value={formState.expatProfile.team}
-                      onChange={(event) =>
+                      onChange={(event) => {
+                        const nextTeam = event.target.value
+                        const binding = teamSupervisorMap.get(normalizeTeamKey(nextTeam))
                         setFormState((prev) => ({
                           ...prev,
-                          expatProfile: { ...prev.expatProfile, team: event.target.value },
+                          expatProfile: {
+                            ...prev.expatProfile,
+                            team: nextTeam,
+                            chineseSupervisorId: binding ? String(binding.supervisorId) : '',
+                          },
                         }))
-                      }
+                      }}
                       disabled={formMode === 'view'}
                       className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
                     />
@@ -629,27 +659,17 @@ export function MemberFormModal({
                   </label>
                   <label className="space-y-1 text-sm text-slate-700">
                     <span className="block font-semibold">{t.form.chineseSupervisor}</span>
-                    <select
-                      value={formState.expatProfile.chineseSupervisorId}
-                      onChange={(event) =>
-                        setFormState((prev) => ({
-                          ...prev,
-                          expatProfile: {
-                            ...prev.expatProfile,
-                            chineseSupervisorId: event.target.value,
-                          },
-                        }))
-                      }
-                      disabled={formMode === 'view'}
-                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+                    <div
+                      className={`w-full rounded-xl border px-3 py-2 text-sm shadow-sm ${
+                        showMissingSupervisor
+                          ? 'border-rose-200 bg-rose-50 text-rose-600'
+                          : 'border-slate-200 bg-slate-50 text-slate-700'
+                      }`}
                     >
-                      <option value="">{t.labels.empty}</option>
-                      {chineseSupervisorOptions.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
+                      {showMissingSupervisor
+                        ? t.teamSupervisor.missing
+                        : supervisorLabel || t.labels.empty}
+                    </div>
                   </label>
                   <label className="space-y-1 text-sm text-slate-700">
                     <span className="block font-semibold">{t.form.contractNumber}</span>

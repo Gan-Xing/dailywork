@@ -2,6 +2,7 @@ import type { Prisma, PermissionStatus } from '@prisma/client'
 
 import { verifyPassword } from '@/lib/auth/password'
 import { hashPassword } from '@/lib/auth/password'
+import { normalizeText } from '@/lib/members/utils'
 import { prisma } from '@/lib/prisma'
 
 export interface AuthPermission {
@@ -67,6 +68,40 @@ const mapUser = (user: Prisma.UserGetPayload<{ select: typeof userSelection }>):
     roles,
     permissions,
   }
+}
+
+const buildContractNumberMap = async (userIds: number[]) => {
+  if (userIds.length === 0) return new Map<number, Set<string>>()
+  const changes = await prisma.userContractChange.findMany({
+    where: {
+      userId: { in: userIds },
+      contractNumber: { not: null },
+    },
+    select: {
+      userId: true,
+      contractNumber: true,
+    },
+  })
+  const map = new Map<number, Set<string>>()
+  changes.forEach((change) => {
+    const normalized = normalizeText(change.contractNumber)
+    if (!normalized) return
+    const set = map.get(change.userId) ?? new Set<string>()
+    set.add(normalized)
+    map.set(change.userId, set)
+  })
+  return map
+}
+
+const resolveContractNumbers = (
+  userId: number,
+  currentNumber: string | null | undefined,
+  contractNumberMap: Map<number, Set<string>>,
+) => {
+  const values = new Set(contractNumberMap.get(userId) ?? [])
+  const normalized = normalizeText(currentNumber ?? null)
+  if (normalized) values.add(normalized)
+  return Array.from(values)
 }
 
 export const login = async (username: string, password: string) => {
@@ -172,6 +207,8 @@ export const listUsers = async () => {
     orderBy: { createdAt: 'asc' },
   })
 
+  const contractNumberMap = await buildContractNumberMap(users.map((user) => user.id))
+
   return users.map((user) => ({
     id: user.id,
     username: user.username,
@@ -216,6 +253,11 @@ export const listUsers = async () => {
             : null,
           team: user.expatProfile.team,
           contractNumber: user.expatProfile.contractNumber,
+          contractNumbers: resolveContractNumbers(
+            user.id,
+            user.expatProfile.contractNumber,
+            contractNumberMap,
+          ),
           contractType: user.expatProfile.contractType,
           contractStartDate: user.expatProfile.contractStartDate
             ? user.expatProfile.contractStartDate.toISOString()
@@ -329,6 +371,8 @@ export const getUserById = async (userId: number) => {
 
   if (!user) return null
 
+  const contractNumberMap = await buildContractNumberMap([user.id])
+
   return {
     id: user.id,
     username: user.username,
@@ -373,6 +417,11 @@ export const getUserById = async (userId: number) => {
             : null,
           team: user.expatProfile.team,
           contractNumber: user.expatProfile.contractNumber,
+          contractNumbers: resolveContractNumbers(
+            user.id,
+            user.expatProfile.contractNumber,
+            contractNumberMap,
+          ),
           contractType: user.expatProfile.contractType,
           contractStartDate: user.expatProfile.contractStartDate
             ? user.expatProfile.contractStartDate.toISOString()

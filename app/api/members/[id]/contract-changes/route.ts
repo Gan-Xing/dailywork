@@ -9,8 +9,12 @@ import {
   parseSalaryUnit,
   resolveSupervisorSnapshot,
 } from '@/lib/server/compensation'
-import { createInitialContractChangeIfMissing } from '@/lib/server/contractChanges'
+import {
+  applyLatestContractSnapshot,
+  createInitialContractChangeIfMissing,
+} from '@/lib/server/contractChanges'
 import { hasPermission } from '@/lib/server/authSession'
+import { resolveTeamSupervisorId } from '@/lib/server/teamSupervisors'
 import { prisma } from '@/lib/prisma'
 
 const canManageCompensation = async () => {
@@ -90,9 +94,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const endDateInput = normalizeOptionalDate(body.endDate)
   const changeDate = normalizeOptionalDate(body.changeDate) ?? new Date()
   const reason = normalizeOptionalText(body.reason)
-  const nextSupervisorId = hasField('chineseSupervisorId')
-    ? Number(body.chineseSupervisorId) || null
+  const nextSupervisorId = expatProfile.team
+    ? await resolveTeamSupervisorId(expatProfile.team)
     : expatProfile.chineseSupervisorId ?? null
+  if (expatProfile.team && !nextSupervisorId) {
+    return NextResponse.json({ error: '班组未绑定中方负责人' }, { status: 400 })
+  }
 
   const hasPayload =
     Boolean(contractNumber) ||
@@ -158,34 +165,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       },
     })
 
-    await tx.userExpatProfile.upsert({
-      where: { userId },
-      create: {
-        userId,
-        chineseSupervisorId: supervisorSnapshot.id,
-        contractNumber,
-        contractType,
-        salaryCategory,
-        prime,
-        baseSalaryAmount: salaryAmount,
-        baseSalaryUnit: salaryUnit,
-        contractStartDate: resolvedStartDate,
-        contractEndDate: resolvedEndDate,
-      },
-      update: {
-        chineseSupervisorId: supervisorSnapshot.id,
-        contractNumber,
-        contractType,
-        salaryCategory,
-        prime,
-        baseSalaryAmount: salaryAmount,
-        baseSalaryUnit: salaryUnit,
-        contractStartDate: resolvedStartDate,
-        contractEndDate: resolvedEndDate,
-      },
-    })
+    const latest = await applyLatestContractSnapshot(tx, userId)
 
-    if (salaryChanged) {
+    if (latest?.id === change.id && salaryChanged) {
       await tx.userPayrollChange.create({
         data: {
           userId,

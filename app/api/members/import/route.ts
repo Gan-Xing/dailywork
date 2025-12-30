@@ -13,7 +13,8 @@ import {
   parseBirthDateInput,
   parseChineseIdBirthDate,
 } from '@/lib/server/memberProfiles'
-import { normalizeTagsInput } from '@/lib/members/utils'
+import { normalizeTagsInput, normalizeTeamKey } from '@/lib/members/utils'
+import { buildTeamSupervisorMap } from '@/lib/server/teamSupervisors'
 import { prisma } from '@/lib/prisma'
 
 const PHONE_PATTERN = /^[+\d][\d\s-]{4,}$/
@@ -93,6 +94,7 @@ type ImportErrorCode =
   | 'missing_termination_reason'
   | 'invalid_termination_date'
   | 'invalid_chinese_supervisor'
+  | 'missing_team_supervisor'
   | 'duplicate_contract_number'
   | 'contract_number_exists'
   | 'role_not_found'
@@ -133,33 +135,6 @@ export async function POST(request: Request) {
   const members = Array.isArray(body?.members) ? (body?.members as ImportMemberInput[]) : []
   if (members.length === 0) {
     return NextResponse.json({ error: '缺少导入数据' }, { status: 400 })
-  }
-
-  const supervisorUsernames = Array.from(
-    new Set(
-      members
-        .map((member) =>
-          typeof member.chineseSupervisor === 'string' ? member.chineseSupervisor.trim().toLowerCase() : '',
-        )
-        .filter(Boolean),
-    ),
-  )
-  const supervisorsByUsername = new Map<string, { id: number; nationality: string | null }>()
-  if (supervisorUsernames.length > 0) {
-    const supervisors = await prisma.user.findMany({
-      where: {
-        OR: supervisorUsernames.map((username) => ({
-          username: { equals: username, mode: 'insensitive' },
-        })),
-      },
-      select: { id: true, username: true, nationality: true },
-    })
-    supervisors.forEach((supervisor) => {
-      supervisorsByUsername.set(supervisor.username.toLowerCase(), {
-        id: supervisor.id,
-        nationality: supervisor.nationality,
-      })
-    })
   }
 
   const errors: ImportError[] = []
@@ -211,13 +186,6 @@ export async function POST(request: Request) {
     const name = typeof member.name === 'string' ? member.name.trim() : ''
     const gender = typeof member.gender === 'string' ? member.gender.trim() : null
     const nationality = typeof member.nationality === 'string' ? member.nationality.trim() : null
-    const supervisorUsername =
-      typeof member.chineseSupervisor === 'string' ? member.chineseSupervisor.trim() : ''
-    const supervisorRecord = supervisorUsername
-      ? supervisorsByUsername.get(supervisorUsername.toLowerCase())
-      : null
-    const chineseSupervisorId =
-      supervisorRecord && supervisorRecord.nationality === 'china' ? supervisorRecord.id : null
     const phones = normalizePhoneList(member.phones)
     const position =
       typeof member.position === 'string' && member.position.trim().length ? member.position.trim() : null
@@ -250,7 +218,6 @@ export async function POST(request: Request) {
     })
     const expatProfile = normalizeExpatProfile({
       team: member.team,
-      chineseSupervisorId,
       contractNumber: member.contractNumber,
       contractType: member.contractType,
       contractStartDate: member.contractStartDate,
@@ -292,11 +259,6 @@ export async function POST(request: Request) {
     }
     if (!name) {
       errors.push({ row, code: 'missing_name' })
-      invalidRows.add(row)
-      hasRowError = true
-    }
-    if (nationality !== 'china' && supervisorUsername && !chineseSupervisorId) {
-      errors.push({ row, code: 'invalid_chinese_supervisor', value: supervisorUsername })
       invalidRows.add(row)
       hasRowError = true
     }
@@ -475,6 +437,10 @@ export async function POST(request: Request) {
         },
       })
     : []
+  const teamSupervisorMap = await buildTeamSupervisorMap([
+    ...prepared.map((member) => member.expatProfile.team),
+    ...existingUsers.map((user) => user.expatProfile?.team),
+  ])
   const matchesByIdentity = new Map<
     string,
     Array<{
@@ -594,6 +560,16 @@ export async function POST(request: Request) {
     }
   })
 
+  prepared.forEach((member) => {
+    const match = matchByRow.get(member.row)
+    const resolvedTeam = member.expatProfile.team ?? match?.expatProfile?.team ?? null
+    const teamKey = normalizeTeamKey(resolvedTeam)
+    if (teamKey && !teamSupervisorMap.has(teamKey)) {
+      errors.push({ row: member.row, code: 'missing_team_supervisor', value: resolvedTeam ?? '' })
+      invalidRows.add(member.row)
+    }
+  })
+
   if (canAssignRole) {
     const roleIds = Array.from(new Set(prepared.flatMap((member) => member.roleIds)))
     if (roleIds.length > 0) {
@@ -661,6 +637,14 @@ export async function POST(request: Request) {
         const shouldUpdateContractDates =
           member.expatProfile.contractStartDate !== null ||
           member.expatProfile.contractEndDate !== null
+        const resolvedTeam = member.expatProfile.team ?? match?.expatProfile?.team ?? null
+        const teamKey = normalizeTeamKey(resolvedTeam)
+        const resolvedSupervisorId = teamKey
+          ? teamSupervisorMap.get(teamKey)?.supervisorId ?? null
+          : match?.expatProfile?.chineseSupervisorId ?? null
+        if (teamKey && !resolvedSupervisorId) {
+          throw new Error('班组未绑定中方负责人')
+        }
         const chineseProfileUpdate = {
           ...(member.chineseProfile.frenchName
             ? { frenchName: member.chineseProfile.frenchName }
@@ -702,9 +686,7 @@ export async function POST(request: Request) {
             : {}),
         }
         const expatProfileUpdate = {
-          ...(member.expatProfile.chineseSupervisorId !== null
-            ? { chineseSupervisorId: member.expatProfile.chineseSupervisorId }
-            : {}),
+          ...(resolvedTeam ? { chineseSupervisorId: resolvedSupervisorId } : {}),
           ...(member.expatProfile.team ? { team: member.expatProfile.team } : {}),
           ...(member.expatProfile.contractNumber
             ? { contractNumber: member.expatProfile.contractNumber }
@@ -763,7 +745,9 @@ export async function POST(request: Request) {
           return typeof value === 'string' ? value : value.toString()
         }
         const existingExpat = match?.expatProfile ?? null
-        const existingExpatSnapshot = existingExpat
+        const existingExpatSnapshot: Parameters<
+          typeof createInitialContractChangeIfMissing
+        >[1]['expatProfile'] = existingExpat
           ? {
               chineseSupervisorId: existingExpat.chineseSupervisorId,
               contractNumber: existingExpat.contractNumber,
@@ -777,22 +761,19 @@ export async function POST(request: Request) {
             }
           : null
         const nextExpat = {
-          team: member.expatProfile.team ?? existingExpat?.team ?? null,
-          chineseSupervisorId:
-            member.expatProfile.chineseSupervisorId !== null
-              ? member.expatProfile.chineseSupervisorId
-              : existingExpat?.chineseSupervisorId ?? null,
+          team: resolvedTeam,
+          chineseSupervisorId: resolvedSupervisorId,
           contractNumber: member.expatProfile.contractNumber ?? existingExpat?.contractNumber ?? null,
           contractType: member.expatProfile.contractType ?? existingExpat?.contractType ?? null,
           salaryCategory: member.expatProfile.salaryCategory ?? existingExpat?.salaryCategory ?? null,
-          prime: member.expatProfile.prime ?? normalizeDecimal(existingExpat?.prime),
+          prime: member.expatProfile.prime ?? normalizeDecimal(existingExpat?.prime ?? null),
           baseSalaryAmount:
             member.expatProfile.baseSalaryAmount ??
-            normalizeDecimal(existingExpat?.baseSalaryAmount),
+            normalizeDecimal(existingExpat?.baseSalaryAmount ?? null),
           baseSalaryUnit: member.expatProfile.baseSalaryUnit ?? existingExpat?.baseSalaryUnit ?? null,
           netMonthlyAmount:
             member.expatProfile.netMonthlyAmount ??
-            normalizeDecimal(existingExpat?.netMonthlyAmount),
+            normalizeDecimal(existingExpat?.netMonthlyAmount ?? null),
           netMonthlyUnit: member.expatProfile.netMonthlyUnit ?? existingExpat?.netMonthlyUnit ?? null,
           contractStartDate: shouldUpdateContractDates
             ? resolvedContractStartDate
@@ -845,6 +826,8 @@ export async function POST(request: Request) {
                 ? {
                     create: {
                       ...member.expatProfile,
+                      team: resolvedTeam,
+                      chineseSupervisorId: resolvedTeam ? resolvedSupervisorId : null,
                       contractStartDate: resolvedContractStartDate,
                       contractEndDate: resolvedContractEndDate,
                     },
