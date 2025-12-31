@@ -541,11 +541,13 @@ export async function POST(request: NextRequest) {
             expatProfile: existingExpat,
             joinDate: existingUser.joinDate ?? null,
             fallbackChangeDate: new Date(),
+            team: existingExpat?.team ?? null,
             position: existingUser.position ?? null,
           })
           await tx.userContractChange.create({
             data: {
               userId,
+              team: nextExpat.team,
               chineseSupervisorId: supervisorSnapshot.id,
               chineseSupervisorName: supervisorSnapshot.name,
               position: resolvedPosition,

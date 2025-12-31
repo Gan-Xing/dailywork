@@ -228,6 +228,7 @@ export async function POST(request: Request) {
         await tx.userContractChange.create({
           data: {
             userId: createdUser.id,
+            team: expatProfileData.team,
             chineseSupervisorId: supervisorSnapshot.id,
             chineseSupervisorName: supervisorSnapshot.name,
             position: resolvedPositionName,

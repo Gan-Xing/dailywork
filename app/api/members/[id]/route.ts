@@ -273,11 +273,13 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
           expatProfile: existingUser.expatProfile,
           joinDate: existingUser.joinDate,
           fallbackChangeDate: new Date(),
+          team: existingUser.expatProfile?.team ?? null,
           position: existingUser.position ?? null,
         })
         await tx.userContractChange.create({
           data: {
             userId,
+            team: expatProfileData.team,
             chineseSupervisorId: supervisorSnapshot.id,
             chineseSupervisorName: supervisorSnapshot.name,
             position: resolvedPositionName,

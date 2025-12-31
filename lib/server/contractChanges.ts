@@ -3,6 +3,7 @@ import type { ContractType, Prisma, SalaryUnit } from '@prisma/client'
 import { formatSupervisorLabel } from '@/lib/members/utils'
 
 type ExpatContractSnapshot = {
+  team?: string | null
   chineseSupervisorId?: number | null
   contractNumber?: string | null
   contractType?: ContractType | null
@@ -20,6 +21,7 @@ type InitialContractChangeParams = {
   joinDate?: Date | null
   fallbackChangeDate?: Date | null
   reason?: string | null
+  team?: string | null
   position?: string | null
 }
 
@@ -54,6 +56,7 @@ export const applyLatestContractSnapshot = async (
     where: { userId },
     create: {
       userId,
+      team: latest.team,
       chineseSupervisorId: latest.chineseSupervisorId,
       contractNumber: latest.contractNumber,
       contractType: latest.contractType,
@@ -65,6 +68,7 @@ export const applyLatestContractSnapshot = async (
       contractEndDate: latest.endDate,
     },
     update: {
+      team: latest.team,
       chineseSupervisorId: latest.chineseSupervisorId,
       contractNumber: latest.contractNumber,
       contractType: latest.contractType,
@@ -181,6 +185,7 @@ export const createInitialContractChangeIfMissing = async (
     joinDate = null,
     fallbackChangeDate = null,
     reason = null,
+    team = null,
     position = null,
   }: InitialContractChangeParams,
 ) => {
@@ -206,6 +211,7 @@ export const createInitialContractChangeIfMissing = async (
   await tx.userContractChange.create({
     data: {
       userId,
+      team,
       chineseSupervisorId: supervisor.id,
       chineseSupervisorName: supervisor.name,
       position,

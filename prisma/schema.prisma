@@ -524,6 +524,7 @@ model UserContractChange {
   id                   Int          @id @default(autoincrement())
   userId               Int
   user                 User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  team                 String?
   chineseSupervisorId  Int?
   chineseSupervisor    User?        @relation("ContractChangeSupervisor", fields: [chineseSupervisorId], references: [id], onDelete: SetNull)
   chineseSupervisorName String?

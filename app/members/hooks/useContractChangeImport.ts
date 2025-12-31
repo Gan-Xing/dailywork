@@ -7,6 +7,7 @@ type MemberCopy = (typeof memberCopy)[keyof typeof memberCopy]
 type ContractChangeImportColumnKey =
   | 'name'
   | 'birthDate'
+  | 'team'
   | 'position'
   | 'contractNumber'
   | 'contractType'
@@ -58,6 +59,7 @@ type ContractChangeImportItem = {
   row: number
   name: string
   birthDate: string
+  team?: string
   position?: string
   contractNumber?: string
   contractType?: string
@@ -131,6 +133,7 @@ export function useContractChangeImport({
     const register = (copy: (typeof memberCopy)[keyof typeof memberCopy]) => {
       add(copy.form.name, 'name')
       add(copy.form.birthDate, 'birthDate')
+      add(copy.form.team, 'team')
       add(copy.form.position, 'position')
       add(copy.form.contractNumber, 'contractNumber')
       add(copy.form.contractType, 'contractType')
@@ -143,6 +146,7 @@ export function useContractChangeImport({
       add(copy.compensation.fields.endDate, 'endDate')
       add(copy.compensation.fields.changeDate, 'changeDate')
       add(copy.compensation.fields.reason, 'reason')
+      add(copy.compensation.fields.team, 'team')
       add(copy.compensation.fields.chineseSupervisor, 'chineseSupervisor')
       add(copy.form.chineseSupervisor, 'chineseSupervisor')
     }
@@ -155,6 +159,7 @@ export function useContractChangeImport({
     () => [
       'name',
       'birthDate',
+      'team',
       'position',
       'contractNumber',
       'contractType',
@@ -176,6 +181,7 @@ export function useContractChangeImport({
     () => ({
       name: t.form.name,
       birthDate: t.form.birthDate,
+      team: t.form.team,
       position: t.form.position,
       contractNumber: t.form.contractNumber,
       contractType: t.form.contractType,
@@ -319,6 +325,7 @@ export function useContractChangeImport({
             const idx = headerIndex.get(key)
             return idx !== undefined ? row[idx] : undefined
           }
+          const team = normalizeText(getCell('team'))
           const contractNumber = normalizeText(getCell('contractNumber'))
           const position = normalizeText(getCell('position'))
           const contractType = normalizeText(getCell('contractType'))
@@ -343,6 +350,7 @@ export function useContractChangeImport({
           }
 
           const hasChangeField =
+            team ||
             position ||
             contractNumber ||
             contractType ||
@@ -365,6 +373,7 @@ export function useContractChangeImport({
             name: nameValue,
             birthDate,
           }
+          if (team) item.team = team
           if (position) item.position = position
           if (contractNumber) item.contractNumber = contractNumber
           if (contractType) item.contractType = contractType

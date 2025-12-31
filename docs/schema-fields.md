@@ -187,6 +187,7 @@
 ### UserContractChange（合同变更历史）
 
 - `userId`：关联成员 ID。
+- `team`（EQUIPE）：班组名称，可空。
 - `chineseSupervisorId`（RESPONSABLE CHINOIS）：中方负责人 ID，可空。
 - `chineseSupervisorName`：中方负责人快照名（`name + frenchName`），可空。
 - `position`：岗位名称，可空。

@@ -120,8 +120,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const body = await request.json()
   const hasField = (key: string) => Object.prototype.hasOwnProperty.call(body, key)
 
-  const teamInput = hasField('team') ? normalizeOptionalText(body.team) : null
-  const resolvedTeam = teamInput ?? expatProfile.team
+  const hasTeamField = hasField('team')
+  const teamInput = hasTeamField ? normalizeOptionalText(body.team) : null
+  const resolvedTeam = hasTeamField ? teamInput : expatProfile.team ?? null
   const position = hasField('position') ? normalizeOptionalText(body.position) : user.position ?? null
   const contractNumber = hasField('contractNumber')
     ? normalizeOptionalText(body.contractNumber)
@@ -153,6 +154,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }
 
   const hasPayload =
+    hasTeamField ||
     Boolean(position) ||
     Boolean(contractNumber) ||
     Boolean(contractType) ||
@@ -198,11 +200,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       expatProfile,
       joinDate: user.joinDate,
       fallbackChangeDate: changeDate,
+      team: expatProfile.team ?? null,
       position: user.position ?? null,
     })
     const change = await tx.userContractChange.create({
       data: {
         userId,
+        team: resolvedTeam,
         chineseSupervisorId: supervisorSnapshot.id,
         chineseSupervisorName: supervisorSnapshot.name,
         position,
@@ -220,16 +224,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     })
 
     const latest = await applyLatestContractSnapshot(tx, userId)
-
-    if (teamInput && teamInput !== expatProfile.team) {
-      await tx.userExpatProfile.update({
-        where: { userId },
-        data: {
-          team: teamInput,
-          chineseSupervisorId: nextSupervisorId,
-        },
-      })
-    }
 
     if (latest?.id === change.id && salaryChanged) {
       await tx.userPayrollChange.create({
@@ -285,6 +279,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     contractChange: {
       id: result.change.id,
       userId: result.change.userId,
+      team: result.change.team ?? null,
       chineseSupervisorId: result.change.chineseSupervisorId,
       chineseSupervisorName: result.change.chineseSupervisorName,
       position: result.change.position ?? null,

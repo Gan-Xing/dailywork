@@ -911,11 +911,13 @@ export async function POST(request: Request) {
               expatProfile: existingExpatSnapshot,
               joinDate: match.joinDate ?? null,
               fallbackChangeDate: new Date(),
+              team: existingExpat?.team ?? null,
               position: match.position ?? null,
             })
             await tx.userContractChange.create({
               data: {
                 userId: match.id,
+                team: nextExpat.team,
                 chineseSupervisorId: supervisorSnapshot.id,
                 chineseSupervisorName: supervisorSnapshot.name,
                 position: member.position ?? match.position ?? null,

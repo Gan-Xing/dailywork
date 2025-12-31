@@ -14,6 +14,7 @@ import {
   syncJoinDateFromContracts,
   syncPositionFromContracts,
 } from '@/lib/server/contractChanges'
+import { normalizeTeamKey } from '@/lib/members/utils'
 import { resolveTeamSupervisorId } from '@/lib/server/teamSupervisors'
 import { prisma } from '@/lib/prisma'
 
@@ -111,8 +112,9 @@ export async function PUT(
   const body = await request.json()
   const hasField = (key: string) => Object.prototype.hasOwnProperty.call(body, key)
 
-  const teamInput = hasField('team') ? normalizeOptionalText(body.team) : null
-  const resolvedTeam = teamInput ?? expatProfile.team
+  const hasTeamField = hasField('team')
+  const teamInput = hasTeamField ? normalizeOptionalText(body.team) : null
+  const team = hasTeamField ? teamInput : record.team ?? null
   const position = hasField('position') ? normalizeOptionalText(body.position) : record.position
   const contractNumber = hasField('contractNumber')
     ? normalizeOptionalText(body.contractNumber)
@@ -140,11 +142,22 @@ export async function PUT(
     ? normalizeOptionalDate(body.changeDate) ?? record.changeDate
     : record.changeDate
   const reason = hasField('reason') ? normalizeOptionalText(body.reason) : record.reason
-  const nextSupervisorId = resolvedTeam
-    ? await resolveTeamSupervisorId(resolvedTeam)
-    : record.chineseSupervisorId ?? expatProfile.chineseSupervisorId ?? null
-  if (resolvedTeam && !nextSupervisorId) {
-    return NextResponse.json({ error: '班组未绑定中方负责人' }, { status: 400 })
+  const isTeamChanged =
+    hasTeamField && normalizeTeamKey(teamInput ?? null) !== normalizeTeamKey(record.team)
+  let supervisorSnapshot = {
+    id: record.chineseSupervisorId ?? null,
+    name: record.chineseSupervisorName ?? null,
+  }
+  if (isTeamChanged) {
+    if (teamInput) {
+      const nextSupervisorId = await resolveTeamSupervisorId(teamInput)
+      if (!nextSupervisorId) {
+        return NextResponse.json({ error: '班组未绑定中方负责人' }, { status: 400 })
+      }
+      supervisorSnapshot = await resolveSupervisorSnapshot(nextSupervisorId)
+    } else {
+      supervisorSnapshot = { id: null, name: null }
+    }
   }
 
   if (contractType === 'CDD' && salaryUnit === 'HOUR') {
@@ -161,12 +174,11 @@ export async function PUT(
     }
   }
 
-  const supervisorSnapshot = await resolveSupervisorSnapshot(nextSupervisorId)
-
   const updated = await prisma.$transaction(async (tx) => {
     const updatedRecord = await tx.userContractChange.update({
       where: { id: recordId },
       data: {
+        team,
         chineseSupervisorId: supervisorSnapshot.id,
         chineseSupervisorName: supervisorSnapshot.name,
         position,
@@ -184,15 +196,6 @@ export async function PUT(
     })
 
     await applyLatestContractSnapshot(tx, userId)
-    if (teamInput && teamInput !== expatProfile.team) {
-      await tx.userExpatProfile.update({
-        where: { userId },
-        data: {
-          team: teamInput,
-          chineseSupervisorId: nextSupervisorId,
-        },
-      })
-    }
 
     const joinDate = await syncJoinDateFromContracts(tx, userId)
     const positionValue = await syncPositionFromContracts(tx, userId)
@@ -228,6 +231,7 @@ export async function PUT(
     contractChange: {
       id: updated.change.id,
       userId: updated.change.userId,
+      team: updated.change.team ?? null,
       chineseSupervisorId: updated.change.chineseSupervisorId,
       chineseSupervisorName: updated.change.chineseSupervisorName,
       position: updated.change.position ?? null,

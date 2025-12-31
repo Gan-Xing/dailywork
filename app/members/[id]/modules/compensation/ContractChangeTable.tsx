@@ -98,10 +98,16 @@ export function ContractChangeTable({
   const [editing, setEditing] = useState<ContractChange | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [formState, setFormState] = useState<ContractChangeForm>(defaultForm)
-  const teamSupervisorBinding = teamSupervisorMap.get(normalizeTeamKey(formState.team))
-  const supervisorLabel = teamSupervisorBinding?.supervisorLabel ?? ''
-  const showMissingSupervisor =
-    Boolean(normalizeTeamKey(formState.team)) && !teamSupervisorBinding
+  const normalizedFormTeam = normalizeTeamKey(formState.team)
+  const normalizedEditingTeam = normalizeTeamKey(editing?.team ?? null)
+  const teamSupervisorBinding = teamSupervisorMap.get(normalizedFormTeam)
+  const isEditingTeamChanged = Boolean(editing) && normalizedFormTeam !== normalizedEditingTeam
+  const storedSupervisorLabel =
+    !isEditingTeamChanged && editing?.chineseSupervisorName ? editing.chineseSupervisorName : ''
+  const supervisorLabel = isEditingTeamChanged || !editing
+    ? teamSupervisorBinding?.supervisorLabel ?? ''
+    : storedSupervisorLabel || (teamSupervisorBinding?.supervisorLabel ?? '')
+  const showMissingSupervisor = Boolean(normalizedFormTeam) && !supervisorLabel
 
   const openCreate = () => {
     setEditing(null)
@@ -111,10 +117,9 @@ export function ContractChangeTable({
 
   const openEdit = (record: ContractChange) => {
     setEditing(record)
-    const binding = teamSupervisorMap.get(normalizeTeamKey(expatProfile.team))
     setFormState({
-      team: expatProfile.team,
-      position: record.position ?? currentPosition,
+      team: record.team ?? '',
+      position: record.position ?? '',
       contractNumber: record.contractNumber ?? '',
       contractType: record.contractType ?? '',
       salaryCategory: record.salaryCategory ?? '',
@@ -125,11 +130,7 @@ export function ContractChangeTable({
       endDate: formatDate(record.endDate),
       changeDate: formatDate(record.changeDate),
       reason: record.reason ?? '',
-      chineseSupervisorId: binding
-        ? String(binding.supervisorId)
-        : record.chineseSupervisorId
-          ? String(record.chineseSupervisorId)
-          : '',
+      chineseSupervisorId: record.chineseSupervisorId ? String(record.chineseSupervisorId) : '',
     })
     setOpen(true)
   }
@@ -242,6 +243,7 @@ export function ContractChangeTable({
           <thead className="border-b border-slate-200 text-xs uppercase tracking-widest text-slate-500">
             <tr>
               <th className="py-2">{t.compensation.fields.changeDate}</th>
+              <th className="py-2">{t.compensation.fields.team}</th>
               <th className="py-2">{t.form.contractNumber}</th>
               <th className="py-2">{t.form.position}</th>
               <th className="py-2">{t.form.contractType}</th>
@@ -259,7 +261,7 @@ export function ContractChangeTable({
           <tbody>
             {records.length === 0 && !loading ? (
               <tr>
-                <td colSpan={13} className="py-4 text-center text-sm text-slate-400">
+                <td colSpan={14} className="py-4 text-center text-sm text-slate-400">
                   {t.feedback.emptyHistory}
                 </td>
               </tr>
@@ -267,6 +269,7 @@ export function ContractChangeTable({
             {records.map((record) => (
               <tr key={record.id} className="border-b border-slate-200 last:border-0">
                 <td className="py-3">{formatDate(record.changeDate) || t.labels.empty}</td>
+                <td className="py-3">{record.team || t.labels.empty}</td>
                 <td className="py-3">{record.contractNumber || t.labels.empty}</td>
                 <td className="py-3">{record.position || t.labels.empty}</td>
                 <td className="py-3">{record.contractType || t.labels.empty}</td>

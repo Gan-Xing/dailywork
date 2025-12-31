@@ -40,6 +40,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
     contractChanges: contractChanges.map((item) => ({
       id: item.id,
       userId: item.userId,
+      team: item.team,
       chineseSupervisorId: item.chineseSupervisorId,
       chineseSupervisorName: item.chineseSupervisorName,
       position: item.position,

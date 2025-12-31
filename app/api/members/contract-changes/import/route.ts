@@ -39,6 +39,7 @@ type ImportItem = {
   row?: number
   name?: string
   birthDate?: string
+  team?: string
   position?: string
   changeDate?: string
   contractNumber?: string
@@ -83,6 +84,7 @@ type PreparedRow = {
   name: string
   birthDate: Date
   changeDate: Date
+  team: string | null
   position: string | null
   contractNumber: string | null
   contractType: ContractType | null
@@ -94,6 +96,7 @@ type PreparedRow = {
   endDate: Date | null
   chineseSupervisor: string | null
   reason: string | null
+  hasTeam: boolean
   hasContractNumber: boolean
   hasContractType: boolean
   hasSalaryCategory: boolean
@@ -107,6 +110,7 @@ type PreparedRow = {
 }
 
 type ExpatSnapshot = {
+  team: string | null
   position: string | null
   contractNumber: string | null
   contractType: ContractType | null
@@ -131,8 +135,10 @@ const buildSnapshot = (
     contractEndDate: Date | null
     chineseSupervisorId: number | null
   } | null | undefined,
+  team: string | null,
   position: string | null,
 ): ExpatSnapshot => ({
+  team,
   position,
   contractNumber: profile?.contractNumber ?? null,
   contractType: profile?.contractType ?? null,
@@ -196,6 +202,7 @@ export async function POST(request: Request) {
       addError(row, 'invalid_birth_date')
     }
 
+    const hasTeam = hasField(item as Record<string, unknown>, 'team')
     const hasContractNumber = hasField(item as Record<string, unknown>, 'contractNumber')
     const hasContractType = hasField(item as Record<string, unknown>, 'contractType')
     const hasSalaryCategory = hasField(item as Record<string, unknown>, 'salaryCategory')
@@ -207,6 +214,7 @@ export async function POST(request: Request) {
     const hasEndDate = hasField(item as Record<string, unknown>, 'endDate')
     const hasChineseSupervisor = hasField(item as Record<string, unknown>, 'chineseSupervisor')
 
+    const team = hasTeam ? normalizeOptionalText(item?.team) : null
     const position = hasPosition ? normalizeOptionalText(item?.position) : null
     const contractNumber = hasContractNumber ? normalizeOptionalText(item?.contractNumber) : null
     const contractType = hasContractType ? parseContractType(item?.contractType) : null
@@ -260,6 +268,7 @@ export async function POST(request: Request) {
     const reason = normalizeOptionalText(item?.reason)
 
     const hasPayload =
+      Boolean(team) ||
       Boolean(position) ||
       Boolean(contractNumber) ||
       Boolean(contractType) ||
@@ -282,6 +291,7 @@ export async function POST(request: Request) {
       name,
       birthDate,
       changeDate: changeDate ?? new Date(),
+      team,
       position,
       contractNumber,
       contractType,
@@ -293,6 +303,7 @@ export async function POST(request: Request) {
       endDate,
       chineseSupervisor,
       reason,
+      hasTeam,
       hasContractNumber,
       hasContractType,
       hasSalaryCategory,
@@ -340,6 +351,7 @@ export async function POST(request: Request) {
           position: true,
           expatProfile: {
             select: {
+              team: true,
               chineseSupervisorId: true,
               contractNumber: true,
               contractType: true,
@@ -564,7 +576,11 @@ export async function POST(request: Request) {
     const sorted = [...rows].sort(
       (left, right) => left.changeDate.getTime() - right.changeDate.getTime(),
     )
-    let snapshot = buildSnapshot(user.expatProfile, user.position ?? null)
+    let snapshot = buildSnapshot(
+      user.expatProfile,
+      user.expatProfile?.team ?? null,
+      user.position ?? null,
+    )
     const initialSnapshot = snapshot
     const fallbackChangeDate = sorted[0]?.changeDate ?? null
     try {
@@ -579,6 +595,7 @@ export async function POST(request: Request) {
             expatProfile: initialSnapshot,
             joinDate: user.joinDate ?? null,
             fallbackChangeDate,
+            team: initialSnapshot?.team ?? null,
             position: user.position ?? null,
           })
         }
@@ -596,6 +613,7 @@ export async function POST(request: Request) {
           const resolvedEndDate = row.endDate ?? addOneYear(resolvedStartDate)
 
           const nextSnapshot: ExpatSnapshot = {
+            team: row.hasTeam ? row.team : snapshot.team,
             position: row.hasPosition ? row.position : snapshot.position,
             contractNumber: row.hasContractNumber ? row.contractNumber : snapshot.contractNumber,
             contractType: row.hasContractType ? row.contractType : snapshot.contractType,
@@ -617,6 +635,7 @@ export async function POST(request: Request) {
           await tx.userContractChange.create({
             data: {
               userId,
+              team: nextSnapshot.team,
               chineseSupervisorId: nextSnapshot.chineseSupervisorId,
               chineseSupervisorName:
                 (nextSnapshot.chineseSupervisorId
