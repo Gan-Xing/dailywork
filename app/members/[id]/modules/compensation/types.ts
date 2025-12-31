@@ -3,6 +3,7 @@ export type ContractChange = {
   userId: number
   chineseSupervisorId: number | null
   chineseSupervisorName: string | null
+  position: string | null
   contractNumber: string | null
   contractType: 'CTJ' | 'CDD' | null
   salaryCategory: string | null

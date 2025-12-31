@@ -7,6 +7,7 @@ type MemberCopy = (typeof memberCopy)[keyof typeof memberCopy]
 type ContractChangeImportColumnKey =
   | 'name'
   | 'birthDate'
+  | 'position'
   | 'contractNumber'
   | 'contractType'
   | 'salaryCategory'
@@ -57,6 +58,7 @@ type ContractChangeImportItem = {
   row: number
   name: string
   birthDate: string
+  position?: string
   contractNumber?: string
   contractType?: string
   salaryCategory?: string
@@ -129,6 +131,7 @@ export function useContractChangeImport({
     const register = (copy: (typeof memberCopy)[keyof typeof memberCopy]) => {
       add(copy.form.name, 'name')
       add(copy.form.birthDate, 'birthDate')
+      add(copy.form.position, 'position')
       add(copy.form.contractNumber, 'contractNumber')
       add(copy.form.contractType, 'contractType')
       add(copy.form.salaryCategory, 'salaryCategory')
@@ -152,6 +155,7 @@ export function useContractChangeImport({
     () => [
       'name',
       'birthDate',
+      'position',
       'contractNumber',
       'contractType',
       'salaryCategory',
@@ -172,6 +176,7 @@ export function useContractChangeImport({
     () => ({
       name: t.form.name,
       birthDate: t.form.birthDate,
+      position: t.form.position,
       contractNumber: t.form.contractNumber,
       contractType: t.form.contractType,
       salaryCategory: t.form.salaryCategory,
@@ -315,6 +320,7 @@ export function useContractChangeImport({
             return idx !== undefined ? row[idx] : undefined
           }
           const contractNumber = normalizeText(getCell('contractNumber'))
+          const position = normalizeText(getCell('position'))
           const contractType = normalizeText(getCell('contractType'))
           const salaryCategory = normalizeText(getCell('salaryCategory'))
           const prime = normalizeText(getCell('prime'))
@@ -337,6 +343,7 @@ export function useContractChangeImport({
           }
 
           const hasChangeField =
+            position ||
             contractNumber ||
             contractType ||
             salaryCategory ||
@@ -358,6 +365,7 @@ export function useContractChangeImport({
             name: nameValue,
             birthDate,
           }
+          if (position) item.position = position
           if (contractNumber) item.contractNumber = contractNumber
           if (contractType) item.contractType = contractType
           if (salaryCategory) item.salaryCategory = salaryCategory

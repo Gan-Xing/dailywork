@@ -418,6 +418,7 @@ export async function POST(request: Request) {
           username: true,
           nationality: true,
           joinDate: true,
+          position: true,
           expatProfile: {
             select: {
               team: true,
@@ -448,6 +449,7 @@ export async function POST(request: Request) {
       username: string
       nationality: string | null
       joinDate: Date | null
+      position: string | null
       expatProfile: ExistingExpatProfile | null
     }>
   >()
@@ -460,6 +462,7 @@ export async function POST(request: Request) {
       username: user.username,
       nationality: user.nationality,
       joinDate: user.joinDate,
+      position: user.position ?? null,
       expatProfile: user.expatProfile,
     })
     matchesByIdentity.set(key, list)
@@ -516,6 +519,7 @@ export async function POST(request: Request) {
       username: string
       nationality: string | null
       joinDate: Date | null
+      position: string | null
       expatProfile: ExistingExpatProfile | null
     } | null
   >()
@@ -907,12 +911,14 @@ export async function POST(request: Request) {
               expatProfile: existingExpatSnapshot,
               joinDate: match.joinDate ?? null,
               fallbackChangeDate: new Date(),
+              position: match.position ?? null,
             })
             await tx.userContractChange.create({
               data: {
                 userId: match.id,
                 chineseSupervisorId: supervisorSnapshot.id,
                 chineseSupervisorName: supervisorSnapshot.name,
+                position: member.position ?? match.position ?? null,
                 contractNumber: nextExpat.contractNumber,
                 contractType: nextExpat.contractType,
                 salaryCategory: nextExpat.salaryCategory,

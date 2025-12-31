@@ -17,6 +17,69 @@ const isDateAfterCutoff = (date: Date | null, cutoffDate: Date | null) => {
   return toDateKey(date) > toDateKey(cutoffDate)
 }
 
+const resolveEarliestContractStart = (
+  changes: Array<{
+    startDate: Date | null
+    changeDate: Date
+  }>,
+  profile?: { contractStartDate?: Date | null } | null,
+) => {
+  let earliest: Date | null = null
+  for (const change of changes) {
+    const start = change.startDate ?? change.changeDate
+    if (!start) continue
+    if (!earliest || start.getTime() < earliest.getTime()) earliest = start
+  }
+  const profileStart = profile?.contractStartDate ?? null
+  if (profileStart) {
+    if (!earliest) {
+      earliest = profileStart
+    } else if (profileStart.getTime() < earliest.getTime()) {
+      earliest = profileStart
+    }
+  }
+  return earliest
+}
+
+const resolveEffectiveJoinDate = (
+  joinDate: Date | null,
+  earliestContractStart: Date | null,
+) => {
+  if (!earliestContractStart) return joinDate
+  if (!joinDate) return earliestContractStart
+  return joinDate.getTime() > earliestContractStart.getTime() ? earliestContractStart : joinDate
+}
+
+const hasActiveContractAtCutoff = (
+  changes: Array<{
+    startDate: Date | null
+    endDate: Date | null
+    changeDate: Date
+  }>,
+  cutoffDate: Date,
+) => {
+  const cutoffTime = cutoffDate.getTime()
+  return changes.some((change) => {
+    const start = change.startDate ?? change.changeDate
+    if (!start) return false
+    const end = change.endDate ?? null
+    const startTime = start.getTime()
+    const endTime = end ? end.getTime() : Number.POSITIVE_INFINITY
+    return startTime <= cutoffTime && endTime >= cutoffTime
+  })
+}
+
+const hasActiveProfileContractAtCutoff = (
+  profile: { contractStartDate?: Date | null; contractEndDate?: Date | null } | null | undefined,
+  cutoffDate: Date,
+) => {
+  if (!profile?.contractStartDate) return false
+  const startTime = profile.contractStartDate.getTime()
+  const endTime = profile.contractEndDate ? profile.contractEndDate.getTime() : Number.POSITIVE_INFINITY
+  const cutoffTime = cutoffDate.getTime()
+  return startTime <= cutoffTime && endTime >= cutoffTime
+}
+
 const addUtcDays = (value: Date, days: number) => {
   const next = new Date(value)
   next.setUTCDate(next.getUTCDate() + days)
@@ -75,6 +138,8 @@ export async function POST(
           chineseSupervisorId: true,
           contractNumber: true,
           contractType: true,
+          contractStartDate: true,
+          contractEndDate: true,
         },
       },
     },
@@ -171,6 +236,7 @@ export async function POST(
 
   const invalidUsers: number[] = []
   const invalidCdd: string[] = []
+  const invalidContractPeriods: string[] = []
   const invalidJoinDates: string[] = []
   const payloads: Array<{
     userId: number
@@ -212,7 +278,20 @@ export async function POST(
       }
     }
 
-    if (isDateAfterCutoff(user.joinDate, run.attendanceCutoffDate)) {
+    const changes = contractChangesByUser.get(userId) ?? []
+    const earliestContractStart = resolveEarliestContractStart(
+      changes,
+      user.expatProfile ?? null,
+    )
+    const effectiveJoinDate = resolveEffectiveJoinDate(user.joinDate, earliestContractStart)
+    if (changes.length > 0) {
+      if (!hasActiveContractAtCutoff(changes, run.attendanceCutoffDate)) {
+        invalidContractPeriods.push(resolvedContractNumber || '未填写合同编号')
+        continue
+      }
+    } else if (hasActiveProfileContractAtCutoff(user.expatProfile, run.attendanceCutoffDate)) {
+      // covered by current profile contract period
+    } else if (isDateAfterCutoff(effectiveJoinDate, run.attendanceCutoffDate)) {
       invalidJoinDates.push(resolvedContractNumber || '未填写合同编号')
       continue
     }
@@ -247,6 +326,14 @@ export async function POST(
   if (invalidCdd.length > 0) {
     return NextResponse.json(
       { error: `CDD 成员仅在当月第一次考勤截止前离职时可录入第 1 次发放: ${invalidCdd.join(', ')}` },
+      { status: 400 },
+    )
+  }
+  if (invalidContractPeriods.length > 0) {
+    return NextResponse.json(
+      {
+        error: `合同不在考勤周期内，无法录入本次发放: ${invalidContractPeriods.join(', ')}`,
+      },
       { status: 400 },
     )
   }

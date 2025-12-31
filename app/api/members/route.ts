@@ -230,6 +230,7 @@ export async function POST(request: Request) {
             userId: createdUser.id,
             chineseSupervisorId: supervisorSnapshot.id,
             chineseSupervisorName: supervisorSnapshot.name,
+            position: resolvedPositionName,
             contractNumber: expatProfileData.contractNumber,
             contractType: expatProfileData.contractType,
             salaryCategory: expatProfileData.salaryCategory,

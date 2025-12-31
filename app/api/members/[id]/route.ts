@@ -78,6 +78,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     select: {
       nationality: true,
       joinDate: true,
+      position: true,
       expatProfile: {
         select: {
           chineseSupervisorId: true,
@@ -272,12 +273,14 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
           expatProfile: existingUser.expatProfile,
           joinDate: existingUser.joinDate,
           fallbackChangeDate: new Date(),
+          position: existingUser.position ?? null,
         })
         await tx.userContractChange.create({
           data: {
             userId,
             chineseSupervisorId: supervisorSnapshot.id,
             chineseSupervisorName: supervisorSnapshot.name,
+            position: resolvedPositionName,
             contractNumber: expatProfileData.contractNumber,
             contractType: expatProfileData.contractType,
             salaryCategory: expatProfileData.salaryCategory,

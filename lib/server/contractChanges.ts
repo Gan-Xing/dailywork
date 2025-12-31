@@ -20,6 +20,7 @@ type InitialContractChangeParams = {
   joinDate?: Date | null
   fallbackChangeDate?: Date | null
   reason?: string | null
+  position?: string | null
 }
 
 const resolveLatestContractChange = async (tx: Prisma.TransactionClient, userId: number) => {
@@ -27,6 +28,20 @@ const resolveLatestContractChange = async (tx: Prisma.TransactionClient, userId:
     where: { userId },
     orderBy: [{ startDate: 'desc' }, { changeDate: 'desc' }, { id: 'desc' }],
   })
+}
+
+const resolveEarliestContractStart = (
+  changes: Array<{ startDate: Date | null; changeDate: Date }>,
+) => {
+  let earliest: Date | null = null
+  for (const change of changes) {
+    const candidate = change.startDate ?? change.changeDate
+    if (!candidate) continue
+    if (!earliest || candidate.getTime() < earliest.getTime()) {
+      earliest = candidate
+    }
+  }
+  return earliest
 }
 
 export const applyLatestContractSnapshot = async (
@@ -62,6 +77,56 @@ export const applyLatestContractSnapshot = async (
     },
   })
   return latest
+}
+
+export const syncJoinDateFromContracts = async (
+  tx: Prisma.TransactionClient,
+  userId: number,
+) => {
+  const changes = await tx.userContractChange.findMany({
+    where: { userId },
+    select: { startDate: true, changeDate: true },
+  })
+  const earliest = resolveEarliestContractStart(changes)
+  const user = await tx.user.findUnique({
+    where: { id: userId },
+    select: { joinDate: true },
+  })
+  if (!user) return null
+  if (earliest) {
+    const earliestTime = earliest.getTime()
+    if (!user.joinDate || user.joinDate.getTime() !== earliestTime) {
+      await tx.user.update({
+        where: { id: userId },
+        data: { joinDate: earliest },
+      })
+      return earliest
+    }
+  }
+  return user.joinDate ?? earliest
+}
+
+export const syncPositionFromContracts = async (
+  tx: Prisma.TransactionClient,
+  userId: number,
+) => {
+  const latest = await resolveLatestContractChange(tx, userId)
+  const user = await tx.user.findUnique({
+    where: { id: userId },
+    select: { position: true },
+  })
+  if (!user) return null
+  const latestPosition = latest?.position ?? null
+  if (latestPosition === null) {
+    return user.position ?? null
+  }
+  if (user.position !== latestPosition) {
+    await tx.user.update({
+      where: { id: userId },
+      data: { position: latestPosition },
+    })
+  }
+  return latestPosition
 }
 
 const addOneYear = (date: Date) => {
@@ -110,7 +175,14 @@ const resolveSupervisorSnapshot = async (
 
 export const createInitialContractChangeIfMissing = async (
   tx: Prisma.TransactionClient,
-  { userId, expatProfile, joinDate = null, fallbackChangeDate = null, reason = null }: InitialContractChangeParams,
+  {
+    userId,
+    expatProfile,
+    joinDate = null,
+    fallbackChangeDate = null,
+    reason = null,
+    position = null,
+  }: InitialContractChangeParams,
 ) => {
   if (!expatProfile) return false
   const existing = await tx.userContractChange.findFirst({
@@ -136,6 +208,7 @@ export const createInitialContractChangeIfMissing = async (
       userId,
       chineseSupervisorId: supervisor.id,
       chineseSupervisorName: supervisor.name,
+      position,
       contractNumber: expatProfile.contractNumber ?? null,
       contractType: expatProfile.contractType ?? null,
       salaryCategory: expatProfile.salaryCategory ?? null,

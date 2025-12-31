@@ -12,6 +12,8 @@ import {
 import {
   applyLatestContractSnapshot,
   createInitialContractChangeIfMissing,
+  syncJoinDateFromContracts,
+  syncPositionFromContracts,
 } from '@/lib/server/contractChanges'
 import { hasPermission } from '@/lib/server/authSession'
 import { resolveTeamSupervisorId } from '@/lib/server/teamSupervisors'
@@ -23,6 +25,51 @@ const canManageCompensation = async () => {
     (await hasPermission('member:edit')) ||
     (await hasPermission('member:manage'))
   )
+}
+
+const formatExpatProfile = (profile: {
+  team: string | null
+  chineseSupervisorId: number | null
+  contractNumber: string | null
+  contractType: string | null
+  contractStartDate: Date | null
+  contractEndDate: Date | null
+  salaryCategory: string | null
+  prime: { toString: () => string } | string | null
+  baseSalaryAmount: { toString: () => string } | string | null
+  baseSalaryUnit: string | null
+  netMonthlyAmount: { toString: () => string } | string | null
+  netMonthlyUnit: string | null
+  maritalStatus: string | null
+  childrenCount: number | null
+  cnpsNumber: string | null
+  cnpsDeclarationCode: string | null
+  provenance: string | null
+  emergencyContactName: string | null
+  emergencyContactPhone: string | null
+} | null) => {
+  if (!profile) return null
+  return {
+    team: profile.team,
+    chineseSupervisorId: profile.chineseSupervisorId ?? null,
+    contractNumber: profile.contractNumber,
+    contractType: profile.contractType,
+    contractStartDate: profile.contractStartDate?.toISOString() ?? null,
+    contractEndDate: profile.contractEndDate?.toISOString() ?? null,
+    salaryCategory: profile.salaryCategory,
+    prime: profile.prime?.toString() ?? null,
+    baseSalaryAmount: profile.baseSalaryAmount?.toString() ?? null,
+    baseSalaryUnit: profile.baseSalaryUnit,
+    netMonthlyAmount: profile.netMonthlyAmount?.toString() ?? null,
+    netMonthlyUnit: profile.netMonthlyUnit,
+    maritalStatus: profile.maritalStatus,
+    childrenCount: profile.childrenCount,
+    cnpsNumber: profile.cnpsNumber,
+    cnpsDeclarationCode: profile.cnpsDeclarationCode,
+    provenance: profile.provenance,
+    emergencyContactName: profile.emergencyContactName,
+    emergencyContactPhone: profile.emergencyContactPhone,
+  }
 }
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -40,6 +87,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     select: {
       nationality: true,
       joinDate: true,
+      position: true,
       expatProfile: {
         select: {
           chineseSupervisorId: true,
@@ -72,6 +120,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const body = await request.json()
   const hasField = (key: string) => Object.prototype.hasOwnProperty.call(body, key)
 
+  const teamInput = hasField('team') ? normalizeOptionalText(body.team) : null
+  const resolvedTeam = teamInput ?? expatProfile.team
+  const position = hasField('position') ? normalizeOptionalText(body.position) : user.position ?? null
   const contractNumber = hasField('contractNumber')
     ? normalizeOptionalText(body.contractNumber)
     : expatProfile.contractNumber
@@ -94,14 +145,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const endDateInput = normalizeOptionalDate(body.endDate)
   const changeDate = normalizeOptionalDate(body.changeDate) ?? new Date()
   const reason = normalizeOptionalText(body.reason)
-  const nextSupervisorId = expatProfile.team
-    ? await resolveTeamSupervisorId(expatProfile.team)
+  const nextSupervisorId = resolvedTeam
+    ? await resolveTeamSupervisorId(resolvedTeam)
     : expatProfile.chineseSupervisorId ?? null
-  if (expatProfile.team && !nextSupervisorId) {
+  if (resolvedTeam && !nextSupervisorId) {
     return NextResponse.json({ error: '班组未绑定中方负责人' }, { status: 400 })
   }
 
   const hasPayload =
+    Boolean(position) ||
     Boolean(contractNumber) ||
     Boolean(contractType) ||
     Boolean(salaryCategory) ||
@@ -146,12 +198,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       expatProfile,
       joinDate: user.joinDate,
       fallbackChangeDate: changeDate,
+      position: user.position ?? null,
     })
     const change = await tx.userContractChange.create({
       data: {
         userId,
         chineseSupervisorId: supervisorSnapshot.id,
         chineseSupervisorName: supervisorSnapshot.name,
+        position,
         contractNumber,
         contractType,
         salaryCategory,
@@ -166,6 +220,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     })
 
     const latest = await applyLatestContractSnapshot(tx, userId)
+
+    if (teamInput && teamInput !== expatProfile.team) {
+      await tx.userExpatProfile.update({
+        where: { userId },
+        data: {
+          team: teamInput,
+          chineseSupervisorId: nextSupervisorId,
+        },
+      })
+    }
 
     if (latest?.id === change.id && salaryChanged) {
       await tx.userPayrollChange.create({
@@ -187,27 +251,58 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       })
     }
 
-    return change
+    const joinDate = await syncJoinDateFromContracts(tx, userId)
+    const positionValue = await syncPositionFromContracts(tx, userId)
+    const updatedProfile = await tx.userExpatProfile.findUnique({
+      where: { userId },
+      select: {
+        team: true,
+        chineseSupervisorId: true,
+        contractNumber: true,
+        contractType: true,
+        contractStartDate: true,
+        contractEndDate: true,
+        salaryCategory: true,
+        prime: true,
+        baseSalaryAmount: true,
+        baseSalaryUnit: true,
+        netMonthlyAmount: true,
+        netMonthlyUnit: true,
+        maritalStatus: true,
+        childrenCount: true,
+        cnpsNumber: true,
+        cnpsDeclarationCode: true,
+        provenance: true,
+        emergencyContactName: true,
+        emergencyContactPhone: true,
+      },
+    })
+
+    return { change, expatProfile: updatedProfile, joinDate, position: positionValue }
   })
 
   return NextResponse.json({
     contractChange: {
-      id: result.id,
-      userId: result.userId,
-      chineseSupervisorId: result.chineseSupervisorId,
-      chineseSupervisorName: result.chineseSupervisorName,
-      contractNumber: result.contractNumber,
-      contractType: result.contractType,
-      salaryCategory: result.salaryCategory,
-      salaryAmount: result.salaryAmount?.toString() ?? null,
-      salaryUnit: result.salaryUnit,
-      prime: result.prime?.toString() ?? null,
-      startDate: result.startDate?.toISOString() ?? null,
-      endDate: result.endDate?.toISOString() ?? null,
-      changeDate: result.changeDate.toISOString(),
-      reason: result.reason,
-      createdAt: result.createdAt.toISOString(),
-      updatedAt: result.updatedAt.toISOString(),
+      id: result.change.id,
+      userId: result.change.userId,
+      chineseSupervisorId: result.change.chineseSupervisorId,
+      chineseSupervisorName: result.change.chineseSupervisorName,
+      position: result.change.position ?? null,
+      contractNumber: result.change.contractNumber,
+      contractType: result.change.contractType,
+      salaryCategory: result.change.salaryCategory,
+      salaryAmount: result.change.salaryAmount?.toString() ?? null,
+      salaryUnit: result.change.salaryUnit,
+      prime: result.change.prime?.toString() ?? null,
+      startDate: result.change.startDate?.toISOString() ?? null,
+      endDate: result.change.endDate?.toISOString() ?? null,
+      changeDate: result.change.changeDate.toISOString(),
+      reason: result.change.reason,
+      createdAt: result.change.createdAt.toISOString(),
+      updatedAt: result.change.updatedAt.toISOString(),
     },
+    expatProfile: formatExpatProfile(result.expatProfile),
+    joinDate: result.joinDate ? result.joinDate.toISOString() : null,
+    position: result.position ?? null,
   })
 }

@@ -167,6 +167,7 @@ export async function POST(request: NextRequest) {
         ? normalizeNullableString(patch.nationality)
         : existingUser.nationality
       const isChinese = resolvedNationality === 'china'
+      let resolvedPosition = existingUser.position ?? null
 
       if (hasField(patch, 'gender')) {
         userUpdates.gender = normalizeNullableString(patch.gender)
@@ -196,6 +197,7 @@ export async function POST(request: NextRequest) {
       if (hasField(patch, 'position')) {
         const position = normalizeNullableString(patch.position)
         userUpdates.position = position
+        resolvedPosition = position
       }
 
       let resolvedJoinDate = existingUser.joinDate ?? null
@@ -539,12 +541,14 @@ export async function POST(request: NextRequest) {
             expatProfile: existingExpat,
             joinDate: existingUser.joinDate ?? null,
             fallbackChangeDate: new Date(),
+            position: existingUser.position ?? null,
           })
           await tx.userContractChange.create({
             data: {
               userId,
               chineseSupervisorId: supervisorSnapshot.id,
               chineseSupervisorName: supervisorSnapshot.name,
+              position: resolvedPosition,
               contractNumber: nextExpat.contractNumber,
               contractType: nextExpat.contractType,
               salaryCategory: nextExpat.salaryCategory,

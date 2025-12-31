@@ -19,6 +19,8 @@ type CompensationSectionProps = {
   teamOptions: string[]
   teamSupervisorMap: Map<string, TeamSupervisorItem>
   onApplyExpatProfile: (patch: Partial<FormState['expatProfile']>) => void
+  onApplyJoinDate: (value: string) => void
+  onApplyPosition: (value: string) => void
 }
 
 export function CompensationSection({
@@ -28,6 +30,8 @@ export function CompensationSection({
   teamOptions,
   teamSupervisorMap,
   onApplyExpatProfile,
+  onApplyJoinDate,
+  onApplyPosition,
 }: CompensationSectionProps) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -109,8 +113,12 @@ export function CompensationSection({
             records={contractChanges}
             onRefresh={loadCompensation}
             expatProfile={formState.expatProfile}
+            currentPosition={formState.position}
+            teamOptions={teamOptions}
             teamSupervisorMap={teamSupervisorMap}
             onApplyExpatProfile={onApplyExpatProfile}
+            onApplyJoinDate={onApplyJoinDate}
+            onApplyPosition={onApplyPosition}
           />
           <PayrollChangeTable
             t={t}

@@ -189,6 +189,7 @@
 - `userId`：关联成员 ID。
 - `chineseSupervisorId`（RESPONSABLE CHINOIS）：中方负责人 ID，可空。
 - `chineseSupervisorName`：中方负责人快照名（`name + frenchName`），可空。
+- `position`：岗位名称，可空。
 - `contractNumber`（MATRICULE）：合同编号，可空。
 - `contractType`（TYPE DE CONTRAT）：枚举 `CTJ` / `CDD`。
 - `salaryCategory`（CATEGORIE）：工资等级，可空。

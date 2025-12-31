@@ -13,6 +13,8 @@ import {
 import {
   applyLatestContractSnapshot,
   createInitialContractChangeIfMissing,
+  syncJoinDateFromContracts,
+  syncPositionFromContracts,
 } from '@/lib/server/contractChanges'
 import { formatSupervisorLabel } from '@/lib/members/utils'
 
@@ -37,6 +39,7 @@ type ImportItem = {
   row?: number
   name?: string
   birthDate?: string
+  position?: string
   changeDate?: string
   contractNumber?: string
   contractType?: string
@@ -80,6 +83,7 @@ type PreparedRow = {
   name: string
   birthDate: Date
   changeDate: Date
+  position: string | null
   contractNumber: string | null
   contractType: ContractType | null
   salaryCategory: string | null
@@ -96,12 +100,14 @@ type PreparedRow = {
   hasSalaryAmount: boolean
   hasSalaryUnit: boolean
   hasPrime: boolean
+  hasPosition: boolean
   hasStartDate: boolean
   hasEndDate: boolean
   hasChineseSupervisor: boolean
 }
 
 type ExpatSnapshot = {
+  position: string | null
   contractNumber: string | null
   contractType: ContractType | null
   salaryCategory: string | null
@@ -113,17 +119,21 @@ type ExpatSnapshot = {
   chineseSupervisorId: number | null
 }
 
-const buildSnapshot = (profile?: {
-  contractNumber: string | null
-  contractType: ContractType | null
-  salaryCategory: string | null
-  baseSalaryAmount: { toString: () => string } | null
-  baseSalaryUnit: SalaryUnit | null
-  prime: { toString: () => string } | null
-  contractStartDate: Date | null
-  contractEndDate: Date | null
-  chineseSupervisorId: number | null
-} | null): ExpatSnapshot => ({
+const buildSnapshot = (
+  profile: {
+    contractNumber: string | null
+    contractType: ContractType | null
+    salaryCategory: string | null
+    baseSalaryAmount: { toString: () => string } | null
+    baseSalaryUnit: SalaryUnit | null
+    prime: { toString: () => string } | null
+    contractStartDate: Date | null
+    contractEndDate: Date | null
+    chineseSupervisorId: number | null
+  } | null | undefined,
+  position: string | null,
+): ExpatSnapshot => ({
+  position,
   contractNumber: profile?.contractNumber ?? null,
   contractType: profile?.contractType ?? null,
   salaryCategory: profile?.salaryCategory ?? null,
@@ -192,10 +202,12 @@ export async function POST(request: Request) {
     const hasSalaryAmount = hasField(item as Record<string, unknown>, 'salaryAmount')
     const hasSalaryUnit = hasField(item as Record<string, unknown>, 'salaryUnit')
     const hasPrime = hasField(item as Record<string, unknown>, 'prime')
+    const hasPosition = hasField(item as Record<string, unknown>, 'position')
     const hasStartDate = hasField(item as Record<string, unknown>, 'startDate')
     const hasEndDate = hasField(item as Record<string, unknown>, 'endDate')
     const hasChineseSupervisor = hasField(item as Record<string, unknown>, 'chineseSupervisor')
 
+    const position = hasPosition ? normalizeOptionalText(item?.position) : null
     const contractNumber = hasContractNumber ? normalizeOptionalText(item?.contractNumber) : null
     const contractType = hasContractType ? parseContractType(item?.contractType) : null
     if (hasContractType && item?.contractType && !contractType) {
@@ -248,6 +260,7 @@ export async function POST(request: Request) {
     const reason = normalizeOptionalText(item?.reason)
 
     const hasPayload =
+      Boolean(position) ||
       Boolean(contractNumber) ||
       Boolean(contractType) ||
       Boolean(salaryCategory) ||
@@ -269,6 +282,7 @@ export async function POST(request: Request) {
       name,
       birthDate,
       changeDate: changeDate ?? new Date(),
+      position,
       contractNumber,
       contractType,
       salaryCategory,
@@ -285,6 +299,7 @@ export async function POST(request: Request) {
       hasSalaryAmount,
       hasSalaryUnit,
       hasPrime,
+      hasPosition,
       hasStartDate,
       hasEndDate,
       hasChineseSupervisor,
@@ -322,6 +337,7 @@ export async function POST(request: Request) {
           birthDate: true,
           nationality: true,
           joinDate: true,
+          position: true,
           expatProfile: {
             select: {
               chineseSupervisorId: true,
@@ -343,6 +359,7 @@ export async function POST(request: Request) {
     Array<{
       id: number
       nationality: string | null
+      position: string | null
       expatProfile: (typeof existingUsers)[number]['expatProfile']
     }>
   >()
@@ -353,6 +370,7 @@ export async function POST(request: Request) {
     list.push({
       id: user.id,
       nationality: user.nationality,
+      position: user.position ?? null,
       expatProfile: user.expatProfile,
     })
     matchesByIdentity.set(key, list)
@@ -546,7 +564,7 @@ export async function POST(request: Request) {
     const sorted = [...rows].sort(
       (left, right) => left.changeDate.getTime() - right.changeDate.getTime(),
     )
-    let snapshot = buildSnapshot(user.expatProfile)
+    let snapshot = buildSnapshot(user.expatProfile, user.position ?? null)
     const initialSnapshot = snapshot
     const fallbackChangeDate = sorted[0]?.changeDate ?? null
     try {
@@ -561,6 +579,7 @@ export async function POST(request: Request) {
             expatProfile: initialSnapshot,
             joinDate: user.joinDate ?? null,
             fallbackChangeDate,
+            position: user.position ?? null,
           })
         }
 
@@ -577,6 +596,7 @@ export async function POST(request: Request) {
           const resolvedEndDate = row.endDate ?? addOneYear(resolvedStartDate)
 
           const nextSnapshot: ExpatSnapshot = {
+            position: row.hasPosition ? row.position : snapshot.position,
             contractNumber: row.hasContractNumber ? row.contractNumber : snapshot.contractNumber,
             contractType: row.hasContractType ? row.contractType : snapshot.contractType,
             salaryCategory: row.hasSalaryCategory ? row.salaryCategory : snapshot.salaryCategory,
@@ -602,6 +622,7 @@ export async function POST(request: Request) {
                 (nextSnapshot.chineseSupervisorId
                   ? supervisorLabelById.get(nextSnapshot.chineseSupervisorId)
                   : null) ?? null,
+              position: nextSnapshot.position,
               contractNumber: nextSnapshot.contractNumber,
               contractType: nextSnapshot.contractType,
               salaryCategory: nextSnapshot.salaryCategory,
@@ -619,6 +640,8 @@ export async function POST(request: Request) {
         }
 
         await applyLatestContractSnapshot(tx, userId)
+        await syncJoinDateFromContracts(tx, userId)
+        await syncPositionFromContracts(tx, userId)
       })
       imported += created
     } catch {

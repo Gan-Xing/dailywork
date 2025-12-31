@@ -263,6 +263,7 @@ export const memberCopy: Record<
       notes: Record<
         | 'name'
         | 'birthDate'
+        | 'position'
         | 'contractNumber'
         | 'contractType'
         | 'salaryCategory'
@@ -772,6 +773,7 @@ export const memberCopy: Record<
       notes: {
         name: '必填；用于定位成员。',
         birthDate: '必填；格式：YYYY-MM-DD。',
+        position: '可选；岗位名称；示例：工程师。',
         contractNumber: '可选；合同编号需唯一。',
         contractType: '可选；固定值：CTJ / CDD。',
         salaryCategory: '可选；工资等级。',
@@ -1292,6 +1294,7 @@ export const memberCopy: Record<
       notes: {
         name: 'Obligatoire ; utilisé pour retrouver le membre.',
         birthDate: 'Obligatoire ; format : YYYY-MM-DD.',
+        position: 'Optionnel ; poste ; ex. Conducteur de travaux.',
         contractNumber: 'Optionnel ; n° contrat unique.',
         contractType: 'Optionnel ; CTJ / CDD.',
         salaryCategory: 'Optionnel ; catégorie.',

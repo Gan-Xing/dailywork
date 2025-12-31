@@ -527,6 +527,7 @@ model UserContractChange {
   chineseSupervisorId  Int?
   chineseSupervisor    User?        @relation("ContractChangeSupervisor", fields: [chineseSupervisorId], references: [id], onDelete: SetNull)
   chineseSupervisorName String?
+  position             String?
   contractNumber       String?
   contractType         ContractType?
   salaryCategory       String?

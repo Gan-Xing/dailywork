@@ -3,7 +3,8 @@ import { useMemo, useState } from 'react'
 import { memberCopy } from '@/lib/i18n/members'
 import { normalizeTeamKey } from '@/lib/members/utils'
 
-import type { ExpatProfileForm, FormState } from '../../types'
+import type { ExpatProfile, ExpatProfileForm, FormState } from '../../types'
+import { buildExpatProfileForm } from '../../utils'
 import type { TeamSupervisorItem } from '../../../hooks/useTeamSupervisors'
 import { CompensationModal } from './CompensationModal'
 import type { ContractChange } from './types'
@@ -11,6 +12,8 @@ import type { ContractChange } from './types'
 type MemberCopy = (typeof memberCopy)[keyof typeof memberCopy]
 
 type ContractChangeForm = {
+  team: string
+  position: string
   contractNumber: string
   contractType: '' | 'CTJ' | 'CDD'
   salaryCategory: string
@@ -30,9 +33,13 @@ type ContractChangeTableProps = {
   loading: boolean
   records: ContractChange[]
   expatProfile: FormState['expatProfile']
+  currentPosition: string
+  teamOptions: string[]
   teamSupervisorMap: Map<string, TeamSupervisorItem>
   onRefresh: () => void
   onApplyExpatProfile: (patch: Partial<FormState['expatProfile']>) => void
+  onApplyJoinDate: (value: string) => void
+  onApplyPosition: (value: string) => void
 }
 
 const formatDate = (value?: string | null) => (value ? value.slice(0, 10) : '')
@@ -45,6 +52,7 @@ const addOneYear = (date: Date) => {
 const buildDefaults = (
   profile: ExpatProfileForm,
   teamSupervisorMap: Map<string, TeamSupervisorItem>,
+  currentPosition: string,
 ): ContractChangeForm => {
   const now = new Date()
   const startDate = formatDate(now.toISOString())
@@ -52,6 +60,8 @@ const buildDefaults = (
   const teamKey = normalizeTeamKey(profile.team)
   const binding = teamKey ? teamSupervisorMap.get(teamKey) : null
   return {
+    team: profile.team,
+    position: currentPosition,
     contractNumber: profile.contractNumber,
     contractType: profile.contractType,
     salaryCategory: profile.salaryCategory,
@@ -72,22 +82,26 @@ export function ContractChangeTable({
   loading,
   records,
   expatProfile,
+  currentPosition,
+  teamOptions,
   teamSupervisorMap,
   onRefresh,
   onApplyExpatProfile,
+  onApplyJoinDate,
+  onApplyPosition,
 }: ContractChangeTableProps) {
   const defaultForm = useMemo(
-    () => buildDefaults(expatProfile, teamSupervisorMap),
-    [expatProfile, teamSupervisorMap],
+    () => buildDefaults(expatProfile, teamSupervisorMap, currentPosition),
+    [currentPosition, expatProfile, teamSupervisorMap],
   )
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<ContractChange | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [formState, setFormState] = useState<ContractChangeForm>(defaultForm)
-  const teamSupervisorBinding = teamSupervisorMap.get(normalizeTeamKey(expatProfile.team))
+  const teamSupervisorBinding = teamSupervisorMap.get(normalizeTeamKey(formState.team))
   const supervisorLabel = teamSupervisorBinding?.supervisorLabel ?? ''
   const showMissingSupervisor =
-    Boolean(normalizeTeamKey(expatProfile.team)) && !teamSupervisorBinding
+    Boolean(normalizeTeamKey(formState.team)) && !teamSupervisorBinding
 
   const openCreate = () => {
     setEditing(null)
@@ -99,6 +113,8 @@ export function ContractChangeTable({
     setEditing(record)
     const binding = teamSupervisorMap.get(normalizeTeamKey(expatProfile.team))
     setFormState({
+      team: expatProfile.team,
+      position: record.position ?? currentPosition,
       contractNumber: record.contractNumber ?? '',
       contractType: record.contractType ?? '',
       salaryCategory: record.salaryCategory ?? '',
@@ -127,6 +143,7 @@ export function ContractChangeTable({
     try {
       const payload = {
         ...formState,
+        team: formState.team,
         chineseSupervisorId: formState.chineseSupervisorId || null,
       }
       const res = await fetch(
@@ -141,14 +158,21 @@ export function ContractChangeTable({
       )
       const data = (await res.json().catch(() => ({}))) as {
         contractChange?: ContractChange
+        expatProfile?: ExpatProfile | null
+        joinDate?: string | null
+        position?: string | null
         error?: string
       }
       if (!res.ok) {
         throw new Error(data.error ?? t.feedback.submitError)
       }
-      if (data.contractChange) {
+      if (data.expatProfile) {
+        onApplyExpatProfile(buildExpatProfileForm(data.expatProfile))
+      } else if (data.contractChange) {
         const change = data.contractChange
+        const nextTeam = formState.team.trim()
         onApplyExpatProfile({
+          ...(nextTeam ? { team: nextTeam } : {}),
           contractNumber: change.contractNumber ?? '',
           contractType: (change.contractType ?? '') as FormState['expatProfile']['contractType'],
           salaryCategory: change.salaryCategory ?? '',
@@ -159,6 +183,12 @@ export function ContractChangeTable({
           contractEndDate: formatDate(change.endDate),
           chineseSupervisorId: change.chineseSupervisorId ? String(change.chineseSupervisorId) : '',
         })
+      }
+      if (typeof data.joinDate === 'string') {
+        onApplyJoinDate(formatDate(data.joinDate))
+      }
+      if (data.position !== undefined) {
+        onApplyPosition(data.position ?? '')
       }
       await onRefresh()
       setOpen(false)
@@ -177,6 +207,16 @@ export function ContractChangeTable({
       method: 'DELETE',
     })
     if (res.ok) {
+      const data = (await res.json().catch(() => ({}))) as {
+        joinDate?: string | null
+        position?: string | null
+      }
+      if (typeof data.joinDate === 'string') {
+        onApplyJoinDate(formatDate(data.joinDate))
+      }
+      if (data.position !== undefined) {
+        onApplyPosition(data.position ?? '')
+      }
       onRefresh()
     }
   }
@@ -203,6 +243,7 @@ export function ContractChangeTable({
             <tr>
               <th className="py-2">{t.compensation.fields.changeDate}</th>
               <th className="py-2">{t.form.contractNumber}</th>
+              <th className="py-2">{t.form.position}</th>
               <th className="py-2">{t.form.contractType}</th>
               <th className="py-2">{t.form.salaryCategory}</th>
               <th className="py-2">{t.form.baseSalaryAmount}</th>
@@ -218,7 +259,7 @@ export function ContractChangeTable({
           <tbody>
             {records.length === 0 && !loading ? (
               <tr>
-                <td colSpan={12} className="py-4 text-center text-sm text-slate-400">
+                <td colSpan={13} className="py-4 text-center text-sm text-slate-400">
                   {t.feedback.emptyHistory}
                 </td>
               </tr>
@@ -227,6 +268,7 @@ export function ContractChangeTable({
               <tr key={record.id} className="border-b border-slate-200 last:border-0">
                 <td className="py-3">{formatDate(record.changeDate) || t.labels.empty}</td>
                 <td className="py-3">{record.contractNumber || t.labels.empty}</td>
+                <td className="py-3">{record.position || t.labels.empty}</td>
                 <td className="py-3">{record.contractType || t.labels.empty}</td>
                 <td className="py-3">{record.salaryCategory || t.labels.empty}</td>
                 <td className="py-3">{record.salaryAmount || t.labels.empty}</td>
@@ -267,6 +309,39 @@ export function ContractChangeTable({
         onClose={closeModal}
       >
         <div className="grid gap-4 sm:grid-cols-2">
+          <label className="space-y-1 text-sm text-slate-700">
+            <span className="block font-semibold">{t.compensation.fields.team}</span>
+            <input
+              list="contract-team-options"
+              value={formState.team}
+              onChange={(event) => {
+                const nextTeam = event.target.value
+                const binding = teamSupervisorMap.get(normalizeTeamKey(nextTeam))
+                setFormState((prev) => ({
+                  ...prev,
+                  team: nextTeam,
+                  chineseSupervisorId: binding ? String(binding.supervisorId) : '',
+                }))
+              }}
+              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+            />
+            <datalist id="contract-team-options">
+              {teamOptions.map((name) => (
+                <option key={name} value={name} />
+              ))}
+            </datalist>
+          </label>
+          <label className="space-y-1 text-sm text-slate-700">
+            <span className="block font-semibold">{t.form.position}</span>
+            <input
+              value={formState.position}
+              onChange={(event) =>
+                setFormState((prev) => ({ ...prev, position: event.target.value }))
+              }
+              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+              placeholder={t.form.positionPlaceholder}
+            />
+          </label>
           <label className="space-y-1 text-sm text-slate-700">
             <span className="block font-semibold">{t.form.contractNumber}</span>
             <input

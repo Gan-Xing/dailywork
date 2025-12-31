@@ -42,6 +42,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
       userId: item.userId,
       chineseSupervisorId: item.chineseSupervisorId,
       chineseSupervisorName: item.chineseSupervisorName,
+      position: item.position,
       contractNumber: item.contractNumber,
       contractType: item.contractType,
       salaryCategory: item.salaryCategory,

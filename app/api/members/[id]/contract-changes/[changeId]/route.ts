@@ -9,7 +9,11 @@ import {
   resolveSupervisorSnapshot,
 } from '@/lib/server/compensation'
 import { hasPermission } from '@/lib/server/authSession'
-import { applyLatestContractSnapshot } from '@/lib/server/contractChanges'
+import {
+  applyLatestContractSnapshot,
+  syncJoinDateFromContracts,
+  syncPositionFromContracts,
+} from '@/lib/server/contractChanges'
 import { resolveTeamSupervisorId } from '@/lib/server/teamSupervisors'
 import { prisma } from '@/lib/prisma'
 
@@ -19,6 +23,51 @@ const canManageCompensation = async () => {
     (await hasPermission('member:edit')) ||
     (await hasPermission('member:manage'))
   )
+}
+
+const formatExpatProfile = (profile: {
+  team: string | null
+  chineseSupervisorId: number | null
+  contractNumber: string | null
+  contractType: string | null
+  contractStartDate: Date | null
+  contractEndDate: Date | null
+  salaryCategory: string | null
+  prime: { toString: () => string } | string | null
+  baseSalaryAmount: { toString: () => string } | string | null
+  baseSalaryUnit: string | null
+  netMonthlyAmount: { toString: () => string } | string | null
+  netMonthlyUnit: string | null
+  maritalStatus: string | null
+  childrenCount: number | null
+  cnpsNumber: string | null
+  cnpsDeclarationCode: string | null
+  provenance: string | null
+  emergencyContactName: string | null
+  emergencyContactPhone: string | null
+} | null) => {
+  if (!profile) return null
+  return {
+    team: profile.team,
+    chineseSupervisorId: profile.chineseSupervisorId ?? null,
+    contractNumber: profile.contractNumber,
+    contractType: profile.contractType,
+    contractStartDate: profile.contractStartDate?.toISOString() ?? null,
+    contractEndDate: profile.contractEndDate?.toISOString() ?? null,
+    salaryCategory: profile.salaryCategory,
+    prime: profile.prime?.toString() ?? null,
+    baseSalaryAmount: profile.baseSalaryAmount?.toString() ?? null,
+    baseSalaryUnit: profile.baseSalaryUnit,
+    netMonthlyAmount: profile.netMonthlyAmount?.toString() ?? null,
+    netMonthlyUnit: profile.netMonthlyUnit,
+    maritalStatus: profile.maritalStatus,
+    childrenCount: profile.childrenCount,
+    cnpsNumber: profile.cnpsNumber,
+    cnpsDeclarationCode: profile.cnpsDeclarationCode,
+    provenance: profile.provenance,
+    emergencyContactName: profile.emergencyContactName,
+    emergencyContactPhone: profile.emergencyContactPhone,
+  }
 }
 
 export async function PUT(
@@ -62,6 +111,9 @@ export async function PUT(
   const body = await request.json()
   const hasField = (key: string) => Object.prototype.hasOwnProperty.call(body, key)
 
+  const teamInput = hasField('team') ? normalizeOptionalText(body.team) : null
+  const resolvedTeam = teamInput ?? expatProfile.team
+  const position = hasField('position') ? normalizeOptionalText(body.position) : record.position
   const contractNumber = hasField('contractNumber')
     ? normalizeOptionalText(body.contractNumber)
     : record.contractNumber
@@ -88,10 +140,10 @@ export async function PUT(
     ? normalizeOptionalDate(body.changeDate) ?? record.changeDate
     : record.changeDate
   const reason = hasField('reason') ? normalizeOptionalText(body.reason) : record.reason
-  const nextSupervisorId = expatProfile.team
-    ? await resolveTeamSupervisorId(expatProfile.team)
+  const nextSupervisorId = resolvedTeam
+    ? await resolveTeamSupervisorId(resolvedTeam)
     : record.chineseSupervisorId ?? expatProfile.chineseSupervisorId ?? null
-  if (expatProfile.team && !nextSupervisorId) {
+  if (resolvedTeam && !nextSupervisorId) {
     return NextResponse.json({ error: '班组未绑定中方负责人' }, { status: 400 })
   }
 
@@ -117,6 +169,7 @@ export async function PUT(
       data: {
         chineseSupervisorId: supervisorSnapshot.id,
         chineseSupervisorName: supervisorSnapshot.name,
+        position,
         contractNumber,
         contractType,
         salaryCategory,
@@ -131,29 +184,69 @@ export async function PUT(
     })
 
     await applyLatestContractSnapshot(tx, userId)
+    if (teamInput && teamInput !== expatProfile.team) {
+      await tx.userExpatProfile.update({
+        where: { userId },
+        data: {
+          team: teamInput,
+          chineseSupervisorId: nextSupervisorId,
+        },
+      })
+    }
 
-    return updatedRecord
+    const joinDate = await syncJoinDateFromContracts(tx, userId)
+    const positionValue = await syncPositionFromContracts(tx, userId)
+    const updatedProfile = await tx.userExpatProfile.findUnique({
+      where: { userId },
+      select: {
+        team: true,
+        chineseSupervisorId: true,
+        contractNumber: true,
+        contractType: true,
+        contractStartDate: true,
+        contractEndDate: true,
+        salaryCategory: true,
+        prime: true,
+        baseSalaryAmount: true,
+        baseSalaryUnit: true,
+        netMonthlyAmount: true,
+        netMonthlyUnit: true,
+        maritalStatus: true,
+        childrenCount: true,
+        cnpsNumber: true,
+        cnpsDeclarationCode: true,
+        provenance: true,
+        emergencyContactName: true,
+        emergencyContactPhone: true,
+      },
+    })
+
+    return { change: updatedRecord, expatProfile: updatedProfile, joinDate, position: positionValue }
   })
 
   return NextResponse.json({
     contractChange: {
-      id: updated.id,
-      userId: updated.userId,
-      chineseSupervisorId: updated.chineseSupervisorId,
-      chineseSupervisorName: updated.chineseSupervisorName,
-      contractNumber: updated.contractNumber,
-      contractType: updated.contractType,
-      salaryCategory: updated.salaryCategory,
-      salaryAmount: updated.salaryAmount?.toString() ?? null,
-      salaryUnit: updated.salaryUnit,
-      prime: updated.prime?.toString() ?? null,
-      startDate: updated.startDate?.toISOString() ?? null,
-      endDate: updated.endDate?.toISOString() ?? null,
-      changeDate: updated.changeDate.toISOString(),
-      reason: updated.reason,
-      createdAt: updated.createdAt.toISOString(),
-      updatedAt: updated.updatedAt.toISOString(),
+      id: updated.change.id,
+      userId: updated.change.userId,
+      chineseSupervisorId: updated.change.chineseSupervisorId,
+      chineseSupervisorName: updated.change.chineseSupervisorName,
+      position: updated.change.position ?? null,
+      contractNumber: updated.change.contractNumber,
+      contractType: updated.change.contractType,
+      salaryCategory: updated.change.salaryCategory,
+      salaryAmount: updated.change.salaryAmount?.toString() ?? null,
+      salaryUnit: updated.change.salaryUnit,
+      prime: updated.change.prime?.toString() ?? null,
+      startDate: updated.change.startDate?.toISOString() ?? null,
+      endDate: updated.change.endDate?.toISOString() ?? null,
+      changeDate: updated.change.changeDate.toISOString(),
+      reason: updated.change.reason,
+      createdAt: updated.change.createdAt.toISOString(),
+      updatedAt: updated.change.updatedAt.toISOString(),
     },
+    expatProfile: formatExpatProfile(updated.expatProfile),
+    joinDate: updated.joinDate ? updated.joinDate.toISOString() : null,
+    position: updated.position ?? null,
   })
 }
 
@@ -179,9 +272,16 @@ export async function DELETE(
     return NextResponse.json({ error: '合同变更记录不存在' }, { status: 404 })
   }
 
-  await prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     await tx.userContractChange.delete({ where: { id: recordId } })
     await applyLatestContractSnapshot(tx, userId)
+    const joinDate = await syncJoinDateFromContracts(tx, userId)
+    const position = await syncPositionFromContracts(tx, userId)
+    return { joinDate, position }
   })
-  return NextResponse.json({ ok: true })
+  return NextResponse.json({
+    ok: true,
+    joinDate: result.joinDate ? result.joinDate.toISOString() : null,
+    position: result.position ?? null,
+  })
 }

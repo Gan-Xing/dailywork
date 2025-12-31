@@ -133,6 +133,18 @@ export function MemberEditClient({ member, canAssignRole }: Props) {
                     expatProfile: { ...prev.expatProfile, ...patch },
                   }))
                 }
+                onApplyJoinDate={(value) =>
+                  setFormState((prev) => ({
+                    ...prev,
+                    joinDate: value,
+                  }))
+                }
+                onApplyPosition={(value) =>
+                  setFormState((prev) => ({
+                    ...prev,
+                    position: value,
+                  }))
+                }
               />
             ) : null}
 
