@@ -7,6 +7,7 @@ type ContractSnapshot = {
   contractNumber: string | null
   contractType: string | null
   ctjOverlap?: boolean
+  contractOverlap?: boolean
 }
 
 const addUtcDays = (value: Date, days: number) => {
@@ -51,6 +52,8 @@ export async function GET(request: Request) {
       userId: true,
       contractNumber: true,
       contractType: true,
+      contractStartDate: true,
+      contractEndDate: true,
     },
   })
   const expatUserIds = expatProfiles.map((profile) => profile.userId)
@@ -117,6 +120,40 @@ export async function GET(request: Request) {
     })
   }
 
+  const hasContractOverlap = (
+    changes: typeof contractChanges,
+    profile: {
+      contractStartDate: Date | null
+      contractEndDate: Date | null
+    },
+    periodStart: Date,
+    periodEnd: Date,
+  ) => {
+    const startTime = periodStart.getTime()
+    const endTime = periodEnd.getTime()
+    let hasAny = false
+
+    const hasOverlap = (start: Date | null, end: Date | null) => {
+      if (!start) return false
+      hasAny = true
+      const intervalStart = start.getTime()
+      const intervalEnd = end ? end.getTime() : Number.POSITIVE_INFINITY
+      return intervalStart <= endTime && intervalEnd >= startTime
+    }
+
+    for (const change of changes) {
+      const start = change.startDate ?? change.changeDate
+      const end = change.endDate ?? null
+      if (hasOverlap(start, end)) return true
+    }
+
+    if (hasOverlap(profile.contractStartDate ?? null, profile.contractEndDate ?? null)) {
+      return true
+    }
+
+    return hasAny ? false : true
+  }
+
   let runOneStartDate: Date | null = null
   const runOne = runs.find((run) => run.sequence === 1)
   if (runOne) {
@@ -131,6 +168,18 @@ export async function GET(request: Request) {
     }
   }
 
+  const runStartDates = new Map<number, Date | null>()
+  if (runOne) {
+    runStartDates.set(runOne.id, runOneStartDate)
+  }
+  const runTwo = runs.find((run) => run.sequence === 2)
+  if (runTwo) {
+    const runTwoStart = runOne
+      ? addUtcDays(runOne.attendanceCutoffDate, 1)
+      : null
+    runStartDates.set(runTwo.id, runTwoStart)
+  }
+
   const contractSnapshots = runs.map((run) => {
     const contracts: Record<number, ContractSnapshot> = {}
     expatProfiles.forEach((profile) => {
@@ -142,7 +191,11 @@ export async function GET(request: Request) {
         run.sequence === 1 && runOneStartDate
           ? hasCtjOverlap(changes, runOneStartDate, run.attendanceCutoffDate)
           : false
-      contracts[profile.userId] = { contractNumber, contractType, ctjOverlap }
+      const periodStart = runStartDates.get(run.id) ?? null
+      const contractOverlap = periodStart
+        ? hasContractOverlap(changes, profile, periodStart, run.attendanceCutoffDate)
+        : true
+      contracts[profile.userId] = { contractNumber, contractType, ctjOverlap, contractOverlap }
     })
     return {
       runId: run.id,

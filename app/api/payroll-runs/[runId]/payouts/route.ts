@@ -9,83 +9,6 @@ import {
 } from '@/lib/server/compensation'
 import { canManagePayroll } from '@/lib/server/payrollRuns'
 
-const toDateKey = (value: Date) =>
-  Date.UTC(value.getUTCFullYear(), value.getUTCMonth(), value.getUTCDate())
-
-const isDateAfterCutoff = (date: Date | null, cutoffDate: Date | null) => {
-  if (!date || !cutoffDate) return false
-  return toDateKey(date) > toDateKey(cutoffDate)
-}
-
-const resolveEarliestContractStart = (
-  changes: Array<{
-    startDate: Date | null
-    changeDate: Date
-  }>,
-  profile?: { contractStartDate?: Date | null } | null,
-) => {
-  let earliest: Date | null = null
-  for (const change of changes) {
-    const start = change.startDate ?? change.changeDate
-    if (!start) continue
-    if (!earliest || start.getTime() < earliest.getTime()) earliest = start
-  }
-  const profileStart = profile?.contractStartDate ?? null
-  if (profileStart) {
-    if (!earliest) {
-      earliest = profileStart
-    } else if (profileStart.getTime() < earliest.getTime()) {
-      earliest = profileStart
-    }
-  }
-  return earliest
-}
-
-const resolveEffectiveJoinDate = (
-  joinDate: Date | null,
-  earliestContractStart: Date | null,
-) => {
-  if (!earliestContractStart) return joinDate
-  if (!joinDate) return earliestContractStart
-  return joinDate.getTime() > earliestContractStart.getTime() ? earliestContractStart : joinDate
-}
-
-const hasActiveContractAtCutoff = (
-  changes: Array<{
-    startDate: Date | null
-    endDate: Date | null
-    changeDate: Date
-  }>,
-  cutoffDate: Date,
-) => {
-  const cutoffTime = cutoffDate.getTime()
-  return changes.some((change) => {
-    const start = change.startDate ?? change.changeDate
-    if (!start) return false
-    const end = change.endDate ?? null
-    const startTime = start.getTime()
-    const endTime = end ? end.getTime() : Number.POSITIVE_INFINITY
-    return startTime <= cutoffTime && endTime >= cutoffTime
-  })
-}
-
-const hasActiveProfileContractAtCutoff = (
-  profile: { contractStartDate?: Date | null; contractEndDate?: Date | null } | null | undefined,
-  cutoffDate: Date,
-) => {
-  if (!profile?.contractStartDate) return false
-  const startTime = profile.contractStartDate.getTime()
-  const endTime = profile.contractEndDate ? profile.contractEndDate.getTime() : Number.POSITIVE_INFINITY
-  const cutoffTime = cutoffDate.getTime()
-  return startTime <= cutoffTime && endTime >= cutoffTime
-}
-
-const addUtcDays = (value: Date, days: number) => {
-  const next = new Date(value)
-  next.setUTCDate(next.getUTCDate() + days)
-  return next
-}
-
 type PayrollPayoutInput = {
   userId: number
   amount?: string | number | null
@@ -129,115 +52,17 @@ export async function POST(
     where: { id: { in: userIds } },
     select: {
       id: true,
-      joinDate: true,
-      terminationDate: true,
       nationality: true,
       expatProfile: {
         select: {
           team: true,
           chineseSupervisorId: true,
-          contractNumber: true,
-          contractType: true,
-          contractStartDate: true,
-          contractEndDate: true,
         },
       },
     },
   })
   const userMap = new Map(users.map((user) => [user.id, user]))
-  const contractChanges = await prisma.userContractChange.findMany({
-    where: { userId: { in: userIds } },
-    select: {
-      userId: true,
-      contractNumber: true,
-      contractType: true,
-      startDate: true,
-      endDate: true,
-      changeDate: true,
-    },
-  })
-  const contractChangesByUser = new Map<number, typeof contractChanges>()
-  contractChanges.forEach((change) => {
-    const list = contractChangesByUser.get(change.userId) ?? []
-    list.push(change)
-    contractChangesByUser.set(change.userId, list)
-  })
-  const resolveContractSnapshot = (
-    changes: typeof contractChanges,
-    cutoffDate: Date,
-    fallback: { contractType: string | null; contractNumber: string | null },
-  ): { contractType: string | null; contractNumber: string | null } => {
-    if (changes.length === 0) return fallback
-    const cutoffTime = cutoffDate.getTime()
-    const byPeriod = changes
-      .filter((change) => change.startDate && change.startDate.getTime() <= cutoffTime)
-      .filter((change) => !change.endDate || change.endDate.getTime() >= cutoffTime)
-      .sort((a, b) => (b.startDate?.getTime() ?? 0) - (a.startDate?.getTime() ?? 0))
-    const match = byPeriod[0]
-    if (match?.contractType || match?.contractNumber) {
-      return {
-        contractType: match?.contractType ?? fallback.contractType,
-        contractNumber: match?.contractNumber ?? fallback.contractNumber,
-      }
-    }
-    const byChangeDate = changes
-      .filter((change) => change.changeDate.getTime() <= cutoffTime)
-      .sort((a, b) => b.changeDate.getTime() - a.changeDate.getTime())
-    const fallbackChange = byChangeDate[0]
-    return {
-      contractType: fallbackChange?.contractType ?? fallback.contractType,
-      contractNumber: fallbackChange?.contractNumber ?? fallback.contractNumber,
-    }
-  }
-  const contractSnapshotByUserId = new Map<
-    number,
-    { contractType: string | null; contractNumber: string | null }
-  >()
-  users.forEach((user) => {
-    const changes = contractChangesByUser.get(user.id) ?? []
-    const fallbackSnapshot = {
-      contractType: user.expatProfile?.contractType ?? null,
-      contractNumber: user.expatProfile?.contractNumber ?? null,
-    }
-    contractSnapshotByUserId.set(
-      user.id,
-      resolveContractSnapshot(changes, run.attendanceCutoffDate, fallbackSnapshot),
-    )
-  })
-
-  let runStartDate: Date | null = null
-  if (run.sequence === 1) {
-    const prevMonth = run.month === 1 ? 12 : run.month - 1
-    const prevYear = run.month === 1 ? run.year - 1 : run.year
-    const prevRun = await prisma.payrollRun.findFirst({
-      where: { year: prevYear, month: prevMonth, sequence: 2 },
-      select: { attendanceCutoffDate: true },
-    })
-    if (prevRun?.attendanceCutoffDate) {
-      runStartDate = addUtcDays(prevRun.attendanceCutoffDate, 1)
-    }
-  }
-
-  const hasCtjOverlap = (userId: number) => {
-    if (!runStartDate) return false
-    const changes = contractChangesByUser.get(userId) ?? []
-    const periodStart = runStartDate.getTime()
-    const periodEnd = run.attendanceCutoffDate.getTime()
-    return changes.some((change) => {
-      if (change.contractType !== 'CTJ') return false
-      const start = change.startDate ?? change.changeDate
-      const end = change.endDate ?? null
-      if (!start) return false
-      const startTime = start.getTime()
-      const endTime = end ? end.getTime() : Number.POSITIVE_INFINITY
-      return startTime <= periodEnd && endTime >= periodStart
-    })
-  }
-
   const invalidUsers: number[] = []
-  const invalidCdd: string[] = []
-  const invalidContractPeriods: string[] = []
-  const invalidJoinDates: string[] = []
   const payloads: Array<{
     userId: number
     amount: string
@@ -260,39 +85,6 @@ export async function POST(
     const amount = normalizeOptionalDecimal(item.amount)
     if (!amount) {
       deleteUserIds.push(userId)
-      continue
-    }
-
-    const contractSnapshot = contractSnapshotByUserId.get(userId)
-    const resolvedContractType =
-      contractSnapshot?.contractType ?? user.expatProfile.contractType ?? null
-    const resolvedContractNumber =
-      contractSnapshot?.contractNumber ?? user.expatProfile.contractNumber ?? null
-    if (run.sequence === 1 && resolvedContractType === 'CDD') {
-      const canRunOneCdd =
-        Boolean(user.terminationDate) &&
-        !isDateAfterCutoff(user.terminationDate, run.attendanceCutoffDate)
-      if (!canRunOneCdd && !hasCtjOverlap(userId)) {
-        invalidCdd.push(resolvedContractNumber || '未填写合同编号')
-        continue
-      }
-    }
-
-    const changes = contractChangesByUser.get(userId) ?? []
-    const earliestContractStart = resolveEarliestContractStart(
-      changes,
-      user.expatProfile ?? null,
-    )
-    const effectiveJoinDate = resolveEffectiveJoinDate(user.joinDate, earliestContractStart)
-    if (changes.length > 0) {
-      if (!hasActiveContractAtCutoff(changes, run.attendanceCutoffDate)) {
-        invalidContractPeriods.push(resolvedContractNumber || '未填写合同编号')
-        continue
-      }
-    } else if (hasActiveProfileContractAtCutoff(user.expatProfile, run.attendanceCutoffDate)) {
-      // covered by current profile contract period
-    } else if (isDateAfterCutoff(effectiveJoinDate, run.attendanceCutoffDate)) {
-      invalidJoinDates.push(resolvedContractNumber || '未填写合同编号')
       continue
     }
 
@@ -322,28 +114,6 @@ export async function POST(
 
   if (invalidUsers.length > 0) {
     return NextResponse.json({ error: `存在无效成员: ${invalidUsers.join(', ')}` }, { status: 400 })
-  }
-  if (invalidCdd.length > 0) {
-    return NextResponse.json(
-      { error: `CDD 成员仅在当月第一次考勤截止前离职时可录入第 1 次发放: ${invalidCdd.join(', ')}` },
-      { status: 400 },
-    )
-  }
-  if (invalidContractPeriods.length > 0) {
-    return NextResponse.json(
-      {
-        error: `合同不在考勤周期内，无法录入本次发放: ${invalidContractPeriods.join(', ')}`,
-      },
-      { status: 400 },
-    )
-  }
-  if (invalidJoinDates.length > 0) {
-    return NextResponse.json(
-      {
-        error: `入职日期晚于考勤截止日期，无法录入本次发放: ${invalidJoinDates.join(', ')}`,
-      },
-      { status: 400 },
-    )
   }
 
   const operations: Prisma.PrismaPromise<unknown>[] = payloads.map((payload) =>
