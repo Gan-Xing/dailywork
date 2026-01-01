@@ -181,8 +181,17 @@
 
 - `team`（EQUIPE）：班组名称，字符串，必填。
 - `teamKey`：班组标准化键（去空格 + 小写），用于唯一约束。
+- `projectId`：默认项目 ID，可空（用于班组联动项目）。
 - `supervisorId`（RESPONSABLE CHINOIS）：绑定的中方负责人用户 ID（仅中国籍成员）。
 - `supervisorName`：中方负责人快照名（`name + frenchName`），可空。
+
+### UserProjectAssignment（成员项目历史）
+
+- `userId`：关联成员 ID。
+- `projectId`：关联项目 ID。
+- `startDate`：项目开始日期。
+- `endDate`：项目结束日期，可空（空表示当前项目）。
+- `createdAt` / `updatedAt`：时间戳。
 
 ### UserContractChange（合同变更历史）
 
@@ -394,6 +403,7 @@
 - `joinDate`：入职日期（date，创建成员默认当天）。
 - `birthDate`：出生日期（date，必填；中方可由身份证解析补全，身份证号仍可选）。
 - `position`：岗位名称，来源于现有成员岗位去重下拉，可手动新增。
+- `project`：当前所属项目（由 `UserProjectAssignment` 中 `endDate` 为空的记录决定）。
 - `employmentStatus`：枚举，`ACTIVE`（在职）、`TERMINATED`（离职）、`ON_LEAVE`（休假）。
 - `terminationDate?` / `terminationReason?`：离职日期与原因（仅详情展示，不在列表列出）。
 - `username` / `passwordHash`：账户名与哈希密码（复用现有认证流程）。

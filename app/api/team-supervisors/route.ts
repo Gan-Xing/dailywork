@@ -31,6 +31,14 @@ export async function GET() {
           chineseProfile: { select: { frenchName: true } },
         },
       },
+      project: {
+        select: {
+          id: true,
+          name: true,
+          code: true,
+          isActive: true,
+        },
+      },
     },
   })
 
@@ -47,6 +55,14 @@ export async function GET() {
       teamKey: binding.teamKey,
       supervisorId: binding.supervisorId,
       supervisorLabel: label,
+      project: binding.project
+        ? {
+            id: binding.project.id,
+            name: binding.project.name,
+            code: binding.project.code,
+            isActive: binding.project.isActive,
+          }
+        : null,
     }
   })
 
@@ -61,6 +77,11 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => null)
   const teamValue = typeof body?.team === 'string' ? body.team.trim() : ''
   const supervisorId = Number(body?.supervisorId)
+  const projectIdInput = body?.projectId
+  const parsedProjectId =
+    projectIdInput === null || projectIdInput === '' || projectIdInput === undefined
+      ? null
+      : Number(projectIdInput)
 
   const teamKey = normalizeTeamKey(teamValue)
   if (!teamKey) {
@@ -68,6 +89,20 @@ export async function POST(request: Request) {
   }
   if (!supervisorId) {
     return NextResponse.json({ error: '中方负责人必填' }, { status: 400 })
+  }
+
+  if (parsedProjectId !== null && !Number.isFinite(parsedProjectId)) {
+    return NextResponse.json({ error: '项目无效' }, { status: 400 })
+  }
+
+  const project = parsedProjectId
+    ? await prisma.project.findUnique({
+        where: { id: parsedProjectId },
+        select: { id: true, name: true, code: true, isActive: true },
+      })
+    : null
+  if (parsedProjectId && !project) {
+    return NextResponse.json({ error: '项目不存在' }, { status: 400 })
   }
 
   const supervisor = await prisma.user.findUnique({
@@ -98,6 +133,7 @@ export async function POST(request: Request) {
         teamKey,
         supervisorId: supervisor.id,
         supervisorName: supervisorLabel,
+        projectId: parsedProjectId,
       },
     })
     return NextResponse.json({
@@ -107,6 +143,7 @@ export async function POST(request: Request) {
         teamKey: created.teamKey,
         supervisorId: created.supervisorId,
         supervisorLabel,
+        project,
       },
     })
   } catch (error) {

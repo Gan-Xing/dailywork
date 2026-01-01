@@ -58,6 +58,7 @@ import { useMemberFilterSummary } from './hooks/useMemberFilterSummary'
 import { useMemberFormatters } from './hooks/useMemberFormatters'
 import { useMemberImportExport } from './hooks/useMemberImportExport'
 import { useTeamSupervisors } from './hooks/useTeamSupervisors'
+import { useProjects } from './hooks/useProjects'
 import { useContractChangeImport } from './hooks/useContractChangeImport'
 import { useMembersData } from './hooks/useMembersData'
 import { usePermissionStatus } from './hooks/usePermissionStatus'
@@ -102,6 +103,7 @@ export function MembersPageClient() {
     position: '',
     employmentStatus: 'ACTIVE' as EmploymentStatus,
     roleIds: [] as number[],
+    projectId: '',
     chineseProfile: { ...emptyChineseProfile },
     expatProfile: { ...emptyExpatProfile },
   })
@@ -170,6 +172,7 @@ export function MembersPageClient() {
     statusFilters,
     roleFilters,
     tagFilters,
+    projectFilters,
     teamFilters,
     chineseSupervisorFilters,
     contractNumberFilters,
@@ -212,6 +215,7 @@ export function MembersPageClient() {
     setStatusFilters,
     setRoleFilters,
     setTagFilters,
+    setProjectFilters,
     setTeamFilters,
     setChineseSupervisorFilters,
     setContractNumberFilters,
@@ -342,6 +346,9 @@ export function MembersPageClient() {
     error: teamSupervisorError,
     refresh: refreshTeamSupervisors,
   } = useTeamSupervisors({ enabled: canViewTeamSupervisors })
+  const { projectOptions } = useProjects({
+    enabled: canViewMembers || canCreateMember || canUpdateMember,
+  })
   const {
     showRoleModal,
     roleSubmitting,
@@ -394,6 +401,7 @@ export function MembersPageClient() {
     statusFilterOptions,
     roleFilterOptions,
     teamFilterOptions,
+    projectFilterOptions,
     chineseSupervisorFilterOptions,
     contractNumberFilterOptions,
     contractTypeFilterOptions,
@@ -461,6 +469,7 @@ export function MembersPageClient() {
     statusFilters,
     roleFilters,
     tagFilters,
+    projectFilters,
     teamFilters,
     chineseSupervisorFilters,
     contractNumberFilters,
@@ -503,6 +512,7 @@ export function MembersPageClient() {
     statusFilters,
     roleFilters,
     tagFilters,
+    projectFilters,
     teamFilters,
     chineseSupervisorFilters,
     contractNumberFilters,
@@ -744,6 +754,7 @@ export function MembersPageClient() {
       position: member.position ?? '',
       employmentStatus: member.employmentStatus ?? 'ACTIVE',
       roleIds: member.roles?.map((role) => role.id) ?? [],
+      projectId: member.project?.id ? String(member.project.id) : '',
       chineseProfile: buildChineseProfileForm(member.chineseProfile),
       expatProfile: buildExpatProfileForm(member.expatProfile),
     })
@@ -842,6 +853,7 @@ export function MembersPageClient() {
       emergencyContactName: formState.expatProfile.emergencyContactName.trim() || null,
       emergencyContactPhone: formState.expatProfile.emergencyContactPhone.trim() || null,
     }
+    const projectIdValue = formState.projectId ? Number(formState.projectId) : null
     if (expatProfilePayload.netMonthlyAmount && !expatProfilePayload.netMonthlyUnit) {
       expatProfilePayload.netMonthlyUnit = 'MONTH'
     }
@@ -859,6 +871,7 @@ export function MembersPageClient() {
       terminationReason: string | null
       position: string | null
       employmentStatus: EmploymentStatus
+      projectId: number | null
       roleIds?: number[]
       chineseProfile: typeof chineseProfilePayload
       expatProfile: typeof expatProfilePayload
@@ -876,6 +889,7 @@ export function MembersPageClient() {
       terminationReason: isTerminated ? terminationReasonValue : null,
       position: formState.position.trim() || null,
       employmentStatus: formState.employmentStatus,
+      projectId: projectIdValue,
       chineseProfile: chineseProfilePayload,
       expatProfile: expatProfilePayload,
     }
@@ -1334,6 +1348,7 @@ export function MembersPageClient() {
                 bulkDrafts={bulkDrafts}
                 bulkEditableColumns={bulkEditableColumns}
                 teamOptions={teamOptions}
+                projectOptions={projectOptions}
                 chineseSupervisorOptions={chineseSupervisorOptions}
                 onStartBulkEdit={startBulkEdit}
                 onCancelBulkEdit={cancelBulkEdit}
@@ -1376,6 +1391,7 @@ export function MembersPageClient() {
                 statusFilterOptions={statusFilterOptions}
                 roleFilterOptions={roleFilterOptions}
                 teamFilterOptions={teamFilterOptions}
+                projectFilterOptions={projectFilterOptions}
                 chineseSupervisorFilterOptions={chineseSupervisorFilterOptions}
                 contractNumberFilterOptions={contractNumberFilterOptions}
                 contractTypeFilterOptions={contractTypeFilterOptions}
@@ -1411,6 +1427,7 @@ export function MembersPageClient() {
                 nationalityFilters={nationalityFilters}
                 phoneFilters={phoneFilters}
                 tagFilters={tagFilters}
+                projectFilters={projectFilters}
                 joinDateFilters={joinDateFilters}
                 positionFilters={positionFilters}
                 statusFilters={statusFilters}
@@ -1451,6 +1468,7 @@ export function MembersPageClient() {
                 setNationalityFilters={setNationalityFilters}
                 setPhoneFilters={setPhoneFilters}
                 setTagFilters={setTagFilters}
+                setProjectFilters={setProjectFilters}
                 setJoinDateFilters={setJoinDateFilters}
                 setPositionFilters={setPositionFilters}
                 setStatusFilters={setStatusFilters}
@@ -1609,6 +1627,7 @@ export function MembersPageClient() {
         error={teamSupervisorError}
         teamSupervisors={teamSupervisors}
         supervisorOptions={chineseSupervisorOptions}
+        projectOptions={projectOptions}
         onClose={() => setShowTeamSupervisorDialog(false)}
         onRefresh={refreshTeamSupervisors}
       />
@@ -1631,6 +1650,7 @@ export function MembersPageClient() {
           positionOptions={positionOptions}
           teamOptions={teamOptions}
           teamSupervisorMap={teamSupervisorMap}
+          projectOptions={projectOptions}
           nationalityByRegion={nationalityByRegion}
           statusLabels={statusLabels}
           isChineseForm={isChineseForm}

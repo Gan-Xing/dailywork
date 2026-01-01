@@ -127,6 +127,7 @@ export const memberCopy: Record<
       | 'employmentStatus'
       | 'roles'
       | 'tags'
+      | 'project'
       | 'team'
       | 'chineseSupervisor'
       | 'contractNumber'
@@ -229,6 +230,7 @@ export const memberCopy: Record<
       importUsernameExists: string
       importInvalidGender: string
       importInvalidPhone: string
+      importInvalidProject: string
       importInvalidContractType: string
       importInvalidSalaryUnit: string
       importInvalidBaseSalaryUnit: string
@@ -265,6 +267,7 @@ export const memberCopy: Record<
         | 'position'
         | 'employmentStatus'
         | 'roles'
+        | 'project'
         | 'team'
         | 'chineseSupervisor'
         | 'contractNumber'
@@ -351,6 +354,7 @@ export const memberCopy: Record<
       add: string
       team: string
       supervisor: string
+      project: string
       edit: string
       delete: string
       confirm: string
@@ -391,6 +395,7 @@ export const memberCopy: Record<
       collapse: string
       expatEmpty: string
       team: string
+      project: string
       chineseSupervisor: string
       contractNumber: string
       contractType: string
@@ -688,6 +693,7 @@ export const memberCopy: Record<
       employmentStatus: '状态',
       roles: '角色',
       tags: '标签',
+      project: '项目',
       team: '班组',
       chineseSupervisor: '中方负责人',
       contractNumber: '合同编号',
@@ -788,6 +794,7 @@ export const memberCopy: Record<
       importUsernameExists: '账号已存在',
       importInvalidGender: '性别必须为男或女',
       importInvalidPhone: '电话号码格式不正确',
+      importInvalidProject: '项目不存在或无效',
       importInvalidContractType: '合同类型必须为 CTJ 或 CDD',
       importInvalidSalaryUnit: '基础工资单位必须为 MONTH 或 HOUR',
       importInvalidBaseSalaryUnit: 'CDD 合同基础工资只能按月',
@@ -824,6 +831,7 @@ export const memberCopy: Record<
         position: '自由填写，建议统一用词；示例：工程师',
         employmentStatus: '固定值：ACTIVE / ON_LEAVE / TERMINATED；新建留空默认 ACTIVE，更新留空保留原值',
         roles: '仅 role:update / role:manage 可见；填写角色名称，多个用 "/" 分隔；示例：Admin / Employee',
+        project: '可选；项目名称或编码。',
         team: '可选；班组或工作组名称。',
         chineseSupervisor: '可选；填写中方负责人账号（username）。',
         contractNumber: '可选；合同编号，需唯一。',
@@ -911,6 +919,7 @@ export const memberCopy: Record<
       add: '新增班组',
       team: '班组',
       supervisor: '中方负责人',
+      project: '项目',
       edit: '编辑',
       delete: '删除',
       confirm: '确认',
@@ -951,6 +960,7 @@ export const memberCopy: Record<
       collapse: '收起',
       expatEmpty: '暂无可填写的当地员工扩展字段。',
       team: '班组',
+      project: '项目',
       chineseSupervisor: '中方负责人',
       contractNumber: '合同编号',
       contractType: '合同类型',
@@ -1257,6 +1267,7 @@ export const memberCopy: Record<
       employmentStatus: 'Statut',
       roles: 'Rôles',
       tags: 'Tags',
+      project: 'Projet',
       team: 'Équipe',
       chineseSupervisor: 'Responsable chinois',
       contractNumber: 'N° contrat',
@@ -1357,6 +1368,7 @@ export const memberCopy: Record<
       importUsernameExists: "Identifiant déjà utilisé",
       importInvalidGender: 'Genre invalide (男 / 女)',
       importInvalidPhone: 'Format de téléphone invalide',
+      importInvalidProject: 'Projet introuvable',
       importInvalidContractType: 'Type de contrat invalide (CTJ / CDD)',
       importInvalidSalaryUnit: 'Unité du salaire de base invalide (MONTH / HOUR)',
       importInvalidBaseSalaryUnit: 'Le salaire de base CDD doit être mensuel',
@@ -1394,6 +1406,7 @@ export const memberCopy: Record<
         employmentStatus:
           'Valeurs fixes : ACTIVE / ON_LEAVE / TERMINATED ; création vide = ACTIVE, sinon conservé',
         roles: 'Visible avec role:update / role:manage ; saisir les noms de rôles, séparés par "/" ; ex. Admin / Employee',
+        project: 'Optionnel ; nom ou code du projet.',
         team: 'Optionnel ; équipe ou groupe.',
         chineseSupervisor: 'Optionnel ; identifiant du responsable chinois (username).',
         contractNumber: 'Optionnel ; numéro de contrat, unique.',
@@ -1483,6 +1496,7 @@ export const memberCopy: Record<
       add: 'Ajouter une équipe',
       team: 'Équipe',
       supervisor: 'Responsable chinois',
+      project: 'Projet',
       edit: 'Éditer',
       delete: 'Supprimer',
       confirm: 'Confirmer',
@@ -1523,6 +1537,7 @@ export const memberCopy: Record<
       collapse: 'Réduire',
       expatEmpty: 'Aucun champ local à renseigner.',
       team: 'Équipe',
+      project: 'Projet',
       chineseSupervisor: 'Responsable chinois',
       contractNumber: 'N° contrat',
       contractType: 'Type de contrat',

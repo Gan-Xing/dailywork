@@ -5,8 +5,9 @@ import { hashPassword } from '@/lib/auth/password'
 import { hasPermission } from '@/lib/server/authSession'
 import { isDecimalEqual, resolveSupervisorSnapshot } from '@/lib/server/compensation'
 import { createInitialContractChangeIfMissing } from '@/lib/server/contractChanges'
-import { normalizeTagsInput } from '@/lib/members/utils'
-import { resolveTeamSupervisorId } from '@/lib/server/teamSupervisors'
+import { normalizeTagsInput, normalizeTeamKey } from '@/lib/members/utils'
+import { resolveTeamDefaults } from '@/lib/server/teamSupervisors'
+import { applyProjectAssignment } from '@/lib/server/memberProjects'
 import {
   hasExpatProfileData,
   normalizeChineseProfile,
@@ -47,6 +48,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     employmentStatus,
     roleIds,
     tags,
+    projectId,
     chineseProfile,
     expatProfile,
     skipChangeHistory,
@@ -73,6 +75,15 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   const chineseProfileData = normalizeChineseProfile(chineseProfile)
   const expatProfileData = normalizeExpatProfile(expatProfile)
   const shouldUpsertExpatProfile = !isChinese || hasExpatProfileData(expatProfileData)
+  const hasProjectField = Object.prototype.hasOwnProperty.call(body ?? {}, 'projectId')
+  const parsedProjectId = hasProjectField
+    ? projectId === null || projectId === '' || projectId === undefined
+      ? null
+      : Number(projectId)
+    : undefined
+  if (hasProjectField && parsedProjectId !== null && !Number.isFinite(parsedProjectId)) {
+    return NextResponse.json({ error: '项目无效' }, { status: 400 })
+  }
   const existingUser = await prisma.user.findUnique({
     where: { id: userId },
     select: {
@@ -95,13 +106,29 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
           netMonthlyUnit: true,
         },
       },
+      projectAssignments: {
+        where: { endDate: null },
+        orderBy: [{ startDate: 'desc' }, { id: 'desc' }],
+        take: 1,
+        select: {
+          project: {
+            select: { id: true, name: true, code: true, isActive: true },
+          },
+        },
+      },
     },
   })
   if (!existingUser) {
     return NextResponse.json({ error: '成员不存在' }, { status: 404 })
   }
+  const teamChanged =
+    normalizeTeamKey(expatProfileData.team) !==
+    normalizeTeamKey(existingUser.expatProfile?.team ?? null)
+  const teamDefaults = expatProfileData.team
+    ? await resolveTeamDefaults(expatProfileData.team)
+    : { supervisorId: null, projectId: null }
   const resolvedSupervisorId = expatProfileData.team
-    ? await resolveTeamSupervisorId(expatProfileData.team)
+    ? teamDefaults.supervisorId
     : expatProfileData.chineseSupervisorId ??
       existingUser.expatProfile?.chineseSupervisorId ??
       null
@@ -109,6 +136,21 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     return NextResponse.json({ error: '班组未绑定中方负责人' }, { status: 400 })
   }
   expatProfileData.chineseSupervisorId = resolvedSupervisorId
+  let resolvedProjectId = hasProjectField ? (parsedProjectId ?? null) : undefined
+  if (!hasProjectField && teamChanged) {
+    resolvedProjectId = teamDefaults.projectId ?? null
+  }
+  const resolvedProject =
+    resolvedProjectId !== undefined && resolvedProjectId !== null
+      ? await prisma.project.findUnique({
+          where: { id: resolvedProjectId },
+          select: { id: true, name: true, code: true, isActive: true },
+        })
+      : null
+  if (resolvedProjectId && !resolvedProject) {
+    return NextResponse.json({ error: '项目不存在' }, { status: 400 })
+  }
+  const existingProject = existingUser.projectAssignments[0]?.project ?? null
   const hasBirthDateInput =
     birthDate !== null &&
     birthDate !== undefined &&
@@ -314,6 +356,15 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         })
       }
 
+      if (resolvedProjectId !== undefined) {
+        await applyProjectAssignment(tx, {
+          userId,
+          projectId: resolvedProjectId,
+          startDate: new Date(),
+          fallbackStartDate: resolvedJoinDate,
+        })
+      }
+
       return updatedUser
     })
 
@@ -334,6 +385,10 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         createdAt: user.createdAt.toISOString(),
         updatedAt: user.updatedAt.toISOString(),
         tags: user.tags ?? [],
+        project:
+          resolvedProjectId !== undefined
+            ? resolvedProject
+            : existingProject,
         roles: canAssignRole
           ? user.roles.map((item) => ({ id: item.role.id, name: item.role.name }))
           : [],

@@ -213,6 +213,21 @@ export function useMemberFilterOptions({
     return options
   }, [membersData, optionCollator, t.labels.empty])
 
+  const projectFilterOptions = useMemo(() => {
+    const values = new Set<string>()
+    let hasEmpty = false
+    membersData.forEach((member) => {
+      const value = normalizeText(member.project?.name)
+      if (value) values.add(value)
+      else hasEmpty = true
+    })
+    const options = Array.from(values)
+      .sort(optionCollator.compare)
+      .map((value) => ({ value, label: value }))
+    if (hasEmpty) options.unshift({ value: EMPTY_FILTER_VALUE, label: t.labels.empty })
+    return options
+  }, [membersData, optionCollator, t.labels.empty])
+
   const chineseSupervisorFilterOptions = useMemo(() => {
     const values = new Set<string>()
     let hasEmpty = false
@@ -690,6 +705,7 @@ export function useMemberFilterOptions({
     statusFilterOptions,
     roleFilterOptions,
     teamFilterOptions,
+    projectFilterOptions,
     chineseSupervisorFilterOptions,
     contractNumberFilterOptions,
     contractTypeFilterOptions,

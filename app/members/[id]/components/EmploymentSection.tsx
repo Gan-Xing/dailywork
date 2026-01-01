@@ -11,6 +11,7 @@ type EmploymentSectionProps = {
   statusLabels: Record<EmploymentStatus, string>
   formState: FormState
   setFormState: Dispatch<SetStateAction<FormState>>
+  projectOptions: { value: string; label: string }[]
 }
 
 export function EmploymentSection({
@@ -18,10 +19,11 @@ export function EmploymentSection({
   statusLabels,
   formState,
   setFormState,
+  projectOptions,
 }: EmploymentSectionProps) {
   return (
     <>
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-4">
         <label className="space-y-1 text-sm text-slate-700">
           <span className="block font-semibold">{t.form.joinDate}</span>
           <input
@@ -59,6 +61,23 @@ export function EmploymentSection({
             {(['ACTIVE', 'ON_LEAVE', 'TERMINATED'] as EmploymentStatus[]).map((status) => (
               <option key={status} value={status}>
                 {statusLabels[status]}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="space-y-1 text-sm text-slate-700">
+          <span className="block font-semibold">{t.form.project}</span>
+          <select
+            value={formState.projectId}
+            onChange={(event) =>
+              setFormState((prev) => ({ ...prev, projectId: event.target.value }))
+            }
+            className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+          >
+            <option value="">{t.labels.empty}</option>
+            {projectOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
               </option>
             ))}
           </select>

@@ -177,6 +177,7 @@ export function MemberDetailDrawer({ member, open, onClose, onEdit }: Props) {
                             emptyLabel={t.labels.empty}
                           />
                           <DetailItem label={t.table.tags} value={formatList(member.tags)} emptyLabel={t.labels.empty} />
+                          <DetailItem label={t.table.project} value={member.project?.name ?? ''} emptyLabel={t.labels.empty} />
                           <DetailItem label={t.table.team} value={member.expatProfile?.team ?? ''} emptyLabel={t.labels.empty} />
                           <DetailItem label={t.table.chineseSupervisor} value={formatSupervisor()} emptyLabel={t.labels.empty} />
                         </dl>

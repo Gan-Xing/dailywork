@@ -32,6 +32,7 @@ type MemberFormModalProps = {
   positionOptions: string[]
   teamOptions: string[]
   teamSupervisorMap: Map<string, TeamSupervisorItem>
+  projectOptions: { value: string; label: string }[]
   nationalityByRegion: Map<NationalityRegion, NationalityOption[]>
   statusLabels: Record<EmploymentStatus, string>
   isChineseForm: boolean
@@ -65,6 +66,7 @@ export function MemberFormModal({
   positionOptions,
   teamOptions,
   teamSupervisorMap,
+  projectOptions,
   nationalityByRegion,
   statusLabels,
   isChineseForm,
@@ -87,15 +89,27 @@ export function MemberFormModal({
     const binding = teamSupervisorMap.get(teamKey)
     if (!binding) return
     const nextSupervisorId = String(binding.supervisorId)
-    if (formState.expatProfile.chineseSupervisorId === nextSupervisorId) return
+    const nextProjectId = binding.project?.id ? String(binding.project.id) : ''
+    const shouldUpdateSupervisor = formState.expatProfile.chineseSupervisorId !== nextSupervisorId
+    const shouldUpdateProject = !formState.projectId && nextProjectId
+    if (!shouldUpdateSupervisor && !shouldUpdateProject) return
     setFormState((prev) => ({
       ...prev,
+      projectId: shouldUpdateProject ? nextProjectId : prev.projectId,
       expatProfile: {
         ...prev.expatProfile,
-        chineseSupervisorId: nextSupervisorId,
+        chineseSupervisorId: shouldUpdateSupervisor
+          ? nextSupervisorId
+          : prev.expatProfile.chineseSupervisorId,
       },
     }))
-  }, [formState.expatProfile.team, formState.expatProfile.chineseSupervisorId, teamSupervisorMap, setFormState])
+  }, [
+    formState.expatProfile.team,
+    formState.expatProfile.chineseSupervisorId,
+    formState.projectId,
+    teamSupervisorMap,
+    setFormState,
+  ])
 
   const teamSupervisorBinding = teamSupervisorMap.get(
     normalizeTeamKey(formState.expatProfile.team),
@@ -312,7 +326,7 @@ export function MemberFormModal({
             </label>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-4">
             <label className="space-y-1 text-sm text-slate-700">
               <span className="block font-semibold">{t.form.joinDate}</span>
               <input
@@ -355,6 +369,24 @@ export function MemberFormModal({
                 {(['ACTIVE', 'ON_LEAVE', 'TERMINATED'] as EmploymentStatus[]).map((status) => (
                   <option key={status} value={status}>
                     {statusLabels[status]}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="space-y-1 text-sm text-slate-700">
+              <span className="block font-semibold">{t.form.project}</span>
+              <select
+                value={formState.projectId}
+                onChange={(event) =>
+                  setFormState((prev) => ({ ...prev, projectId: event.target.value }))
+                }
+                disabled={formMode === 'view'}
+                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+              >
+                <option value="">{t.labels.empty}</option>
+                {projectOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
                   </option>
                 ))}
               </select>
@@ -646,6 +678,7 @@ export function MemberFormModal({
                             team: nextTeam,
                             chineseSupervisorId: binding ? String(binding.supervisorId) : '',
                           },
+                          projectId: binding?.project?.id ? String(binding.project.id) : '',
                         }))
                       }}
                       disabled={formMode === 'view'}

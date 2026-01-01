@@ -90,6 +90,7 @@ export function useMemberImportExport({
       add(copy.form.terminationDate, 'terminationDate')
       add(copy.form.terminationReason, 'terminationReason')
       add(copy.form.roles, 'roles')
+      add(copy.form.project, 'project')
       add(copy.form.team, 'team')
       add(copy.form.chineseSupervisor, 'chineseSupervisor')
       add(copy.form.contractNumber, 'contractNumber')
@@ -227,6 +228,9 @@ export function useMemberImportExport({
           break
         case 'missing_termination_reason':
           message = t.errors.terminationReasonRequired
+          break
+        case 'invalid_project':
+          message = t.errors.importInvalidProject
           break
         case 'duplicate_contract_number':
           message = t.errors.importDuplicateContractNumber
@@ -416,6 +420,7 @@ export function useMemberImportExport({
             position?: string | null
             employmentStatus?: EmploymentStatus | null
             roleIds?: number[]
+            project?: string | null
             team?: string | null
             contractNumber?: string | null
             contractType?: string | null
@@ -426,8 +431,8 @@ export function useMemberImportExport({
             baseSalary?: string | null
             netMonthly?: string | null
             maritalStatus?: string | null
-          childrenCount?: number | string | null
-          chineseSupervisor?: string | null
+            childrenCount?: number | string | null
+            chineseSupervisor?: string | null
             cnpsNumber?: string | null
             cnpsDeclarationCode?: string | null
             provenance?: string | null
@@ -548,6 +553,9 @@ export function useMemberImportExport({
                 }
                 break
               }
+              case 'project':
+                record.project = String(rawValue ?? '').trim()
+                break
               case 'team':
                 record.team = String(rawValue ?? '').trim()
                 break
@@ -841,6 +849,8 @@ export function useMemberImportExport({
                 : t.labels.empty
             case 'tags':
               return formatProfileList(member.tags)
+            case 'project':
+              return formatProfileText(member.project?.name ?? null)
             case 'team':
               return formatProfileText(expatProfile?.team)
             case 'chineseSupervisor':

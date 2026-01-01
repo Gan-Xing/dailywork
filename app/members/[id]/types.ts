@@ -60,6 +60,12 @@ export type Member = {
   position: string | null
   employmentStatus: EmploymentStatus
   roles: { id: number; name: string }[]
+  project?: {
+    id: number
+    name: string
+    code: string | null
+    isActive: boolean
+  } | null
   chineseProfile?: ChineseProfile | null
   expatProfile?: ExpatProfile | null
 }
@@ -137,6 +143,7 @@ export type FormState = {
   employmentStatus: EmploymentStatus
   roleIds: number[]
   skipChangeHistory: boolean
+  projectId: string
   chineseProfile: ChineseProfileForm
   expatProfile: ExpatProfileForm
 }

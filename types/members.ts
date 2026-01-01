@@ -67,6 +67,12 @@ export type Member = {
   roles: { id: number; name: string }[]
   createdAt: string
   updatedAt: string
+  project?: {
+    id: number
+    name: string
+    code: string | null
+    isActive: boolean
+  } | null
   chineseProfile?: ChineseProfile | null
   expatProfile?: ExpatProfile | null
 }
@@ -152,6 +158,7 @@ export type MemberFormState = {
   position: string
   employmentStatus: EmploymentStatus
   roleIds: number[]
+  projectId: string
   chineseProfile: ChineseProfileForm
   expatProfile: ExpatProfileForm
 }
@@ -166,6 +173,7 @@ export type MemberBulkPatch = {
   employmentStatus?: EmploymentStatus
   terminationDate?: string | null
   terminationReason?: string | null
+  projectId?: string | number | null
   expatProfile?: Partial<{
     team: string | null
     chineseSupervisorId: string | number | null

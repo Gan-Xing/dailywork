@@ -31,6 +31,7 @@ type UseFilteredMembersParams = {
   statusFilters: string[]
   roleFilters: string[]
   tagFilters: string[]
+  projectFilters: string[]
   teamFilters: string[]
   chineseSupervisorFilters: string[]
   contractNumberFilters: string[]
@@ -81,6 +82,7 @@ export function useFilteredMembers({
   statusFilters,
   roleFilters,
   tagFilters,
+  projectFilters,
   teamFilters,
   chineseSupervisorFilters,
   contractNumberFilters,
@@ -169,6 +171,7 @@ export function useFilteredMembers({
         }
       }
       if (!matchesTagFilter(member.tags, tagFilters)) return false
+      if (!matchesValueFilter(member.project?.name, projectFilters)) return false
       const supervisorLabel = normalizeText(
         formatSupervisorLabel({
           name: expatProfile?.chineseSupervisor?.name ?? null,
@@ -356,6 +359,13 @@ export function useFilteredMembers({
             result = compareNullable(
               left.tags?.join(' / '),
               right.tags?.join(' / '),
+              (a, b) => collator.compare(a, b),
+            )
+            break
+          case 'project':
+            result = compareNullable(
+              getTextValue(left.project?.name ?? null),
+              getTextValue(right.project?.name ?? null),
               (a, b) => collator.compare(a, b),
             )
             break
@@ -596,6 +606,7 @@ export function useFilteredMembers({
     statusFilters,
     roleFilters,
     tagFilters,
+    projectFilters,
     teamFilters,
     chineseSupervisorFilters,
     contractNumberFilters,

@@ -37,6 +37,7 @@ type MembersTabProps = {
   bulkDrafts: Record<number, MemberBulkPatch>
   bulkEditableColumns: ColumnKey[]
   teamOptions: string[]
+  projectOptions: Option[]
   chineseSupervisorOptions: { value: string; label: string }[]
   onStartBulkEdit: () => void
   onCancelBulkEdit: () => void
@@ -79,6 +80,7 @@ type MembersTabProps = {
   statusFilterOptions: Option[]
   roleFilterOptions: Option[]
   teamFilterOptions: Option[]
+  projectFilterOptions: Option[]
   chineseSupervisorFilterOptions: Option[]
   contractNumberFilterOptions: Option[]
   contractTypeFilterOptions: Option[]
@@ -114,6 +116,7 @@ type MembersTabProps = {
   nationalityFilters: string[]
   phoneFilters: string[]
   tagFilters: string[]
+  projectFilters: string[]
   joinDateFilters: string[]
   positionFilters: string[]
   statusFilters: string[]
@@ -159,6 +162,7 @@ type MembersTabProps = {
   setStatusFilters: (value: string[]) => void
   setRoleFilters: (value: string[]) => void
   setTeamFilters: (value: string[]) => void
+  setProjectFilters: (value: string[]) => void
   setChineseSupervisorFilters: (value: string[]) => void
   setContractNumberFilters: (value: string[]) => void
   setContractTypeFilters: (value: string[]) => void
@@ -247,10 +251,11 @@ export function MembersTab(props: MembersTabProps) {
     bulkEditMode,
     bulkSaving,
     bulkHasChanges,
-    bulkDrafts,
-    bulkEditableColumns,
-    teamOptions,
-    chineseSupervisorOptions,
+  bulkDrafts,
+  bulkEditableColumns,
+  teamOptions,
+  projectOptions,
+  chineseSupervisorOptions,
     onStartBulkEdit,
     onCancelBulkEdit,
     onSaveBulkEdit,
@@ -290,9 +295,10 @@ export function MembersTab(props: MembersTabProps) {
     joinDateFilterOptions,
     positionFilterOptions,
     statusFilterOptions,
-    roleFilterOptions,
-    teamFilterOptions,
-    chineseSupervisorFilterOptions,
+  roleFilterOptions,
+  teamFilterOptions,
+  projectFilterOptions,
+  chineseSupervisorFilterOptions,
     contractNumberFilterOptions,
     contractTypeFilterOptions,
     contractStartDateFilterOptions,
@@ -330,9 +336,10 @@ export function MembersTab(props: MembersTabProps) {
     joinDateFilters,
     positionFilters,
     statusFilters,
-    roleFilters,
-    teamFilters,
-    chineseSupervisorFilters,
+  roleFilters,
+  teamFilters,
+  projectFilters,
+  chineseSupervisorFilters,
     contractNumberFilters,
     contractTypeFilters,
     contractStartDateFilters,
@@ -370,9 +377,10 @@ export function MembersTab(props: MembersTabProps) {
     setJoinDateFilters,
     setPositionFilters,
     setStatusFilters,
-    setRoleFilters,
-    setTeamFilters,
-    setChineseSupervisorFilters,
+  setRoleFilters,
+  setTeamFilters,
+  setProjectFilters,
+  setChineseSupervisorFilters,
     setContractNumberFilters,
     setContractTypeFilters,
     setContractStartDateFilters,
@@ -823,9 +831,10 @@ export function MembersTab(props: MembersTabProps) {
             statusFilterOptions={statusFilterOptions}
             roleFilterOptions={roleFilterOptions}
             teamFilterOptions={teamFilterOptions}
-              chineseSupervisorFilterOptions={chineseSupervisorFilterOptions}
-              contractNumberFilterOptions={contractNumberFilterOptions}
-              contractTypeFilterOptions={contractTypeFilterOptions}
+            projectFilterOptions={projectFilterOptions}
+            chineseSupervisorFilterOptions={chineseSupervisorFilterOptions}
+            contractNumberFilterOptions={contractNumberFilterOptions}
+            contractTypeFilterOptions={contractTypeFilterOptions}
               contractStartDateFilterOptions={contractStartDateFilterOptions}
               contractEndDateFilterOptions={contractEndDateFilterOptions}
               salaryCategoryFilterOptions={salaryCategoryFilterOptions}
@@ -853,11 +862,12 @@ export function MembersTab(props: MembersTabProps) {
               createdAtFilterOptions={createdAtFilterOptions}
               updatedAtFilterOptions={updatedAtFilterOptions}
               nameFilters={nameFilters}
-              usernameFilters={usernameFilters}
+            usernameFilters={usernameFilters}
             genderFilters={genderFilters}
             nationalityFilters={nationalityFilters}
             phoneFilters={phoneFilters}
             tagFilters={tagFilters}
+            projectFilters={projectFilters}
             joinDateFilters={joinDateFilters}
             positionFilters={positionFilters}
             statusFilters={statusFilters}
@@ -893,16 +903,17 @@ export function MembersTab(props: MembersTabProps) {
               createdAtFilters={createdAtFilters}
               updatedAtFilters={updatedAtFilters}
               setNameFilters={setNameFilters}
-              setUsernameFilters={setUsernameFilters}
+            setUsernameFilters={setUsernameFilters}
             setGenderFilters={setGenderFilters}
             setNationalityFilters={setNationalityFilters}
             setPhoneFilters={setPhoneFilters}
             setTagFilters={setTagFilters}
+            setProjectFilters={setProjectFilters}
             setJoinDateFilters={setJoinDateFilters}
             setPositionFilters={setPositionFilters}
             setStatusFilters={setStatusFilters}
-              setRoleFilters={setRoleFilters}
-              setTeamFilters={setTeamFilters}
+            setRoleFilters={setRoleFilters}
+            setTeamFilters={setTeamFilters}
               setChineseSupervisorFilters={setChineseSupervisorFilters}
               setContractNumberFilters={setContractNumberFilters}
               setContractTypeFilters={setContractTypeFilters}
@@ -966,6 +977,7 @@ export function MembersTab(props: MembersTabProps) {
                   bulkDrafts={bulkDrafts}
                   bulkEditableColumns={bulkEditableColumns}
                   teamOptions={teamOptions}
+                  projectOptions={projectOptions}
                   chineseSupervisorOptions={chineseSupervisorOptions}
                   onBulkFieldChange={onBulkFieldChange}
                   onViewMember={onViewMember}

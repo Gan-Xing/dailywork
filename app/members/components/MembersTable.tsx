@@ -23,6 +23,7 @@ type MembersTableProps = {
   bulkDrafts: Record<number, MemberBulkPatch>
   bulkEditableColumns: ColumnKey[]
   teamOptions: string[]
+  projectOptions: { value: string; label: string }[]
   chineseSupervisorOptions: { value: string; label: string }[]
   onBulkFieldChange: (memberId: number, path: string, value: string | null | undefined) => void
   onViewMember: (member: Member) => void
@@ -54,6 +55,7 @@ export function MembersTable({
   bulkDrafts,
   bulkEditableColumns,
   teamOptions,
+  projectOptions,
   chineseSupervisorOptions,
   onBulkFieldChange,
   onViewMember,
@@ -323,6 +325,14 @@ export function MembersTable({
               onClick={() => handleSort('tags')}
             >
               {t.table.tags} {sortIndicator('tags')}
+            </th>
+          ) : null}
+          {isVisible('project') ? (
+            <th
+              className="px-3 py-3 whitespace-nowrap cursor-pointer select-none"
+              onClick={() => handleSort('project')}
+            >
+              {t.table.project} {sortIndicator('project')}
             </th>
           ) : null}
           {isVisible('team') ? (
@@ -788,6 +798,18 @@ export function MembersTable({
                       : (
                         t.labels.empty
                       )}
+                </td>
+              ) : null}
+              {isVisible('project') ? (
+                <td className="whitespace-nowrap px-4 py-3 text-slate-700 align-middle">
+                  {isEditable('project')
+                    ? renderBulkSelect({
+                        memberId: member.id,
+                        path: 'projectId',
+                        currentValue: member.project?.id ? String(member.project.id) : '',
+                        options: projectOptions,
+                      })
+                    : formatProfileText(member.project?.name ?? null)}
                 </td>
               ) : null}
               {isVisible('team') ? (

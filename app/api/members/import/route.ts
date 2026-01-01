@@ -13,8 +13,9 @@ import {
   parseBirthDateInput,
   parseChineseIdBirthDate,
 } from '@/lib/server/memberProfiles'
-import { normalizeTagsInput, normalizeTeamKey } from '@/lib/members/utils'
+import { normalizeTagsInput, normalizeTeamKey, normalizeText } from '@/lib/members/utils'
 import { buildTeamSupervisorMap } from '@/lib/server/teamSupervisors'
+import { applyProjectAssignment } from '@/lib/server/memberProjects'
 import { prisma } from '@/lib/prisma'
 
 const PHONE_PATTERN = /^[+\d][\d\s-]{4,}$/
@@ -44,6 +45,7 @@ type ImportMemberInput = {
   employmentStatus?: string | null
   roleIds?: number[]
   team?: string | null
+  project?: string | null
   chineseSupervisor?: string | null
   contractNumber?: string | null
   contractType?: string | null
@@ -93,6 +95,7 @@ type ImportErrorCode =
   | 'missing_termination_date'
   | 'missing_termination_reason'
   | 'invalid_termination_date'
+  | 'invalid_project'
   | 'invalid_chinese_supervisor'
   | 'missing_team_supervisor'
   | 'duplicate_contract_number'
@@ -158,6 +161,7 @@ export async function POST(request: Request) {
     employmentStatus: PrismaEmploymentStatus | null
     hasEmploymentStatusInput: boolean
     roleIds: number[]
+    project: string | null
     chineseProfile: ReturnType<typeof normalizeChineseProfile>
     hasChineseProfileData: boolean
     expatProfile: ReturnType<typeof normalizeExpatProfile>
@@ -195,6 +199,7 @@ export async function POST(request: Request) {
         : null
     const hasEmploymentStatusInput = Boolean(employmentStatus)
     const contractTypeInput = typeof member.contractType === 'string' ? member.contractType.trim() : ''
+    const project = typeof member.project === 'string' ? member.project.trim() : null
     const roleIds =
       canAssignRole && Array.isArray(member.roleIds)
         ? member.roleIds.map((value: unknown) => Number(value)).filter(Boolean)
@@ -378,6 +383,7 @@ export async function POST(request: Request) {
         tags: normalizeTagsInput(member.tags),
         hasTagsInput: member.tags !== undefined,
         roleIds: uniqueRoleIds,
+        project,
         chineseProfile,
         hasChineseProfileData: hasChineseProfileData(chineseProfile),
         expatProfile,
@@ -442,6 +448,19 @@ export async function POST(request: Request) {
     ...prepared.map((member) => member.expatProfile.team),
     ...existingUsers.map((user) => user.expatProfile?.team),
   ])
+  const projects = await prisma.project.findMany({
+    select: { id: true, name: true, code: true, isActive: true },
+  })
+  const projectLookup = new Map<
+    string,
+    { id: number; name: string; code: string | null; isActive: boolean }
+  >()
+  projects.forEach((project) => {
+    const nameKey = normalizeText(project.name).toLowerCase()
+    if (nameKey) projectLookup.set(nameKey, project)
+    const codeKey = normalizeText(project.code ?? null).toLowerCase()
+    if (codeKey) projectLookup.set(codeKey, project)
+  })
   const matchesByIdentity = new Map<
     string,
     Array<{
@@ -574,6 +593,14 @@ export async function POST(request: Request) {
     }
   })
 
+  prepared.forEach((member) => {
+    const projectKey = normalizeText(member.project).toLowerCase()
+    if (projectKey && !projectLookup.has(projectKey)) {
+      errors.push({ row: member.row, code: 'invalid_project', value: member.project ?? '' })
+      invalidRows.add(member.row)
+    }
+  })
+
   if (canAssignRole) {
     const roleIds = Array.from(new Set(prepared.flatMap((member) => member.roleIds)))
     if (roleIds.length > 0) {
@@ -643,12 +670,17 @@ export async function POST(request: Request) {
           member.expatProfile.contractEndDate !== null
         const resolvedTeam = member.expatProfile.team ?? match?.expatProfile?.team ?? null
         const teamKey = normalizeTeamKey(resolvedTeam)
+        const teamDefaults = teamKey ? teamSupervisorMap.get(teamKey) ?? null : null
         const resolvedSupervisorId = teamKey
-          ? teamSupervisorMap.get(teamKey)?.supervisorId ?? null
+          ? teamDefaults?.supervisorId ?? null
           : match?.expatProfile?.chineseSupervisorId ?? null
         if (teamKey && !resolvedSupervisorId) {
           throw new Error('班组未绑定中方负责人')
         }
+        const projectKey = normalizeText(member.project).toLowerCase()
+        const explicitProjectId = projectKey ? projectLookup.get(projectKey)?.id ?? null : null
+        const resolvedProjectId = explicitProjectId ?? teamDefaults?.projectId ?? null
+        const hasExplicitProject = Boolean(projectKey)
         const chineseProfileUpdate = {
           ...(member.chineseProfile.frenchName
             ? { frenchName: member.chineseProfile.frenchName }
@@ -802,9 +834,13 @@ export async function POST(request: Request) {
             existingExpat?.baseSalaryUnit !== nextExpat.baseSalaryUnit ||
             !isDecimalEqual(existingExpat?.netMonthlyAmount ?? null, nextExpat.netMonthlyAmount ?? null) ||
             existingExpat?.netMonthlyUnit !== nextExpat.netMonthlyUnit)
+        const teamChanged =
+          normalizeTeamKey(resolvedTeam) !== normalizeTeamKey(existingExpat?.team ?? null)
+        const shouldUpdateProjectAssignment = !match || hasExplicitProject || teamChanged
         if (!match) {
           const resolvedEmploymentStatus = member.employmentStatus ?? 'ACTIVE'
-          await tx.user.create({
+          const createdJoinDate = member.joinDate ?? new Date()
+          const createdUser = await tx.user.create({
             data: {
               username: member.username!,
               passwordHash: passwordHash!,
@@ -812,7 +848,7 @@ export async function POST(request: Request) {
               gender: member.gender ?? null,
               nationality: member.nationality ?? null,
               phones: member.phones,
-              joinDate: member.joinDate ?? new Date(),
+              joinDate: createdJoinDate,
               birthDate: member.birthDate,
               tags: member.tags ?? [],
               terminationDate:
@@ -847,6 +883,13 @@ export async function POST(request: Request) {
                   : undefined,
             },
           })
+          if (shouldUpdateProjectAssignment && resolvedProjectId) {
+            await applyProjectAssignment(tx, {
+              userId: createdUser.id,
+              projectId: resolvedProjectId,
+              startDate: createdJoinDate,
+            })
+          }
           continue
         }
 
@@ -903,6 +946,14 @@ export async function POST(request: Request) {
               : undefined,
           },
         })
+        if (shouldUpdateProjectAssignment) {
+          await applyProjectAssignment(tx, {
+            userId: match.id,
+            projectId: resolvedProjectId,
+            startDate: new Date(),
+            fallbackStartDate: resolvedJoinDate ?? match.joinDate ?? null,
+          })
+        }
         if (shouldRecordHistory && shouldTrackExpatChanges && (contractChanged || payrollChanged)) {
           const supervisorSnapshot = await resolveSupervisorSnapshot(nextExpat.chineseSupervisorId)
           if (contractChanged) {

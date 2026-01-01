@@ -8,6 +8,12 @@ export type TeamSupervisorItem = {
   teamKey: string
   supervisorId: number
   supervisorLabel: string
+  project: {
+    id: number
+    name: string
+    code: string | null
+    isActive: boolean
+  } | null
 }
 
 type UseTeamSupervisorsOptions = {

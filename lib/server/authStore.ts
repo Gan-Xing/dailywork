@@ -198,6 +198,21 @@ export const listUsers = async () => {
           updatedAt: true,
         },
       },
+      projectAssignments: {
+        where: { endDate: null },
+        orderBy: [{ startDate: 'desc' }, { id: 'desc' }],
+        take: 1,
+        select: {
+          project: {
+            select: {
+              id: true,
+              name: true,
+              code: true,
+              isActive: true,
+            },
+          },
+        },
+      },
       roles: {
         include: {
           role: true,
@@ -209,80 +224,91 @@ export const listUsers = async () => {
 
   const contractNumberMap = await buildContractNumberMap(users.map((user) => user.id))
 
-  return users.map((user) => ({
-    id: user.id,
-    username: user.username,
-    name: user.name,
-    gender: user.gender,
-    nationality: user.nationality,
-    phones: user.phones,
-    tags: user.tags ?? [],
-    joinDate: user.joinDate ? user.joinDate.toISOString() : null,
-    birthDate: user.birthDate ? user.birthDate.toISOString() : null,
-    terminationDate: user.terminationDate ? user.terminationDate.toISOString() : null,
-    terminationReason: user.terminationReason,
-    position: user.position,
-    employmentStatus: user.employmentStatus,
-    createdAt: user.createdAt.toISOString(),
-    updatedAt: user.updatedAt.toISOString(),
-    roles: user.roles.map((item) => ({
-      id: item.role.id,
-      name: item.role.name,
-    })),
-    chineseProfile: user.chineseProfile
-      ? {
-          ...user.chineseProfile,
-          createdAt: user.chineseProfile.createdAt.toISOString(),
-          updatedAt: user.chineseProfile.updatedAt.toISOString(),
-        }
-      : null,
-    expatProfile: user.expatProfile
-      ? {
-          chineseSupervisorId: user.expatProfile.chineseSupervisorId ?? null,
-          chineseSupervisor: user.expatProfile.chineseSupervisor
-            ? {
-                id: user.expatProfile.chineseSupervisor.id,
-                name: user.expatProfile.chineseSupervisor.name,
-                username: user.expatProfile.chineseSupervisor.username,
-                chineseProfile: user.expatProfile.chineseSupervisor.chineseProfile
-                  ? {
-                      frenchName: user.expatProfile.chineseSupervisor.chineseProfile.frenchName,
-                    }
-                  : null,
-              }
-            : null,
-          team: user.expatProfile.team,
-          contractNumber: user.expatProfile.contractNumber,
-          contractNumbers: resolveContractNumbers(
-            user.id,
-            user.expatProfile.contractNumber,
-            contractNumberMap,
-          ),
-          contractType: user.expatProfile.contractType,
-          contractStartDate: user.expatProfile.contractStartDate
-            ? user.expatProfile.contractStartDate.toISOString()
-            : null,
-          contractEndDate: user.expatProfile.contractEndDate
-            ? user.expatProfile.contractEndDate.toISOString()
-            : null,
-          salaryCategory: user.expatProfile.salaryCategory,
-          prime: user.expatProfile.prime?.toString() ?? null,
-          baseSalaryAmount: user.expatProfile.baseSalaryAmount?.toString() ?? null,
-          baseSalaryUnit: user.expatProfile.baseSalaryUnit,
-          netMonthlyAmount: user.expatProfile.netMonthlyAmount?.toString() ?? null,
-          netMonthlyUnit: user.expatProfile.netMonthlyUnit,
-          maritalStatus: user.expatProfile.maritalStatus,
-          childrenCount: user.expatProfile.childrenCount,
-          cnpsNumber: user.expatProfile.cnpsNumber,
-          cnpsDeclarationCode: user.expatProfile.cnpsDeclarationCode,
-          provenance: user.expatProfile.provenance,
-          emergencyContactName: user.expatProfile.emergencyContactName,
-          emergencyContactPhone: user.expatProfile.emergencyContactPhone,
-          createdAt: user.expatProfile.createdAt.toISOString(),
-          updatedAt: user.expatProfile.updatedAt.toISOString(),
-        }
-      : null,
-  }))
+  return users.map((user) => {
+    const project = user.projectAssignments[0]?.project ?? null
+    return {
+      id: user.id,
+      username: user.username,
+      name: user.name,
+      gender: user.gender,
+      nationality: user.nationality,
+      phones: user.phones,
+      tags: user.tags ?? [],
+      joinDate: user.joinDate ? user.joinDate.toISOString() : null,
+      birthDate: user.birthDate ? user.birthDate.toISOString() : null,
+      terminationDate: user.terminationDate ? user.terminationDate.toISOString() : null,
+      terminationReason: user.terminationReason,
+      position: user.position,
+      employmentStatus: user.employmentStatus,
+      createdAt: user.createdAt.toISOString(),
+      updatedAt: user.updatedAt.toISOString(),
+      project: project
+        ? {
+            id: project.id,
+            name: project.name,
+            code: project.code,
+            isActive: project.isActive,
+          }
+        : null,
+      roles: user.roles.map((item) => ({
+        id: item.role.id,
+        name: item.role.name,
+      })),
+      chineseProfile: user.chineseProfile
+        ? {
+            ...user.chineseProfile,
+            createdAt: user.chineseProfile.createdAt.toISOString(),
+            updatedAt: user.chineseProfile.updatedAt.toISOString(),
+          }
+        : null,
+      expatProfile: user.expatProfile
+        ? {
+            chineseSupervisorId: user.expatProfile.chineseSupervisorId ?? null,
+            chineseSupervisor: user.expatProfile.chineseSupervisor
+              ? {
+                  id: user.expatProfile.chineseSupervisor.id,
+                  name: user.expatProfile.chineseSupervisor.name,
+                  username: user.expatProfile.chineseSupervisor.username,
+                  chineseProfile: user.expatProfile.chineseSupervisor.chineseProfile
+                    ? {
+                        frenchName: user.expatProfile.chineseSupervisor.chineseProfile.frenchName,
+                      }
+                    : null,
+                }
+              : null,
+            team: user.expatProfile.team,
+            contractNumber: user.expatProfile.contractNumber,
+            contractNumbers: resolveContractNumbers(
+              user.id,
+              user.expatProfile.contractNumber,
+              contractNumberMap,
+            ),
+            contractType: user.expatProfile.contractType,
+            contractStartDate: user.expatProfile.contractStartDate
+              ? user.expatProfile.contractStartDate.toISOString()
+              : null,
+            contractEndDate: user.expatProfile.contractEndDate
+              ? user.expatProfile.contractEndDate.toISOString()
+              : null,
+            salaryCategory: user.expatProfile.salaryCategory,
+            prime: user.expatProfile.prime?.toString() ?? null,
+            baseSalaryAmount: user.expatProfile.baseSalaryAmount?.toString() ?? null,
+            baseSalaryUnit: user.expatProfile.baseSalaryUnit,
+            netMonthlyAmount: user.expatProfile.netMonthlyAmount?.toString() ?? null,
+            netMonthlyUnit: user.expatProfile.netMonthlyUnit,
+            maritalStatus: user.expatProfile.maritalStatus,
+            childrenCount: user.expatProfile.childrenCount,
+            cnpsNumber: user.expatProfile.cnpsNumber,
+            cnpsDeclarationCode: user.expatProfile.cnpsDeclarationCode,
+            provenance: user.expatProfile.provenance,
+            emergencyContactName: user.expatProfile.emergencyContactName,
+            emergencyContactPhone: user.expatProfile.emergencyContactPhone,
+            createdAt: user.expatProfile.createdAt.toISOString(),
+            updatedAt: user.expatProfile.updatedAt.toISOString(),
+          }
+        : null,
+    }
+  })
 }
 
 export const getUserById = async (userId: number) => {
@@ -366,12 +392,28 @@ export const getUserById = async (userId: number) => {
           role: true,
         },
       },
+      projectAssignments: {
+        where: { endDate: null },
+        orderBy: [{ startDate: 'desc' }, { id: 'desc' }],
+        take: 1,
+        select: {
+          project: {
+            select: {
+              id: true,
+              name: true,
+              code: true,
+              isActive: true,
+            },
+          },
+        },
+      },
     },
   })
 
   if (!user) return null
 
   const contractNumberMap = await buildContractNumberMap([user.id])
+  const project = user.projectAssignments[0]?.project ?? null
 
   return {
     id: user.id,
@@ -389,6 +431,14 @@ export const getUserById = async (userId: number) => {
     employmentStatus: user.employmentStatus,
     createdAt: user.createdAt.toISOString(),
     updatedAt: user.updatedAt.toISOString(),
+    project: project
+      ? {
+          id: project.id,
+          name: project.name,
+          code: project.code,
+          isActive: project.isActive,
+        }
+      : null,
     roles: user.roles.map((item) => ({
       id: item.role.id,
       name: item.role.name,

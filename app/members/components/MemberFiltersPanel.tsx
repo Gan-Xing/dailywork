@@ -29,6 +29,7 @@ type MemberFiltersPanelProps = {
   statusFilterOptions: Option[]
   roleFilterOptions: Option[]
   teamFilterOptions: Option[]
+  projectFilterOptions: Option[]
   chineseSupervisorFilterOptions: Option[]
   contractNumberFilterOptions: Option[]
   contractTypeFilterOptions: Option[]
@@ -69,6 +70,7 @@ type MemberFiltersPanelProps = {
   statusFilters: string[]
   roleFilters: string[]
   teamFilters: string[]
+  projectFilters: string[]
   chineseSupervisorFilters: string[]
   contractNumberFilters: string[]
   contractTypeFilters: string[]
@@ -109,6 +111,7 @@ type MemberFiltersPanelProps = {
   setStatusFilters: (value: string[]) => void
   setRoleFilters: (value: string[]) => void
   setTeamFilters: (value: string[]) => void
+  setProjectFilters: (value: string[]) => void
   setChineseSupervisorFilters: (value: string[]) => void
   setContractNumberFilters: (value: string[]) => void
   setContractTypeFilters: (value: string[]) => void
@@ -176,6 +179,7 @@ export function MemberFiltersPanel({
   statusFilterOptions,
   roleFilterOptions,
   teamFilterOptions,
+  projectFilterOptions,
   chineseSupervisorFilterOptions,
   contractNumberFilterOptions,
   contractTypeFilterOptions,
@@ -216,6 +220,7 @@ export function MemberFiltersPanel({
   statusFilters,
   roleFilters,
   teamFilters,
+  projectFilters,
   chineseSupervisorFilters,
   contractNumberFilters,
   contractTypeFilters,
@@ -256,6 +261,7 @@ export function MemberFiltersPanel({
   setStatusFilters,
   setRoleFilters,
   setTeamFilters,
+  setProjectFilters,
   setChineseSupervisorFilters,
   setContractNumberFilters,
   setContractTypeFilters,
@@ -446,6 +452,13 @@ export function MemberFiltersPanel({
       <section className={sectionBaseClasses}>
         <SectionTitle label={t.fieldGroups.localProfile} theme="purple" />
         <div className={sectionGridClasses}>
+          <MultiSelectFilter
+            label={t.table.project}
+            options={projectFilterOptions}
+            selected={projectFilters}
+            onChange={setProjectFilters}
+            {...sharedFilterProps}
+          />
           <MultiSelectFilter
             label={t.table.team}
             options={teamFilterOptions}

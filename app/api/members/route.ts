@@ -5,7 +5,8 @@ import { hasPermission } from '@/lib/server/authSession'
 import { listUsers } from '@/lib/server/authStore'
 import { resolveSupervisorSnapshot } from '@/lib/server/compensation'
 import { normalizeTagsInput } from '@/lib/members/utils'
-import { resolveTeamSupervisorId } from '@/lib/server/teamSupervisors'
+import { resolveTeamDefaults } from '@/lib/server/teamSupervisors'
+import { applyProjectAssignment } from '@/lib/server/memberProjects'
 import {
   hasExpatProfileData,
   hasChineseProfileData,
@@ -53,6 +54,7 @@ export async function POST(request: Request) {
     employmentStatus,
     roleIds,
     tags,
+    projectId,
     chineseProfile,
     expatProfile,
   } = body ?? {}
@@ -79,13 +81,32 @@ export async function POST(request: Request) {
   const chineseProfileData = normalizeChineseProfile(chineseProfile)
   const shouldCreateChineseProfile = isChinese && hasChineseProfileData(chineseProfileData)
   const expatProfileData = normalizeExpatProfile(expatProfile)
+  const parsedProjectId =
+    projectId === null || projectId === '' || projectId === undefined ? null : Number(projectId)
+  if (parsedProjectId !== null && !Number.isFinite(parsedProjectId)) {
+    return NextResponse.json({ error: '项目无效' }, { status: 400 })
+  }
+
+  const teamDefaults = expatProfileData.team
+    ? await resolveTeamDefaults(expatProfileData.team)
+    : { supervisorId: null, projectId: null }
   const resolvedSupervisorId = expatProfileData.team
-    ? await resolveTeamSupervisorId(expatProfileData.team)
+    ? teamDefaults.supervisorId
     : expatProfileData.chineseSupervisorId ?? null
   if (expatProfileData.team && !resolvedSupervisorId) {
     return NextResponse.json({ error: '班组未绑定中方负责人' }, { status: 400 })
   }
   expatProfileData.chineseSupervisorId = resolvedSupervisorId
+  const resolvedProjectId = parsedProjectId ?? teamDefaults.projectId ?? null
+  const project = resolvedProjectId
+    ? await prisma.project.findUnique({
+        where: { id: resolvedProjectId },
+        select: { id: true, name: true, code: true, isActive: true },
+      })
+    : null
+  if (resolvedProjectId && !project) {
+    return NextResponse.json({ error: '项目不存在' }, { status: 400 })
+  }
   const shouldCreateExpatProfile = !isChinese || hasExpatProfileData(expatProfileData)
   const shouldCreateContractChange =
     !isChinese && (expatProfileData.contractNumber || expatProfileData.contractType)
@@ -263,6 +284,14 @@ export async function POST(request: Request) {
         })
       }
 
+      if (resolvedProjectId) {
+        await applyProjectAssignment(tx, {
+          userId: createdUser.id,
+          projectId: resolvedProjectId,
+          startDate: resolvedJoinDate,
+        })
+      }
+
       return createdUser
     })
 
@@ -283,6 +312,14 @@ export async function POST(request: Request) {
         createdAt: user.createdAt.toISOString(),
         updatedAt: user.updatedAt.toISOString(),
         tags: user.tags ?? [],
+        project: project
+          ? {
+              id: project.id,
+              name: project.name,
+              code: project.code,
+              isActive: project.isActive,
+            }
+          : null,
         roles: canAssignRole
           ? user.roles.map((item) => ({ id: item.role.id, name: item.role.name }))
           : [],

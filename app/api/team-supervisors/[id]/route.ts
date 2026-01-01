@@ -28,6 +28,11 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 
   const body = await request.json().catch(() => null)
   const nextTeam = typeof body?.team === 'string' ? body.team.trim() : existing.team
+  const projectIdInput = body?.projectId
+  const parsedProjectId =
+    projectIdInput === null || projectIdInput === '' || projectIdInput === undefined
+      ? null
+      : Number(projectIdInput)
   const teamKey = normalizeTeamKey(nextTeam)
   if (!teamKey) {
     return NextResponse.json({ error: '班组必填' }, { status: 400 })
@@ -56,6 +61,20 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     return NextResponse.json({ error: '班组已存在' }, { status: 409 })
   }
 
+  if (parsedProjectId !== null && !Number.isFinite(parsedProjectId)) {
+    return NextResponse.json({ error: '项目无效' }, { status: 400 })
+  }
+
+  const project = parsedProjectId
+    ? await prisma.project.findUnique({
+        where: { id: parsedProjectId },
+        select: { id: true, name: true, code: true, isActive: true },
+      })
+    : null
+  if (parsedProjectId && !project) {
+    return NextResponse.json({ error: '项目不存在' }, { status: 400 })
+  }
+
   const supervisorLabel =
     formatSupervisorLabel({
       name: supervisor.name,
@@ -71,6 +90,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         teamKey,
         supervisorId: supervisor.id,
         supervisorName: supervisorLabel,
+        projectId: parsedProjectId,
       },
     })
     return NextResponse.json({
@@ -80,6 +100,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         teamKey: updated.teamKey,
         supervisorId: updated.supervisorId,
         supervisorLabel,
+        project,
       },
     })
   } catch (error) {

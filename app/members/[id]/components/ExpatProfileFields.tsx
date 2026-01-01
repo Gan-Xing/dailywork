@@ -29,15 +29,27 @@ export function ExpatProfileFields({
     const binding = teamSupervisorMap.get(teamKey)
     if (!binding) return
     const nextSupervisorId = String(binding.supervisorId)
-    if (formState.expatProfile.chineseSupervisorId === nextSupervisorId) return
+    const nextProjectId = binding.project?.id ? String(binding.project.id) : ''
+    const shouldUpdateSupervisor = formState.expatProfile.chineseSupervisorId !== nextSupervisorId
+    const shouldUpdateProject = !formState.projectId && nextProjectId
+    if (!shouldUpdateSupervisor && !shouldUpdateProject) return
     setFormState((prev) => ({
       ...prev,
+      projectId: shouldUpdateProject ? nextProjectId : prev.projectId,
       expatProfile: {
         ...prev.expatProfile,
-        chineseSupervisorId: nextSupervisorId,
+        chineseSupervisorId: shouldUpdateSupervisor
+          ? nextSupervisorId
+          : prev.expatProfile.chineseSupervisorId,
       },
     }))
-  }, [formState.expatProfile.team, formState.expatProfile.chineseSupervisorId, setFormState, teamSupervisorMap])
+  }, [
+    formState.expatProfile.team,
+    formState.expatProfile.chineseSupervisorId,
+    formState.projectId,
+    setFormState,
+    teamSupervisorMap,
+  ])
 
   const teamSupervisorBinding = teamSupervisorMap.get(
     normalizeTeamKey(formState.expatProfile.team),
@@ -64,6 +76,7 @@ export function ExpatProfileFields({
                 team: nextTeam,
                 chineseSupervisorId: binding ? String(binding.supervisorId) : '',
               },
+              projectId: binding?.project?.id ? String(binding.project.id) : '',
             }))
           }}
           className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"

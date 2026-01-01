@@ -1,16 +1,17 @@
 import { Prisma, type ContractType, type EmploymentStatus, type SalaryUnit } from '@prisma/client'
 import { NextResponse, type NextRequest } from 'next/server'
 
-import { normalizeTagsInput } from '@/lib/members/utils'
+import { normalizeTagsInput, normalizeTeamKey } from '@/lib/members/utils'
 import { hasPermission } from '@/lib/server/authSession'
 import { isDecimalEqual, resolveSupervisorSnapshot } from '@/lib/server/compensation'
 import { createInitialContractChangeIfMissing } from '@/lib/server/contractChanges'
-import { resolveTeamSupervisorId } from '@/lib/server/teamSupervisors'
+import { resolveTeamDefaults } from '@/lib/server/teamSupervisors'
 import {
   normalizeChineseProfile,
   normalizeExpatProfile,
   parseChineseIdBirthDate,
 } from '@/lib/server/memberProfiles'
+import { applyProjectAssignment } from '@/lib/server/memberProjects'
 import { prisma } from '@/lib/prisma'
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -66,6 +67,21 @@ export async function POST(request: NextRequest) {
   }
 
   const results: Array<{ id: number; ok: boolean; error?: string }> = []
+  const projectCache = new Map<
+    number,
+    { id: number; name: string; code: string | null; isActive: boolean } | null
+  >()
+  const getProjectById = async (id: number) => {
+    if (projectCache.has(id)) {
+      return projectCache.get(id) ?? null
+    }
+    const project = await prisma.project.findUnique({
+      where: { id },
+      select: { id: true, name: true, code: true, isActive: true },
+    })
+    projectCache.set(id, project)
+    return project
+  }
 
   for (const item of items) {
     const userId = Number(item?.id)
@@ -92,6 +108,18 @@ export async function POST(request: NextRequest) {
 
     const expatPatch = isRecord(patch.expatProfile) ? patch.expatProfile : null
     const chinesePatch = isRecord(patch.chineseProfile) ? patch.chineseProfile : null
+    const hasProjectField = hasField(patch, 'projectId')
+    const projectIdInput = hasProjectField ? patch.projectId : undefined
+    const parsedProjectId = hasProjectField
+      ? projectIdInput === null || projectIdInput === '' || projectIdInput === undefined
+        ? null
+        : Number(projectIdInput)
+      : undefined
+
+    if (hasProjectField && parsedProjectId !== null && !Number.isFinite(parsedProjectId)) {
+      results.push({ id: userId, ok: false, error: 'Invalid project ID' })
+      continue
+    }
 
     if (expatPatch && hasField(expatPatch, 'contractNumber')) {
       results.push({ id: userId, ok: false, error: 'Contract number is not bulk-editable' })
@@ -294,6 +322,7 @@ export async function POST(request: NextRequest) {
 
       const expatUpdates: Prisma.UserExpatProfileUncheckedUpdateWithoutUserInput = {}
       let expatCreateData: Prisma.UserExpatProfileUncheckedCreateWithoutUserInput | null = null
+      let teamDefaultProjectId: number | null = null
 
       if (expatPatch) {
         const normalizedExpat = normalizeExpatProfile(expatPatch)
@@ -345,13 +374,14 @@ export async function POST(request: NextRequest) {
           nextExpat.netMonthlyUnit = normalizedExpat.netMonthlyUnit
         }
         if (nextExpat.team) {
-          const mappedSupervisorId = await resolveTeamSupervisorId(nextExpat.team)
-          if (!mappedSupervisorId) {
+          const defaults = await resolveTeamDefaults(nextExpat.team)
+          if (!defaults.supervisorId) {
             results.push({ id: userId, ok: false, error: '班组未绑定中方负责人' })
             continue
           }
-          expatUpdates.chineseSupervisorId = mappedSupervisorId
-          nextExpat.chineseSupervisorId = mappedSupervisorId
+          expatUpdates.chineseSupervisorId = defaults.supervisorId
+          nextExpat.chineseSupervisorId = defaults.supervisorId
+          teamDefaultProjectId = defaults.projectId ?? null
         }
 
         const addOneYear = (date: Date) => {
@@ -493,6 +523,22 @@ export async function POST(request: NextRequest) {
           },
         }
       }
+      const teamChanged =
+        normalizeTeamKey(nextExpat.team) !== normalizeTeamKey(existingExpat?.team ?? null)
+      let resolvedProjectId: number | null | undefined = undefined
+      if (parsedProjectId !== undefined) {
+        resolvedProjectId = parsedProjectId
+      } else if (teamChanged) {
+        resolvedProjectId = teamDefaultProjectId ?? null
+      }
+
+      if (resolvedProjectId !== undefined && resolvedProjectId !== null) {
+        const project = await getProjectById(resolvedProjectId)
+        if (!project) {
+          results.push({ id: userId, ok: false, error: '项目不存在' })
+          continue
+        }
+      }
       const isSameDate = (left?: Date | null, right?: Date | null) => {
         if (!left && !right) return true
         if (!left || !right) return false
@@ -579,6 +625,15 @@ export async function POST(request: NextRequest) {
               netMonthlyAmount: nextExpat.netMonthlyAmount,
               netMonthlyUnit: nextExpat.netMonthlyUnit,
             },
+          })
+        }
+
+        if (resolvedProjectId !== undefined) {
+          await applyProjectAssignment(tx, {
+            userId,
+            projectId: resolvedProjectId,
+            startDate: new Date(),
+            fallbackStartDate: resolvedJoinDate,
           })
         }
       })

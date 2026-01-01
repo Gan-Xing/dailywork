@@ -14,6 +14,7 @@ type TeamSupervisorDialogProps = {
   error: string | null
   teamSupervisors: TeamSupervisorItem[]
   supervisorOptions: { value: string; label: string }[]
+  projectOptions: { value: string; label: string }[]
   onClose: () => void
   onRefresh: () => Promise<void> | void
 }
@@ -28,12 +29,14 @@ export function TeamSupervisorDialog({
   error,
   teamSupervisors,
   supervisorOptions,
+  projectOptions,
   onClose,
   onRefresh,
 }: TeamSupervisorDialogProps) {
   const [editingId, setEditingId] = useState<EditingId>(null)
   const [draftTeam, setDraftTeam] = useState('')
   const [draftSupervisorId, setDraftSupervisorId] = useState('')
+  const [draftProjectId, setDraftProjectId] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
 
@@ -42,6 +45,7 @@ export function TeamSupervisorDialog({
       setEditingId(null)
       setDraftTeam('')
       setDraftSupervisorId('')
+      setDraftProjectId('')
       setActionError(null)
     }
   }, [open])
@@ -53,6 +57,7 @@ export function TeamSupervisorDialog({
     setEditingId('new')
     setDraftTeam('')
     setDraftSupervisorId('')
+    setDraftProjectId('')
     setActionError(null)
   }
 
@@ -61,6 +66,7 @@ export function TeamSupervisorDialog({
     setEditingId(item.id)
     setDraftTeam(item.team)
     setDraftSupervisorId(String(item.supervisorId))
+    setDraftProjectId(item.project ? String(item.project.id) : '')
     setActionError(null)
   }
 
@@ -68,6 +74,7 @@ export function TeamSupervisorDialog({
     setEditingId(null)
     setDraftTeam('')
     setDraftSupervisorId('')
+    setDraftProjectId('')
     setActionError(null)
   }
 
@@ -93,6 +100,7 @@ export function TeamSupervisorDialog({
         body: JSON.stringify({
           team: draftTeam.trim(),
           supervisorId: Number(draftSupervisorId),
+          projectId: draftProjectId ? Number(draftProjectId) : null,
         }),
       })
       if (!res.ok) {
@@ -158,8 +166,9 @@ export function TeamSupervisorDialog({
 
         <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-6 py-4">
           <div className="grid grid-cols-12 gap-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">
-            <span className="col-span-4">{t.teamSupervisor.team}</span>
-            <span className="col-span-4">{t.teamSupervisor.supervisor}</span>
+            <span className="col-span-3">{t.teamSupervisor.team}</span>
+            <span className="col-span-3">{t.teamSupervisor.supervisor}</span>
+            <span className="col-span-2">{t.teamSupervisor.project}</span>
             <span className="col-span-2 text-center">{t.teamSupervisor.edit}</span>
             <span className="col-span-2 text-center">{t.teamSupervisor.delete}</span>
           </div>
@@ -170,15 +179,27 @@ export function TeamSupervisorDialog({
                 value={draftTeam}
                 onChange={(event) => setDraftTeam(event.target.value)}
                 placeholder={t.teamSupervisor.teamPlaceholder}
-                className="col-span-4 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+                className="col-span-3 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
               />
               <select
                 value={draftSupervisorId}
                 onChange={(event) => setDraftSupervisorId(event.target.value)}
-                className="col-span-4 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+                className="col-span-3 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
               >
                 <option value="">{t.labels.empty}</option>
                 {supervisorOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={draftProjectId}
+                onChange={(event) => setDraftProjectId(event.target.value)}
+                className="col-span-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+              >
+                <option value="">{t.labels.empty}</option>
+                {projectOptions.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
                   </option>
@@ -226,15 +247,27 @@ export function TeamSupervisorDialog({
                 <input
                   value={draftTeam}
                   onChange={(event) => setDraftTeam(event.target.value)}
-                  className="col-span-4 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+                  className="col-span-3 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
                 />
                 <select
                   value={draftSupervisorId}
                   onChange={(event) => setDraftSupervisorId(event.target.value)}
-                  className="col-span-4 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+                  className="col-span-3 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
                 >
                   <option value="">{t.labels.empty}</option>
                   {supervisorOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={draftProjectId}
+                  onChange={(event) => setDraftProjectId(event.target.value)}
+                  className="col-span-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+                >
+                  <option value="">{t.labels.empty}</option>
+                  {projectOptions.map((option) => (
                     <option key={option.value} value={option.value}>
                       {option.label}
                     </option>
@@ -264,8 +297,9 @@ export function TeamSupervisorDialog({
                 key={item.id}
                 className="grid grid-cols-12 gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-700"
               >
-                <span className="col-span-4 truncate">{item.team}</span>
-                <span className="col-span-4 truncate">{item.supervisorLabel}</span>
+                <span className="col-span-3 truncate">{item.team}</span>
+                <span className="col-span-3 truncate">{item.supervisorLabel}</span>
+                <span className="col-span-2 truncate">{item.project?.name ?? t.labels.empty}</span>
                 <button
                   type="button"
                   disabled={!canManage}

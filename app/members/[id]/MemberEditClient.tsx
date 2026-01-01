@@ -20,6 +20,7 @@ import { RoleSelector } from './components/RoleSelector'
 import { useMemberEditData } from './hooks/useMemberEditData'
 import { useMemberEditForm } from './hooks/useMemberEditForm'
 import { useTeamSupervisors } from '../hooks/useTeamSupervisors'
+import { useProjects } from '../hooks/useProjects'
 import { CompensationSection } from './modules/compensation/CompensationSection'
 import type { Member } from './types'
 
@@ -55,6 +56,7 @@ export function MemberEditClient({ member, canAssignRole }: Props) {
     currentTeam: formState.expatProfile.team,
   })
   const { teamSupervisorMap } = useTeamSupervisors()
+  const { projectOptions } = useProjects()
 
   const nationalityByRegion = useMemo(() => {
     const grouped = new Map<NationalityRegion, NationalityOption[]>()
@@ -107,6 +109,7 @@ export function MemberEditClient({ member, canAssignRole }: Props) {
               statusLabels={statusLabels}
               formState={formState}
               setFormState={setFormState}
+              projectOptions={projectOptions}
             />
 
             <ProfileSection
