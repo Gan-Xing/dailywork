@@ -28,8 +28,51 @@ export const memberCopy: Record<
       members: string
       memberEdit: string
     }
-    tabs: Record<'members' | 'roles' | 'permissions' | 'payroll', string>
-    tabDescriptions: Record<'members' | 'roles' | 'permissions' | 'payroll', string>
+    tabs: Record<'overview' | 'members' | 'roles' | 'permissions' | 'payroll', string>
+    tabDescriptions: Record<'overview' | 'members' | 'roles' | 'permissions' | 'payroll', string>
+    overview: {
+      title: string
+      subtitle: string
+      filters: {
+        tagLabel: string
+        tagHint: string
+      }
+      summary: {
+        total: string
+        china: string
+        nonChina: string
+        local: string
+      }
+      charts: {
+        nationality: string
+        team: string
+        supervisor: string
+        provenance: string
+        salary: string
+        contractCost: string
+        tenure: string
+        contractExpiry: string
+      }
+      labels: {
+        total: string
+        people: string
+        noData: string
+        other: string
+        unassignedTeam: string
+        unassignedSupervisor: string
+        missingProvenance: string
+        missingContractType: string
+        missingContractDate: string
+        overdue: string
+        beyond: string
+        localScope: string
+        china: string
+        nonChina: string
+      }
+      helpers: {
+        salaryRule: string
+      }
+    }
     stats: Record<'headcount' | 'active' | 'roles' | 'coverage', string>
     helpers: {
       permissionCoverage: string
@@ -525,16 +568,61 @@ export const memberCopy: Record<
       memberEdit: '编辑成员',
     },
     tabs: {
+      overview: '数据概览',
       members: '成员列表',
       roles: '角色管理',
       permissions: '权限管理',
       payroll: '工资发放',
     },
     tabDescriptions: {
+      overview: '全量成员数据概览与结构对比。',
       members: '筛选成员、导入导出与审计记录视图。',
       roles: '梳理角色职责并查看成员覆盖与权限绑定。',
       permissions: '审视权限编码、描述与角色覆盖范围。',
       payroll: '按月两次批量录入并生成发放报表。',
+    },
+    overview: {
+      title: '数据概览',
+      subtitle: '基于全量成员数据进行分析（不区分在职/离职）。',
+      filters: {
+        tagLabel: '项目标签筛选',
+        tagHint: '可选：按成员标签过滤后查看对比。',
+      },
+      summary: {
+        total: '成员总数',
+        china: '中国籍',
+        nonChina: '非中国籍',
+        local: '本地员工',
+      },
+      charts: {
+        nationality: '中外人员占比',
+        team: '班组人数',
+        supervisor: '中方负责人',
+        provenance: '籍贯/属地分布',
+        salary: '薪资区间占比',
+        contractCost: '合同类型成本对比',
+        tenure: '员工司龄分布',
+        contractExpiry: '合同到期分布（未来 3 个月）',
+      },
+      labels: {
+        total: '总数',
+        people: '人',
+        noData: '暂无数据',
+        other: '其他',
+        unassignedTeam: '未分配班组',
+        unassignedSupervisor: '未绑定负责人',
+        missingProvenance: '未填写籍贯',
+        missingContractType: '未填写合同类型',
+        missingContractDate: '未填写到期日',
+        overdue: '已到期',
+        beyond: '超过 3 个月',
+        localScope: '仅非中国籍',
+        china: '中国籍',
+        nonChina: '非中国籍',
+      },
+      helpers: {
+        salaryRule: 'CTJ 时薪按 22 天 × 8 小时折算月薪；月薪优先取 NET MENSUEL，否则用基础工资 + 津贴。',
+      },
     },
     stats: {
       headcount: '成员总数',
@@ -1047,16 +1135,62 @@ export const memberCopy: Record<
       memberEdit: 'Modifier le membre',
     },
     tabs: {
+      overview: 'Aperçu',
       members: 'Liste des membres',
       roles: 'Gestion des rôles',
       permissions: 'Permissions',
       payroll: 'Versements',
     },
     tabDescriptions: {
+      overview: "Vue d'ensemble des effectifs et comparaisons.",
       members: 'Filtrer les membres, importer/exporter et consulter les audits.',
       roles: 'Clarifier les rôles, leurs membres et permissions liées.',
       permissions: 'Consulter chaque permission, sa description et sa couverture.',
       payroll: 'Saisie en lot et reporting mensuel des versements.',
+    },
+    overview: {
+      title: "Vue d'ensemble",
+      subtitle: 'Analyse basée sur tous les membres (tous statuts confondus).',
+      filters: {
+        tagLabel: 'Filtrer par tags projet',
+        tagHint: 'Optionnel : filtrer par tags des membres pour comparer.',
+      },
+      summary: {
+        total: 'Effectif total',
+        china: 'Chinois',
+        nonChina: 'Non chinois',
+        local: 'Employés locaux',
+      },
+      charts: {
+        nationality: 'Part Chinois / Non chinois',
+        team: 'Effectifs par équipe',
+        supervisor: 'Top responsables chinois',
+        provenance: 'Répartition des provenances',
+        salary: 'Répartition des salaires',
+        contractCost: 'Coût par type de contrat',
+        tenure: 'Ancienneté',
+        contractExpiry: 'Échéances de contrat (3 mois)',
+      },
+      labels: {
+        total: 'Total',
+        people: 'pers.',
+        noData: 'Aucune donnée',
+        other: 'Autres',
+        unassignedTeam: 'Équipe non renseignée',
+        unassignedSupervisor: 'Responsable non renseigné',
+        missingProvenance: 'Provenance non renseignée',
+        missingContractType: 'Type de contrat manquant',
+        missingContractDate: 'Date de fin manquante',
+        overdue: 'Déjà expiré',
+        beyond: 'Au-delà de 3 mois',
+        localScope: 'Non chinois',
+        china: 'Chinois',
+        nonChina: 'Non chinois',
+      },
+      helpers: {
+        salaryRule:
+          'CTJ : conversion horaire 22 j × 8 h; NET MENSUEL prioritaire, sinon salaire de base + prime.',
+      },
     },
     stats: {
       headcount: 'Effectif',

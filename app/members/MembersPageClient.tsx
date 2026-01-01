@@ -43,6 +43,7 @@ import { useMemberTableState } from '@/lib/members/useMemberTableState'
 import { usePreferredLocale } from '@/lib/usePreferredLocale'
 import { MemberDetailDrawerMount } from './components/MemberDetailDrawerMount'
 import { MemberFormModal } from './components/MemberFormModal'
+import { MembersOverviewTab } from './components/MembersOverviewTab'
 import { MembersTab } from './components/MembersTab'
 import { MembersPageHeader } from './components/MembersPageHeader'
 import { PayrollPayoutsTab } from './components/PayrollPayoutsTab'
@@ -70,7 +71,7 @@ import type { Member, MemberBulkPatch, MemberFormState as FormState } from '@/ty
 
 
 
-type TabKey = 'members' | 'roles' | 'permissions' | 'payroll'
+type TabKey = 'overview' | 'members' | 'roles' | 'permissions' | 'payroll'
 
 export function MembersPageClient() {
   const { locale, setLocale } = usePreferredLocale()
@@ -271,6 +272,10 @@ export function MembersPageClient() {
   useEffect(() => {
     const tabParam = searchParams?.get('tab')
     if (!tabParam) return
+    if (tabParam === 'overview') {
+      setActiveTab('overview')
+      return
+    }
     if (tabParam === 'payroll' && canViewPayroll) {
       setActiveTab('payroll')
       return
@@ -1261,7 +1266,7 @@ export function MembersPageClient() {
       : []),
   ]
   const availableTabs = useMemo<TabKey[]>(() => {
-    const tabs: TabKey[] = ['members', 'roles']
+    const tabs: TabKey[] = ['overview', 'members', 'roles']
     if (canViewPermissions) tabs.push('permissions')
     if (canViewPayroll) tabs.push('payroll')
     return tabs
@@ -1305,6 +1310,16 @@ export function MembersPageClient() {
       <section className="w-full bg-slate-50">
         <div className="mx-auto grid max-w-[1700px] gap-8 px-6 pb-14 pt-6 sm:px-8 xl:px-12 2xl:px-14 min-w-0">
           <div className="min-w-0 w-full rounded-3xl border border-slate-200 bg-white shadow-xl shadow-slate-900/5">
+            {activeTab === 'overview' ? (
+              <MembersOverviewTab
+                t={t}
+                locale={locale}
+                members={membersData}
+                loading={loading}
+                error={error}
+              />
+            ) : null}
+
             {activeTab === 'members' ? (
               <MembersTab
                 t={t}

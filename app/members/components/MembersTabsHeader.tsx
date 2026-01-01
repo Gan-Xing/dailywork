@@ -5,9 +5,9 @@ type MemberCopy = (typeof memberCopy)[keyof typeof memberCopy]
 
 type MembersTabsHeaderProps = {
   t: MemberCopy
-  activeTab: 'members' | 'roles' | 'permissions' | 'payroll'
-  onChangeTab: (tab: 'members' | 'roles' | 'permissions' | 'payroll') => void
-  tabs: Array<'members' | 'roles' | 'permissions' | 'payroll'>
+  activeTab: 'overview' | 'members' | 'roles' | 'permissions' | 'payroll'
+  onChangeTab: (tab: 'overview' | 'members' | 'roles' | 'permissions' | 'payroll') => void
+  tabs: Array<'overview' | 'members' | 'roles' | 'permissions' | 'payroll'>
 }
 
 export function MembersTabsHeader({ t, activeTab, onChangeTab, tabs }: MembersTabsHeaderProps) {
