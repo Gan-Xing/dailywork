@@ -1,0 +1,92 @@
+Found 15 members with payout/contract mismatches.
+Filtered: team/supervisor mismatches only (no-contract excluded).
+
+Payout Team Counts
+- BITUME BOUAKE: 9
+- TOPO: 3
+- OUVRAGE TANDA: 1
+- PREFABRICATION: 1
+- TERRASSEMENT TANDA: 1
+
+Contract Team Counts
+- BITUME BONDOUKOU: 9
+- OUVRAGE 2: 2
+- TOPO: 2
+- LABO: 1
+- CHRIS: 1
+
+Payout Supervisor Counts
+- 田都娃 / TianDuwa(#29): 9
+- 姚国防 / YaoGuofang(#17): 3
+- 宋金泽 / SongJinze(#8): 1
+- 涂明 / TuMing(#21): 1
+- 杜钦 / Chris(#11): 1
+
+Contract Supervisor Counts
+- 田都娃 / TianDuwa(#29): 9
+- 涂高 / TuGao(#4): 2
+- 王栋 / WangDong(#9): 2
+- 姚国防 / YaoGuofang(#17): 1
+- 杜钦 / Chris(#11): 1
+
+Details
+user=80 name=KONE MOUSSA
+  payout#5659 date=2025-09-26T00:00:00.000Z team=OUVRAGE TANDA supervisor=宋金泽 / SongJinze(#8)
+  contract#527 start=2025-09-03T00:00:00.000Z end=2026-02-20T00:00:00.000Z team=OUVRAGE 2 supervisor=涂高 / TuGao(#4)
+  mismatch=team,supervisor
+user=193 name=LENI MAKINTE
+  payout#5837 date=2025-08-15T00:00:00.000Z team=BITUME BOUAKE supervisor=田都娃 / TianDuwa(#29)
+  contract#353 start=2024-08-21T00:00:00.000Z end=2025-08-20T00:00:00.000Z team=BITUME BONDOUKOU supervisor=田都娃 / TianDuwa(#29)
+  mismatch=team
+user=195 name=KIDAPOA KOUNDI
+  payout#5843 date=2025-08-15T00:00:00.000Z team=BITUME BOUAKE supervisor=田都娃 / TianDuwa(#29)
+  contract#282 start=2025-03-01T00:00:00.000Z end=2025-08-20T00:00:00.000Z team=BITUME BONDOUKOU supervisor=田都娃 / TianDuwa(#29)
+  mismatch=team
+user=197 name=NIAMIEN KOUAME ABRAHAM
+  payout#5835 date=2025-08-15T00:00:00.000Z team=BITUME BOUAKE supervisor=田都娃 / TianDuwa(#29)
+  contract#361 start=2024-08-21T00:00:00.000Z end=2025-08-20T00:00:00.000Z team=BITUME BONDOUKOU supervisor=田都娃 / TianDuwa(#29)
+  mismatch=team
+user=198 name=KOUADIO KOUAKOU CEDRIC
+  payout#5816 date=2025-08-15T00:00:00.000Z team=BITUME BOUAKE supervisor=田都娃 / TianDuwa(#29)
+  contract#315 start=2025-03-01T00:00:00.000Z end=2025-08-20T00:00:00.000Z team=BITUME BONDOUKOU supervisor=田都娃 / TianDuwa(#29)
+  mismatch=team
+user=200 name=YAO N'DA KOUAKOU ANGENORE EZECHIEL
+  payout#5813 date=2025-08-15T00:00:00.000Z team=BITUME BOUAKE supervisor=田都娃 / TianDuwa(#29)
+  contract#398 start=2024-08-21T00:00:00.000Z end=2025-08-21T00:00:00.000Z team=BITUME BONDOUKOU supervisor=田都娃 / TianDuwa(#29)
+  mismatch=team
+user=201 name=KONAN KOFFI MARIUS
+  payout#5836 date=2025-08-15T00:00:00.000Z team=BITUME BOUAKE supervisor=田都娃 / TianDuwa(#29)
+  contract#293 start=2025-03-01T00:00:00.000Z end=2025-08-20T00:00:00.000Z team=BITUME BONDOUKOU supervisor=田都娃 / TianDuwa(#29)
+  mismatch=team
+user=209 name=KOUAME N'DA KOUAKOU JEAN BAPTISTE
+  payout#5822 date=2025-08-15T00:00:00.000Z team=BITUME BOUAKE supervisor=田都娃 / TianDuwa(#29)
+  contract#327 start=2025-03-01T00:00:00.000Z end=2025-08-20T00:00:00.000Z team=BITUME BONDOUKOU supervisor=田都娃 / TianDuwa(#29)
+  mismatch=team
+user=211 name=YAO N'DRI GUY MARTIAL
+  payout#5834 date=2025-08-15T00:00:00.000Z team=BITUME BOUAKE supervisor=田都娃 / TianDuwa(#29)
+  contract#400 start=2024-08-21T00:00:00.000Z end=2025-08-20T00:00:00.000Z team=BITUME BONDOUKOU supervisor=田都娃 / TianDuwa(#29)
+  mismatch=team
+user=215 name=DIOMANDE ADAMA
+  payout#5842 date=2025-08-15T00:00:00.000Z team=BITUME BOUAKE supervisor=田都娃 / TianDuwa(#29)
+  contract#258 start=2025-04-21T00:00:00.000Z end=2025-08-20T00:00:00.000Z team=BITUME BONDOUKOU supervisor=田都娃 / TianDuwa(#29)
+  mismatch=team
+user=281 name=ZAN BI KOUAME RODRIGUE
+  payout#5674 date=2025-09-26T00:00:00.000Z team=PREFABRICATION supervisor=涂明 / TuMing(#21)
+  contract#556 start=2025-09-03T00:00:00.000Z end=2026-03-20T00:00:00.000Z team=OUVRAGE 2 supervisor=涂高 / TuGao(#4)
+  mismatch=team,supervisor
+user=365 name=OUATTARA KAFOUINROLOU
+  payout#5922 date=2025-08-15T00:00:00.000Z team=TOPO supervisor=姚国防 / YaoGuofang(#17)
+  contract#367 start=2024-08-21T00:00:00.000Z end=2025-08-20T23:59:59.000Z team=LABO supervisor=姚国防 / YaoGuofang(#17)
+  mismatch=team
+user=367 name=OUATTARA DJAKALIA
+  payout#5666 date=2025-09-26T00:00:00.000Z team=TOPO supervisor=姚国防 / YaoGuofang(#17)
+  contract#540 start=2025-09-02T00:00:00.000Z end=2026-03-20T00:00:00.000Z team=TOPO supervisor=王栋 / WangDong(#9)
+  mismatch=supervisor
+user=368 name=KOUADIO YAO PATRICE
+  payout#5587 date=2025-09-26T00:00:00.000Z team=TOPO supervisor=姚国防 / YaoGuofang(#17)
+  contract#529 start=2025-09-11T00:00:00.000Z end=2026-03-20T00:00:00.000Z team=TOPO supervisor=王栋 / WangDong(#9)
+  mismatch=supervisor
+user=503 name=FODJO ADAMA OUATTARA
+  payout#5570 date=2025-09-26T00:00:00.000Z team=TERRASSEMENT TANDA supervisor=杜钦 / Chris(#11)
+  contract#219 start=2025-09-17T00:00:00.000Z end=2025-10-19T00:00:00.000Z team=CHRIS supervisor=杜钦 / Chris(#11)
+  mismatch=team

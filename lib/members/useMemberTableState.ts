@@ -20,6 +20,8 @@ export type MemberFiltersState = {
   chineseSupervisorFilters: string[]
   contractNumberFilters: string[]
   contractTypeFilters: string[]
+  contractStartDateFilters: string[]
+  contractEndDateFilters: string[]
   salaryCategoryFilters: string[]
   baseSalaryFilters: string[]
   netMonthlyFilters: string[]
@@ -70,6 +72,8 @@ const initialFiltersState: MemberFiltersState = {
   chineseSupervisorFilters: [],
   contractNumberFilters: [],
   contractTypeFilters: [],
+  contractStartDateFilters: [],
+  contractEndDateFilters: [],
   salaryCategoryFilters: [],
   baseSalaryFilters: [],
   netMonthlyFilters: [],
@@ -189,6 +193,8 @@ export function useMemberTableState(options: Options = {}) {
         setFilter('chineseSupervisorFilters', value),
       setContractNumberFilters: (value: string[]) => setFilter('contractNumberFilters', value),
       setContractTypeFilters: (value: string[]) => setFilter('contractTypeFilters', value),
+      setContractStartDateFilters: (value: string[]) => setFilter('contractStartDateFilters', value),
+      setContractEndDateFilters: (value: string[]) => setFilter('contractEndDateFilters', value),
       setSalaryCategoryFilters: (value: string[]) => setFilter('salaryCategoryFilters', value),
       setBaseSalaryFilters: (value: string[]) => setFilter('baseSalaryFilters', value),
       setNetMonthlyFilters: (value: string[]) => setFilter('netMonthlyFilters', value),

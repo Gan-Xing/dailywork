@@ -32,6 +32,8 @@ type MemberFiltersPanelProps = {
   chineseSupervisorFilterOptions: Option[]
   contractNumberFilterOptions: Option[]
   contractTypeFilterOptions: Option[]
+  contractStartDateFilterOptions: Option[]
+  contractEndDateFilterOptions: Option[]
   salaryCategoryFilterOptions: Option[]
   baseSalaryFilterOptions: Option[]
   netMonthlyFilterOptions: Option[]
@@ -70,6 +72,8 @@ type MemberFiltersPanelProps = {
   chineseSupervisorFilters: string[]
   contractNumberFilters: string[]
   contractTypeFilters: string[]
+  contractStartDateFilters: string[]
+  contractEndDateFilters: string[]
   salaryCategoryFilters: string[]
   baseSalaryFilters: string[]
   netMonthlyFilters: string[]
@@ -108,6 +112,8 @@ type MemberFiltersPanelProps = {
   setChineseSupervisorFilters: (value: string[]) => void
   setContractNumberFilters: (value: string[]) => void
   setContractTypeFilters: (value: string[]) => void
+  setContractStartDateFilters: (value: string[]) => void
+  setContractEndDateFilters: (value: string[]) => void
   setSalaryCategoryFilters: (value: string[]) => void
   setBaseSalaryFilters: (value: string[]) => void
   setNetMonthlyFilters: (value: string[]) => void
@@ -173,6 +179,8 @@ export function MemberFiltersPanel({
   chineseSupervisorFilterOptions,
   contractNumberFilterOptions,
   contractTypeFilterOptions,
+  contractStartDateFilterOptions,
+  contractEndDateFilterOptions,
   salaryCategoryFilterOptions,
   baseSalaryFilterOptions,
   netMonthlyFilterOptions,
@@ -211,6 +219,8 @@ export function MemberFiltersPanel({
   chineseSupervisorFilters,
   contractNumberFilters,
   contractTypeFilters,
+  contractStartDateFilters,
+  contractEndDateFilters,
   salaryCategoryFilters,
   baseSalaryFilters,
   netMonthlyFilters,
@@ -249,6 +259,8 @@ export function MemberFiltersPanel({
   setChineseSupervisorFilters,
   setContractNumberFilters,
   setContractTypeFilters,
+  setContractStartDateFilters,
+  setContractEndDateFilters,
   setSalaryCategoryFilters,
   setBaseSalaryFilters,
   setNetMonthlyFilters,
@@ -385,6 +397,20 @@ export function MemberFiltersPanel({
             options={contractTypeFilterOptions}
             selected={contractTypeFilters}
             onChange={setContractTypeFilters}
+            {...sharedFilterProps}
+          />
+          <MultiSelectFilter
+            label={t.table.contractStartDate}
+            options={contractStartDateFilterOptions}
+            selected={contractStartDateFilters}
+            onChange={setContractStartDateFilters}
+            {...sharedFilterProps}
+          />
+          <MultiSelectFilter
+            label={t.table.contractEndDate}
+            options={contractEndDateFilterOptions}
+            selected={contractEndDateFilters}
+            onChange={setContractEndDateFilters}
             {...sharedFilterProps}
           />
         </div>

@@ -6,6 +6,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type ChangeEvent,
   type FormEvent,
 } from 'react'
 
@@ -140,6 +141,8 @@ export function MembersPageClient() {
   const [showTeamSupervisorDialog, setShowTeamSupervisorDialog] = useState(false)
   const importInputRef = useRef<HTMLInputElement | null>(null)
   const contractChangeImportInputRef = useRef<HTMLInputElement | null>(null)
+  const contractAuditInputRef = useRef<HTMLInputElement | null>(null)
+  const [contractAuditLoading, setContractAuditLoading] = useState(false)
   const {
     filters,
     filterActions,
@@ -170,6 +173,8 @@ export function MembersPageClient() {
     chineseSupervisorFilters,
     contractNumberFilters,
     contractTypeFilters,
+    contractStartDateFilters,
+    contractEndDateFilters,
     salaryCategoryFilters,
     baseSalaryFilters,
     netMonthlyFilters,
@@ -210,6 +215,8 @@ export function MembersPageClient() {
     setChineseSupervisorFilters,
     setContractNumberFilters,
     setContractTypeFilters,
+    setContractStartDateFilters,
+    setContractEndDateFilters,
     setSalaryCategoryFilters,
     setBaseSalaryFilters,
     setNetMonthlyFilters,
@@ -385,6 +392,8 @@ export function MembersPageClient() {
     chineseSupervisorFilterOptions,
     contractNumberFilterOptions,
     contractTypeFilterOptions,
+    contractStartDateFilterOptions,
+    contractEndDateFilterOptions,
     salaryCategoryFilterOptions,
     baseSalaryFilterOptions,
     netMonthlyFilterOptions,
@@ -451,6 +460,8 @@ export function MembersPageClient() {
     chineseSupervisorFilters,
     contractNumberFilters,
     contractTypeFilters,
+    contractStartDateFilters,
+    contractEndDateFilters,
     salaryCategoryFilters,
     baseSalaryFilters,
     netMonthlyFilters,
@@ -491,6 +502,8 @@ export function MembersPageClient() {
     chineseSupervisorFilters,
     contractNumberFilters,
     contractTypeFilters,
+    contractStartDateFilters,
+    contractEndDateFilters,
     salaryCategoryFilters,
     baseSalaryFilters,
     netMonthlyFilters,
@@ -1070,6 +1083,49 @@ export function MembersPageClient() {
       contractChangeImportInputRef.current.click()
     }
   }
+  const handleContractAuditClick = () => {
+    if (!canViewMembers) {
+      setActionError(t.access.needMemberView)
+      setActionNotice(null)
+      return
+    }
+    if (contractAuditInputRef.current) {
+      contractAuditInputRef.current.value = ''
+      contractAuditInputRef.current.click()
+    }
+  }
+
+  const handleContractAuditFileChange = useCallback(
+    async (event: ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0]
+      if (!file) return
+      setContractAuditLoading(true)
+      setActionError(null)
+      setActionNotice(null)
+      try {
+        const formData = new FormData()
+        formData.append('file', file)
+        const res = await fetch('/api/members/contract-audit', {
+          method: 'POST',
+          body: formData,
+        })
+        const payload = await res.json().catch(() => ({}))
+        if (!res.ok) {
+          throw new Error(payload.error ?? t.errors.importFailed)
+        }
+        const reportPath = typeof payload.path === 'string' ? payload.path : ''
+        setActionNotice(t.feedback.contractAuditReady(reportPath))
+      } catch (err) {
+        setActionError(err instanceof Error ? err.message : t.errors.importFailed)
+      } finally {
+        if (contractAuditInputRef.current) {
+          contractAuditInputRef.current.value = ''
+        }
+        setContractAuditLoading(false)
+      }
+    },
+    [t],
+  )
 
   const handleSort = (field: SortField) => {
     if (field === 'roles' && !canAssignRole) return
@@ -1275,6 +1331,7 @@ export function MembersPageClient() {
                 actionNotice={actionNotice}
                 importing={importing}
                 contractChangeImporting={contractChangeImporting}
+                contractAuditLoading={contractAuditLoading}
                 contractChangeTemplateDownloading={contractChangeTemplateDownloading}
                 exporting={exporting}
                 templateDownloading={templateDownloading}
@@ -1283,6 +1340,7 @@ export function MembersPageClient() {
                 onOpenTeamSupervisorDialog={() => setShowTeamSupervisorDialog(true)}
                 onImportFileChange={handleImportFileChange}
                 onContractChangeImportFileChange={handleContractChangeImportFileChange}
+                onContractAuditFileChange={handleContractAuditFileChange}
                 onContractChangeTemplateDownload={handleContractChangeTemplateDownload}
                 showCreateModal={showCreateModal}
                 showFilterDrawer={showFilterDrawer}
@@ -1306,6 +1364,8 @@ export function MembersPageClient() {
                 chineseSupervisorFilterOptions={chineseSupervisorFilterOptions}
                 contractNumberFilterOptions={contractNumberFilterOptions}
                 contractTypeFilterOptions={contractTypeFilterOptions}
+                contractStartDateFilterOptions={contractStartDateFilterOptions}
+                contractEndDateFilterOptions={contractEndDateFilterOptions}
                 salaryCategoryFilterOptions={salaryCategoryFilterOptions}
                 baseSalaryFilterOptions={baseSalaryFilterOptions}
                 netMonthlyFilterOptions={netMonthlyFilterOptions}
@@ -1344,6 +1404,8 @@ export function MembersPageClient() {
                 chineseSupervisorFilters={chineseSupervisorFilters}
                 contractNumberFilters={contractNumberFilters}
                 contractTypeFilters={contractTypeFilters}
+                contractStartDateFilters={contractStartDateFilters}
+                contractEndDateFilters={contractEndDateFilters}
                 salaryCategoryFilters={salaryCategoryFilters}
                 baseSalaryFilters={baseSalaryFilters}
                 netMonthlyFilters={netMonthlyFilters}
@@ -1382,6 +1444,8 @@ export function MembersPageClient() {
                 setChineseSupervisorFilters={setChineseSupervisorFilters}
                 setContractNumberFilters={setContractNumberFilters}
                 setContractTypeFilters={setContractTypeFilters}
+                setContractStartDateFilters={setContractStartDateFilters}
+                setContractEndDateFilters={setContractEndDateFilters}
                 setSalaryCategoryFilters={setSalaryCategoryFilters}
                 setBaseSalaryFilters={setBaseSalaryFilters}
                 setNetMonthlyFilters={setNetMonthlyFilters}
@@ -1421,10 +1485,12 @@ export function MembersPageClient() {
                 onOpenCreateModal={openCreateModal}
                 onImportClick={handleImportClick}
                 onContractChangeImportClick={handleContractChangeImportClick}
+                onContractAuditClick={handleContractAuditClick}
                 onExport={handleExportMembers}
                 onDownloadTemplate={handleDownloadTemplate}
                 importInputRef={importInputRef}
                 contractChangeImportInputRef={contractChangeImportInputRef}
+                contractAuditInputRef={contractAuditInputRef}
                 columnSelectorRef={columnSelectorRef}
                 handleSort={handleSort}
                 sortIndicator={sortIndicator}

@@ -49,6 +49,7 @@ type MembersTabProps = {
   actionNotice: string | null
   importing: boolean
   contractChangeImporting: boolean
+  contractAuditLoading: boolean
   contractChangeTemplateDownloading: boolean
   exporting: boolean
   templateDownloading: boolean
@@ -57,6 +58,7 @@ type MembersTabProps = {
   onOpenTeamSupervisorDialog: () => void
   onImportFileChange: (event: ChangeEvent<HTMLInputElement>) => void
   onContractChangeImportFileChange: (event: ChangeEvent<HTMLInputElement>) => void
+  onContractAuditFileChange: (event: ChangeEvent<HTMLInputElement>) => void
   onContractChangeTemplateDownload: () => void
   showCreateModal: boolean
   showFilterDrawer: boolean
@@ -80,6 +82,8 @@ type MembersTabProps = {
   chineseSupervisorFilterOptions: Option[]
   contractNumberFilterOptions: Option[]
   contractTypeFilterOptions: Option[]
+  contractStartDateFilterOptions: Option[]
+  contractEndDateFilterOptions: Option[]
   salaryCategoryFilterOptions: Option[]
   baseSalaryFilterOptions: Option[]
   netMonthlyFilterOptions: Option[]
@@ -118,6 +122,8 @@ type MembersTabProps = {
   chineseSupervisorFilters: string[]
   contractNumberFilters: string[]
   contractTypeFilters: string[]
+  contractStartDateFilters: string[]
+  contractEndDateFilters: string[]
   salaryCategoryFilters: string[]
   baseSalaryFilters: string[]
   netMonthlyFilters: string[]
@@ -156,6 +162,8 @@ type MembersTabProps = {
   setChineseSupervisorFilters: (value: string[]) => void
   setContractNumberFilters: (value: string[]) => void
   setContractTypeFilters: (value: string[]) => void
+  setContractStartDateFilters: (value: string[]) => void
+  setContractEndDateFilters: (value: string[]) => void
   setSalaryCategoryFilters: (value: string[]) => void
   setBaseSalaryFilters: (value: string[]) => void
   setNetMonthlyFilters: (value: string[]) => void
@@ -195,10 +203,12 @@ type MembersTabProps = {
   onOpenCreateModal: () => void
   onImportClick: () => void
   onContractChangeImportClick: () => void
+  onContractAuditClick: () => void
   onExport: () => void
   onDownloadTemplate: () => void
   importInputRef: RefObject<HTMLInputElement>
   contractChangeImportInputRef: RefObject<HTMLInputElement>
+  contractAuditInputRef: RefObject<HTMLInputElement>
   columnSelectorRef: RefObject<HTMLDivElement>
   handleSort: (field: SortField) => void
   sortIndicator: (field: SortField) => string
@@ -252,6 +262,7 @@ export function MembersTab(props: MembersTabProps) {
     actionNotice,
     importing,
     contractChangeImporting,
+    contractAuditLoading,
     contractChangeTemplateDownloading,
     exporting,
     templateDownloading,
@@ -260,6 +271,7 @@ export function MembersTab(props: MembersTabProps) {
     onOpenTeamSupervisorDialog,
     onImportFileChange,
     onContractChangeImportFileChange,
+    onContractAuditFileChange,
     onContractChangeTemplateDownload,
     showCreateModal,
     showFilterDrawer,
@@ -283,6 +295,8 @@ export function MembersTab(props: MembersTabProps) {
     chineseSupervisorFilterOptions,
     contractNumberFilterOptions,
     contractTypeFilterOptions,
+    contractStartDateFilterOptions,
+    contractEndDateFilterOptions,
     salaryCategoryFilterOptions,
     baseSalaryFilterOptions,
     netMonthlyFilterOptions,
@@ -321,6 +335,8 @@ export function MembersTab(props: MembersTabProps) {
     chineseSupervisorFilters,
     contractNumberFilters,
     contractTypeFilters,
+    contractStartDateFilters,
+    contractEndDateFilters,
     salaryCategoryFilters,
     baseSalaryFilters,
     netMonthlyFilters,
@@ -359,6 +375,8 @@ export function MembersTab(props: MembersTabProps) {
     setChineseSupervisorFilters,
     setContractNumberFilters,
     setContractTypeFilters,
+    setContractStartDateFilters,
+    setContractEndDateFilters,
     setSalaryCategoryFilters,
     setBaseSalaryFilters,
     setNetMonthlyFilters,
@@ -398,10 +416,12 @@ export function MembersTab(props: MembersTabProps) {
     onOpenCreateModal,
     onImportClick,
     onContractChangeImportClick,
+    onContractAuditClick,
     onExport,
     onDownloadTemplate,
     importInputRef,
     contractChangeImportInputRef,
+    contractAuditInputRef,
     columnSelectorRef,
     handleSort,
     sortIndicator,
@@ -580,6 +600,12 @@ export function MembersTab(props: MembersTabProps) {
           >
             {t.actions.contractChangeTemplate}
           </ActionButton>
+          <ActionButton
+            onClick={onContractAuditClick}
+            disabled={!canViewMembers || contractAuditLoading}
+          >
+            {t.actions.contractAudit}
+          </ActionButton>
           <ActionButton onClick={onExport} disabled={!canViewMembers || exporting}>
             {t.actions.export}
           </ActionButton>
@@ -612,6 +638,13 @@ export function MembersTab(props: MembersTabProps) {
             type="file"
             accept=".xlsx,.xls,.csv"
             onChange={onContractChangeImportFileChange}
+            className="hidden"
+          />
+          <input
+            ref={contractAuditInputRef}
+            type="file"
+            accept=".xlsx,.xls,.csv"
+            onChange={onContractAuditFileChange}
             className="hidden"
           />
           <ActionButton onClick={onClearFilters} disabled={!hasActiveFilters}>
@@ -793,6 +826,8 @@ export function MembersTab(props: MembersTabProps) {
               chineseSupervisorFilterOptions={chineseSupervisorFilterOptions}
               contractNumberFilterOptions={contractNumberFilterOptions}
               contractTypeFilterOptions={contractTypeFilterOptions}
+              contractStartDateFilterOptions={contractStartDateFilterOptions}
+              contractEndDateFilterOptions={contractEndDateFilterOptions}
               salaryCategoryFilterOptions={salaryCategoryFilterOptions}
               baseSalaryFilterOptions={baseSalaryFilterOptions}
               netMonthlyFilterOptions={netMonthlyFilterOptions}
@@ -831,6 +866,8 @@ export function MembersTab(props: MembersTabProps) {
               chineseSupervisorFilters={chineseSupervisorFilters}
               contractNumberFilters={contractNumberFilters}
               contractTypeFilters={contractTypeFilters}
+              contractStartDateFilters={contractStartDateFilters}
+              contractEndDateFilters={contractEndDateFilters}
               salaryCategoryFilters={salaryCategoryFilters}
               baseSalaryFilters={baseSalaryFilters}
               netMonthlyFilters={netMonthlyFilters}
@@ -869,6 +906,8 @@ export function MembersTab(props: MembersTabProps) {
               setChineseSupervisorFilters={setChineseSupervisorFilters}
               setContractNumberFilters={setContractNumberFilters}
               setContractTypeFilters={setContractTypeFilters}
+              setContractStartDateFilters={setContractStartDateFilters}
+              setContractEndDateFilters={setContractEndDateFilters}
               setSalaryCategoryFilters={setSalaryCategoryFilters}
               setBaseSalaryFilters={setBaseSalaryFilters}
               setNetMonthlyFilters={setNetMonthlyFilters}

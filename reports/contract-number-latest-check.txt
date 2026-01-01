@@ -1,0 +1,32 @@
+Entries: 27
+
+MBDKO022 | KESSE TIEMOKO JEROME (user=79) | latest=MBDKO022 | isLatest=YES | team=OUVRAGE TANDA
+MBDKO093 | KONE MOUSSA (user=80) | latest=MBDKO093 | isLatest=YES | team=OUVRAGE TANDA
+MBDKO109 | TOURE NANFOURDY (user=81) | latest=MBDKO109 | isLatest=YES | team=OUVRAGE TANDA
+MBDKO111 | KOFFI KOUADIO PATRICE (user=82) | latest=MBDKO111 | isLatest=YES | team=OUVRAGE TANDA
+MBDKO133 | CAMARA MOHAMED (user=83) | latest=MBDKO133 | isLatest=YES | team=OUVRAGE TANDA
+JBDKO376 | KONAN N'DRI JORES (user=84) | latest=null | isLatest=UNKNOWN | team=OUVRAGE TANDA
+JBDKO560 | OKA KOUAME JEAN LOUIS (user=85) | latest=null | isLatest=UNKNOWN | team=OUVRAGE TANDA
+JBDKO679 | BOITRIN KOUAME PRINCE (user=86) | latest=null | isLatest=UNKNOWN | team=OUVRAGE TANDA
+JBDKO680 | SOUMAHORO ABOU (user=87) | latest=null | isLatest=UNKNOWN | team=OUVRAGE TANDA
+JBDKO682 | YAO KOUAME ROLAND LOUIS (user=88) | latest=null | isLatest=UNKNOWN | team=OUVRAGE TANDA
+JBDKO683 | KOUADIO KOUADIO THEODORE (user=89) | latest=null | isLatest=UNKNOWN | team=OUVRAGE TANDA
+JBDKO684 | ADJOUMANI KOFFI GILBERT (user=90) | latest=null | isLatest=UNKNOWN | team=OUVRAGE TANDA
+JBDKO746 | DEMBELE LAMINE (user=91) | latest=null | isLatest=UNKNOWN | team=OUVRAGE TANDA
+JBDKO752 | SORO DOULAYE (user=92) | latest=null | isLatest=UNKNOWN | team=OUVRAGE TANDA
+JBDKO755 | KONAN N'GESSAN PARFAIT (user=93) | latest=null | isLatest=UNKNOWN | team=OUVRAGE TANDA
+JBDKO756 | KOUAKOU YAO BENJAMIN (user=94) | latest=null | isLatest=UNKNOWN | team=OUVRAGE TANDA
+JBDKO760 | KRA KOUASSI ANANI EMERSON (user=95) | latest=null | isLatest=UNKNOWN | team=OUVRAGE TANDA
+JBDKO761 | OUATTARA MOHAMED (user=96) | latest=null | isLatest=UNKNOWN | team=OUVRAGE TANDA
+JBDKO764 | KOMOE DAOUDA OUATTARA (user=97) | latest=null | isLatest=UNKNOWN | team=OUVRAGE TANDA
+JBDKO772 | KPONVI YAO RAPHAEL (user=98) | latest=null | isLatest=UNKNOWN | team=OUVRAGE TANDA
+JBDKO797 | KOUAME KOUADIO PACOME (user=99) | latest=null | isLatest=UNKNOWN | team=OUVRAGE TANDA
+JBDKO798 | KOUADIO KOUADIO LUCIEN (user=100) | latest=null | isLatest=UNKNOWN | team=OUVRAGE TANDA
+JBDKO800 | KAMBIRE SANSAN SAMUEL (user=101) | latest=null | isLatest=UNKNOWN | team=OUVRAGE TANDA
+JBDKO801 | OUATTARA EL-ASSOUMY (user=102) | latest=null | isLatest=UNKNOWN | team=OUVRAGE TANDA
+JBDKO859 | OUATTARA SOUADIKOU (user=103) | latest=null | isLatest=UNKNOWN | team=OUVRAGE TANDA
+JBDKO860 | KAMBIRE FIRKONTE DENIS (user=104) | latest=null | isLatest=UNKNOWN | team=OUVRAGE TANDA
+JBDKO885 | SOVIDE FRANCK DANIEL (user=105) | latest=JBDKO885 | isLatest=YES | team=OUVRAGE TANDA
+
+Team Summary
+- OUVRAGE TANDA: 27

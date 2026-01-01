@@ -1,0 +1,136 @@
+Found 23 contract change records with team/supervisor mismatch.
+
+Reason Counts
+- supervisor-mismatch: 23
+
+Details
+user=365 name=OUATTARA KAFOUINROLOU
+  mismatch#466 MBDKO044 CDD reason=supervisor-mismatch
+    change: team=TOPO supervisor=姚国防 / YaoGuofang(#17) start=2025-08-21T00:00:00.000Z end=2026-03-20T00:00:00.000Z change=2025-08-21T00:00:00.000Z
+    binding: team=TOPO supervisor=王栋 / WangDong(#9)
+  all contract changes:
+    #367 JBDKO185 CTJ team=LABO supervisor=姚国防 / YaoGuofang(#17) start=2024-08-21T00:00:00.000Z end=2025-08-20T23:59:59.000Z change=2024-08-21T00:00:00.000Z
+    #466 MBDKO044 CDD team=TOPO supervisor=姚国防 / YaoGuofang(#17) start=2025-08-21T00:00:00.000Z end=2026-03-20T00:00:00.000Z change=2025-08-21T00:00:00.000Z
+
+user=405 name=KOUASSI KOUAME DELPHIN
+  mismatch#339 JBDKO196 CTJ reason=supervisor-mismatch
+    change: team=CUISINE + MENAGE supervisor=甘星 / Franck(#1) start=2024-08-21T00:00:00.000Z end=2025-08-20T23:59:59.000Z change=2024-08-21T00:00:00.000Z
+    binding: team=CUISINE + MENAGE supervisor=何柳琴 / HeLiuqin(#2)
+  mismatch#460 MBDKO050 CDD reason=supervisor-mismatch
+    change: team=CUISINE + MENAGE supervisor=甘星 / Franck(#1) start=2025-08-21T00:00:00.000Z end=2026-03-20T00:00:00.000Z change=2025-08-21T00:00:00.000Z
+    binding: team=CUISINE + MENAGE supervisor=何柳琴 / HeLiuqin(#2)
+  all contract changes:
+    #339 JBDKO196 CTJ team=CUISINE + MENAGE supervisor=甘星 / Franck(#1) start=2024-08-21T00:00:00.000Z end=2025-08-20T23:59:59.000Z change=2024-08-21T00:00:00.000Z
+    #460 MBDKO050 CDD team=CUISINE + MENAGE supervisor=甘星 / Franck(#1) start=2025-08-21T00:00:00.000Z end=2026-03-20T00:00:00.000Z change=2025-08-21T00:00:00.000Z
+
+user=406 name=KOUADIO KOUASSI JUNIOR
+  mismatch#317 JBDKO199 CTJ reason=supervisor-mismatch
+    change: team=CUISINE + MENAGE supervisor=甘星 / Franck(#1) start=2024-08-21T00:00:00.000Z end=2025-08-20T23:59:59.000Z change=2024-08-21T00:00:00.000Z
+    binding: team=CUISINE + MENAGE supervisor=何柳琴 / HeLiuqin(#2)
+  mismatch#459 MBDKO051 CDD reason=supervisor-mismatch
+    change: team=CUISINE + MENAGE supervisor=甘星 / Franck(#1) start=2025-08-21T00:00:00.000Z end=2026-03-20T00:00:00.000Z change=2025-08-21T00:00:00.000Z
+    binding: team=CUISINE + MENAGE supervisor=何柳琴 / HeLiuqin(#2)
+  all contract changes:
+    #317 JBDKO199 CTJ team=CUISINE + MENAGE supervisor=甘星 / Franck(#1) start=2024-08-21T00:00:00.000Z end=2025-08-20T23:59:59.000Z change=2024-08-21T00:00:00.000Z
+    #459 MBDKO051 CDD team=CUISINE + MENAGE supervisor=甘星 / Franck(#1) start=2025-08-21T00:00:00.000Z end=2026-03-20T00:00:00.000Z change=2025-08-21T00:00:00.000Z
+
+user=407 name=KOTRO AFFOUET VICTOIRE
+  mismatch#309 JBDKO198 CTJ reason=supervisor-mismatch
+    change: team=CUISINE + MENAGE supervisor=甘星 / Franck(#1) start=2024-08-21T00:00:00.000Z end=2025-08-20T23:59:59.000Z change=2024-08-21T00:00:00.000Z
+    binding: team=CUISINE + MENAGE supervisor=何柳琴 / HeLiuqin(#2)
+  mismatch#457 MBDKO053 CDD reason=supervisor-mismatch
+    change: team=CUISINE + MENAGE supervisor=甘星 / Franck(#1) start=2025-08-21T00:00:00.000Z end=2026-03-20T00:00:00.000Z change=2025-08-21T00:00:00.000Z
+    binding: team=CUISINE + MENAGE supervisor=何柳琴 / HeLiuqin(#2)
+  all contract changes:
+    #309 JBDKO198 CTJ team=CUISINE + MENAGE supervisor=甘星 / Franck(#1) start=2024-08-21T00:00:00.000Z end=2025-08-20T23:59:59.000Z change=2024-08-21T00:00:00.000Z
+    #457 MBDKO053 CDD team=CUISINE + MENAGE supervisor=甘星 / Franck(#1) start=2025-08-21T00:00:00.000Z end=2026-03-20T00:00:00.000Z change=2025-08-21T00:00:00.000Z
+
+user=411 name=AHOUSSOU KOUAME MAURICE
+  mismatch#227 JBDKO045 CTJ reason=supervisor-mismatch
+    change: team=PICK-UP supervisor=甘星 / Franck(#1) start=2024-08-21T00:00:00.000Z end=2025-08-20T23:59:59.000Z change=2024-08-21T00:00:00.000Z
+    binding: team=PICK-UP supervisor=何柳琴 / HeLiuqin(#2)
+  mismatch#447 MBDKO063 CDD reason=supervisor-mismatch
+    change: team=PICK-UP supervisor=甘星 / Franck(#1) start=2025-08-21T00:00:00.000Z end=2026-02-20T00:00:00.000Z change=2025-08-21T00:00:00.000Z
+    binding: team=PICK-UP supervisor=何柳琴 / HeLiuqin(#2)
+  all contract changes:
+    #227 JBDKO045 CTJ team=PICK-UP supervisor=甘星 / Franck(#1) start=2024-08-21T00:00:00.000Z end=2025-08-20T23:59:59.000Z change=2024-08-21T00:00:00.000Z
+    #447 MBDKO063 CDD team=PICK-UP supervisor=甘星 / Franck(#1) start=2025-08-21T00:00:00.000Z end=2026-02-20T00:00:00.000Z change=2025-08-21T00:00:00.000Z
+
+user=412 name=N'GUESSAN KOFFI MODESTE
+  mismatch#359 JBDKO212 CTJ reason=supervisor-mismatch
+    change: team=PICK-UP supervisor=甘星 / Franck(#1) start=2024-08-21T00:00:00.000Z end=2025-08-20T23:59:59.000Z change=2024-08-21T00:00:00.000Z
+    binding: team=PICK-UP supervisor=何柳琴 / HeLiuqin(#2)
+  mismatch#445 MBDKO065 CDD reason=supervisor-mismatch
+    change: team=PICK-UP supervisor=甘星 / Franck(#1) start=2025-08-21T00:00:00.000Z end=2026-03-20T00:00:00.000Z change=2025-08-21T00:00:00.000Z
+    binding: team=PICK-UP supervisor=何柳琴 / HeLiuqin(#2)
+  all contract changes:
+    #359 JBDKO212 CTJ team=PICK-UP supervisor=甘星 / Franck(#1) start=2024-08-21T00:00:00.000Z end=2025-08-20T23:59:59.000Z change=2024-08-21T00:00:00.000Z
+    #445 MBDKO065 CDD team=PICK-UP supervisor=甘星 / Franck(#1) start=2025-08-21T00:00:00.000Z end=2026-03-20T00:00:00.000Z change=2025-08-21T00:00:00.000Z
+
+user=413 name=OUEDRAOGO SOLO
+  mismatch#373 JBDKO213 CTJ reason=supervisor-mismatch
+    change: team=PICK-UP supervisor=甘星 / Franck(#1) start=2024-08-21T00:00:00.000Z end=2025-08-20T23:59:59.000Z change=2024-08-21T00:00:00.000Z
+    binding: team=PICK-UP supervisor=何柳琴 / HeLiuqin(#2)
+  mismatch#444 MBDKO066 CDD reason=supervisor-mismatch
+    change: team=PICK-UP supervisor=甘星 / Franck(#1) start=2025-08-21T00:00:00.000Z end=2026-03-20T00:00:00.000Z change=2025-08-21T00:00:00.000Z
+    binding: team=PICK-UP supervisor=何柳琴 / HeLiuqin(#2)
+  all contract changes:
+    #373 JBDKO213 CTJ team=PICK-UP supervisor=甘星 / Franck(#1) start=2024-08-21T00:00:00.000Z end=2025-08-20T23:59:59.000Z change=2024-08-21T00:00:00.000Z
+    #444 MBDKO066 CDD team=PICK-UP supervisor=甘星 / Franck(#1) start=2025-08-21T00:00:00.000Z end=2026-03-20T00:00:00.000Z change=2025-08-21T00:00:00.000Z
+
+user=414 name=YAYA KONE
+  mismatch#155 JBDKO215 CTJ reason=supervisor-mismatch
+    change: team=PICK-UP supervisor=甘星 / Franck(#1) start=2024-08-21T00:00:00.000Z end=2025-07-20T00:00:00.000Z change=2024-08-21T00:00:00.000Z
+    binding: team=PICK-UP supervisor=何柳琴 / HeLiuqin(#2)
+  mismatch#156 JBDKO609 CTJ reason=supervisor-mismatch
+    change: team=PICK-UP supervisor=甘星 / Franck(#1) start=2025-09-06T00:00:00.000Z end=2025-11-20T23:59:59.000Z change=2025-09-06T00:00:00.000Z
+    binding: team=PICK-UP supervisor=何柳琴 / HeLiuqin(#2)
+  mismatch#164 MBDKO131 CDD reason=supervisor-mismatch
+    change: team=PICK-UP supervisor=甘星 / Franck(#1) start=2025-11-21T00:00:00.000Z end=2026-01-20T00:00:00.000Z change=2025-11-21T00:00:00.000Z
+    binding: team=PICK-UP supervisor=何柳琴 / HeLiuqin(#2)
+  all contract changes:
+    #155 JBDKO215 CTJ team=PICK-UP supervisor=甘星 / Franck(#1) start=2024-08-21T00:00:00.000Z end=2025-07-20T00:00:00.000Z change=2024-08-21T00:00:00.000Z
+    #156 JBDKO609 CTJ team=PICK-UP supervisor=甘星 / Franck(#1) start=2025-09-06T00:00:00.000Z end=2025-11-20T23:59:59.000Z change=2025-09-06T00:00:00.000Z
+    #164 MBDKO131 CDD team=PICK-UP supervisor=甘星 / Franck(#1) start=2025-11-21T00:00:00.000Z end=2026-01-20T00:00:00.000Z change=2025-11-21T00:00:00.000Z
+
+user=415 name=OUATTARA EL HADJ TIECOUROUBAH
+  mismatch#159 JBDKO259 CTJ reason=supervisor-mismatch
+    change: team=PICK-UP supervisor=甘星 / Franck(#1) start=2024-08-21T00:00:00.000Z end=2025-07-05T00:00:00.000Z change=2024-08-21T00:00:00.000Z
+    binding: team=PICK-UP supervisor=何柳琴 / HeLiuqin(#2)
+  mismatch#160 JBDKO656 CTJ reason=supervisor-mismatch
+    change: team=PICK-UP supervisor=甘星 / Franck(#1) start=2025-09-23T00:00:00.000Z end=2025-11-20T23:59:59.000Z change=2025-09-23T00:00:00.000Z
+    binding: team=PICK-UP supervisor=何柳琴 / HeLiuqin(#2)
+  mismatch#166 MBDKO132 CDD reason=supervisor-mismatch
+    change: team=PICK-UP supervisor=甘星 / Franck(#1) start=2025-11-21T00:00:00.000Z end=2026-01-20T00:00:00.000Z change=2025-11-21T00:00:00.000Z
+    binding: team=PICK-UP supervisor=何柳琴 / HeLiuqin(#2)
+  all contract changes:
+    #159 JBDKO259 CTJ team=PICK-UP supervisor=甘星 / Franck(#1) start=2024-08-21T00:00:00.000Z end=2025-07-05T00:00:00.000Z change=2024-08-21T00:00:00.000Z
+    #160 JBDKO656 CTJ team=PICK-UP supervisor=甘星 / Franck(#1) start=2025-09-23T00:00:00.000Z end=2025-11-20T23:59:59.000Z change=2025-09-23T00:00:00.000Z
+    #166 MBDKO132 CDD team=PICK-UP supervisor=甘星 / Franck(#1) start=2025-11-21T00:00:00.000Z end=2026-01-20T00:00:00.000Z change=2025-11-21T00:00:00.000Z
+
+user=503 name=FODJO ADAMA OUATTARA
+  mismatch#220 JBDKO816 CTJ reason=supervisor-mismatch
+    change: team=TERRASSEMENT TANDA supervisor=杜钦 / Chris(#11) start=2025-11-13T00:00:00.000Z end=2026-01-20T00:00:00.000Z change=2025-11-13T00:00:00.000Z
+    binding: team=TERRASSEMENT TANDA supervisor=刘晓杰 / LiuXiaojie(#10)
+  all contract changes:
+    #219 JBDKO590 CTJ team=CHRIS supervisor=杜钦 / Chris(#11) start=2025-09-17T00:00:00.000Z end=2025-10-19T00:00:00.000Z change=2025-09-17T00:00:00.000Z
+    #220 JBDKO816 CTJ team=TERRASSEMENT TANDA supervisor=杜钦 / Chris(#11) start=2025-11-13T00:00:00.000Z end=2026-01-20T00:00:00.000Z change=2025-11-13T00:00:00.000Z
+
+user=512 name=ISSIFOU MALIKI
+  mismatch#525 JBDKO742 CTJ reason=supervisor-mismatch
+    change: team=BITUME BONDOUKOU supervisor=涂明 / TuMing(#21) start=2025-11-01T00:00:00.000Z end=2025-11-20T00:00:00.000Z change=2025-11-01T00:00:00.000Z
+    binding: team=BITUME BONDOUKOU supervisor=田都娃 / TianDuwa(#29)
+  all contract changes:
+    #526 JBDKO554 CTJ team=BITUME BONDOUKOU supervisor=田都娃 / TianDuwa(#29) start=2025-06-21T00:00:00.000Z end=2025-08-05T00:00:00.000Z change=2025-06-21T00:00:00.000Z
+    #525 JBDKO742 CTJ team=BITUME BONDOUKOU supervisor=涂明 / TuMing(#21) start=2025-11-01T00:00:00.000Z end=2025-11-20T00:00:00.000Z change=2025-11-01T00:00:00.000Z
+
+user=524 name=ABISSA ADJA TATA MADELEINE
+  mismatch#221 JBDKO197 CTJ reason=supervisor-mismatch
+    change: team=CUISINE + MENAGE supervisor=甘星 / Franck(#1) start=2024-08-21T00:00:00.000Z end=2025-08-20T23:59:59.000Z change=2024-08-21T00:00:00.000Z
+    binding: team=CUISINE + MENAGE supervisor=何柳琴 / HeLiuqin(#2)
+  mismatch#458 MBDKO052 CDD reason=supervisor-mismatch
+    change: team=CUISINE + MENAGE supervisor=甘星 / Franck(#1) start=2025-08-21T00:00:00.000Z end=2026-03-20T00:00:00.000Z change=2025-08-21T00:00:00.000Z
+    binding: team=CUISINE + MENAGE supervisor=何柳琴 / HeLiuqin(#2)
+  all contract changes:
+    #221 JBDKO197 CTJ team=CUISINE + MENAGE supervisor=甘星 / Franck(#1) start=2024-08-21T00:00:00.000Z end=2025-08-20T23:59:59.000Z change=2024-08-21T00:00:00.000Z
+    #458 MBDKO052 CDD team=CUISINE + MENAGE supervisor=甘星 / Franck(#1) start=2025-08-21T00:00:00.000Z end=2026-03-20T00:00:00.000Z change=2025-08-21T00:00:00.000Z

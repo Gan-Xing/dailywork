@@ -35,6 +35,8 @@ type UseFilteredMembersParams = {
   chineseSupervisorFilters: string[]
   contractNumberFilters: string[]
   contractTypeFilters: string[]
+  contractStartDateFilters: string[]
+  contractEndDateFilters: string[]
   salaryCategoryFilters: string[]
   baseSalaryFilters: string[]
   netMonthlyFilters: string[]
@@ -83,6 +85,8 @@ export function useFilteredMembers({
   chineseSupervisorFilters,
   contractNumberFilters,
   contractTypeFilters,
+  contractStartDateFilters,
+  contractEndDateFilters,
   salaryCategoryFilters,
   baseSalaryFilters,
   netMonthlyFilters,
@@ -177,6 +181,10 @@ export function useFilteredMembers({
       if (!matchesListFilter(collectContractNumbers(expatProfile), contractNumberFilters))
         return false
       if (!matchesValueFilter(expatProfile?.contractType, contractTypeFilters)) return false
+      if (!matchesMonthFilter(expatProfile?.contractStartDate, contractStartDateFilters))
+        return false
+      if (!matchesMonthFilter(expatProfile?.contractEndDate, contractEndDateFilters))
+        return false
       if (!matchesValueFilter(expatProfile?.salaryCategory, salaryCategoryFilters)) return false
       if (
         !matchesValueFilter(
@@ -592,6 +600,8 @@ export function useFilteredMembers({
     chineseSupervisorFilters,
     contractNumberFilters,
     contractTypeFilters,
+    contractStartDateFilters,
+    contractEndDateFilters,
     salaryCategoryFilters,
     baseSalaryFilters,
     netMonthlyFilters,

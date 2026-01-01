@@ -268,6 +268,36 @@ export function useMemberFilterOptions({
     return options
   }, [membersData, optionCollator, t.labels.empty])
 
+  const contractStartDateFilterOptions = useMemo(() => {
+    const values = new Set<string>()
+    membersData.forEach((member) => {
+      const key = getMonthKey(member.expatProfile?.contractStartDate)
+      if (key) values.add(key)
+    })
+    const options = Array.from(values)
+      .sort((a, b) => b.localeCompare(a))
+      .map((value) => ({ value, label: value }))
+    if (membersData.some((member) => !member.expatProfile?.contractStartDate)) {
+      options.unshift({ value: EMPTY_FILTER_VALUE, label: t.labels.empty })
+    }
+    return options
+  }, [membersData, t.labels.empty])
+
+  const contractEndDateFilterOptions = useMemo(() => {
+    const values = new Set<string>()
+    membersData.forEach((member) => {
+      const key = getMonthKey(member.expatProfile?.contractEndDate)
+      if (key) values.add(key)
+    })
+    const options = Array.from(values)
+      .sort((a, b) => b.localeCompare(a))
+      .map((value) => ({ value, label: value }))
+    if (membersData.some((member) => !member.expatProfile?.contractEndDate)) {
+      options.unshift({ value: EMPTY_FILTER_VALUE, label: t.labels.empty })
+    }
+    return options
+  }, [membersData, t.labels.empty])
+
   const salaryCategoryFilterOptions = useMemo(() => {
     const values = new Set<string>()
     let hasEmpty = false
@@ -663,6 +693,8 @@ export function useMemberFilterOptions({
     chineseSupervisorFilterOptions,
     contractNumberFilterOptions,
     contractTypeFilterOptions,
+    contractStartDateFilterOptions,
+    contractEndDateFilterOptions,
     salaryCategoryFilterOptions,
     baseSalaryFilterOptions,
     netMonthlyFilterOptions,

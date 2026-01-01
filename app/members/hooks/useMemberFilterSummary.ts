@@ -15,6 +15,8 @@ export type MemberFiltersSummaryInput = {
   chineseSupervisorFilters: string[]
   contractNumberFilters: string[]
   contractTypeFilters: string[]
+  contractStartDateFilters: string[]
+  contractEndDateFilters: string[]
   salaryCategoryFilters: string[]
   baseSalaryFilters: string[]
   netMonthlyFilters: string[]
@@ -58,6 +60,8 @@ export function useMemberFilterSummary(filters: MemberFiltersSummaryInput) {
     chineseSupervisorFilters,
     contractNumberFilters,
     contractTypeFilters,
+    contractStartDateFilters,
+    contractEndDateFilters,
     salaryCategoryFilters,
     baseSalaryFilters,
     netMonthlyFilters,
@@ -101,6 +105,8 @@ export function useMemberFilterSummary(filters: MemberFiltersSummaryInput) {
       chineseSupervisorFilters.length > 0 ||
       contractNumberFilters.length > 0 ||
       contractTypeFilters.length > 0 ||
+      contractStartDateFilters.length > 0 ||
+      contractEndDateFilters.length > 0 ||
       salaryCategoryFilters.length > 0 ||
       baseSalaryFilters.length > 0 ||
       netMonthlyFilters.length > 0 ||
@@ -140,6 +146,8 @@ export function useMemberFilterSummary(filters: MemberFiltersSummaryInput) {
       chineseSupervisorFilters,
       contractNumberFilters,
       contractTypeFilters,
+      contractStartDateFilters,
+      contractEndDateFilters,
       salaryCategoryFilters,
       baseSalaryFilters,
       netMonthlyFilters,
@@ -184,6 +192,8 @@ export function useMemberFilterSummary(filters: MemberFiltersSummaryInput) {
       chineseSupervisorFilters.length +
       contractNumberFilters.length +
       contractTypeFilters.length +
+      contractStartDateFilters.length +
+      contractEndDateFilters.length +
       salaryCategoryFilters.length +
       baseSalaryFilters.length +
       netMonthlyFilters.length +
@@ -224,6 +234,8 @@ export function useMemberFilterSummary(filters: MemberFiltersSummaryInput) {
     chineseSupervisorFilters,
     contractNumberFilters,
     contractTypeFilters,
+    contractStartDateFilters,
+    contractEndDateFilters,
     salaryCategoryFilters,
     baseSalaryFilters,
     netMonthlyFilters,

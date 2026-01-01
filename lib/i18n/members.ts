@@ -129,6 +129,7 @@ export const memberCopy: Record<
       create: string
       import: string
       importContractChanges: string
+      contractAudit: string
       export: string
       template: string
       contractChangeTemplate: string
@@ -399,6 +400,7 @@ export const memberCopy: Record<
       importRowError: (row: number, message: string) => string
       importSkipConfirm: (validCount: number, errorCount: number) => string
       importPartialSuccess: (imported: number, skipped: number) => string
+      contractAuditReady: (path: string) => string
       bulkSaveSuccess: (count: number) => string
       bulkSavePartial: (success: number, failed: number) => string
       bulkSaveEmpty: string
@@ -641,6 +643,7 @@ export const memberCopy: Record<
       create: '新增成员',
       import: '导入成员',
       importContractChanges: '导入合同变更',
+      contractAudit: '合同核对',
       export: '导出 Excel/CSV',
       template: '成员导入模板',
       contractChangeTemplate: '合同变更模板',
@@ -914,6 +917,7 @@ export const memberCopy: Record<
         `发现 ${errorCount} 行错误，仍有 ${validCount} 行可导入。是否忽略错误行继续导入？`,
       importPartialSuccess: (imported: number, skipped: number) =>
         `已导入 ${imported} 条，已跳过 ${skipped} 条错误数据。`,
+      contractAuditReady: (path: string) => `核对报告已生成：${path || 'reports/'}`,
       bulkSaveSuccess: (count: number) => `已保存 ${count} 条修改。`,
       bulkSavePartial: (success: number, failed: number) =>
         `已保存 ${success} 条，${failed} 条失败。`,
@@ -1162,6 +1166,7 @@ export const memberCopy: Record<
       create: 'Ajouter un membre',
       import: 'Importer',
       importContractChanges: 'Importer changements de contrat',
+      contractAudit: 'Audit contrats',
       export: 'Exporter Excel/CSV',
       template: "Modèle d'import membres",
       contractChangeTemplate: 'Modèle changement de contrat',
@@ -1439,6 +1444,7 @@ export const memberCopy: Record<
         `${errorCount} lignes en erreur, ${validCount} lignes valides. Ignorer les erreurs et continuer ?`,
       importPartialSuccess: (imported: number, skipped: number) =>
         `Import partiel : ${imported} ok, ${skipped} ignorées.`,
+      contractAuditReady: (path: string) => `Rapport créé : ${path || 'reports/'}`,
       bulkSaveSuccess: (count: number) => `${count} modification(s) enregistrée(s).`,
       bulkSavePartial: (success: number, failed: number) =>
         `${success} enregistrée(s), ${failed} échouée(s).`,

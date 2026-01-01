@@ -29,6 +29,7 @@ export function PayrollPayoutTable({
         <table className="w-full text-left text-sm text-slate-700">
           <thead className="border-b border-slate-200 text-xs uppercase tracking-widest text-slate-500">
             <tr>
+              <th className="py-2 text-center">{t.table.sequence}</th>
               <th className="py-2">{t.compensation.fields.payoutDate}</th>
               <th className="py-2">{t.compensation.fields.amount}</th>
               <th className="py-2">{t.compensation.fields.currency}</th>
@@ -40,13 +41,14 @@ export function PayrollPayoutTable({
           <tbody>
             {records.length === 0 && !loading ? (
               <tr>
-                <td colSpan={6} className="py-4 text-center text-sm text-slate-400">
+                <td colSpan={7} className="py-4 text-center text-sm text-slate-400">
                   {t.feedback.emptyHistory}
                 </td>
               </tr>
             ) : null}
-            {records.map((record) => (
+            {records.map((record, index) => (
               <tr key={record.id} className="border-b border-slate-200 last:border-0">
+                <td className="py-3 text-center text-xs text-slate-500">{index + 1}</td>
                 <td className="py-3">{formatDate(record.payoutDate) || t.labels.empty}</td>
                 <td className="py-3 font-medium">{record.amount}</td>
                 <td className="py-3">{record.currency || 'XOF'}</td>
