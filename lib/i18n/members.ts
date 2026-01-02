@@ -47,8 +47,11 @@ export const memberCopy: Record<
         nationality: string
         team: string
         supervisor: string
+        teamCostScatter: string
+        teamCostShare: string
         provenance: string
         salary: string
+        actualSalary: string
         contractCost: string
         tenure: string
         contractExpiry: string
@@ -68,9 +71,21 @@ export const memberCopy: Record<
         localScope: string
         china: string
         nonChina: string
+        payrollTotal: string
+        payrollAverage: string
+        payrollMedian: string
+        payrollRatio: string
+        teamSortCount: string
+        teamSortAvg: string
+        teamSortMedian: string
+        modeOverview: string
+        modeDetail: string
+        modeCompare: string
+        scatterHint: string
       }
       helpers: {
         salaryRule: string
+        actualSalaryRule: string
       }
     }
     stats: Record<'headcount' | 'active' | 'roles' | 'coverage', string>
@@ -603,8 +618,11 @@ export const memberCopy: Record<
         nationality: '中外人员占比',
         team: '班组分析',
         supervisor: '中方负责人',
+        teamCostScatter: '班组热力',
+        teamCostShare: '成本集中度',
         provenance: '籍贯/属地分布',
-        salary: '薪资区间占比',
+        salary: '合同薪资区间占比',
+        actualSalary: '实发薪资区间占比',
         contractCost: '合同类型成本对比',
         tenure: '员工司龄分布',
         contractExpiry: '合同到期分布（未来 3 个月）',
@@ -626,11 +644,19 @@ export const memberCopy: Record<
         nonChina: '非中国籍',
         payrollTotal: '上月实发',
         payrollAverage: '人均',
+        payrollMedian: '中位',
+        payrollRatio: '均/中',
         teamSortCount: '人数',
         teamSortAvg: '均薪',
+        teamSortMedian: '中位',
+        modeOverview: '概览',
+        modeDetail: '详情',
+        modeCompare: '对比',
+        scatterHint: '颜色=列内相对值',
       },
       helpers: {
-        salaryRule: 'CTJ 时薪按 22 天 × 8 小时折算月薪；月薪优先取 NET MENSUEL，否则用基础工资 + 津贴。',
+        salaryRule: '合同口径：CTJ 时薪按 22 天 × 8 小时折算月薪；月薪优先取 NET MENSUEL，否则用基础工资 + 津贴。',
+        actualSalaryRule: '实发口径：上月 run1 + run2 汇总，仅计已发金额。',
       },
     },
     stats: {
@@ -1179,8 +1205,11 @@ export const memberCopy: Record<
         nationality: 'Part Chinois / Non chinois',
         team: 'Analyse des équipes',
         supervisor: 'Top responsables chinois',
+        teamCostScatter: 'Carte thermique',
+        teamCostShare: 'Concentration des coûts',
         provenance: 'Répartition des provenances',
-        salary: 'Répartition des salaires',
+        salary: 'Répartition des salaires contractuels',
+        actualSalary: 'Répartition des salaires versés',
         contractCost: 'Coût par type de contrat',
         tenure: 'Ancienneté',
         contractExpiry: 'Échéances de contrat (3 mois)',
@@ -1202,12 +1231,20 @@ export const memberCopy: Record<
         nonChina: 'Non chinois',
         payrollTotal: 'Total M-1',
         payrollAverage: 'Moyenne',
+        payrollMedian: 'Médiane',
+        payrollRatio: 'Moy./Méd.',
         teamSortCount: 'Effectif',
         teamSortAvg: 'Moyenne',
+        teamSortMedian: 'Méd.',
+        modeOverview: 'Vue',
+        modeDetail: 'Détail',
+        modeCompare: 'Compare',
+        scatterHint: 'Couleur = valeur relative par colonne',
       },
       helpers: {
         salaryRule:
-          'CTJ : conversion horaire 22 j × 8 h; NET MENSUEL prioritaire, sinon salaire de base + prime.',
+          'Contrat : CTJ converti (22 j × 8 h); NET MENSUEL prioritaire, sinon salaire de base + prime.',
+        actualSalaryRule: 'Versements : M-1 (run1 + run2), uniquement les montants versés.',
       },
     },
     stats: {

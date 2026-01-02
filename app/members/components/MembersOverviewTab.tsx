@@ -39,16 +39,25 @@ type BarItem = {
   meta?: string
 }
 
-type TeamSortMode = 'count' | 'avgPayroll'
+type TeamSortMode = 'count' | 'avgPayroll' | 'medianPayroll'
 
 type TeamStatsItem = {
   label: string
   value: number
   payrollTotal: number
   payrollAverage: number
+  payrollMedian: number
 }
 
 type TeamBarItem = TeamStatsItem & {
+  color: string
+}
+
+type ContractCostItem = {
+  label: string
+  total: number
+  avg: number
+  count: number
   color: string
 }
 
@@ -63,6 +72,9 @@ type SupervisorItem = {
   value: number
   teamDetails: SupervisorTeamDetail[]
   maxTeamCount: number
+  payrollTotal: number
+  payrollAverage: number
+  payrollMedian: number
 }
 
 type DonutItem = {
@@ -96,6 +108,14 @@ const CHART_COLORS = [
 ]
 
 const HOURS_PER_MONTH_CTJ = 22 * 8
+const SALARY_RANGES = [
+  { min: 0, max: 0 },
+  { min: 1, max: 100000 },
+  { min: 100001, max: 200000 },
+  { min: 200001, max: 300000 },
+  { min: 300001, max: 500000 },
+  { min: 500001, max: Number.POSITIVE_INFINITY },
+]
 
 const toLocaleId = (locale: Locale) => (locale === 'fr' ? 'fr-FR' : 'zh-CN')
 
@@ -137,6 +157,36 @@ const resolveMonthlySalary = (member: Member) => {
   return Math.max(0, baseMonthly + prime)
 }
 
+const calculateMedian = (values: number[]) => {
+  if (values.length === 0) return 0
+  const sorted = [...values].sort((a, b) => a - b)
+  const mid = Math.floor(sorted.length / 2)
+  return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2
+}
+
+const buildSalaryDistribution = (
+  values: number[],
+  formatMoney: (value: number) => string,
+) => {
+  const labels = SALARY_RANGES.map((range) => {
+    if (range.min === 0 && range.max === 0) return '0'
+    if (range.max === Number.POSITIVE_INFINITY) return `${formatMoney(range.min)}+`
+    return `${formatMoney(range.min)}-${formatMoney(range.max)}`
+  })
+  const counts = SALARY_RANGES.map(() => 0)
+  values.forEach((value) => {
+    const index = SALARY_RANGES.findIndex(
+      (range) => value >= range.min && value <= range.max,
+    )
+    if (index >= 0) counts[index] += 1
+  })
+  return labels.map((label, idx) => ({
+    label,
+    value: counts[idx],
+    color: CHART_COLORS[idx % CHART_COLORS.length],
+  }))
+}
+
 const buildTopItems = (items: Array<{ label: string; value: number }>, limit: number, otherLabel: string) => {
   if (items.length <= limit) return items
   const head = items.slice(0, limit - 1)
@@ -157,12 +207,16 @@ const OverviewCard = ({
 }) => (
   <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm h-full flex flex-col">
     <div className="mb-4 flex items-start justify-between gap-2">
-      <div>
+      <div className="min-w-0">
         <p className="text-sm font-semibold text-slate-900">{title}</p>
-        {subtitle ? <p className="text-xs text-slate-500">{subtitle}</p> : null}
+        {subtitle ? (
+          <p className="text-[11px] leading-snug text-slate-500 line-clamp-2" title={subtitle}>
+            {subtitle}
+          </p>
+        ) : null}
       </div>
       {badge ? (
-        <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-semibold text-slate-600">
+        <span className="shrink-0 whitespace-nowrap rounded-full bg-slate-100 px-2 py-1 text-[10px] font-semibold text-slate-600">
           {badge}
         </span>
       ) : null}
@@ -283,6 +337,293 @@ const BarList = ({
   )
 }
 
+const ContractCostBulletList = ({
+  items,
+  formatMoney,
+  formatNumber,
+  emptyLabel,
+  labels,
+}: {
+  items: ContractCostItem[]
+  formatMoney: (value: number) => string
+  formatNumber: (value: number) => string
+  emptyLabel: string
+  labels: {
+    people: string
+    payrollAverage: string
+  }
+}) => {
+  if (items.length === 0) {
+    return <p className="text-sm text-slate-500">{emptyLabel}</p>
+  }
+  const maxTotal = Math.max(...items.map((item) => item.total), 1)
+  const maxAvg = Math.max(...items.map((item) => item.avg), 1)
+
+  return (
+    <div className="space-y-5">
+      {items.map((item) => {
+        const totalRatio = Math.max(item.total / maxTotal, 0.02)
+        const avgRatio = Math.min(Math.max(item.avg / maxAvg, 0), 1)
+        const avgLeft = Math.min(Math.max(avgRatio, 0.02), 0.98) * 100
+
+        return (
+          <div key={item.label} className="flex items-center gap-3">
+            <div className="w-12 text-xs font-semibold text-slate-600">{item.label}</div>
+            <div className="flex-1">
+              <div className="relative h-2.5 rounded-full bg-slate-100 overflow-hidden ring-1 ring-slate-100/60">
+                <div
+                  className="h-full rounded-full relative"
+                  style={{
+                    width: `${totalRatio * 100}%`,
+                    backgroundColor: item.color,
+                  }}
+                >
+                  <div className="absolute inset-0 bg-gradient-to-b from-white/25 to-transparent" />
+                </div>
+                <span
+                  className="absolute top-1/2 h-2.5 w-2.5 -translate-y-1/2 -translate-x-1/2 rounded-full border-2 border-white shadow-sm"
+                  style={{
+                    left: `${avgLeft}%`,
+                    backgroundColor: item.color,
+                  }}
+                />
+              </div>
+              <div className="mt-1 flex items-center justify-between text-[11px] text-slate-500">
+                <span className="font-semibold text-slate-600">{formatMoney(item.total)}</span>
+                <span>
+                  {labels.payrollAverage} {formatMoney(item.avg)}
+                </span>
+              </div>
+            </div>
+            <span className="shrink-0 rounded-full bg-slate-100 px-2 py-1 text-[10px] font-semibold text-slate-600">
+              {formatNumber(item.count)} {labels.people}
+            </span>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+const TeamCostHeatmap = ({
+  items,
+  formatMoney,
+  formatNumber,
+  formatRatio,
+  emptyLabel,
+  hint,
+  labels,
+}: {
+  items: TeamStatsItem[]
+  formatMoney: (value: number) => string
+  formatNumber: (value: number) => string
+  formatRatio: (value: number) => string
+  emptyLabel: string
+  hint: string
+  labels: {
+    team: string
+    people: string
+    payrollTotal: string
+    payrollAverage: string
+    payrollMedian: string
+    payrollRatio: string
+  }
+}) => {
+  const hasPayroll = items.some((item) => item.payrollTotal > 0)
+  if (!hasPayroll) {
+    return <p className="text-sm text-slate-500">{emptyLabel}</p>
+  }
+
+  const rows = items
+    .filter((item) => item.value > 0)
+    .sort((a, b) => b.payrollTotal - a.payrollTotal)
+
+  const metrics = rows.map((item) => ({
+    count: item.value,
+    total: item.payrollTotal,
+    avg: item.payrollAverage,
+    median: item.payrollMedian,
+    ratio: item.payrollMedian > 0 ? item.payrollAverage / item.payrollMedian : 0,
+  }))
+
+  const getRange = (values: number[]) => {
+    const min = Math.min(...values)
+    const max = Math.max(...values, min + 1)
+    return { min, max }
+  }
+
+  const ranges = {
+    count: getRange(metrics.map((item) => item.count)),
+    total: getRange(metrics.map((item) => item.total)),
+    avg: getRange(metrics.map((item) => item.avg)),
+    median: getRange(metrics.map((item) => item.median)),
+    ratio: getRange(metrics.map((item) => item.ratio)),
+  }
+
+  const hues = {
+    count: 200,
+    total: 220,
+    avg: 40,
+    median: 280,
+    ratio: 0,
+  }
+
+  const metricRows = [
+    {
+      key: 'count',
+      label: labels.people,
+      range: ranges.count,
+      hue: hues.count,
+      formatValue: formatNumber,
+      getValue: (metric: (typeof metrics)[number]) => metric.count,
+    },
+    {
+      key: 'total',
+      label: labels.payrollTotal,
+      range: ranges.total,
+      hue: hues.total,
+      formatValue: formatMoney,
+      getValue: (metric: (typeof metrics)[number]) => metric.total,
+    },
+    {
+      key: 'avg',
+      label: labels.payrollAverage,
+      range: ranges.avg,
+      hue: hues.avg,
+      formatValue: formatMoney,
+      getValue: (metric: (typeof metrics)[number]) => metric.avg,
+    },
+    {
+      key: 'median',
+      label: labels.payrollMedian,
+      range: ranges.median,
+      hue: hues.median,
+      formatValue: formatMoney,
+      getValue: (metric: (typeof metrics)[number]) => metric.median,
+    },
+    {
+      key: 'ratio',
+      label: labels.payrollRatio,
+      range: ranges.ratio,
+      hue: hues.ratio,
+      formatValue: formatRatio,
+      getValue: (metric: (typeof metrics)[number]) => metric.ratio,
+    },
+  ] as const
+
+  const getCellStyle = (value: number, range: { min: number; max: number }, hue: number) => {
+    const t = (value - range.min) / Math.max(range.max - range.min, 1)
+    const lightness = 92 - t * 40
+    return {
+      backgroundColor: `hsl(${hue} 70% ${lightness}%)`,
+      color: lightness < 68 ? '#f8fafc' : '#0f172a',
+    }
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="overflow-auto rounded-xl border border-slate-200">
+        {/* Mobile: one team per row */}
+        <table className="min-w-full text-xs xl:hidden">
+          <thead className="bg-slate-50 text-slate-500">
+            <tr>
+              <th className="px-3 py-2 text-left font-semibold">{labels.team}</th>
+              <th className="px-3 py-2 text-right font-semibold">{labels.people}</th>
+              <th className="px-3 py-2 text-right font-semibold">{labels.payrollTotal}</th>
+              <th className="px-3 py-2 text-right font-semibold">{labels.payrollAverage}</th>
+              <th className="px-3 py-2 text-right font-semibold">{labels.payrollMedian}</th>
+              <th className="px-3 py-2 text-right font-semibold">{labels.payrollRatio}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((item, index) => {
+              const metric = metrics[index]
+              return (
+                <tr key={item.label} className="border-t border-slate-100">
+                  <td className="px-3 py-2 text-slate-700 font-medium truncate" title={item.label}>
+                    {item.label}
+                  </td>
+                  <td
+                    className="px-3 py-2 text-right font-semibold"
+                    style={getCellStyle(metric.count, ranges.count, hues.count)}
+                  >
+                    {formatNumber(metric.count)}
+                  </td>
+                  <td
+                    className="px-3 py-2 text-right font-semibold"
+                    style={getCellStyle(metric.total, ranges.total, hues.total)}
+                  >
+                    {formatMoney(metric.total)}
+                  </td>
+                  <td
+                    className="px-3 py-2 text-right font-semibold"
+                    style={getCellStyle(metric.avg, ranges.avg, hues.avg)}
+                  >
+                    {formatMoney(metric.avg)}
+                  </td>
+                  <td
+                    className="px-3 py-2 text-right font-semibold"
+                    style={getCellStyle(metric.median, ranges.median, hues.median)}
+                  >
+                    {formatMoney(metric.median)}
+                  </td>
+                  <td
+                    className="px-3 py-2 text-right font-semibold"
+                    style={getCellStyle(metric.ratio, ranges.ratio, hues.ratio)}
+                  >
+                    {formatRatio(metric.ratio)}
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+
+        {/* Desktop: one metric per row, teams as columns */}
+        <table className="hidden min-w-max text-xs xl:table">
+          <thead className="bg-slate-50 text-slate-500">
+            <tr>
+              <th className="px-3 py-2 text-left font-semibold">{labels.team}</th>
+              {rows.map((item) => (
+                <th
+                  key={item.label}
+                  className="px-3 py-2 text-center font-semibold whitespace-nowrap"
+                  title={item.label}
+                >
+                  {item.label}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {metricRows.map((metricRow) => (
+              <tr key={metricRow.key} className="border-t border-slate-100">
+                <td className="px-3 py-2 text-slate-600 font-semibold whitespace-nowrap">
+                  {metricRow.label}
+                </td>
+                {rows.map((item, index) => {
+                  const metric = metrics[index]
+                  const value = metricRow.getValue(metric)
+                  return (
+                    <td
+                      key={`${metricRow.key}-${item.label}`}
+                      className="px-3 py-2 text-center font-semibold whitespace-nowrap"
+                      style={getCellStyle(value, metricRow.range, metricRow.hue)}
+                    >
+                      {metricRow.formatValue(value)}
+                    </td>
+                  )
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="text-[11px] text-slate-400">{hint}</p>
+    </div>
+  )
+}
+
 const TeamDistributionGrid = ({
   items,
   missing,
@@ -316,10 +657,10 @@ const TeamDistributionGrid = ({
          </div>
          <div className="flex flex-col items-end gap-2 text-right">
             {showPayroll ? (
-              <div className="inline-flex rounded-full bg-slate-100 p-1 text-[11px] font-semibold text-slate-500">
+              <div className="inline-flex rounded-full bg-slate-100 p-1 text-[10px] font-semibold text-slate-500">
                 <button
                   type="button"
-                  className={`rounded-full px-3 py-1 transition-all ${
+                  className={`rounded-full px-2.5 py-1 transition-all ${
                     sortMode === 'count'
                       ? 'bg-white text-slate-900 shadow-sm'
                       : 'text-slate-500 hover:text-slate-700'
@@ -331,7 +672,7 @@ const TeamDistributionGrid = ({
                 </button>
                 <button
                   type="button"
-                  className={`rounded-full px-3 py-1 transition-all ${
+                  className={`rounded-full px-2.5 py-1 transition-all ${
                     sortMode === 'avgPayroll'
                       ? 'bg-white text-slate-900 shadow-sm'
                       : 'text-slate-500 hover:text-slate-700'
@@ -340,6 +681,18 @@ const TeamDistributionGrid = ({
                   aria-pressed={sortMode === 'avgPayroll'}
                 >
                   {t.overview.labels.teamSortAvg}
+                </button>
+                <button
+                  type="button"
+                  className={`rounded-full px-2.5 py-1 transition-all ${
+                    sortMode === 'medianPayroll'
+                      ? 'bg-white text-slate-900 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                  onClick={() => onSortChange('medianPayroll')}
+                  aria-pressed={sortMode === 'medianPayroll'}
+                >
+                  {t.overview.labels.teamSortMedian}
                 </button>
               </div>
             ) : null}
@@ -376,16 +729,21 @@ const TeamDistributionGrid = ({
                    </div>
                 </div>
                 {showPayroll ? (
-                  <div className="mt-2 text-[11px] text-slate-400">
-                    <span className="font-medium text-slate-500">
-                      {t.overview.labels.payrollTotal}
+                  <div className="mt-2 text-[10px] text-slate-400 flex flex-wrap gap-x-2">
+                    <span>
+                      <span className="font-medium text-slate-500">{t.overview.labels.payrollTotal}</span>
+                      <span className="ml-1">{formatMoney(item.payrollTotal)}</span>
                     </span>
-                    <span className="ml-1">{formatMoney(item.payrollTotal ?? 0)}</span>
-                    <span className="mx-2 text-slate-300">|</span>
-                    <span className="font-medium text-slate-500">
-                      {t.overview.labels.payrollAverage}
+                    <span className="text-slate-300">|</span>
+                    <span>
+                      <span className="font-medium text-slate-500">{t.overview.labels.payrollAverage}</span>
+                      <span className="ml-1">{formatMoney(item.payrollAverage)}</span>
                     </span>
-                    <span className="ml-1">{formatMoney(item.payrollAverage ?? 0)}</span>
+                    <span className="text-slate-300">|</span>
+                    <span>
+                      <span className="font-medium text-slate-500">{t.overview.labels.payrollMedian}</span>
+                      <span className="ml-1">{formatMoney(item.payrollMedian)}</span>
+                    </span>
                   </div>
                 ) : null}
              </div>
@@ -404,7 +762,23 @@ const TeamDistributionGrid = ({
   )
 }
 
-const SupervisorPowerGrid = ({ items, missing, t }: { items: SupervisorItem[], missing: number, t: MemberCopy }) => {
+const SupervisorPowerGrid = ({
+  items,
+  missing,
+  t,
+  showPayroll,
+  sortMode,
+  onSortChange,
+  formatMoney,
+}: {
+  items: SupervisorItem[]
+  missing: number
+  t: MemberCopy
+  showPayroll: boolean
+  sortMode: TeamSortMode
+  onSortChange: (mode: TeamSortMode) => void
+  formatMoney: (value: number) => string
+}) => {
   if (items.length === 0 && missing === 0) return null
 
   return (
@@ -416,13 +790,53 @@ const SupervisorPowerGrid = ({ items, missing, t }: { items: SupervisorItem[], m
                {t.overview.labels.localScope}
             </p>
          </div>
+         {showPayroll ? (
+           <div className="inline-flex rounded-full bg-slate-100 p-1 text-[10px] font-semibold text-slate-500">
+             <button
+               type="button"
+               className={`rounded-full px-2.5 py-1 transition-all ${
+                 sortMode === 'count'
+                   ? 'bg-white text-slate-900 shadow-sm'
+                   : 'text-slate-500 hover:text-slate-700'
+               }`}
+               onClick={() => onSortChange('count')}
+               aria-pressed={sortMode === 'count'}
+             >
+               {t.overview.labels.teamSortCount}
+             </button>
+             <button
+               type="button"
+               className={`rounded-full px-2.5 py-1 transition-all ${
+                 sortMode === 'avgPayroll'
+                   ? 'bg-white text-slate-900 shadow-sm'
+                   : 'text-slate-500 hover:text-slate-700'
+               }`}
+               onClick={() => onSortChange('avgPayroll')}
+               aria-pressed={sortMode === 'avgPayroll'}
+             >
+               {t.overview.labels.teamSortAvg}
+             </button>
+             <button
+               type="button"
+               className={`rounded-full px-2.5 py-1 transition-all ${
+                 sortMode === 'medianPayroll'
+                   ? 'bg-white text-slate-900 shadow-sm'
+                   : 'text-slate-500 hover:text-slate-700'
+               }`}
+               onClick={() => onSortChange('medianPayroll')}
+               aria-pressed={sortMode === 'medianPayroll'}
+             >
+               {t.overview.labels.teamSortMedian}
+             </button>
+           </div>
+         ) : null}
       </div>
       
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {items.map((item) => {
           return (
             <div key={item.label} className="flex flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-all hover:border-slate-300 hover:shadow-md">
-               <div className="flex items-start justify-between gap-3 mb-4">
+               <div className="flex items-start justify-between gap-3 mb-2">
                   <div>
                     <span className="font-bold text-slate-900 text-base block truncate" title={item.label}>{item.label}</span>
                   </div>
@@ -432,8 +846,24 @@ const SupervisorPowerGrid = ({ items, missing, t }: { items: SupervisorItem[], m
                   </div>
                </div>
                
+               {showPayroll ? (
+                  <div className="mb-4 text-[10px] text-slate-400 border-b border-slate-50 pb-2">
+                    <div className="flex justify-between">
+                      <span>{t.overview.labels.payrollTotal}</span>
+                      <span className="font-medium text-slate-600">{formatMoney(item.payrollTotal)}</span>
+                    </div>
+                    <div className="flex justify-between mt-0.5">
+                      <span>
+                        {t.overview.labels.payrollAverage} / {t.overview.labels.payrollMedian}
+                      </span>
+                      <span className="font-medium text-slate-600">
+                        {formatMoney(item.payrollAverage)} / {formatMoney(item.payrollMedian)}
+                      </span>
+                    </div>
+                  </div>
+                ) : null}
+               
                <div className="flex-1 space-y-3">
-                 <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Power Structure</div>
                  {item.teamDetails.map((team, idx) => (
                     <div key={team.name} className="group">
                       <div className="flex justify-between items-end mb-1">
@@ -497,6 +927,10 @@ export function MembersOverviewTab({
     () => new Intl.NumberFormat(toLocaleId(locale)),
     [locale],
   )
+  const ratioFormatter = useMemo(
+    () => new Intl.NumberFormat(toLocaleId(locale), { maximumFractionDigits: 2 }),
+    [locale],
+  )
   const formatNumber = useCallback(
     (value: number) => numberFormatter.format(Math.round(value)),
     [numberFormatter],
@@ -505,25 +939,28 @@ export function MembersOverviewTab({
     (value: number) => numberFormatter.format(Math.round(value)),
     [numberFormatter],
   )
-  const teamCollator = useMemo(
+  const formatRatio = useCallback(
+    (value: number) => ratioFormatter.format(value),
+    [ratioFormatter],
+  )
+  const nameCollator = useMemo(
     () => new Intl.Collator(toLocaleId(locale), { numeric: true, sensitivity: 'base' }),
     [locale],
   )
 
   const [payrollPayouts, setPayrollPayouts] = useState<PayrollPayout[]>([])
   const [payrollReady, setPayrollReady] = useState(false)
+  const [viewMode, setViewMode] = useState<'overview' | 'detail' | 'compare'>('overview')
   const [teamSortMode, setTeamSortMode] = useState<TeamSortMode>('count')
+  const [supervisorSortMode, setSupervisorSortMode] = useState<TeamSortMode>('count')
 
+  // Fetch payroll data when permission is granted
   useEffect(() => {
-    if (!canViewPayroll) {
-      setPayrollPayouts([])
-      setPayrollReady(false)
-      return
-    }
+    if (!canViewPayroll) return
 
     let cancelled = false
     const { year, month } = getLastMonthKey()
-    setPayrollReady(false)
+    
     fetch(`/api/payroll-runs?year=${year}&month=${month}`)
       .then((res) => {
         if (!res.ok) throw new Error('Failed to load payroll')
@@ -545,16 +982,18 @@ export function MembersOverviewTab({
     }
   }, [canViewPayroll])
 
+  const showTeamPayroll = canViewPayroll && payrollReady
+
   const payrollPayoutsByMemberId = useMemo(() => {
     const map = new Map<number, number>()
-    if (!payrollReady) return map
+    if (!showTeamPayroll) return map
     payrollPayouts.forEach((payout) => {
       const amount = parseNumber(payout.amount)
       if (amount === null) return
       map.set(payout.userId, (map.get(payout.userId) ?? 0) + amount)
     })
     return map
-  }, [payrollPayouts, payrollReady])
+  }, [payrollPayouts, showTeamPayroll])
 
   const filterControlProps = {
     allLabel: t.filters.all,
@@ -599,10 +1038,8 @@ export function MembersOverviewTab({
   }, [scopedMembers])
 
   const teamStats = useMemo(() => {
-    const map = new Map<string, { count: number; payrollTotal: number }>()
+    const map = new Map<string, { count: number; payrollTotal: number; salaries: number[] }>()
     let missing = 0
-    // Filter out Chinese nationals explicitly as requested by leadership
-    // to show only local team composition
     const teamMembers = localMembers.filter(m => m.nationality !== 'china')
     
     teamMembers.forEach((member) => {
@@ -611,10 +1048,12 @@ export function MembersOverviewTab({
         missing += 1
         return
       }
-      const current = map.get(team) ?? { count: 0, payrollTotal: 0 }
+      const current = map.get(team) ?? { count: 0, payrollTotal: 0, salaries: [] }
       current.count += 1
-      if (payrollReady) {
-        current.payrollTotal += payrollPayoutsByMemberId.get(member.id) ?? 0
+      if (showTeamPayroll) {
+        const salary = payrollPayoutsByMemberId.get(member.id) ?? 0
+        current.payrollTotal += salary
+        current.salaries.push(salary)
       }
       map.set(team, current)
     })
@@ -623,36 +1062,38 @@ export function MembersOverviewTab({
       value: data.count,
       payrollTotal: data.payrollTotal,
       payrollAverage: data.count ? data.payrollTotal / data.count : 0,
+      payrollMedian: calculateMedian(data.salaries),
     }))
 
-    // Display ALL teams, do not aggregate into "Other"
     return {
       items,
       missing,
     }
-  }, [localMembers, payrollPayoutsByMemberId, payrollReady])
-
-  const showTeamPayroll = canViewPayroll && payrollReady
+  }, [localMembers, payrollPayoutsByMemberId, showTeamPayroll])
 
   const sortedTeamItems = useMemo(() => {
     const mode: TeamSortMode = showTeamPayroll ? teamSortMode : 'count'
     const list = [...teamStats.items]
     const getSortValue = (item: TeamStatsItem) =>
-      mode === 'avgPayroll' ? item.payrollAverage : item.value
+      mode === 'avgPayroll'
+        ? item.payrollAverage
+        : mode === 'medianPayroll'
+          ? item.payrollMedian
+          : item.value
     list.sort((a, b) => {
       const diff = getSortValue(b) - getSortValue(a)
       if (diff !== 0) return diff
       if (a.value !== b.value) return b.value - a.value
-      return teamCollator.compare(a.label, b.label)
+      return nameCollator.compare(a.label, b.label)
     })
     return list.map((item, idx): TeamBarItem => ({
       ...item,
       color: CHART_COLORS[idx % CHART_COLORS.length],
     }))
-  }, [teamStats.items, teamSortMode, showTeamPayroll, teamCollator])
+  }, [teamStats.items, teamSortMode, showTeamPayroll, nameCollator])
 
   const supervisorStats = useMemo(() => {
-    const map = new Map<string, { count: number, teamCounts: Map<string, number> }>()
+    const map = new Map<string, { count: number, teamCounts: Map<string, number>, payrollTotal: number, salaries: number[] }>()
     let missing = 0
     localMembers.forEach((member) => {
       const supervisor = member.expatProfile?.chineseSupervisor
@@ -668,8 +1109,14 @@ export function MembersOverviewTab({
         return
       }
       
-      const current = map.get(label) ?? { count: 0, teamCounts: new Map<string, number>() }
+      const current = map.get(label) ?? { count: 0, teamCounts: new Map<string, number>(), payrollTotal: 0, salaries: [] }
       current.count += 1
+      
+      if (showTeamPayroll) {
+         const salary = payrollPayoutsByMemberId.get(member.id) ?? 0
+         current.payrollTotal += salary
+         current.salaries.push(salary)
+      }
       
       const teamName = normalizeText(member.expatProfile?.team)
       if (teamName) {
@@ -682,30 +1129,54 @@ export function MembersOverviewTab({
       map.set(label, current)
     })
     
-    const items = Array.from(map.entries())
-      .map(([label, data]) => {
-        const teamDetails: SupervisorTeamDetail[] = Array.from(data.teamCounts.entries())
-          .map(([name, count]) => ({
-             name,
-             count,
-             percent: Math.round((count / data.count) * 100)
-          }))
-          .sort((a, b) => b.count - a.count)
-          
-        return { 
-          label, 
-          value: data.count,
-          teamDetails,
-          maxTeamCount: teamDetails.length > 0 ? teamDetails[0].count : 0
-        }
-      })
-      .sort((a, b) => b.value - a.value)
-      
+    const items = Array.from(map.entries()).map(([label, data]) => {
+      const teamDetails: SupervisorTeamDetail[] = Array.from(data.teamCounts.entries())
+        .map(([name, count]) => ({
+           name,
+           count,
+           percent: Math.round((count / data.count) * 100)
+        }))
+        .sort((a, b) => b.count - a.count)
+        
+      return { 
+        label, 
+        value: data.count,
+        teamDetails,
+        maxTeamCount: teamDetails.length > 0 ? teamDetails[0].count : 0,
+        payrollTotal: data.payrollTotal,
+        payrollAverage: data.count ? data.payrollTotal / data.count : 0,
+        payrollMedian: calculateMedian(data.salaries)
+      }
+    })
+
     return {
       items,
       missing,
     }
-  }, [localMembers, t.overview.labels.unassignedTeam])
+  }, [
+    localMembers,
+    t.overview.labels.unassignedTeam,
+    payrollPayoutsByMemberId,
+    showTeamPayroll,
+  ])
+
+  const sortedSupervisorItems = useMemo(() => {
+    const mode: TeamSortMode = showTeamPayroll ? supervisorSortMode : 'count'
+    const list = [...supervisorStats.items]
+    const getSortValue = (item: SupervisorItem) =>
+      mode === 'avgPayroll'
+        ? item.payrollAverage
+        : mode === 'medianPayroll'
+          ? item.payrollMedian
+          : item.value
+    list.sort((a, b) => {
+      const diff = getSortValue(b) - getSortValue(a)
+      if (diff !== 0) return diff
+      if (a.value !== b.value) return b.value - a.value
+      return nameCollator.compare(a.label, b.label)
+    })
+    return list
+  }, [supervisorStats.items, supervisorSortMode, showTeamPayroll, nameCollator])
 
   const provenanceStats = useMemo(() => {
     const map = new Map<string, number>()
@@ -731,36 +1202,21 @@ export function MembersOverviewTab({
     }
   }, [localMembers, t.overview.labels.other])
 
-  const salaryStats = useMemo(() => {
-    const salaryRanges = [
-      { min: 0, max: 0 },
-      { min: 1, max: 100000 },
-      { min: 100001, max: 200000 },
-      { min: 200001, max: 300000 },
-      { min: 300001, max: 500000 },
-      { min: 500001, max: Number.POSITIVE_INFINITY },
-    ]
-    const labels = salaryRanges.map((range) => {
-      if (range.min === 0 && range.max === 0) return '0'
-      if (range.max === Number.POSITIVE_INFINITY) return `${formatMoney(range.min)}+`
-      return `${formatMoney(range.min)}-${formatMoney(range.max)}`
-    })
-    const counts = salaryRanges.map(() => 0)
-    localMembers.forEach((member) => {
-      const value = resolveMonthlySalary(member)
-      const index = salaryRanges.findIndex(
-        (range) => value >= range.min && value <= range.max,
-      )
-      if (index >= 0) counts[index] += 1
-    })
-    return labels.map((label, idx) => ({
-      label,
-      value: counts[idx],
-      color: CHART_COLORS[idx % CHART_COLORS.length],
-    }))
+  const contractSalaryStats = useMemo(() => {
+    const values = localMembers.map((member) => resolveMonthlySalary(member))
+    return buildSalaryDistribution(values, formatMoney)
   }, [localMembers, formatMoney])
 
+  const payoutSalaryStats = useMemo(() => {
+    if (!showTeamPayroll) return []
+    const values = localMembers.map((member) => payrollPayoutsByMemberId.get(member.id) ?? 0)
+    return buildSalaryDistribution(values, formatMoney)
+  }, [localMembers, payrollPayoutsByMemberId, showTeamPayroll, formatMoney])
+
   const contractCostStats = useMemo(() => {
+    if (!showTeamPayroll) {
+      return { items: [], unknown: 0 }
+    }
     let ctjTotal = 0
     let cddTotal = 0
     let ctjCount = 0
@@ -768,7 +1224,7 @@ export function MembersOverviewTab({
     let unknown = 0
     localMembers.forEach((member) => {
       const type = member.expatProfile?.contractType ?? null
-      const salary = resolveMonthlySalary(member)
+      const salary = payrollPayoutsByMemberId.get(member.id) ?? 0
       if (type === 'CTJ') {
         ctjTotal += salary
         ctjCount += 1
@@ -783,20 +1239,26 @@ export function MembersOverviewTab({
       items: [
         {
           label: 'CTJ',
-          value: ctjTotal,
+          total: ctjTotal,
+          avg: ctjCount ? ctjTotal / ctjCount : 0,
+          count: ctjCount,
           color: CHART_COLORS[0],
-          meta: `${formatNumber(ctjCount)} ${t.overview.labels.people}`,
         },
         {
           label: 'CDD',
-          value: cddTotal,
+          total: cddTotal,
+          avg: cddCount ? cddTotal / cddCount : 0,
+          count: cddCount,
           color: CHART_COLORS[1],
-          meta: `${formatNumber(cddCount)} ${t.overview.labels.people}`,
         },
       ],
       unknown,
     }
-  }, [localMembers, formatNumber, t.overview.labels.people])
+  }, [
+    localMembers,
+    payrollPayoutsByMemberId,
+    showTeamPayroll,
+  ])
 
   const tenureStats = useMemo(() => {
     const monthUnit = locale === 'fr' ? 'mois' : '月'
@@ -933,8 +1395,29 @@ export function MembersOverviewTab({
           </h2>
           <p className="text-sm text-slate-500">{t.overview.subtitle}</p>
         </div>
+        
+        {/* Top Segmented Control */}
+        <div className="flex bg-slate-100 rounded-lg p-1 gap-1">
+          {(['overview', 'detail', 'compare'] as const).map((mode) => (
+             <button
+                key={mode}
+                onClick={() => setViewMode(mode)}
+                className={`px-4 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                  viewMode === mode 
+                    ? 'bg-white text-slate-900 shadow-sm ring-1 ring-black/5' 
+                    : 'text-slate-500 hover:text-slate-700'
+                }`}
+             >
+                {mode === 'overview'
+                  ? t.overview.labels.modeOverview
+                  : mode === 'detail'
+                    ? t.overview.labels.modeDetail
+                    : t.overview.labels.modeCompare}
+             </button>
+          ))}
+        </div>
       </div>
-
+      
       <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4 mb-4">
           <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">
@@ -1022,7 +1505,6 @@ export function MembersOverviewTab({
         ))}
       </div>
 
-      {/* Prominent Team Distribution Section */}
       <TeamDistributionGrid 
         items={sortedTeamItems}
         missing={teamStats.missing} 
@@ -1033,17 +1515,37 @@ export function MembersOverviewTab({
         formatMoney={formatMoney}
       />
 
-      {/* Prominent Supervisor Power Grid Section */}
       <SupervisorPowerGrid 
-        items={supervisorStats.items} 
+        items={sortedSupervisorItems}
         missing={supervisorStats.missing} 
         t={t} 
+        showPayroll={showTeamPayroll}
+        sortMode={showTeamPayroll ? supervisorSortMode : 'count'}
+        onSortChange={setSupervisorSortMode}
+        formatMoney={formatMoney}
       />
 
       <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-        {/* Removed the Nationality chart from here */}
-
-        {/* Removed Supervisor chart from here as it's promoted above */}
+        <div className="md:col-span-2 xl:col-span-3">
+          <OverviewCard title={t.overview.charts.teamCostScatter} badge={t.overview.labels.localScope}>
+            <TeamCostHeatmap
+              items={teamStats.items}
+              formatMoney={formatMoney}
+              formatNumber={formatNumber}
+              formatRatio={formatRatio}
+              emptyLabel={t.overview.labels.noData}
+              hint={t.overview.labels.scatterHint}
+              labels={{
+                team: t.table.team,
+                people: t.overview.labels.people,
+                payrollTotal: t.overview.labels.payrollTotal,
+                payrollAverage: t.overview.labels.payrollAverage,
+                payrollMedian: t.overview.labels.payrollMedian,
+                payrollRatio: t.overview.labels.payrollRatio,
+              }}
+            />
+          </OverviewCard>
+        </div>
 
         <OverviewCard title={t.overview.charts.provenance} badge={t.overview.labels.localScope}>
           <DonutChart
@@ -1059,21 +1561,42 @@ export function MembersOverviewTab({
           ) : null}
         </OverviewCard>
 
-        <OverviewCard title={t.overview.charts.salary} badge={t.overview.labels.localScope}>
+        <OverviewCard
+          title={t.overview.charts.salary}
+          subtitle={t.overview.helpers.salaryRule}
+          badge={t.overview.labels.localScope}
+        >
           <DonutChart
-            items={salaryStats}
+            items={contractSalaryStats}
             totalLabel={t.overview.labels.total}
             formatValue={formatNumber}
             emptyLabel={t.overview.labels.noData}
           />
-          <p className="mt-2 text-xs text-slate-500">{t.overview.helpers.salaryRule}</p>
+        </OverviewCard>
+
+        <OverviewCard
+          title={t.overview.charts.actualSalary}
+          subtitle={t.overview.helpers.actualSalaryRule}
+          badge={t.overview.labels.localScope}
+        >
+          <DonutChart
+            items={payoutSalaryStats}
+            totalLabel={t.overview.labels.total}
+            formatValue={formatNumber}
+            emptyLabel={t.overview.labels.noData}
+          />
         </OverviewCard>
 
         <OverviewCard title={t.overview.charts.contractCost} badge={t.overview.labels.localScope}>
-          <BarList
+          <ContractCostBulletList
             items={contractCostStats.items}
-            formatValue={formatMoney}
+            formatMoney={formatMoney}
+            formatNumber={formatNumber}
             emptyLabel={t.overview.labels.noData}
+            labels={{
+              people: t.overview.labels.people,
+              payrollAverage: t.overview.labels.payrollAverage,
+            }}
           />
           {contractCostStats.unknown ? (
             <p className="mt-2 text-xs text-slate-500">
