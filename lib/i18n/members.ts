@@ -652,11 +652,11 @@ export const memberCopy: Record<
         modeOverview: '概览',
         modeDetail: '详情',
         modeCompare: '对比',
-        scatterHint: '颜色=列内相对值',
+        scatterHint: '颜色=列内相对值。均/中：值越大，高薪越集中；接近 1，分布越均衡；过低提示异常。',
       },
       helpers: {
-        salaryRule: '合同口径：CTJ 时薪按 22 天 × 8 小时折算月薪；月薪优先取 NET MENSUEL，否则用基础工资 + 津贴。',
-        actualSalaryRule: '实发口径：上月 run1 + run2 汇总，仅计已发金额。',
+        salaryRule: '合同口径：CTJ 时薪按 22 天 × 8 小时折算月薪；月薪优先取实发工资，否则用基础工资 + 津贴。',
+        actualSalaryRule: '实发口径：上月月中 + 月末汇总，仅计已发金额。',
       },
     },
     stats: {
@@ -1239,7 +1239,8 @@ export const memberCopy: Record<
         modeOverview: 'Vue',
         modeDetail: 'Détail',
         modeCompare: 'Compare',
-        scatterHint: 'Couleur = valeur relative par colonne',
+        scatterHint:
+        'Couleur = valeur relative par colonne. Moy./Méd. : plus la valeur est élevée, plus les hauts salaires sont concentrés ; proche de 1, plus la distribution est équilibrée ; trop faible indique une anomalie.',
       },
       helpers: {
         salaryRule:

@@ -205,23 +205,23 @@ const OverviewCard = ({
   badge?: string
   children: ReactNode
 }) => (
-  <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm h-full flex flex-col">
-    <div className="mb-4 flex items-start justify-between gap-2">
+  <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition-all hover:shadow-md h-full flex flex-col">
+    <div className="mb-5 flex items-start justify-between gap-2">
       <div className="min-w-0">
-        <p className="text-sm font-semibold text-slate-900">{title}</p>
+        <h3 className="text-base font-bold text-slate-900">{title}</h3>
         {subtitle ? (
-          <p className="text-[11px] leading-snug text-slate-500 line-clamp-2" title={subtitle}>
+          <p className="mt-1 text-[11px] leading-snug text-slate-500 line-clamp-2" title={subtitle}>
             {subtitle}
           </p>
         ) : null}
       </div>
       {badge ? (
-        <span className="shrink-0 whitespace-nowrap rounded-full bg-slate-100 px-2 py-1 text-[10px] font-semibold text-slate-600">
+        <span className="shrink-0 whitespace-nowrap rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold tracking-wide text-slate-600">
           {badge}
         </span>
       ) : null}
     </div>
-    <div className="flex-1">
+    <div className="flex-1 min-h-0">
       {children}
     </div>
   </div>
@@ -241,7 +241,11 @@ const DonutChart = ({
   const visibleItems = items.filter((item) => item.value > 0)
   const total = visibleItems.reduce((sum, item) => sum + item.value, 0)
   if (total === 0) {
-    return <p className="text-sm text-slate-500">{emptyLabel}</p>
+    return (
+      <div className="flex h-full items-center justify-center p-4">
+        <p className="text-sm font-medium text-slate-400">{emptyLabel}</p>
+      </div>
+    )
   }
   const segments = visibleItems.reduce(
     (acc, item) => {
@@ -256,35 +260,35 @@ const DonutChart = ({
   ).segments
 
   return (
-    <div className="flex flex-col gap-6 sm:flex-row sm:items-center h-full justify-center">
-      <div className="relative h-36 w-36 shrink-0 filter drop-shadow-sm">
+    <div className="flex flex-col gap-8 sm:flex-row sm:items-center h-full justify-center">
+      <div className="relative h-40 w-40 shrink-0 filter drop-shadow-sm self-center sm:self-auto">
         <div
           className="absolute inset-0 rounded-full"
           style={{ backgroundImage: `conic-gradient(${segments.join(',')})` }}
         />
-        <div className="absolute inset-8 rounded-full bg-white shadow-inner" />
-        <div className="absolute inset-0 flex flex-col items-center justify-center text-center text-[10px] text-slate-500 pointer-events-none">
-          <span className="font-semibold uppercase tracking-wider text-slate-400 mb-0.5">{totalLabel}</span>
-          <span className="text-xl font-bold text-slate-900">{formatValue(total)}</span>
+        <div className="absolute inset-[18%] rounded-full bg-white shadow-inner" />
+        <div className="absolute inset-0 flex flex-col items-center justify-center text-center text-slate-500 pointer-events-none p-4">
+          <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-0.5">{totalLabel}</span>
+          <span className="text-2xl font-extrabold text-slate-900 leading-none">{formatValue(total)}</span>
         </div>
       </div>
-      <div className="flex-1 space-y-3">
+      <div className="flex-1 w-full space-y-2.5">
         {visibleItems.map((item) => {
           const percent = Math.round((item.value / total) * 100)
           return (
-            <div key={item.label} className="group flex items-center justify-between gap-3 text-sm">
-              <div className="flex items-center gap-2.5 overflow-hidden">
+            <div key={item.label} className="group flex items-center justify-between gap-3 text-sm rounded-lg hover:bg-slate-50 p-1.5 -mx-1.5 transition-colors">
+              <div className="flex items-center gap-3 overflow-hidden">
                 <span 
-                  className="h-2.5 w-2.5 shrink-0 rounded-full shadow-sm ring-2 ring-white" 
+                  className="h-3 w-3 shrink-0 rounded-full shadow-sm ring-2 ring-white" 
                   style={{ backgroundColor: item.color }} 
                 />
-                <span className="truncate font-medium text-slate-600 transition-colors group-hover:text-slate-900">
+                <span className="truncate font-medium text-slate-600 group-hover:text-slate-900 transition-colors">
                   {item.label}
                 </span>
               </div>
               <div className="flex items-baseline gap-2 shrink-0">
-                <span className="font-bold text-slate-700">{formatValue(item.value)}</span>
-                <span className="text-xs font-medium text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded">{percent}%</span>
+                <span className="font-bold text-slate-900">{formatValue(item.value)}</span>
+                <span className="text-xs font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full min-w-[3rem] text-center">{percent}%</span>
               </div>
             </div>
           )
@@ -531,65 +535,51 @@ const TeamCostHeatmap = ({
 
   const getCellStyle = (value: number, range: { min: number; max: number }, hue: number) => {
     const t = (value - range.min) / Math.max(range.max - range.min, 1)
-    const lightness = 92 - t * 40
+    const lightness = 95 - t * 45 // Slightly lighter base for better text contrast
     return {
       backgroundColor: `hsl(${hue} 70% ${lightness}%)`,
-      color: lightness < 68 ? '#f8fafc' : '#0f172a',
+      color: lightness < 65 ? '#ffffff' : '#1e293b', // Darker text for light backgrounds, white for dark
     }
   }
 
   return (
-    <div className="space-y-2">
-      <div className="overflow-auto rounded-xl border border-slate-200">
+    <div className="space-y-3 h-full flex flex-col">
+      <div className="flex-1 overflow-auto rounded-xl border border-slate-200 bg-white shadow-inner scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-transparent">
         {/* Mobile: one team per row */}
         <table className="min-w-full text-xs xl:hidden">
-          <thead className="bg-slate-50 text-slate-500">
+          <thead className="bg-slate-50 text-slate-500 font-medium border-b border-slate-200">
             <tr>
-              <th className="px-3 py-2 text-left font-semibold">{labels.team}</th>
-              <th className="px-3 py-2 text-right font-semibold">{labels.people}</th>
-              <th className="px-3 py-2 text-right font-semibold">{labels.payrollTotal}</th>
-              <th className="px-3 py-2 text-right font-semibold">{labels.payrollAverage}</th>
-              <th className="px-3 py-2 text-right font-semibold">{labels.payrollMedian}</th>
-              <th className="px-3 py-2 text-right font-semibold">{labels.payrollRatio}</th>
+              <th className="px-4 py-3 text-left font-bold sticky top-0 bg-slate-50 z-10">{labels.team}</th>
+              <th className="px-4 py-3 text-right font-semibold">{labels.people}</th>
+              <th className="px-4 py-3 text-right font-semibold">{labels.payrollTotal}</th>
+              <th className="px-4 py-3 text-right font-semibold">{labels.payrollAverage}</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className="divide-y divide-slate-100">
             {rows.map((item, index) => {
               const metric = metrics[index]
               return (
-                <tr key={item.label} className="border-t border-slate-100">
-                  <td className="px-3 py-2 text-slate-700 font-medium truncate" title={item.label}>
+                <tr key={item.label} className="group hover:bg-slate-50">
+                  <td className="px-4 py-3 text-slate-800 font-bold truncate bg-white group-hover:bg-slate-50" title={item.label}>
                     {item.label}
                   </td>
                   <td
-                    className="px-3 py-2 text-right font-semibold"
+                    className="px-4 py-3 text-right font-medium"
                     style={getCellStyle(metric.count, ranges.count, hues.count)}
                   >
                     {formatNumber(metric.count)}
                   </td>
                   <td
-                    className="px-3 py-2 text-right font-semibold"
+                    className="px-4 py-3 text-right font-medium"
                     style={getCellStyle(metric.total, ranges.total, hues.total)}
                   >
                     {formatMoney(metric.total)}
                   </td>
                   <td
-                    className="px-3 py-2 text-right font-semibold"
+                    className="px-4 py-3 text-right font-medium"
                     style={getCellStyle(metric.avg, ranges.avg, hues.avg)}
                   >
                     {formatMoney(metric.avg)}
-                  </td>
-                  <td
-                    className="px-3 py-2 text-right font-semibold"
-                    style={getCellStyle(metric.median, ranges.median, hues.median)}
-                  >
-                    {formatMoney(metric.median)}
-                  </td>
-                  <td
-                    className="px-3 py-2 text-right font-semibold"
-                    style={getCellStyle(metric.ratio, ranges.ratio, hues.ratio)}
-                  >
-                    {formatRatio(metric.ratio)}
                   </td>
                 </tr>
               )
@@ -598,14 +588,16 @@ const TeamCostHeatmap = ({
         </table>
 
         {/* Desktop: one metric per row, teams as columns */}
-        <table className="hidden min-w-max text-xs xl:table">
-          <thead className="bg-slate-50 text-slate-500">
+        <table className="hidden min-w-max text-xs xl:table border-collapse">
+          <thead>
             <tr>
-              <th className="px-3 py-2 text-left font-semibold">{labels.team}</th>
+              <th className="px-4 py-3 text-left font-bold bg-slate-50 text-slate-500 border-b border-r border-slate-200 sticky left-0 z-20 w-32 shadow-[4px_0_8px_-2px_rgba(0,0,0,0.05)]">
+                 {/* Empty corner cell */}
+              </th>
               {rows.map((item) => (
                 <th
                   key={item.label}
-                  className="px-3 py-2 text-center font-semibold whitespace-nowrap"
+                  className="px-4 py-3 text-center font-bold text-slate-600 bg-slate-50 border-b border-slate-200 whitespace-nowrap min-w-[80px]"
                   title={item.label}
                 >
                   {item.label}
@@ -615,8 +607,8 @@ const TeamCostHeatmap = ({
           </thead>
           <tbody>
             {metricRows.map((metricRow) => (
-              <tr key={metricRow.key} className="border-t border-slate-100">
-                <td className="px-3 py-2 text-slate-600 font-semibold whitespace-nowrap">
+              <tr key={metricRow.key}>
+                <td className="px-4 py-3 text-slate-600 font-bold bg-slate-50 border-r border-b border-slate-200 sticky left-0 z-10 whitespace-nowrap shadow-[4px_0_8px_-2px_rgba(0,0,0,0.05)]">
                   {metricRow.label}
                 </td>
                 {rows.map((item, index) => {
@@ -625,7 +617,7 @@ const TeamCostHeatmap = ({
                   return (
                     <td
                       key={`${metricRow.key}-${item.label}`}
-                      className="px-3 py-2 text-center font-semibold whitespace-nowrap"
+                      className="px-4 py-3 text-center font-medium border-b border-white whitespace-nowrap transition-opacity hover:opacity-90"
                       style={getCellStyle(value, metricRow.range, metricRow.hue)}
                     >
                       {metricRow.formatValue(value)}
@@ -637,7 +629,7 @@ const TeamCostHeatmap = ({
           </tbody>
         </table>
       </div>
-      <p className="text-[11px] text-slate-400">{hint}</p>
+      <p className="text-[10px] text-slate-400 px-1 italic">{hint}</p>
     </div>
   )
 }
