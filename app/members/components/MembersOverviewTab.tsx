@@ -654,26 +654,6 @@ export function MembersOverviewTab({
     },
   ]
 
-  const nationalityItems: DonutItem[] = [
-    {
-      label: t.overview.labels.china,
-      value: nationalityStats.china,
-      color: CHART_COLORS[0],
-    },
-    {
-      label: t.overview.labels.nonChina,
-      value: nationalityStats.nonChina,
-      color: CHART_COLORS[1],
-    },
-  ]
-  if (nationalityStats.unknown > 0) {
-    nationalityItems.push({
-      label: t.labels.empty,
-      value: nationalityStats.unknown,
-      color: CHART_COLORS[2],
-    })
-  }
-
   return (
     <div className="space-y-8 p-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
@@ -780,16 +760,7 @@ export function MembersOverviewTab({
       />
 
       <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-        <OverviewCard title={t.overview.charts.nationality}>
-          <DonutChart
-            items={nationalityItems}
-            totalLabel={t.overview.labels.total}
-            formatValue={formatNumber}
-            emptyLabel={t.overview.labels.noData}
-          />
-        </OverviewCard>
-
-        {/* Removed the small Team Size chart from here */}
+        {/* Removed the Nationality chart from here */}
 
         <OverviewCard title={t.overview.charts.supervisor} badge={t.overview.labels.localScope}>
           <BarList
