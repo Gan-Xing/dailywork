@@ -38,6 +38,19 @@ type BarItem = {
   meta?: string
 }
 
+type SupervisorTeamDetail = {
+  name: string
+  count: number
+  percent: number
+}
+
+type SupervisorItem = {
+  label: string
+  value: number
+  teamDetails: SupervisorTeamDetail[]
+  maxTeamCount: number
+}
+
 type DonutItem = {
   label: string
   value: number
@@ -303,6 +316,75 @@ const TeamDistributionGrid = ({ items, missing, t }: { items: BarItem[], missing
   )
 }
 
+const SupervisorPowerGrid = ({ items, missing, t }: { items: SupervisorItem[], missing: number, t: MemberCopy }) => {
+  if (items.length === 0 && missing === 0) return null
+
+  return (
+    <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-md transition-shadow hover:shadow-lg">
+      <div className="mb-6 flex items-center justify-between border-b border-slate-100 pb-4">
+         <div>
+            <h3 className="text-lg font-bold text-slate-900">{t.overview.charts.supervisor}</h3>
+            <p className="text-sm text-slate-500 mt-1">
+               {t.overview.labels.localScope}
+            </p>
+         </div>
+      </div>
+      
+      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        {items.map((item) => {
+          return (
+            <div key={item.label} className="flex flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-all hover:border-slate-300 hover:shadow-md">
+               <div className="flex items-start justify-between gap-3 mb-4">
+                  <div>
+                    <span className="font-bold text-slate-900 text-base block truncate" title={item.label}>{item.label}</span>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <span className="block text-2xl font-bold text-slate-900 leading-none">{item.value}</span>
+                    <span className="text-[10px] font-medium text-slate-400 uppercase">Total</span>
+                  </div>
+               </div>
+               
+               <div className="flex-1 space-y-3">
+                 <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Power Structure</div>
+                 {item.teamDetails.map((team, idx) => (
+                    <div key={team.name} className="group">
+                      <div className="flex justify-between items-end mb-1">
+                        <span className="text-xs font-medium text-slate-700 truncate pr-2" title={team.name}>{team.name}</span>
+                        <div className="text-right shrink-0 leading-none">
+                          <span className="text-xs font-bold text-slate-900">{team.count}</span>
+                          <span className="text-[10px] text-slate-400 ml-1">({team.percent}%)</span>
+                        </div>
+                      </div>
+                      <div className="h-1.5 w-full rounded-full bg-slate-100 overflow-hidden">
+                        <div 
+                          className="h-full rounded-full bg-slate-400 group-hover:bg-slate-600 transition-colors"
+                          style={{ width: `${team.percent}%` }}
+                        />
+                      </div>
+                    </div>
+                 ))}
+                 {item.teamDetails.length === 0 && (
+                     <p className="text-xs text-slate-400 italic text-center py-2">
+                        {t.overview.labels.unassignedTeam}
+                     </p>
+                 )}
+               </div>
+            </div>
+          )
+        })}
+      </div>
+      
+      {missing > 0 && (
+        <div className="mt-6 border-t border-slate-100 pt-4">
+           <p className="text-xs font-medium text-slate-400 text-center">
+              {t.overview.labels.unassignedSupervisor}: {missing}
+           </p>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function MembersOverviewTab({
   t,
   locale,
@@ -407,7 +489,7 @@ export function MembersOverviewTab({
   }, [localMembers])
 
   const supervisorStats = useMemo(() => {
-    const map = new Map<string, number>()
+    const map = new Map<string, { count: number, teamCounts: Map<string, number> }>()
     let missing = 0
     localMembers.forEach((member) => {
       const supervisor = member.expatProfile?.chineseSupervisor
@@ -422,20 +504,45 @@ export function MembersOverviewTab({
         missing += 1
         return
       }
-      map.set(label, (map.get(label) ?? 0) + 1)
+      
+      const current = map.get(label) ?? { count: 0, teamCounts: new Map<string, number>() }
+      current.count += 1
+      
+      const teamName = normalizeText(member.expatProfile?.team)
+      if (teamName) {
+        current.teamCounts.set(teamName, (current.teamCounts.get(teamName) ?? 0) + 1)
+      } else {
+        const unassignedLabel = t.overview.labels.unassignedTeam
+        current.teamCounts.set(unassignedLabel, (current.teamCounts.get(unassignedLabel) ?? 0) + 1)
+      }
+      
+      map.set(label, current)
     })
-    const sorted = Array.from(map.entries())
-      .map(([label, value]) => ({ label, value }))
+    
+    const items = Array.from(map.entries())
+      .map(([label, data]) => {
+        const teamDetails: SupervisorTeamDetail[] = Array.from(data.teamCounts.entries())
+          .map(([name, count]) => ({
+             name,
+             count,
+             percent: Math.round((count / data.count) * 100)
+          }))
+          .sort((a, b) => b.count - a.count)
+          
+        return { 
+          label, 
+          value: data.count,
+          teamDetails,
+          maxTeamCount: teamDetails.length > 0 ? teamDetails[0].count : 0
+        }
+      })
       .sort((a, b) => b.value - a.value)
-    const list = buildTopItems(sorted, 8, t.overview.labels.other)
+      
     return {
-      items: list.map((item, idx) => ({
-        ...item,
-        color: CHART_COLORS[idx % CHART_COLORS.length],
-      })),
+      items,
       missing,
     }
-  }, [localMembers, t.overview.labels.other])
+  }, [localMembers, t.overview.labels.unassignedTeam])
 
   const provenanceStats = useMemo(() => {
     const map = new Map<string, number>()
@@ -759,21 +866,17 @@ export function MembersOverviewTab({
         t={t} 
       />
 
+      {/* Prominent Supervisor Power Grid Section */}
+      <SupervisorPowerGrid 
+        items={supervisorStats.items} 
+        missing={supervisorStats.missing} 
+        t={t} 
+      />
+
       <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
         {/* Removed the Nationality chart from here */}
 
-        <OverviewCard title={t.overview.charts.supervisor} badge={t.overview.labels.localScope}>
-          <BarList
-            items={supervisorStats.items}
-            formatValue={(value) => `${formatNumber(value)} ${t.overview.labels.people}`}
-            emptyLabel={t.overview.labels.noData}
-          />
-          {supervisorStats.missing ? (
-            <p className="mt-2 text-xs text-slate-500">
-              {t.overview.labels.unassignedSupervisor}: {formatNumber(supervisorStats.missing)}
-            </p>
-          ) : null}
-        </OverviewCard>
+        {/* Removed Supervisor chart from here as it's promoted above */}
 
         <OverviewCard title={t.overview.charts.provenance} badge={t.overview.labels.localScope}>
           <DonutChart
