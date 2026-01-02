@@ -74,6 +74,11 @@ import type { Member, MemberBulkPatch, MemberFormState as FormState } from '@/ty
 
 type TabKey = 'overview' | 'members' | 'roles' | 'permissions' | 'payroll'
 
+const DEFAULT_EXCLUDED_PROJECT_NAMES = new Set(
+  ['阿比让办事处', '铁布高速项目'].map((value) => normalizeText(value)).filter(Boolean),
+)
+const DEFAULT_EXCLUDED_PROJECT_CODES = new Set(['project-abidjan-office', 'project-tieb-highway'])
+
 export function MembersPageClient() {
   const { locale, setLocale } = usePreferredLocale()
   const t = memberCopy[locale]
@@ -82,7 +87,7 @@ export function MembersPageClient() {
   const { home: breadcrumbHome, members: breadcrumbMembers } = t.breadcrumbs
 
   const getTodayString = useCallback(() => new Date().toISOString().slice(0, 10), [])
-  const [activeTab, setActiveTab] = useState<TabKey>('members')
+  const [activeTab, setActiveTab] = useState<TabKey>('overview')
   const [selectedMember, setSelectedMember] = useState<Member | null>(null)
   const [showFilterDrawer, setShowFilterDrawer] = useState(false)
   const [showCreateModal, setShowCreateModal] = useState(false)
@@ -146,6 +151,7 @@ export function MembersPageClient() {
   const contractChangeImportInputRef = useRef<HTMLInputElement | null>(null)
   const contractAuditInputRef = useRef<HTMLInputElement | null>(null)
   const [contractAuditLoading, setContractAuditLoading] = useState(false)
+  const defaultFiltersAppliedRef = useRef(false)
   const {
     filters,
     filterActions,
@@ -160,6 +166,8 @@ export function MembersPageClient() {
     sortStack,
     setSortStack,
     resetFilters,
+    filtersHydrated,
+    filtersLoadedFromStorage,
   } = useMemberTableState({ defaultPageSize: 20, defaultSortStack })
   const {
     nameFilters,
@@ -601,8 +609,38 @@ export function MembersPageClient() {
     [sortStack],
   )
 
+  const applyDefaultFilters = useCallback(() => {
+    if (projectFilterOptions.length === 0) return
+    const excludedProjectNames = new Set(DEFAULT_EXCLUDED_PROJECT_NAMES)
+    projects.forEach((project) => {
+      if (!project.code || !DEFAULT_EXCLUDED_PROJECT_CODES.has(project.code)) return
+      const normalized = normalizeText(project.name)
+      if (normalized) excludedProjectNames.add(normalized)
+    })
+    const nextProjectFilters = projectFilterOptions
+      .map((option) => option.value)
+      .filter((value) => !excludedProjectNames.has(normalizeText(value)))
+    setProjectFilters(nextProjectFilters)
+  }, [projectFilterOptions, projects, setProjectFilters])
+
+  useEffect(() => {
+    if (!filtersHydrated || filtersLoadedFromStorage || defaultFiltersAppliedRef.current) return
+    if (projectFilterOptions.length === 0) return
+    if (projectFilters.length === 0) {
+      applyDefaultFilters()
+    }
+    defaultFiltersAppliedRef.current = true
+  }, [
+    applyDefaultFilters,
+    filtersHydrated,
+    filtersLoadedFromStorage,
+    projectFilterOptions.length,
+    projectFilters.length,
+  ])
+
   const clearFilters = () => {
     resetFilters()
+    applyDefaultFilters()
   }
 
   const modalTitle = formMode === 'view' ? t.actions.view : t.actions.create
@@ -1333,6 +1371,18 @@ export function MembersPageClient() {
                 members={membersData}
                 loading={loading}
                 error={error}
+                projectFilterOptions={projectFilterOptions}
+                statusFilterOptions={statusFilterOptions}
+                nationalityFilterOptions={nationalityFilterOptions}
+                teamFilterOptions={teamFilterOptions}
+                projectFilters={projectFilters}
+                statusFilters={statusFilters}
+                nationalityFilters={nationalityFilters}
+                teamFilters={teamFilters}
+                onProjectFiltersChange={setProjectFilters}
+                onStatusFiltersChange={setStatusFilters}
+                onNationalityFiltersChange={setNationalityFilters}
+                onTeamFiltersChange={setTeamFilters}
               />
             ) : null}
 

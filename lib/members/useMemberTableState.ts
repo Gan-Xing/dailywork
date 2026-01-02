@@ -54,19 +54,15 @@ type FilterAction =
   | { type: 'reset' }
   | { type: 'hydrate'; value: Partial<MemberFiltersState> }
 
-const defaultNonChineseNationalities = nationalityOptions
-  .filter((opt) => opt.key !== 'china')
-  .map((opt) => opt.key)
-
 const initialFiltersState: MemberFiltersState = {
   nameFilters: [],
   usernameFilters: [],
   genderFilters: [],
-  nationalityFilters: defaultNonChineseNationalities,
+  nationalityFilters: [],
   phoneFilters: [],
   joinDateFilters: [],
   positionFilters: [],
-  statusFilters: ['ACTIVE'],
+  statusFilters: [],
   roleFilters: [],
   tagFilters: [],
   projectFilters: [],
@@ -138,6 +134,7 @@ type Options = {
 export function useMemberTableState(options: Options = {}) {
   const [filters, dispatch] = useReducer(filterReducer, initialFiltersState)
   const [filtersHydrated, setFiltersHydrated] = useState(false)
+  const [filtersLoadedFromStorage, setFiltersLoadedFromStorage] = useState(false)
   const [filtersOpen, setFiltersOpen] = useState(true)
   const [page, setPage] = useState(1)
   const [pageInput, setPageInput] = useState('1')
@@ -160,6 +157,7 @@ export function useMemberTableState(options: Options = {}) {
       const next = getStoredFilters(parsed)
       if (Object.keys(next).length > 0) {
         dispatch({ type: 'hydrate', value: next })
+        setFiltersLoadedFromStorage(true)
       }
     } catch (error) {
       console.error('Failed to load member filters', error)
@@ -243,5 +241,7 @@ export function useMemberTableState(options: Options = {}) {
     sortStack,
     setSortStack,
     resetFilters,
+    filtersHydrated,
+    filtersLoadedFromStorage,
   }
 }

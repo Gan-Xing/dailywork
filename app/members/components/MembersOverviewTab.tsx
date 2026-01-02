@@ -1,12 +1,12 @@
 'use client'
 
-import { useCallback, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useMemo, type ReactNode } from 'react'
 
-import { MultiSelectFilter } from '@/components/MultiSelectFilter'
+import { MultiSelectFilter, type MultiSelectOption } from '@/components/MultiSelectFilter'
 import type { Locale } from '@/lib/i18n'
 import { memberCopy } from '@/lib/i18n/members'
 import { EMPTY_FILTER_VALUE } from '@/lib/members/constants'
-import { formatSupervisorLabel, normalizeTagKey, normalizeText } from '@/lib/members/utils'
+import { formatSupervisorLabel, normalizeText } from '@/lib/members/utils'
 import type { Member } from '@/types/members'
 
 type MemberCopy = (typeof memberCopy)[keyof typeof memberCopy]
@@ -17,6 +17,18 @@ type Props = {
   members: Member[]
   loading: boolean
   error: string | null
+  projectFilterOptions: MultiSelectOption[]
+  statusFilterOptions: MultiSelectOption[]
+  nationalityFilterOptions: MultiSelectOption[]
+  teamFilterOptions: MultiSelectOption[]
+  projectFilters: string[]
+  statusFilters: string[]
+  nationalityFilters: string[]
+  teamFilters: string[]
+  onProjectFiltersChange: (value: string[]) => void
+  onStatusFiltersChange: (value: string[]) => void
+  onNationalityFiltersChange: (value: string[]) => void
+  onTeamFiltersChange: (value: string[]) => void
 }
 
 type BarItem = {
@@ -54,6 +66,13 @@ const parseNumber = (value?: string | null) => {
   if (!normalized) return null
   const parsed = Number(normalized.replace(/,/g, ''))
   return Number.isFinite(parsed) ? parsed : null
+}
+
+const matchesValueFilter = (value: string | null | undefined, filters: string[]) => {
+  if (filters.length === 0) return true
+  const normalized = normalizeText(value)
+  if (!normalized) return filters.includes(EMPTY_FILTER_VALUE)
+  return filters.includes(normalized)
 }
 
 const resolveMonthlySalary = (member: Member) => {
@@ -202,8 +221,25 @@ const BarList = ({
   )
 }
 
-export function MembersOverviewTab({ t, locale, members, loading, error }: Props) {
-  const [tagFilters, setTagFilters] = useState<string[]>([])
+export function MembersOverviewTab({
+  t,
+  locale,
+  members,
+  loading,
+  error,
+  projectFilterOptions,
+  statusFilterOptions,
+  nationalityFilterOptions,
+  teamFilterOptions,
+  projectFilters,
+  statusFilters,
+  nationalityFilters,
+  teamFilters,
+  onProjectFiltersChange,
+  onStatusFiltersChange,
+  onNationalityFiltersChange,
+  onTeamFiltersChange,
+}: Props) {
   const numberFormatter = useMemo(
     () => new Intl.NumberFormat(toLocaleId(locale)),
     [locale],
@@ -226,48 +262,17 @@ export function MembersOverviewTab({ t, locale, members, loading, error }: Props
     noOptionsLabel: t.filters.noOptions,
   }
 
-  const tagOptions = useMemo(() => {
-    const localeId = locale === 'fr' ? 'fr' : ['zh-Hans-u-co-pinyin', 'zh-Hans', 'zh']
-    const collator = new Intl.Collator(localeId, { numeric: true, sensitivity: 'base' })
-    const tagsByKey = new Map<string, string>()
-    let hasEmpty = false
-    members.forEach((member) => {
-      const tags = member.tags ?? []
-      if (tags.length === 0) {
-        hasEmpty = true
-        return
-      }
-      tags.forEach((tag) => {
-        const trimmed = normalizeText(tag)
-        if (!trimmed) return
-        const key = normalizeTagKey(trimmed)
-        if (!key || tagsByKey.has(key)) return
-        tagsByKey.set(key, trimmed)
-      })
-    })
-    const options = Array.from(tagsByKey.values())
-      .sort(collator.compare)
-      .map((value) => ({ value: normalizeTagKey(value), label: value }))
-    if (hasEmpty) {
-      options.unshift({ value: EMPTY_FILTER_VALUE, label: t.labels.empty })
-    }
-    return options
-  }, [members, locale, t.labels.empty])
-
-  const scopedMembers = useMemo(() => {
-    if (tagFilters.length === 0) return members
-    const wantsEmpty = tagFilters.includes(EMPTY_FILTER_VALUE)
-    const filterKeys = tagFilters
-      .filter((value) => value !== EMPTY_FILTER_VALUE)
-      .map((value) => normalizeTagKey(value))
-      .filter(Boolean)
-    return members.filter((member) => {
-      const tags = (member.tags ?? []).map((tag) => normalizeTagKey(tag)).filter(Boolean)
-      if (tags.length === 0) return wantsEmpty
-      if (filterKeys.length === 0) return true
-      return tags.some((tag) => filterKeys.includes(tag))
-    })
-  }, [members, tagFilters])
+  const scopedMembers = useMemo(
+    () =>
+      members.filter((member) => {
+        if (!matchesValueFilter(member.project?.name ?? null, projectFilters)) return false
+        if (!matchesValueFilter(member.employmentStatus, statusFilters)) return false
+        if (!matchesValueFilter(member.nationality, nationalityFilters)) return false
+        if (!matchesValueFilter(member.expatProfile?.team ?? null, teamFilters)) return false
+        return true
+      }),
+    [members, projectFilters, statusFilters, nationalityFilters, teamFilters],
+  )
 
   const localMembers = useMemo(
     () => scopedMembers.filter((member) => Boolean(member.expatProfile)),
@@ -591,12 +596,30 @@ export function MembersOverviewTab({ t, locale, members, loading, error }: Props
           </p>
           <p className="text-xs text-slate-500">{t.overview.subtitle}</p>
         </div>
-        <div className="min-w-[260px]">
+      </div>
+
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+            {t.filters.title}
+          </p>
+          <p className="text-[11px] text-slate-400">
+            {(() => {
+              const selectedCount =
+                projectFilters.length +
+                statusFilters.length +
+                nationalityFilters.length +
+                teamFilters.length
+              return selectedCount > 0 ? t.filters.selected(selectedCount) : t.filters.all
+            })()}
+          </p>
+        </div>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <MultiSelectFilter
-            label={t.overview.filters.tagLabel}
-            options={tagOptions}
-            selected={tagFilters}
-            onChange={setTagFilters}
+            label={t.table.project}
+            options={projectFilterOptions}
+            selected={projectFilters}
+            onChange={onProjectFiltersChange}
             allLabel={filterControlProps.allLabel}
             selectedLabel={filterControlProps.selectedLabel}
             selectAllLabel={filterControlProps.selectAllLabel}
@@ -604,9 +627,42 @@ export function MembersOverviewTab({ t, locale, members, loading, error }: Props
             searchPlaceholder={filterControlProps.searchPlaceholder}
             noOptionsLabel={filterControlProps.noOptionsLabel}
           />
-          <p className="mt-2 text-[11px] text-slate-400">
-            {t.overview.filters.tagHint}
-          </p>
+          <MultiSelectFilter
+            label={t.table.employmentStatus}
+            options={statusFilterOptions}
+            selected={statusFilters}
+            onChange={onStatusFiltersChange}
+            allLabel={filterControlProps.allLabel}
+            selectedLabel={filterControlProps.selectedLabel}
+            selectAllLabel={filterControlProps.selectAllLabel}
+            clearLabel={filterControlProps.clearLabel}
+            searchPlaceholder={filterControlProps.searchPlaceholder}
+            noOptionsLabel={filterControlProps.noOptionsLabel}
+          />
+          <MultiSelectFilter
+            label={t.table.nationality}
+            options={nationalityFilterOptions}
+            selected={nationalityFilters}
+            onChange={onNationalityFiltersChange}
+            allLabel={filterControlProps.allLabel}
+            selectedLabel={filterControlProps.selectedLabel}
+            selectAllLabel={filterControlProps.selectAllLabel}
+            clearLabel={filterControlProps.clearLabel}
+            searchPlaceholder={filterControlProps.searchPlaceholder}
+            noOptionsLabel={filterControlProps.noOptionsLabel}
+          />
+          <MultiSelectFilter
+            label={t.table.team}
+            options={teamFilterOptions}
+            selected={teamFilters}
+            onChange={onTeamFiltersChange}
+            allLabel={filterControlProps.allLabel}
+            selectedLabel={filterControlProps.selectedLabel}
+            selectAllLabel={filterControlProps.selectAllLabel}
+            clearLabel={filterControlProps.clearLabel}
+            searchPlaceholder={filterControlProps.searchPlaceholder}
+            noOptionsLabel={filterControlProps.noOptionsLabel}
+          />
         </div>
       </div>
 
