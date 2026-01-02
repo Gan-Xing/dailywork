@@ -471,6 +471,7 @@ export function MembersTab(props: MembersTabProps) {
         'joinDate',
         'birthDate',
         'position',
+        'project',
         'employmentStatus',
         'terminationDate',
         'terminationReason',

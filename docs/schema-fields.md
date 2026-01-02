@@ -367,7 +367,7 @@
 
 ## 财务主数据
 
-- **Project（财务项目）**：`id`、`name`、`code?`、`isActive`、`createdAt`、`updatedAt`；初始 5 个项目：邦杜库市政路项目、邦杜库边境路项目、邦杜库供料项目、铁布高速项目、阿比让办事处。
+- **Project（财务项目）**：`id`、`name`、`code?`、`isActive`、`createdAt`、`updatedAt`；初始 6 个项目：邦杜库市政路项目、邦杜库边境路项目、邦杜库供料项目、铁布高速项目、阿比让办事处、丹达市政路项目。
 - **FinanceUnit（金额单位）**：`id`、`name`、`symbol?`、`isActive`、`sortOrder`、`createdAt`、`updatedAt`；默认包含“西法”“美金”“人民币”。
 - **PaymentType（支付方式）**：`id`、`name`、`isActive`、`sortOrder`、`createdAt`、`updatedAt`；默认包含“现金”“现金支票”“转账支票”“办事处代付”“无票据支出”。
 - **FinanceCategory（分类树）**：存储自定义/扩展后的财务分类节点，字段含 `key`（唯一）、`parentKey`、`label.zh`、`label.en?`、`label.fr?`、`code?`、`isActive`、`sortOrder`、`createdAt`、`updatedAt`。

@@ -36,7 +36,7 @@
 - `finance:manage`（管理）：具备编辑权限，且可维护财务主数据：项目 Project 新增/删/改/查，事项分类树维护，金额单位维护，支付方式维护。
 
 ## 主数据（字典）
-- 项目（Project）：独立于道路，初始 5 个——邦杜库市政路项目、邦杜库边境路项目、邦杜库供料项目、铁布高速项目、阿比让办事处；字段含 `id`、`name`、`code`（可选）、`isActive`、`createdAt`、`updatedAt`。
+- 项目（Project）：独立于道路，初始 6 个——邦杜库市政路项目、邦杜库边境路项目、邦杜库供料项目、铁布高速项目、阿比让办事处、丹达市政路项目；字段含 `id`、`name`、`code`（可选）、`isActive`、`createdAt`、`updatedAt`。
 - 金额单位：默认包含“西法”“美金”“人民币”，支持管理权限下增删改查，字段含 `id`、`name`、`symbol?`、`isActive`、`sortOrder`。
 - 支付方式：默认包含“现金”“现金支票”“转账支票”“办事处代付”“无票据支出”，可被管理权限维护，字段含 `id`、`name`、`isActive`、`sortOrder`。
 - 财务分类树：来源于 `lib/data/finance-cost-categories.json`，管理权限下允许增删改查节点，需保证 `key` 唯一且稳定；若启用多语言可追加 `label.en` 等。

@@ -16,12 +16,14 @@ import {
   toSalaryFilterValue,
 } from '@/lib/members/utils'
 import type { Member, Role } from '@/types/members'
+import type { ProjectItem } from './useProjects'
 
 type MemberCopy = (typeof memberCopy)[keyof typeof memberCopy]
 
 type UseMemberFilterOptionsParams = {
   membersData: Member[]
   rolesData: Role[]
+  projects?: ProjectItem[]
   locale: keyof typeof memberCopy
   t: MemberCopy
   canAssignRole: boolean
@@ -34,6 +36,7 @@ type Option = { value: string; label: string }
 export function useMemberFilterOptions({
   membersData,
   rolesData,
+  projects = [],
   locale,
   t,
   canAssignRole,
@@ -221,12 +224,16 @@ export function useMemberFilterOptions({
       if (value) values.add(value)
       else hasEmpty = true
     })
+    projects.forEach((project) => {
+      const value = normalizeText(project.name)
+      if (value) values.add(value)
+    })
     const options = Array.from(values)
       .sort(optionCollator.compare)
       .map((value) => ({ value, label: value }))
     if (hasEmpty) options.unshift({ value: EMPTY_FILTER_VALUE, label: t.labels.empty })
     return options
-  }, [membersData, optionCollator, t.labels.empty])
+  }, [membersData, optionCollator, projects, t.labels.empty])
 
   const chineseSupervisorFilterOptions = useMemo(() => {
     const values = new Set<string>()

@@ -191,6 +191,7 @@ export const ensureFinanceDefaults = async () => {
         { name: '邦杜库供料项目', code: 'project-bondoukou-supply' },
         { name: '铁布高速项目', code: 'project-tieb-highway' },
         { name: '阿比让办事处', code: 'project-abidjan-office' },
+        { name: '丹达市政路项目', code: 'project-danda-city' },
       ],
       skipDuplicates: true,
     }),

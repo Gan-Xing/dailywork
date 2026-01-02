@@ -145,6 +145,7 @@ export function useMemberFilterSummary(filters: MemberFiltersSummaryInput) {
       statusFilters,
       roleFilters,
       tagFilters,
+      projectFilters,
       teamFilters,
       chineseSupervisorFilters,
       contractNumberFilters,

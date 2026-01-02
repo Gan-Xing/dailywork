@@ -356,6 +356,13 @@ export function MemberFiltersPanel({
             {...sharedFilterProps}
           />
           <MultiSelectFilter
+            label={t.table.project}
+            options={projectFilterOptions}
+            selected={projectFilters}
+            onChange={setProjectFilters}
+            {...sharedFilterProps}
+          />
+          <MultiSelectFilter
             label={t.table.employmentStatus}
             options={statusFilterOptions}
             selected={statusFilters}
@@ -452,13 +459,6 @@ export function MemberFiltersPanel({
       <section className={sectionBaseClasses}>
         <SectionTitle label={t.fieldGroups.localProfile} theme="purple" />
         <div className={sectionGridClasses}>
-          <MultiSelectFilter
-            label={t.table.project}
-            options={projectFilterOptions}
-            selected={projectFilters}
-            onChange={setProjectFilters}
-            {...sharedFilterProps}
-          />
           <MultiSelectFilter
             label={t.table.team}
             options={teamFilterOptions}

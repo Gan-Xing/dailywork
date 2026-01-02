@@ -346,7 +346,7 @@ export function MembersPageClient() {
     error: teamSupervisorError,
     refresh: refreshTeamSupervisors,
   } = useTeamSupervisors({ enabled: canViewTeamSupervisors })
-  const { projectOptions } = useProjects({
+  const { projectOptions, projects } = useProjects({
     enabled: canViewMembers || canCreateMember || canUpdateMember,
   })
   const {
@@ -434,6 +434,7 @@ export function MembersPageClient() {
   } = useMemberFilterOptions({
     membersData,
     rolesData,
+    projects,
     locale,
     t,
     canAssignRole,
@@ -633,6 +634,7 @@ export function MembersPageClient() {
       position: '',
       employmentStatus: 'ACTIVE',
       roleIds: [],
+      projectId: '',
       chineseProfile: { ...emptyChineseProfile },
       expatProfile: { ...emptyExpatProfile },
     })
