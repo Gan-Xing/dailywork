@@ -307,32 +307,39 @@ const BarList = ({
     return <p className="text-sm text-slate-500">{emptyLabel}</p>
   }
   const maxValue = Math.max(...items.map((item) => item.value), 1)
+  const total = items.reduce((sum, item) => sum + item.value, 0)
   return (
-    <div className="space-y-4">
-      {items.map((item) => (
-        <div key={item.label} className="group">
-          <div className="mb-1.5 flex items-center justify-between gap-2 text-sm">
-            <span className="truncate font-medium text-slate-700 transition-colors group-hover:text-slate-900">
-              {item.label}
-            </span>
-            <span className="text-xs font-medium text-slate-500">
-              {formatValue(item.value)}
-              {item.meta ? ` · ${item.meta}` : ''}
-            </span>
-          </div>
-          <div className="h-2 w-full rounded-full bg-slate-100 overflow-hidden ring-1 ring-slate-100/50">
-            <div
-              className="h-full rounded-full transition-all duration-700 ease-out group-hover:brightness-95 relative"
-              style={{
-                width: `${Math.max((item.value / maxValue) * 100, 2)}%`,
-                backgroundColor: item.color,
-              }}
-            >
-              <div className="absolute inset-0 bg-gradient-to-b from-white/20 to-transparent"></div>
+    <div className="space-y-5">
+      {items.map((item) => {
+        const percent = total > 0 ? Math.round((item.value / total) * 100) : 0
+        return (
+          <div key={item.label} className="group">
+            <div className="mb-2 flex items-end justify-between gap-2">
+              <span className="truncate font-semibold text-slate-700 transition-colors group-hover:text-slate-900">
+                {item.label}
+              </span>
+              <div className="text-right shrink-0">
+                <span className="text-base font-bold text-slate-900">{formatValue(item.value)}</span>
+                <span className="ml-1 text-xs font-medium text-slate-400">{percent}%</span>
+              </div>
             </div>
+            <div className="h-3 w-full rounded-full bg-slate-100 overflow-hidden ring-1 ring-slate-100/50">
+              <div
+                className="h-full rounded-full transition-all duration-700 ease-out group-hover:brightness-95 relative"
+                style={{
+                  width: `${Math.max((item.value / maxValue) * 100, 2)}%`,
+                  backgroundColor: item.color,
+                }}
+              >
+                <div className="absolute inset-0 bg-gradient-to-b from-white/20 to-transparent"></div>
+              </div>
+            </div>
+            {item.meta ? (
+              <div className="mt-2 text-[10px] text-slate-400">{item.meta}</div>
+            ) : null}
           </div>
-        </div>
-      ))}
+        )
+      })}
     </div>
   )
 }
@@ -358,46 +365,57 @@ const ContractCostBulletList = ({
   }
   const maxTotal = Math.max(...items.map((item) => item.total), 1)
   const maxAvg = Math.max(...items.map((item) => item.avg), 1)
+  const totalSum = items.reduce((sum, item) => sum + item.total, 0)
 
   return (
     <div className="space-y-5">
       {items.map((item) => {
+        const percent = totalSum > 0 ? Math.round((item.total / totalSum) * 100) : 0
         const totalRatio = Math.max(item.total / maxTotal, 0.02)
         const avgRatio = Math.min(Math.max(item.avg / maxAvg, 0), 1)
         const avgLeft = Math.min(Math.max(avgRatio, 0.02), 0.98) * 100
 
         return (
-          <div key={item.label} className="flex items-center gap-3">
-            <div className="w-12 text-xs font-semibold text-slate-600">{item.label}</div>
-            <div className="flex-1">
-              <div className="relative h-2.5 rounded-full bg-slate-100 overflow-hidden ring-1 ring-slate-100/60">
-                <div
-                  className="h-full rounded-full relative"
-                  style={{
-                    width: `${totalRatio * 100}%`,
-                    backgroundColor: item.color,
-                  }}
-                >
-                  <div className="absolute inset-0 bg-gradient-to-b from-white/25 to-transparent" />
-                </div>
-                <span
-                  className="absolute top-1/2 h-2.5 w-2.5 -translate-y-1/2 -translate-x-1/2 rounded-full border-2 border-white shadow-sm"
-                  style={{
-                    left: `${avgLeft}%`,
-                    backgroundColor: item.color,
-                  }}
-                />
+          <div key={item.label} className="group">
+            <div className="mb-2 flex items-end justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: item.color }} />
+                <span className="font-semibold text-slate-700">{item.label}</span>
               </div>
-              <div className="mt-1 flex items-center justify-between text-[11px] text-slate-500">
-                <span className="font-semibold text-slate-600">{formatMoney(item.total)}</span>
-                <span>
-                  {labels.payrollAverage} {formatMoney(item.avg)}
-                </span>
+              <div className="text-right shrink-0">
+                <span className="text-xl font-bold text-slate-900">{formatMoney(item.total)}</span>
+                <span className="ml-1 text-xs font-medium text-slate-400">{percent}%</span>
               </div>
             </div>
-            <span className="shrink-0 rounded-full bg-slate-100 px-2 py-1 text-[10px] font-semibold text-slate-600">
-              {formatNumber(item.count)} {labels.people}
-            </span>
+            <div className="relative h-3 rounded-full bg-slate-100 overflow-hidden ring-1 ring-slate-100/60">
+              <div
+                className="h-full rounded-full transition-all duration-700 ease-out group-hover:brightness-95 relative"
+                style={{
+                  width: `${totalRatio * 100}%`,
+                  backgroundColor: item.color,
+                }}
+              >
+                <div className="absolute inset-0 bg-gradient-to-b from-white/25 to-transparent" />
+              </div>
+              <span
+                className="absolute top-1/2 h-2.5 w-2.5 -translate-y-1/2 -translate-x-1/2 rounded-full border-2 border-white shadow-sm"
+                style={{
+                  left: `${avgLeft}%`,
+                  backgroundColor: item.color,
+                }}
+              />
+            </div>
+            <div className="mt-2 text-[10px] text-slate-400 flex flex-wrap gap-x-2">
+              <span>
+                <span className="font-medium text-slate-500">{labels.payrollAverage}</span>
+                <span className="ml-1">{formatMoney(item.avg)}</span>
+              </span>
+              <span className="text-slate-300">|</span>
+              <span>
+                <span className="font-medium text-slate-500">{formatNumber(item.count)}</span>
+                <span className="ml-1">{labels.people}</span>
+              </span>
+            </div>
           </div>
         )
       })}
@@ -780,6 +798,7 @@ const SupervisorPowerGrid = ({
   formatMoney: (value: number) => string
 }) => {
   if (items.length === 0 && missing === 0) return null
+  const maxSupervisorCount = Math.max(...items.map((item) => item.value), 1)
 
   return (
     <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-md transition-shadow hover:shadow-lg">
@@ -835,42 +854,60 @@ const SupervisorPowerGrid = ({
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {items.map((item) => {
           return (
-            <div key={item.label} className="flex flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-all hover:border-slate-300 hover:shadow-md">
-               <div className="flex items-start justify-between gap-3 mb-2">
-                  <div>
-                    <span className="font-bold text-slate-900 text-base block truncate" title={item.label}>{item.label}</span>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <span className="block text-2xl font-bold text-slate-900 leading-none">{item.value}</span>
-                    <span className="text-[10px] font-medium text-slate-400 uppercase">Total</span>
-                  </div>
+            <div key={item.label} className="flex flex-col rounded-2xl border border-slate-200 bg-white shadow-sm transition-all hover:border-slate-300 hover:shadow-md overflow-hidden">
+               <div className="p-5 pb-3">
+                 <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <span className="font-bold text-slate-900 text-base block truncate" title={item.label}>
+                        {item.label}
+                      </span>
+                      <div className="mt-3 flex items-center gap-2">
+                        <div className="h-1.5 flex-1 rounded-full bg-slate-100 overflow-hidden">
+                           <div
+                              className="h-full rounded-full bg-slate-400"
+                              style={{ width: `${(item.value / maxSupervisorCount) * 100}%` }}
+                           />
+                        </div>
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <span className="block text-2xl font-bold text-slate-900 leading-none">
+                        {item.value}
+                      </span>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mt-1 block">
+                        Total
+                      </span>
+                    </div>
+                 </div>
                </div>
                
                {showPayroll ? (
-                  <div className="mb-4 text-[10px] text-slate-400 border-b border-slate-50 pb-2">
-                    <div className="flex justify-between">
-                      <span>{t.overview.labels.payrollTotal}</span>
-                      <span className="font-medium text-slate-600">{formatMoney(item.payrollTotal)}</span>
+                  <div className="bg-slate-50 border-y border-slate-100 px-5 py-3">
+                    <div className="flex justify-between items-baseline mb-2">
+                      <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">{t.overview.labels.payrollTotal}</span>
+                      <span className="font-bold text-slate-700 font-mono text-sm">{formatMoney(item.payrollTotal)}</span>
                     </div>
-                    <div className="flex justify-between mt-0.5">
-                      <span>
-                        {t.overview.labels.payrollAverage} / {t.overview.labels.payrollMedian}
-                      </span>
-                      <span className="font-medium text-slate-600">
-                        {formatMoney(item.payrollAverage)} / {formatMoney(item.payrollMedian)}
-                      </span>
+                    <div className="flex justify-between items-baseline border-t border-slate-200/50 pt-2">
+                       <span className="text-[10px] text-slate-400 font-medium">
+                         {t.overview.labels.payrollAverage} / {t.overview.labels.payrollMedian}
+                       </span>
+                       <span className="text-xs font-semibold text-slate-600 font-mono">
+                         {formatMoney(item.payrollAverage)} / {formatMoney(item.payrollMedian)}
+                       </span>
                     </div>
                   </div>
                 ) : null}
                
-               <div className="flex-1 space-y-3">
+               <div className="flex-1 space-y-3 p-5 pt-4">
                  {item.teamDetails.map((team, idx) => (
                     <div key={team.name} className="group">
-                      <div className="flex justify-between items-end mb-1">
-                        <span className="text-xs font-medium text-slate-700 truncate pr-2" title={team.name}>{team.name}</span>
-                        <div className="text-right shrink-0 leading-none">
-                          <span className="text-xs font-bold text-slate-900">{team.count}</span>
-                          <span className="text-[10px] text-slate-400 ml-1">({team.percent}%)</span>
+                      <div className="flex justify-between items-center mb-1.5">
+                        <span className="text-xs font-medium text-slate-600 truncate pr-2" title={team.name}>
+                          {team.name}
+                        </span>
+                        <div className="text-right shrink-0 flex items-baseline gap-1">
+                          <span className="text-xs font-bold text-slate-700">{team.count}</span>
+                          <span className="text-[10px] text-slate-400">({team.percent}%)</span>
                         </div>
                       </div>
                       <div className="h-1.5 w-full rounded-full bg-slate-100 overflow-hidden">
