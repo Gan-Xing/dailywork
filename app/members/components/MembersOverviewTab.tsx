@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useMemo, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 
 import { MultiSelectFilter, type MultiSelectOption } from '@/components/MultiSelectFilter'
 import type { Locale } from '@/lib/i18n'
@@ -17,6 +17,7 @@ type Props = {
   members: Member[]
   loading: boolean
   error: string | null
+  canViewPayroll: boolean
   projectFilterOptions: MultiSelectOption[]
   statusFilterOptions: MultiSelectOption[]
   nationalityFilterOptions: MultiSelectOption[]
@@ -38,6 +39,19 @@ type BarItem = {
   meta?: string
 }
 
+type TeamSortMode = 'count' | 'avgPayroll'
+
+type TeamStatsItem = {
+  label: string
+  value: number
+  payrollTotal: number
+  payrollAverage: number
+}
+
+type TeamBarItem = TeamStatsItem & {
+  color: string
+}
+
 type SupervisorTeamDetail = {
   name: string
   count: number
@@ -55,6 +69,11 @@ type DonutItem = {
   label: string
   value: number
   color: string
+}
+
+type PayrollPayout = {
+  userId: number
+  amount: string
 }
 
 const CHART_COLORS = [
@@ -85,6 +104,16 @@ const parseNumber = (value?: string | null) => {
   if (!normalized) return null
   const parsed = Number(normalized.replace(/,/g, ''))
   return Number.isFinite(parsed) ? parsed : null
+}
+
+const getLastMonthKey = () => {
+  const date = new Date()
+  const utc = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1))
+  utc.setUTCMonth(utc.getUTCMonth() - 1)
+  return {
+    year: utc.getUTCFullYear(),
+    month: utc.getUTCMonth() + 1,
+  }
 }
 
 const matchesValueFilter = (value: string | null | undefined, filters: string[]) => {
@@ -254,7 +283,23 @@ const BarList = ({
   )
 }
 
-const TeamDistributionGrid = ({ items, missing, t }: { items: BarItem[], missing: number, t: MemberCopy }) => {
+const TeamDistributionGrid = ({
+  items,
+  missing,
+  t,
+  showPayroll,
+  sortMode,
+  onSortChange,
+  formatMoney,
+}: {
+  items: TeamBarItem[]
+  missing: number
+  t: MemberCopy
+  showPayroll: boolean
+  sortMode: TeamSortMode
+  onSortChange: (mode: TeamSortMode) => void
+  formatMoney: (value: number) => string
+}) => {
   if (items.length === 0 && missing === 0) return null
   
   const maxValue = Math.max(...items.map((item) => item.value), 1)
@@ -269,9 +314,39 @@ const TeamDistributionGrid = ({ items, missing, t }: { items: BarItem[], missing
                {t.overview.labels.localScope}
             </p>
          </div>
-         <div className="text-right">
-            <span className="text-2xl font-bold text-slate-900">{total}</span>
-            <span className="ml-2 text-xs font-semibold uppercase tracking-wider text-slate-400">{t.overview.labels.people}</span>
+         <div className="flex flex-col items-end gap-2 text-right">
+            {showPayroll ? (
+              <div className="inline-flex rounded-full bg-slate-100 p-1 text-[11px] font-semibold text-slate-500">
+                <button
+                  type="button"
+                  className={`rounded-full px-3 py-1 transition-all ${
+                    sortMode === 'count'
+                      ? 'bg-white text-slate-900 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                  onClick={() => onSortChange('count')}
+                  aria-pressed={sortMode === 'count'}
+                >
+                  {t.overview.labels.teamSortCount}
+                </button>
+                <button
+                  type="button"
+                  className={`rounded-full px-3 py-1 transition-all ${
+                    sortMode === 'avgPayroll'
+                      ? 'bg-white text-slate-900 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                  onClick={() => onSortChange('avgPayroll')}
+                  aria-pressed={sortMode === 'avgPayroll'}
+                >
+                  {t.overview.labels.teamSortAvg}
+                </button>
+              </div>
+            ) : null}
+            <div>
+               <span className="text-2xl font-bold text-slate-900">{total}</span>
+               <span className="ml-2 text-xs font-semibold uppercase tracking-wider text-slate-400">{t.overview.labels.people}</span>
+            </div>
          </div>
       </div>
       
@@ -300,6 +375,19 @@ const TeamDistributionGrid = ({ items, missing, t }: { items: BarItem[], missing
                      <div className="absolute inset-0 bg-gradient-to-b from-white/20 to-transparent"></div>
                    </div>
                 </div>
+                {showPayroll ? (
+                  <div className="mt-2 text-[11px] text-slate-400">
+                    <span className="font-medium text-slate-500">
+                      {t.overview.labels.payrollTotal}
+                    </span>
+                    <span className="ml-1">{formatMoney(item.payrollTotal ?? 0)}</span>
+                    <span className="mx-2 text-slate-300">|</span>
+                    <span className="font-medium text-slate-500">
+                      {t.overview.labels.payrollAverage}
+                    </span>
+                    <span className="ml-1">{formatMoney(item.payrollAverage ?? 0)}</span>
+                  </div>
+                ) : null}
              </div>
            )
         })}
@@ -391,6 +479,7 @@ export function MembersOverviewTab({
   members,
   loading,
   error,
+  canViewPayroll,
   projectFilterOptions,
   statusFilterOptions,
   nationalityFilterOptions,
@@ -416,6 +505,56 @@ export function MembersOverviewTab({
     (value: number) => numberFormatter.format(Math.round(value)),
     [numberFormatter],
   )
+  const teamCollator = useMemo(
+    () => new Intl.Collator(toLocaleId(locale), { numeric: true, sensitivity: 'base' }),
+    [locale],
+  )
+
+  const [payrollPayouts, setPayrollPayouts] = useState<PayrollPayout[]>([])
+  const [payrollReady, setPayrollReady] = useState(false)
+  const [teamSortMode, setTeamSortMode] = useState<TeamSortMode>('count')
+
+  useEffect(() => {
+    if (!canViewPayroll) {
+      setPayrollPayouts([])
+      setPayrollReady(false)
+      return
+    }
+
+    let cancelled = false
+    const { year, month } = getLastMonthKey()
+    setPayrollReady(false)
+    fetch(`/api/payroll-runs?year=${year}&month=${month}`)
+      .then((res) => {
+        if (!res.ok) throw new Error('Failed to load payroll')
+        return res.json() as Promise<{ payouts?: PayrollPayout[] }>
+      })
+      .then((data) => {
+        if (cancelled) return
+        setPayrollPayouts(Array.isArray(data.payouts) ? data.payouts : [])
+        setPayrollReady(true)
+      })
+      .catch(() => {
+        if (cancelled) return
+        setPayrollPayouts([])
+        setPayrollReady(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [canViewPayroll])
+
+  const payrollPayoutsByMemberId = useMemo(() => {
+    const map = new Map<number, number>()
+    if (!payrollReady) return map
+    payrollPayouts.forEach((payout) => {
+      const amount = parseNumber(payout.amount)
+      if (amount === null) return
+      map.set(payout.userId, (map.get(payout.userId) ?? 0) + amount)
+    })
+    return map
+  }, [payrollPayouts, payrollReady])
 
   const filterControlProps = {
     allLabel: t.filters.all,
@@ -460,7 +599,7 @@ export function MembersOverviewTab({
   }, [scopedMembers])
 
   const teamStats = useMemo(() => {
-    const map = new Map<string, number>()
+    const map = new Map<string, { count: number; payrollTotal: number }>()
     let missing = 0
     // Filter out Chinese nationals explicitly as requested by leadership
     // to show only local team composition
@@ -472,21 +611,45 @@ export function MembersOverviewTab({
         missing += 1
         return
       }
-      map.set(team, (map.get(team) ?? 0) + 1)
+      const current = map.get(team) ?? { count: 0, payrollTotal: 0 }
+      current.count += 1
+      if (payrollReady) {
+        current.payrollTotal += payrollPayoutsByMemberId.get(member.id) ?? 0
+      }
+      map.set(team, current)
     })
-    const sorted = Array.from(map.entries())
-      .map(([label, value]) => ({ label, value }))
-      .sort((a, b) => b.value - a.value)
-      
+    const items: TeamStatsItem[] = Array.from(map.entries()).map(([label, data]) => ({
+      label,
+      value: data.count,
+      payrollTotal: data.payrollTotal,
+      payrollAverage: data.count ? data.payrollTotal / data.count : 0,
+    }))
+
     // Display ALL teams, do not aggregate into "Other"
     return {
-      items: sorted.map((item, idx) => ({
-        ...item,
-        color: CHART_COLORS[idx % CHART_COLORS.length],
-      })),
+      items,
       missing,
     }
-  }, [localMembers])
+  }, [localMembers, payrollPayoutsByMemberId, payrollReady])
+
+  const showTeamPayroll = canViewPayroll && payrollReady
+
+  const sortedTeamItems = useMemo(() => {
+    const mode: TeamSortMode = showTeamPayroll ? teamSortMode : 'count'
+    const list = [...teamStats.items]
+    const getSortValue = (item: TeamStatsItem) =>
+      mode === 'avgPayroll' ? item.payrollAverage : item.value
+    list.sort((a, b) => {
+      const diff = getSortValue(b) - getSortValue(a)
+      if (diff !== 0) return diff
+      if (a.value !== b.value) return b.value - a.value
+      return teamCollator.compare(a.label, b.label)
+    })
+    return list.map((item, idx): TeamBarItem => ({
+      ...item,
+      color: CHART_COLORS[idx % CHART_COLORS.length],
+    }))
+  }, [teamStats.items, teamSortMode, showTeamPayroll, teamCollator])
 
   const supervisorStats = useMemo(() => {
     const map = new Map<string, { count: number, teamCounts: Map<string, number> }>()
@@ -861,9 +1024,13 @@ export function MembersOverviewTab({
 
       {/* Prominent Team Distribution Section */}
       <TeamDistributionGrid 
-        items={teamStats.items} 
+        items={sortedTeamItems}
         missing={teamStats.missing} 
         t={t} 
+        showPayroll={showTeamPayroll}
+        sortMode={showTeamPayroll ? teamSortMode : 'count'}
+        onSortChange={setTeamSortMode}
+        formatMoney={formatMoney}
       />
 
       {/* Prominent Supervisor Power Grid Section */}

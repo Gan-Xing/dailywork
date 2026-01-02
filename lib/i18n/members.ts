@@ -601,7 +601,7 @@ export const memberCopy: Record<
       },
       charts: {
         nationality: '中外人员占比',
-        team: '班组人数',
+        team: '班组分析',
         supervisor: '中方负责人',
         provenance: '籍贯/属地分布',
         salary: '薪资区间占比',
@@ -624,6 +624,10 @@ export const memberCopy: Record<
         localScope: '仅非中国籍',
         china: '中国籍',
         nonChina: '非中国籍',
+        payrollTotal: '上月实发',
+        payrollAverage: '人均',
+        teamSortCount: '人数',
+        teamSortAvg: '均薪',
       },
       helpers: {
         salaryRule: 'CTJ 时薪按 22 天 × 8 小时折算月薪；月薪优先取 NET MENSUEL，否则用基础工资 + 津贴。',
@@ -1173,7 +1177,7 @@ export const memberCopy: Record<
       },
       charts: {
         nationality: 'Part Chinois / Non chinois',
-        team: 'Effectifs par équipe',
+        team: 'Analyse des équipes',
         supervisor: 'Top responsables chinois',
         provenance: 'Répartition des provenances',
         salary: 'Répartition des salaires',
@@ -1196,6 +1200,10 @@ export const memberCopy: Record<
         localScope: 'Non chinois',
         china: 'Chinois',
         nonChina: 'Non chinois',
+        payrollTotal: 'Total M-1',
+        payrollAverage: 'Moyenne',
+        teamSortCount: 'Effectif',
+        teamSortAvg: 'Moyenne',
       },
       helpers: {
         salaryRule:

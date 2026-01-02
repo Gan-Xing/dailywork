@@ -1371,6 +1371,7 @@ export function MembersPageClient() {
                 members={membersData}
                 loading={loading}
                 error={error}
+                canViewPayroll={canViewPayroll}
                 projectFilterOptions={projectFilterOptions}
                 statusFilterOptions={statusFilterOptions}
                 nationalityFilterOptions={nationalityFilterOptions}
