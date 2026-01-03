@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
 
+import type { Locale } from '@/lib/i18n'
 import { memberCopy } from '@/lib/i18n/members'
-import { normalizeTeamKey } from '@/lib/members/utils'
+import { normalizeTeamKey, resolveTeamDisplayName, resolveTeamInputValue } from '@/lib/members/utils'
 
 import type { FormState } from '../../types'
 import type { TeamSupervisorItem } from '../../../hooks/useTeamSupervisors'
@@ -24,6 +25,7 @@ type PayrollChangeForm = {
 
 type PayrollChangeTableProps = {
   t: MemberCopy
+  locale: Locale
   userId: number
   loading: boolean
   records: PayrollChange[]
@@ -57,6 +59,7 @@ const buildDefaults = (
 
 export function PayrollChangeTable({
   t,
+  locale,
   userId,
   loading,
   records,
@@ -66,6 +69,8 @@ export function PayrollChangeTable({
   onRefresh,
   onApplyExpatProfile,
 }: PayrollChangeTableProps) {
+  const resolveTeamLabel = (team?: string | null) =>
+    resolveTeamDisplayName(team ?? null, locale, teamSupervisorMap)
   const defaultForm = useMemo(
     () => buildDefaults(expatProfile, teamSupervisorMap),
     [expatProfile, teamSupervisorMap],
@@ -217,7 +222,7 @@ export function PayrollChangeTable({
                 <td className="py-3">{record.baseSalaryAmount || record.salaryAmount || t.labels.empty}</td>
                 <td className="py-3">{record.baseSalaryUnit || record.salaryUnit || t.labels.empty}</td>
                 <td className="py-3">{record.netMonthlyAmount || t.labels.empty}</td>
-                <td className="py-3">{record.team || t.labels.empty}</td>
+                <td className="py-3">{resolveTeamLabel(record.team) || t.labels.empty}</td>
                 <td className="py-3">{record.chineseSupervisorName || t.labels.empty}</td>
                 <td className="py-3">
                   <div className="flex items-center gap-2">
@@ -333,9 +338,10 @@ export function PayrollChangeTable({
             <span className="block font-semibold">{t.compensation.fields.team}</span>
             <input
               list="payroll-team-options"
-              value={formState.team}
+              value={resolveTeamDisplayName(formState.team, locale, teamSupervisorMap) || formState.team}
               onChange={(event) => {
-                const nextTeam = event.target.value
+                const input = event.target.value
+                const nextTeam = resolveTeamInputValue(input, locale, teamSupervisorMap)
                 const binding = teamSupervisorMap.get(normalizeTeamKey(nextTeam))
                 setFormState((prev) => ({
                   ...prev,
@@ -347,7 +353,10 @@ export function PayrollChangeTable({
             />
             <datalist id="payroll-team-options">
               {teamOptions.map((name) => (
-                <option key={name} value={name} />
+                <option
+                  key={name}
+                  value={resolveTeamDisplayName(name, locale, teamSupervisorMap) || name}
+                />
               ))}
             </datalist>
           </label>

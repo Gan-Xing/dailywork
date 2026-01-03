@@ -9,7 +9,13 @@ import {
   type NationalityRegion,
   type NationalityOption,
 } from '@/lib/i18n/members'
-import { normalizeTagsInput, normalizeTeamKey, parseBirthDateFromIdNumber } from '@/lib/members/utils'
+import {
+  normalizeTagsInput,
+  normalizeTeamKey,
+  parseBirthDateFromIdNumber,
+  resolveTeamDisplayName,
+  resolveTeamInputValue,
+} from '@/lib/members/utils'
 import type { ExpatProfileForm, MemberFormState as FormState, Role } from '@/types/members'
 import type { TeamSupervisorItem } from '../hooks/useTeamSupervisors'
 
@@ -667,9 +673,16 @@ export function MemberFormModal({
                     <span className="block font-semibold">{t.form.team}</span>
                     <input
                       list="team-options"
-                      value={formState.expatProfile.team}
+                      value={
+                        resolveTeamDisplayName(
+                          formState.expatProfile.team,
+                          locale,
+                          teamSupervisorMap,
+                        ) || formState.expatProfile.team
+                      }
                       onChange={(event) => {
-                        const nextTeam = event.target.value
+                        const input = event.target.value
+                        const nextTeam = resolveTeamInputValue(input, locale, teamSupervisorMap)
                         const binding = teamSupervisorMap.get(normalizeTeamKey(nextTeam))
                         setFormState((prev) => ({
                           ...prev,
@@ -686,7 +699,10 @@ export function MemberFormModal({
                     />
                     <datalist id="team-options">
                       {teamOptions.map((name) => (
-                        <option key={name} value={name} />
+                        <option
+                          key={name}
+                          value={resolveTeamDisplayName(name, locale, teamSupervisorMap) || name}
+                        />
                       ))}
                     </datalist>
                   </label>

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 
+import type { Locale } from '@/lib/i18n'
 import { memberCopy } from '@/lib/i18n/members'
 
 import type { FormState } from '../../types'
@@ -14,6 +15,7 @@ type MemberCopy = (typeof memberCopy)[keyof typeof memberCopy]
 
 type CompensationSectionProps = {
   t: MemberCopy
+  locale: Locale
   userId: number
   formState: FormState
   teamOptions: string[]
@@ -25,6 +27,7 @@ type CompensationSectionProps = {
 
 export function CompensationSection({
   t,
+  locale,
   userId,
   formState,
   teamOptions,
@@ -108,6 +111,7 @@ export function CompensationSection({
         <div className="mt-6 grid gap-6">
           <ContractChangeTable
             t={t}
+            locale={locale}
             userId={userId}
             loading={loading}
             records={contractChanges}
@@ -122,6 +126,7 @@ export function CompensationSection({
           />
           <PayrollChangeTable
             t={t}
+            locale={locale}
             userId={userId}
             loading={loading}
             records={payrollChanges}
@@ -131,7 +136,13 @@ export function CompensationSection({
             teamSupervisorMap={teamSupervisorMap}
             onApplyExpatProfile={onApplyExpatProfile}
           />
-          <PayrollPayoutTable t={t} loading={loading} records={payrollPayouts} />
+          <PayrollPayoutTable
+            t={t}
+            locale={locale}
+            teamSupervisorMap={teamSupervisorMap}
+            loading={loading}
+            records={payrollPayouts}
+          />
         </div>
       ) : null}
     </section>

@@ -9,7 +9,7 @@
 <body>
     <div class="page landscape">
         <!-- Header -->
-        <h1 class="main-title">LISTE DE PAIEMENT DES SALAIRES DES TRAVAILLEURS DE LA DIRECTION （CRBC） 土方班组-丹达</h1>
+        <h1 class="main-title">LISTE DE PAIEMENT DES SALAIRES DES TRAVAILLEURS DE LA DIRECTION （CRBC） {{teamLabel}}</h1>
         <h2 class="sub-title">当地雇员工资发放表</h2>
 
         <!-- Info Section -->
@@ -17,7 +17,7 @@
             <div class="info-row">
                 <div class="info-left">
                     <span class="label">制表单位：</span>
-                    <span class="value">邦社库&丹达项目经理部</span>
+                    <span class="value">{{unitName}}</span>
                 </div>
             </div>
             <div class="info-row time-row">
@@ -25,9 +25,9 @@
                     <span class="label">工资结算起止时间：</span>
                 </div>
                 <div class="info-right time-values">
-                    <span>2025/10/21</span>
+                    <span>{{periodStart}}</span>
                     <span class="time-sep">至</span>
-                    <span>2025/11/5</span>
+                    <span>{{periodEnd}}</span>
                 </div>
             </div>
         </div>
@@ -55,114 +55,16 @@
                 </tr>
             </thead>
             <tbody>
-                <tr>
-                    <td>1</td>
-                    <td>JBDKO326</td>
-                    <td>COULIBALY ZOUMANA</td>
-                    <td>276,700</td>
-                    <td></td>
-                    <td>276,700</td>
-                    <td></td>
-                </tr>
-                <tr>
-                    <td>2</td>
-                    <td>JBDKO456</td>
-                    <td>TUO KOLOTIOLOMA RICHARD</td>
-                    <td>87,500</td>
-                    <td></td>
-                    <td>87,500</td>
-                    <td></td>
-                </tr>
-                <tr>
-                    <td>3</td>
-                    <td>JBDKO584</td>
-                    <td>OUATTARA DAOUDA</td>
-                    <td>68,900</td>
-                    <td></td>
-                    <td>68,900</td>
-                    <td></td>
-                </tr>
-                <tr>
-                    <td>4</td>
-                    <td>JBDKO585</td>
-                    <td>KOFFI ADAYE KOUAKOU FRANCOIS</td>
-                    <td>71,900</td>
-                    <td></td>
-                    <td>71,900</td>
-                    <td></td>
-                </tr>
-                <tr>
-                    <td>5</td>
-                    <td>JBDKO586</td>
-                    <td>KOUMAN YAO PIERRE</td>
-                    <td>70,600</td>
-                    <td></td>
-                    <td>70,600</td>
-                    <td></td>
-                </tr>
-                <tr>
-                    <td>6</td>
-                    <td>JBDKO587</td>
-                    <td>KOUMAN KOFFI OUATTARA NOUHO</td>
-                    <td>79,200</td>
-                    <td></td>
-                    <td>79,200</td>
-                    <td></td>
-                </tr>
-                <tr>
-                    <td>7</td>
-                    <td>JBDKO588</td>
-                    <td>DIARRA AROUNA</td>
-                    <td>100,200</td>
-                    <td></td>
-                    <td>100,200</td>
-                    <td></td>
-                </tr>
-                <tr>
-                    <td>8</td>
-                    <td>JBDKO589</td>
-                    <td>KARAMOKO ADAMA LAMA</td>
-                    <td>67,400</td>
-                    <td></td>
-                    <td>67,400</td>
-                    <td></td>
-                </tr>
-                <tr>
-                    <td>9</td>
-                    <td>JBDKO616</td>
-                    <td>YAPI ASSI ALEX XAVIER</td>
-                    <td>98,900</td>
-                    <td></td>
-                    <td>98,900</td>
-                    <td></td>
-                </tr>
-                <tr>
-                    <td>10</td>
-                    <td>JBDKO625</td>
-                    <td>KONATE DATCHA</td>
-                    <td>97,400</td>
-                    <td></td>
-                    <td>97,400</td>
-                    <td></td>
-                </tr>
-                <tr>
-                    <td>11</td>
-                    <td>JBDKO626</td>
-                    <td>SOULEYMANE YAO SIAKA</td>
-                    <td>75,000</td>
-                    <td></td>
-                    <td>75,000</td>
-                    <td></td>
-                </tr>
+                {{rows}}
             </tbody>
             <tfoot>
                 <tr class="total-row">
                     <td colspan="1" class="total-label">Total</td> <!-- Using colspan 1 and letting others flow or merge? Image shows Total under N° column basically or spanning? It spans N° and Matricule maybe? Actually looks like just in the first cell text aligned left with bold 'Total'. -->
                     <td></td> <!-- Matricule col -->
                     <td></td> <!-- Name col -->
-                    <td class="total-val">1,093,700</td>
-                    <td class="total-val">-</td>
-                    <td class="total-val">1,093,700</td>
+                    <td class="total-val">{{totalAmount}}</td>
+                    <td class="total-val">{{totalAdvance}}</td>
+                    <td class="total-val">{{totalPaid}}</td>
                     <td></td>
                 </tr>
             </tfoot>
@@ -182,7 +84,7 @@
 
         <!-- Page Number -->
         <div class="page-footer">
-            第 1 页，共 1 页
+            第 {{pageNumber}} 页，共 {{pageCount}} 页
         </div>
     </div>
 </body>

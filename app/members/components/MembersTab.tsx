@@ -10,6 +10,7 @@ import type { Member, MemberBulkPatch, Role } from '@/types/members'
 import { MemberFiltersPanel } from './MemberFiltersPanel'
 import { MembersTable } from './MembersTable'
 import { PaginationBar } from './PaginationBar'
+import type { TeamSupervisorItem } from '../hooks/useTeamSupervisors'
 
 type MemberCopy = (typeof memberCopy)[keyof typeof memberCopy]
 
@@ -37,6 +38,7 @@ type MembersTabProps = {
   bulkDrafts: Record<number, MemberBulkPatch>
   bulkEditableColumns: ColumnKey[]
   teamOptions: string[]
+  teamSupervisorMap: Map<string, TeamSupervisorItem>
   projectOptions: Option[]
   chineseSupervisorOptions: { value: string; label: string }[]
   onStartBulkEdit: () => void
@@ -254,6 +256,7 @@ export function MembersTab(props: MembersTabProps) {
   bulkDrafts,
   bulkEditableColumns,
   teamOptions,
+  teamSupervisorMap,
   projectOptions,
   chineseSupervisorOptions,
     onStartBulkEdit,
@@ -978,6 +981,7 @@ export function MembersTab(props: MembersTabProps) {
                   bulkDrafts={bulkDrafts}
                   bulkEditableColumns={bulkEditableColumns}
                   teamOptions={teamOptions}
+                  teamSupervisorMap={teamSupervisorMap}
                   projectOptions={projectOptions}
                   chineseSupervisorOptions={chineseSupervisorOptions}
                   onBulkFieldChange={onBulkFieldChange}

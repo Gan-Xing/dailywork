@@ -1,7 +1,8 @@
 import { useEffect, type Dispatch, type SetStateAction } from 'react'
 
+import type { Locale } from '@/lib/i18n'
 import { memberCopy } from '@/lib/i18n/members'
-import { normalizeTeamKey } from '@/lib/members/utils'
+import { normalizeTeamKey, resolveTeamDisplayName, resolveTeamInputValue } from '@/lib/members/utils'
 
 import type { FormState } from '../types'
 import type { TeamSupervisorItem } from '../../hooks/useTeamSupervisors'
@@ -10,6 +11,7 @@ type MemberCopy = (typeof memberCopy)[keyof typeof memberCopy]
 
 type ExpatProfileFieldsProps = {
   t: MemberCopy
+  locale: Locale
   formState: FormState
   setFormState: Dispatch<SetStateAction<FormState>>
   teamOptions: string[]
@@ -18,6 +20,7 @@ type ExpatProfileFieldsProps = {
 
 export function ExpatProfileFields({
   t,
+  locale,
   formState,
   setFormState,
   teamOptions,
@@ -65,9 +68,16 @@ export function ExpatProfileFields({
         <span className="block font-semibold">{t.form.team}</span>
         <input
           list="team-options"
-          value={formState.expatProfile.team}
+          value={
+            resolveTeamDisplayName(
+              formState.expatProfile.team,
+              locale,
+              teamSupervisorMap,
+            ) || formState.expatProfile.team
+          }
           onChange={(event) => {
-            const nextTeam = event.target.value
+            const input = event.target.value
+            const nextTeam = resolveTeamInputValue(input, locale, teamSupervisorMap)
             const binding = teamSupervisorMap.get(normalizeTeamKey(nextTeam))
             setFormState((prev) => ({
               ...prev,
@@ -83,7 +93,10 @@ export function ExpatProfileFields({
         />
         <datalist id="team-options">
           {teamOptions.map((name) => (
-            <option key={name} value={name} />
+            <option
+              key={name}
+              value={resolveTeamDisplayName(name, locale, teamSupervisorMap) || name}
+            />
           ))}
         </datalist>
       </label>

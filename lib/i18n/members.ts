@@ -406,6 +406,7 @@ export const memberCopy: Record<
       subtitle: string
       add: string
       team: string
+      teamZh: string
       supervisor: string
       project: string
       edit: string
@@ -417,6 +418,7 @@ export const memberCopy: Record<
       teamRequired: string
       supervisorRequired: string
       teamPlaceholder: string
+      teamZhPlaceholder: string
       deleteConfirm: (team: string) => string
     }
     form: {
@@ -567,6 +569,8 @@ export const memberCopy: Record<
         bulkPaste: string
         applyPaste: string
         clearPaste: string
+        exportPdf: string
+        exportingPdf: string
       }
       confirm: {
         clearRun: (label: string) => string
@@ -590,6 +594,7 @@ export const memberCopy: Record<
         loadFailed: string
         saveFailed: string
         missingAmount: (count: number) => string
+        exportFailed: string
         importInvalidTargets: string
         importErrorTitle: string
         importErrorSummary: (count: number) => string
@@ -1023,6 +1028,7 @@ export const memberCopy: Record<
       subtitle: '维护班组与中方负责人绑定。',
       add: '新增班组',
       team: '班组',
+      teamZh: '中文班组',
       supervisor: '中方负责人',
       project: '项目',
       edit: '编辑',
@@ -1034,6 +1040,7 @@ export const memberCopy: Record<
       teamRequired: '班组必填',
       supervisorRequired: '中方负责人必填',
       teamPlaceholder: '输入班组名称',
+      teamZhPlaceholder: '输入班组中文名',
       deleteConfirm: (team: string) => `确定删除班组 ${team} 吗？`,
     },
     form: {
@@ -1187,6 +1194,8 @@ export const memberCopy: Record<
         bulkPaste: '批量粘贴',
         applyPaste: '应用',
         clearPaste: '清空',
+        exportPdf: '导出工资',
+        exportingPdf: '导出中...',
       },
       confirm: {
         clearRun: (label: string) => `确认清空 ${label} 的发放记录吗？此操作不可恢复。`,
@@ -1210,6 +1219,7 @@ export const memberCopy: Record<
         loadFailed: '加载工资发放失败',
         saveFailed: '保存工资发放失败',
         missingAmount: (count: number) => `仍有 ${count} 人未填写金额`,
+        exportFailed: '导出工资失败，请稍后重试。',
         importInvalidTargets: '没有可用的发放日期',
         importErrorTitle: '导入错误',
         importErrorSummary: (count: number) => `发现 ${count} 条错误，请修正后重试。`,
@@ -1654,6 +1664,7 @@ export const memberCopy: Record<
       subtitle: "Lier chaque équipe à un responsable chinois.",
       add: 'Ajouter une équipe',
       team: 'Équipe',
+      teamZh: "Équipe (chinois)",
       supervisor: 'Responsable chinois',
       project: 'Projet',
       edit: 'Éditer',
@@ -1665,6 +1676,7 @@ export const memberCopy: Record<
       teamRequired: "L'équipe est obligatoire",
       supervisorRequired: 'Responsable chinois requis',
       teamPlaceholder: "Saisir le nom de l'équipe",
+      teamZhPlaceholder: "Saisir le nom chinois de l'équipe",
       deleteConfirm: (team: string) => `Supprimer l'équipe ${team} ?`,
     },
     form: {
@@ -1819,6 +1831,8 @@ export const memberCopy: Record<
         bulkPaste: 'Coller en lot',
         applyPaste: 'Appliquer',
         clearPaste: 'Effacer',
+        exportPdf: 'Exporter salaires',
+        exportingPdf: 'Export en cours...',
       },
       confirm: {
         clearRun: (label: string) =>
@@ -1843,6 +1857,7 @@ export const memberCopy: Record<
         loadFailed: 'Échec du chargement des versements',
         saveFailed: "Échec de l'enregistrement",
         missingAmount: (count: number) => `Montant manquant pour ${count} personne(s)`,
+        exportFailed: "Échec de l'export des salaires",
         importInvalidTargets: 'Aucune date de versement valide',
         importErrorTitle: "Erreurs d'import",
         importErrorSummary: (count: number) =>

@@ -448,6 +448,7 @@ export function MembersPageClient() {
     canAssignRole,
     statusLabels,
     findNationalityLabel,
+    teamSupervisorMap,
   })
   const resolveRoleName = useCallback(
     (role: { id: number; name: string }) => {
@@ -1376,6 +1377,7 @@ export function MembersPageClient() {
                 statusFilterOptions={statusFilterOptions}
                 nationalityFilterOptions={nationalityFilterOptions}
                 teamFilterOptions={teamFilterOptions}
+                teamSupervisorMap={teamSupervisorMap}
                 projectFilters={projectFilters}
                 statusFilters={statusFilters}
                 nationalityFilters={nationalityFilters}
@@ -1401,6 +1403,7 @@ export function MembersPageClient() {
                 bulkDrafts={bulkDrafts}
                 bulkEditableColumns={bulkEditableColumns}
                 teamOptions={teamOptions}
+                teamSupervisorMap={teamSupervisorMap}
                 projectOptions={projectOptions}
                 chineseSupervisorOptions={chineseSupervisorOptions}
                 onStartBulkEdit={startBulkEdit}
@@ -1648,6 +1651,7 @@ export function MembersPageClient() {
                 membersLoading={loading}
                 membersError={error}
                 teamOptions={teamOptions}
+                teamSupervisorMap={teamSupervisorMap}
                 chineseSupervisorOptions={chineseSupervisorOptions}
                 canViewPayroll={canViewPayroll}
                 canManagePayroll={canManagePayroll}
@@ -1674,6 +1678,7 @@ export function MembersPageClient() {
 
       <TeamSupervisorDialog
         t={t}
+        locale={locale}
         open={showTeamSupervisorDialog}
         canManage={canCreateMember}
         loading={teamSupervisorLoading}
@@ -1728,6 +1733,7 @@ export function MembersPageClient() {
           setSelectedMember(null)
           openEditPage(member)
         }}
+        teamSupervisorMap={teamSupervisorMap}
       />
     </main>
   )

@@ -12,6 +12,7 @@ import {
   collectContractNumbers,
   normalizeTagKey,
   normalizeText,
+  resolveTeamDisplayName,
   toNumberFilterValue,
   toSalaryFilterValue,
 } from '@/lib/members/utils'
@@ -29,6 +30,7 @@ type UseMemberFilterOptionsParams = {
   canAssignRole: boolean
   statusLabels: Record<EmploymentStatus, string>
   findNationalityLabel: (value: string | null) => string
+  teamSupervisorMap?: Map<string, { teamZh?: string | null }>
 }
 
 type Option = { value: string; label: string }
@@ -42,6 +44,7 @@ export function useMemberFilterOptions({
   canAssignRole,
   statusLabels,
   findNationalityLabel,
+  teamSupervisorMap,
 }: UseMemberFilterOptionsParams) {
   const optionCollator = useMemo(() => {
     const localeId = locale === 'fr' ? 'fr' : ['zh-Hans-u-co-pinyin', 'zh-Hans', 'zh']
@@ -210,11 +213,14 @@ export function useMemberFilterOptions({
       else hasEmpty = true
     })
     const options = Array.from(values)
-      .sort(optionCollator.compare)
-      .map((value) => ({ value, label: value }))
+      .map((value) => ({
+        value,
+        label: resolveTeamDisplayName(value, locale, teamSupervisorMap) || value,
+      }))
+      .sort((a, b) => optionCollator.compare(a.label, b.label))
     if (hasEmpty) options.unshift({ value: EMPTY_FILTER_VALUE, label: t.labels.empty })
     return options
-  }, [membersData, optionCollator, t.labels.empty])
+  }, [membersData, optionCollator, t.labels.empty, locale, teamSupervisorMap])
 
   const projectFilterOptions = useMemo(() => {
     const values = new Set<string>()

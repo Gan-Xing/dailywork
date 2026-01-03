@@ -6,7 +6,7 @@ import { MultiSelectFilter, type MultiSelectOption } from '@/components/MultiSel
 import type { Locale } from '@/lib/i18n'
 import { memberCopy } from '@/lib/i18n/members'
 import { EMPTY_FILTER_VALUE } from '@/lib/members/constants'
-import { formatSupervisorLabel, normalizeText } from '@/lib/members/utils'
+import { formatSupervisorLabel, normalizeText, resolveTeamDisplayName } from '@/lib/members/utils'
 import type { Member } from '@/types/members'
 
 type MemberCopy = (typeof memberCopy)[keyof typeof memberCopy]
@@ -22,6 +22,7 @@ type Props = {
   statusFilterOptions: MultiSelectOption[]
   nationalityFilterOptions: MultiSelectOption[]
   teamFilterOptions: MultiSelectOption[]
+  teamSupervisorMap: Map<string, { teamZh?: string | null }>
   projectFilters: string[]
   statusFilters: string[]
   nationalityFilters: string[]
@@ -1237,6 +1238,7 @@ const PositionDetailModal = ({
 
 const TeamCostHeatmap = ({
   items,
+  resolveTeamLabel,
   formatMoney,
   formatNumber,
   formatRatio,
@@ -1245,6 +1247,7 @@ const TeamCostHeatmap = ({
   labels,
 }: {
   items: TeamStatsItem[]
+  resolveTeamLabel: (value: string) => string
   formatMoney: (value: number) => string
   formatNumber: (value: number) => string
   formatRatio: (value: number) => string
@@ -1366,10 +1369,14 @@ const TeamCostHeatmap = ({
           <tbody className="divide-y divide-slate-100">
             {rows.map((item, index) => {
               const metric = metrics[index]
+              const displayLabel = resolveTeamLabel(item.label)
               return (
                 <tr key={item.label} className="group hover:bg-slate-50">
-                  <td className="px-4 py-3 text-slate-800 font-bold truncate bg-white group-hover:bg-slate-50" title={item.label}>
-                    {item.label}
+                  <td
+                    className="px-4 py-3 text-slate-800 font-bold truncate bg-white group-hover:bg-slate-50"
+                    title={displayLabel}
+                  >
+                    {displayLabel}
                   </td>
                   <td
                     className="px-4 py-3 text-right font-medium"
@@ -1402,15 +1409,18 @@ const TeamCostHeatmap = ({
               <th className="px-4 py-3 text-left font-bold bg-slate-50 text-slate-500 border-b border-r border-slate-200 sticky left-0 z-20 w-32 shadow-[4px_0_8px_-2px_rgba(0,0,0,0.05)]">
                  {/* Empty corner cell */}
               </th>
-              {rows.map((item) => (
-                <th
-                  key={item.label}
-                  className="px-4 py-3 text-center font-bold text-slate-600 bg-slate-50 border-b border-slate-200 whitespace-nowrap min-w-[80px]"
-                  title={item.label}
-                >
-                  {item.label}
-                </th>
-              ))}
+              {rows.map((item) => {
+                const displayLabel = resolveTeamLabel(item.label)
+                return (
+                  <th
+                    key={item.label}
+                    className="px-4 py-3 text-center font-bold text-slate-600 bg-slate-50 border-b border-slate-200 whitespace-nowrap min-w-[80px]"
+                    title={displayLabel}
+                  >
+                    {displayLabel}
+                  </th>
+                )
+              })}
             </tr>
           </thead>
           <tbody>
@@ -1451,6 +1461,7 @@ const TeamDistributionGrid = ({
   onSortChange,
   formatMoney,
   onTeamSelect,
+  resolveTeamLabel,
 }: {
   items: TeamBarItem[]
   missing: number
@@ -1460,6 +1471,7 @@ const TeamDistributionGrid = ({
   onSortChange: (mode: TeamSortMode) => void
   formatMoney: (value: number) => string
   onTeamSelect?: (team: string) => void
+  resolveTeamLabel: (value: string) => string
 }) => {
   if (items.length === 0 && missing === 0) return null
   
@@ -1534,6 +1546,7 @@ const TeamDistributionGrid = ({
                  onTeamSelect(item.label)
                }
              : undefined
+           const displayLabel = resolveTeamLabel(item.label)
            return (
              <button
                key={item.label}
@@ -1543,7 +1556,7 @@ const TeamDistributionGrid = ({
              >
                 <div className="mb-2 flex items-end justify-between">
                    <div className="flex flex-col min-w-0 pr-2">
-                       <span className="font-bold text-slate-700 truncate" title={item.label}>{item.label}</span>
+                       <span className="font-bold text-slate-700 truncate" title={displayLabel}>{displayLabel}</span>
                    </div>
                    <div className="text-right shrink-0">
                       <span className="text-xl font-bold text-slate-900 leading-none">{item.value}</span>
@@ -1604,6 +1617,7 @@ const SupervisorPowerGrid = ({
   onSortChange,
   formatMoney,
   onTeamsSelect,
+  resolveTeamLabel,
 }: {
   items: SupervisorItem[]
   missing: number
@@ -1613,6 +1627,7 @@ const SupervisorPowerGrid = ({
   onSortChange: (mode: TeamSortMode) => void
   formatMoney: (value: number) => string
   onTeamsSelect?: (teams: string[]) => void
+  resolveTeamLabel: (value: string) => string
 }) => {
   if (items.length === 0 && missing === 0) return null
   const maxSupervisorCount = Math.max(...items.map((item) => item.value), 1)
@@ -1731,11 +1746,13 @@ const SupervisorPowerGrid = ({
                 ) : null}
                
                <div className="flex-1 space-y-3 p-5 pt-4">
-                 {item.teamDetails.map((team, idx) => (
+                 {item.teamDetails.map((team) => {
+                    const displayTeam = resolveTeamLabel(team.name)
+                    return (
                     <div key={team.name} className="group">
                       <div className="flex justify-between items-center mb-1.5">
-                        <span className="text-xs font-medium text-slate-600 truncate pr-2" title={team.name}>
-                          {team.name}
+                        <span className="text-xs font-medium text-slate-600 truncate pr-2" title={displayTeam}>
+                          {displayTeam}
                         </span>
                         <div className="text-right shrink-0 flex items-baseline gap-1">
                           <span className="text-xs font-bold text-slate-700">{team.count}</span>
@@ -1749,7 +1766,8 @@ const SupervisorPowerGrid = ({
                         />
                       </div>
                     </div>
-                 ))}
+                  )
+                 })}
                  {item.teamDetails.length === 0 && (
                      <p className="text-xs text-slate-400 italic text-center py-2">
                         {t.overview.labels.unassignedTeam}
@@ -1783,6 +1801,7 @@ export function MembersOverviewTab({
   statusFilterOptions,
   nationalityFilterOptions,
   teamFilterOptions,
+  teamSupervisorMap,
   projectFilters,
   statusFilters,
   nationalityFilters,
@@ -1815,6 +1834,10 @@ export function MembersOverviewTab({
   const nameCollator = useMemo(
     () => new Intl.Collator(toLocaleId(locale), { numeric: true, sensitivity: 'base' }),
     [locale],
+  )
+  const resolveTeamLabel = useCallback(
+    (team: string) => resolveTeamDisplayName(team, locale, teamSupervisorMap) || team,
+    [locale, teamSupervisorMap],
   )
 
   const [payrollPayouts, setPayrollPayouts] = useState<PayrollPayout[]>([])
@@ -1992,21 +2015,21 @@ export function MembersOverviewTab({
       const diff = getSortValue(b) - getSortValue(a)
       if (diff !== 0) return diff
       if (a.value !== b.value) return b.value - a.value
-      return nameCollator.compare(a.label, b.label)
+      return nameCollator.compare(resolveTeamLabel(a.label), resolveTeamLabel(b.label))
     })
     return list.map((item, idx): TeamBarItem => ({
       ...item,
       color: CHART_COLORS[idx % CHART_COLORS.length],
     }))
-  }, [teamStats.items, teamSortMode, showTeamPayroll, nameCollator])
+  }, [teamStats.items, teamSortMode, showTeamPayroll, nameCollator, resolveTeamLabel])
 
   const detailTeamOptions = useMemo(
     () =>
       sortedTeamItems.map((item) => ({
         value: item.label,
-        label: item.label,
+        label: resolveTeamLabel(item.label),
       })),
-    [sortedTeamItems],
+    [resolveTeamLabel, sortedTeamItems],
   )
 
   const defaultDetailTeam = useMemo(
@@ -2888,7 +2911,8 @@ export function MembersOverviewTab({
           username: supervisor?.username ?? null,
         }),
       ) || t.overview.labels.unassignedSupervisor
-      const team = normalizeText(member.expatProfile?.team) || t.overview.labels.unassignedTeam
+      const teamValue = normalizeText(member.expatProfile?.team)
+      const team = teamValue ? resolveTeamLabel(teamValue) : t.overview.labels.unassignedTeam
       const memberName = member.name ?? member.username ?? `#${member.id}`
       const amountsByDate = payoutsByMember.get(member.id) ?? {}
       const total = Object.values(amountsByDate).reduce((sum, value) => sum + value, 0)
@@ -2928,6 +2952,7 @@ export function MembersOverviewTab({
     detailRecordSort.direction,
     detailRecordSort.key,
     nameCollator,
+    resolveTeamLabel,
     showTeamPayroll,
     t.overview.labels.unassignedSupervisor,
     t.overview.labels.unassignedTeam,
@@ -3121,6 +3146,7 @@ export function MembersOverviewTab({
             onSortChange={setTeamSortMode}
             formatMoney={formatMoney}
             onTeamSelect={(team) => handleDetailJump([team])}
+            resolveTeamLabel={resolveTeamLabel}
           />
 
           <SupervisorPowerGrid 
@@ -3132,6 +3158,7 @@ export function MembersOverviewTab({
             onSortChange={setSupervisorSortMode}
             formatMoney={formatMoney}
             onTeamsSelect={(teams) => handleDetailJump(teams)}
+            resolveTeamLabel={resolveTeamLabel}
           />
 
           <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
@@ -3139,6 +3166,7 @@ export function MembersOverviewTab({
               <OverviewCard title={t.overview.charts.teamCostScatter} badge={t.overview.labels.localScope}>
                 <TeamCostHeatmap
                   items={teamStats.items}
+                  resolveTeamLabel={resolveTeamLabel}
                   formatMoney={formatMoney}
                   formatNumber={formatNumber}
                   formatRatio={formatRatio}
@@ -3329,7 +3357,7 @@ export function MembersOverviewTab({
                   key={team}
                   className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-600"
                 >
-                  {team}
+                  {resolveTeamLabel(team)}
                 </span>
               ))}
             </div>

@@ -510,6 +510,7 @@ model UserExpatProfile {
 model TeamSupervisor {
   id              Int      @id @default(autoincrement())
   team            String
+  teamZh          String?
   teamKey         String   @unique
   supervisorId    Int
   projectId       Int?

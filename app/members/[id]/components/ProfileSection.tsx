@@ -1,5 +1,6 @@
 import type { Dispatch, SetStateAction } from 'react'
 
+import type { Locale } from '@/lib/i18n'
 import { memberCopy } from '@/lib/i18n/members'
 
 import type { FormState } from '../types'
@@ -11,6 +12,7 @@ type MemberCopy = (typeof memberCopy)[keyof typeof memberCopy]
 
 type ProfileSectionProps = {
   t: MemberCopy
+  locale: Locale
   isChineseForm: boolean
   profileExpanded: boolean
   onToggleExpanded: () => void
@@ -22,6 +24,7 @@ type ProfileSectionProps = {
 
 export function ProfileSection({
   t,
+  locale,
   isChineseForm,
   profileExpanded,
   onToggleExpanded,
@@ -55,6 +58,7 @@ export function ProfileSection({
         ) : (
           <ExpatProfileFields
             t={t}
+            locale={locale}
             formState={formState}
             setFormState={setFormState}
             teamOptions={teamOptions}

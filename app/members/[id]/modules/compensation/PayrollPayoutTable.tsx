@@ -1,10 +1,14 @@
+import type { Locale } from '@/lib/i18n'
 import { memberCopy } from '@/lib/i18n/members'
+import { resolveTeamDisplayName } from '@/lib/members/utils'
 import type { PayrollPayout } from './types'
 
 type MemberCopy = (typeof memberCopy)[keyof typeof memberCopy]
 
 type PayrollPayoutTableProps = {
   t: MemberCopy
+  locale: Locale
+  teamSupervisorMap: Map<string, { teamZh?: string | null }>
   loading: boolean
   records: PayrollPayout[]
 }
@@ -13,9 +17,13 @@ const formatDate = (value?: string | null) => (value ? value.slice(0, 10) : '')
 
 export function PayrollPayoutTable({
   t,
+  locale,
+  teamSupervisorMap,
   loading,
   records,
 }: PayrollPayoutTableProps) {
+  const resolveTeamLabel = (team?: string | null) =>
+    resolveTeamDisplayName(team ?? null, locale, teamSupervisorMap)
   return (
     <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
       <div className="flex items-center justify-between gap-4">
@@ -52,7 +60,7 @@ export function PayrollPayoutTable({
                 <td className="py-3">{formatDate(record.payoutDate) || t.labels.empty}</td>
                 <td className="py-3 font-medium">{record.amount}</td>
                 <td className="py-3">{record.currency || 'XOF'}</td>
-                <td className="py-3">{record.team || t.labels.empty}</td>
+                <td className="py-3">{resolveTeamLabel(record.team) || t.labels.empty}</td>
                 <td className="py-3">{record.chineseSupervisorName || t.labels.empty}</td>
                 <td className="py-3 text-slate-500">{record.note || t.labels.empty}</td>
               </tr>

@@ -180,6 +180,7 @@
 ### TeamSupervisor（班组负责人绑定）
 
 - `team`（EQUIPE）：班组名称，字符串，必填。
+- `teamZh`（EQUIPE 中文名）：班组中文名称，字符串，可空（用于中文界面显示）。
 - `teamKey`：班组标准化键（去空格 + 小写），用于唯一约束。
 - `projectId`：默认项目 ID，可空（用于班组联动项目）。
 - `supervisorId`（RESPONSABLE CHINOIS）：绑定的中方负责人用户 ID（仅中国籍成员）。

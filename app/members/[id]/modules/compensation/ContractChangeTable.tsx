@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
 
+import type { Locale } from '@/lib/i18n'
 import { memberCopy } from '@/lib/i18n/members'
-import { normalizeTeamKey } from '@/lib/members/utils'
+import { normalizeTeamKey, resolveTeamDisplayName, resolveTeamInputValue } from '@/lib/members/utils'
 
 import type { ExpatProfile, ExpatProfileForm, FormState } from '../../types'
 import { buildExpatProfileForm } from '../../utils'
@@ -29,6 +30,7 @@ type ContractChangeForm = {
 
 type ContractChangeTableProps = {
   t: MemberCopy
+  locale: Locale
   userId: number
   loading: boolean
   records: ContractChange[]
@@ -78,6 +80,7 @@ const buildDefaults = (
 
 export function ContractChangeTable({
   t,
+  locale,
   userId,
   loading,
   records,
@@ -90,6 +93,8 @@ export function ContractChangeTable({
   onApplyJoinDate,
   onApplyPosition,
 }: ContractChangeTableProps) {
+  const resolveTeamLabel = (team?: string | null) =>
+    resolveTeamDisplayName(team ?? null, locale, teamSupervisorMap)
   const defaultForm = useMemo(
     () => buildDefaults(expatProfile, teamSupervisorMap, currentPosition),
     [currentPosition, expatProfile, teamSupervisorMap],
@@ -269,7 +274,7 @@ export function ContractChangeTable({
             {records.map((record) => (
               <tr key={record.id} className="border-b border-slate-200 last:border-0">
                 <td className="py-3">{formatDate(record.changeDate) || t.labels.empty}</td>
-                <td className="py-3">{record.team || t.labels.empty}</td>
+                <td className="py-3">{resolveTeamLabel(record.team) || t.labels.empty}</td>
                 <td className="py-3">{record.contractNumber || t.labels.empty}</td>
                 <td className="py-3">{record.position || t.labels.empty}</td>
                 <td className="py-3">{record.contractType || t.labels.empty}</td>
@@ -316,9 +321,10 @@ export function ContractChangeTable({
             <span className="block font-semibold">{t.compensation.fields.team}</span>
             <input
               list="contract-team-options"
-              value={formState.team}
+              value={resolveTeamDisplayName(formState.team, locale, teamSupervisorMap) || formState.team}
               onChange={(event) => {
-                const nextTeam = event.target.value
+                const input = event.target.value
+                const nextTeam = resolveTeamInputValue(input, locale, teamSupervisorMap)
                 const binding = teamSupervisorMap.get(normalizeTeamKey(nextTeam))
                 setFormState((prev) => ({
                   ...prev,
@@ -330,7 +336,10 @@ export function ContractChangeTable({
             />
             <datalist id="contract-team-options">
               {teamOptions.map((name) => (
-                <option key={name} value={name} />
+                <option
+                  key={name}
+                  value={resolveTeamDisplayName(name, locale, teamSupervisorMap) || name}
+                />
               ))}
             </datalist>
           </label>

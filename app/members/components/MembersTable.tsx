@@ -1,8 +1,15 @@
 import type { Locale } from '@/lib/i18n'
 import { genderOptions, memberCopy, nationalityOptions } from '@/lib/i18n/members'
 import type { ColumnKey, SortField } from '@/lib/members/constants'
-import { formatSupervisorLabel, normalizeText, toSalaryFilterValue } from '@/lib/members/utils'
+import {
+  formatSupervisorLabel,
+  normalizeText,
+  resolveTeamDisplayName,
+  resolveTeamInputValue,
+  toSalaryFilterValue,
+} from '@/lib/members/utils'
 import type { Member, MemberBulkPatch, Role } from '@/types/members'
+import type { TeamSupervisorItem } from '../hooks/useTeamSupervisors'
 
 type MemberCopy = (typeof memberCopy)[keyof typeof memberCopy]
 
@@ -23,6 +30,7 @@ type MembersTableProps = {
   bulkDrafts: Record<number, MemberBulkPatch>
   bulkEditableColumns: ColumnKey[]
   teamOptions: string[]
+  teamSupervisorMap: Map<string, TeamSupervisorItem>
   projectOptions: { value: string; label: string }[]
   chineseSupervisorOptions: { value: string; label: string }[]
   onBulkFieldChange: (memberId: number, path: string, value: string | null | undefined) => void
@@ -55,6 +63,7 @@ export function MembersTable({
   bulkDrafts,
   bulkEditableColumns,
   teamOptions,
+  teamSupervisorMap,
   projectOptions,
   chineseSupervisorOptions,
   onBulkFieldChange,
@@ -91,19 +100,26 @@ export function MembersTable({
     return draftValue
   }
 
+  const resolveTeamLabel = (team?: string | null) =>
+    resolveTeamDisplayName(team ?? null, locale, teamSupervisorMap)
+
   const handleBulkChange = (
     memberId: number,
     path: string,
     value: string,
     currentValue: string,
   ) => {
-    const normalizedNext = normalizeText(value)
+    const resolvedNext =
+      path === 'expatProfile.team'
+        ? resolveTeamInputValue(value, locale, teamSupervisorMap)
+        : value
+    const normalizedNext = normalizeText(resolvedNext)
     const normalizedCurrent = normalizeText(currentValue)
     if (!normalizedNext || normalizedNext === normalizedCurrent) {
       onBulkFieldChange(memberId, path, undefined)
       return
     }
-    onBulkFieldChange(memberId, path, value)
+    onBulkFieldChange(memberId, path, resolvedNext)
   }
 
   const renderBulkInput = ({
@@ -126,18 +142,26 @@ export function MembersTable({
     disabled?: boolean
   }) => {
     if (disabled) {
-      return <span className="text-slate-400">{normalizeText(currentValue) || t.labels.empty}</span>
+      const displayValue =
+        path === 'expatProfile.team'
+          ? resolveTeamLabel(currentValue) || t.labels.empty
+          : normalizeText(currentValue) || t.labels.empty
+      return <span className="text-slate-400">{displayValue}</span>
     }
     const draftValue = resolveDraftValue(memberId, path)
     const isCleared = draftValue === null
     const value = resolveInputValue(draftValue, currentValue)
+    const displayValue =
+      path === 'expatProfile.team'
+        ? resolveTeamDisplayName(value, locale, teamSupervisorMap) || value
+        : value
     return (
       <div className="flex items-center gap-2">
         <input
           type={type}
           inputMode={inputMode}
           list={listId}
-          value={value}
+          value={displayValue}
           onChange={(event) =>
             handleBulkChange(memberId, path, event.target.value, currentValue)
           }
@@ -213,7 +237,10 @@ export function MembersTable({
       {teamOptions.length > 0 ? (
         <datalist id="bulk-team-options">
           {teamOptions.map((team) => (
-            <option key={team} value={team} />
+            <option
+              key={team}
+              value={resolveTeamDisplayName(team, locale, teamSupervisorMap) || team}
+            />
           ))}
         </datalist>
       ) : null}
@@ -822,7 +849,7 @@ export function MembersTable({
                         listId: 'bulk-team-options',
                         disabled: member.nationality === 'china',
                       })
-                    : formatProfileText(expatProfile?.team)}
+                    : formatProfileText(resolveTeamLabel(expatProfile?.team))}
                 </td>
               ) : null}
               {isVisible('chineseSupervisor') ? (

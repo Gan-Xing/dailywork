@@ -7,7 +7,7 @@ import {
   memberCopy,
   nationalityOptions,
 } from '@/lib/i18n/members'
-import { formatSupervisorLabel } from '@/lib/members/utils'
+import { formatSupervisorLabel, resolveTeamDisplayName } from '@/lib/members/utils'
 import { usePreferredLocale } from '@/lib/usePreferredLocale'
 import type { Member } from '@/types/members'
 
@@ -16,11 +16,12 @@ type Props = {
   open: boolean
   onClose: () => void
   onEdit: (member: Member) => void
+  teamSupervisorMap: Map<string, { teamZh?: string | null }>
 }
 
 type TabKey = 'overview' | 'contracts' | 'payroll' | 'documents'
 
-export function MemberDetailDrawer({ member, open, onClose, onEdit }: Props) {
+export function MemberDetailDrawer({ member, open, onClose, onEdit, teamSupervisorMap }: Props) {
   const { locale } = usePreferredLocale()
   const t = memberCopy[locale]
   const [activeTab, setActiveTab] = useState<TabKey>('overview')
@@ -70,6 +71,12 @@ export function MemberDetailDrawer({ member, open, onClose, onEdit }: Props) {
     })
     return label || t.labels.empty
   }
+
+  const teamLabel = resolveTeamDisplayName(
+    member.expatProfile?.team ?? null,
+    locale,
+    teamSupervisorMap,
+  )
 
   const sections = [
     { key: 'overview', label: t.drawer.tabs.overview },
@@ -178,7 +185,7 @@ export function MemberDetailDrawer({ member, open, onClose, onEdit }: Props) {
                           />
                           <DetailItem label={t.table.tags} value={formatList(member.tags)} emptyLabel={t.labels.empty} />
                           <DetailItem label={t.table.project} value={member.project?.name ?? ''} emptyLabel={t.labels.empty} />
-                          <DetailItem label={t.table.team} value={member.expatProfile?.team ?? ''} emptyLabel={t.labels.empty} />
+                          <DetailItem label={t.table.team} value={teamLabel} emptyLabel={t.labels.empty} />
                           <DetailItem label={t.table.chineseSupervisor} value={formatSupervisor()} emptyLabel={t.labels.empty} />
                         </dl>
                       </section>

@@ -114,6 +114,7 @@ export function MemberEditClient({ member, canAssignRole }: Props) {
 
             <ProfileSection
               t={t}
+              locale={locale}
               isChineseForm={isChineseForm}
               profileExpanded={profileExpanded}
               onToggleExpanded={() => setProfileExpanded((prev) => !prev)}
@@ -126,6 +127,7 @@ export function MemberEditClient({ member, canAssignRole }: Props) {
             {!isChineseForm ? (
               <CompensationSection
                 t={t}
+                locale={locale}
                 userId={member.id}
                 formState={formState}
                 teamOptions={teamOptions}

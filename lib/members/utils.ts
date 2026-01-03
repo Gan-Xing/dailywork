@@ -1,3 +1,4 @@
+import type { Locale } from '@/lib/i18n'
 import type {
   ChineseProfile,
   ChineseProfileForm,
@@ -9,6 +10,50 @@ export const normalizeText = (value?: string | null) => (value ?? '').trim()
 
 export const normalizeTeamKey = (value?: string | null) =>
   normalizeText(value).toLowerCase()
+
+export const resolveTeamDisplayName = (
+  team: string | null | undefined,
+  locale: Locale,
+  teamSupervisorMap?: Map<string, { teamZh?: string | null }> | null,
+) => {
+  const normalizedTeam = normalizeText(team)
+  if (!normalizedTeam) return ''
+  if (locale !== 'zh' || !teamSupervisorMap) return normalizedTeam
+  const teamKey = normalizeTeamKey(normalizedTeam)
+  if (!teamKey) return normalizedTeam
+  const teamZh = normalizeText(teamSupervisorMap.get(teamKey)?.teamZh ?? null)
+  return teamZh || normalizedTeam
+}
+
+export const resolveTeamInputValue = (
+  input: string,
+  locale: Locale,
+  teamSupervisorMap?: Map<string, { team?: string | null; teamZh?: string | null }> | null,
+) => {
+  const normalizedInput = normalizeText(input)
+  if (!normalizedInput) return ''
+  if (!teamSupervisorMap) return normalizedInput
+  const inputKey = normalizeTeamKey(normalizedInput)
+  let teamMatch: string | null = null
+  let teamZhMatch: string | null = null
+  teamSupervisorMap.forEach((item) => {
+    if (!teamMatch) {
+      const team = normalizeText(item.team ?? null)
+      if (team && normalizeTeamKey(team) === inputKey) {
+        teamMatch = team
+      }
+    }
+    if (locale === 'zh' && !teamZhMatch) {
+      const teamZh = normalizeText(item.teamZh ?? null)
+      if (teamZh && normalizeTeamKey(teamZh) === inputKey) {
+        teamZhMatch = normalizeText(item.team ?? null)
+      }
+    }
+  })
+  if (teamMatch) return teamMatch
+  if (teamZhMatch) return teamZhMatch
+  return normalizedInput
+}
 
 export const formatSupervisorLabel = (value: {
   name?: string | null

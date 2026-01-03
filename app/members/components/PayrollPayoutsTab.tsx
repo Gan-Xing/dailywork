@@ -8,13 +8,14 @@ import { useToast } from '@/components/ToastProvider'
 import { AlertDialog } from '@/components/AlertDialog'
 import type { Locale } from '@/lib/i18n'
 import { memberCopy } from '@/lib/i18n/members'
-import { formatSupervisorLabel, normalizeText } from '@/lib/members/utils'
+import { formatSupervisorLabel, normalizeText, resolveTeamDisplayName } from '@/lib/members/utils'
 import {
   usePayrollImport,
   type ImportTarget,
   type PayrollImportErrorItem,
 } from '../hooks/usePayrollImport'
 import type { Member } from '@/types/members'
+import type { TeamSupervisorItem } from '../hooks/useTeamSupervisors'
 
 type MemberCopy = (typeof memberCopy)[keyof typeof memberCopy]
 
@@ -73,6 +74,7 @@ type PayrollPayoutsTabProps = {
   membersLoading: boolean
   membersError: string | null
   teamOptions: string[]
+  teamSupervisorMap: Map<string, TeamSupervisorItem>
   chineseSupervisorOptions: SupervisorOption[]
   canViewPayroll: boolean
   canManagePayroll: boolean
@@ -113,6 +115,7 @@ export function PayrollPayoutsTab({
   membersLoading,
   membersError,
   teamOptions,
+  teamSupervisorMap,
   chineseSupervisorOptions,
   canViewPayroll,
   canManagePayroll,
@@ -133,6 +136,7 @@ export function PayrollPayoutsTab({
   const [savingDates, setSavingDates] = useState<Record<number, boolean>>({})
   const [bulkOpen, setBulkOpen] = useState<Record<number, boolean>>({})
   const [bulkInputs, setBulkInputs] = useState<Record<number, string>>({})
+  const [exportingRunId, setExportingRunId] = useState<number | null>(null)
   const [nameFilters, setNameFilters] = useState<string[]>([])
   const [teamFilters, setTeamFilters] = useState<string[]>([])
   const [supervisorFilters, setSupervisorFilters] = useState<string[]>([])
@@ -356,9 +360,12 @@ export function PayrollPayoutsTab({
       map.set(value, team)
     })
     return Array.from(map.entries())
-      .map(([value, label]) => ({ value, label }))
+      .map(([value, label]) => ({
+        value,
+        label: resolveTeamDisplayName(label, locale, teamSupervisorMap) || label,
+      }))
       .sort((left, right) => collator.compare(left.label, right.label))
-  }, [teamOptions, collator])
+  }, [teamOptions, collator, locale, teamSupervisorMap])
 
   const supervisorFilterOptions = useMemo(() => {
     const list = chineseSupervisorOptions
@@ -837,9 +844,13 @@ export function PayrollPayoutsTab({
   const getTeamLabel = (member: Member, runId?: number) => {
     if (runId) {
       const payout = payoutMap.get(runId)?.get(member.id)
-      if (payout?.team) return payout.team
+      if (payout?.team) {
+        const label = resolveTeamDisplayName(payout.team, locale, teamSupervisorMap)
+        return label || t.labels.empty
+      }
     }
-    return normalizeText(member.expatProfile?.team) || t.labels.empty
+    const label = resolveTeamDisplayName(member.expatProfile?.team ?? null, locale, teamSupervisorMap)
+    return label || t.labels.empty
   }
 
   const runOneEligibleMembers = useMemo(
@@ -1031,6 +1042,45 @@ export function PayrollPayoutsTab({
     XLSX.writeFile(workbook, filename, { bookType: 'xlsx' })
   }
 
+  const exportSalaryPdf = async (run: PayrollRun) => {
+    if (exportingRunId) return
+    setExportingRunId(run.id)
+    setError(null)
+    try {
+      const controller = new AbortController()
+      const timeoutId = window.setTimeout(() => controller.abort(), 30_000)
+      const res = await fetch(`/api/payroll-runs/${run.id}/salary-pdf`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
+        body: JSON.stringify({ locale }),
+      })
+      window.clearTimeout(timeoutId)
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { message?: string }
+        throw new Error(data.message ?? t.payroll.errors.exportFailed)
+      }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const filename = `salary-payouts-${selectedMonth}-run-${run.sequence}.pdf`
+      const link = document.createElement('a')
+      link.href = url
+      link.download = filename
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.setTimeout(() => URL.revokeObjectURL(url), 30_000)
+    } catch (err) {
+      const message =
+        (err as Error).name === 'AbortError'
+          ? t.payroll.errors.exportFailed
+          : (err as Error).message
+      setError(message)
+    } finally {
+      setExportingRunId(null)
+    }
+  }
+
   const sumRun = (runId: number | undefined, members: Member[]) => {
     if (!runId) return 0
     return members.reduce((total, member) => {
@@ -1195,6 +1245,9 @@ export function PayrollPayoutsTab({
           const isSavingDate = savingDates[run.id]
           const isSavingRun = savingRuns[run.id]
           const isBulkOpen = bulkOpen[run.id]
+          const isExporting = exportingRunId === run.id
+          const isExportBusy = exportingRunId !== null
+          const hasPayouts = (payoutMap.get(run.id)?.size ?? 0) > 0
           return (
             <div key={run.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
               <div className="flex items-start justify-between gap-3">
@@ -1284,6 +1337,14 @@ export function PayrollPayoutsTab({
                   className="rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700"
                 >
                   {t.payroll.actions.bulkPaste}
+                </button>
+                <button
+                  type="button"
+                  disabled={!hasPayouts || isExportBusy}
+                  onClick={() => exportSalaryPdf(run)}
+                  className="rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700 disabled:opacity-60"
+                >
+                  {isExporting ? t.payroll.actions.exportingPdf : t.payroll.actions.exportPdf}
                 </button>
               </div>
               {isBulkOpen ? (

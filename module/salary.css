@@ -39,12 +39,18 @@ body {
     .page.landscape {
         margin: 0;
         box-shadow: none;
-        page-break-after: avoid;
-        /* Changed from always to avoid unnecessary breaks */
+        break-after: page;
+        page-break-after: always;
+        /* Ensure each salary page prints on its own PDF page */
         width: 100%;
         height: 100%;
         padding: 5mm 10mm;
         /* Even smaller vertical padding for print */
+    }
+
+    .page.landscape:last-child {
+        break-after: auto;
+        page-break-after: auto;
     }
 }
 

@@ -28,6 +28,9 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 
   const body = await request.json().catch(() => null)
   const nextTeam = typeof body?.team === 'string' ? body.team.trim() : existing.team
+  const teamZhInput = typeof body?.teamZh === 'string' ? body.teamZh.trim() : null
+  const nextTeamZh =
+    teamZhInput === null ? existing.teamZh ?? null : teamZhInput.length ? teamZhInput : null
   const projectIdInput = body?.projectId
   const parsedProjectId =
     projectIdInput === null || projectIdInput === '' || projectIdInput === undefined
@@ -87,6 +90,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       where: { id: bindingId },
       data: {
         team: nextTeam,
+        teamZh: nextTeamZh,
         teamKey,
         supervisorId: supervisor.id,
         supervisorName: supervisorLabel,
@@ -97,6 +101,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       teamSupervisor: {
         id: updated.id,
         team: updated.team,
+        teamZh: updated.teamZh ?? null,
         teamKey: updated.teamKey,
         supervisorId: updated.supervisorId,
         supervisorLabel,

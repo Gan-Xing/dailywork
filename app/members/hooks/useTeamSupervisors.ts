@@ -5,6 +5,7 @@ import { normalizeTeamKey } from '@/lib/members/utils'
 export type TeamSupervisorItem = {
   id: number
   team: string
+  teamZh: string | null
   teamKey: string
   supervisorId: number
   supervisorLabel: string

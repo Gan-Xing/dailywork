@@ -52,6 +52,7 @@ export async function GET() {
     return {
       id: binding.id,
       team: binding.team,
+      teamZh: binding.teamZh ?? null,
       teamKey: binding.teamKey,
       supervisorId: binding.supervisorId,
       supervisorLabel: label,
@@ -76,6 +77,8 @@ export async function POST(request: Request) {
 
   const body = await request.json().catch(() => null)
   const teamValue = typeof body?.team === 'string' ? body.team.trim() : ''
+  const teamZhValue = typeof body?.teamZh === 'string' ? body.teamZh.trim() : ''
+  const teamZh = teamZhValue.length ? teamZhValue : null
   const supervisorId = Number(body?.supervisorId)
   const projectIdInput = body?.projectId
   const parsedProjectId =
@@ -130,6 +133,7 @@ export async function POST(request: Request) {
     const created = await prisma.teamSupervisor.create({
       data: {
         team: teamValue,
+        teamZh,
         teamKey,
         supervisorId: supervisor.id,
         supervisorName: supervisorLabel,
@@ -140,6 +144,7 @@ export async function POST(request: Request) {
       teamSupervisor: {
         id: created.id,
         team: created.team,
+        teamZh: created.teamZh ?? null,
         teamKey: created.teamKey,
         supervisorId: created.supervisorId,
         supervisorLabel,
