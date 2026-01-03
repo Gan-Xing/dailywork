@@ -193,6 +193,9 @@ const parseNumber = (value?: string | null) => {
   return Number.isFinite(parsed) ? parsed : null
 }
 
+const formatMonthValue = (year: number, month: number) =>
+  `${year}-${String(month).padStart(2, '0')}`
+
 const getLastMonthKey = () => {
   const date = new Date()
   const utc = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1))
@@ -201,6 +204,29 @@ const getLastMonthKey = () => {
     year: utc.getUTCFullYear(),
     month: utc.getUTCMonth() + 1,
   }
+}
+
+const getLastMonthValue = () => {
+  const { year, month } = getLastMonthKey()
+  return formatMonthValue(year, month)
+}
+
+const buildRecentMonthOptions = (count: number) => {
+  const options: MultiSelectOption[] = []
+  const { year, month } = getLastMonthKey()
+  const cursor = new Date(Date.UTC(year, month - 1, 1))
+  for (let i = 0; i < count; i += 1) {
+    const value = formatMonthValue(cursor.getUTCFullYear(), cursor.getUTCMonth() + 1)
+    options.push({ value, label: value })
+    cursor.setUTCMonth(cursor.getUTCMonth() - 1)
+  }
+  return options
+}
+
+const parseMonthValue = (value: string) => {
+  const [year, month] = value.split('-').map((part) => Number(part))
+  if (!year || !month) return null
+  return { year, month }
 }
 
 const matchesValueFilter = (value: string | null | undefined, filters: string[]) => {
@@ -258,18 +284,35 @@ const resolvePositionGroup = (normalized: string, raw: string) => {
   return 'other'
 }
 
+const getSalaryRanges = (multiplier: number) => {
+  if (!Number.isFinite(multiplier) || multiplier <= 1) return SALARY_RANGES
+  let prevMax = 0
+  return SALARY_RANGES.map((range, index) => {
+    if (index === 0) {
+      prevMax = range.max
+      return range
+    }
+    const max =
+      range.max === Number.POSITIVE_INFINITY ? range.max : range.max * multiplier
+    const min = index === 1 ? 1 : (prevMax === Number.POSITIVE_INFINITY ? prevMax : prevMax + 1)
+    prevMax = max
+    return { min, max }
+  })
+}
+
 const buildSalaryDistribution = (
   values: number[],
   formatMoney: (value: number) => string,
+  ranges: Array<{ min: number; max: number }>,
 ) => {
-  const labels = SALARY_RANGES.map((range) => {
+  const labels = ranges.map((range) => {
     if (range.min === 0 && range.max === 0) return '0'
     if (range.max === Number.POSITIVE_INFINITY) return `${formatMoney(range.min)}+`
     return `${formatMoney(range.min)}-${formatMoney(range.max)}`
   })
-  const counts = SALARY_RANGES.map(() => 0)
+  const counts = ranges.map(() => 0)
   values.forEach((value) => {
-    const index = SALARY_RANGES.findIndex(
+    const index = ranges.findIndex(
       (range) => value >= range.min && value <= range.max,
     )
     if (index >= 0) counts[index] += 1
@@ -1181,22 +1224,47 @@ export function MembersOverviewTab({
   const [teamSortMode, setTeamSortMode] = useState<TeamSortMode>('count')
   const [supervisorSortMode, setSupervisorSortMode] = useState<TeamSortMode>('count')
   const [positionGroupFocus, setPositionGroupFocus] = useState<string | null>(null)
+  const defaultPayrollMonth = useMemo(() => getLastMonthValue(), [])
+  const [payrollMonthFilters, setPayrollMonthFilters] = useState<string[]>(() => [
+    defaultPayrollMonth,
+  ])
+  const payrollMonthOptions = useMemo(() => buildRecentMonthOptions(12), [])
+  const activePayrollMonths = useMemo(() => {
+    const months = payrollMonthFilters.length > 0 ? payrollMonthFilters : [defaultPayrollMonth]
+    return Array.from(new Set(months)).sort()
+  }, [payrollMonthFilters, defaultPayrollMonth])
+  const payrollMonthCount = Math.max(activePayrollMonths.length, 1)
+  const handlePayrollMonthChange = useCallback(
+    (next: string[]) => {
+      setPayrollMonthFilters(next.length === 0 ? [defaultPayrollMonth] : next)
+    },
+    [defaultPayrollMonth],
+  )
 
   // Fetch payroll data when permission is granted
   useEffect(() => {
     if (!canViewPayroll) return
 
     let cancelled = false
-    const { year, month } = getLastMonthKey()
-    
-    fetch(`/api/payroll-runs?year=${year}&month=${month}`)
-      .then((res) => {
-        if (!res.ok) throw new Error('Failed to load payroll')
-        return res.json() as Promise<{ payouts?: PayrollPayout[] }>
-      })
-      .then((data) => {
+    const monthParams = activePayrollMonths
+      .map((value) => parseMonthValue(value))
+      .filter((value): value is { year: number; month: number } => Boolean(value))
+    const resolvedMonthParams = monthParams.length > 0 ? monthParams : [getLastMonthKey()]
+
+    Promise.all(
+      resolvedMonthParams.map(({ year, month }) =>
+        fetch(`/api/payroll-runs?year=${year}&month=${month}`).then((res) => {
+          if (!res.ok) throw new Error('Failed to load payroll')
+          return res.json() as Promise<{ payouts?: PayrollPayout[] }>
+        }),
+      ),
+    )
+      .then((payloads) => {
         if (cancelled) return
-        setPayrollPayouts(Array.isArray(data.payouts) ? data.payouts : [])
+        const nextPayouts = payloads.flatMap((data) =>
+          Array.isArray(data.payouts) ? data.payouts : [],
+        )
+        setPayrollPayouts(nextPayouts)
         setPayrollReady(true)
       })
       .catch(() => {
@@ -1208,7 +1276,7 @@ export function MembersOverviewTab({
     return () => {
       cancelled = true
     }
-  }, [canViewPayroll])
+  }, [canViewPayroll, activePayrollMonths])
 
   const showTeamPayroll = canViewPayroll && payrollReady
 
@@ -1431,15 +1499,19 @@ export function MembersOverviewTab({
   }, [localMembers, t.overview.labels.other])
 
   const contractSalaryStats = useMemo(() => {
-    const values = localMembers.map((member) => resolveMonthlySalary(member))
-    return buildSalaryDistribution(values, formatMoney)
-  }, [localMembers, formatMoney])
+    const ranges = getSalaryRanges(payrollMonthCount)
+    const values = localMembers.map(
+      (member) => resolveMonthlySalary(member) * payrollMonthCount,
+    )
+    return buildSalaryDistribution(values, formatMoney, ranges)
+  }, [localMembers, formatMoney, payrollMonthCount])
 
   const payoutSalaryStats = useMemo(() => {
     if (!showTeamPayroll) return []
+    const ranges = getSalaryRanges(payrollMonthCount)
     const values = localMembers.map((member) => payrollPayoutsByMemberId.get(member.id) ?? 0)
-    return buildSalaryDistribution(values, formatMoney)
-  }, [localMembers, payrollPayoutsByMemberId, showTeamPayroll, formatMoney])
+    return buildSalaryDistribution(values, formatMoney, ranges)
+  }, [localMembers, payrollPayoutsByMemberId, showTeamPayroll, formatMoney, payrollMonthCount])
 
   const contractCostStats = useMemo(() => {
     if (!showTeamPayroll) {
@@ -1760,16 +1832,22 @@ export function MembersOverviewTab({
           </p>
           <p className="text-[11px] text-slate-400">
             {(() => {
+              const monthFilterCount =
+                payrollMonthFilters.length === 1 &&
+                payrollMonthFilters[0] === defaultPayrollMonth
+                  ? 0
+                  : payrollMonthFilters.length
               const selectedCount =
                 projectFilters.length +
                 statusFilters.length +
                 nationalityFilters.length +
-                teamFilters.length
+                teamFilters.length +
+                monthFilterCount
               return selectedCount > 0 ? t.filters.selected(selectedCount) : t.filters.all
             })()}
           </p>
         </div>
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
           <MultiSelectFilter
             label={t.table.project}
             options={projectFilterOptions}
@@ -1811,6 +1889,19 @@ export function MembersOverviewTab({
             options={teamFilterOptions}
             selected={teamFilters}
             onChange={onTeamFiltersChange}
+            allLabel={filterControlProps.allLabel}
+            selectedLabel={filterControlProps.selectedLabel}
+            selectAllLabel={filterControlProps.selectAllLabel}
+            clearLabel={filterControlProps.clearLabel}
+            searchPlaceholder={filterControlProps.searchPlaceholder}
+            noOptionsLabel={filterControlProps.noOptionsLabel}
+          />
+          <MultiSelectFilter
+            label={t.filters.payrollMonth}
+            options={payrollMonthOptions}
+            selected={payrollMonthFilters}
+            onChange={handlePayrollMonthChange}
+            searchable={false}
             allLabel={filterControlProps.allLabel}
             selectedLabel={filterControlProps.selectedLabel}
             selectAllLabel={filterControlProps.selectAllLabel}

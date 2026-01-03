@@ -143,6 +143,7 @@ export const memberCopy: Record<
       noOptions: string
       collapse: string
       expand: string
+      payrollMonth: string
     }
     pagination: {
       summary: (total: number, page: number, totalPages: number) => string
@@ -742,6 +743,7 @@ export const memberCopy: Record<
       noOptions: '暂无可选项',
       collapse: '收起筛选',
       expand: '展开筛选',
+      payrollMonth: '工资月份',
     },
     pagination: {
       summary: (total: number, page: number, totalPages: number) =>
@@ -1355,6 +1357,7 @@ export const memberCopy: Record<
       noOptions: 'Aucune option',
       collapse: 'Réduire',
       expand: 'Développer',
+      payrollMonth: 'Mois de paie',
     },
     pagination: {
       summary: (total: number, page: number, totalPages: number) =>
