@@ -58,15 +58,7 @@
                 {{rows}}
             </tbody>
             <tfoot>
-                <tr class="total-row">
-                    <td colspan="1" class="total-label">Total</td> <!-- Using colspan 1 and letting others flow or merge? Image shows Total under N° column basically or spanning? It spans N° and Matricule maybe? Actually looks like just in the first cell text aligned left with bold 'Total'. -->
-                    <td></td> <!-- Matricule col -->
-                    <td></td> <!-- Name col -->
-                    <td class="total-val">{{totalAmount}}</td>
-                    <td class="total-val">{{totalAdvance}}</td>
-                    <td class="total-val">{{totalPaid}}</td>
-                    <td></td>
-                </tr>
+                {{totalRow}}
             </tfoot>
         </table>
 

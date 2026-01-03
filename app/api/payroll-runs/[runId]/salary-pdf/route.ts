@@ -238,7 +238,6 @@ export async function POST(
         })
       }
 
-      const isLastChunk = chunkIndex === chunks.length - 1
       pages.push({
         teamLabel: label,
         teamZh: zh,
@@ -247,9 +246,10 @@ export async function POST(
         periodStart: formatDate(periodStart),
         periodEnd: formatDate(periodEnd),
         rows,
-        totalAmount: isLastChunk ? totalAmount : '',
-        totalAdvance: isLastChunk ? '-' : '',
-        totalPaid: isLastChunk ? totalAmount : '',
+        showTotal: chunkIndex === chunks.length - 1,
+        totalAmount: chunkIndex === chunks.length - 1 ? totalAmount : '',
+        totalAdvance: chunkIndex === chunks.length - 1 ? '-' : '',
+        totalPaid: chunkIndex === chunks.length - 1 ? totalAmount : '',
         pageNumber: 0,
         pageCount: 0,
       })

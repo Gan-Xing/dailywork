@@ -26,6 +26,7 @@ export type SalaryPage = {
   teamLabel: string
   teamZh: string
   teamFr: string
+  showTotal: boolean
   unitName: string
   periodStart: string
   periodEnd: string
@@ -151,6 +152,7 @@ function fillTemplate(template: string, page: SalaryPage) {
     periodStart: escapeHtml(page.periodStart),
     periodEnd: escapeHtml(page.periodEnd),
     rows: rowsHtml,
+    totalRow: page.showTotal ? renderTotalRow(page) : '',
     totalAmount: escapeHtml(page.totalAmount),
     totalAdvance: escapeHtml(page.totalAdvance),
     totalPaid: escapeHtml(page.totalPaid),
@@ -163,6 +165,18 @@ function fillTemplate(template: string, page: SalaryPage) {
     if (!key) return ''
     return replacements[key] ?? ''
   })
+}
+
+function renderTotalRow(page: SalaryPage) {
+  return [
+    '<tr class="total-row">',
+    '  <td colspan="1" class="total-label">Total</td>',
+    '  <td colspan="2"></td>',
+    `  <td class="total-val">${escapeHtml(page.totalAmount)}</td>`,
+    `  <td class="total-val">${escapeHtml(page.totalAdvance)}</td>`,
+    `  <td class="total-val">${escapeHtml(page.totalPaid)}</td>`,
+    '</tr>',
+  ].join('\n')
 }
 
 function renderRows(rows: SalaryRow[]) {
