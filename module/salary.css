@@ -1,0 +1,219 @@
+/* Reset and Page Setup */
+* {
+    box-sizing: border-box;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+}
+
+@page {
+    size: A4 landscape;
+    margin: 0;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    background-color: #f0f0f0;
+    /* Light gray for web viewing */
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 11pt;
+    color: #000;
+}
+
+.page.landscape {
+    width: 297mm;
+    height: 210mm;
+    padding: 10mm;
+    /* Reduced from 15mm */
+    margin: 10mm auto;
+    background: white;
+    position: relative;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+@media print {
+    body {
+        background-color: white;
+    }
+
+    .page.landscape {
+        margin: 0;
+        box-shadow: none;
+        page-break-after: avoid;
+        /* Changed from always to avoid unnecessary breaks */
+        width: 100%;
+        height: 100%;
+        padding: 5mm 10mm;
+        /* Even smaller vertical padding for print */
+    }
+}
+
+/* Header */
+.main-title {
+    text-align: center;
+    font-size: 14pt;
+    font-weight: bold;
+    margin: 0 0 3mm 0;
+    /* Reduced from 5mm */
+    text-transform: uppercase;
+}
+
+.sub-title {
+    text-align: center;
+    font-size: 12pt;
+    font-weight: bold;
+    margin: 0 0 3mm 0;
+    /* Reduced from 10mm */
+}
+
+/* Info Section */
+.info-section {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 2mm;
+    font-weight: bold;
+    font-size: 10pt;
+}
+
+.info-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 1mm;
+    align-items: flex-end;
+}
+
+.time-row {
+    justify-content: space-between;
+}
+
+.info-left .label {
+    font-weight: bold;
+}
+
+.info-left .value {
+    font-weight: bold;
+    margin-left: 2mm;
+}
+
+.time-values {
+    display: flex;
+    gap: 20mm;
+}
+
+.time-sep {
+    margin: 0 5mm;
+}
+
+/* Table */
+.salary-table {
+    width: 100%;
+    border-collapse: collapse;
+    border: 0.5mm solid black;
+    text-align: center;
+    font-size: 10pt;
+}
+
+.salary-table th,
+.salary-table td {
+    border: 0.3mm solid black;
+    padding: 5px 2px;
+    /* Increased from 4px to 5px to be less 'narrow' */
+    vertical-align: middle;
+}
+
+.salary-table thead th {
+    font-weight: bold;
+    padding: 4px 2px;
+}
+
+/* Column Widths */
+.col-num {
+    width: 10mm;
+}
+
+.col-matricule {
+    width: 30mm;
+}
+
+/* nom takes rest */
+.col-montant-payer {
+    width: 35mm;
+}
+
+.col-avance {
+    width: 25mm;
+}
+
+.col-montant-paye {
+    width: 35mm;
+}
+
+.col-signature {
+    width: 30mm;
+}
+
+/* Subheader row styling */
+.subheader-row th {
+    font-weight: bold;
+}
+
+/* Rows height */
+.salary-table tbody td {
+    height: 8mm;
+    /* Increased from 7mm */
+    font-weight: bold;
+}
+
+.total-row td {
+    font-weight: bold;
+    background-color: transparent;
+    height: 8mm;
+}
+
+.total-label {
+    text-align: center;
+}
+
+/* Signatures */
+.signatures-section {
+    margin-top: 5mm;
+    /* Reduced from 15mm */
+    display: flex;
+    justify-content: space-between;
+    padding: 0 20mm;
+    font-weight: bold;
+    font-size: 11pt;
+}
+
+.sig-block {
+    display: flex;
+    flex-direction: column;
+    gap: 15mm;
+}
+
+.sig-block.left {
+    align-items: flex-start;
+}
+
+.sig-block.right {
+    align-items: center;
+    margin-right: 20mm;
+}
+
+.sig-sub {
+    font-weight: bold;
+    /* Changed to bold to better match image */
+    font-size: 10pt;
+}
+
+/* Page Footer */
+.page-footer {
+    position: relative;
+    /* Changed from absolute to relative to ensure separation */
+    margin-top: 5mm;
+    width: 100%;
+    text-align: center;
+    font-size: 10pt;
+    padding-bottom: 5mm;
+    clear: both;
+}
