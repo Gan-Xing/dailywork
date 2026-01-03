@@ -6,6 +6,7 @@ type MemberDetailDrawerMountProps = {
   onClose: () => void
   onEdit: (member: Member) => void
   teamSupervisorMap: Map<string, { teamZh?: string | null }>
+  canViewCompensation: boolean
 }
 
 export function MemberDetailDrawerMount({
@@ -13,6 +14,7 @@ export function MemberDetailDrawerMount({
   onClose,
   onEdit,
   teamSupervisorMap,
+  canViewCompensation,
 }: MemberDetailDrawerMountProps) {
   return (
     <MemberDetailDrawer
@@ -22,6 +24,7 @@ export function MemberDetailDrawerMount({
       onClose={onClose}
       onEdit={(member) => onEdit(member)}
       teamSupervisorMap={teamSupervisorMap}
+      canViewCompensation={canViewCompensation}
     />
   )
 }

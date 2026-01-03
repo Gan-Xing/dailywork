@@ -1734,6 +1734,7 @@ export function MembersPageClient() {
           openEditPage(member)
         }}
         teamSupervisorMap={teamSupervisorMap}
+        canViewCompensation={canUpdateMember}
       />
     </main>
   )
