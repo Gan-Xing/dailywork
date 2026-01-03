@@ -6,6 +6,12 @@ import path from 'path'
 const templatePath = path.resolve('module/salary.html')
 const cssPath = path.resolve('module/salary.css')
 const PLACEHOLDER_REGEX = /{{\s*([^{}]+?)\s*}}/g
+const FONT_FAMILY = 'SalaryReport'
+const FALLBACK_FONTS =
+  "'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', 'SimHei', Arial, Helvetica, sans-serif"
+const FONT_CANDIDATES = [
+  process.env.SALARY_PDF_FONT_PATH,
+]
 
 export type SalaryRow = {
   index: number | string
@@ -18,6 +24,8 @@ export type SalaryRow = {
 
 export type SalaryPage = {
   teamLabel: string
+  teamZh: string
+  teamFr: string
   unitName: string
   periodStart: string
   periodEnd: string
@@ -35,9 +43,11 @@ type TemplateParts = {
 }
 
 let cachedTemplate: TemplateParts | null = null
+let cachedFontCss: string | null = null
 
 export async function renderSalaryReportHtml(pages: SalaryPage[]): Promise<string> {
   const { pageTemplate, css } = await loadTemplateParts()
+  const fontCss = await loadFontCss()
   const content = pages
     .map((page) => fillTemplate(pageTemplate, page))
     .filter(Boolean)
@@ -49,7 +59,7 @@ export async function renderSalaryReportHtml(pages: SalaryPage[]): Promise<strin
     '<head>',
     '<meta charset="UTF-8" />',
     '<meta name="viewport" content="width=device-width, initial-scale=1.0" />',
-    `<style>${css}</style>`,
+    `<style>${css}\n${fontCss}</style>`,
     '</head>',
     '<body>',
     content,
@@ -75,10 +85,68 @@ function extractBody(html: string) {
   return html
 }
 
+async function loadFontCss(): Promise<string> {
+  if (cachedFontCss !== null) return cachedFontCss
+  const embedded = await resolveFontEmbed()
+  const fontFamily = embedded ? `'${FONT_FAMILY}', ${FALLBACK_FONTS}` : FALLBACK_FONTS
+  const bodyCss = `body { font-family: ${fontFamily}; }`
+  cachedFontCss = [embedded?.css ?? '', bodyCss].filter(Boolean).join('\n')
+  return cachedFontCss
+}
+
+async function resolveFontEmbed(): Promise<{ css: string } | null> {
+  const fontPath = await findFontPath()
+  if (!fontPath) return null
+  try {
+    const data = await fs.readFile(fontPath)
+    const { mime, format } = resolveFontFormat(fontPath)
+    const base64 = data.toString('base64')
+    const css = [
+      `@font-face {`,
+      `  font-family: '${FONT_FAMILY}';`,
+      `  src: url(data:${mime};base64,${base64}) format('${format}');`,
+      `  font-weight: normal;`,
+      `  font-style: normal;`,
+      `  font-display: swap;`,
+      `}`,
+    ].join('\n')
+    return { css }
+  } catch {
+    return null
+  }
+}
+
+async function findFontPath() {
+  console.log('[SalaryPDF] Looking for font in:', FONT_CANDIDATES)
+  for (const candidate of FONT_CANDIDATES) {
+    if (!candidate) continue
+    try {
+      await fs.access(candidate)
+      console.log('[SalaryPDF] Found font at:', candidate)
+      return candidate
+    } catch {
+      console.log('[SalaryPDF] Font not found at:', candidate)
+      continue
+    }
+  }
+  console.warn('[SalaryPDF] No suitable font found, using fallback system fonts.')
+  return null
+}
+
+function resolveFontFormat(fontPath: string) {
+  const ext = path.extname(fontPath).toLowerCase()
+  if (ext === '.otf') return { mime: 'font/otf', format: 'opentype' }
+  if (ext === '.woff2') return { mime: 'font/woff2', format: 'woff2' }
+  if (ext === '.woff') return { mime: 'font/woff', format: 'woff' }
+  return { mime: 'font/ttf', format: 'truetype' }
+}
+
 function fillTemplate(template: string, page: SalaryPage) {
   const rowsHtml = renderRows(page.rows)
   const replacements: Record<string, string> = {
     teamLabel: escapeHtml(page.teamLabel),
+    teamZh: escapeHtml(page.teamZh),
+    teamFr: escapeHtml(page.teamFr),
     unitName: escapeHtml(page.unitName),
     periodStart: escapeHtml(page.periodStart),
     periodEnd: escapeHtml(page.periodEnd),

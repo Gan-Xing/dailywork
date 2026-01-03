@@ -15,7 +15,7 @@ body {
     padding: 0;
     background-color: #f0f0f0;
     /* Light gray for web viewing */
-    font-family: Arial, Helvetica, sans-serif;
+    font-family: 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', 'SimHei', Arial, Helvetica, sans-serif;
     font-size: 11pt;
     color: #000;
 }
@@ -194,7 +194,7 @@ body {
 .sig-block {
     display: flex;
     flex-direction: column;
-    gap: 15mm;
+    gap: 8mm;
 }
 
 .sig-block.left {
@@ -216,10 +216,10 @@ body {
 .page-footer {
     position: relative;
     /* Changed from absolute to relative to ensure separation */
-    margin-top: 5mm;
+    margin-top: 10mm;
     width: 100%;
     text-align: center;
     font-size: 10pt;
-    padding-bottom: 5mm;
+    padding-bottom: 0;
     clear: both;
 }

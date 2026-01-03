@@ -3,7 +3,7 @@ import puppeteer from 'puppeteer'
 
 import { prisma } from '@/lib/prisma'
 import { canViewPayroll } from '@/lib/server/payrollRuns'
-import { normalizeText } from '@/lib/members/utils'
+import { normalizeTeamKey, normalizeText } from '@/lib/members/utils'
 import { renderSalaryReportHtml, type SalaryPage, type SalaryRow } from '@/lib/templates/salaryReport'
 
 const EXECUTABLE_PATH =
@@ -14,6 +14,8 @@ const EXECUTABLE_PATH =
 const LAUNCH_ARGS = ['--no-sandbox', '--disable-setuid-sandbox']
 const ROWS_PER_PAGE = 12
 const DEFAULT_UNIT_NAME = '邦社库&丹达项目经理部'
+const TEAM_FALLBACK_LABEL = '未分组 / Non assigné'
+const TEAM_FALLBACK_KEY = 'unassigned'
 
 type ExportPayload = {
   locale?: string
@@ -44,6 +46,16 @@ const chunkRows = <T,>(rows: T[], size: number) => {
     result.push(rows.slice(i, i + size))
   }
   return result
+}
+
+const buildTeamLabel = (teamZh: string, teamName: string, fallback: string) => {
+  const zh = normalizeText(teamZh)
+  const name = normalizeText(teamName)
+  if (zh && name) {
+    if (zh.toLowerCase() === name.toLowerCase()) return zh
+    return `${zh} / ${name}`
+  }
+  return zh || name || fallback
 }
 
 export async function POST(
@@ -112,6 +124,24 @@ export async function POST(
     return NextResponse.json({ message: '暂无可导出的工资记录' }, { status: 404 })
   }
 
+  const teamKeys = new Set<string>()
+  payouts.forEach((payout) => {
+    const rawTeam = normalizeText(payout.team) || normalizeText(payout.user.expatProfile?.team)
+    const key = normalizeTeamKey(rawTeam)
+    if (key) teamKeys.add(key)
+  })
+  const teamSupervisors = teamKeys.size
+    ? await prisma.teamSupervisor.findMany({
+        where: { teamKey: { in: Array.from(teamKeys) } },
+        select: { teamKey: true, teamZh: true },
+      })
+    : []
+  const teamZhByKey = new Map<string, string>()
+  teamSupervisors.forEach((item) => {
+    const zh = normalizeText(item.teamZh)
+    if (zh) teamZhByKey.set(item.teamKey, zh)
+  })
+
   const prevYear = run.month === 1 ? run.year - 1 : run.year
   const prevMonth = run.month === 1 ? 12 : run.month - 1
   const [prevRunTwo, runOne] = await Promise.all([
@@ -145,18 +175,20 @@ export async function POST(
     return formatter.format(parsed)
   }
 
-  const teamFallback = locale === 'fr' ? 'Non assigné' : '未分组'
-  const teams = new Map<string, { label: string; items: typeof payouts }>()
+  const teamFallback = TEAM_FALLBACK_LABEL
+  const teams = new Map<string, { label: string; zh: string; fr: string; items: typeof payouts }>()
 
   payouts.forEach((payout) => {
     const rawTeam = normalizeText(payout.team) || normalizeText(payout.user.expatProfile?.team)
-    const label = rawTeam || teamFallback
-    const key = rawTeam.toLowerCase() || teamFallback.toLowerCase()
-    const entry = teams.get(key)
+    const teamKey = normalizeTeamKey(rawTeam)
+    const teamZh = teamKey ? teamZhByKey.get(teamKey) ?? '' : ''
+    const label = buildTeamLabel(teamZh, rawTeam, teamFallback)
+    const groupKey = teamKey || TEAM_FALLBACK_KEY
+    const entry = teams.get(groupKey)
     if (entry) {
       entry.items.push(payout)
     } else {
-      teams.set(key, { label, items: [payout] })
+      teams.set(groupKey, { label, zh: teamZh, fr: rawTeam, items: [payout] })
     }
   })
 
@@ -165,7 +197,7 @@ export async function POST(
     collator.compare(left.label, right.label),
   )
 
-  sortedTeams.forEach(({ label, items }) => {
+  sortedTeams.forEach(({ label, zh, fr, items }) => {
     const sortedItems = [...items].sort((left, right) => {
       const leftName = normalizeText(left.user.name) || normalizeText(left.user.username)
       const rightName = normalizeText(right.user.name) || normalizeText(right.user.username)
@@ -209,6 +241,8 @@ export async function POST(
       const isLastChunk = chunkIndex === chunks.length - 1
       pages.push({
         teamLabel: label,
+        teamZh: zh,
+        teamFr: fr || TEAM_FALLBACK_LABEL,
         unitName,
         periodStart: formatDate(periodStart),
         periodEnd: formatDate(periodEnd),
@@ -229,14 +263,19 @@ export async function POST(
 
   const html = await renderSalaryReportHtml(pages)
 
+  console.log(`[SalaryPDF] Start generating PDF for runId: ${id}, rows: ${payouts.length}`)
+
   try {
+    console.log(`[SalaryPDF] Launching puppeteer with: ${EXECUTABLE_PATH}`)
     const browser = await puppeteer.launch({
       headless: true,
       executablePath: EXECUTABLE_PATH,
       args: LAUNCH_ARGS,
     })
     const page = await browser.newPage()
-    await page.setContent(html, { waitUntil: 'networkidle0' })
+    console.log('[SalaryPDF] Setting content...')
+    await page.setContent(html, { waitUntil: 'load', timeout: 60000 })
+    console.log('[SalaryPDF] Content set. Generating PDF...')
     const pdfBuffer = await page.pdf({
       format: 'A4',
       landscape: true,
@@ -244,6 +283,8 @@ export async function POST(
       margin: { top: '0mm', bottom: '0mm', left: '0mm', right: '0mm' },
     })
     await browser.close()
+
+    console.log(`[SalaryPDF] PDF generated successfully. Size: ${pdfBuffer.byteLength} bytes`)
 
     const filename = `salary-payouts-${run.year}-${String(run.month).padStart(2, '0')}-run-${run.sequence}.pdf`
     const pdfArrayBuffer = pdfBuffer.buffer.slice(
@@ -259,6 +300,7 @@ export async function POST(
       },
     })
   } catch (error) {
+    console.error('[SalaryPDF] Generation failed:', error)
     const message =
       (error as Error).message ||
       '生成 PDF 失败：请先安装浏览器内核或设置 CHROMIUM_EXECUTABLE_PATH/PUPPETEER_EXECUTABLE_PATH。'
