@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
 
 import { MultiSelectFilter, type MultiSelectOption } from '@/components/MultiSelectFilter'
 import type { Locale } from '@/lib/i18n'
@@ -61,6 +61,29 @@ type ContractCostItem = {
   color: string
 }
 
+type TrendPoint = {
+  label: string
+  value: number
+}
+
+type ContractTypeTrendItem = {
+  label: string
+  ctj: number
+  cdd: number
+  other: number
+  total: number
+  delta: number
+}
+
+type PayoutRecordRow = {
+  id: number
+  team: string
+  memberName: string
+  supervisor: string
+  amountsByDate: Record<string, number>
+  total: number
+}
+
 type SelectableBarItem = BarItem & {
   key: string
 }
@@ -96,8 +119,40 @@ type DonutItem = {
 }
 
 type PayrollPayout = {
+  id: number
+  runId: number
   userId: number
+  team: string | null
+  chineseSupervisorId: number | null
+  chineseSupervisorName: string | null
+  payoutDate: string
   amount: string
+  currency: string
+  note: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+type PayrollRun = {
+  id: number
+  year: number
+  month: number
+  sequence: number
+  payoutDate: string
+  attendanceCutoffDate: string
+}
+
+type PayrollContractSnapshot = {
+  contractNumber: string | null
+  contractType: string | null
+  ctjOverlap?: boolean
+  contractOverlap?: boolean
+}
+
+type PayrollContractSnapshotPayload = {
+  runId: number
+  cutoffDate: string
+  contracts?: Record<string, PayrollContractSnapshot>
 }
 
 const CHART_COLORS = [
@@ -229,6 +284,17 @@ const parseMonthValue = (value: string) => {
   return { year, month }
 }
 
+const sortMonthValues = (values: string[]) => {
+  return [...values].sort((a, b) => {
+    const left = parseMonthValue(a)
+    const right = parseMonthValue(b)
+    if (!left && !right) return 0
+    if (!left) return -1
+    if (!right) return 1
+    return left.year * 12 + left.month - (right.year * 12 + right.month)
+  })
+}
+
 const matchesValueFilter = (value: string | null | undefined, filters: string[]) => {
   if (filters.length === 0) return true
   const normalized = normalizeText(value)
@@ -282,6 +348,55 @@ const resolvePositionGroup = (normalized: string, raw: string) => {
     if (/结构工程师|工程师|工程部/.test(rawValue)) return 'siteWork'
   }
   return 'other'
+}
+
+const buildPositionStats = (
+  members: Member[],
+  nameCollator: Intl.Collator,
+  labels: MemberCopy['overview']['positionGroups'],
+) => {
+  const groupMap = new Map<string, { count: number; raw: Map<string, { label: string; value: number }> }>()
+  POSITION_GROUPS.forEach((group) => {
+    groupMap.set(group.key, { count: 0, raw: new Map() })
+  })
+  let missing = 0
+  members.forEach((member) => {
+    const rawPosition = normalizeText(member.position)
+    if (!rawPosition) {
+      missing += 1
+      return
+    }
+    const normalized = normalizePositionKey(rawPosition)
+    const groupKey = resolvePositionGroup(normalized, rawPosition)
+    const group = groupMap.get(groupKey) ?? groupMap.get('other')
+    if (!group) return
+    group.count += 1
+    const rawKey = normalized || normalizeText(rawPosition).toLowerCase()
+    const existing = group.raw.get(rawKey)
+    if (existing) {
+      existing.value += 1
+    } else {
+      group.raw.set(rawKey, { label: rawPosition, value: 1 })
+    }
+  })
+  const items: PositionGroupItem[] = POSITION_GROUPS.map((group, idx) => {
+    const groupData = groupMap.get(group.key) ?? { count: 0, raw: new Map() }
+    const rawItems = Array.from(groupData.raw.values())
+      .sort((a, b) => {
+        const diff = b.value - a.value
+        if (diff !== 0) return diff
+        return nameCollator.compare(a.label, b.label)
+      })
+    return {
+      key: group.key,
+      label: labels[group.key],
+      value: groupData.count,
+      color: CHART_COLORS[idx % CHART_COLORS.length],
+      rawItems,
+    }
+  }).filter((item) => item.value > 0)
+
+  return { items, missing }
 }
 
 const getSalaryRanges = (multiplier: number) => {
@@ -624,6 +739,291 @@ const ContractCostBulletList = ({
   )
 }
 
+const LineChart = ({
+  items,
+  formatValue,
+  emptyLabel,
+}: {
+  items: TrendPoint[]
+  formatValue: (value: number) => string
+  emptyLabel: string
+}) => {
+  const gradientId = useId()
+  if (items.length === 0) {
+    return <p className="text-sm text-slate-500">{emptyLabel}</p>
+  }
+  const values = items.map((item) => item.value)
+  const maxValue = Math.max(...values, 0)
+  const minValue = Math.min(...values, 0)
+  const range = maxValue - minValue || 1
+  const points = items.map((item, index) => {
+    const x = items.length === 1 ? 50 : (index / (items.length - 1)) * 100
+    const y = 100 - ((item.value - minValue) / range) * 100
+    return { x, y, value: item.value, label: item.label }
+  })
+  const linePoints = points.map((point) => `${point.x},${point.y}`).join(' ')
+  const areaPoints = `0,100 ${linePoints} 100,100`
+
+  return (
+    <div className="space-y-3">
+      <div className="relative h-40 w-full">
+        <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="h-full w-full">
+          <defs>
+            <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.25" />
+              <stop offset="100%" stopColor="#38bdf8" stopOpacity="0" />
+            </linearGradient>
+          </defs>
+          <polygon points={areaPoints} fill={`url(#${gradientId})`} />
+          <polyline
+            points={linePoints}
+            fill="none"
+            stroke="#0ea5e9"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          {points.map((point) => (
+            <circle
+              key={point.label}
+              cx={point.x}
+              cy={point.y}
+              r="2.5"
+              fill="#0ea5e9"
+              stroke="#fff"
+              strokeWidth="1"
+            />
+          ))}
+        </svg>
+        <div className="absolute inset-0 flex items-start justify-between text-[10px] text-slate-400">
+          <span>{formatValue(maxValue)}</span>
+          <span>{formatValue(minValue)}</span>
+        </div>
+      </div>
+      <div className="flex justify-between text-[10px] text-slate-500">
+        {items.map((item) => (
+          <span key={item.label} className="truncate">
+            {item.label}
+          </span>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+const ContractTypeTrendList = ({
+  items,
+  formatNumber,
+  emptyLabel,
+  labels,
+}: {
+  items: ContractTypeTrendItem[]
+  formatNumber: (value: number) => string
+  emptyLabel: string
+  labels: {
+    ctj: string
+    cdd: string
+    other: string
+    total: string
+    delta: string
+  }
+}) => {
+  if (items.length === 0) {
+    return <p className="text-sm text-slate-500">{emptyLabel}</p>
+  }
+  const maxTotal = Math.max(...items.map((item) => item.total), 1)
+  return (
+    <div className="space-y-4">
+      {items.map((item) => {
+        const totalWidth = Math.max((item.total / maxTotal) * 100, 6)
+        const ctjWidth = item.total ? (item.ctj / item.total) * 100 : 0
+        const cddWidth = item.total ? (item.cdd / item.total) * 100 : 0
+        const otherWidth = item.total ? (item.other / item.total) * 100 : 0
+        const deltaLabel = item.delta > 0 ? `+${formatNumber(item.delta)}` : formatNumber(item.delta)
+        const deltaClass =
+          item.delta > 0 ? 'text-emerald-600' : item.delta < 0 ? 'text-rose-600' : 'text-slate-400'
+        return (
+          <div key={item.label} className="flex flex-wrap items-center gap-3">
+            <div className="w-16 text-xs font-semibold text-slate-600">{item.label}</div>
+            <div className="flex-1 min-w-[160px]">
+              <div className="h-3 rounded-full bg-slate-100 overflow-hidden">
+                <div className="h-full flex" style={{ width: `${totalWidth}%` }}>
+                  <div className="h-full bg-sky-500" style={{ width: `${ctjWidth}%` }} />
+                  <div className="h-full bg-emerald-500" style={{ width: `${cddWidth}%` }} />
+                  {item.other > 0 ? (
+                    <div className="h-full bg-slate-400" style={{ width: `${otherWidth}%` }} />
+                  ) : null}
+                </div>
+              </div>
+              <div className="mt-1 flex flex-wrap gap-x-2 text-[10px] text-slate-400">
+                <span>
+                  {labels.ctj} {formatNumber(item.ctj)}
+                </span>
+                <span>
+                  {labels.cdd} {formatNumber(item.cdd)}
+                </span>
+                {item.other > 0 ? (
+                  <span>
+                    {labels.other} {formatNumber(item.other)}
+                  </span>
+                ) : null}
+              </div>
+            </div>
+            <div className="text-right text-xs">
+              <div className="font-semibold text-slate-700">
+                {labels.total} {formatNumber(item.total)}
+              </div>
+              <div className={deltaClass}>
+                {labels.delta} {deltaLabel}
+              </div>
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+const SalaryPyramid = ({
+  items,
+  formatValue,
+  emptyLabel,
+}: {
+  items: BarItem[]
+  formatValue: (value: number) => string
+  emptyLabel: string
+}) => {
+  const total = items.reduce((sum, item) => sum + item.value, 0)
+  if (items.length === 0 || total === 0) {
+    return <p className="text-sm text-slate-500">{emptyLabel}</p>
+  }
+  const maxValue = Math.max(...items.map((item) => item.value), 1)
+  return (
+    <div className="space-y-3">
+      {items.map((item) => {
+        const width = Math.max((item.value / maxValue) * 100, 4)
+        return (
+          <div key={item.label} className="flex items-center gap-3">
+            <span className="w-20 text-[10px] font-medium text-slate-500">{item.label}</span>
+            <div className="flex-1">
+              <div className="h-3 w-full">
+                <div
+                  className="h-3 rounded-full mx-auto"
+                  style={{ width: `${width}%`, backgroundColor: item.color }}
+                />
+              </div>
+            </div>
+            <span className="w-14 text-right text-[10px] font-semibold text-slate-600">
+              {formatValue(item.value)}
+            </span>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+const PayoutRecordsTable = ({
+  columns,
+  rows,
+  sortKey,
+  sortDirection,
+  onSortChange,
+  formatMoney,
+  emptyLabel,
+  labels,
+}: {
+  columns: string[]
+  rows: PayoutRecordRow[]
+  sortKey: string
+  sortDirection: 'asc' | 'desc'
+  onSortChange: (key: string) => void
+  formatMoney: (value: number) => string
+  emptyLabel: string
+  labels: {
+    team: string
+    member: string
+    supervisor: string
+    total: string
+  }
+}) => {
+  if (rows.length === 0) {
+    return <p className="text-sm text-slate-500">{emptyLabel}</p>
+  }
+  const renderSort = (key: string) => {
+    if (sortKey !== key) return null
+    return <span className="ml-1 text-[10px] text-slate-400">{sortDirection === 'asc' ? '^' : 'v'}</span>
+  }
+  return (
+    <div className="overflow-x-auto">
+      <table className="min-w-full text-xs">
+        <thead className="bg-slate-50 text-slate-500">
+          <tr>
+            <th
+              className="px-3 py-2 text-left font-semibold cursor-pointer"
+              onClick={() => onSortChange('team')}
+            >
+              {labels.team}
+              {renderSort('team')}
+            </th>
+            <th
+              className="px-3 py-2 text-left font-semibold cursor-pointer"
+              onClick={() => onSortChange('member')}
+            >
+              {labels.member}
+              {renderSort('member')}
+            </th>
+            <th
+              className="px-3 py-2 text-left font-semibold cursor-pointer"
+              onClick={() => onSortChange('supervisor')}
+            >
+              {labels.supervisor}
+              {renderSort('supervisor')}
+            </th>
+            {columns.map((column) => (
+              <th
+                key={column}
+                className="px-3 py-2 text-right font-semibold cursor-pointer"
+                onClick={() => onSortChange(column)}
+              >
+                {column}
+                {renderSort(column)}
+              </th>
+            ))}
+            <th
+              className="px-3 py-2 text-right font-semibold cursor-pointer"
+              onClick={() => onSortChange('total')}
+            >
+              {labels.total}
+              {renderSort('total')}
+            </th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-100">
+          {rows.map((row) => (
+            <tr key={row.id} className="hover:bg-slate-50">
+              <td className="px-3 py-2 text-slate-700">{row.team}</td>
+              <td className="px-3 py-2 text-slate-700 font-medium">{row.memberName}</td>
+              <td className="px-3 py-2 text-slate-500">{row.supervisor}</td>
+              {columns.map((column) => {
+                const value = row.amountsByDate[column]
+                return (
+                  <td key={`${row.id}-${column}`} className="px-3 py-2 text-right text-slate-700">
+                    {value ? formatMoney(value) : '-'}
+                  </td>
+                )
+              })}
+              <td className="px-3 py-2 text-right font-semibold text-slate-800">
+                {row.total ? formatMoney(row.total) : '-'}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
 const PositionDetailModal = ({
   open,
   title,
@@ -883,6 +1283,7 @@ const TeamDistributionGrid = ({
   sortMode,
   onSortChange,
   formatMoney,
+  onTeamSelect,
 }: {
   items: TeamBarItem[]
   missing: number
@@ -891,6 +1292,7 @@ const TeamDistributionGrid = ({
   sortMode: TeamSortMode
   onSortChange: (mode: TeamSortMode) => void
   formatMoney: (value: number) => string
+  onTeamSelect?: (team: string) => void
 }) => {
   if (items.length === 0 && missing === 0) return null
   
@@ -957,8 +1359,21 @@ const TeamDistributionGrid = ({
       <div className="grid gap-x-8 gap-y-8 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {items.map((item) => {
            const percent = total > 0 ? Math.round((item.value / total) * 100) : 0
+           const cardClasses = `group relative text-left w-full ${
+             onTeamSelect ? 'cursor-pointer' : 'cursor-default'
+           }`
+           const handleClick = onTeamSelect
+             ? () => {
+                 onTeamSelect(item.label)
+               }
+             : undefined
            return (
-             <div key={item.label} className="group relative">
+             <button
+               key={item.label}
+               type="button"
+               onClick={handleClick}
+               className={cardClasses}
+             >
                 <div className="mb-2 flex items-end justify-between">
                    <div className="flex flex-col min-w-0 pr-2">
                        <span className="font-bold text-slate-700 truncate" title={item.label}>{item.label}</span>
@@ -997,7 +1412,7 @@ const TeamDistributionGrid = ({
                     </span>
                   </div>
                 ) : null}
-             </div>
+             </button>
            )
         })}
       </div>
@@ -1021,6 +1436,7 @@ const SupervisorPowerGrid = ({
   sortMode,
   onSortChange,
   formatMoney,
+  onTeamsSelect,
 }: {
   items: SupervisorItem[]
   missing: number
@@ -1029,6 +1445,7 @@ const SupervisorPowerGrid = ({
   sortMode: TeamSortMode
   onSortChange: (mode: TeamSortMode) => void
   formatMoney: (value: number) => string
+  onTeamsSelect?: (teams: string[]) => void
 }) => {
   if (items.length === 0 && missing === 0) return null
   const maxSupervisorCount = Math.max(...items.map((item) => item.value), 1)
@@ -1086,8 +1503,23 @@ const SupervisorPowerGrid = ({
       
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {items.map((item) => {
+          const selectableTeams = item.teamDetails
+            .map((team) => team.name)
+            .filter((name) => name && name !== t.overview.labels.unassignedTeam)
+          const handleClick = onTeamsSelect
+            ? () => {
+                onTeamsSelect(selectableTeams)
+              }
+            : undefined
           return (
-            <div key={item.label} className="flex flex-col rounded-2xl border border-slate-200 bg-white shadow-sm transition-all hover:border-slate-300 hover:shadow-md overflow-hidden">
+            <button
+              key={item.label}
+              type="button"
+              onClick={handleClick}
+              className={`flex flex-col rounded-2xl border border-slate-200 bg-white shadow-sm transition-all hover:border-slate-300 hover:shadow-md overflow-hidden text-left ${
+                onTeamsSelect ? 'cursor-pointer' : 'cursor-default'
+              }`}
+            >
                <div className="p-5 pb-3">
                  <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
@@ -1157,7 +1589,7 @@ const SupervisorPowerGrid = ({
                      </p>
                  )}
                </div>
-            </div>
+            </button>
           )
         })}
       </div>
@@ -1219,11 +1651,23 @@ export function MembersOverviewTab({
   )
 
   const [payrollPayouts, setPayrollPayouts] = useState<PayrollPayout[]>([])
+  const [payrollRuns, setPayrollRuns] = useState<PayrollRun[]>([])
+  const [payrollContractSnapshots, setPayrollContractSnapshots] = useState<
+    Record<number, Record<number, PayrollContractSnapshot>>
+  >({})
   const [payrollReady, setPayrollReady] = useState(false)
   const [viewMode, setViewMode] = useState<'overview' | 'detail' | 'compare'>('overview')
   const [teamSortMode, setTeamSortMode] = useState<TeamSortMode>('count')
   const [supervisorSortMode, setSupervisorSortMode] = useState<TeamSortMode>('count')
   const [positionGroupFocus, setPositionGroupFocus] = useState<string | null>(null)
+  const [detailTeams, setDetailTeams] = useState<string[]>([])
+  const [detailAutoMonthsPending, setDetailAutoMonthsPending] = useState(false)
+  const [detailMonthOptions, setDetailMonthOptions] = useState<string[]>([])
+  const detailMemberIdsRef = useRef<Set<number>>(new Set())
+  const [detailRecordSort, setDetailRecordSort] = useState<{
+    key: string
+    direction: 'asc' | 'desc'
+  }>({ key: 'total', direction: 'desc' })
   const defaultPayrollMonth = useMemo(() => getLastMonthValue(), [])
   const [payrollMonthFilters, setPayrollMonthFilters] = useState<string[]>(() => [
     defaultPayrollMonth,
@@ -1241,42 +1685,106 @@ export function MembersOverviewTab({
     [defaultPayrollMonth],
   )
 
+  const triggerDetailAutoMonths = useCallback(() => {
+    if (payrollMonthOptions.length === 0) return
+    setDetailMonthOptions([])
+    setDetailAutoMonthsPending(true)
+  }, [payrollMonthOptions])
+
   // Fetch payroll data when permission is granted
   useEffect(() => {
     if (!canViewPayroll) return
 
     let cancelled = false
-    const monthParams = activePayrollMonths
-      .map((value) => parseMonthValue(value))
-      .filter((value): value is { year: number; month: number } => Boolean(value))
-    const resolvedMonthParams = monthParams.length > 0 ? monthParams : [getLastMonthKey()]
+    const loadPayroll = async () => {
+      setPayrollReady(false)
+      const monthValues = detailAutoMonthsPending
+        ? payrollMonthOptions.map((option) => option.value)
+        : activePayrollMonths
+      const monthParams = monthValues
+        .map((value) => parseMonthValue(value))
+        .filter((value): value is { year: number; month: number } => Boolean(value))
+      const resolvedMonthParams = monthParams.length > 0 ? monthParams : [getLastMonthKey()]
 
-    Promise.all(
-      resolvedMonthParams.map(({ year, month }) =>
-        fetch(`/api/payroll-runs?year=${year}&month=${month}`).then((res) => {
-          if (!res.ok) throw new Error('Failed to load payroll')
-          return res.json() as Promise<{ payouts?: PayrollPayout[] }>
-        }),
-      ),
-    )
-      .then((payloads) => {
+      try {
+        const payloads = await Promise.all(
+          resolvedMonthParams.map(({ year, month }) =>
+            fetch(`/api/payroll-runs?year=${year}&month=${month}`).then((res) => {
+              if (!res.ok) throw new Error('Failed to load payroll')
+              return res.json() as Promise<{
+                runs?: PayrollRun[]
+                payouts?: PayrollPayout[]
+                contractSnapshots?: PayrollContractSnapshotPayload[]
+              }>
+            }),
+          ),
+        )
         if (cancelled) return
         const nextPayouts = payloads.flatMap((data) =>
           Array.isArray(data.payouts) ? data.payouts : [],
         )
+        const nextRuns = payloads.flatMap((data) => (Array.isArray(data.runs) ? data.runs : []))
+        const runsById = new Map<number, PayrollRun>()
+        nextRuns.forEach((run) => {
+          runsById.set(run.id, run)
+        })
+        const snapshotsByRunId: Record<number, Record<number, PayrollContractSnapshot>> = {}
+        payloads.forEach((data) => {
+          const snapshots = Array.isArray(data.contractSnapshots) ? data.contractSnapshots : []
+          snapshots.forEach((snapshot) => {
+            const contracts: Record<number, PayrollContractSnapshot> = {}
+            Object.entries(snapshot.contracts ?? {}).forEach(([userId, contract]) => {
+              const id = Number(userId)
+              if (Number.isNaN(id)) return
+              contracts[id] = contract
+            })
+            snapshotsByRunId[snapshot.runId] = contracts
+          })
+        })
         setPayrollPayouts(nextPayouts)
+        setPayrollRuns(Array.from(runsById.values()))
+        setPayrollContractSnapshots(snapshotsByRunId)
         setPayrollReady(true)
-      })
-      .catch(() => {
+
+        if (detailAutoMonthsPending) {
+          const monthSet = new Set<string>()
+          const memberIds = detailMemberIdsRef.current
+          nextPayouts.forEach((payout) => {
+            if (!memberIds.has(payout.userId)) return
+            const run = runsById.get(payout.runId)
+            const key = run
+              ? formatMonthValue(run.year, run.month)
+              : payout.payoutDate.slice(0, 7)
+            monthSet.add(key)
+          })
+          const available = sortMonthValues(Array.from(monthSet))
+          const fallback = sortMonthValues(payrollMonthOptions.map((option) => option.value))
+          const optionValues = available.length > 0 ? available : fallback
+          const selection = optionValues.slice(-5)
+          setDetailMonthOptions(optionValues)
+          if (selection.length > 0) {
+            setPayrollMonthFilters(selection)
+          }
+          setDetailAutoMonthsPending(false)
+        }
+      } catch {
         if (cancelled) return
         setPayrollPayouts([])
+        setPayrollRuns([])
+        setPayrollContractSnapshots({})
         setPayrollReady(false)
-      })
+        if (detailAutoMonthsPending) {
+          setDetailAutoMonthsPending(false)
+        }
+      }
+    }
+
+    void loadPayroll()
 
     return () => {
       cancelled = true
     }
-  }, [canViewPayroll, activePayrollMonths])
+  }, [canViewPayroll, activePayrollMonths, detailAutoMonthsPending, payrollMonthOptions])
 
   const showTeamPayroll = canViewPayroll && payrollReady
 
@@ -1290,6 +1798,30 @@ export function MembersOverviewTab({
     })
     return map
   }, [payrollPayouts, showTeamPayroll])
+
+  const payrollRunsById = useMemo(() => {
+    const map = new Map<number, PayrollRun>()
+    payrollRuns.forEach((run) => {
+      map.set(run.id, run)
+    })
+    return map
+  }, [payrollRuns])
+
+  const payrollSnapshotByMonth = useMemo(() => {
+    const snapshotByMonth = new Map<string, Record<number, PayrollContractSnapshot>>()
+    const seqByMonth = new Map<string, number>()
+    payrollRuns.forEach((run) => {
+      const snapshot = payrollContractSnapshots[run.id]
+      if (!snapshot) return
+      const key = formatMonthValue(run.year, run.month)
+      const prevSeq = seqByMonth.get(key) ?? -1
+      if (run.sequence >= prevSeq) {
+        seqByMonth.set(key, run.sequence)
+        snapshotByMonth.set(key, snapshot)
+      }
+    })
+    return snapshotByMonth
+  }, [payrollRuns, payrollContractSnapshots])
 
   const filterControlProps = {
     allLabel: t.filters.all,
@@ -1316,6 +1848,14 @@ export function MembersOverviewTab({
     () => scopedMembers.filter((member) => Boolean(member.expatProfile)),
     [scopedMembers],
   )
+
+  const membersById = useMemo(() => {
+    const map = new Map<number, Member>()
+    members.forEach((member) => {
+      map.set(member.id, member)
+    })
+    return map
+  }, [members])
 
   const nationalityStats = useMemo(() => {
     let china = 0
@@ -1387,6 +1927,77 @@ export function MembersOverviewTab({
       color: CHART_COLORS[idx % CHART_COLORS.length],
     }))
   }, [teamStats.items, teamSortMode, showTeamPayroll, nameCollator])
+
+  const detailTeamOptions = useMemo(
+    () =>
+      sortedTeamItems.map((item) => ({
+        value: item.label,
+        label: item.label,
+      })),
+    [sortedTeamItems],
+  )
+
+  const defaultDetailTeam = useMemo(
+    () => (sortedTeamItems[0]?.label ? [sortedTeamItems[0].label] : []),
+    [sortedTeamItems],
+  )
+
+  const activeDetailTeams = useMemo(
+    () => (detailTeams.length > 0 ? detailTeams : defaultDetailTeam),
+    [detailTeams, defaultDetailTeam],
+  )
+
+  const handleDetailTeamChange = useCallback(
+    (next: string[]) => {
+      if (next.length === 0) {
+        setDetailTeams(defaultDetailTeam)
+        return
+      }
+      setDetailTeams(next)
+    },
+    [defaultDetailTeam],
+  )
+
+  const handleDetailRecordSort = useCallback((key: string) => {
+    setDetailRecordSort((prev) => {
+      if (prev.key === key) {
+        return { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' }
+      }
+      return { key, direction: 'desc' }
+    })
+  }, [])
+
+  const handleDetailJump = useCallback(
+    (teams: string[]) => {
+      const normalized = Array.from(new Set(teams.filter(Boolean)))
+      if (normalized.length === 0) {
+        setDetailTeams(defaultDetailTeam)
+      } else {
+        setDetailTeams(normalized)
+      }
+      triggerDetailAutoMonths()
+      setViewMode('detail')
+    },
+    [defaultDetailTeam, triggerDetailAutoMonths],
+  )
+
+  const handleViewModeChange = useCallback(
+    (mode: 'overview' | 'detail' | 'compare') => {
+      if (mode === 'overview') {
+        setPayrollMonthFilters([defaultPayrollMonth])
+        setDetailMonthOptions([])
+        setDetailAutoMonthsPending(false)
+      }
+      if (mode === 'detail' && detailTeams.length === 0) {
+        setDetailTeams(defaultDetailTeam)
+      }
+      if (mode === 'detail') {
+        triggerDetailAutoMonths()
+      }
+      setViewMode(mode)
+    },
+    [defaultDetailTeam, defaultPayrollMonth, detailTeams.length, triggerDetailAutoMonths],
+  )
 
   const supervisorStats = useMemo(() => {
     const map = new Map<string, { count: number, teamCounts: Map<string, number>, payrollTotal: number, salaries: number[] }>()
@@ -1607,55 +2218,39 @@ export function MembersOverviewTab({
     }
   }, [scopedMembers, locale])
 
-  const positionStats = useMemo(() => {
-    const groupMap = new Map<string, { count: number; raw: Map<string, { label: string; value: number }> }>()
-    POSITION_GROUPS.forEach((group) => {
-      groupMap.set(group.key, { count: 0, raw: new Map() })
-    })
-    let missing = 0
-    const positionMembers = localMembers.filter((member) => member.nationality !== 'china')
-    positionMembers.forEach((member) => {
-      const rawPosition = normalizeText(member.position)
-      if (!rawPosition) {
-        missing += 1
-        return
-      }
-      const normalized = normalizePositionKey(rawPosition)
-      const groupKey = resolvePositionGroup(normalized, rawPosition)
-      const group = groupMap.get(groupKey) ?? groupMap.get('other')
-      if (!group) return
-      group.count += 1
-      const rawKey = normalized || normalizeText(rawPosition).toLowerCase()
-      const existing = group.raw.get(rawKey)
-      if (existing) {
-        existing.value += 1
-      } else {
-        group.raw.set(rawKey, { label: rawPosition, value: 1 })
-      }
-    })
-    const items: PositionGroupItem[] = POSITION_GROUPS.map((group, idx) => {
-      const groupData = groupMap.get(group.key) ?? { count: 0, raw: new Map() }
-      const rawItems = Array.from(groupData.raw.values())
-        .sort((a, b) => {
-          const diff = b.value - a.value
-          if (diff !== 0) return diff
-          return nameCollator.compare(a.label, b.label)
-        })
-      return {
-        key: group.key,
-        label: t.overview.positionGroups[group.key],
-        value: groupData.count,
-        color: CHART_COLORS[idx % CHART_COLORS.length],
-        rawItems,
-      }
-    }).filter((item) => item.value > 0)
+  const detailTeamSet = useMemo(() => new Set(activeDetailTeams), [activeDetailTeams])
 
-    return { items, missing }
+  const detailMembers = useMemo(
+    () =>
+      localMembers.filter(
+        (member) =>
+          member.nationality !== 'china' &&
+          detailTeamSet.has(normalizeText(member.expatProfile?.team)),
+      ),
+    [localMembers, detailTeamSet],
+  )
+
+  const detailMemberIds = useMemo(() => new Set(detailMembers.map((member) => member.id)), [detailMembers])
+
+  useEffect(() => {
+    detailMemberIdsRef.current = detailMemberIds
+  }, [detailMemberIds])
+
+  const positionStats = useMemo(() => {
+    const positionMembers = localMembers.filter((member) => member.nationality !== 'china')
+    return buildPositionStats(positionMembers, nameCollator, t.overview.positionGroups)
   }, [localMembers, nameCollator, t.overview.positionGroups])
 
+  const detailPositionStats = useMemo(
+    () => buildPositionStats(detailMembers, nameCollator, t.overview.positionGroups),
+    [detailMembers, nameCollator, t.overview.positionGroups],
+  )
+
+  const currentPositionStats = viewMode === 'detail' ? detailPositionStats : positionStats
+
   const activePositionGroup = useMemo(
-    () => positionStats.items.find((item) => item.key === positionGroupFocus) ?? null,
-    [positionGroupFocus, positionStats.items],
+    () => currentPositionStats.items.find((item) => item.key === positionGroupFocus) ?? null,
+    [positionGroupFocus, currentPositionStats.items],
   )
 
   const positionDetailItems = useMemo(() => {
@@ -1754,6 +2349,420 @@ export function MembersOverviewTab({
     }
   }, [localMembers])
 
+  const detailPayouts = useMemo(() => {
+    if (!showTeamPayroll) return []
+    return payrollPayouts.flatMap((payout) => {
+      if (!detailMemberIds.has(payout.userId)) return []
+      const amount = parseNumber(payout.amount)
+      if (amount === null) return []
+      return [{ payout, amount }]
+    })
+  }, [detailMemberIds, payrollPayouts, showTeamPayroll])
+
+  const detailPayoutsByMemberId = useMemo(() => {
+    const map = new Map<number, number>()
+    detailPayouts.forEach(({ payout, amount }) => {
+      map.set(payout.userId, (map.get(payout.userId) ?? 0) + amount)
+    })
+    return map
+  }, [detailPayouts])
+
+  const visiblePayrollMonthOptions = useMemo(() => {
+    if (viewMode !== 'detail' || detailMonthOptions.length === 0) return payrollMonthOptions
+    return detailMonthOptions.map((value) => ({ value, label: value }))
+  }, [detailMonthOptions, payrollMonthOptions, viewMode])
+
+  const detailMonthlyStats = useMemo(() => {
+    const months = sortMonthValues(activePayrollMonths)
+    const map = new Map<string, { total: number; memberIds: Set<number> }>()
+    months.forEach((key) => {
+      map.set(key, { total: 0, memberIds: new Set() })
+    })
+    detailPayouts.forEach(({ payout, amount }) => {
+      const run = payrollRunsById.get(payout.runId)
+      const key = run ? formatMonthValue(run.year, run.month) : payout.payoutDate.slice(0, 7)
+      const entry = map.get(key)
+      if (!entry) return
+      entry.total += amount
+      entry.memberIds.add(payout.userId)
+    })
+    return months.map((key) => {
+      const entry = map.get(key) ?? { total: 0, memberIds: new Set() }
+      const count = entry.memberIds.size
+      return {
+        key,
+        label: key,
+        total: entry.total,
+        average: count > 0 ? entry.total / count : 0,
+        memberIds: entry.memberIds,
+      }
+    })
+  }, [activePayrollMonths, detailPayouts, payrollRunsById])
+
+  const detailPayrollTotalSeries = useMemo(
+    () =>
+      detailMonthlyStats.map((item) => ({
+        label: item.label,
+        value: item.total,
+      })),
+    [detailMonthlyStats],
+  )
+
+  const detailPayrollAverageSeries = useMemo(
+    () =>
+      detailMonthlyStats.map((item) => ({
+        label: item.label,
+        value: item.average,
+      })),
+    [detailMonthlyStats],
+  )
+
+  const detailContractTypeTrend = useMemo(() => {
+    const result: ContractTypeTrendItem[] = []
+    let prevTotal = 0
+    detailMonthlyStats.forEach((item, index) => {
+      const snapshot = payrollSnapshotByMonth.get(item.key) ?? {}
+      let ctj = 0
+      let cdd = 0
+      let other = 0
+      item.memberIds.forEach((memberId) => {
+        const type =
+          snapshot[memberId]?.contractType ??
+          membersById.get(memberId)?.expatProfile?.contractType ??
+          null
+        if (type === 'CTJ') ctj += 1
+        else if (type === 'CDD') cdd += 1
+        else other += 1
+      })
+      const total = ctj + cdd + other
+      const delta = index === 0 ? 0 : total - prevTotal
+      prevTotal = total
+      result.push({
+        label: item.label,
+        ctj,
+        cdd,
+        other,
+        total,
+        delta,
+      })
+    })
+    return result
+  }, [detailMonthlyStats, payrollSnapshotByMonth, membersById])
+
+  const detailProvenanceStats = useMemo(() => {
+    const map = new Map<string, number>()
+    let missing = 0
+    detailMembers.forEach((member) => {
+      const value = normalizeText(member.expatProfile?.provenance)
+      if (!value) {
+        missing += 1
+        return
+      }
+      map.set(value, (map.get(value) ?? 0) + 1)
+    })
+    const sorted = Array.from(map.entries())
+      .map(([label, value]) => ({ label, value }))
+      .sort((a, b) => b.value - a.value)
+    const list = buildTopItems(sorted, 6, t.overview.labels.other)
+    return {
+      items: list.map((item, idx) => ({
+        ...item,
+        color: CHART_COLORS[idx % CHART_COLORS.length],
+      })),
+      missing,
+    }
+  }, [detailMembers, t.overview.labels.other])
+
+  const detailContractSalaryStats = useMemo(() => {
+    const ranges = getSalaryRanges(1)
+    const values = detailMembers.map((member) => resolveMonthlySalary(member))
+    return buildSalaryDistribution(values, formatMoney, ranges)
+  }, [detailMembers, formatMoney])
+
+  const detailPayoutSalaryStats = useMemo(() => {
+    if (!showTeamPayroll) return []
+    const ranges = getSalaryRanges(1)
+    const divisor = Math.max(payrollMonthCount, 1)
+    const values = detailMembers.map(
+      (member) => (detailPayoutsByMemberId.get(member.id) ?? 0) / divisor,
+    )
+    return buildSalaryDistribution(values, formatMoney, ranges)
+  }, [detailMembers, detailPayoutsByMemberId, formatMoney, payrollMonthCount, showTeamPayroll])
+
+  const detailAgeStats = useMemo(() => {
+    const yearUnit = locale === 'fr' ? 'ans' : '岁'
+    const ranges = [
+      { label: `0-17${yearUnit}`, min: 0, max: 17 },
+      { label: `18-24${yearUnit}`, min: 18, max: 24 },
+      { label: `25-29${yearUnit}`, min: 25, max: 29 },
+      { label: `30-34${yearUnit}`, min: 30, max: 34 },
+      { label: `35-39${yearUnit}`, min: 35, max: 39 },
+      { label: `40-44${yearUnit}`, min: 40, max: 44 },
+      { label: `45-49${yearUnit}`, min: 45, max: 49 },
+      { label: `50+${yearUnit}`, min: 50, max: Number.POSITIVE_INFINITY },
+    ]
+    const counts = ranges.map(() => 0)
+    let missing = 0
+    const now = new Date()
+    detailMembers.forEach((member) => {
+      if (!member.birthDate) {
+        missing += 1
+        return
+      }
+      const birthDate = new Date(member.birthDate)
+      if (Number.isNaN(birthDate.getTime())) {
+        missing += 1
+        return
+      }
+      let age = now.getFullYear() - birthDate.getFullYear()
+      const monthDiff = now.getMonth() - birthDate.getMonth()
+      if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < birthDate.getDate())) {
+        age -= 1
+      }
+      if (age < 0) {
+        missing += 1
+        return
+      }
+      const index = ranges.findIndex((range) => age >= range.min && age <= range.max)
+      if (index >= 0) counts[index] += 1
+    })
+    return {
+      items: ranges.map((range, idx) => ({
+        label: range.label,
+        value: counts[idx],
+        color: CHART_COLORS[idx % CHART_COLORS.length],
+      })),
+      missing,
+    }
+  }, [detailMembers, locale])
+
+  const detailTenureStats = useMemo(() => {
+    const monthUnit = locale === 'fr' ? 'mois' : '月'
+    const yearUnit = locale === 'fr' ? 'ans' : '年'
+    const ranges = [
+      { label: `0-3${monthUnit}`, min: 0, max: 2 },
+      { label: `3-6${monthUnit}`, min: 3, max: 5 },
+      { label: `6-12${monthUnit}`, min: 6, max: 11 },
+      { label: `1-2${yearUnit}`, min: 12, max: 23 },
+      { label: `2+${yearUnit}`, min: 24, max: Number.POSITIVE_INFINITY },
+    ]
+    const counts = ranges.map(() => 0)
+    let missing = 0
+    const now = new Date()
+    detailMembers.forEach((member) => {
+      if (!member.joinDate) {
+        missing += 1
+        return
+      }
+      const joined = new Date(member.joinDate)
+      if (Number.isNaN(joined.getTime())) {
+        missing += 1
+        return
+      }
+      const months =
+        (now.getFullYear() - joined.getFullYear()) * 12 + (now.getMonth() - joined.getMonth())
+      const normalized = Math.max(0, months)
+      const index = ranges.findIndex(
+        (range) => normalized >= range.min && normalized <= range.max,
+      )
+      if (index >= 0) counts[index] += 1
+    })
+    return {
+      items: ranges.map((range, idx) => ({
+        label: range.label,
+        value: counts[idx],
+        color: CHART_COLORS[idx % CHART_COLORS.length],
+      })),
+      missing,
+    }
+  }, [detailMembers, locale])
+
+  const detailContractCostStats = useMemo(() => {
+    if (!showTeamPayroll) {
+      return { items: [], unknown: 0 }
+    }
+    let ctjTotal = 0
+    let cddTotal = 0
+    let ctjCount = 0
+    let cddCount = 0
+    let unknown = 0
+    detailMembers.forEach((member) => {
+      const type = member.expatProfile?.contractType ?? null
+      const salary = detailPayoutsByMemberId.get(member.id) ?? 0
+      if (type === 'CTJ') {
+        ctjTotal += salary
+        ctjCount += 1
+      } else if (type === 'CDD') {
+        cddTotal += salary
+        cddCount += 1
+      } else {
+        unknown += 1
+      }
+    })
+    const divisor = Math.max(payrollMonthCount, 1)
+    return {
+      items: [
+        {
+          label: 'CTJ',
+          total: ctjTotal,
+          avg: ctjCount ? ctjTotal / ctjCount / divisor : 0,
+          count: ctjCount,
+          color: CHART_COLORS[0],
+        },
+        {
+          label: 'CDD',
+          total: cddTotal,
+          avg: cddCount ? cddTotal / cddCount / divisor : 0,
+          count: cddCount,
+          color: CHART_COLORS[1],
+        },
+      ],
+      unknown,
+    }
+  }, [detailMembers, detailPayoutsByMemberId, payrollMonthCount, showTeamPayroll])
+
+  const detailContractExpiryStats = useMemo(() => {
+    const now = new Date()
+    const months: string[] = []
+    for (let i = 0; i < 3; i += 1) {
+      const date = new Date(now.getFullYear(), now.getMonth() + i, 1)
+      months.push(date.toISOString().slice(0, 7))
+    }
+    const counts = new Map(months.map((key) => [key, 0]))
+    let overdue = 0
+    let beyond = 0
+    let missing = 0
+    detailMembers.forEach((member) => {
+      const endDate = member.expatProfile?.contractEndDate
+      if (!endDate) {
+        missing += 1
+        return
+      }
+      const end = new Date(endDate)
+      if (Number.isNaN(end.getTime())) {
+        missing += 1
+        return
+      }
+      const key = end.toISOString().slice(0, 7)
+      if (counts.has(key)) {
+        counts.set(key, (counts.get(key) ?? 0) + 1)
+      } else if (end < now) {
+        overdue += 1
+      } else {
+        beyond += 1
+      }
+    })
+    return {
+      items: Array.from(counts.entries()).map(([label, value], idx) => ({
+        label,
+        value,
+        color: CHART_COLORS[idx % CHART_COLORS.length],
+      })),
+      overdue,
+      beyond,
+      missing,
+    }
+  }, [detailMembers])
+
+  const salaryPyramidStats = useMemo(() => {
+    if (!showTeamPayroll) return []
+    const ranges = [
+      { min: 0, max: 150000 },
+      { min: 150001, max: 250000 },
+      { min: 250001, max: 400000 },
+      { min: 400001, max: Number.POSITIVE_INFINITY },
+    ]
+    const labels = ranges.map((range) => {
+      if (range.max === Number.POSITIVE_INFINITY) return `${formatMoney(range.min)}+`
+      return `${formatMoney(range.min)}-${formatMoney(range.max)}`
+    })
+    const counts = ranges.map(() => 0)
+    const divisor = Math.max(payrollMonthCount, 1)
+    detailMembers.forEach((member) => {
+      const value = (detailPayoutsByMemberId.get(member.id) ?? 0) / divisor
+      const index = ranges.findIndex(
+        (range) => value >= range.min && value <= range.max,
+      )
+      if (index >= 0) counts[index] += 1
+    })
+    return labels.map((label, idx) => ({
+      label,
+      value: counts[idx],
+      color: CHART_COLORS[idx % CHART_COLORS.length],
+    }))
+  }, [detailMembers, detailPayoutsByMemberId, formatMoney, payrollMonthCount, showTeamPayroll])
+
+  const detailPayoutDateColumns = useMemo(() => {
+    const dates = new Set<string>()
+    detailPayouts.forEach(({ payout }) => {
+      dates.add(payout.payoutDate.slice(0, 10))
+    })
+    return Array.from(dates).sort()
+  }, [detailPayouts])
+
+  const detailPayoutRows = useMemo(() => {
+    if (!showTeamPayroll) return []
+    const payoutsByMember = new Map<number, Record<string, number>>()
+    detailPayouts.forEach(({ payout, amount }) => {
+      const date = payout.payoutDate.slice(0, 10)
+      const existing = payoutsByMember.get(payout.userId) ?? {}
+      existing[date] = (existing[date] ?? 0) + amount
+      payoutsByMember.set(payout.userId, existing)
+    })
+    const rows: PayoutRecordRow[] = detailMembers.map((member) => {
+      const supervisor = member.expatProfile?.chineseSupervisor
+      const supervisorLabel = normalizeText(
+        formatSupervisorLabel({
+          name: supervisor?.name ?? null,
+          frenchName: supervisor?.chineseProfile?.frenchName ?? null,
+          username: supervisor?.username ?? null,
+        }),
+      ) || t.overview.labels.unassignedSupervisor
+      const team = normalizeText(member.expatProfile?.team) || t.overview.labels.unassignedTeam
+      const memberName = member.name ?? member.username ?? `#${member.id}`
+      const amountsByDate = payoutsByMember.get(member.id) ?? {}
+      const total = Object.values(amountsByDate).reduce((sum, value) => sum + value, 0)
+      return {
+        id: member.id,
+        team,
+        memberName,
+        supervisor: supervisorLabel,
+        amountsByDate,
+        total,
+      }
+    })
+    const direction = detailRecordSort.direction === 'asc' ? 1 : -1
+    rows.sort((a, b) => {
+      const key = detailRecordSort.key
+      let diff = 0
+      if (key === 'team') {
+        diff = nameCollator.compare(a.team, b.team)
+      } else if (key === 'member') {
+        diff = nameCollator.compare(a.memberName, b.memberName)
+      } else if (key === 'supervisor') {
+        diff = nameCollator.compare(a.supervisor, b.supervisor)
+      } else if (key === 'total') {
+        diff = a.total - b.total
+      } else {
+        const left = a.amountsByDate[key] ?? 0
+        const right = b.amountsByDate[key] ?? 0
+        diff = left - right
+      }
+      if (diff !== 0) return diff * direction
+      return nameCollator.compare(a.memberName, b.memberName)
+    })
+    return rows
+  }, [
+    detailMembers,
+    detailPayouts,
+    detailRecordSort.direction,
+    detailRecordSort.key,
+    nameCollator,
+    showTeamPayroll,
+    t.overview.labels.unassignedSupervisor,
+    t.overview.labels.unassignedTeam,
+  ])
+
   if (loading) {
     return <div className="p-6 text-sm text-slate-500">{t.feedback.loading}</div>
   }
@@ -1808,7 +2817,7 @@ export function MembersOverviewTab({
           {(['overview', 'detail', 'compare'] as const).map((mode) => (
              <button
                 key={mode}
-                onClick={() => setViewMode(mode)}
+                onClick={() => handleViewModeChange(mode)}
                 className={`px-4 py-1.5 rounded-md text-xs font-semibold transition-all ${
                   viewMode === mode 
                     ? 'bg-white text-slate-900 shadow-sm ring-1 ring-black/5' 
@@ -1898,7 +2907,7 @@ export function MembersOverviewTab({
           />
           <MultiSelectFilter
             label={t.filters.payrollMonth}
-            options={payrollMonthOptions}
+            options={visiblePayrollMonthOptions}
             selected={payrollMonthFilters}
             onChange={handlePayrollMonthChange}
             searchable={false}
@@ -1931,186 +2940,436 @@ export function MembersOverviewTab({
         ))}
       </div>
 
-      <TeamDistributionGrid 
-        items={sortedTeamItems}
-        missing={teamStats.missing} 
-        t={t} 
-        showPayroll={showTeamPayroll}
-        sortMode={showTeamPayroll ? teamSortMode : 'count'}
-        onSortChange={setTeamSortMode}
-        formatMoney={formatMoney}
-      />
+      {viewMode === 'overview' ? (
+        <>
+          <TeamDistributionGrid 
+            items={sortedTeamItems}
+            missing={teamStats.missing} 
+            t={t} 
+            showPayroll={showTeamPayroll}
+            sortMode={showTeamPayroll ? teamSortMode : 'count'}
+            onSortChange={setTeamSortMode}
+            formatMoney={formatMoney}
+            onTeamSelect={(team) => handleDetailJump([team])}
+          />
 
-      <SupervisorPowerGrid 
-        items={sortedSupervisorItems}
-        missing={supervisorStats.missing} 
-        t={t} 
-        showPayroll={showTeamPayroll}
-        sortMode={showTeamPayroll ? supervisorSortMode : 'count'}
-        onSortChange={setSupervisorSortMode}
-        formatMoney={formatMoney}
-      />
+          <SupervisorPowerGrid 
+            items={sortedSupervisorItems}
+            missing={supervisorStats.missing} 
+            t={t} 
+            showPayroll={showTeamPayroll}
+            sortMode={showTeamPayroll ? supervisorSortMode : 'count'}
+            onSortChange={setSupervisorSortMode}
+            formatMoney={formatMoney}
+            onTeamsSelect={(teams) => handleDetailJump(teams)}
+          />
 
-      <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-        <div className="md:col-span-2 xl:col-span-3">
-          <OverviewCard title={t.overview.charts.teamCostScatter} badge={t.overview.labels.localScope}>
-            <TeamCostHeatmap
-              items={teamStats.items}
-              formatMoney={formatMoney}
+          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+            <div className="md:col-span-2 xl:col-span-3">
+              <OverviewCard title={t.overview.charts.teamCostScatter} badge={t.overview.labels.localScope}>
+                <TeamCostHeatmap
+                  items={teamStats.items}
+                  formatMoney={formatMoney}
+                  formatNumber={formatNumber}
+                  formatRatio={formatRatio}
+                  emptyLabel={t.overview.labels.noData}
+                  hint={t.overview.labels.scatterHint}
+                  labels={{
+                    team: t.table.team,
+                    people: t.overview.labels.people,
+                    payrollTotal: t.overview.labels.payrollTotal,
+                    payrollAverage: t.overview.labels.payrollAverage,
+                    payrollMedian: t.overview.labels.payrollMedian,
+                    payrollRatio: t.overview.labels.payrollRatio,
+                  }}
+                />
+              </OverviewCard>
+            </div>
+
+            <OverviewCard title={t.overview.charts.provenance} badge={t.overview.labels.localScope}>
+              <DonutChart
+                items={provenanceStats.items}
+                totalLabel={t.overview.labels.total}
+                formatValue={formatNumber}
+                emptyLabel={t.overview.labels.noData}
+              />
+              {provenanceStats.missing ? (
+                <p className="mt-2 text-xs text-slate-500">
+                  {t.overview.labels.missingProvenance}: {formatNumber(provenanceStats.missing)}
+                </p>
+              ) : null}
+            </OverviewCard>
+
+            <OverviewCard
+              title={t.overview.charts.salary}
+              subtitle={t.overview.helpers.salaryRule}
+              badge={t.overview.labels.localScope}
+            >
+              <DonutChart
+                items={contractSalaryStats}
+                totalLabel={t.overview.labels.total}
+                formatValue={formatNumber}
+                emptyLabel={t.overview.labels.noData}
+              />
+            </OverviewCard>
+
+            <OverviewCard
+              title={t.overview.charts.actualSalary}
+              subtitle={t.overview.helpers.actualSalaryRuleDetail}
+              badge={t.overview.labels.localScope}
+            >
+              <DonutChart
+                items={payoutSalaryStats}
+                totalLabel={t.overview.labels.total}
+                formatValue={formatNumber}
+                emptyLabel={t.overview.labels.noData}
+              />
+            </OverviewCard>
+
+            <div className="md:col-span-2 xl:col-span-3">
+              <OverviewCard
+                title={t.overview.charts.position}
+                subtitle={t.overview.helpers.positionRule}
+                badge={t.overview.labels.localScope}
+              >
+                <SelectableBarList
+                  items={positionStats.items.map((item) => ({
+                    key: item.key,
+                    label: item.label,
+                    value: item.value,
+                    color: item.color,
+                  }))}
+                  selectedKey={positionGroupFocus}
+                  onSelect={(key) => setPositionGroupFocus((current) => (current === key ? null : key))}
+                  formatValue={(value) => `${formatNumber(value)} ${t.overview.labels.people}`}
+                  emptyLabel={t.overview.labels.noData}
+                  columns={2}
+                />
+                {positionStats.missing ? (
+                  <p className="mt-2 text-xs text-slate-500">
+                    {t.overview.labels.missingPosition}: {formatNumber(positionStats.missing)}
+                  </p>
+                ) : null}
+                {positionStats.items.length ? (
+                  <p className="mt-2 text-xs text-slate-400">{t.overview.labels.positionDetailHint}</p>
+                ) : null}
+              </OverviewCard>
+            </div>
+
+            <OverviewCard title={t.overview.charts.age}>
+              <BarList
+                items={ageStats.items}
+                formatValue={(value) => `${formatNumber(value)} ${t.overview.labels.people}`}
+                emptyLabel={t.overview.labels.noData}
+              />
+              {ageStats.missing ? (
+                <p className="mt-2 text-xs text-slate-500">
+                  {t.overview.labels.missingBirthDate}: {formatNumber(ageStats.missing)}
+                </p>
+              ) : null}
+            </OverviewCard>
+
+            <OverviewCard title={t.overview.charts.tenure}>
+              <BarList
+                items={tenureStats.items}
+                formatValue={(value) => `${formatNumber(value)} ${t.overview.labels.people}`}
+                emptyLabel={t.overview.labels.noData}
+              />
+              {tenureStats.missing ? (
+                <p className="mt-2 text-xs text-slate-500">
+                  {t.labels.empty}: {formatNumber(tenureStats.missing)}
+                </p>
+              ) : null}
+            </OverviewCard>
+
+            <div className="md:col-span-2 xl:col-span-1 flex h-full flex-col gap-6">
+              <div className="flex-1">
+                <OverviewCard title={t.overview.charts.contractCost} badge={t.overview.labels.localScope}>
+                  <ContractCostBulletList
+                    items={contractCostStats.items}
+                    formatMoney={formatMoney}
+                    formatNumber={formatNumber}
+                    emptyLabel={t.overview.labels.noData}
+                    labels={{
+                      people: t.overview.labels.people,
+                      payrollAverage: t.overview.labels.payrollAverage,
+                    }}
+                  />
+                  {contractCostStats.unknown ? (
+                    <p className="mt-2 text-xs text-slate-500">
+                      {t.overview.labels.missingContractType}: {formatNumber(contractCostStats.unknown)}
+                    </p>
+                  ) : null}
+                </OverviewCard>
+              </div>
+              <div className="flex-1">
+                <OverviewCard title={t.overview.charts.contractExpiry} badge={t.overview.labels.localScope}>
+                  <BarList
+                    items={contractExpiryStats.items}
+                    formatValue={(value) => `${formatNumber(value)} ${t.overview.labels.people}`}
+                    emptyLabel={t.overview.labels.noData}
+                  />
+                  <div className="mt-2 flex flex-wrap gap-3 text-xs text-slate-500">
+                    <span>
+                      {t.overview.labels.overdue}: {formatNumber(contractExpiryStats.overdue)}
+                    </span>
+                    <span>
+                      {t.overview.labels.beyond}: {formatNumber(contractExpiryStats.beyond)}
+                    </span>
+                    <span>
+                      {t.overview.labels.missingContractDate}: {formatNumber(contractExpiryStats.missing)}
+                    </span>
+                  </div>
+                </OverviewCard>
+              </div>
+            </div>
+          </div>
+        </>
+      ) : null}
+
+      {viewMode === 'detail' ? (
+        <div className="space-y-6">
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">
+                  {t.overview.labels.detailTeams}
+                </p>
+                <p className="text-[11px] text-slate-400">
+                  {t.overview.labels.detailTeamsHint}
+                </p>
+              </div>
+              <MultiSelectFilter
+                label={t.table.team}
+                options={detailTeamOptions}
+                selected={activeDetailTeams}
+                onChange={handleDetailTeamChange}
+                className="min-w-[220px]"
+                allLabel={filterControlProps.allLabel}
+                selectedLabel={filterControlProps.selectedLabel}
+                selectAllLabel={filterControlProps.selectAllLabel}
+                clearLabel={filterControlProps.clearLabel}
+                searchPlaceholder={filterControlProps.searchPlaceholder}
+                noOptionsLabel={filterControlProps.noOptionsLabel}
+              />
+            </div>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {activeDetailTeams.map((team) => (
+                <span
+                  key={team}
+                  className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-600"
+                >
+                  {team}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid gap-6 md:grid-cols-2">
+            <OverviewCard title={t.overview.charts.detailPayrollTotal} badge={t.overview.labels.localScope}>
+              <LineChart
+                items={detailPayrollTotalSeries}
+                formatValue={formatMoney}
+                emptyLabel={t.overview.labels.noData}
+              />
+            </OverviewCard>
+            <OverviewCard title={t.overview.charts.detailPayrollAverage} badge={t.overview.labels.localScope}>
+              <LineChart
+                items={detailPayrollAverageSeries}
+                formatValue={formatMoney}
+                emptyLabel={t.overview.labels.noData}
+              />
+            </OverviewCard>
+          </div>
+
+          <OverviewCard title={t.overview.charts.contractTypeTrend} badge={t.overview.labels.localScope}>
+            <ContractTypeTrendList
+              items={detailContractTypeTrend}
               formatNumber={formatNumber}
-              formatRatio={formatRatio}
               emptyLabel={t.overview.labels.noData}
-              hint={t.overview.labels.scatterHint}
+              labels={{
+                ctj: t.overview.labels.ctj,
+                cdd: t.overview.labels.cdd,
+                other: t.overview.labels.other,
+                total: t.overview.labels.total,
+                delta: t.overview.labels.delta,
+              }}
+            />
+          </OverviewCard>
+
+          <OverviewCard title={t.overview.charts.salaryPyramid} badge={t.overview.labels.localScope}>
+            <SalaryPyramid
+              items={salaryPyramidStats}
+              formatValue={formatNumber}
+              emptyLabel={t.overview.labels.noData}
+            />
+          </OverviewCard>
+
+          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+            <OverviewCard title={t.overview.charts.provenance} badge={t.overview.labels.localScope}>
+              <DonutChart
+                items={detailProvenanceStats.items}
+                totalLabel={t.overview.labels.total}
+                formatValue={formatNumber}
+                emptyLabel={t.overview.labels.noData}
+              />
+              {detailProvenanceStats.missing ? (
+                <p className="mt-2 text-xs text-slate-500">
+                  {t.overview.labels.missingProvenance}: {formatNumber(detailProvenanceStats.missing)}
+                </p>
+              ) : null}
+            </OverviewCard>
+
+            <OverviewCard
+              title={t.overview.charts.salary}
+              subtitle={t.overview.helpers.salaryRule}
+              badge={t.overview.labels.localScope}
+            >
+              <DonutChart
+                items={detailContractSalaryStats}
+                totalLabel={t.overview.labels.total}
+                formatValue={formatNumber}
+                emptyLabel={t.overview.labels.noData}
+              />
+            </OverviewCard>
+
+            <OverviewCard
+              title={t.overview.charts.actualSalary}
+              subtitle={t.overview.helpers.actualSalaryRuleDetail}
+              badge={t.overview.labels.localScope}
+            >
+              <DonutChart
+                items={detailPayoutSalaryStats}
+                totalLabel={t.overview.labels.total}
+                formatValue={formatNumber}
+                emptyLabel={t.overview.labels.noData}
+              />
+            </OverviewCard>
+
+            <div className="md:col-span-2 xl:col-span-3">
+              <OverviewCard
+                title={t.overview.charts.position}
+                subtitle={t.overview.helpers.positionRule}
+                badge={t.overview.labels.localScope}
+              >
+                <SelectableBarList
+                  items={detailPositionStats.items.map((item) => ({
+                    key: item.key,
+                    label: item.label,
+                    value: item.value,
+                    color: item.color,
+                  }))}
+                  selectedKey={positionGroupFocus}
+                  onSelect={(key) => setPositionGroupFocus((current) => (current === key ? null : key))}
+                  formatValue={(value) => `${formatNumber(value)} ${t.overview.labels.people}`}
+                  emptyLabel={t.overview.labels.noData}
+                  columns={2}
+                />
+                {detailPositionStats.missing ? (
+                  <p className="mt-2 text-xs text-slate-500">
+                    {t.overview.labels.missingPosition}: {formatNumber(detailPositionStats.missing)}
+                  </p>
+                ) : null}
+                {detailPositionStats.items.length ? (
+                  <p className="mt-2 text-xs text-slate-400">{t.overview.labels.positionDetailHint}</p>
+                ) : null}
+              </OverviewCard>
+            </div>
+
+            <OverviewCard title={t.overview.charts.age}>
+              <BarList
+                items={detailAgeStats.items}
+                formatValue={(value) => `${formatNumber(value)} ${t.overview.labels.people}`}
+                emptyLabel={t.overview.labels.noData}
+              />
+              {detailAgeStats.missing ? (
+                <p className="mt-2 text-xs text-slate-500">
+                  {t.overview.labels.missingBirthDate}: {formatNumber(detailAgeStats.missing)}
+                </p>
+              ) : null}
+            </OverviewCard>
+
+            <OverviewCard title={t.overview.charts.tenure}>
+              <BarList
+                items={detailTenureStats.items}
+                formatValue={(value) => `${formatNumber(value)} ${t.overview.labels.people}`}
+                emptyLabel={t.overview.labels.noData}
+              />
+              {detailTenureStats.missing ? (
+                <p className="mt-2 text-xs text-slate-500">
+                  {t.labels.empty}: {formatNumber(detailTenureStats.missing)}
+                </p>
+              ) : null}
+            </OverviewCard>
+
+            <div className="md:col-span-2 xl:col-span-1 flex h-full flex-col gap-6">
+              <div className="flex-1">
+                <OverviewCard title={t.overview.charts.contractCost} badge={t.overview.labels.localScope}>
+                  <ContractCostBulletList
+                    items={detailContractCostStats.items}
+                    formatMoney={formatMoney}
+                    formatNumber={formatNumber}
+                    emptyLabel={t.overview.labels.noData}
+                    labels={{
+                      people: t.overview.labels.people,
+                      payrollAverage: t.overview.labels.payrollAverage,
+                    }}
+                  />
+                  {detailContractCostStats.unknown ? (
+                    <p className="mt-2 text-xs text-slate-500">
+                      {t.overview.labels.missingContractType}: {formatNumber(detailContractCostStats.unknown)}
+                    </p>
+                  ) : null}
+                </OverviewCard>
+              </div>
+              <div className="flex-1">
+                <OverviewCard title={t.overview.charts.contractExpiry} badge={t.overview.labels.localScope}>
+                  <BarList
+                    items={detailContractExpiryStats.items}
+                    formatValue={(value) => `${formatNumber(value)} ${t.overview.labels.people}`}
+                    emptyLabel={t.overview.labels.noData}
+                  />
+                  <div className="mt-2 flex flex-wrap gap-3 text-xs text-slate-500">
+                    <span>
+                      {t.overview.labels.overdue}: {formatNumber(detailContractExpiryStats.overdue)}
+                    </span>
+                    <span>
+                      {t.overview.labels.beyond}: {formatNumber(detailContractExpiryStats.beyond)}
+                    </span>
+                    <span>
+                      {t.overview.labels.missingContractDate}: {formatNumber(detailContractExpiryStats.missing)}
+                    </span>
+                  </div>
+                </OverviewCard>
+              </div>
+            </div>
+          </div>
+
+          <OverviewCard title={t.overview.charts.payoutRecords} badge={t.overview.labels.localScope}>
+            <PayoutRecordsTable
+              columns={detailPayoutDateColumns}
+              rows={detailPayoutRows}
+              sortKey={detailRecordSort.key}
+              sortDirection={detailRecordSort.direction}
+              onSortChange={handleDetailRecordSort}
+              formatMoney={formatMoney}
+              emptyLabel={t.overview.labels.noData}
               labels={{
                 team: t.table.team,
-                people: t.overview.labels.people,
-                payrollTotal: t.overview.labels.payrollTotal,
-                payrollAverage: t.overview.labels.payrollAverage,
-                payrollMedian: t.overview.labels.payrollMedian,
-                payrollRatio: t.overview.labels.payrollRatio,
+                member: t.table.name,
+                supervisor: t.table.chineseSupervisor,
+                total: t.overview.labels.payoutTotal,
               }}
             />
           </OverviewCard>
         </div>
+      ) : null}
 
-        <OverviewCard title={t.overview.charts.provenance} badge={t.overview.labels.localScope}>
-          <DonutChart
-            items={provenanceStats.items}
-            totalLabel={t.overview.labels.total}
-            formatValue={formatNumber}
-            emptyLabel={t.overview.labels.noData}
-          />
-          {provenanceStats.missing ? (
-            <p className="mt-2 text-xs text-slate-500">
-              {t.overview.labels.missingProvenance}: {formatNumber(provenanceStats.missing)}
-            </p>
-          ) : null}
-        </OverviewCard>
-
-        <OverviewCard
-          title={t.overview.charts.salary}
-          subtitle={t.overview.helpers.salaryRule}
-          badge={t.overview.labels.localScope}
-        >
-          <DonutChart
-            items={contractSalaryStats}
-            totalLabel={t.overview.labels.total}
-            formatValue={formatNumber}
-            emptyLabel={t.overview.labels.noData}
-          />
-        </OverviewCard>
-
-        <OverviewCard
-          title={t.overview.charts.actualSalary}
-          subtitle={t.overview.helpers.actualSalaryRule}
-          badge={t.overview.labels.localScope}
-        >
-          <DonutChart
-            items={payoutSalaryStats}
-            totalLabel={t.overview.labels.total}
-            formatValue={formatNumber}
-            emptyLabel={t.overview.labels.noData}
-          />
-        </OverviewCard>
-
-        <div className="md:col-span-2 xl:col-span-3">
-          <OverviewCard
-            title={t.overview.charts.position}
-            subtitle={t.overview.helpers.positionRule}
-            badge={t.overview.labels.localScope}
-          >
-            <SelectableBarList
-              items={positionStats.items.map((item) => ({
-                key: item.key,
-                label: item.label,
-                value: item.value,
-                color: item.color,
-              }))}
-              selectedKey={positionGroupFocus}
-              onSelect={(key) => setPositionGroupFocus((current) => (current === key ? null : key))}
-              formatValue={(value) => `${formatNumber(value)} ${t.overview.labels.people}`}
-              emptyLabel={t.overview.labels.noData}
-              columns={2}
-            />
-            {positionStats.missing ? (
-              <p className="mt-2 text-xs text-slate-500">
-                {t.overview.labels.missingPosition}: {formatNumber(positionStats.missing)}
-              </p>
-            ) : null}
-            {positionStats.items.length ? (
-              <p className="mt-2 text-xs text-slate-400">{t.overview.labels.positionDetailHint}</p>
-            ) : null}
-          </OverviewCard>
+      {viewMode === 'compare' ? (
+        <div className="rounded-2xl border border-slate-200 bg-white p-8 text-sm text-slate-500 shadow-sm">
+          {t.overview.labels.compareHint}
         </div>
-
-        <OverviewCard title={t.overview.charts.age}>
-          <BarList
-            items={ageStats.items}
-            formatValue={(value) => `${formatNumber(value)} ${t.overview.labels.people}`}
-            emptyLabel={t.overview.labels.noData}
-          />
-          {ageStats.missing ? (
-            <p className="mt-2 text-xs text-slate-500">
-              {t.overview.labels.missingBirthDate}: {formatNumber(ageStats.missing)}
-            </p>
-          ) : null}
-        </OverviewCard>
-
-        <OverviewCard title={t.overview.charts.tenure}>
-          <BarList
-            items={tenureStats.items}
-            formatValue={(value) => `${formatNumber(value)} ${t.overview.labels.people}`}
-            emptyLabel={t.overview.labels.noData}
-          />
-          {tenureStats.missing ? (
-            <p className="mt-2 text-xs text-slate-500">
-              {t.labels.empty}: {formatNumber(tenureStats.missing)}
-            </p>
-          ) : null}
-        </OverviewCard>
-
-        <div className="md:col-span-2 xl:col-span-1 flex h-full flex-col gap-6">
-          <div className="flex-1">
-            <OverviewCard title={t.overview.charts.contractCost} badge={t.overview.labels.localScope}>
-              <ContractCostBulletList
-                items={contractCostStats.items}
-                formatMoney={formatMoney}
-                formatNumber={formatNumber}
-                emptyLabel={t.overview.labels.noData}
-                labels={{
-                  people: t.overview.labels.people,
-                  payrollAverage: t.overview.labels.payrollAverage,
-                }}
-              />
-              {contractCostStats.unknown ? (
-                <p className="mt-2 text-xs text-slate-500">
-                  {t.overview.labels.missingContractType}: {formatNumber(contractCostStats.unknown)}
-                </p>
-              ) : null}
-            </OverviewCard>
-          </div>
-          <div className="flex-1">
-            <OverviewCard title={t.overview.charts.contractExpiry} badge={t.overview.labels.localScope}>
-              <BarList
-                items={contractExpiryStats.items}
-                formatValue={(value) => `${formatNumber(value)} ${t.overview.labels.people}`}
-                emptyLabel={t.overview.labels.noData}
-              />
-              <div className="mt-2 flex flex-wrap gap-3 text-xs text-slate-500">
-                <span>
-                  {t.overview.labels.overdue}: {formatNumber(contractExpiryStats.overdue)}
-                </span>
-                <span>
-                  {t.overview.labels.beyond}: {formatNumber(contractExpiryStats.beyond)}
-                </span>
-                <span>
-                  {t.overview.labels.missingContractDate}: {formatNumber(contractExpiryStats.missing)}
-                </span>
-              </div>
-            </OverviewCard>
-          </div>
-        </div>
-      </div>
+      ) : null}
 
       <PositionDetailModal
         open={Boolean(activePositionGroup)}

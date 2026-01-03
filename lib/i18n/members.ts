@@ -57,6 +57,11 @@ export const memberCopy: Record<
         age: string
         tenure: string
         contractExpiry: string
+        detailPayrollTotal: string
+        detailPayrollAverage: string
+        contractTypeTrend: string
+        salaryPyramid: string
+        payoutRecords: string
       }
       labels: {
         total: string
@@ -89,10 +94,18 @@ export const memberCopy: Record<
         positionDetailTitle: string
         positionDetailHint: string
         positionDetailClear: string
+        detailTeams: string
+        detailTeamsHint: string
+        ctj: string
+        cdd: string
+        delta: string
+        payoutTotal: string
+        compareHint: string
       }
       helpers: {
         salaryRule: string
         actualSalaryRule: string
+        actualSalaryRuleDetail: string
         positionRule: string
       }
       positionGroups: Record<
@@ -653,6 +666,11 @@ export const memberCopy: Record<
         age: '年龄分布',
         tenure: '员工司龄分布',
         contractExpiry: '合同到期分布（未来 3 个月）',
+        detailPayrollTotal: '月度实发总额趋势',
+        detailPayrollAverage: '月度人均工资趋势',
+        contractTypeTrend: '合同类型人数趋势',
+        salaryPyramid: '薪酬结构金字塔',
+        payoutRecords: '发放记录',
       },
       labels: {
         total: '总数',
@@ -685,10 +703,18 @@ export const memberCopy: Record<
         positionDetailTitle: '岗位细分',
         positionDetailHint: '点击分类查看细分',
         positionDetailClear: '收起',
+        detailTeams: '班组选择',
+        detailTeamsHint: '点击班组或负责人卡片可跳转分析',
+        ctj: 'CTJ',
+        cdd: 'CDD',
+        delta: '较上月',
+        payoutTotal: '发放总额',
+        compareHint: '对比模式暂未开放。',
       },
       helpers: {
         salaryRule: '合同口径：CTJ 时薪按 22 天 × 8 小时折算月薪；月薪优先取实发工资，否则用基础工资 + 津贴。',
-        actualSalaryRule: '实发口径：上月月中 + 月末汇总，仅计已发金额。',
+        actualSalaryRule: '实发口径：所选月份月中 + 月末汇总，仅计已发金额。',
+        actualSalaryRuleDetail: '实发口径：所选月份月中 + 月末汇总，按月均计算，仅计已发金额。',
         positionRule: '岗位按关键词归一化，原始数据不变。',
       },
       positionGroups: {
@@ -1264,6 +1290,11 @@ export const memberCopy: Record<
         age: 'Répartition par âge',
         tenure: 'Ancienneté',
         contractExpiry: 'Échéances de contrat (3 mois)',
+        detailPayrollTotal: 'Tendance des versements mensuels',
+        detailPayrollAverage: 'Tendance du salaire moyen',
+        contractTypeTrend: 'Tendance CTJ/CDD',
+        salaryPyramid: 'Pyramide salariale',
+        payoutRecords: 'Historique des versements',
       },
       labels: {
         total: 'Total',
@@ -1297,11 +1328,20 @@ export const memberCopy: Record<
         positionDetailTitle: 'Détail des postes',
         positionDetailHint: 'Cliquer sur une catégorie pour voir le détail',
         positionDetailClear: 'Réduire',
+        detailTeams: 'Sélection des équipes',
+        detailTeamsHint: "Cliquer sur une équipe ou un responsable pour analyser",
+        ctj: 'CTJ',
+        cdd: 'CDD',
+        delta: 'Δ vs M-1',
+        payoutTotal: 'Total versé',
+        compareHint: 'Le mode comparaison n’est pas encore disponible.',
       },
       helpers: {
         salaryRule:
           'Contrat : CTJ converti (22 j × 8 h); NET MENSUEL prioritaire, sinon salaire de base + prime.',
-        actualSalaryRule: 'Versements : M-1 (run1 + run2), uniquement les montants versés.',
+        actualSalaryRule: 'Versements : mois sélectionnés (mi-mois + fin de mois), uniquement les montants versés.',
+        actualSalaryRuleDetail:
+          'Versements : mois sélectionnés (mi-mois + fin de mois), moyenne mensuelle, uniquement les montants versés.',
         positionRule: 'Postes normalisés par mots-clés, données d’origine intactes.',
       },
       positionGroups: {
