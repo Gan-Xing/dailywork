@@ -61,6 +61,18 @@ type ContractCostItem = {
   color: string
 }
 
+type SelectableBarItem = BarItem & {
+  key: string
+}
+
+type PositionGroupItem = {
+  key: string
+  label: string
+  value: number
+  color: string
+  rawItems: Array<{ label: string; value: number }>
+}
+
 type SupervisorTeamDetail = {
   name: string
   count: number
@@ -117,6 +129,61 @@ const SALARY_RANGES = [
   { min: 500001, max: Number.POSITIVE_INFINITY },
 ]
 
+const POSITION_GROUPS = [
+  {
+    key: 'safetyHse',
+    matchers: [/\bhse\b/, /\bvigile\b/, /\bsecurite\b/, /regulateur/, /circulation/, /environnement/],
+  },
+  {
+    key: 'labQuality',
+    matchers: [/\blabo\b/, /\blaborantin\b/, /qualite/, /pesee/],
+  },
+  {
+    key: 'plantQuarry',
+    matchers: [/centrale/, /concassage/, /carriere/, /enrobage/, /bitume/],
+  },
+  {
+    key: 'surveyTopo',
+    matchers: [/topo/],
+  },
+  {
+    key: 'maintenance',
+    matchers: [/mecanicien/, /electricien/, /garage/],
+  },
+  {
+    key: 'equipmentOps',
+    matchers: [/\bconducteur\b/],
+  },
+  {
+    key: 'driversTransport',
+    matchers: [/\bchauffeur\b/, /graderiste/],
+  },
+  {
+    key: 'livingServices',
+    matchers: [/cuisine/, /menage/],
+  },
+  {
+    key: 'warehouseLogistics',
+    matchers: [/entrepot/, /logistique/],
+  },
+  {
+    key: 'supervision',
+    matchers: [/chef d equipe/, /responsab/],
+  },
+  {
+    key: 'adminSupport',
+    matchers: [/assistant/, /gestionnaire/, /interprete/, /guide/, /charge d affaires/, /vulgarisateur/],
+  },
+  {
+    key: 'siteWork',
+    matchers: [/ouvrier/, /macon/, /aide macon/, /ferrailleur/, /soudeur/, /menuisier/, /ratisseur/, /terrassier/, /ingenieur/, /genie civil/],
+  },
+  {
+    key: 'other',
+    matchers: [],
+  },
+] as const
+
 const toLocaleId = (locale: Locale) => (locale === 'fr' ? 'fr-FR' : 'zh-CN')
 
 const parseNumber = (value?: string | null) => {
@@ -162,6 +229,33 @@ const calculateMedian = (values: number[]) => {
   const sorted = [...values].sort((a, b) => a - b)
   const mid = Math.floor(sorted.length / 2)
   return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2
+}
+
+const normalizePositionKey = (value: string) => {
+  return normalizeText(value)
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+const resolvePositionGroup = (normalized: string, raw: string) => {
+  if (normalized) {
+    for (const group of POSITION_GROUPS) {
+      if (group.matchers.length === 0) continue
+      if (group.matchers.some((matcher) => matcher.test(normalized))) {
+        return group.key
+      }
+    }
+  }
+  const rawValue = normalizeText(raw)
+  if (rawValue) {
+    if (/修理/.test(rawValue)) return 'maintenance'
+    if (/结构工程师|工程师|工程部/.test(rawValue)) return 'siteWork'
+  }
+  return 'other'
 }
 
 const buildSalaryDistribution = (
@@ -348,6 +442,66 @@ const BarList = ({
   )
 }
 
+const SelectableBarList = ({
+  items,
+  selectedKey,
+  onSelect,
+  formatValue,
+  emptyLabel,
+  columns = 1,
+}: {
+  items: SelectableBarItem[]
+  selectedKey: string | null
+  onSelect: (key: string) => void
+  formatValue: (value: number) => string
+  emptyLabel: string
+  columns?: 1 | 2
+}) => {
+  if (items.length === 0) {
+    return <p className="text-sm text-slate-500">{emptyLabel}</p>
+  }
+  const maxValue = Math.max(...items.map((item) => item.value), 1)
+  const total = items.reduce((sum, item) => sum + item.value, 0)
+  return (
+    <div className={columns === 2 ? 'grid gap-3 sm:grid-cols-2' : 'space-y-3'}>
+      {items.map((item) => {
+        const percent = total > 0 ? Math.round((item.value / total) * 100) : 0
+        const isActive = selectedKey === item.key
+        return (
+          <button
+            type="button"
+            key={item.key}
+            onClick={() => onSelect(item.key)}
+            aria-pressed={isActive}
+            className={`w-full rounded-xl p-2 text-left transition ${
+              isActive
+                ? 'bg-slate-50 ring-1 ring-slate-200'
+                : 'hover:bg-slate-50/60'
+            }`}
+          >
+            <div className="mb-2 flex items-end justify-between gap-2">
+              <span className="truncate font-semibold text-slate-700">{item.label}</span>
+              <div className="text-right shrink-0">
+                <span className="text-base font-bold text-slate-900">{formatValue(item.value)}</span>
+                <span className="ml-1 text-xs font-medium text-slate-400">{percent}%</span>
+              </div>
+            </div>
+            <div className="h-2.5 w-full rounded-full bg-slate-100 overflow-hidden ring-1 ring-slate-100/50">
+              <div
+                className="h-full rounded-full transition-all duration-700 ease-out"
+                style={{
+                  width: `${Math.max((item.value / maxValue) * 100, 2)}%`,
+                  backgroundColor: item.color,
+                }}
+              />
+            </div>
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
 const ContractCostBulletList = ({
   items,
   formatMoney,
@@ -423,6 +577,50 @@ const ContractCostBulletList = ({
           </div>
         )
       })}
+    </div>
+  )
+}
+
+const PositionDetailModal = ({
+  open,
+  title,
+  items,
+  formatValue,
+  emptyLabel,
+  onClose,
+}: {
+  open: boolean
+  title: string
+  items: BarItem[]
+  formatValue: (value: number) => string
+  emptyLabel: string
+  onClose: () => void
+}) => {
+  if (!open) return null
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 px-4 py-6">
+      <div className="w-full max-w-xl max-h-[calc(100vh-3rem)] overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl shadow-slate-900/30">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-lg font-semibold text-slate-900">{title}</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-full border border-slate-200 px-2 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+            aria-label="Close"
+          >
+            X
+          </button>
+        </div>
+        <div className="mt-4">
+          <BarList
+            items={items}
+            formatValue={formatValue}
+            emptyLabel={emptyLabel}
+          />
+        </div>
+      </div>
     </div>
   )
 }
@@ -982,6 +1180,7 @@ export function MembersOverviewTab({
   const [viewMode, setViewMode] = useState<'overview' | 'detail' | 'compare'>('overview')
   const [teamSortMode, setTeamSortMode] = useState<TeamSortMode>('count')
   const [supervisorSortMode, setSupervisorSortMode] = useState<TeamSortMode>('count')
+  const [positionGroupFocus, setPositionGroupFocus] = useState<string | null>(null)
 
   // Fetch payroll data when permission is granted
   useEffect(() => {
@@ -1288,6 +1487,113 @@ export function MembersOverviewTab({
     payrollPayoutsByMemberId,
     showTeamPayroll,
   ])
+
+  const ageStats = useMemo(() => {
+    const yearUnit = locale === 'fr' ? 'ans' : '岁'
+    const ranges = [
+      { label: `0-17${yearUnit}`, min: 0, max: 17 },
+      { label: `18-24${yearUnit}`, min: 18, max: 24 },
+      { label: `25-29${yearUnit}`, min: 25, max: 29 },
+      { label: `30-34${yearUnit}`, min: 30, max: 34 },
+      { label: `35-39${yearUnit}`, min: 35, max: 39 },
+      { label: `40-44${yearUnit}`, min: 40, max: 44 },
+      { label: `45-49${yearUnit}`, min: 45, max: 49 },
+      { label: `50+${yearUnit}`, min: 50, max: Number.POSITIVE_INFINITY },
+    ]
+    const counts = ranges.map(() => 0)
+    let missing = 0
+    const now = new Date()
+    scopedMembers.forEach((member) => {
+      if (!member.birthDate) {
+        missing += 1
+        return
+      }
+      const birthDate = new Date(member.birthDate)
+      if (Number.isNaN(birthDate.getTime())) {
+        missing += 1
+        return
+      }
+      let age = now.getFullYear() - birthDate.getFullYear()
+      const monthDiff = now.getMonth() - birthDate.getMonth()
+      if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < birthDate.getDate())) {
+        age -= 1
+      }
+      if (age < 0) {
+        missing += 1
+        return
+      }
+      const index = ranges.findIndex((range) => age >= range.min && age <= range.max)
+      if (index >= 0) counts[index] += 1
+    })
+    return {
+      items: ranges.map((range, idx) => ({
+        label: range.label,
+        value: counts[idx],
+        color: CHART_COLORS[idx % CHART_COLORS.length],
+      })),
+      missing,
+    }
+  }, [scopedMembers, locale])
+
+  const positionStats = useMemo(() => {
+    const groupMap = new Map<string, { count: number; raw: Map<string, { label: string; value: number }> }>()
+    POSITION_GROUPS.forEach((group) => {
+      groupMap.set(group.key, { count: 0, raw: new Map() })
+    })
+    let missing = 0
+    const positionMembers = localMembers.filter((member) => member.nationality !== 'china')
+    positionMembers.forEach((member) => {
+      const rawPosition = normalizeText(member.position)
+      if (!rawPosition) {
+        missing += 1
+        return
+      }
+      const normalized = normalizePositionKey(rawPosition)
+      const groupKey = resolvePositionGroup(normalized, rawPosition)
+      const group = groupMap.get(groupKey) ?? groupMap.get('other')
+      if (!group) return
+      group.count += 1
+      const rawKey = normalized || normalizeText(rawPosition).toLowerCase()
+      const existing = group.raw.get(rawKey)
+      if (existing) {
+        existing.value += 1
+      } else {
+        group.raw.set(rawKey, { label: rawPosition, value: 1 })
+      }
+    })
+    const items: PositionGroupItem[] = POSITION_GROUPS.map((group, idx) => {
+      const groupData = groupMap.get(group.key) ?? { count: 0, raw: new Map() }
+      const rawItems = Array.from(groupData.raw.values())
+        .sort((a, b) => {
+          const diff = b.value - a.value
+          if (diff !== 0) return diff
+          return nameCollator.compare(a.label, b.label)
+        })
+      return {
+        key: group.key,
+        label: t.overview.positionGroups[group.key],
+        value: groupData.count,
+        color: CHART_COLORS[idx % CHART_COLORS.length],
+        rawItems,
+      }
+    }).filter((item) => item.value > 0)
+
+    return { items, missing }
+  }, [localMembers, nameCollator, t.overview.positionGroups])
+
+  const activePositionGroup = useMemo(
+    () => positionStats.items.find((item) => item.key === positionGroupFocus) ?? null,
+    [positionGroupFocus, positionStats.items],
+  )
+
+  const positionDetailItems = useMemo(() => {
+    if (!activePositionGroup) return []
+    return activePositionGroup.rawItems.map((item, idx) => ({
+      label: item.label,
+      value: item.value,
+      color: CHART_COLORS[idx % CHART_COLORS.length],
+    }))
+  }, [activePositionGroup])
 
   const tenureStats = useMemo(() => {
     const monthUnit = locale === 'fr' ? 'mois' : '月'
@@ -1616,20 +1922,45 @@ export function MembersOverviewTab({
           />
         </OverviewCard>
 
-        <OverviewCard title={t.overview.charts.contractCost} badge={t.overview.labels.localScope}>
-          <ContractCostBulletList
-            items={contractCostStats.items}
-            formatMoney={formatMoney}
-            formatNumber={formatNumber}
+        <div className="md:col-span-2 xl:col-span-3">
+          <OverviewCard
+            title={t.overview.charts.position}
+            subtitle={t.overview.helpers.positionRule}
+            badge={t.overview.labels.localScope}
+          >
+            <SelectableBarList
+              items={positionStats.items.map((item) => ({
+                key: item.key,
+                label: item.label,
+                value: item.value,
+                color: item.color,
+              }))}
+              selectedKey={positionGroupFocus}
+              onSelect={(key) => setPositionGroupFocus((current) => (current === key ? null : key))}
+              formatValue={(value) => `${formatNumber(value)} ${t.overview.labels.people}`}
+              emptyLabel={t.overview.labels.noData}
+              columns={2}
+            />
+            {positionStats.missing ? (
+              <p className="mt-2 text-xs text-slate-500">
+                {t.overview.labels.missingPosition}: {formatNumber(positionStats.missing)}
+              </p>
+            ) : null}
+            {positionStats.items.length ? (
+              <p className="mt-2 text-xs text-slate-400">{t.overview.labels.positionDetailHint}</p>
+            ) : null}
+          </OverviewCard>
+        </div>
+
+        <OverviewCard title={t.overview.charts.age}>
+          <BarList
+            items={ageStats.items}
+            formatValue={(value) => `${formatNumber(value)} ${t.overview.labels.people}`}
             emptyLabel={t.overview.labels.noData}
-            labels={{
-              people: t.overview.labels.people,
-              payrollAverage: t.overview.labels.payrollAverage,
-            }}
           />
-          {contractCostStats.unknown ? (
+          {ageStats.missing ? (
             <p className="mt-2 text-xs text-slate-500">
-              {t.overview.labels.missingContractType}: {formatNumber(contractCostStats.unknown)}
+              {t.overview.labels.missingBirthDate}: {formatNumber(ageStats.missing)}
             </p>
           ) : null}
         </OverviewCard>
@@ -1647,25 +1978,61 @@ export function MembersOverviewTab({
           ) : null}
         </OverviewCard>
 
-        <OverviewCard title={t.overview.charts.contractExpiry} badge={t.overview.labels.localScope}>
-          <BarList
-            items={contractExpiryStats.items}
-            formatValue={(value) => `${formatNumber(value)} ${t.overview.labels.people}`}
-            emptyLabel={t.overview.labels.noData}
-          />
-          <div className="mt-2 flex flex-wrap gap-3 text-xs text-slate-500">
-            <span>
-              {t.overview.labels.overdue}: {formatNumber(contractExpiryStats.overdue)}
-            </span>
-            <span>
-              {t.overview.labels.beyond}: {formatNumber(contractExpiryStats.beyond)}
-            </span>
-            <span>
-              {t.overview.labels.missingContractDate}: {formatNumber(contractExpiryStats.missing)}
-            </span>
+        <div className="md:col-span-2 xl:col-span-1 flex h-full flex-col gap-6">
+          <div className="flex-1">
+            <OverviewCard title={t.overview.charts.contractCost} badge={t.overview.labels.localScope}>
+              <ContractCostBulletList
+                items={contractCostStats.items}
+                formatMoney={formatMoney}
+                formatNumber={formatNumber}
+                emptyLabel={t.overview.labels.noData}
+                labels={{
+                  people: t.overview.labels.people,
+                  payrollAverage: t.overview.labels.payrollAverage,
+                }}
+              />
+              {contractCostStats.unknown ? (
+                <p className="mt-2 text-xs text-slate-500">
+                  {t.overview.labels.missingContractType}: {formatNumber(contractCostStats.unknown)}
+                </p>
+              ) : null}
+            </OverviewCard>
           </div>
-        </OverviewCard>
+          <div className="flex-1">
+            <OverviewCard title={t.overview.charts.contractExpiry} badge={t.overview.labels.localScope}>
+              <BarList
+                items={contractExpiryStats.items}
+                formatValue={(value) => `${formatNumber(value)} ${t.overview.labels.people}`}
+                emptyLabel={t.overview.labels.noData}
+              />
+              <div className="mt-2 flex flex-wrap gap-3 text-xs text-slate-500">
+                <span>
+                  {t.overview.labels.overdue}: {formatNumber(contractExpiryStats.overdue)}
+                </span>
+                <span>
+                  {t.overview.labels.beyond}: {formatNumber(contractExpiryStats.beyond)}
+                </span>
+                <span>
+                  {t.overview.labels.missingContractDate}: {formatNumber(contractExpiryStats.missing)}
+                </span>
+              </div>
+            </OverviewCard>
+          </div>
+        </div>
       </div>
+
+      <PositionDetailModal
+        open={Boolean(activePositionGroup)}
+        title={
+          activePositionGroup
+            ? `${t.overview.labels.positionDetailTitle} · ${activePositionGroup.label}`
+            : ''
+        }
+        items={positionDetailItems}
+        formatValue={(value) => `${formatNumber(value)} ${t.overview.labels.people}`}
+        emptyLabel={t.overview.labels.noData}
+        onClose={() => setPositionGroupFocus(null)}
+      />
     </div>
   )
 }

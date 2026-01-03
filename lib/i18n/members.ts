@@ -53,6 +53,8 @@ export const memberCopy: Record<
         salary: string
         actualSalary: string
         contractCost: string
+        position: string
+        age: string
         tenure: string
         contractExpiry: string
       }
@@ -82,11 +84,33 @@ export const memberCopy: Record<
         modeDetail: string
         modeCompare: string
         scatterHint: string
+        missingBirthDate: string
+        missingPosition: string
+        positionDetailTitle: string
+        positionDetailHint: string
+        positionDetailClear: string
       }
       helpers: {
         salaryRule: string
         actualSalaryRule: string
+        positionRule: string
       }
+      positionGroups: Record<
+        | 'safetyHse'
+        | 'labQuality'
+        | 'plantQuarry'
+        | 'surveyTopo'
+        | 'maintenance'
+        | 'equipmentOps'
+        | 'driversTransport'
+        | 'livingServices'
+        | 'warehouseLogistics'
+        | 'supervision'
+        | 'adminSupport'
+        | 'siteWork'
+        | 'other',
+        string
+      >
     }
     stats: Record<'headcount' | 'active' | 'roles' | 'coverage', string>
     helpers: {
@@ -624,6 +648,8 @@ export const memberCopy: Record<
         salary: '合同薪资区间占比',
         actualSalary: '实发薪资区间占比',
         contractCost: '合同类型成本对比',
+        position: '岗位分布',
+        age: '年龄分布',
         tenure: '员工司龄分布',
         contractExpiry: '合同到期分布（未来 3 个月）',
       },
@@ -653,10 +679,31 @@ export const memberCopy: Record<
         modeDetail: '详情',
         modeCompare: '对比',
         scatterHint: '颜色=列内相对值。均/中：值越大，高薪越集中；接近 1，分布越均衡；过低提示异常。',
+        missingBirthDate: '未填写出生日期',
+        missingPosition: '未填写岗位',
+        positionDetailTitle: '岗位细分',
+        positionDetailHint: '点击分类查看细分',
+        positionDetailClear: '收起',
       },
       helpers: {
         salaryRule: '合同口径：CTJ 时薪按 22 天 × 8 小时折算月薪；月薪优先取实发工资，否则用基础工资 + 津贴。',
         actualSalaryRule: '实发口径：上月月中 + 月末汇总，仅计已发金额。',
+        positionRule: '岗位按关键词归一化，原始数据不变。',
+      },
+      positionGroups: {
+        safetyHse: '安全/HSE',
+        labQuality: '实验室/质量',
+        plantQuarry: '拌合站/破碎/采石',
+        surveyTopo: '测量',
+        maintenance: '维修/机电',
+        equipmentOps: '设备操作',
+        driversTransport: '驾驶/运输',
+        livingServices: '后勤/生活服务',
+        warehouseLogistics: '仓储/物流',
+        supervision: '领班/管理',
+        adminSupport: '行政/支持',
+        siteWork: '施工/土建',
+        other: '其他/未归一',
       },
     },
     stats: {
@@ -1211,6 +1258,8 @@ export const memberCopy: Record<
         salary: 'Répartition des salaires contractuels',
         actualSalary: 'Répartition des salaires versés',
         contractCost: 'Coût par type de contrat',
+        position: 'Répartition des postes',
+        age: 'Répartition par âge',
         tenure: 'Ancienneté',
         contractExpiry: 'Échéances de contrat (3 mois)',
       },
@@ -1240,12 +1289,33 @@ export const memberCopy: Record<
         modeDetail: 'Détail',
         modeCompare: 'Compare',
         scatterHint:
-        'Couleur = valeur relative par colonne. Moy./Méd. : plus la valeur est élevée, plus les hauts salaires sont concentrés ; proche de 1, plus la distribution est équilibrée ; trop faible indique une anomalie.',
+          'Couleur = valeur relative par colonne. Moy./Méd. : plus la valeur est élevée, plus les hauts salaires sont concentrés ; proche de 1, plus la distribution est équilibrée ; trop faible indique une anomalie.',
+        missingBirthDate: 'Date de naissance manquante',
+        missingPosition: 'Poste manquant',
+        positionDetailTitle: 'Détail des postes',
+        positionDetailHint: 'Cliquer sur une catégorie pour voir le détail',
+        positionDetailClear: 'Réduire',
       },
       helpers: {
         salaryRule:
           'Contrat : CTJ converti (22 j × 8 h); NET MENSUEL prioritaire, sinon salaire de base + prime.',
         actualSalaryRule: 'Versements : M-1 (run1 + run2), uniquement les montants versés.',
+        positionRule: 'Postes normalisés par mots-clés, données d’origine intactes.',
+      },
+      positionGroups: {
+        safetyHse: 'Sécurité/HSE',
+        labQuality: 'Laboratoire/Qualité',
+        plantQuarry: 'Centrale/Concassage/Carrière',
+        surveyTopo: 'TOPO',
+        maintenance: 'Maintenance/Électricité',
+        equipmentOps: 'Opérateurs d’Engins',
+        driversTransport: 'Chauffeurs/Transport',
+        livingServices: 'Services Généraux',
+        warehouseLogistics: 'Magasin/Logistique',
+        supervision: 'Encadrement',
+        adminSupport: 'Support/Administratif',
+        siteWork: 'Travaux/Maçonnerie',
+        other: 'Autres/Non Normalisé',
       },
     },
     stats: {
