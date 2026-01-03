@@ -1691,101 +1691,6 @@ export function MembersOverviewTab({
     setDetailAutoMonthsPending(true)
   }, [payrollMonthOptions])
 
-  // Fetch payroll data when permission is granted
-  useEffect(() => {
-    if (!canViewPayroll) return
-
-    let cancelled = false
-    const loadPayroll = async () => {
-      setPayrollReady(false)
-      const monthValues = detailAutoMonthsPending
-        ? payrollMonthOptions.map((option) => option.value)
-        : activePayrollMonths
-      const monthParams = monthValues
-        .map((value) => parseMonthValue(value))
-        .filter((value): value is { year: number; month: number } => Boolean(value))
-      const resolvedMonthParams = monthParams.length > 0 ? monthParams : [getLastMonthKey()]
-
-      try {
-        const payloads = await Promise.all(
-          resolvedMonthParams.map(({ year, month }) =>
-            fetch(`/api/payroll-runs?year=${year}&month=${month}`).then((res) => {
-              if (!res.ok) throw new Error('Failed to load payroll')
-              return res.json() as Promise<{
-                runs?: PayrollRun[]
-                payouts?: PayrollPayout[]
-                contractSnapshots?: PayrollContractSnapshotPayload[]
-              }>
-            }),
-          ),
-        )
-        if (cancelled) return
-        const nextPayouts = payloads.flatMap((data) =>
-          Array.isArray(data.payouts) ? data.payouts : [],
-        )
-        const nextRuns = payloads.flatMap((data) => (Array.isArray(data.runs) ? data.runs : []))
-        const runsById = new Map<number, PayrollRun>()
-        nextRuns.forEach((run) => {
-          runsById.set(run.id, run)
-        })
-        const snapshotsByRunId: Record<number, Record<number, PayrollContractSnapshot>> = {}
-        payloads.forEach((data) => {
-          const snapshots = Array.isArray(data.contractSnapshots) ? data.contractSnapshots : []
-          snapshots.forEach((snapshot) => {
-            const contracts: Record<number, PayrollContractSnapshot> = {}
-            Object.entries(snapshot.contracts ?? {}).forEach(([userId, contract]) => {
-              const id = Number(userId)
-              if (Number.isNaN(id)) return
-              contracts[id] = contract
-            })
-            snapshotsByRunId[snapshot.runId] = contracts
-          })
-        })
-        setPayrollPayouts(nextPayouts)
-        setPayrollRuns(Array.from(runsById.values()))
-        setPayrollContractSnapshots(snapshotsByRunId)
-        setPayrollReady(true)
-
-        if (detailAutoMonthsPending) {
-          const monthSet = new Set<string>()
-          const memberIds = detailMemberIdsRef.current
-          nextPayouts.forEach((payout) => {
-            if (!memberIds.has(payout.userId)) return
-            const run = runsById.get(payout.runId)
-            const key = run
-              ? formatMonthValue(run.year, run.month)
-              : payout.payoutDate.slice(0, 7)
-            monthSet.add(key)
-          })
-          const available = sortMonthValues(Array.from(monthSet))
-          const fallback = sortMonthValues(payrollMonthOptions.map((option) => option.value))
-          const optionValues = available.length > 0 ? available : fallback
-          const selection = optionValues.slice(-5)
-          setDetailMonthOptions(optionValues)
-          if (selection.length > 0) {
-            setPayrollMonthFilters(selection)
-          }
-          setDetailAutoMonthsPending(false)
-        }
-      } catch {
-        if (cancelled) return
-        setPayrollPayouts([])
-        setPayrollRuns([])
-        setPayrollContractSnapshots({})
-        setPayrollReady(false)
-        if (detailAutoMonthsPending) {
-          setDetailAutoMonthsPending(false)
-        }
-      }
-    }
-
-    void loadPayroll()
-
-    return () => {
-      cancelled = true
-    }
-  }, [canViewPayroll, activePayrollMonths, detailAutoMonthsPending, payrollMonthOptions])
-
   const showTeamPayroll = canViewPayroll && payrollReady
 
   const payrollPayoutsByMemberId = useMemo(() => {
@@ -2235,6 +2140,104 @@ export function MembersOverviewTab({
   useEffect(() => {
     detailMemberIdsRef.current = detailMemberIds
   }, [detailMemberIds])
+
+  const detailMemberIdParam = useMemo(() => {
+    if (viewMode !== 'detail') return ''
+    const ids = Array.from(detailMemberIds).sort((a, b) => a - b)
+    return ids.length > 0 ? ids.join(',') : ''
+  }, [detailMemberIds, viewMode])
+
+  // Fetch payroll data when permission is granted
+  useEffect(() => {
+    if (!canViewPayroll) return
+
+    let cancelled = false
+    const loadPayroll = async () => {
+      setPayrollReady(false)
+      const monthValues = detailAutoMonthsPending
+        ? payrollMonthOptions.map((option) => option.value)
+        : activePayrollMonths
+
+      try {
+        const monthsParam = monthValues.join(',')
+        const params = new URLSearchParams()
+        params.set('months', monthsParam)
+        if (detailMemberIdParam) params.set('memberIds', detailMemberIdParam)
+        const res = await fetch(`/api/payroll-runs?${params.toString()}`)
+        if (!res.ok) throw new Error('Failed to load payroll')
+        const payload = (await res.json()) as {
+          runs?: PayrollRun[]
+          payouts?: PayrollPayout[]
+          contractSnapshots?: PayrollContractSnapshotPayload[]
+        }
+        if (cancelled) return
+        const nextPayouts = Array.isArray(payload.payouts) ? payload.payouts : []
+        const nextRuns = Array.isArray(payload.runs) ? payload.runs : []
+        const runsById = new Map<number, PayrollRun>()
+        nextRuns.forEach((run) => {
+          runsById.set(run.id, run)
+        })
+        const snapshotsByRunId: Record<number, Record<number, PayrollContractSnapshot>> = {}
+        const snapshots = Array.isArray(payload.contractSnapshots) ? payload.contractSnapshots : []
+        snapshots.forEach((snapshot) => {
+          const contracts: Record<number, PayrollContractSnapshot> = {}
+          Object.entries(snapshot.contracts ?? {}).forEach(([userId, contract]) => {
+            const id = Number(userId)
+            if (Number.isNaN(id)) return
+            contracts[id] = contract
+          })
+          snapshotsByRunId[snapshot.runId] = contracts
+        })
+        setPayrollPayouts(nextPayouts)
+        setPayrollRuns(Array.from(runsById.values()))
+        setPayrollContractSnapshots(snapshotsByRunId)
+        setPayrollReady(true)
+
+        if (detailAutoMonthsPending) {
+          const monthSet = new Set<string>()
+          const memberIds = detailMemberIdsRef.current
+          nextPayouts.forEach((payout) => {
+            if (!memberIds.has(payout.userId)) return
+            const run = runsById.get(payout.runId)
+            const key = run
+              ? formatMonthValue(run.year, run.month)
+              : payout.payoutDate.slice(0, 7)
+            monthSet.add(key)
+          })
+          const available = sortMonthValues(Array.from(monthSet))
+          const fallback = sortMonthValues(payrollMonthOptions.map((option) => option.value))
+          const optionValues = available.length > 0 ? available : fallback
+          const selection = optionValues.slice(-5)
+          setDetailMonthOptions(optionValues)
+          if (selection.length > 0) {
+            setPayrollMonthFilters(selection)
+          }
+          setDetailAutoMonthsPending(false)
+        }
+      } catch {
+        if (cancelled) return
+        setPayrollPayouts([])
+        setPayrollRuns([])
+        setPayrollContractSnapshots({})
+        setPayrollReady(false)
+        if (detailAutoMonthsPending) {
+          setDetailAutoMonthsPending(false)
+        }
+      }
+    }
+
+    void loadPayroll()
+
+    return () => {
+      cancelled = true
+    }
+  }, [
+    canViewPayroll,
+    activePayrollMonths,
+    detailAutoMonthsPending,
+    payrollMonthOptions,
+    detailMemberIdParam,
+  ])
 
   const positionStats = useMemo(() => {
     const positionMembers = localMembers.filter((member) => member.nationality !== 'china')
