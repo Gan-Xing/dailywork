@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 
 import { MultiSelectFilter, type MultiSelectOption } from '@/components/MultiSelectFilter'
 import type { Locale } from '@/lib/i18n'
@@ -748,64 +748,231 @@ const LineChart = ({
   formatValue: (value: number) => string
   emptyLabel: string
 }) => {
-  const gradientId = useId()
-  if (items.length === 0) {
-    return <p className="text-sm text-slate-500">{emptyLabel}</p>
+  const containerRef = useRef<HTMLDivElement>(null)
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
+  const [size, setSize] = useState({ width: 0, height: 0 })
+
+  useEffect(() => {
+    if (!containerRef.current) return
+    const resizeObserver = new ResizeObserver((entries) => {
+      const entry = entries[0]
+      setSize({ width: entry.contentRect.width, height: entry.contentRect.height })
+    })
+    resizeObserver.observe(containerRef.current)
+    return () => resizeObserver.disconnect()
+  }, [])
+
+  const chart = useMemo(() => {
+    if (items.length === 0 || size.width === 0 || size.height === 0) return null
+    const padding = { top: 14, bottom: 18, left: 10, right: 10 }
+    const values = items.map((item) => item.value)
+    const dataMin = Math.min(...values)
+    const dataMax = Math.max(...values)
+    const rangePadding = (dataMax - dataMin) * 0.2
+    const effectivePadding = rangePadding === 0 ? (dataMax * 0.1 || 10) : rangePadding
+    const minValue = Math.max(0, dataMin - effectivePadding)
+    const maxValue = dataMax + effectivePadding
+    const range = maxValue - minValue || 1
+    const plotWidth = size.width - padding.left - padding.right
+    const plotHeight = size.height - padding.top - padding.bottom
+    const points = items.map((item, index) => {
+      const x =
+        items.length === 1
+          ? padding.left + plotWidth / 2
+          : padding.left + (index / (items.length - 1)) * plotWidth
+      const normalized = (item.value - minValue) / range
+      const y = padding.top + (1 - normalized) * plotHeight
+      return {
+        x,
+        y,
+        xPercent: size.width ? (x / size.width) * 100 : 0,
+        yPercent: size.height ? (y / size.height) * 100 : 0,
+        value: item.value,
+        label: item.label,
+      }
+    })
+    return {
+      padding,
+      plotWidth,
+      plotHeight,
+      minValue,
+      maxValue,
+      points,
+    }
+  }, [items, size.height, size.width])
+
+  useEffect(() => {
+    if (!canvasRef.current || !chart) return
+    const canvas = canvasRef.current
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    const dpr = window.devicePixelRatio || 1
+    canvas.width = size.width * dpr
+    canvas.height = size.height * dpr
+    canvas.style.width = `${size.width}px`
+    canvas.style.height = `${size.height}px`
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+    ctx.clearRect(0, 0, size.width, size.height)
+
+    const { padding, plotHeight, points } = chart
+
+    ctx.strokeStyle = '#f1f5f9'
+    ctx.lineWidth = 1
+    points.forEach((point) => {
+      ctx.beginPath()
+      ctx.moveTo(point.x, padding.top)
+      ctx.lineTo(point.x, padding.top + plotHeight)
+      ctx.stroke()
+    })
+
+    if (points.length === 0) return
+    const gradient = ctx.createLinearGradient(0, padding.top, 0, padding.top + plotHeight)
+    gradient.addColorStop(0, 'rgba(99,102,241,0.18)')
+    gradient.addColorStop(1, 'rgba(99,102,241,0)')
+    ctx.beginPath()
+    ctx.moveTo(points[0].x, padding.top + plotHeight)
+    points.forEach((point) => {
+      ctx.lineTo(point.x, point.y)
+    })
+    ctx.lineTo(points[points.length - 1].x, padding.top + plotHeight)
+    ctx.closePath()
+    ctx.fillStyle = gradient
+    ctx.fill()
+
+    ctx.strokeStyle = '#6366f1'
+    ctx.lineWidth = 2
+    ctx.lineJoin = 'round'
+    ctx.lineCap = 'round'
+    ctx.beginPath()
+    points.forEach((point, index) => {
+      if (index === 0) ctx.moveTo(point.x, point.y)
+      else ctx.lineTo(point.x, point.y)
+    })
+    ctx.stroke()
+
+    if (hoveredIndex !== null && points[hoveredIndex]) {
+      ctx.save()
+      ctx.strokeStyle = 'rgba(148,163,184,0.8)'
+      ctx.setLineDash([4, 4])
+      ctx.beginPath()
+      ctx.moveTo(points[hoveredIndex].x, padding.top)
+      ctx.lineTo(points[hoveredIndex].x, padding.top + plotHeight)
+      ctx.stroke()
+      ctx.restore()
+    }
+
+    points.forEach((point, idx) => {
+      const isActive = idx === hoveredIndex
+      const radius = isActive ? 4 : 2
+      ctx.beginPath()
+      ctx.arc(point.x, point.y, radius, 0, Math.PI * 2)
+      ctx.fillStyle = isActive ? '#ffffff' : '#6366f1'
+      ctx.strokeStyle = isActive ? '#6366f1' : '#ffffff'
+      ctx.lineWidth = isActive ? 2 : 1
+      ctx.fill()
+      ctx.stroke()
+    })
+
+    ctx.font = '10px system-ui, -apple-system, sans-serif'
+    points.forEach((point, idx) => {
+      const isFirst = idx === 0
+      const isLast = idx === items.length - 1
+      const isActive = idx === hoveredIndex
+      const showDense = items.length <= 6
+      const showAlternate = items.length <= 12 && idx % 2 === 0
+      const shouldShow = isActive || showDense || showAlternate || isFirst || isLast
+      if (!shouldShow) return
+      ctx.fillStyle = isActive ? 'rgba(51,65,85,0.9)' : 'rgba(100,116,139,0.55)'
+      const text = formatValue(point.value)
+      const textWidth = ctx.measureText(text).width
+      const x =
+        isFirst ? point.x : isLast ? point.x - textWidth : point.x - textWidth / 2
+      const y = Math.max(point.y - 8, padding.top + 6)
+      ctx.fillText(text, x, y)
+    })
+  }, [chart, hoveredIndex, items.length, formatValue, size.height, size.width])
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!size.width || items.length <= 1) return
+    const rect = containerRef.current?.getBoundingClientRect()
+    if (!rect) return
+    const x = e.clientX - rect.left
+    const percent = Math.max(0, Math.min(1, x / rect.width))
+    const index = Math.round(percent * (items.length - 1))
+    setHoveredIndex(index)
   }
-  const values = items.map((item) => item.value)
-  const maxValue = Math.max(...values, 0)
-  const minValue = Math.min(...values, 0)
-  const range = maxValue - minValue || 1
-  const points = items.map((item, index) => {
-    const x = items.length === 1 ? 50 : (index / (items.length - 1)) * 100
-    const y = 100 - ((item.value - minValue) / range) * 100
-    return { x, y, value: item.value, label: item.label }
-  })
-  const linePoints = points.map((point) => `${point.x},${point.y}`).join(' ')
-  const areaPoints = `0,100 ${linePoints} 100,100`
+
+  const handleMouseLeave = () => {
+    setHoveredIndex(null)
+  }
+
+  if (items.length === 0) {
+    return (
+      <div className="flex h-full items-center justify-center p-4">
+        <p className="text-sm font-medium text-slate-400">{emptyLabel}</p>
+      </div>
+    )
+  }
+
+  const activePoint = hoveredIndex !== null && chart ? chart.points[hoveredIndex] : null
 
   return (
-    <div className="space-y-3">
-      <div className="relative h-40 w-full">
-        <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="h-full w-full">
-          <defs>
-            <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.25" />
-              <stop offset="100%" stopColor="#38bdf8" stopOpacity="0" />
-            </linearGradient>
-          </defs>
-          <polygon points={areaPoints} fill={`url(#${gradientId})`} />
-          <polyline
-            points={linePoints}
-            fill="none"
-            stroke="#0ea5e9"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          {points.map((point) => (
-            <circle
-              key={point.label}
-              cx={point.x}
-              cy={point.y}
-              r="2.5"
-              fill="#0ea5e9"
-              stroke="#fff"
-              strokeWidth="1"
-            />
-          ))}
-        </svg>
-        <div className="absolute inset-0 flex items-start justify-between text-[10px] text-slate-400">
-          <span>{formatValue(maxValue)}</span>
-          <span>{formatValue(minValue)}</span>
-        </div>
+    <div
+      className="group relative w-full select-none pt-2 pb-2"
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
+    >
+      <div ref={containerRef} className="relative h-56 w-full cursor-crosshair">
+        <canvas ref={canvasRef} className="h-full w-full" />
+
+        {activePoint ? (
+          <div
+            className="absolute pointer-events-none z-10 -translate-x-1/2 -translate-y-full px-2 pb-2 transition-all duration-75 ease-out"
+            style={{
+              left: `${activePoint.xPercent}%`,
+              top: `${activePoint.yPercent}%`,
+            }}
+          >
+            <div className="flex flex-col items-center rounded-lg bg-slate-900/90 px-2 py-1 text-white shadow-xl backdrop-blur-sm">
+              <span className="text-[10px] font-medium leading-none">{activePoint.label}</span>
+              <span className="mt-0.5 text-[11px] font-semibold leading-none">
+                {formatValue(activePoint.value)}
+              </span>
+              <div className="absolute -bottom-1 left-1/2 h-2 w-2 -translate-x-1/2 rotate-45 bg-slate-900/90" />
+            </div>
+          </div>
+        ) : null}
       </div>
-      <div className="flex justify-between text-[10px] text-slate-500">
-        {items.map((item) => (
-          <span key={item.label} className="truncate">
-            {item.label}
-          </span>
-        ))}
+
+      <div
+        className="mt-3 grid gap-2 text-[10px]"
+        style={{ gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))` }}
+      >
+        {items.map((item, idx) => {
+          const isActive = idx === hoveredIndex
+          const valueLabel = formatValue(item.value)
+          return (
+            <div key={item.label} className="flex min-w-0 flex-col items-center">
+              <span
+                className={`max-w-full truncate text-[10px] font-semibold ${
+                  isActive ? 'text-slate-900' : 'text-slate-500'
+                }`}
+                title={valueLabel}
+              >
+                {valueLabel}
+              </span>
+              <span
+                className={`max-w-full truncate text-[9px] ${
+                  isActive ? 'text-indigo-600 font-semibold' : 'text-slate-400'
+                }`}
+                title={item.label}
+              >
+                {item.label}
+              </span>
+            </div>
+          )
+        })}
       </div>
     </div>
   )

@@ -6,7 +6,9 @@ Centralized planning lives in `docs/` (`PROJECT_PLAN.md`, `PROMPT_GUIDE.md`, `sc
 ## Build, Test, and Development Commands
 - `npm install` – bootstrap dependencies, including Next.js, Prisma/Drizzle, and testing stacks.
 - `npm run dev` – launch the local Next.js server; export `DATABASE_URL=postgres://localhost:5432/daily_report` beforehand so server actions reach Postgres.
-- `npx prisma migrate dev` – update the local schema whenever `docs/schema-fields.md` changes, followed by `npm run db:seed` if seed scripts exist.
+- `prisma migrate deploy` – apply migrations in non-dev environments (do not run `npx prisma migrate dev`).
+- 绝对不要使用 `npx prisma migrate dev`，绝对不能执行 `npx prisma migrate dev`，把这部分留给我自己处理，我只需要执行 `prisma migrate deploy`，dev 会有删除数据库的风险，绝对不能做！
+- Never run `npx prisma migrate dev`; leave this to the user and use `prisma migrate deploy` only because `dev` can reset or delete data.
 - `npm run lint` – execute ESLint + Prettier checks; fix violations before committing.
 - `npm run test` – run the unit/integration suite (Vitest or Jest); add `--runInBand` if Postgres-backed tests need serialized execution.
 
