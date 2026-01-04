@@ -108,6 +108,9 @@ type ColumnOption = {
   label: string
 }
 
+type SortDirection = 'asc' | 'desc'
+type SortState = { key: ColumnKey; direction: SortDirection } | null
+
 const defaultVisibleColumns: ColumnKey[] = [
   'code',
   'projectName',
@@ -126,6 +129,7 @@ const defaultVisibleColumns: ColumnKey[] = [
 ]
 
 const signatureKeys = new Set(['signature', 'senderSignature', 'recipientSignature'])
+const sortableColumns = new Set<ColumnKey>(['code', 'subject', 'senderDate', 'submissionCreatedAt', 'designation'])
 
 const formatJson = (value: unknown) => {
   if (value === null || value === undefined) return ''
@@ -154,6 +158,58 @@ const displayValue = (value: unknown) => {
   return String(value)
 }
 
+const parseDateValue = (value: string) => {
+  if (!value) return null
+  const timestamp = Date.parse(value)
+  return Number.isNaN(timestamp) ? null : timestamp
+}
+
+const parseNumberFromString = (value: string) => {
+  const match = value.match(/(\d+)/)
+  if (!match) return null
+  const parsed = Number(match[1])
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+const normalizeText = (value: string) => value.trim().toLowerCase()
+
+const isEmptySortValue = (value: string | number | null) =>
+  value === null || value === undefined || (typeof value === 'string' && value.trim() === '')
+
+const getSortValue = (row: SubmissionRow, key: ColumnKey): string | number | null => {
+  switch (key) {
+    case 'code': {
+      if (typeof row.submissionNumber === 'number') return row.submissionNumber
+      const numeric = parseNumberFromString(row.code)
+      return numeric ?? normalizeText(row.code)
+    }
+    case 'subject':
+      return normalizeText(row.subject)
+    case 'designation':
+      return normalizeText(row.designation)
+    case 'senderDate': {
+      const parsed = parseDateValue(row.senderDate)
+      return parsed ?? normalizeText(row.senderDate)
+    }
+    case 'submissionCreatedAt': {
+      const parsed = parseDateValue(row.submissionCreatedAt)
+      return parsed ?? normalizeText(row.submissionCreatedAt)
+    }
+    default:
+      return null
+  }
+}
+
+const compareSortValues = (a: string | number | null, b: string | number | null, locale: string) => {
+  const aEmpty = isEmptySortValue(a)
+  const bEmpty = isEmptySortValue(b)
+  if (aEmpty && bEmpty) return 0
+  if (aEmpty) return 1
+  if (bEmpty) return -1
+  if (typeof a === 'number' && typeof b === 'number') return a - b
+  return String(a).localeCompare(String(b), locale, { numeric: true, sensitivity: 'base' })
+}
+
 type SubmissionsTableProps = {
   rows: SubmissionRow[]
   canUpdate?: boolean
@@ -169,6 +225,10 @@ export default function SubmissionsTable({ rows, canUpdate = false, canDelete = 
   const [loadingAction, setLoadingAction] = useState(false)
   const [visibleColumns, setVisibleColumns] = useState<ColumnKey[]>(() => defaultVisibleColumns)
   const [showColumnSelector, setShowColumnSelector] = useState(false)
+  const [sortState, setSortState] = useState<SortState>(null)
+  const [page, setPage] = useState(1)
+  const [pageInput, setPageInput] = useState('1')
+  const [pageSize, setPageSize] = useState(20)
   const columnSelectorRef = useRef<HTMLDivElement | null>(null)
 
   const columnLabels = copy.submissionsTable.columns
@@ -224,13 +284,34 @@ export default function SubmissionsTable({ rows, canUpdate = false, canDelete = 
     [columnLabels],
   )
 
-  const allSelected = selected.length > 0 && selected.length === new Set(data.map((r) => r.docId)).size
   const isVisible = (key: ColumnKey) => visibleColumns.includes(key)
   const columnCount = columnOptions.filter((option) => isVisible(option.key)).length + 1
+  const sortedData = useMemo(() => {
+    if (!sortState) return data
+    const { key, direction } = sortState
+    const multiplier = direction === 'asc' ? 1 : -1
+    const stabilized = data.map((row, index) => ({ row, index }))
+    stabilized.sort((a, b) => {
+      const result = compareSortValues(getSortValue(a.row, key), getSortValue(b.row, key), locale)
+      if (result !== 0) return result * multiplier
+      return a.index - b.index
+    })
+    return stabilized.map((item) => item.row)
+  }, [data, sortState, locale])
+  const totalPages = Math.max(1, Math.ceil(sortedData.length / pageSize))
+  const pagedData = useMemo(() => {
+    const start = (page - 1) * pageSize
+    return sortedData.slice(start, start + pageSize)
+  }, [page, pageSize, sortedData])
+  const pageDocIds = useMemo(() => Array.from(new Set(pagedData.map((row) => row.docId))), [pagedData])
+  const allSelected = pageDocIds.length > 0 && pageDocIds.every((id) => selected.includes(id))
+  const dataDocIds = useMemo(() => new Set(data.map((row) => row.docId)), [data])
 
   useEffect(() => {
     setData(rows)
     setSelected([])
+    setPage(1)
+    setPageInput('1')
   }, [rows])
 
   useEffect(() => {
@@ -242,6 +323,20 @@ export default function SubmissionsTable({ rows, canUpdate = false, canDelete = 
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
+
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages)
+    }
+  }, [page, totalPages])
+
+  useEffect(() => {
+    setPageInput(String(page))
+  }, [page])
+
+  useEffect(() => {
+    setSelected((prev) => prev.filter((id) => dataDocIds.has(id)))
+  }, [dataDocIds])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -281,8 +376,11 @@ export default function SubmissionsTable({ rows, canUpdate = false, canDelete = 
   const handleClearColumns = () => persistVisibleColumns([])
 
   const toggleAll = () => {
-    if (allSelected) setSelected([])
-    else setSelected(Array.from(new Set(data.map((r) => r.docId))))
+    if (allSelected) {
+      setSelected((prev) => prev.filter((id) => !pageDocIds.includes(id)))
+    } else {
+      setSelected((prev) => Array.from(new Set([...prev, ...pageDocIds])))
+    }
   }
 
   const toggleOne = (id: number) => {
@@ -294,6 +392,15 @@ export default function SubmissionsTable({ rows, canUpdate = false, canDelete = 
       ? visibleColumns.filter((item) => item !== key)
       : [...visibleColumns, key]
     persistVisibleColumns(next)
+  }
+
+  const toggleSort = (key: ColumnKey) => {
+    if (!sortableColumns.has(key)) return
+    setSortState((prev) => {
+      if (!prev || prev.key !== key) return { key, direction: 'asc' }
+      if (prev.direction === 'asc') return { key, direction: 'desc' }
+      return null
+    })
   }
 
   const callBulk = async (body: Record<string, unknown>) => {
@@ -563,15 +670,37 @@ export default function SubmissionsTable({ rows, canUpdate = false, canDelete = 
                   <th
                     key={option.key}
                     className={`px-4 py-3 text-left ${option.key === 'action' ? 'text-right' : ''}`}
+                    aria-sort={
+                      sortableColumns.has(option.key)
+                        ? sortState?.key === option.key
+                          ? sortState.direction === 'asc'
+                            ? 'ascending'
+                            : 'descending'
+                          : 'none'
+                        : undefined
+                    }
                   >
-                    {option.label}
+                    {sortableColumns.has(option.key) ? (
+                      <button
+                        type="button"
+                        onClick={() => toggleSort(option.key)}
+                        className="group inline-flex items-center gap-2 text-left"
+                      >
+                        <span>{option.label}</span>
+                        <span className="text-[10px] text-slate-400 group-hover:text-slate-600">
+                          {sortState?.key === option.key ? (sortState.direction === 'asc' ? '^' : 'v') : '-'}
+                        </span>
+                      </button>
+                    ) : (
+                      option.label
+                    )}
                   </th>
                 ) : null,
               )}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {data.map((row) => {
+            {pagedData.map((row) => {
               const checked = selected.includes(row.docId)
               return (
                 <tr key={`${row.docId}-${row.itemId ?? 'na'}`} className="text-sm text-slate-800">
@@ -602,6 +731,83 @@ export default function SubmissionsTable({ rows, canUpdate = false, canDelete = 
             ) : null}
           </tbody>
         </table>
+      </div>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 px-4 py-3 text-xs text-slate-600">
+        <span>
+          {formatCopy(copy.submissionsTable.pagination.summary, {
+            total: sortedData.length,
+            page,
+            totalPages,
+          })}
+        </span>
+        <div className="flex items-center gap-2">
+          <label className="flex items-center gap-2 text-xs text-slate-600">
+            <span className="text-slate-400">{copy.submissionsTable.pagination.pageSizeLabel}</span>
+            <select
+              value={pageSize}
+              onChange={(e) => {
+                const value = Number(e.target.value)
+                if (!Number.isFinite(value)) return
+                setPageSize(value)
+                setPage(1)
+              }}
+              className="h-8 rounded-full border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 focus:border-emerald-400 focus:outline-none"
+              aria-label={copy.submissionsTable.pagination.pageSizeLabel}
+            >
+              {[10, 20, 30, 50, 100].map((size) => (
+                <option key={size} value={size}>
+                  {size}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button
+            type="button"
+            className="rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-700 hover:border-slate-300 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={page <= 1}
+            onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+          >
+            {copy.submissionsTable.pagination.prev}
+          </button>
+          <div className="flex items-center gap-1 text-xs text-slate-600">
+            <input
+              type="number"
+              min={1}
+              max={totalPages}
+              value={pageInput}
+              onChange={(e) => setPageInput(e.target.value)}
+              onBlur={() => {
+                const value = Number(pageInput)
+                if (!Number.isFinite(value)) {
+                  setPageInput(String(page))
+                  return
+                }
+                const next = Math.min(totalPages, Math.max(1, Math.round(value)))
+                if (next !== page) setPage(next)
+                setPageInput(String(next))
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  const value = Number(pageInput)
+                  const next = Number.isFinite(value) ? Math.min(totalPages, Math.max(1, Math.round(value))) : page
+                  if (next !== page) setPage(next)
+                  setPageInput(String(next))
+                }
+              }}
+              className="h-8 w-14 rounded-full border border-slate-200 bg-white px-2 py-1 text-center text-xs text-slate-700 focus:border-emerald-400 focus:outline-none"
+              aria-label={copy.submissionsTable.pagination.goTo}
+            />
+            <span className="text-slate-400">/ {totalPages}</span>
+          </div>
+          <button
+            type="button"
+            className="rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-700 hover:border-slate-300 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={page >= totalPages}
+            onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
+          >
+            {copy.submissionsTable.pagination.next}
+          </button>
+        </div>
       </div>
     </div>
   )

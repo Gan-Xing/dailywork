@@ -93,6 +93,13 @@ export type DocumentsCopy = {
   submissionsTable: {
     title: string
     columns: Record<string, string>
+    pagination: {
+      summary: string
+      prev: string
+      next: string
+      goTo: string
+      pageSizeLabel: string
+    }
     columnSelector: {
       selectedTemplate: string
       noneSelected: string
@@ -478,6 +485,13 @@ export const documentsCopy: Record<Locale, DocumentsCopy> = {
         updatedById: '更新人ID',
         action: '操作',
       },
+      pagination: {
+        summary: '共 {total} 条 · 第 {page}/{totalPages} 页',
+        prev: '上一页',
+        next: '下一页',
+        goTo: '跳转页码',
+        pageSizeLabel: '每页条数',
+      },
       columnSelector: {
         selectedTemplate: '已选 {count} 列',
         noneSelected: '未选择列',
@@ -860,6 +874,13 @@ export const documentsCopy: Record<Locale, DocumentsCopy> = {
         updatedBy: 'Mis à jour par',
         updatedById: 'ID modificateur',
         action: 'Actions',
+      },
+      pagination: {
+        summary: '{total} éléments · Page {page}/{totalPages}',
+        prev: 'Précédent',
+        next: 'Suivant',
+        goTo: 'Aller à la page',
+        pageSizeLabel: 'Éléments par page',
       },
       columnSelector: {
         selectedTemplate: '{count} colonnes sélectionnées',

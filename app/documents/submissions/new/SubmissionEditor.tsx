@@ -57,7 +57,7 @@ const buildDefaultData = (): SubmissionData => {
         firstName: '',
       },
     },
-    items: [{ designation: '', quantity: undefined, observation: '' }],
+    items: [{ designation: '', quantity: 1, observation: '' }],
     comments: '',
   }
 }
@@ -485,13 +485,13 @@ export default function SubmissionEditor({ initialSubmission, canManage = false,
   }
 
   const addItem = () => {
-    setData((prev) => ({ ...prev, items: [...(prev.items || []), { designation: '', quantity: undefined, observation: '' }] }))
+    setData((prev) => ({ ...prev, items: [...(prev.items || []), { designation: '', quantity: 1, observation: '' }] }))
   }
 
   const updateItem = (index: number, key: keyof SubmissionItem, value: string) => {
     setData((prev) => {
       const nextItems = [...(prev.items || [])]
-      const existing = nextItems[index] || { designation: '', quantity: undefined, observation: '' }
+      const existing = nextItems[index] || { designation: '', quantity: 1, observation: '' }
       const updated: SubmissionItem = { ...existing, [key]: key === 'quantity' ? Number(value) || undefined : value }
       nextItems[index] = updated
       return { ...prev, items: nextItems }

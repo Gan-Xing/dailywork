@@ -24,6 +24,15 @@ export default async function SubmissionEditPage({ params }: { params: Promise<{
   if (!submission) return notFound()
 
   const submissionNumber = submission.submission?.submissionNumber ?? null
+  const normalizeItems = (
+    items: Array<{ designation?: string | null; quantity?: number | null; observation?: string | null }> = [],
+  ) =>
+    items.map((item) => ({
+      designation: item.designation ?? '',
+      quantity: Number.isFinite(item.quantity) ? (item.quantity as number) : 1,
+      observation: item.observation ?? undefined,
+    }))
+  const fallbackItems = Array.isArray((submission.data as any)?.items) ? ((submission.data as any)?.items as any[]) : []
 
   const data: SubmissionData = {
     documentMeta: {
@@ -56,12 +65,14 @@ export default async function SubmissionEditPage({ params }: { params: Promise<{
     },
     items:
       submission.items?.length && submission.items.length > 0
-        ? submission.items.map((it) => ({
-            designation: it.designation,
-            quantity: it.quantity ?? undefined,
-            observation: it.observation ?? undefined,
-          }))
-        : (submission.data as any)?.items ?? [],
+        ? normalizeItems(
+            submission.items.map((it) => ({
+              designation: it.designation,
+              quantity: it.quantity ?? null,
+              observation: it.observation ?? null,
+            })),
+          )
+        : normalizeItems(fallbackItems),
     comments: submission.submission?.comments ?? (submission.data as any)?.comments ?? '',
   }
 
