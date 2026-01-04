@@ -777,6 +777,7 @@ export function useMemberImportExport({
     [
       canCreateMember,
       canAssignRole,
+      canDeleteMember,
       rolesData,
       importHeaderMap,
       nationalityLookup,

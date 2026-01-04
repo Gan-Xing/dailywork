@@ -1169,7 +1169,6 @@ const ContractExpiryModal = ({
     close: string
   }
 }) => {
-  if (!open) return null
   const [sortKey, setSortKey] = useState<ContractExpirySortKey>('team')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
   const collator = useMemo(
@@ -1243,6 +1242,7 @@ const ContractExpiryModal = ({
     })
     return list
   }, [collator, rows, sortDirection, sortKey])
+  if (!open) return null
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 px-4 py-6">
       <div className="w-full max-w-6xl max-h-[calc(100vh-3rem)] overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl shadow-slate-900/30">
@@ -3980,10 +3980,7 @@ export function MembersOverviewTab({
     dataQualityModal,
     onRefreshMembers,
     t.errors.needMemberUpdate,
-    t.feedback.bulkSaveEmpty,
-    t.feedback.bulkSavePartial,
-    t.feedback.bulkSaveSuccess,
-    t.feedback.submitError,
+    t.feedback,
   ])
 
   const detailMemberIds = useMemo(() => new Set(detailMembers.map((member) => member.id)), [detailMembers])
