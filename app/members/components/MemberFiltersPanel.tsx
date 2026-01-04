@@ -141,6 +141,7 @@ type MemberFiltersPanelProps = {
   setHealthStatusFilters: (value: string[]) => void
   setCreatedAtFilters: (value: string[]) => void
   setUpdatedAtFilters: (value: string[]) => void
+  isViewerChinese: boolean
 }
 
 const sectionBaseClasses =
@@ -291,6 +292,7 @@ export function MemberFiltersPanel({
   setHealthStatusFilters,
   setCreatedAtFilters,
   setUpdatedAtFilters,
+  isViewerChinese,
 }: MemberFiltersPanelProps) {
   const sharedFilterProps = { ...filterControlProps, className: 'w-full' }
 
@@ -525,95 +527,97 @@ export function MemberFiltersPanel({
         </div>
       </section>
 
-      <section className={sectionBaseClasses}>
-        <SectionTitle label={t.fieldGroups.chineseProfile} theme="rose" />
-        <div className={sectionGridClasses}>
-          <MultiSelectFilter
-            label={t.table.frenchName}
-            options={frenchNameFilterOptions}
-            selected={frenchNameFilters}
-            onChange={setFrenchNameFilters}
-            {...sharedFilterProps}
-          />
-          <MultiSelectFilter
-            label={t.table.idNumber}
-            options={idNumberFilterOptions}
-            selected={idNumberFilters}
-            onChange={setIdNumberFilters}
-            {...sharedFilterProps}
-          />
-          <MultiSelectFilter
-            label={t.table.passportNumber}
-            options={passportNumberFilterOptions}
-            selected={passportNumberFilters}
-            onChange={setPassportNumberFilters}
-            {...sharedFilterProps}
-          />
-          <MultiSelectFilter
-            label={t.table.educationAndMajor}
-            options={educationAndMajorFilterOptions}
-            selected={educationAndMajorFilters}
-            onChange={setEducationAndMajorFilters}
-            {...sharedFilterProps}
-          />
-          <MultiSelectFilter
-            label={t.table.certifications}
-            options={certificationsFilterOptions}
-            selected={certificationsFilters}
-            onChange={setCertificationsFilters}
-            {...sharedFilterProps}
-          />
-          <MultiSelectFilter
-            label={t.table.domesticMobile}
-            options={domesticMobileFilterOptions}
-            selected={domesticMobileFilters}
-            onChange={setDomesticMobileFilters}
-            {...sharedFilterProps}
-          />
-          <MultiSelectFilter
-            label={t.table.redBookValidYears}
-            options={redBookValidYearsFilterOptions}
-            selected={redBookValidYearsFilters}
-            onChange={setRedBookValidYearsFilters}
-            {...sharedFilterProps}
-          />
-          <MultiSelectFilter
-            label={t.table.cumulativeAbroadYears}
-            options={cumulativeAbroadYearsFilterOptions}
-            selected={cumulativeAbroadYearsFilters}
-            onChange={setCumulativeAbroadYearsFilters}
-            {...sharedFilterProps}
-          />
-          <MultiSelectFilter
-            label={t.table.birthplace}
-            options={birthplaceFilterOptions}
-            selected={birthplaceFilters}
-            onChange={setBirthplaceFilters}
-            {...sharedFilterProps}
-          />
-          <MultiSelectFilter
-            label={t.table.residenceInChina}
-            options={residenceInChinaFilterOptions}
-            selected={residenceInChinaFilters}
-            onChange={setResidenceInChinaFilters}
-            {...sharedFilterProps}
-          />
-          <MultiSelectFilter
-            label={t.table.medicalHistory}
-            options={medicalHistoryFilterOptions}
-            selected={medicalHistoryFilters}
-            onChange={setMedicalHistoryFilters}
-            {...sharedFilterProps}
-          />
-          <MultiSelectFilter
-            label={t.table.healthStatus}
-            options={healthStatusFilterOptions}
-            selected={healthStatusFilters}
-            onChange={setHealthStatusFilters}
-            {...sharedFilterProps}
-          />
-        </div>
-      </section>
+      {isViewerChinese ? (
+        <section className={sectionBaseClasses}>
+          <SectionTitle label={t.fieldGroups.chineseProfile} theme="rose" />
+          <div className={sectionGridClasses}>
+            <MultiSelectFilter
+              label={t.table.frenchName}
+              options={frenchNameFilterOptions}
+              selected={frenchNameFilters}
+              onChange={setFrenchNameFilters}
+              {...sharedFilterProps}
+            />
+            <MultiSelectFilter
+              label={t.table.idNumber}
+              options={idNumberFilterOptions}
+              selected={idNumberFilters}
+              onChange={setIdNumberFilters}
+              {...sharedFilterProps}
+            />
+            <MultiSelectFilter
+              label={t.table.passportNumber}
+              options={passportNumberFilterOptions}
+              selected={passportNumberFilters}
+              onChange={setPassportNumberFilters}
+              {...sharedFilterProps}
+            />
+            <MultiSelectFilter
+              label={t.table.educationAndMajor}
+              options={educationAndMajorFilterOptions}
+              selected={educationAndMajorFilters}
+              onChange={setEducationAndMajorFilters}
+              {...sharedFilterProps}
+            />
+            <MultiSelectFilter
+              label={t.table.certifications}
+              options={certificationsFilterOptions}
+              selected={certificationsFilters}
+              onChange={setCertificationsFilters}
+              {...sharedFilterProps}
+            />
+            <MultiSelectFilter
+              label={t.table.domesticMobile}
+              options={domesticMobileFilterOptions}
+              selected={domesticMobileFilters}
+              onChange={setDomesticMobileFilters}
+              {...sharedFilterProps}
+            />
+            <MultiSelectFilter
+              label={t.table.redBookValidYears}
+              options={redBookValidYearsFilterOptions}
+              selected={redBookValidYearsFilters}
+              onChange={setRedBookValidYearsFilters}
+              {...sharedFilterProps}
+            />
+            <MultiSelectFilter
+              label={t.table.cumulativeAbroadYears}
+              options={cumulativeAbroadYearsFilterOptions}
+              selected={cumulativeAbroadYearsFilters}
+              onChange={setCumulativeAbroadYearsFilters}
+              {...sharedFilterProps}
+            />
+            <MultiSelectFilter
+              label={t.table.birthplace}
+              options={birthplaceFilterOptions}
+              selected={birthplaceFilters}
+              onChange={setBirthplaceFilters}
+              {...sharedFilterProps}
+            />
+            <MultiSelectFilter
+              label={t.table.residenceInChina}
+              options={residenceInChinaFilterOptions}
+              selected={residenceInChinaFilters}
+              onChange={setResidenceInChinaFilters}
+              {...sharedFilterProps}
+            />
+            <MultiSelectFilter
+              label={t.table.medicalHistory}
+              options={medicalHistoryFilterOptions}
+              selected={medicalHistoryFilters}
+              onChange={setMedicalHistoryFilters}
+              {...sharedFilterProps}
+            />
+            <MultiSelectFilter
+              label={t.table.healthStatus}
+              options={healthStatusFilterOptions}
+              selected={healthStatusFilters}
+              onChange={setHealthStatusFilters}
+              {...sharedFilterProps}
+            />
+          </div>
+        </section>
+      ) : null}
 
     </div>
   )

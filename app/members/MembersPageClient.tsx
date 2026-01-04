@@ -1613,6 +1613,7 @@ export function MembersPageClient() {
                   setPage(1)
                 }}
                 stats={headerStats}
+                isViewerChinese={isViewerChinese}
               />
             ) : null}
 
