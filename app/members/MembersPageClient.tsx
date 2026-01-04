@@ -1390,6 +1390,7 @@ export function MembersPageClient() {
                 onStatusFiltersChange={setStatusFilters}
                 onNationalityFiltersChange={setNationalityFilters}
                 onTeamFiltersChange={setTeamFilters}
+                onViewMember={(member) => setSelectedMember(member)}
               />
             ) : null}
 

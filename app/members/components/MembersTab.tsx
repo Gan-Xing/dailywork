@@ -1,4 +1,11 @@
-import type { ChangeEvent, ReactNode, RefObject } from 'react'
+import {
+  type ChangeEvent,
+  type ReactNode,
+  type RefObject,
+  useEffect,
+  useRef,
+  useState,
+} from 'react'
 
 import { MemberFilterDrawer } from '@/components/members/MemberFilterDrawer'
 import { ActionButton } from '@/components/members/MemberButtons'
@@ -460,6 +467,22 @@ export function MembersTab(props: MembersTabProps) {
     stats,
   } = props
 
+  const [showActionsDropdown, setShowActionsDropdown] = useState(false)
+  const actionsDropdownRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        actionsDropdownRef.current &&
+        !actionsDropdownRef.current.contains(event.target as Node)
+      ) {
+        setShowActionsDropdown(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
   const columnGroups = [
     {
       key: 'basic',
@@ -580,52 +603,7 @@ export function MembersTab(props: MembersTabProps) {
           >
             {t.actions.create}
           </button>
-          <ActionButton onClick={onImportClick} disabled={!canCreateMember || importing}>
-            {t.actions.import}
-          </ActionButton>
-          {canDeleteMember ? (
-            <label
-              className={`inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-[11px] font-semibold text-slate-600 ${
-                !canCreateMember ? 'cursor-not-allowed opacity-60' : 'hover:bg-slate-50'
-              }`}
-            >
-              <input
-                type="checkbox"
-                checked={skipImportHistory}
-                onChange={(event) => onToggleSkipImportHistory(event.target.checked)}
-                disabled={!canCreateMember}
-                className="accent-emerald-500"
-              />
-              <span>{t.form.skipChangeHistory}</span>
-            </label>
-          ) : null}
-          <ActionButton onClick={onOpenTeamSupervisorDialog} disabled={!canCreateMember}>
-            {t.actions.teamSupervisors}
-          </ActionButton>
-          <ActionButton
-            onClick={onContractChangeImportClick}
-            disabled={!canUpdateMember || contractChangeImporting}
-          >
-            {t.actions.importContractChanges}
-          </ActionButton>
-          <ActionButton
-            onClick={onContractChangeTemplateDownload}
-            disabled={contractChangeTemplateDownloading}
-          >
-            {t.actions.contractChangeTemplate}
-          </ActionButton>
-          <ActionButton
-            onClick={onContractAuditClick}
-            disabled={!canViewMembers || contractAuditLoading}
-          >
-            {t.actions.contractAudit}
-          </ActionButton>
-          <ActionButton onClick={onExport} disabled={!canViewMembers || exporting}>
-            {t.actions.export}
-          </ActionButton>
-          <ActionButton onClick={onDownloadTemplate} disabled={templateDownloading}>
-            {t.actions.template}
-          </ActionButton>
+
           {!bulkEditMode ? (
             <ActionButton onClick={onStartBulkEdit} disabled={!canUpdateMember || loading}>
               {t.actions.bulkEdit}
@@ -640,27 +618,121 @@ export function MembersTab(props: MembersTabProps) {
               </ActionButton>
             </>
           )}
-          <input
-            ref={importInputRef}
-            type="file"
-            accept=".xlsx,.xls,.csv"
-            onChange={onImportFileChange}
-            className="hidden"
-          />
-          <input
-            ref={contractChangeImportInputRef}
-            type="file"
-            accept=".xlsx,.xls,.csv"
-            onChange={onContractChangeImportFileChange}
-            className="hidden"
-          />
-          <input
-            ref={contractAuditInputRef}
-            type="file"
-            accept=".xlsx,.xls,.csv"
-            onChange={onContractAuditFileChange}
-            className="hidden"
-          />
+
+          <div className="relative" ref={actionsDropdownRef}>
+            <button
+              type="button"
+              onClick={() => setShowActionsDropdown((prev) => !prev)}
+              className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+            >
+              {t.table.actions}
+              <span aria-hidden>⌵</span>
+            </button>
+            {showActionsDropdown && (
+              <div className="absolute right-0 top-full z-20 mt-2 w-56 origin-top-right rounded-xl border border-slate-200 bg-white shadow-xl ring-1 ring-slate-900/5 focus:outline-none">
+                <div className="py-2">
+                  <div className="px-3 pb-2 pt-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    {t.actions.import} / {t.actions.export}
+                  </div>
+                  <button
+                    onClick={() => {
+                      onImportClick()
+                      setShowActionsDropdown(false)
+                    }}
+                    disabled={!canCreateMember || importing}
+                    className="block w-full px-4 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    {t.actions.import}
+                  </button>
+                  <button
+                    onClick={() => {
+                      onExport()
+                      setShowActionsDropdown(false)
+                    }}
+                    disabled={!canViewMembers || exporting}
+                    className="block w-full px-4 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    {t.actions.export}
+                  </button>
+                  <button
+                    onClick={() => {
+                      onDownloadTemplate()
+                      setShowActionsDropdown(false)
+                    }}
+                    disabled={templateDownloading}
+                    className="block w-full px-4 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    {t.actions.template}
+                  </button>
+                </div>
+                <div className="border-t border-slate-100 py-2">
+                  <div className="px-3 pb-2 pt-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    {t.fieldGroups.contract}
+                  </div>
+                  <button
+                    onClick={() => {
+                      onContractChangeImportClick()
+                      setShowActionsDropdown(false)
+                    }}
+                    disabled={!canUpdateMember || contractChangeImporting}
+                    className="block w-full px-4 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    {t.actions.importContractChanges}
+                  </button>
+                  <button
+                    onClick={() => {
+                      onContractChangeTemplateDownload()
+                      setShowActionsDropdown(false)
+                    }}
+                    disabled={contractChangeTemplateDownloading}
+                    className="block w-full px-4 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    {t.actions.contractChangeTemplate}
+                  </button>
+                  <button
+                    onClick={() => {
+                      onContractAuditClick()
+                      setShowActionsDropdown(false)
+                    }}
+                    disabled={!canViewMembers || contractAuditLoading}
+                    className="block w-full px-4 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    {t.actions.contractAudit}
+                  </button>
+                </div>
+                <div className="border-t border-slate-100 py-2">
+                  <div className="px-3 pb-2 pt-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    {t.overview.labels.other}
+                  </div>
+                  <button
+                    onClick={() => {
+                      onOpenTeamSupervisorDialog()
+                      setShowActionsDropdown(false)
+                    }}
+                    disabled={!canCreateMember}
+                    className="block w-full px-4 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    {t.actions.teamSupervisors}
+                  </button>
+                  {canDeleteMember && (
+                    <label className="flex w-full cursor-pointer items-center gap-2 px-4 py-2 text-xs text-slate-700 hover:bg-slate-50">
+                      <input
+                        type="checkbox"
+                        checked={skipImportHistory}
+                        onChange={(event) => onToggleSkipImportHistory(event.target.checked)}
+                        disabled={!canCreateMember}
+                        className="accent-emerald-500"
+                      />
+                      <span>{t.form.skipChangeHistory}</span>
+                    </label>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="mx-2 h-6 w-px bg-slate-200" />
+
           <ActionButton onClick={onClearFilters} disabled={!hasActiveFilters}>
             {t.filters.reset}
           </ActionButton>
@@ -793,6 +865,27 @@ export function MembersTab(props: MembersTabProps) {
           <ActionButton onClick={onClearSort} disabled={isSortDefault}>
             {t.actions.clearSort}
           </ActionButton>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".xlsx,.xls,.csv"
+            onChange={onImportFileChange}
+            className="hidden"
+          />
+          <input
+            ref={contractChangeImportInputRef}
+            type="file"
+            accept=".xlsx,.xls,.csv"
+            onChange={onContractChangeImportFileChange}
+            className="hidden"
+          />
+          <input
+            ref={contractAuditInputRef}
+            type="file"
+            accept=".xlsx,.xls,.csv"
+            onChange={onContractAuditFileChange}
+            className="hidden"
+          />
         </div>
       </div>
 

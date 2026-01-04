@@ -31,6 +31,7 @@ type Props = {
   onStatusFiltersChange: (value: string[]) => void
   onNationalityFiltersChange: (value: string[]) => void
   onTeamFiltersChange: (value: string[]) => void
+  onViewMember: (member: Member) => void
 }
 
 type BarItem = {
@@ -1097,6 +1098,7 @@ const PayoutRecordsTable = ({
   sortKey,
   sortDirection,
   onSortChange,
+  onViewMember,
   formatMoney,
   emptyLabel,
   labels,
@@ -1106,6 +1108,7 @@ const PayoutRecordsTable = ({
   sortKey: string
   sortDirection: 'asc' | 'desc'
   onSortChange: (key: string) => void
+  onViewMember: (memberId: number) => void
   formatMoney: (value: number) => string
   emptyLabel: string
   labels: {
@@ -1168,10 +1171,18 @@ const PayoutRecordsTable = ({
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100">
-          {rows.map((row) => (
+              {rows.map((row) => (
             <tr key={row.id} className="hover:bg-slate-50">
               <td className="px-3 py-2 text-slate-700">{row.team}</td>
-              <td className="px-3 py-2 text-slate-700 font-medium">{row.memberName}</td>
+              <td className="px-3 py-2 text-slate-700 font-medium">
+                <button
+                  type="button"
+                  onClick={() => onViewMember(row.id)}
+                  className="text-left text-slate-900 hover:text-slate-700 hover:underline"
+                >
+                  {row.memberName}
+                </button>
+              </td>
               <td className="px-3 py-2 text-slate-500">{row.supervisor}</td>
               {columns.map((column) => {
                 const value = row.amountsByDate[column]
@@ -1810,6 +1821,7 @@ export function MembersOverviewTab({
   onStatusFiltersChange,
   onNationalityFiltersChange,
   onTeamFiltersChange,
+  onViewMember,
 }: Props) {
   const numberFormatter = useMemo(
     () => new Intl.NumberFormat(toLocaleId(locale)),
@@ -1951,6 +1963,15 @@ export function MembersOverviewTab({
     })
     return map
   }, [members])
+  const handleViewDetailMember = useCallback(
+    (memberId: number) => {
+      const member = membersById.get(memberId)
+      if (member) {
+        onViewMember(member)
+      }
+    },
+    [membersById, onViewMember],
+  )
 
   const nationalityStats = useMemo(() => {
     let china = 0
@@ -3550,6 +3571,7 @@ export function MembersOverviewTab({
               sortKey={detailRecordSort.key}
               sortDirection={detailRecordSort.direction}
               onSortChange={handleDetailRecordSort}
+              onViewMember={handleViewDetailMember}
               formatMoney={formatMoney}
               emptyLabel={t.overview.labels.noData}
               labels={{
