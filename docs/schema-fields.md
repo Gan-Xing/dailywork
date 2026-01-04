@@ -283,6 +283,37 @@
 
 > 说明：产值页面会优先尝试匹配 `phaseDefinitionId + spec` 的可报价条目，再使用分项默认价格；管理页面通过 `/value/prices` 提供增删改查入口，确保每个可报价名称与对应价格一一对应。
 
+## 工程量清单条目（BoqItem）
+
+- **用途**：存储项目级工程量清单条目，支持合同清单与实际清单两类，并保留章节/小计/汇总层级信息，方便后续做计量与月产值统计。
+- **字段**
+     1. `id`：唯一标识。
+     2. `projectId`：关联 `Project`（必填）。
+     3. `sheetType`：枚举 `CONTRACT` / `ACTUAL`，区分合同清单与实际清单，默认 `CONTRACT`。
+     4. `contractItemId?`：可选，指向合同清单条目，用于建立实际清单与合同清单的映射关系。
+     5. `code`：条目编号（如 `100`、`101a`、`TOTAL HTVA`），必填。
+     6. `designationZh` / `designationFr`：中法双语名称，必填。
+     7. `unit?`：计量单位，可空。
+     8. `unitPrice?` / `quantity?` / `totalPrice?`：金额或数量（decimal），允许为空以支持章节标题/汇总行。
+     9. `tone`：枚举 `SECTION` / `SUBSECTION` / `ITEM` / `TOTAL`，用于控制显示层级与汇总呈现。
+    10. `sortOrder`：排序权重，默认 `0`，用于保持原始清单顺序。
+    11. `isActive`：布尔，软删除开关，默认 `true`。
+    12. `createdAt` / `updatedAt`：时间戳。
+
+## 工程量计量（月度明细，BoqMeasurement）
+
+- **用途**：记录每月完成工程量，用于生成实际工程量清单、计量单与月产值统计。
+- **字段**
+     1. `id`：唯一标识。
+     2. `projectId`：关联 `Project`（必填）。
+     3. `boqItemId`：关联 `BoqItem`（必填）。
+     4. `period`：月份标识（日期类型，按月存储）。
+     5. `quantity`：本月完成量（decimal）。
+     6. `unitPrice?`：可选月度单价（用于临时调整/变更价）。
+     7. `amount?`：本月产值金额（可选，允许前端或报表计算后回写）。
+     8. `note?`：备注。
+     9. `createdAt` / `updatedAt`：时间戳。
+
 ## 层次与验收内容定义（LayerDefinition / CheckDefinition）
 
 - **用途**：去重存储全局可选的层次/验收内容，供分项模板或分项实例选择与继承，避免同名条目分散为孤立字符串。

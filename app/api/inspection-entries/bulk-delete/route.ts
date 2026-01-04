@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 
 import { getSessionUser, hasPermission } from '@/lib/server/authSession'
+import type { IntervalSide } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 
 export async function POST(request: Request) {
@@ -31,7 +32,47 @@ export async function POST(request: Request) {
   }
 
   try {
-    const result = await prisma.inspectionEntry.deleteMany({ where: { id: { in: ids } } })
+    const seedEntries = await prisma.inspectionEntry.findMany({
+      where: { id: { in: ids } },
+      select: { roadId: true, phaseId: true, side: true, startPk: true, endPk: true, documentId: true },
+    })
+    if (!seedEntries.length) {
+      return NextResponse.json({ message: '未找到需要删除的报检明细' }, { status: 404 })
+    }
+    const groupMap = new Map<
+      string,
+      { roadId: number; phaseId: number; side: IntervalSide; startPk: number; endPk: number; documentId: number | null }
+    >()
+    seedEntries.forEach((entry) => {
+      const key = `${entry.roadId}:${entry.phaseId}:${entry.side}:${entry.startPk}:${entry.endPk}:${entry.documentId ?? 'null'}`
+      if (!groupMap.has(key)) {
+        groupMap.set(key, {
+          roadId: entry.roadId,
+          phaseId: entry.phaseId,
+          side: entry.side,
+          startPk: entry.startPk,
+          endPk: entry.endPk,
+          documentId: entry.documentId ?? null,
+        })
+      }
+    })
+    const groupFilters = Array.from(groupMap.values()).map((entry) => ({
+      roadId: entry.roadId,
+      phaseId: entry.phaseId,
+      side: entry.side,
+      startPk: entry.startPk,
+      endPk: entry.endPk,
+      documentId: entry.documentId,
+    }))
+    const groupedEntries = await prisma.inspectionEntry.findMany({
+      where: { OR: groupFilters },
+      select: { id: true },
+    })
+    const expandedIds = groupedEntries.map((entry) => entry.id)
+    if (!expandedIds.length) {
+      return NextResponse.json({ message: '未找到需要删除的报检明细' }, { status: 404 })
+    }
+    const result = await prisma.inspectionEntry.deleteMany({ where: { id: { in: expandedIds } } })
     return NextResponse.json({ deleted: result.count })
   } catch (error) {
     return NextResponse.json({ message: (error as Error).message }, { status: 400 })

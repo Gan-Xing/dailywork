@@ -1066,7 +1066,13 @@ export function useInspectionFlow({
   }, [phases, latestInspectionByPhase])
 
   const resolvePointProgress = useCallback(
-    (phaseId: number, side: IntervalSide, startPk: number, endPk: number) => {
+    (
+      phaseId: number,
+      side: IntervalSide,
+      startPk: number,
+      endPk: number,
+      allowedLayers: string[] = [],
+    ) => {
       const workflowLayers = workflowLayersByPhaseId.get(phaseId)
       const phaseNameFallback = phases.find((item) => item.id === phaseId)?.name ?? ''
       const phaseNameForContext = workflowLayers?.phaseName ?? phaseNameFallback
@@ -1075,18 +1081,24 @@ export function useInspectionFlow({
       if (!layers.length) {
         return { percent: 0, completedLayers: 0, totalLayers: 0 }
       }
+      const allowedLayerSet = new Set(
+        allowedLayers.map((layer) => normalizeLabel(layer)).filter(Boolean),
+      )
+      const effectiveLayers = allowedLayerSet.size
+        ? layers.filter((layer) => allowedLayerSet.has(normalizeLabel(layer.name)))
+        : layers
       const candidatesForSide = (targetSide: IntervalSide) =>
         targetSide === 'BOTH' ? (['BOTH', 'LEFT', 'RIGHT'] as IntervalSide[]) : ([targetSide, 'BOTH'] as IntervalSide[])
 
-      const totalChecks = layers.reduce((sum, layer) => sum + layer.checks.length, 0)
+      const totalChecks = effectiveLayers.reduce((sum, layer) => sum + layer.checks.length, 0)
       if (!totalChecks) {
         return { percent: 0, completedLayers: 0, totalLayers: 0 }
       }
 
       let completedChecks = 0
-      layers.forEach((layer) => {
+      effectiveLayers.forEach((layer) => {
         layer.checks.forEach((check) => {
-          const hasStatus = candidatesForSide(side).some((candidateSide) => {
+          const hasApproved = candidatesForSide(side).some((candidateSide) => {
             const keyWithIds = buildCheckStatusKey({
               phaseId,
               phaseName: phaseNameForContext,
@@ -1110,9 +1122,9 @@ export function useInspectionFlow({
               endPk: targetEnd,
             })
             const snapshot = latestPointInspections.get(keyWithIds) ?? latestPointInspections.get(keyWithNames)
-            return (statusPriority[snapshot?.status ?? 'PENDING'] ?? 0) >= (statusPriority.SCHEDULED ?? 0)
+            return snapshot?.status === 'APPROVED'
           })
-          if (hasStatus) {
+          if (hasApproved) {
             completedChecks += 1
           }
         })

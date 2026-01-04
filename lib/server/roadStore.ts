@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import type {
+  IntervalSide,
   PhaseDTO,
   RoadPhaseProgressDTO,
   RoadSectionDTO,
@@ -9,7 +10,10 @@ import type {
   RoadSectionWithPhasesDTO,
 } from '@/lib/progressTypes'
 import { resolveRoadLabels } from '@/lib/i18n/roadDictionary'
+import { canonicalizeProgressList } from '@/lib/i18n/progressDictionary'
+import type { WorkflowBinding } from '@/lib/progressWorkflow'
 import { listPhases } from './progressStore'
+import { getWorkflowByPhaseDefinitionId } from './workflowStore'
 
 const normalizeValue = (value: string) => value.trim()
 
@@ -89,6 +93,9 @@ const SUBBASE_PHASE_NAME = '垫层'
 const SUBBASE_LAYER_NAME = '路基垫层'
 
 const normalizePhaseName = (value: string) => value.trim()
+const normalizeLabel = (value: string) => value.trim().toLowerCase()
+const canonicalizeSingle = (kind: 'layer' | 'check', value: string) =>
+  canonicalizeProgressList(kind, [value]).at(0) ?? value
 
 const calcCompletedLinearLength = (
   inspections: { startPk: number; endPk: number; side: string }[],
@@ -127,6 +134,131 @@ const resolvePhaseLayers = (phase: {
   return Array.from(new Set(defaultLayers))
 }
 
+const resolveIntervalLayers = (
+  interval: { layers?: string[] | null; layerIds?: number[] | null },
+  fallbackLayers: string[],
+  layerNameById: Map<number, string>,
+) => {
+  const fromNames = Array.isArray(interval.layers) ? interval.layers : []
+  const normalizedNames = canonicalizeProgressList('layer', fromNames)
+  if (normalizedNames.length) return normalizedNames
+  const fromIds = Array.isArray(interval.layerIds)
+    ? interval.layerIds
+        .map((id) => layerNameById.get(id))
+        .filter(Boolean) as string[]
+    : []
+  const normalizedIds = canonicalizeProgressList('layer', fromIds)
+  if (normalizedIds.length) return normalizedIds
+  return canonicalizeProgressList('layer', fallbackLayers)
+}
+
+const buildIntervalLayerMap = (
+  intervals: { startPk: number; endPk: number; side: string; layers?: string[] | null; layerIds?: number[] | null }[],
+  fallbackLayers: string[],
+  layerNameById: Map<number, string>,
+) => {
+  const map = new Map<
+    string,
+    { startPk: number; endPk: number; side: IntervalSide; layers: string[] }
+  >()
+  intervals.forEach((interval) => {
+    const [start, end] = normalizeSegment(interval.startPk, interval.endPk)
+    const side = (interval.side ?? 'BOTH') as IntervalSide
+    const key = buildPointStructureKey(start, end, side)
+    if (!key) return
+    const layers = resolveIntervalLayers(interval, fallbackLayers, layerNameById)
+    map.set(key, {
+      startPk: start,
+      endPk: end,
+      side,
+      layers: layers.map((layer) => normalizeLabel(canonicalizeSingle('layer', layer))).filter(Boolean),
+    })
+  })
+  return map
+}
+
+const buildWorkflowStageByLayer = (workflow?: WorkflowBinding | null) => {
+  const map = new Map<string, number>()
+  if (!workflow?.layers?.length) return map
+  workflow.layers.forEach((layer) => {
+    const key = normalizeLabel(canonicalizeSingle('layer', layer.name))
+    if (!key) return
+    map.set(key, Number.isFinite(layer.stage) ? layer.stage : 0)
+  })
+  return map
+}
+
+const resolveTerminalLayers = (
+  allowedLayers: string[],
+  stageByLayer: Map<string, number>,
+  fallbackLayers: string[],
+) => {
+  const candidateLayers = allowedLayers.length ? allowedLayers : fallbackLayers
+  const normalized = candidateLayers
+    .map((layer) => normalizeLabel(canonicalizeSingle('layer', layer)))
+    .filter(Boolean)
+  if (!normalized.length) return []
+  let maxStage = -Infinity
+  normalized.forEach((layer) => {
+    const stage = stageByLayer.get(layer)
+    if (stage === undefined) return
+    if (stage > maxStage) maxStage = stage
+  })
+  if (maxStage === -Infinity) {
+    const stages = Array.from(stageByLayer.values())
+    if (!stages.length) return normalized
+    maxStage = Math.max(...stages)
+  }
+  return normalized.filter((layer) => (stageByLayer.get(layer) ?? maxStage) === maxStage)
+}
+
+const buildTerminalLayerMap = (
+  intervalLayers: Map<string, { startPk: number; endPk: number; side: IntervalSide; layers: string[] }>,
+  stageByLayer: Map<string, number>,
+  fallbackLayers: string[],
+) => {
+  const map = new Map<string, string[]>()
+  intervalLayers.forEach((interval, key) => {
+    const terminalLayers = resolveTerminalLayers(interval.layers, stageByLayer, fallbackLayers)
+    if (!terminalLayers.length) return
+    map.set(key, terminalLayers)
+  })
+  return map
+}
+
+const buildWorkflowChecksByLayer = (workflow?: WorkflowBinding | null) => {
+  const map = new Map<string, Set<string>>()
+  if (!workflow?.layers?.length) return map
+  workflow.layers.forEach((layer) => {
+    const layerKey = normalizeLabel(canonicalizeSingle('layer', layer.name))
+    if (!layerKey) return
+    const checks = canonicalizeProgressList(
+      'check',
+      layer.checks.map((check) => check.name),
+    )
+    const checkSet = new Set(checks.map((check) => normalizeLabel(check)).filter(Boolean))
+    if (!checkSet.size) return
+    map.set(layerKey, checkSet)
+  })
+  return map
+}
+
+const ensureIntervalSide = (value?: string | null): IntervalSide =>
+  value === 'LEFT' || value === 'RIGHT' || value === 'BOTH' ? value : 'BOTH'
+
+const buildInspectionRangesFromEntries = (
+  entries: { startPk: number; endPk: number; side: string }[],
+) => {
+  const map = new Map<string, { startPk: number; endPk: number; side: IntervalSide }>()
+  entries.forEach((entry) => {
+    const key = buildPointStructureKey(entry.startPk, entry.endPk, entry.side)
+    if (!key || map.has(key)) return
+    const [start, end] = normalizeSegment(entry.startPk, entry.endPk)
+    map.set(key, { startPk: start, endPk: end, side: ensureIntervalSide(entry.side) })
+  })
+  return Array.from(map.values())
+}
+
 const isEarthworkPhase = (phase: { name: string }) =>
   normalizePhaseName(phase.name) === EARTHWORK_PHASE_NAME
 
@@ -141,43 +273,62 @@ const isSubbasePhase = (phase: {
 }
 
 const calcCompletedPointStructures = (
-  inspections: { startPk: number; endPk: number; side: string; layers: string[] }[],
-  resolvedLayers: string[],
+  entries: { startPk: number; endPk: number; side: string; layerName: string; checkName: string }[],
+  intervalLayers: Map<string, { startPk: number; endPk: number; side: IntervalSide; layers: string[] }>,
+  workflow?: WorkflowBinding | null,
 ) => {
-  if (!inspections.length) return 0
-  const resolvedSet = new Set(resolvedLayers.filter(Boolean))
-  const structureLayers = new Map<string, Set<string>>()
-  const fallbackLayers = new Set<string>()
+  if (!intervalLayers.size || !workflow?.layers?.length) return 0
 
-  inspections.forEach((inspection) => {
-    const key = buildPointStructureKey(inspection.startPk, inspection.endPk, inspection.side)
+  const workflowChecksByLayer = buildWorkflowChecksByLayer(workflow)
+  if (!workflowChecksByLayer.size) return 0
+
+  const entriesByStructure = new Map<string, Array<{ layerKey: string; checkKey: string }>>()
+  entries.forEach((entry) => {
+    const key = buildPointStructureKey(entry.startPk, entry.endPk, entry.side)
     if (!key) return
-    const layers = Array.isArray(inspection.layers) ? inspection.layers : []
-    const layerSet = structureLayers.get(key) ?? new Set<string>()
-    layers.forEach((layer) => {
-      const normalized = `${layer}`.trim()
-      if (!normalized) return
-      if (resolvedSet.size && !resolvedSet.has(normalized)) return
-      layerSet.add(normalized)
-      if (resolvedSet.size === 0) {
-        fallbackLayers.add(normalized)
-      }
-    })
-    structureLayers.set(key, layerSet)
+    const layerKey = normalizeLabel(canonicalizeSingle('layer', entry.layerName))
+    const checkKey = normalizeLabel(canonicalizeSingle('check', entry.checkName))
+    if (!layerKey || !checkKey) return
+    const list = entriesByStructure.get(key) ?? []
+    list.push({ layerKey, checkKey })
+    entriesByStructure.set(key, list)
   })
-
-  const layerCount = resolvedSet.size || fallbackLayers.size
-  if (layerCount <= 0) {
-    return structureLayers.size
-  }
 
   let total = 0
-  structureLayers.forEach((layers) => {
-    if (!layers.size) return
-    total += Math.min(1, layers.size / layerCount)
+  intervalLayers.forEach((interval) => {
+    if (!interval.layers.length) return
+    let totalChecks = 0
+    const checksByLayer = new Map<string, Set<string>>()
+    interval.layers.forEach((layerKey) => {
+      const checks = workflowChecksByLayer.get(layerKey)
+      if (!checks || checks.size === 0) return
+      checksByLayer.set(layerKey, checks)
+      totalChecks += checks.size
+    })
+    if (totalChecks <= 0) return
+
+    const completed = new Set<string>()
+    const candidateSides =
+      interval.side === 'BOTH'
+        ? (['BOTH', 'LEFT', 'RIGHT'] as string[])
+        : ([interval.side, 'BOTH'] as string[])
+    candidateSides.forEach((candidateSide) => {
+      const key = buildPointStructureKey(interval.startPk, interval.endPk, candidateSide)
+      if (!key) return
+      const structureEntries = entriesByStructure.get(key) ?? []
+      structureEntries.forEach((entry) => {
+        const allowedChecks = checksByLayer.get(entry.layerKey)
+        if (!allowedChecks) return
+        if (!allowedChecks.has(entry.checkKey)) return
+        completed.add(`${entry.layerKey}::${entry.checkKey}`)
+      })
+    })
+    total += Math.min(1, completed.size / totalChecks)
   })
+
   return total
 }
+
 
 export const listRoadSectionsWithProgress = async (): Promise<RoadSectionProgressDTO[]> => {
   const roads = await prisma.roadSection.findMany({
@@ -190,18 +341,28 @@ export const listRoadSectionsWithProgress = async (): Promise<RoadSectionProgres
       endPk: true,
       createdAt: true,
       updatedAt: true,
-          phases: {
-            select: {
-              id: true,
-              name: true,
-              measure: true,
-              phaseDefinitionId: true,
-              designLength: true,
+      phases: {
+        select: {
+          id: true,
+          name: true,
+          measure: true,
+          phaseDefinitionId: true,
+          designLength: true,
           updatedAt: true,
           inspections: {
             where: { status: { in: ['SCHEDULED', 'SUBMITTED', 'IN_PROGRESS', 'APPROVED'] } },
             orderBy: { updatedAt: 'desc' },
             select: { startPk: true, endPk: true, side: true, layers: true, updatedAt: true, status: true },
+          },
+          entries: {
+            where: { status: 'APPROVED' },
+            select: {
+              startPk: true,
+              endPk: true,
+              side: true,
+              layerName: true,
+              checkName: true,
+            },
           },
           intervals: {
             select: {
@@ -209,12 +370,15 @@ export const listRoadSectionsWithProgress = async (): Promise<RoadSectionProgres
               endPk: true,
               side: true,
               spec: true,
+              layers: true,
+              layerIds: true,
             },
           },
           layerLinks: {
             select: {
               layerDefinition: {
                 select: {
+                  id: true,
                   name: true,
                 },
               },
@@ -226,6 +390,7 @@ export const listRoadSectionsWithProgress = async (): Promise<RoadSectionProgres
                 select: {
                   layerDefinition: {
                     select: {
+                      id: true,
                       name: true,
                     },
                   },
@@ -238,6 +403,21 @@ export const listRoadSectionsWithProgress = async (): Promise<RoadSectionProgres
     },
   })
 
+  const phaseDefinitionIds = Array.from(
+    new Set(
+      roads.flatMap((road) => road.phases.map((phase) => phase.phaseDefinitionId)),
+    ),
+  )
+  const workflowEntries = await Promise.all(
+    phaseDefinitionIds.map(async (id) => [id, await getWorkflowByPhaseDefinitionId(id)] as const),
+  )
+  const workflowByDefinitionId = new Map<number, WorkflowBinding>()
+  workflowEntries.forEach(([id, workflow]) => {
+    if (workflow) {
+      workflowByDefinitionId.set(id, workflow)
+    }
+  })
+
   return roads.map((road) => {
     const subbasePhase = road.phases.find((phase) => isSubbasePhase(phase))
     const subbaseInspections = subbasePhase
@@ -245,15 +425,70 @@ export const listRoadSectionsWithProgress = async (): Promise<RoadSectionProgres
       : []
     const phases: RoadPhaseProgressDTO[] = road.phases.map((phase) => {
       const designLength = Math.max(0, phase.designLength || 0)
-      const resolvedLayers = phase.measure === 'POINT' ? resolvePhaseLayers(phase) : []
+      const workflow = workflowByDefinitionId.get(phase.phaseDefinitionId) ?? null
+      const resolvedLayers =
+        phase.measure === 'POINT' || phase.measure === 'LINEAR' ? resolvePhaseLayers(phase) : []
+      let fallbackLayerKeys = canonicalizeProgressList('layer', resolvedLayers)
+        .map((layer) => normalizeLabel(layer))
+        .filter(Boolean)
+      if (!fallbackLayerKeys.length && workflow?.layers?.length) {
+        fallbackLayerKeys = canonicalizeProgressList(
+          'layer',
+          workflow.layers.map((layer) => layer.name),
+        )
+          .map((layer) => normalizeLabel(layer))
+          .filter(Boolean)
+      }
+      const layerNameById = new Map<number, string>()
+      phase.layerLinks.forEach((link) => {
+        if (link.layerDefinition?.id) {
+          layerNameById.set(link.layerDefinition.id, link.layerDefinition.name)
+        }
+      })
+      phase.phaseDefinition?.defaultLayers?.forEach((item) => {
+        if (!item.layerDefinition?.id) return
+        if (!layerNameById.has(item.layerDefinition.id)) {
+          layerNameById.set(item.layerDefinition.id, item.layerDefinition.name)
+        }
+      })
+      const intervalLayerMap =
+        phase.measure === 'POINT' || phase.measure === 'LINEAR'
+          ? buildIntervalLayerMap(phase.intervals ?? [], resolvedLayers, layerNameById)
+          : new Map<string, { startPk: number; endPk: number; side: IntervalSide; layers: string[] }>()
+      const stageByLayer = phase.measure === 'LINEAR' ? buildWorkflowStageByLayer(workflow) : new Map()
+      const terminalLayerMap =
+        phase.measure === 'LINEAR'
+          ? buildTerminalLayerMap(intervalLayerMap, stageByLayer, fallbackLayerKeys)
+          : new Map<string, string[]>()
+      const approvedEntries = phase.entries ?? []
       const approvedInspections = phase.inspections.filter((inspection) => inspection.status === 'APPROVED')
       // Earthwork progress is driven by subbase (Couche de forme) scheduled ranges.
       const sourceInspections =
         isEarthworkPhase(phase) && subbasePhase ? subbaseInspections : approvedInspections
+      const filteredLinearEntries =
+        phase.measure === 'LINEAR' && !isEarthworkPhase(phase)
+          ? approvedEntries.filter((entry) => {
+              const key = buildPointStructureKey(entry.startPk, entry.endPk, entry.side)
+              const candidateKey = key ?? ''
+              const bothKey =
+                entry.side !== 'BOTH'
+                  ? buildPointStructureKey(entry.startPk, entry.endPk, 'BOTH')
+                  : null
+              const terminalLayers =
+                terminalLayerMap.get(candidateKey) ??
+                (bothKey ? terminalLayerMap.get(bothKey) : null) ??
+                resolveTerminalLayers(fallbackLayerKeys, stageByLayer, fallbackLayerKeys)
+              if (!terminalLayers.length) return true
+              const layerKey = normalizeLabel(canonicalizeSingle('layer', entry.layerName))
+              return terminalLayers.includes(layerKey)
+            })
+          : approvedEntries
       const rawCompletedLength =
         phase.measure === 'POINT'
-          ? calcCompletedPointStructures(sourceInspections, resolvedLayers)
-          : calcCompletedLinearLength(sourceInspections)
+          ? calcCompletedPointStructures(approvedEntries, intervalLayerMap, workflow)
+          : phase.measure === 'LINEAR' && !isEarthworkPhase(phase)
+            ? calcCompletedLinearLength(buildInspectionRangesFromEntries(filteredLinearEntries))
+            : calcCompletedLinearLength(sourceInspections)
       const cappedCompletedLength =
         designLength > 0 ? Math.min(designLength, rawCompletedLength) : rawCompletedLength
       const completedPercent =
@@ -267,11 +502,16 @@ export const listRoadSectionsWithProgress = async (): Promise<RoadSectionProgres
         layers: (interval as { layers?: string[] }).layers ?? [],
         layerIds: (interval as { layerIds?: number[] }).layerIds ?? [],
       })) ?? []
-      const inspectionRanges = sourceInspections.map((inspection) => ({
-        startPk: inspection.startPk,
-        endPk: inspection.endPk,
-        side: inspection.side,
-      }))
+      const inspectionRanges =
+        phase.measure === 'POINT'
+          ? buildInspectionRangesFromEntries(approvedEntries)
+          : phase.measure === 'LINEAR' && !isEarthworkPhase(phase)
+            ? buildInspectionRangesFromEntries(filteredLinearEntries)
+            : sourceInspections.map((inspection) => ({
+                startPk: inspection.startPk,
+                endPk: inspection.endPk,
+                side: ensureIntervalSide(inspection.side),
+              }))
       return {
         phaseId: phase.id,
         phaseName: phase.name,

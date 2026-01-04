@@ -12,6 +12,10 @@ export type ProductionValueCopy = {
     description: string
     cta: string
   }
+  tabs: {
+    production: string
+    boq: string
+  }
   page: {
     title: string
     description: string
@@ -36,6 +40,35 @@ export type ProductionValueCopy = {
       priceLoadError: string
     }
   }
+  boq: {
+    title: string
+    description: string
+    projectLabel: string
+    projectPlaceholder: string
+    actions: {
+      searchLabel: string
+      searchPlaceholder: string
+      viewLabel: string
+      viewAll: string
+      viewSummary: string
+    }
+    tableHeaders: {
+      code: string
+      designation: string
+      unit: string
+      unitPrice: string
+      quantity: string
+      totalPrice: string
+    }
+    messages: {
+      loading: string
+      projectLoading: string
+      loadError: string
+      empty: string
+      noHeader: string
+      noMatches: string
+    }
+  }
 }
 
 export const productionValueCopy: Record<Locale, ProductionValueCopy> = {
@@ -50,6 +83,10 @@ export const productionValueCopy: Record<Locale, ProductionValueCopy> = {
       description:
         '汇总各分项的设计/完成量与单价，梳理产值进度。权限足够即可查看最新数据。',
       cta: '查看产值详情'
+    },
+    tabs: {
+      production: '产值计量',
+      boq: '工程量清单'
     },
     page: {
       title: '产值计量',
@@ -74,6 +111,35 @@ export const productionValueCopy: Record<Locale, ProductionValueCopy> = {
         priceLoading: '正在加载价格配置…',
         priceLoadError: '价格配置加载失败，请稍后重试'
       }
+    },
+    boq: {
+      title: '工程量清单',
+      description: '按项目录入工程量清单，为后续计量与账单制作打基础。',
+      projectLabel: '项目',
+      projectPlaceholder: '选择项目',
+      actions: {
+        searchLabel: '检索',
+        searchPlaceholder: '输入编号或名称…',
+        viewLabel: '视图',
+        viewAll: '全部',
+        viewSummary: '仅汇总'
+      },
+      tableHeaders: {
+        code: '编号',
+        designation: '工程内容',
+        unit: '单位',
+        unitPrice: '单价（F CFA）',
+        quantity: '数量',
+        totalPrice: '合价（F CFA）'
+      },
+      messages: {
+        loading: '正在加载工程量清单…',
+        projectLoading: '正在加载项目列表…',
+        loadError: '工程量清单加载失败，请稍后重试',
+        empty: '该项目暂无工程量清单记录',
+        noHeader: '暂无表头信息',
+        noMatches: '未找到匹配的工程量清单记录'
+      }
     }
   },
   fr: {
@@ -87,6 +153,10 @@ export const productionValueCopy: Record<Locale, ProductionValueCopy> = {
       description:
         'Regroupe les quantités prévues, réalisées et les prix unitaires par sous-ouvrage pour alimenter la comptabilité.',
       cta: 'Voir les valeurs'
+    },
+    tabs: {
+      production: 'Valeurs',
+      boq: 'Devis quantitatif'
     },
     page: {
       title: 'Calcul des valeurs',
@@ -110,6 +180,36 @@ export const productionValueCopy: Record<Locale, ProductionValueCopy> = {
         error: 'Impossible de charger les valeurs, réessayez plus tard',
         priceLoading: 'Chargement des prix unitaires…',
         priceLoadError: 'Impossible de charger les prix unitaires, réessayez plus tard'
+      }
+    },
+    boq: {
+      title: 'Devis quantitatif',
+      description:
+        'Saisie du devis quantitatif par projet pour préparer les métrés et les factures.',
+      projectLabel: 'Projet',
+      projectPlaceholder: 'Sélectionner un projet',
+      actions: {
+        searchLabel: 'Recherche',
+        searchPlaceholder: 'Rechercher par code ou désignation…',
+        viewLabel: 'Vue',
+        viewAll: 'Tout',
+        viewSummary: 'Synthèse'
+      },
+      tableHeaders: {
+        code: 'N° Prix',
+        designation: 'Designation des Travaux',
+        unit: 'Unité',
+        unitPrice: 'Prix unitaire (F CFA)',
+        quantity: 'Quantité',
+        totalPrice: 'Prix total (F CFA)'
+      },
+      messages: {
+        loading: 'Chargement du devis quantitatif…',
+        projectLoading: 'Chargement des projets…',
+        loadError: 'Impossible de charger le devis quantitatif, réessayez plus tard.',
+        empty: 'Aucun devis quantitatif pour ce projet.',
+        noHeader: 'En-tête indisponible pour ce projet.',
+        noMatches: 'Aucun élément ne correspond à la recherche.'
       }
     }
   }

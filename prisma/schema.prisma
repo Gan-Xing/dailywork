@@ -84,6 +84,18 @@ enum PaymentStatus {
   PAID
 }
 
+enum BoqSheetType {
+  CONTRACT
+  ACTUAL
+}
+
+enum BoqItemTone {
+  SECTION
+  SUBSECTION
+  ITEM
+  TOTAL
+}
+
 model PhaseDefinition {
   id             Int                     @id @default(autoincrement())
   name           String
@@ -641,6 +653,54 @@ model Project {
   finances  FinanceEntry[]
   teamSupervisors TeamSupervisor[]
   memberAssignments UserProjectAssignment[]
+  boqItems BoqItem[]
+  boqMeasurements BoqMeasurement[]
+}
+
+model BoqItem {
+  id             Int          @id @default(autoincrement())
+  projectId      Int
+  sheetType      BoqSheetType @default(CONTRACT)
+  contractItemId Int?
+  code           String
+  designationZh  String
+  designationFr  String
+  unit           String?
+  unitPrice      Decimal?     @db.Decimal(18, 2)
+  quantity       Decimal?     @db.Decimal(18, 2)
+  totalPrice     Decimal?     @db.Decimal(18, 2)
+  tone           BoqItemTone  @default(ITEM)
+  sortOrder      Int          @default(0)
+  isActive       Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  project        Project      @relation(fields: [projectId], references: [id])
+  contractItem   BoqItem?     @relation("BoqItemContractLink", fields: [contractItemId], references: [id])
+  derivedItems   BoqItem[]    @relation("BoqItemContractLink")
+  measurements   BoqMeasurement[]
+
+  @@index([projectId, sheetType, sortOrder])
+  @@index([projectId, sheetType, code])
+}
+
+model BoqMeasurement {
+  id        Int       @id @default(autoincrement())
+  projectId Int
+  boqItemId Int
+  period    DateTime
+  quantity  Decimal   @db.Decimal(18, 2)
+  unitPrice Decimal?  @db.Decimal(18, 2)
+  amount    Decimal?  @db.Decimal(18, 2)
+  note      String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id])
+  boqItem BoqItem @relation(fields: [boqItemId], references: [id], onDelete: Cascade)
+
+  @@unique([boqItemId, period])
+  @@index([projectId, period])
 }
 
 model FinanceUnit {

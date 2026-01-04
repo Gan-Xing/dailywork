@@ -96,6 +96,47 @@ export async function POST(request: Request) {
 
   if (!ids.length) return NextResponse.json({ message: '请选择需要更新的报检明细' }, { status: 400 })
 
+  const seedEntries = await prisma.inspectionEntry.findMany({
+    where: { id: { in: ids } },
+    select: { roadId: true, phaseId: true, side: true, startPk: true, endPk: true, documentId: true },
+  })
+  if (!seedEntries.length) {
+    return NextResponse.json({ message: '未找到需要更新的报检明细' }, { status: 404 })
+  }
+  const groupMap = new Map<
+    string,
+    { roadId: number; phaseId: number; side: IntervalSide; startPk: number; endPk: number; documentId: number | null }
+  >()
+  seedEntries.forEach((entry) => {
+    const key = `${entry.roadId}:${entry.phaseId}:${entry.side}:${entry.startPk}:${entry.endPk}:${entry.documentId ?? 'null'}`
+    if (!groupMap.has(key)) {
+      groupMap.set(key, {
+        roadId: entry.roadId,
+        phaseId: entry.phaseId,
+        side: entry.side,
+        startPk: entry.startPk,
+        endPk: entry.endPk,
+        documentId: entry.documentId ?? null,
+      })
+    }
+  })
+  const groupFilters = Array.from(groupMap.values()).map((entry) => ({
+    roadId: entry.roadId,
+    phaseId: entry.phaseId,
+    side: entry.side,
+    startPk: entry.startPk,
+    endPk: entry.endPk,
+    documentId: entry.documentId,
+  }))
+  const groupedEntries = await prisma.inspectionEntry.findMany({
+    where: { OR: groupFilters },
+    select: { id: true },
+  })
+  const expandedIds = groupedEntries.map((entry) => entry.id)
+  if (!expandedIds.length) {
+    return NextResponse.json({ message: '未找到需要更新的报检明细' }, { status: 404 })
+  }
+
   const hasAnyField = Object.values(payload).some((value) => value !== undefined && value !== '')
   if (!hasAnyField) {
     return NextResponse.json({ message: '请至少填写一个需要批量修改的字段' }, { status: 400 })
@@ -133,7 +174,7 @@ export async function POST(request: Request) {
 
   try {
     const updates = await prisma.$transaction(
-      ids.map((id) =>
+      expandedIds.map((id) =>
         prisma.inspectionEntry.update({
           where: { id },
           data: {

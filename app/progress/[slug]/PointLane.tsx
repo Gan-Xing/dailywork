@@ -70,6 +70,7 @@ interface PointLaneProps {
     side: IntervalSide,
     startPk: number,
     endPk: number,
+    allowedLayers?: string[],
   ) => {
     percent: number
     completedLayers: number
@@ -160,7 +161,13 @@ export function PointLane({
                     : item.side === 'RIGHT'
                       ? sideLabelMap.RIGHT
                       : sideLabelMap.BOTH
-                const progress = resolvePointProgress(phase.id, item.side, item.startPk, item.endPk)
+                const progress = resolvePointProgress(
+                  phase.id,
+                  item.side,
+                  item.startPk,
+                  item.endPk,
+                  item.layers && item.layers.length ? item.layers : phase.resolvedLayers,
+                )
                 return (
                   <button
                     key={`${item.startPk}-${item.endPk}-${idx}`}
