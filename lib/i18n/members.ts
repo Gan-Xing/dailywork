@@ -49,6 +49,7 @@ export const memberCopy: Record<
         supervisor: string
         teamCostScatter: string
         teamCostShare: string
+        dataQuality: string
         provenance: string
         salary: string
         actualSalary: string
@@ -73,8 +74,13 @@ export const memberCopy: Record<
         missingProvenance: string
         missingContractType: string
         missingContractDate: string
+        missingPhone: string
+        missingPhoneHint: string
+        missingCnps: string
+        missingCnpsWithoutDeclaration: string
         overdue: string
         beyond: string
+        scopeAll: string
         localScope: string
         china: string
         nonChina: string
@@ -100,6 +106,7 @@ export const memberCopy: Record<
         cdd: string
         delta: string
         payoutTotal: string
+        dataQualityHint: string
         compareHint: string
       }
       helpers: {
@@ -663,6 +670,7 @@ export const memberCopy: Record<
         supervisor: '中方负责人',
         teamCostScatter: '班组热力',
         teamCostShare: '成本集中度',
+        dataQuality: '人工处理清单',
         provenance: '籍贯/属地分布',
         salary: '合同薪资区间占比',
         actualSalary: '实发薪资区间占比',
@@ -687,8 +695,13 @@ export const memberCopy: Record<
         missingProvenance: '未填写籍贯',
         missingContractType: '未填写合同类型',
         missingContractDate: '未填写到期日',
+        missingPhone: '缺失电话号码',
+        missingPhoneHint: '含 0500000000 视为缺失',
+        missingCnps: '缺失 CNPS 编号',
+        missingCnpsWithoutDeclaration: '缺失 CNPS 编号且无申报码',
         overdue: '已到期',
         beyond: '超过 3 个月',
+        scopeAll: '全员范围',
         localScope: '仅非中国籍',
         china: '中国籍',
         nonChina: '非中国籍',
@@ -714,6 +727,7 @@ export const memberCopy: Record<
         cdd: 'CDD',
         delta: '较上月',
         payoutTotal: '发放总额',
+        dataQualityHint: '这些字段需要人工补录或核对',
         compareHint: '对比模式暂未开放。',
       },
       helpers: {
@@ -1292,6 +1306,7 @@ export const memberCopy: Record<
         supervisor: 'Top responsables chinois',
         teamCostScatter: 'Carte thermique',
         teamCostShare: 'Concentration des coûts',
+        dataQuality: 'Suivi manuel',
         provenance: 'Répartition des provenances',
         salary: 'Répartition des salaires contractuels',
         actualSalary: 'Répartition des salaires versés',
@@ -1316,8 +1331,13 @@ export const memberCopy: Record<
         missingProvenance: 'Provenance non renseignée',
         missingContractType: 'Type de contrat manquant',
         missingContractDate: 'Date de fin manquante',
+        missingPhone: 'Téléphone manquant',
+        missingPhoneHint: '0500000000 est compté comme manquant',
+        missingCnps: 'N° CNPS manquant',
+        missingCnpsWithoutDeclaration: 'N° CNPS manquant et aucun code CNPS',
         overdue: 'Déjà expiré',
         beyond: 'Au-delà de 3 mois',
+        scopeAll: 'Tous',
         localScope: 'Non chinois',
         china: 'Chinois',
         nonChina: 'Non chinois',
@@ -1344,6 +1364,7 @@ export const memberCopy: Record<
         cdd: 'CDD',
         delta: 'Δ vs M-1',
         payoutTotal: 'Total versé',
+        dataQualityHint: 'Champs à compléter ou vérifier manuellement',
         compareHint: 'Le mode comparaison n’est pas encore disponible.',
       },
       helpers: {

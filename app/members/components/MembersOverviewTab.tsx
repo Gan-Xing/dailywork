@@ -18,6 +18,7 @@ type Props = {
   loading: boolean
   error: string | null
   canViewPayroll: boolean
+  canUpdateMember: boolean
   projectFilterOptions: MultiSelectOption[]
   statusFilterOptions: MultiSelectOption[]
   nationalityFilterOptions: MultiSelectOption[]
@@ -32,6 +33,7 @@ type Props = {
   onNationalityFiltersChange: (value: string[]) => void
   onTeamFiltersChange: (value: string[]) => void
   onViewMember: (member: Member) => void
+  onRefreshMembers: () => Promise<void>
 }
 
 type BarItem = {
@@ -185,6 +187,137 @@ const SALARY_RANGES = [
   { min: 300001, max: 500000 },
   { min: 500001, max: Number.POSITIVE_INFINITY },
 ]
+
+const PHONE_PLACEHOLDER = '0500000000'
+
+const normalizePhoneDigits = (value: string) => value.replace(/[^\d]/g, '')
+
+const hasValidPhone = (phones: string[]) => {
+  const normalized = phones.map(normalizePhoneDigits).filter(Boolean)
+  if (normalized.length === 0) return false
+  return normalized.some((value) => value !== PHONE_PLACEHOLDER)
+}
+
+const countMissingPhones = (members: Member[]) => {
+  let missing = 0
+  members.forEach((member) => {
+    const phones = Array.isArray(member.phones) ? member.phones : []
+    if (!hasValidPhone(phones)) {
+      missing += 1
+    }
+  })
+  return missing
+}
+
+const isMissingPhone = (member: Member) => {
+  const phones = Array.isArray(member.phones) ? member.phones : []
+  return !hasValidPhone(phones)
+}
+
+const isMissingCnpsNumber = (member: Member) =>
+  !normalizeText(member.expatProfile?.cnpsNumber)
+
+const isMissingCnpsAndDeclaration = (member: Member) =>
+  !normalizeText(member.expatProfile?.cnpsNumber) &&
+  !normalizeText(member.expatProfile?.cnpsDeclarationCode)
+
+const buildCnpsStats = (members: Member[]) => {
+  let missing = 0
+  let missingWithoutDeclaration = 0
+  members.forEach((member) => {
+    const cnpsNumber = normalizeText(member.expatProfile?.cnpsNumber)
+    const cnpsDeclaration = normalizeText(member.expatProfile?.cnpsDeclarationCode)
+    if (!cnpsNumber) {
+      missing += 1
+      if (!cnpsDeclaration) {
+        missingWithoutDeclaration += 1
+      }
+    }
+  })
+  return { missing, missingWithoutDeclaration }
+}
+
+type ContractExpiryItem = {
+  key: string
+  label: string
+  value: number
+  color: string
+}
+
+type ContractExpiryStats = {
+  items: ContractExpiryItem[]
+  overdue: number
+  beyond: number
+  missing: number
+  membersByKey: Map<string, Member[]>
+  overdueMembers: Member[]
+}
+
+const buildContractExpiryStats = (members: Member[], overdueLabel: string): ContractExpiryStats => {
+  const now = new Date()
+  const months: string[] = []
+  for (let i = 0; i < 3; i += 1) {
+    const date = new Date(now.getFullYear(), now.getMonth() + i, 1)
+    months.push(date.toISOString().slice(0, 7))
+  }
+  const counts = new Map(months.map((key) => [key, 0]))
+  const membersByKey = new Map<string, Member[]>(months.map((key) => [key, []]))
+  let overdue = 0
+  let beyond = 0
+  let missing = 0
+  const overdueMembers: Member[] = []
+
+  members.forEach((member) => {
+    const endDate = member.expatProfile?.contractEndDate
+    if (!endDate) {
+      missing += 1
+      return
+    }
+    const parsed = new Date(endDate)
+    if (Number.isNaN(parsed.getTime())) {
+      missing += 1
+      return
+    }
+    if (parsed < now) {
+      overdue += 1
+      overdueMembers.push(member)
+      return
+    }
+    const key = parsed.toISOString().slice(0, 7)
+    if (counts.has(key)) {
+      counts.set(key, (counts.get(key) ?? 0) + 1)
+      membersByKey.get(key)?.push(member)
+    } else {
+      beyond += 1
+    }
+  })
+
+  const items: ContractExpiryItem[] = [
+    {
+      key: 'overdue',
+      label: overdueLabel,
+      value: overdue,
+      color: CHART_COLORS[0],
+    },
+  ]
+  months.forEach((key, idx) => {
+    items.push({
+      key,
+      label: key,
+      value: counts.get(key) ?? 0,
+      color: CHART_COLORS[(idx + 1) % CHART_COLORS.length],
+    })
+  })
+
+  return {
+    items,
+    overdue,
+    beyond,
+    missing,
+    membersByKey,
+    overdueMembers,
+  }
+}
 
 const POSITION_GROUPS = [
   {
@@ -598,6 +731,556 @@ const BarList = ({
           </div>
         )
       })}
+    </div>
+  )
+}
+
+type DataQualityKey = 'missingPhone' | 'missingCnps' | 'missingCnpsWithoutDeclaration'
+
+type DataQualityItem = {
+  key: DataQualityKey
+  label: string
+  value: number
+  helper?: string
+  scope?: string
+}
+
+type DataQualityRow = {
+  id: number
+  team: string
+  name: string
+  birthDate: string
+  fieldValue: string
+  member: Member
+}
+
+const DataQualityList = ({
+  items,
+  formatValue,
+  emptyLabel,
+  onSelect,
+}: {
+  items: DataQualityItem[]
+  formatValue: (value: number) => string
+  emptyLabel: string
+  onSelect?: (key: DataQualityKey) => void
+}) => {
+  if (items.length === 0) {
+    return <p className="text-sm text-slate-500">{emptyLabel}</p>
+  }
+  return (
+    <div className="space-y-3">
+      {items.map((item) => {
+        const highlight = item.value > 0
+        const content = (
+          <>
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm font-semibold text-slate-700">{item.label}</span>
+                {item.scope ? (
+                  <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500 ring-1 ring-slate-200">
+                    {item.scope}
+                  </span>
+                ) : null}
+              </div>
+              {item.helper ? (
+                <p className="mt-1 text-[11px] text-slate-400">{item.helper}</p>
+              ) : null}
+            </div>
+            <span className={`text-lg font-bold ${highlight ? 'text-rose-600' : 'text-slate-900'}`}>
+              {formatValue(item.value)}
+            </span>
+          </>
+        )
+        if (!onSelect) {
+          return (
+            <div
+              key={item.key}
+              className="flex items-start justify-between gap-4 rounded-2xl border border-slate-100 bg-slate-50/60 p-3"
+            >
+              {content}
+            </div>
+          )
+        }
+        return (
+          <button
+            type="button"
+            key={item.key}
+            onClick={() => onSelect(item.key)}
+            className="flex w-full items-start justify-between gap-4 rounded-2xl border border-slate-100 bg-slate-50/60 p-3 text-left transition hover:border-slate-200 hover:bg-slate-50"
+          >
+            {content}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+const DataQualityModal = ({
+  open,
+  title,
+  rows,
+  fieldLabel,
+  placeholder,
+  canEdit,
+  drafts,
+  onDraftChange,
+  onSave,
+  onClose,
+  onViewMember,
+  saving,
+  hasChanges,
+  error,
+  notice,
+  emptyLabel,
+  emptyValueLabel,
+  labels,
+}: {
+  open: boolean
+  title: string
+  rows: DataQualityRow[]
+  fieldLabel: string
+  placeholder?: string
+  canEdit: boolean
+  drafts: Record<number, string>
+  onDraftChange: (memberId: number, value: string) => void
+  onSave: () => void
+  onClose: () => void
+  onViewMember: (member: Member) => void
+  saving: boolean
+  hasChanges: boolean
+  error: string | null
+  notice: string | null
+  emptyLabel: string
+  emptyValueLabel: string
+  labels: {
+    team: string
+    name: string
+    birthDate: string
+    save: string
+    close: string
+  }
+}) => {
+  if (!open) return null
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 px-4 py-6">
+      <div className="w-full max-w-5xl max-h-[calc(100vh-3rem)] overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl shadow-slate-900/30">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-lg font-semibold text-slate-900">{title}</p>
+            <p className="mt-1 text-xs text-slate-500">{fieldLabel}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            {canEdit ? (
+              <button
+                type="button"
+                onClick={onSave}
+                disabled={!hasChanges || saving}
+                className="rounded-full bg-slate-900 px-4 py-1.5 text-xs font-semibold text-white shadow-sm transition disabled:cursor-not-allowed disabled:bg-slate-300"
+              >
+                {labels.save}
+              </button>
+            ) : null}
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-full border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+              aria-label={labels.close}
+            >
+              {labels.close}
+            </button>
+          </div>
+        </div>
+        {error ? (
+          <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+            {error}
+          </div>
+        ) : null}
+        {notice ? (
+          <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+            {notice}
+          </div>
+        ) : null}
+        <div className="mt-4 overflow-x-auto rounded-2xl border border-slate-100">
+          <table className="w-full table-auto text-left text-sm text-slate-700">
+            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+              <tr>
+                <th className="px-4 py-2">{labels.team}</th>
+                <th className="px-4 py-2">{labels.name}</th>
+                <th className="px-4 py-2">{labels.birthDate}</th>
+                <th className="px-4 py-2">{fieldLabel}</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {rows.length === 0 ? (
+                <tr>
+                  <td className="px-4 py-6 text-center text-slate-400" colSpan={4}>
+                    {emptyLabel}
+                  </td>
+                </tr>
+              ) : (
+                rows.map((row) => {
+                  const value = drafts[row.id] ?? row.fieldValue
+                  return (
+                    <tr key={row.id} className="hover:bg-slate-50">
+                      <td className="px-4 py-2 text-slate-600">{row.team}</td>
+                      <td className="px-4 py-2">
+                        <button
+                          type="button"
+                          onClick={() => onViewMember(row.member)}
+                          className="text-left font-semibold text-slate-900 hover:underline"
+                        >
+                          {row.name}
+                        </button>
+                      </td>
+                      <td className="px-4 py-2 text-slate-600">
+                        {row.birthDate}
+                      </td>
+                      <td className="px-4 py-2">
+                        {canEdit ? (
+                          <input
+                            type="text"
+                            value={value}
+                            onChange={(event) => onDraftChange(row.id, event.target.value)}
+                            placeholder={placeholder}
+                            disabled={saving}
+                            className="w-full rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-700 shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100 disabled:cursor-not-allowed disabled:bg-slate-100"
+                          />
+                        ) : (
+                          <span className="text-slate-500">
+                            {value || emptyValueLabel}
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+type ContractExpiryRow = {
+  id: number
+  team: string
+  teamValue: string
+  name: string
+  nameValue: string
+  birthDate: string
+  birthDateValue: number | null
+  contractNumber: string
+  contractNumberValue: string
+  contractType: string
+  contractTypeValue: string
+  contractStartDate: string
+  contractStartValue: number | null
+  contractEndDate: string
+  contractEndValue: number | null
+  member: Member
+}
+
+type ContractExpirySortKey =
+  | 'team'
+  | 'name'
+  | 'birthDate'
+  | 'contractNumber'
+  | 'contractType'
+  | 'contractStartDate'
+  | 'contractEndDate'
+
+const ContractExpiryList = ({
+  items,
+  formatValue,
+  emptyLabel,
+  onSelect,
+}: {
+  items: ContractExpiryItem[]
+  formatValue: (value: number) => string
+  emptyLabel: string
+  onSelect?: (key: string) => void
+}) => {
+  if (items.length === 0) {
+    return <p className="text-sm text-slate-500">{emptyLabel}</p>
+  }
+  const maxValue = Math.max(...items.map((item) => item.value), 1)
+  const total = items.reduce((sum, item) => sum + item.value, 0)
+  return (
+    <div className="space-y-5">
+      {items.map((item) => {
+        const percent = total > 0 ? Math.round((item.value / total) * 100) : 0
+        const content = (
+          <>
+            <div className="mb-2 flex items-end justify-between gap-2">
+              <span className="truncate font-semibold text-slate-700 transition-colors group-hover:text-slate-900">
+                {item.label}
+              </span>
+              <div className="text-right shrink-0">
+                <span className="text-base font-bold text-slate-900">{formatValue(item.value)}</span>
+                <span className="ml-1 text-xs font-medium text-slate-400">{percent}%</span>
+              </div>
+            </div>
+            <div className="h-3 w-full rounded-full bg-slate-100 overflow-hidden ring-1 ring-slate-100/50">
+              <div
+                className="h-full rounded-full transition-all duration-700 ease-out group-hover:brightness-95 relative"
+                style={{
+                  width: `${Math.max((item.value / maxValue) * 100, 2)}%`,
+                  backgroundColor: item.color,
+                }}
+              >
+                <div className="absolute inset-0 bg-gradient-to-b from-white/20 to-transparent"></div>
+              </div>
+            </div>
+          </>
+        )
+        if (!onSelect) {
+          return (
+            <div key={item.key} className="group">
+              {content}
+            </div>
+          )
+        }
+        return (
+          <button
+            type="button"
+            key={item.key}
+            onClick={() => onSelect(item.key)}
+            className="group w-full text-left"
+          >
+            {content}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+const ContractExpiryModal = ({
+  open,
+  title,
+  rows,
+  emptyLabel,
+  canEdit,
+  locale,
+  onClose,
+  onViewMember,
+  onEditMember,
+  labels,
+}: {
+  open: boolean
+  title: string
+  rows: ContractExpiryRow[]
+  emptyLabel: string
+  canEdit: boolean
+  locale: Locale
+  onClose: () => void
+  onViewMember: (member: Member) => void
+  onEditMember: (member: Member) => void
+  labels: {
+    team: string
+    name: string
+    birthDate: string
+    contractNumber: string
+    contractType: string
+    contractStartDate: string
+    contractEndDate: string
+    actions: string
+    edit: string
+    close: string
+  }
+}) => {
+  if (!open) return null
+  const [sortKey, setSortKey] = useState<ContractExpirySortKey>('team')
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
+  const collator = useMemo(
+    () => new Intl.Collator(toLocaleId(locale), { numeric: true, sensitivity: 'base' }),
+    [locale],
+  )
+
+  const handleSort = (key: ContractExpirySortKey) => {
+    setSortKey((current) => {
+      if (current === key) {
+        setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'))
+        return current
+      }
+      setSortDirection('asc')
+      return key
+    })
+  }
+
+  const sortIndicator = (key: ContractExpirySortKey) => {
+    if (sortKey !== key) return ''
+    return sortDirection === 'asc' ? ' ^' : ' v'
+  }
+
+  const sortedRows = useMemo(() => {
+    const compareOptionalString = (left: string, right: string) => {
+      const leftValue = normalizeText(left)
+      const rightValue = normalizeText(right)
+      if (!leftValue && !rightValue) return 0
+      if (!leftValue) return 1
+      if (!rightValue) return -1
+      const diff = collator.compare(leftValue, rightValue)
+      return sortDirection === 'asc' ? diff : -diff
+    }
+    const compareOptionalNumber = (left: number | null, right: number | null) => {
+      if (left === null && right === null) return 0
+      if (left === null) return 1
+      if (right === null) return -1
+      const diff = left - right
+      return sortDirection === 'asc' ? diff : -diff
+    }
+    const list = [...rows]
+    list.sort((a, b) => {
+      let diff = 0
+      switch (sortKey) {
+        case 'team':
+          diff = compareOptionalString(a.teamValue, b.teamValue)
+          break
+        case 'name':
+          diff = compareOptionalString(a.nameValue, b.nameValue)
+          break
+        case 'birthDate':
+          diff = compareOptionalNumber(a.birthDateValue, b.birthDateValue)
+          break
+        case 'contractNumber':
+          diff = compareOptionalString(a.contractNumberValue, b.contractNumberValue)
+          break
+        case 'contractType':
+          diff = compareOptionalString(a.contractTypeValue, b.contractTypeValue)
+          break
+        case 'contractStartDate':
+          diff = compareOptionalNumber(a.contractStartValue, b.contractStartValue)
+          break
+        case 'contractEndDate':
+          diff = compareOptionalNumber(a.contractEndValue, b.contractEndValue)
+          break
+        default:
+          diff = 0
+      }
+      if (diff !== 0) return diff
+      return collator.compare(a.nameValue, b.nameValue)
+    })
+    return list
+  }, [collator, rows, sortDirection, sortKey])
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 px-4 py-6">
+      <div className="w-full max-w-6xl max-h-[calc(100vh-3rem)] overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl shadow-slate-900/30">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-lg font-semibold text-slate-900">{title}</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-full border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+            aria-label={labels.close}
+          >
+            {labels.close}
+          </button>
+        </div>
+        <div className="mt-4 overflow-x-auto rounded-2xl border border-slate-100">
+          <table className="w-full table-auto text-left text-sm text-slate-700">
+            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+              <tr>
+                <th
+                  className="px-4 py-2 cursor-pointer"
+                  onClick={() => handleSort('team')}
+                >
+                  {labels.team}
+                  {sortIndicator('team')}
+                </th>
+                <th
+                  className="px-4 py-2 cursor-pointer"
+                  onClick={() => handleSort('name')}
+                >
+                  {labels.name}
+                  {sortIndicator('name')}
+                </th>
+                <th
+                  className="px-4 py-2 cursor-pointer"
+                  onClick={() => handleSort('birthDate')}
+                >
+                  {labels.birthDate}
+                  {sortIndicator('birthDate')}
+                </th>
+                <th
+                  className="px-4 py-2 cursor-pointer"
+                  onClick={() => handleSort('contractNumber')}
+                >
+                  {labels.contractNumber}
+                  {sortIndicator('contractNumber')}
+                </th>
+                <th
+                  className="px-4 py-2 cursor-pointer"
+                  onClick={() => handleSort('contractType')}
+                >
+                  {labels.contractType}
+                  {sortIndicator('contractType')}
+                </th>
+                <th
+                  className="px-4 py-2 cursor-pointer"
+                  onClick={() => handleSort('contractStartDate')}
+                >
+                  {labels.contractStartDate}
+                  {sortIndicator('contractStartDate')}
+                </th>
+                <th
+                  className="px-4 py-2 cursor-pointer"
+                  onClick={() => handleSort('contractEndDate')}
+                >
+                  {labels.contractEndDate}
+                  {sortIndicator('contractEndDate')}
+                </th>
+                <th className="px-4 py-2 text-right">{labels.actions}</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {rows.length === 0 ? (
+                <tr>
+                  <td className="px-4 py-6 text-center text-slate-400" colSpan={8}>
+                    {emptyLabel}
+                  </td>
+                </tr>
+              ) : (
+                sortedRows.map((row) => (
+                  <tr key={row.id} className="hover:bg-slate-50">
+                    <td className="px-4 py-2 text-slate-600">{row.team}</td>
+                    <td className="px-4 py-2">
+                      <button
+                        type="button"
+                        onClick={() => onViewMember(row.member)}
+                        className="text-left font-semibold text-slate-900 hover:underline"
+                      >
+                        {row.name}
+                      </button>
+                    </td>
+                    <td className="px-4 py-2 text-slate-600">{row.birthDate}</td>
+                    <td className="px-4 py-2 text-slate-600">{row.contractNumber}</td>
+                    <td className="px-4 py-2 text-slate-600">{row.contractType}</td>
+                    <td className="px-4 py-2 text-slate-600">{row.contractStartDate}</td>
+                    <td className="px-4 py-2 text-slate-600">{row.contractEndDate}</td>
+                    <td className="px-4 py-2 text-right">
+                      <button
+                        type="button"
+                        onClick={() => onEditMember(row.member)}
+                        disabled={!canEdit}
+                        className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+                      >
+                        {labels.edit}
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   )
 }
@@ -1808,6 +2491,7 @@ export function MembersOverviewTab({
   loading,
   error,
   canViewPayroll,
+  canUpdateMember,
   projectFilterOptions,
   statusFilterOptions,
   nationalityFilterOptions,
@@ -1822,6 +2506,7 @@ export function MembersOverviewTab({
   onNationalityFiltersChange,
   onTeamFiltersChange,
   onViewMember,
+  onRefreshMembers,
 }: Props) {
   const numberFormatter = useMemo(
     () => new Intl.NumberFormat(toLocaleId(locale)),
@@ -1865,6 +2550,18 @@ export function MembersOverviewTab({
   const [detailTeams, setDetailTeams] = useState<string[]>([])
   const [detailAutoMonthsPending, setDetailAutoMonthsPending] = useState(false)
   const [detailMonthOptions, setDetailMonthOptions] = useState<string[]>([])
+  const [dataQualityModal, setDataQualityModal] = useState<{
+    key: DataQualityKey
+    scope: 'overview' | 'detail'
+  } | null>(null)
+  const [dataQualityDrafts, setDataQualityDrafts] = useState<Record<number, string>>({})
+  const [dataQualitySaving, setDataQualitySaving] = useState(false)
+  const [dataQualityError, setDataQualityError] = useState<string | null>(null)
+  const [dataQualityNotice, setDataQualityNotice] = useState<string | null>(null)
+  const [contractExpiryModal, setContractExpiryModal] = useState<{
+    key: string
+    scope: 'overview' | 'detail'
+  } | null>(null)
   const detailMemberIdsRef = useRef<Set<number>>(new Set())
   const [detailRecordSort, setDetailRecordSort] = useState<{
     key: string
@@ -1886,6 +2583,18 @@ export function MembersOverviewTab({
     },
     [defaultPayrollMonth],
   )
+
+  useEffect(() => {
+    if (!dataQualityModal) {
+      setDataQualityDrafts({})
+      setDataQualityError(null)
+      setDataQualityNotice(null)
+      return
+    }
+    setDataQualityDrafts({})
+    setDataQualityError(null)
+    setDataQualityNotice(null)
+  }, [dataQualityModal])
 
   const triggerDetailAutoMonths = useCallback(() => {
     if (payrollMonthOptions.length === 0) return
@@ -2346,6 +3055,191 @@ export function MembersOverviewTab({
     [localMembers, detailTeamSet],
   )
 
+  const missingPhoneCount = useMemo(() => countMissingPhones(scopedMembers), [scopedMembers])
+  const detailMissingPhoneCount = useMemo(
+    () => countMissingPhones(detailMembers),
+    [detailMembers],
+  )
+  const localNonChinaMembers = useMemo(
+    () => localMembers.filter((member) => member.nationality !== 'china'),
+    [localMembers],
+  )
+  const cnpsStats = useMemo(() => buildCnpsStats(localNonChinaMembers), [localNonChinaMembers])
+  const detailCnpsStats = useMemo(() => buildCnpsStats(detailMembers), [detailMembers])
+
+  const handleDataQualityOpen = useCallback(
+    (key: DataQualityKey, scope: 'overview' | 'detail') => {
+      setDataQualityModal({ key, scope })
+    },
+    [],
+  )
+
+  const handleDataQualityClose = useCallback(() => {
+    setDataQualityModal(null)
+  }, [])
+
+  const handleDataQualityDraftChange = useCallback((memberId: number, value: string) => {
+    setDataQualityDrafts((prev) => ({ ...prev, [memberId]: value }))
+    setDataQualityError(null)
+    setDataQualityNotice(null)
+  }, [])
+
+  const dataQualityFieldLabel = useMemo(() => {
+    if (!dataQualityModal) return ''
+    if (dataQualityModal.key === 'missingPhone') return t.table.phones
+    if (dataQualityModal.key === 'missingCnps') return t.table.cnpsNumber
+    return t.table.cnpsDeclarationCode
+  }, [dataQualityModal, t.table.cnpsDeclarationCode, t.table.cnpsNumber, t.table.phones])
+
+  const dataQualityPlaceholder = useMemo(() => {
+    if (!dataQualityModal) return ''
+    if (dataQualityModal.key === 'missingPhone') return t.form.phonePlaceholder
+    if (dataQualityModal.key === 'missingCnps') return t.form.cnpsNumber
+    return t.form.cnpsDeclarationCode
+  }, [
+    dataQualityModal,
+    t.form.cnpsDeclarationCode,
+    t.form.cnpsNumber,
+    t.form.phonePlaceholder,
+  ])
+
+  const dataQualityRows = useMemo(() => {
+    if (!dataQualityModal) return []
+    const baseMembers =
+      dataQualityModal.scope === 'detail'
+        ? detailMembers
+        : dataQualityModal.key === 'missingPhone'
+          ? scopedMembers
+          : localNonChinaMembers
+    const filtered = baseMembers.filter((member) => {
+      if (dataQualityModal.key === 'missingPhone') return isMissingPhone(member)
+      if (dataQualityModal.key === 'missingCnps') return isMissingCnpsNumber(member)
+      return isMissingCnpsAndDeclaration(member)
+    })
+    return filtered.map((member) => {
+      const teamValue = normalizeText(member.expatProfile?.team)
+      const teamLabel = teamValue
+        ? resolveTeamLabel(teamValue)
+        : t.overview.labels.unassignedTeam
+      const displayName = normalizeText(member.name ?? null) || member.username || `#${member.id}`
+      const parsedBirthDate = member.birthDate ? new Date(member.birthDate) : null
+      const birthDate =
+        parsedBirthDate && !Number.isNaN(parsedBirthDate.getTime())
+          ? parsedBirthDate.toLocaleDateString(locale)
+          : t.labels.empty
+      const fieldValue =
+        dataQualityModal.key === 'missingPhone'
+          ? member.phones?.join(' / ') ?? ''
+          : dataQualityModal.key === 'missingCnps'
+            ? member.expatProfile?.cnpsNumber ?? ''
+            : member.expatProfile?.cnpsDeclarationCode ?? ''
+      return {
+        id: member.id,
+        team: teamLabel,
+        name: displayName,
+        birthDate,
+        fieldValue,
+        member,
+      }
+    })
+  }, [
+    dataQualityModal,
+    detailMembers,
+    locale,
+    localNonChinaMembers,
+    resolveTeamLabel,
+    scopedMembers,
+    t.labels.empty,
+    t.overview.labels.unassignedTeam,
+  ])
+
+  const dataQualityChanges = useMemo(() => {
+    if (!dataQualityModal) return []
+    return dataQualityRows.flatMap((row) => {
+      const draft = dataQualityDrafts[row.id]
+      if (draft === undefined) return []
+      if (normalizeText(draft) === normalizeText(row.fieldValue)) return []
+      return [{ id: row.id, value: draft }]
+    })
+  }, [dataQualityModal, dataQualityDrafts, dataQualityRows])
+
+  const handleDataQualitySave = useCallback(async () => {
+    if (!dataQualityModal) return
+    if (!canUpdateMember) {
+      setDataQualityError(t.errors.needMemberUpdate)
+      return
+    }
+    if (dataQualityChanges.length === 0) {
+      setDataQualityError(null)
+      setDataQualityNotice(t.feedback.bulkSaveEmpty)
+      return
+    }
+    setDataQualitySaving(true)
+    setDataQualityError(null)
+    setDataQualityNotice(null)
+    try {
+      const items = dataQualityChanges.map(({ id, value }) => {
+        const trimmed = value.trim()
+        const patch =
+          dataQualityModal.key === 'missingPhone'
+            ? { phones: trimmed }
+            : dataQualityModal.key === 'missingCnps'
+              ? { expatProfile: { cnpsNumber: trimmed } }
+              : { expatProfile: { cnpsDeclarationCode: trimmed } }
+        return { id, patch }
+      })
+      const res = await fetch('/api/members/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error ?? t.feedback.submitError)
+      }
+      const data = await res.json().catch(() => ({}))
+      const results = Array.isArray(data.results) ? data.results : []
+      const failed = results.filter((result: { ok: boolean }) => !result.ok)
+      const successCount = results.length - failed.length
+      if (failed.length > 0) {
+        const failedIds = new Set(failed.map((result: { id: number }) => result.id))
+        setDataQualityDrafts((prev) => {
+          const next: Record<number, string> = {}
+          Object.entries(prev).forEach(([id, value]) => {
+            if (failedIds.has(Number(id))) {
+              next[Number(id)] = value
+            }
+          })
+          return next
+        })
+        setDataQualityError(
+          failed[0]?.error ? String(failed[0].error) : t.feedback.submitError,
+        )
+        setDataQualityNotice(t.feedback.bulkSavePartial(successCount, failed.length))
+      } else {
+        setDataQualityNotice(t.feedback.bulkSaveSuccess(successCount))
+        setDataQualityDrafts({})
+      }
+      if (successCount > 0) {
+        await onRefreshMembers()
+      }
+    } catch (err) {
+      setDataQualityError(err instanceof Error ? err.message : t.feedback.submitError)
+    } finally {
+      setDataQualitySaving(false)
+    }
+  }, [
+    canUpdateMember,
+    dataQualityChanges,
+    dataQualityModal,
+    onRefreshMembers,
+    t.errors.needMemberUpdate,
+    t.feedback.bulkSaveEmpty,
+    t.feedback.bulkSavePartial,
+    t.feedback.bulkSaveSuccess,
+    t.feedback.submitError,
+  ])
+
   const detailMemberIds = useMemo(() => new Set(detailMembers.map((member) => member.id)), [detailMembers])
 
   useEffect(() => {
@@ -2517,51 +3411,10 @@ export function MembersOverviewTab({
     }
   }, [scopedMembers, locale])
 
-  const contractExpiryStats = useMemo(() => {
-    const now = new Date()
-    const months: string[] = []
-    for (let i = 0; i < 3; i += 1) {
-      const date = new Date(now.getFullYear(), now.getMonth() + i, 1)
-      months.push(date.toISOString().slice(0, 7))
-    }
-    const counts = new Map(months.map((key) => [key, 0]))
-    let overdue = 0
-    let beyond = 0
-    let missing = 0
-    localMembers.forEach((member) => {
-      const endDate = member.expatProfile?.contractEndDate
-      if (!endDate) {
-        missing += 1
-        return
-      }
-      const parsed = new Date(endDate)
-      if (Number.isNaN(parsed.getTime())) {
-        missing += 1
-        return
-      }
-      if (parsed < now) {
-        overdue += 1
-        return
-      }
-      const key = parsed.toISOString().slice(0, 7)
-      if (counts.has(key)) {
-        counts.set(key, (counts.get(key) ?? 0) + 1)
-      } else {
-        beyond += 1
-      }
-    })
-    const items = Array.from(counts.entries()).map(([label, value], idx) => ({
-      label,
-      value,
-      color: CHART_COLORS[idx % CHART_COLORS.length],
-    }))
-    return {
-      items,
-      overdue,
-      beyond,
-      missing,
-    }
-  }, [localMembers])
+  const contractExpiryStats = useMemo(
+    () => buildContractExpiryStats(localMembers, t.overview.labels.overdue),
+    [localMembers, t.overview.labels.overdue],
+  )
 
   const detailPayouts = useMemo(() => {
     if (!showTeamPayroll) return []
@@ -2835,48 +3688,126 @@ export function MembersOverviewTab({
     }
   }, [detailMembers, detailPayoutsByMemberId, payrollMonthCount, showTeamPayroll])
 
-  const detailContractExpiryStats = useMemo(() => {
-    const now = new Date()
-    const months: string[] = []
-    for (let i = 0; i < 3; i += 1) {
-      const date = new Date(now.getFullYear(), now.getMonth() + i, 1)
-      months.push(date.toISOString().slice(0, 7))
-    }
-    const counts = new Map(months.map((key) => [key, 0]))
-    let overdue = 0
-    let beyond = 0
-    let missing = 0
-    detailMembers.forEach((member) => {
-      const endDate = member.expatProfile?.contractEndDate
-      if (!endDate) {
-        missing += 1
-        return
+  const detailContractExpiryStats = useMemo(
+    () => buildContractExpiryStats(detailMembers, t.overview.labels.overdue),
+    [detailMembers, t.overview.labels.overdue],
+  )
+
+  const handleContractExpiryOpen = useCallback(
+    (scope: 'overview' | 'detail', key: string) => {
+      setContractExpiryModal({ scope, key })
+    },
+    [],
+  )
+
+  const handleContractExpiryClose = useCallback(() => {
+    setContractExpiryModal(null)
+  }, [])
+
+  const handleEditMember = useCallback(
+    (member: Member) => {
+      setContractExpiryModal(null)
+      if (typeof window !== 'undefined') {
+        window.open(`/members/${member.id}`, '_blank', 'noopener,noreferrer')
       }
-      const end = new Date(endDate)
-      if (Number.isNaN(end.getTime())) {
-        missing += 1
-        return
-      }
-      const key = end.toISOString().slice(0, 7)
-      if (counts.has(key)) {
-        counts.set(key, (counts.get(key) ?? 0) + 1)
-      } else if (end < now) {
-        overdue += 1
-      } else {
-        beyond += 1
+    },
+    [],
+  )
+
+  const contractExpiryModalRows = useMemo(() => {
+    if (!contractExpiryModal) return []
+    const stats =
+      contractExpiryModal.scope === 'detail' ? detailContractExpiryStats : contractExpiryStats
+    const members =
+      contractExpiryModal.key === 'overdue'
+        ? stats.overdueMembers
+        : stats.membersByKey.get(contractExpiryModal.key) ?? []
+    const rows = members.map((member) => {
+      const teamValue = normalizeText(member.expatProfile?.team)
+      const teamLabel = teamValue
+        ? resolveTeamLabel(teamValue)
+        : t.overview.labels.unassignedTeam
+      const displayName = normalizeText(member.name ?? null) || member.username || `#${member.id}`
+      const parsedBirthDate = member.birthDate ? new Date(member.birthDate) : null
+      const birthDateValue =
+        parsedBirthDate && !Number.isNaN(parsedBirthDate.getTime())
+          ? parsedBirthDate.getTime()
+          : null
+      const birthDate =
+        parsedBirthDate && !Number.isNaN(parsedBirthDate.getTime())
+          ? parsedBirthDate.toLocaleDateString(locale)
+          : t.labels.empty
+      const contractNumberValue = normalizeText(member.expatProfile?.contractNumber)
+      const contractNumber = contractNumberValue || t.labels.empty
+      const contractTypeRaw = normalizeText(member.expatProfile?.contractType).toUpperCase()
+      const contractType =
+        contractTypeRaw === 'CTJ'
+          ? t.overview.labels.ctj
+          : contractTypeRaw === 'CDD'
+            ? t.overview.labels.cdd
+            : t.labels.empty
+      const contractStartDate = member.expatProfile?.contractStartDate
+        ? new Date(member.expatProfile.contractStartDate)
+        : null
+      const contractStartValue =
+        contractStartDate && !Number.isNaN(contractStartDate.getTime())
+          ? contractStartDate.getTime()
+          : null
+      const contractStartLabel =
+        contractStartDate && !Number.isNaN(contractStartDate.getTime())
+          ? contractStartDate.toLocaleDateString(locale)
+          : t.labels.empty
+      const contractEndDate = member.expatProfile?.contractEndDate
+        ? new Date(member.expatProfile.contractEndDate)
+        : null
+      const contractEndValue =
+        contractEndDate && !Number.isNaN(contractEndDate.getTime())
+          ? contractEndDate.getTime()
+          : null
+      const contractEndLabel =
+        contractEndDate && !Number.isNaN(contractEndDate.getTime())
+          ? contractEndDate.toLocaleDateString(locale)
+          : t.labels.empty
+      return {
+        id: member.id,
+        team: teamLabel,
+        teamValue,
+        name: displayName,
+        nameValue: displayName,
+        birthDate,
+        birthDateValue,
+        contractNumber,
+        contractNumberValue,
+        contractType,
+        contractTypeValue: contractTypeRaw,
+        contractStartDate: contractStartLabel,
+        contractStartValue,
+        contractEndDate: contractEndLabel,
+        contractEndValue,
+        member,
       }
     })
-    return {
-      items: Array.from(counts.entries()).map(([label, value], idx) => ({
-        label,
-        value,
-        color: CHART_COLORS[idx % CHART_COLORS.length],
-      })),
-      overdue,
-      beyond,
-      missing,
-    }
-  }, [detailMembers])
+    return rows
+  }, [
+    contractExpiryModal,
+    contractExpiryStats,
+    detailContractExpiryStats,
+    locale,
+    resolveTeamLabel,
+    t.labels.empty,
+    t.overview.labels.cdd,
+    t.overview.labels.ctj,
+    t.overview.labels.unassignedTeam,
+  ])
+
+  const contractExpiryModalTitle = useMemo(() => {
+    if (!contractExpiryModal) return ''
+    const label =
+      contractExpiryModal.key === 'overdue'
+        ? t.overview.labels.overdue
+        : contractExpiryModal.key
+    return `${t.overview.charts.contractExpiry} · ${label}`
+  }, [contractExpiryModal, t.overview.charts.contractExpiry, t.overview.labels.overdue])
 
   const salaryPyramidStats = useMemo(() => {
     if (!showTeamPayroll) return []
@@ -3205,6 +4136,38 @@ export function MembersOverviewTab({
               </OverviewCard>
             </div>
 
+            <OverviewCard
+              title={t.overview.charts.dataQuality}
+              subtitle={t.overview.labels.dataQualityHint}
+            >
+              <DataQualityList
+                items={[
+                  {
+                    key: 'missingPhone',
+                    label: t.overview.labels.missingPhone,
+                    value: missingPhoneCount,
+                    helper: t.overview.labels.missingPhoneHint,
+                    scope: t.overview.labels.scopeAll,
+                  },
+                  {
+                    key: 'missingCnps',
+                    label: t.overview.labels.missingCnps,
+                    value: cnpsStats.missing,
+                    scope: t.overview.labels.localScope,
+                  },
+                  {
+                    key: 'missingCnpsWithoutDeclaration',
+                    label: t.overview.labels.missingCnpsWithoutDeclaration,
+                    value: cnpsStats.missingWithoutDeclaration,
+                    scope: t.overview.labels.localScope,
+                  },
+                ]}
+                formatValue={formatNumber}
+                emptyLabel={t.overview.labels.noData}
+                onSelect={(key) => handleDataQualityOpen(key, 'overview')}
+              />
+            </OverviewCard>
+
             <OverviewCard title={t.overview.charts.provenance} badge={t.overview.labels.localScope}>
               <DonutChart
                 items={provenanceStats.items}
@@ -3323,15 +4286,13 @@ export function MembersOverviewTab({
               </div>
               <div className="flex-1">
                 <OverviewCard title={t.overview.charts.contractExpiry} badge={t.overview.labels.localScope}>
-                  <BarList
+                  <ContractExpiryList
                     items={contractExpiryStats.items}
                     formatValue={(value) => `${formatNumber(value)} ${t.overview.labels.people}`}
                     emptyLabel={t.overview.labels.noData}
+                    onSelect={(key) => handleContractExpiryOpen('overview', key)}
                   />
                   <div className="mt-2 flex flex-wrap gap-3 text-xs text-slate-500">
-                    <span>
-                      {t.overview.labels.overdue}: {formatNumber(contractExpiryStats.overdue)}
-                    </span>
                     <span>
                       {t.overview.labels.beyond}: {formatNumber(contractExpiryStats.beyond)}
                     </span>
@@ -3425,6 +4386,39 @@ export function MembersOverviewTab({
           </OverviewCard>
 
           <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+            <OverviewCard
+              title={t.overview.charts.dataQuality}
+              subtitle={t.overview.labels.dataQualityHint}
+              badge={t.overview.labels.localScope}
+            >
+              <DataQualityList
+                items={[
+                  {
+                    key: 'missingPhone',
+                    label: t.overview.labels.missingPhone,
+                    value: detailMissingPhoneCount,
+                    helper: t.overview.labels.missingPhoneHint,
+                    scope: t.overview.labels.localScope,
+                  },
+                  {
+                    key: 'missingCnps',
+                    label: t.overview.labels.missingCnps,
+                    value: detailCnpsStats.missing,
+                    scope: t.overview.labels.localScope,
+                  },
+                  {
+                    key: 'missingCnpsWithoutDeclaration',
+                    label: t.overview.labels.missingCnpsWithoutDeclaration,
+                    value: detailCnpsStats.missingWithoutDeclaration,
+                    scope: t.overview.labels.localScope,
+                  },
+                ]}
+                formatValue={formatNumber}
+                emptyLabel={t.overview.labels.noData}
+                onSelect={(key) => handleDataQualityOpen(key, 'detail')}
+              />
+            </OverviewCard>
+
             <OverviewCard title={t.overview.charts.provenance} badge={t.overview.labels.localScope}>
               <DonutChart
                 items={detailProvenanceStats.items}
@@ -3543,15 +4537,13 @@ export function MembersOverviewTab({
               </div>
               <div className="flex-1">
                 <OverviewCard title={t.overview.charts.contractExpiry} badge={t.overview.labels.localScope}>
-                  <BarList
+                  <ContractExpiryList
                     items={detailContractExpiryStats.items}
                     formatValue={(value) => `${formatNumber(value)} ${t.overview.labels.people}`}
                     emptyLabel={t.overview.labels.noData}
+                    onSelect={(key) => handleContractExpiryOpen('detail', key)}
                   />
                   <div className="mt-2 flex flex-wrap gap-3 text-xs text-slate-500">
-                    <span>
-                      {t.overview.labels.overdue}: {formatNumber(detailContractExpiryStats.overdue)}
-                    </span>
                     <span>
                       {t.overview.labels.beyond}: {formatNumber(detailContractExpiryStats.beyond)}
                     </span>
@@ -3590,6 +4582,63 @@ export function MembersOverviewTab({
           {t.overview.labels.compareHint}
         </div>
       ) : null}
+
+      <ContractExpiryModal
+        open={Boolean(contractExpiryModal)}
+        title={contractExpiryModalTitle}
+        rows={contractExpiryModalRows}
+        emptyLabel={t.overview.labels.noData}
+        canEdit={canUpdateMember}
+        locale={locale}
+        onClose={handleContractExpiryClose}
+        onViewMember={onViewMember}
+        onEditMember={handleEditMember}
+        labels={{
+          team: t.table.team,
+          name: t.table.name,
+          birthDate: t.table.birthDate,
+          contractNumber: t.table.contractNumber,
+          contractType: t.table.contractType,
+          contractStartDate: t.table.contractStartDate,
+          contractEndDate: t.table.contractEndDate,
+          actions: t.table.actions,
+          edit: t.actions.edit,
+          close: t.labels.close,
+        }}
+      />
+
+      <DataQualityModal
+        open={Boolean(dataQualityModal)}
+        title={
+          dataQualityModal?.key === 'missingPhone'
+            ? t.overview.labels.missingPhone
+            : dataQualityModal?.key === 'missingCnps'
+              ? t.overview.labels.missingCnps
+              : t.overview.labels.missingCnpsWithoutDeclaration
+        }
+        rows={dataQualityRows}
+        fieldLabel={dataQualityFieldLabel}
+        placeholder={dataQualityPlaceholder}
+        canEdit={canUpdateMember}
+        drafts={dataQualityDrafts}
+        onDraftChange={handleDataQualityDraftChange}
+        onSave={handleDataQualitySave}
+        onClose={handleDataQualityClose}
+        onViewMember={onViewMember}
+        saving={dataQualitySaving}
+        hasChanges={dataQualityChanges.length > 0}
+        error={dataQualityError}
+        notice={dataQualityNotice}
+        emptyLabel={t.overview.labels.noData}
+        emptyValueLabel={t.labels.empty}
+        labels={{
+          team: t.table.team,
+          name: t.table.name,
+          birthDate: t.table.birthDate,
+          save: t.actions.saveChanges,
+          close: t.labels.close,
+        }}
+      />
 
       <PositionDetailModal
         open={Boolean(activePositionGroup)}

@@ -778,7 +778,9 @@ export function MembersPageClient() {
       return
     }
     setActionError(null)
-    router.push(`/members/${member.id}`)
+    if (typeof window !== 'undefined') {
+      window.open(`/members/${member.id}`, '_blank', 'noopener,noreferrer')
+    }
   }
 
   const openViewModal = (member: Member) => {
@@ -1377,6 +1379,7 @@ export function MembersPageClient() {
                 loading={loading}
                 error={error}
                 canViewPayroll={canViewPayroll}
+                canUpdateMember={canUpdateMember}
                 projectFilterOptions={projectFilterOptions}
                 statusFilterOptions={statusFilterOptions}
                 nationalityFilterOptions={nationalityFilterOptions}
@@ -1391,6 +1394,7 @@ export function MembersPageClient() {
                 onNationalityFiltersChange={setNationalityFilters}
                 onTeamFiltersChange={setTeamFilters}
                 onViewMember={(member) => setSelectedMember(member)}
+                onRefreshMembers={loadData}
               />
             ) : null}
 
