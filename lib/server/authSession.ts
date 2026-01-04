@@ -12,6 +12,7 @@ const secret = process.env.AUTH_SECRET ?? 'dev-secret'
 export interface SessionUser {
   id: number
   username: string
+  nationality: string | null
   roles: { id: number; name: string }[]
   permissions: string[]
   issuedAt: number
@@ -43,6 +44,7 @@ export const issueSession = async (user: AuthUser) => {
   const session: SessionUser = {
     id: user.id,
     username: user.username,
+    nationality: user.nationality ?? null,
     roles: user.roles.map((role) => ({ id: role.id, name: role.name })),
     permissions: user.permissions,
     issuedAt: Date.now(),

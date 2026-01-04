@@ -3,6 +3,7 @@ import { useMemo, type ReactNode } from 'react'
 import { memberCopy } from '@/lib/i18n/members'
 import {
   memberTemplateColumns,
+  memberTemplateColumnsExpat,
   type ColumnKey,
   type TemplateColumnKey,
 } from '@/lib/members/constants'
@@ -12,9 +13,10 @@ type MemberCopy = (typeof memberCopy)[keyof typeof memberCopy]
 type UseMemberColumnsParams = {
   t: MemberCopy
   canAssignRole: boolean
+  isViewerChinese: boolean
 }
 
-export function useMemberColumns({ t, canAssignRole }: UseMemberColumnsParams) {
+export function useMemberColumns({ t, canAssignRole, isViewerChinese }: UseMemberColumnsParams) {
   const columnOptions: { key: ColumnKey; label: ReactNode }[] = useMemo(() => {
     const baseOptions: { key: ColumnKey; label: ReactNode }[] = [
       { key: 'sequence', label: t.table.sequence },
@@ -173,9 +175,10 @@ export function useMemberColumns({ t, canAssignRole }: UseMemberColumnsParams) {
   )
 
   const templateColumns = useMemo(() => {
-    if (canAssignRole) return memberTemplateColumns
-    return memberTemplateColumns.filter((key) => key !== 'roles')
-  }, [canAssignRole])
+    const baseColumns = isViewerChinese ? memberTemplateColumns : memberTemplateColumnsExpat
+    if (canAssignRole) return baseColumns
+    return baseColumns.filter((key) => key !== 'roles')
+  }, [canAssignRole, isViewerChinese])
 
   return {
     columnOptions,

@@ -14,6 +14,7 @@ type ProfileSectionProps = {
   t: MemberCopy
   locale: Locale
   isChineseForm: boolean
+  canViewChineseProfile: boolean
   profileExpanded: boolean
   onToggleExpanded: () => void
   formState: FormState
@@ -26,6 +27,7 @@ export function ProfileSection({
   t,
   locale,
   isChineseForm,
+  canViewChineseProfile,
   profileExpanded,
   onToggleExpanded,
   formState,
@@ -33,6 +35,9 @@ export function ProfileSection({
   teamOptions,
   teamSupervisorMap,
 }: ProfileSectionProps) {
+  if (isChineseForm && !canViewChineseProfile) {
+    return null
+  }
   return (
     <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
       <button

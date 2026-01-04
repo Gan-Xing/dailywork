@@ -27,9 +27,16 @@ import type { Member } from './types'
 type Props = {
   member: Member
   canAssignRole: boolean
+  canDeleteMember: boolean
+  isViewerChinese: boolean
 }
 
-export function MemberEditClient({ member, canAssignRole }: Props) {
+export function MemberEditClient({
+  member,
+  canAssignRole,
+  canDeleteMember,
+  isViewerChinese,
+}: Props) {
   const { locale, setLocale } = usePreferredLocale()
   const t = memberCopy[locale]
   const statusLabels = employmentStatusLabels[locale]
@@ -71,6 +78,7 @@ export function MemberEditClient({ member, canAssignRole }: Props) {
   }, [])
 
   const isChineseForm = formState.nationality === 'china'
+  const canViewChineseProfile = isViewerChinese || member.nationality !== 'china'
   const displayName = formState.name || formState.username
   const phoneSummary = formState.phones.length
     ? `${formState.phones.length} ${t.form.phones}`
@@ -116,6 +124,7 @@ export function MemberEditClient({ member, canAssignRole }: Props) {
               t={t}
               locale={locale}
               isChineseForm={isChineseForm}
+              canViewChineseProfile={canViewChineseProfile}
               profileExpanded={profileExpanded}
               onToggleExpanded={() => setProfileExpanded((prev) => !prev)}
               formState={formState}
@@ -124,7 +133,7 @@ export function MemberEditClient({ member, canAssignRole }: Props) {
               teamSupervisorMap={teamSupervisorMap}
             />
 
-            {!isChineseForm ? (
+            {isViewerChinese || member.nationality !== 'china' ? (
               <CompensationSection
                 t={t}
                 locale={locale}
@@ -166,8 +175,10 @@ export function MemberEditClient({ member, canAssignRole }: Props) {
               submitting={submitting}
               actionError={actionError}
               skipChangeHistory={formState.skipChangeHistory}
-              onToggleSkipChangeHistory={(value) =>
-                setFormState((prev) => ({ ...prev, skipChangeHistory: value }))
+              onToggleSkipChangeHistory={
+                canDeleteMember
+                  ? (value) => setFormState((prev) => ({ ...prev, skipChangeHistory: value }))
+                  : undefined
               }
             />
           </form>

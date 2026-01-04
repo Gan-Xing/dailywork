@@ -271,6 +271,8 @@ export function MembersPageClient() {
     canViewPayroll,
     canManagePayroll,
     shouldShowAccessDenied,
+    isViewerChinese,
+    viewerNationality,
   } = useSessionPermissions()
   useEffect(() => {
     if (activeTab === 'permissions' && !canViewPermissions) {
@@ -394,6 +396,7 @@ export function MembersPageClient() {
   const { columnOptions, columnLabels, templateColumnLabels, templateColumns } = useMemberColumns({
     t,
     canAssignRole,
+    isViewerChinese,
   })
   const {
     positionOptions,
@@ -568,6 +571,7 @@ export function MembersPageClient() {
     canCreateMember,
     canViewMembers,
     canAssignRole,
+    canDeleteMember,
     rolesData,
     members: filteredMembers,
     visibleColumns,
@@ -585,7 +589,7 @@ export function MembersPageClient() {
     loadData,
     setActionError,
     setActionNotice,
-    skipChangeHistory: skipImportHistory,
+    skipChangeHistory: canDeleteMember ? skipImportHistory : false,
   })
   const {
     importing: contractChangeImporting,
@@ -1735,6 +1739,7 @@ export function MembersPageClient() {
         }}
         teamSupervisorMap={teamSupervisorMap}
         canViewCompensation={canUpdateMember}
+        viewerNationality={viewerNationality}
       />
     </main>
   )

@@ -45,6 +45,8 @@ export function useSessionPermissions() {
     hasSessionPermission('payroll:view') || hasSessionPermission('payroll:manage')
   const canManagePayroll = hasSessionPermission('payroll:manage')
   const shouldShowAccessDenied = authLoaded && !canViewMembers
+  const viewerNationality = session?.nationality ?? null
+  const isViewerChinese = viewerNationality === 'china'
 
   return {
     authLoaded,
@@ -62,5 +64,7 @@ export function useSessionPermissions() {
     canViewPayroll,
     canManagePayroll,
     shouldShowAccessDenied,
+    viewerNationality,
+    isViewerChinese,
   }
 }

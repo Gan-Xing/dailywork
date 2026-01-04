@@ -21,6 +21,7 @@ export interface AuthRole {
 export interface AuthUser {
   id: number
   username: string
+  nationality: string | null
   roles: AuthRole[]
   permissions: string[]
 }
@@ -28,6 +29,7 @@ export interface AuthUser {
 const userSelection = {
   id: true,
   username: true,
+  nationality: true,
   passwordHash: true,
   roles: {
     include: {
@@ -65,6 +67,7 @@ const mapUser = (user: Prisma.UserGetPayload<{ select: typeof userSelection }>):
   return {
     id: user.id,
     username: user.username,
+    nationality: user.nationality ?? null,
     roles,
     permissions,
   }

@@ -18,6 +18,7 @@ type Props = {
   onEdit: (member: Member) => void
   teamSupervisorMap: Map<string, { teamZh?: string | null }>
   canViewCompensation: boolean
+  viewerNationality: string | null
 }
 
 type TabKey = 'overview' | 'contracts' | 'payroll' | 'documents'
@@ -70,6 +71,7 @@ export function MemberDetailDrawer({
   onEdit,
   teamSupervisorMap,
   canViewCompensation,
+  viewerNationality,
 }: Props) {
   const { locale } = usePreferredLocale()
   const t = memberCopy[locale]
@@ -79,6 +81,9 @@ export function MemberDetailDrawer({
   const [compensationLoading, setCompensationLoading] = useState(false)
   const [compensationError, setCompensationError] = useState<string | null>(null)
   const memberId = member?.id ?? null
+  const isViewerChinese = viewerNationality === 'china'
+  const showCompensationTabs = member?.nationality !== 'china'
+  const canShowCompensation = canViewCompensation && showCompensationTabs
 
   useEffect(() => {
     if (!open || !member) return
@@ -89,7 +94,7 @@ export function MemberDetailDrawer({
     if (!open || !member) return
     setCompensation(null)
     setCompensationError(null)
-    if (!canViewCompensation) return
+    if (!canShowCompensation) return
     let cancelled = false
     const loadCompensation = async () => {
       setCompensationLoading(true)
@@ -116,7 +121,7 @@ export function MemberDetailDrawer({
     return () => {
       cancelled = true
     }
-  }, [open, member, memberId, canViewCompensation, t.feedback.loadError])
+  }, [open, member, memberId, canShowCompensation, t.feedback.loadError])
 
   if (!open || !member) return null
 
@@ -185,9 +190,13 @@ export function MemberDetailDrawer({
 
   const sections = [
     { key: 'overview', label: t.drawer.tabs.overview },
-    { key: 'contracts', label: t.drawer.tabs.contracts },
-    { key: 'payroll', label: t.drawer.tabs.payroll },
-    // { key: 'documents', label: '档案 Documents' },
+    ...(showCompensationTabs
+      ? ([
+          { key: 'contracts', label: t.drawer.tabs.contracts },
+          { key: 'payroll', label: t.drawer.tabs.payroll },
+          // { key: 'documents', label: '档案 Documents' },
+        ] as const)
+      : []),
   ] as const
   const displayName = member.name?.length ? member.name : t.labels.empty
   const contractChanges = compensation?.contractChanges ?? []
@@ -299,28 +308,30 @@ export function MemberDetailDrawer({
                     </dl>
                   </section>
 
-                  <section>
-                    <h3 className="mb-4 mt-6 border-b pb-2 text-sm font-medium leading-6 text-gray-900">
-                      {t.drawer.sections.personal}
-                    </h3>
-                    <dl className="grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2">
-                      <DetailItem label={t.table.maritalStatus} value={member.expatProfile?.maritalStatus ?? ''} emptyLabel={t.labels.empty} />
-                      <DetailItem
-                        label={t.table.childrenCount}
-                        value={member.expatProfile?.childrenCount?.toString() ?? ''}
-                        emptyLabel={t.labels.empty}
-                      />
-                      <DetailItem label={t.table.provenance} value={member.expatProfile?.provenance ?? ''} emptyLabel={t.labels.empty} />
-                      <DetailItem label={t.table.cnpsNumber} value={member.expatProfile?.cnpsNumber ?? ''} emptyLabel={t.labels.empty} />
-                      <DetailItem
-                        label={t.table.cnpsDeclarationCode}
-                        value={member.expatProfile?.cnpsDeclarationCode ?? ''}
-                        emptyLabel={t.labels.empty}
-                      />
-                    </dl>
-                  </section>
+                  {member.nationality !== 'china' && (
+                    <section>
+                      <h3 className="mb-4 mt-6 border-b pb-2 text-sm font-medium leading-6 text-gray-900">
+                        {t.drawer.sections.personal}
+                      </h3>
+                      <dl className="grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2">
+                        <DetailItem label={t.table.maritalStatus} value={member.expatProfile?.maritalStatus ?? ''} emptyLabel={t.labels.empty} />
+                        <DetailItem
+                          label={t.table.childrenCount}
+                          value={member.expatProfile?.childrenCount?.toString() ?? ''}
+                          emptyLabel={t.labels.empty}
+                        />
+                        <DetailItem label={t.table.provenance} value={member.expatProfile?.provenance ?? ''} emptyLabel={t.labels.empty} />
+                        <DetailItem label={t.table.cnpsNumber} value={member.expatProfile?.cnpsNumber ?? ''} emptyLabel={t.labels.empty} />
+                        <DetailItem
+                          label={t.table.cnpsDeclarationCode}
+                          value={member.expatProfile?.cnpsDeclarationCode ?? ''}
+                          emptyLabel={t.labels.empty}
+                        />
+                      </dl>
+                    </section>
+                  )}
 
-                  {member.nationality === 'china' && (
+                  {member.nationality === 'china' && isViewerChinese && (
                     <section>
                       <h3 className="mb-4 mt-6 border-b pb-2 text-sm font-medium leading-6 text-gray-900">
                         {t.drawer.sections.chineseProfile}
@@ -381,7 +392,7 @@ export function MemberDetailDrawer({
                 </div>
               )}
 
-              {activeTab === 'contracts' && (
+              {showCompensationTabs && activeTab === 'contracts' && (
                 <div className="space-y-6">
                   <section>
                     <h3 className="mb-4 border-b pb-2 text-sm font-medium leading-6 text-gray-900">
@@ -430,7 +441,7 @@ export function MemberDetailDrawer({
                         <span className="text-xs text-gray-400">{t.feedback.loading}</span>
                       )}
                     </div>
-                    {!canViewCompensation && (
+                    {!canShowCompensation && (
                       <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
                         {t.errors.needMemberUpdate}
                       </div>
@@ -440,7 +451,7 @@ export function MemberDetailDrawer({
                         {compensationError}
                       </div>
                     )}
-                    {canViewCompensation && (
+                    {canShowCompensation && (
                       <div className="overflow-hidden rounded-lg border border-slate-200">
                         <table className="min-w-full divide-y divide-slate-200 text-sm">
                           <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -480,7 +491,7 @@ export function MemberDetailDrawer({
                 </div>
               )}
 
-              {activeTab === 'payroll' && (
+              {showCompensationTabs && activeTab === 'payroll' && (
                 <div className="space-y-6">
                   <section>
                     <h3 className="mb-4 border-b pb-2 text-sm font-medium leading-6 text-gray-900">
@@ -519,7 +530,7 @@ export function MemberDetailDrawer({
                         <span className="text-xs text-gray-400">{t.feedback.loading}</span>
                       )}
                     </div>
-                    {!canViewCompensation && (
+                    {!canShowCompensation && (
                       <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
                         {t.errors.needMemberUpdate}
                       </div>
@@ -529,7 +540,7 @@ export function MemberDetailDrawer({
                         {compensationError}
                       </div>
                     )}
-                    {canViewCompensation && (
+                    {canShowCompensation && (
                       <div className="overflow-hidden rounded-lg border border-slate-200">
                         <table className="min-w-full divide-y divide-slate-200 text-sm">
                           <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -578,7 +589,7 @@ export function MemberDetailDrawer({
                         <span className="text-xs text-gray-400">{t.feedback.loading}</span>
                       )}
                     </div>
-                    {!canViewCompensation && (
+                    {!canShowCompensation && (
                       <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
                         {t.errors.needMemberUpdate}
                       </div>
@@ -588,7 +599,7 @@ export function MemberDetailDrawer({
                         {compensationError}
                       </div>
                     )}
-                    {canViewCompensation && (
+                    {canShowCompensation && (
                       <div className="overflow-hidden rounded-lg border border-slate-200">
                         <table className="min-w-full divide-y divide-slate-200 text-sm">
                           <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">

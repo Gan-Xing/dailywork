@@ -583,20 +583,22 @@ export function MembersTab(props: MembersTabProps) {
           <ActionButton onClick={onImportClick} disabled={!canCreateMember || importing}>
             {t.actions.import}
           </ActionButton>
-          <label
-            className={`inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-[11px] font-semibold text-slate-600 ${
-              !canCreateMember ? 'cursor-not-allowed opacity-60' : 'hover:bg-slate-50'
-            }`}
-          >
-            <input
-              type="checkbox"
-              checked={skipImportHistory}
-              onChange={(event) => onToggleSkipImportHistory(event.target.checked)}
-              disabled={!canCreateMember}
-              className="accent-emerald-500"
-            />
-            <span>{t.form.skipChangeHistory}</span>
-          </label>
+          {canDeleteMember ? (
+            <label
+              className={`inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-[11px] font-semibold text-slate-600 ${
+                !canCreateMember ? 'cursor-not-allowed opacity-60' : 'hover:bg-slate-50'
+              }`}
+            >
+              <input
+                type="checkbox"
+                checked={skipImportHistory}
+                onChange={(event) => onToggleSkipImportHistory(event.target.checked)}
+                disabled={!canCreateMember}
+                className="accent-emerald-500"
+              />
+              <span>{t.form.skipChangeHistory}</span>
+            </label>
+          ) : null}
           <ActionButton onClick={onOpenTeamSupervisorDialog} disabled={!canCreateMember}>
             {t.actions.teamSupervisors}
           </ActionButton>

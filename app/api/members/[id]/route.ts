@@ -53,6 +53,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     expatProfile,
     skipChangeHistory,
   } = body ?? {}
+  const canBypassHistory = Boolean(skipChangeHistory) && (await hasPermission('member:delete'))
 
   const normalizedUsername = typeof username === 'string' ? username.trim() : undefined
 
@@ -71,7 +72,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   }
   const resolvedEmploymentStatus = employmentStatus ?? 'ACTIVE'
   const isChinese = nationality === 'china'
-  const shouldRecordHistory = !skipChangeHistory
+  const shouldRecordHistory = !canBypassHistory
   const chineseProfileData = normalizeChineseProfile(chineseProfile)
   const expatProfileData = normalizeExpatProfile(expatProfile)
   const shouldUpsertExpatProfile = !isChinese || hasExpatProfileData(expatProfileData)

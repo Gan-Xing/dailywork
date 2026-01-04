@@ -241,6 +241,23 @@ export const memberTemplateColumns: TemplateColumnKey[] = [
   'medicalHistory',
   'healthStatus',
 ]
+const chineseOnlyTemplateColumns = new Set<TemplateColumnKey>([
+  'frenchName',
+  'idNumber',
+  'passportNumber',
+  'educationAndMajor',
+  'certifications',
+  'domesticMobile',
+  'redBookValidYears',
+  'cumulativeAbroadYears',
+  'birthplace',
+  'residenceInChina',
+  'medicalHistory',
+  'healthStatus',
+])
+export const memberTemplateColumnsExpat = memberTemplateColumns.filter(
+  (key) => !chineseOnlyTemplateColumns.has(key),
+)
 export const REQUIRED_IMPORT_COLUMNS: TemplateColumnKey[] = ['name', 'birthDate']
 export const PHONE_PATTERN = /^[+\d][\d\s-]{4,}$/
 export const EMPTY_FILTER_VALUE = '__EMPTY__'

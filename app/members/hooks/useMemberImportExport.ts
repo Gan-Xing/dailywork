@@ -20,6 +20,7 @@ type UseMemberImportExportParams = {
   canCreateMember: boolean
   canViewMembers: boolean
   canAssignRole: boolean
+  canDeleteMember: boolean
   rolesData: Role[]
   members: Member[]
   visibleColumns: ColumnKey[]
@@ -46,6 +47,7 @@ export function useMemberImportExport({
   canCreateMember,
   canViewMembers,
   canAssignRole,
+  canDeleteMember,
   rolesData,
   members,
   visibleColumns,
@@ -738,7 +740,7 @@ export function useMemberImportExport({
           body: JSON.stringify({
             members: prepared,
             ignoreErrors: errors.length > 0,
-            skipChangeHistory: Boolean(skipChangeHistory),
+            skipChangeHistory: Boolean(skipChangeHistory && canDeleteMember),
           }),
         })
         const payload = (await res.json().catch(() => ({}))) as {

@@ -3,8 +3,6 @@ import type { ContractType, EmploymentStatus as PrismaEmploymentStatus, SalaryUn
 
 import { hashPassword } from '@/lib/auth/password'
 import { hasPermission } from '@/lib/server/authSession'
-import { isDecimalEqual, resolveSupervisorSnapshot } from '@/lib/server/compensation'
-import { createInitialContractChangeIfMissing } from '@/lib/server/contractChanges'
 import {
   hasExpatProfileData,
   hasChineseProfileData,
@@ -132,9 +130,9 @@ export async function POST(request: Request) {
   const canAssignRole =
     (await hasPermission('role:update')) || (await hasPermission('role:manage'))
   const body = await request.json().catch(() => null)
-  const ignoreErrors = Boolean(body?.ignoreErrors)
   const skipChangeHistory = Boolean(body?.skipChangeHistory)
-  const shouldRecordHistory = !skipChangeHistory
+  const canBypassHistory = skipChangeHistory && (await hasPermission('member:delete'))
+  const ignoreErrors = Boolean(body?.ignoreErrors)
   const members = Array.isArray(body?.members) ? (body?.members as ImportMemberInput[]) : []
   if (members.length === 0) {
     return NextResponse.json({ error: '缺少导入数据' }, { status: 400 })
@@ -166,9 +164,9 @@ export async function POST(request: Request) {
     hasChineseProfileData: boolean
     expatProfile: ReturnType<typeof normalizeExpatProfile>
     hasExpatProfileData: boolean
+    hasContractTypeInput: boolean
   }> = []
   const seenUsernames = new Set<string>()
-  const seenContractNumbers = new Set<string>()
 
   const normalizePhoneList = (value: ImportMemberInput['phones']) => {
     if (Array.isArray(value)) {
@@ -292,30 +290,6 @@ export async function POST(request: Request) {
       invalidRows.add(row)
       hasRowError = true
     }
-    if (contractTypeInput && nationality !== 'china' && !expatProfile.contractType) {
-      errors.push({ row, code: 'invalid_contract_type', value: contractTypeInput })
-      invalidRows.add(row)
-      hasRowError = true
-    }
-    if (
-      nationality !== 'china' &&
-      expatProfile.contractType === 'CDD' &&
-      expatProfile.baseSalaryUnit === 'HOUR'
-    ) {
-      errors.push({ row, code: 'invalid_base_salary_unit' })
-      invalidRows.add(row)
-      hasRowError = true
-    }
-    if (nationality !== 'china' && expatProfile.contractNumber) {
-      const contractKey = expatProfile.contractNumber.toLowerCase()
-      if (seenContractNumbers.has(contractKey)) {
-        errors.push({ row, code: 'duplicate_contract_number', value: expatProfile.contractNumber })
-        invalidRows.add(row)
-        hasRowError = true
-      } else {
-        seenContractNumbers.add(contractKey)
-      }
-    }
     if (hasBirthDateInput && !parsedBirthDate) {
       errors.push({ row, code: 'invalid_birth_date', value: String(member.birthDate ?? '') })
       invalidRows.add(row)
@@ -388,6 +362,7 @@ export async function POST(request: Request) {
         hasChineseProfileData: hasChineseProfileData(chineseProfile),
         expatProfile,
         hasExpatProfileData: hasExpatProfileData(expatProfile),
+        hasContractTypeInput: Boolean(contractTypeInput),
       })
     }
   })
@@ -508,29 +483,6 @@ export async function POST(request: Request) {
     existingUsernames.map((user) => [user.username.toLowerCase(), user.id]),
   )
 
-  const contractNumberValues = Array.from(
-    new Set(
-      prepared
-        .map((member) => member.expatProfile.contractNumber)
-        .filter((value): value is string => Boolean(value)),
-    ),
-  )
-  const existingContractNumbers = contractNumberValues.length
-    ? await prisma.userExpatProfile.findMany({
-        where: {
-          OR: contractNumberValues.map((value) => ({
-            contractNumber: { equals: value, mode: 'insensitive' },
-          })),
-        },
-        select: { userId: true, contractNumber: true },
-      })
-    : []
-  const contractByValue = new Map(
-    existingContractNumbers.flatMap((item) =>
-      item.contractNumber ? [[item.contractNumber.toLowerCase(), item.userId] as const] : [],
-    ),
-  )
-
   const matchByRow = new Map<
     number,
     {
@@ -570,8 +522,76 @@ export async function POST(request: Request) {
         invalidRows.add(member.row)
       }
     }
-    if (member.expatProfile.contractNumber) {
-      const existingUserId = contractByValue.get(member.expatProfile.contractNumber.toLowerCase())
+  })
+
+  const contractNumberCandidates = prepared.filter((member) => {
+    const match = matchByRow.get(member.row)
+    if (!match) return Boolean(member.expatProfile.contractNumber)
+    if (!canBypassHistory) return false
+    return Boolean(member.expatProfile.contractNumber)
+  })
+  const newContractNumberValues = Array.from(
+    new Set(
+      contractNumberCandidates
+        .map((member) => member.expatProfile.contractNumber)
+        .filter((value): value is string => Boolean(value)),
+    ),
+  )
+  const existingContractNumbers = newContractNumberValues.length
+    ? await prisma.userExpatProfile.findMany({
+        where: {
+          OR: newContractNumberValues.map((value) => ({
+            contractNumber: { equals: value, mode: 'insensitive' },
+          })),
+        },
+        select: { userId: true, contractNumber: true },
+      })
+    : []
+  const contractByValue = new Map(
+    existingContractNumbers.flatMap((item) =>
+      item.contractNumber ? [[item.contractNumber.toLowerCase(), item.userId] as const] : [],
+    ),
+  )
+  const seenContractNumbers = new Set<string>()
+
+  prepared.forEach((member) => {
+    if (invalidRows.has(member.row)) return
+    const match = matchByRow.get(member.row)
+    if (match && !canBypassHistory) return
+    if (
+      member.hasContractTypeInput &&
+      member.nationality !== 'china' &&
+      !member.expatProfile.contractType
+    ) {
+      errors.push({
+        row: member.row,
+        code: 'invalid_contract_type',
+      })
+      invalidRows.add(member.row)
+      return
+    }
+    if (
+      member.nationality !== 'china' &&
+      member.expatProfile.contractType === 'CDD' &&
+      member.expatProfile.baseSalaryUnit === 'HOUR'
+    ) {
+      errors.push({ row: member.row, code: 'invalid_base_salary_unit' })
+      invalidRows.add(member.row)
+      return
+    }
+    if (member.nationality !== 'china' && member.expatProfile.contractNumber) {
+      const contractKey = member.expatProfile.contractNumber.toLowerCase()
+      if (seenContractNumbers.has(contractKey)) {
+        errors.push({
+          row: member.row,
+          code: 'duplicate_contract_number',
+          value: member.expatProfile.contractNumber,
+        })
+        invalidRows.add(member.row)
+        return
+      }
+      seenContractNumbers.add(contractKey)
+      const existingUserId = contractByValue.get(contractKey)
       if (existingUserId && existingUserId !== match?.id) {
         errors.push({
           row: member.row,
@@ -584,8 +604,10 @@ export async function POST(request: Request) {
   })
 
   prepared.forEach((member) => {
+    if (invalidRows.has(member.row)) return
     const match = matchByRow.get(member.row)
-    const resolvedTeam = member.expatProfile.team ?? match?.expatProfile?.team ?? null
+    if (match && (!canBypassHistory || !member.expatProfile.team)) return
+    const resolvedTeam = member.expatProfile.team ?? null
     const teamKey = normalizeTeamKey(resolvedTeam)
     if (teamKey && !teamSupervisorMap.has(teamKey)) {
       errors.push({ row: member.row, code: 'missing_team_supervisor', value: resolvedTeam ?? '' })
@@ -638,371 +660,351 @@ export async function POST(request: Request) {
     candidateBatches.push(resolvedCandidates.slice(i, i + IMPORT_BATCH_SIZE))
   }
 
-  const isSameDate = (left?: Date | null, right?: Date | null) => {
-    if (!left && !right) return true
-    if (!left || !right) return false
-    return left.getTime() === right.getTime()
-  }
-
   for (const batch of candidateBatches) {
     await prisma.$transaction(
       async (tx) => {
-      for (const { member, match, passwordHash } of batch) {
-        const resolvedNationality = member.nationality ?? match?.nationality ?? null
-        const isChinese = resolvedNationality === 'china'
-        const shouldUpsertChineseProfile = isChinese && member.hasChineseProfileData
-        const shouldUpsertExpatProfile = !isChinese || member.hasExpatProfileData
-        const addOneYear = (date: Date) => {
-          const next = new Date(date)
-          next.setFullYear(next.getFullYear() + 1)
-          return next
-        }
-        const resolvedJoinDate = member.joinDate ?? match?.joinDate ?? null
-        const resolvedContractStartDate =
-          !isChinese ? member.expatProfile.contractStartDate ?? resolvedJoinDate : null
-        const resolvedContractEndDate =
-          !isChinese
-            ? member.expatProfile.contractEndDate ??
-              (resolvedContractStartDate ? addOneYear(resolvedContractStartDate) : null)
-            : null
-        const shouldUpdateContractDates =
-          member.expatProfile.contractStartDate !== null ||
-          member.expatProfile.contractEndDate !== null
-        const resolvedTeam = member.expatProfile.team ?? match?.expatProfile?.team ?? null
-        const teamKey = normalizeTeamKey(resolvedTeam)
-        const teamDefaults = teamKey ? teamSupervisorMap.get(teamKey) ?? null : null
-        const resolvedSupervisorId = teamKey
-          ? teamDefaults?.supervisorId ?? null
-          : match?.expatProfile?.chineseSupervisorId ?? null
-        if (teamKey && !resolvedSupervisorId) {
-          throw new Error('班组未绑定中方负责人')
-        }
-        const projectKey = normalizeText(member.project).toLowerCase()
-        const explicitProjectId = projectKey ? projectLookup.get(projectKey)?.id ?? null : null
-        const resolvedProjectId = explicitProjectId ?? teamDefaults?.projectId ?? null
-        const hasExplicitProject = Boolean(projectKey)
-        const chineseProfileUpdate = {
-          ...(member.chineseProfile.frenchName
-            ? { frenchName: member.chineseProfile.frenchName }
-            : {}),
-          ...(member.chineseProfile.idNumber ? { idNumber: member.chineseProfile.idNumber } : {}),
-          ...(member.chineseProfile.passportNumber
-            ? { passportNumber: member.chineseProfile.passportNumber }
-            : {}),
-          ...(member.chineseProfile.educationAndMajor
-            ? { educationAndMajor: member.chineseProfile.educationAndMajor }
-            : {}),
-          ...(member.chineseProfile.certifications.length > 0
-            ? { certifications: member.chineseProfile.certifications }
-            : {}),
-          ...(member.chineseProfile.domesticMobile
-            ? { domesticMobile: member.chineseProfile.domesticMobile }
-            : {}),
-          ...(member.chineseProfile.emergencyContactName
-            ? { emergencyContactName: member.chineseProfile.emergencyContactName }
-            : {}),
-          ...(member.chineseProfile.emergencyContactPhone
-            ? { emergencyContactPhone: member.chineseProfile.emergencyContactPhone }
-            : {}),
-          ...(member.chineseProfile.redBookValidYears !== null
-            ? { redBookValidYears: member.chineseProfile.redBookValidYears }
-            : {}),
-          ...(member.chineseProfile.cumulativeAbroadYears !== null
-            ? { cumulativeAbroadYears: member.chineseProfile.cumulativeAbroadYears }
-            : {}),
-          ...(member.chineseProfile.birthplace ? { birthplace: member.chineseProfile.birthplace } : {}),
-          ...(member.chineseProfile.residenceInChina
-            ? { residenceInChina: member.chineseProfile.residenceInChina }
-            : {}),
-          ...(member.chineseProfile.medicalHistory
-            ? { medicalHistory: member.chineseProfile.medicalHistory }
-            : {}),
-          ...(member.chineseProfile.healthStatus
-            ? { healthStatus: member.chineseProfile.healthStatus }
-            : {}),
-        }
-        const expatProfileUpdate = {
-          ...(resolvedTeam ? { chineseSupervisorId: resolvedSupervisorId } : {}),
-          ...(member.expatProfile.team ? { team: member.expatProfile.team } : {}),
-          ...(member.expatProfile.contractNumber
-            ? { contractNumber: member.expatProfile.contractNumber }
-            : {}),
-          ...(member.expatProfile.contractType
-            ? { contractType: member.expatProfile.contractType }
-            : {}),
-          ...(shouldUpdateContractDates
-            ? {
-                contractStartDate: resolvedContractStartDate,
-                contractEndDate: resolvedContractEndDate,
-              }
-            : {}),
-          ...(member.expatProfile.salaryCategory
-            ? { salaryCategory: member.expatProfile.salaryCategory }
-            : {}),
-          ...(member.expatProfile.prime ? { prime: member.expatProfile.prime } : {}),
-          ...(member.expatProfile.baseSalaryAmount
-            ? { baseSalaryAmount: member.expatProfile.baseSalaryAmount }
-            : {}),
-          ...(member.expatProfile.baseSalaryUnit
-            ? { baseSalaryUnit: member.expatProfile.baseSalaryUnit }
-            : {}),
-          ...(member.expatProfile.netMonthlyAmount
-            ? { netMonthlyAmount: member.expatProfile.netMonthlyAmount }
-            : {}),
-          ...(member.expatProfile.netMonthlyUnit
-            ? { netMonthlyUnit: member.expatProfile.netMonthlyUnit }
-            : {}),
-          ...(member.expatProfile.maritalStatus
-            ? { maritalStatus: member.expatProfile.maritalStatus }
-            : {}),
-          ...(member.expatProfile.childrenCount !== null
-            ? { childrenCount: member.expatProfile.childrenCount }
-            : {}),
-          ...(member.expatProfile.cnpsNumber
-            ? { cnpsNumber: member.expatProfile.cnpsNumber }
-            : {}),
-          ...(member.expatProfile.cnpsDeclarationCode
-            ? { cnpsDeclarationCode: member.expatProfile.cnpsDeclarationCode }
-            : {}),
-          ...(member.expatProfile.provenance
-            ? { provenance: member.expatProfile.provenance }
-            : {}),
-          ...(member.expatProfile.emergencyContactName
-            ? { emergencyContactName: member.expatProfile.emergencyContactName }
-            : {}),
-          ...(member.expatProfile.emergencyContactPhone
-            ? { emergencyContactPhone: member.expatProfile.emergencyContactPhone }
-            : {}),
-        }
-        const normalizeDecimal = (
-          value: ExistingExpatProfile['prime'] | null | undefined,
-        ) => {
-          if (value === null || value === undefined) return null
-          return typeof value === 'string' ? value : value.toString()
-        }
-        const existingExpat = match?.expatProfile ?? null
-        const existingExpatSnapshot: Parameters<
-          typeof createInitialContractChangeIfMissing
-        >[1]['expatProfile'] = existingExpat
-          ? {
-              chineseSupervisorId: existingExpat.chineseSupervisorId,
-              contractNumber: existingExpat.contractNumber,
-              contractType: existingExpat.contractType,
-              salaryCategory: existingExpat.salaryCategory,
-              baseSalaryAmount: normalizeDecimal(existingExpat.baseSalaryAmount),
-              baseSalaryUnit: existingExpat.baseSalaryUnit,
-              prime: normalizeDecimal(existingExpat.prime),
-              contractStartDate: existingExpat.contractStartDate,
-              contractEndDate: existingExpat.contractEndDate,
+        for (const { member, match, passwordHash } of batch) {
+          const resolvedNationality = member.nationality ?? match?.nationality ?? null
+          const isChinese = resolvedNationality === 'china'
+          const shouldUpsertChineseProfile = isChinese && member.hasChineseProfileData
+          const addOneYear = (date: Date) => {
+            const next = new Date(date)
+            next.setFullYear(next.getFullYear() + 1)
+            return next
+          }
+          const resolvedJoinDate = match?.joinDate ?? member.joinDate ?? null
+          const projectKey = normalizeText(member.project).toLowerCase()
+          const explicitProjectId = projectKey ? projectLookup.get(projectKey)?.id ?? null : null
+          const hasExplicitProject = Boolean(projectKey)
+          const chineseProfileUpdate = {
+            ...(member.chineseProfile.frenchName
+              ? { frenchName: member.chineseProfile.frenchName }
+              : {}),
+            ...(member.chineseProfile.idNumber ? { idNumber: member.chineseProfile.idNumber } : {}),
+            ...(member.chineseProfile.passportNumber
+              ? { passportNumber: member.chineseProfile.passportNumber }
+              : {}),
+            ...(member.chineseProfile.educationAndMajor
+              ? { educationAndMajor: member.chineseProfile.educationAndMajor }
+              : {}),
+            ...(member.chineseProfile.certifications.length > 0
+              ? { certifications: member.chineseProfile.certifications }
+              : {}),
+            ...(member.chineseProfile.domesticMobile
+              ? { domesticMobile: member.chineseProfile.domesticMobile }
+              : {}),
+            ...(member.chineseProfile.emergencyContactName
+              ? { emergencyContactName: member.chineseProfile.emergencyContactName }
+              : {}),
+            ...(member.chineseProfile.emergencyContactPhone
+              ? { emergencyContactPhone: member.chineseProfile.emergencyContactPhone }
+              : {}),
+            ...(member.chineseProfile.redBookValidYears !== null
+              ? { redBookValidYears: member.chineseProfile.redBookValidYears }
+              : {}),
+            ...(member.chineseProfile.cumulativeAbroadYears !== null
+              ? { cumulativeAbroadYears: member.chineseProfile.cumulativeAbroadYears }
+              : {}),
+            ...(member.chineseProfile.birthplace
+              ? { birthplace: member.chineseProfile.birthplace }
+              : {}),
+            ...(member.chineseProfile.residenceInChina
+              ? { residenceInChina: member.chineseProfile.residenceInChina }
+              : {}),
+            ...(member.chineseProfile.medicalHistory
+              ? { medicalHistory: member.chineseProfile.medicalHistory }
+              : {}),
+            ...(member.chineseProfile.healthStatus
+              ? { healthStatus: member.chineseProfile.healthStatus }
+              : {}),
+          }
+          const allowedExpatProfileUpdate = {
+            ...(member.expatProfile.maritalStatus
+              ? { maritalStatus: member.expatProfile.maritalStatus }
+              : {}),
+            ...(member.expatProfile.childrenCount !== null
+              ? { childrenCount: member.expatProfile.childrenCount }
+              : {}),
+            ...(member.expatProfile.cnpsNumber
+              ? { cnpsNumber: member.expatProfile.cnpsNumber }
+              : {}),
+            ...(member.expatProfile.cnpsDeclarationCode
+              ? { cnpsDeclarationCode: member.expatProfile.cnpsDeclarationCode }
+              : {}),
+            ...(member.expatProfile.provenance
+              ? { provenance: member.expatProfile.provenance }
+              : {}),
+            ...(member.expatProfile.emergencyContactName
+              ? { emergencyContactName: member.expatProfile.emergencyContactName }
+              : {}),
+            ...(member.expatProfile.emergencyContactPhone
+              ? { emergencyContactPhone: member.expatProfile.emergencyContactPhone }
+              : {}),
+          }
+          const hasAllowedExpatProfileUpdate = Object.keys(allowedExpatProfileUpdate).length > 0
+          if (!match) {
+            const resolvedContractStartDate =
+              !isChinese ? member.expatProfile.contractStartDate ?? resolvedJoinDate : null
+            const resolvedContractEndDate =
+              !isChinese
+                ? member.expatProfile.contractEndDate ??
+                  (resolvedContractStartDate ? addOneYear(resolvedContractStartDate) : null)
+                : null
+            const resolvedTeam = member.expatProfile.team ?? null
+            const teamKey = normalizeTeamKey(resolvedTeam)
+            const teamDefaults = teamKey ? teamSupervisorMap.get(teamKey) ?? null : null
+            const resolvedSupervisorId = teamKey ? teamDefaults?.supervisorId ?? null : null
+            if (teamKey && !resolvedSupervisorId) {
+              throw new Error('班组未绑定中方负责人')
             }
-          : null
-        const nextExpat = {
-          team: resolvedTeam,
-          chineseSupervisorId: resolvedSupervisorId,
-          contractNumber: member.expatProfile.contractNumber ?? existingExpat?.contractNumber ?? null,
-          contractType: member.expatProfile.contractType ?? existingExpat?.contractType ?? null,
-          salaryCategory: member.expatProfile.salaryCategory ?? existingExpat?.salaryCategory ?? null,
-          prime: member.expatProfile.prime ?? normalizeDecimal(existingExpat?.prime ?? null),
-          baseSalaryAmount:
-            member.expatProfile.baseSalaryAmount ??
-            normalizeDecimal(existingExpat?.baseSalaryAmount ?? null),
-          baseSalaryUnit: member.expatProfile.baseSalaryUnit ?? existingExpat?.baseSalaryUnit ?? null,
-          netMonthlyAmount:
-            member.expatProfile.netMonthlyAmount ??
-            normalizeDecimal(existingExpat?.netMonthlyAmount ?? null),
-          netMonthlyUnit: member.expatProfile.netMonthlyUnit ?? existingExpat?.netMonthlyUnit ?? null,
-          contractStartDate: shouldUpdateContractDates
-            ? resolvedContractStartDate
-            : existingExpat?.contractStartDate ?? null,
-          contractEndDate: shouldUpdateContractDates
-            ? resolvedContractEndDate
-            : existingExpat?.contractEndDate ?? null,
-        }
-        const shouldTrackExpatChanges =
-          !isChinese && (member.hasExpatProfileData || Boolean(existingExpat))
-        const contractChanged =
-          shouldTrackExpatChanges &&
-          (existingExpat?.contractNumber !== nextExpat.contractNumber ||
-            existingExpat?.contractType !== nextExpat.contractType ||
-            !isSameDate(existingExpat?.contractStartDate, nextExpat.contractStartDate) ||
-            !isSameDate(existingExpat?.contractEndDate, nextExpat.contractEndDate))
-        const payrollChanged =
-          shouldTrackExpatChanges &&
-          (existingExpat?.salaryCategory !== nextExpat.salaryCategory ||
-            !isDecimalEqual(existingExpat?.prime ?? null, nextExpat.prime ?? null) ||
-            !isDecimalEqual(existingExpat?.baseSalaryAmount ?? null, nextExpat.baseSalaryAmount ?? null) ||
-            existingExpat?.baseSalaryUnit !== nextExpat.baseSalaryUnit ||
-            !isDecimalEqual(existingExpat?.netMonthlyAmount ?? null, nextExpat.netMonthlyAmount ?? null) ||
-            existingExpat?.netMonthlyUnit !== nextExpat.netMonthlyUnit)
-        const teamChanged =
-          normalizeTeamKey(resolvedTeam) !== normalizeTeamKey(existingExpat?.team ?? null)
-        const shouldUpdateProjectAssignment = !match || hasExplicitProject || teamChanged
-        if (!match) {
-          const resolvedEmploymentStatus = member.employmentStatus ?? 'ACTIVE'
-          const createdJoinDate = member.joinDate ?? new Date()
-          const createdUser = await tx.user.create({
-            data: {
-              username: member.username!,
-              passwordHash: passwordHash!,
-              name: member.name,
-              gender: member.gender ?? null,
-              nationality: member.nationality ?? null,
-              phones: member.phones,
-              joinDate: createdJoinDate,
-              birthDate: member.birthDate,
-              tags: member.tags ?? [],
-              terminationDate:
-                resolvedEmploymentStatus === 'TERMINATED' ? member.terminationDate : null,
-              terminationReason:
-                resolvedEmploymentStatus === 'TERMINATED' ? member.terminationReason : null,
-              position: member.position ?? null,
-              employmentStatus: resolvedEmploymentStatus,
-              chineseProfile: shouldUpsertChineseProfile
-                ? {
-                    create: member.chineseProfile,
-                  }
-                : undefined,
-              expatProfile: shouldUpsertExpatProfile
-                ? {
-                    create: {
-                      ...member.expatProfile,
-                      team: resolvedTeam,
-                      chineseSupervisorId: resolvedTeam ? resolvedSupervisorId : null,
-                      contractStartDate: resolvedContractStartDate,
-                      contractEndDate: resolvedContractEndDate,
-                    },
-                  }
-                : undefined,
-              roles:
-                canAssignRole && member.roleIds.length > 0
+            const resolvedProjectId = explicitProjectId ?? teamDefaults?.projectId ?? null
+            const shouldUpsertExpatProfile = !isChinese || member.hasExpatProfileData
+            const resolvedEmploymentStatus = member.employmentStatus ?? 'ACTIVE'
+            const createdJoinDate = member.joinDate ?? new Date()
+            const createdUser = await tx.user.create({
+              data: {
+                username: member.username!,
+                passwordHash: passwordHash!,
+                name: member.name,
+                gender: member.gender ?? null,
+                nationality: member.nationality ?? null,
+                phones: member.phones,
+                joinDate: createdJoinDate,
+                birthDate: member.birthDate,
+                tags: member.tags ?? [],
+                terminationDate:
+                  resolvedEmploymentStatus === 'TERMINATED' ? member.terminationDate : null,
+                terminationReason:
+                  resolvedEmploymentStatus === 'TERMINATED' ? member.terminationReason : null,
+                position: member.position ?? null,
+                employmentStatus: resolvedEmploymentStatus,
+                chineseProfile: shouldUpsertChineseProfile
                   ? {
-                      create: member.roleIds.map((id) => ({
-                        role: { connect: { id } },
-                      })),
+                      create: member.chineseProfile,
                     }
                   : undefined,
-            },
-          })
-          if (shouldUpdateProjectAssignment && resolvedProjectId) {
-            await applyProjectAssignment(tx, {
-              userId: createdUser.id,
-              projectId: resolvedProjectId,
-              startDate: createdJoinDate,
+                expatProfile: shouldUpsertExpatProfile
+                  ? {
+                      create: {
+                        ...member.expatProfile,
+                        team: resolvedTeam,
+                        chineseSupervisorId: resolvedTeam ? resolvedSupervisorId : null,
+                        contractStartDate: resolvedContractStartDate,
+                        contractEndDate: resolvedContractEndDate,
+                      },
+                    }
+                  : undefined,
+                roles:
+                  canAssignRole && member.roleIds.length > 0
+                    ? {
+                        create: member.roleIds.map((id) => ({
+                          role: { connect: { id } },
+                        })),
+                      }
+                    : undefined,
+              },
             })
+            if (resolvedProjectId) {
+              await applyProjectAssignment(tx, {
+                userId: createdUser.id,
+                projectId: resolvedProjectId,
+                startDate: createdJoinDate,
+              })
+            }
+            continue
           }
-          continue
-        }
 
-        const terminationPayload = member.hasEmploymentStatusInput
-          ? member.employmentStatus === 'TERMINATED'
-            ? {
-                terminationDate: member.terminationDate,
-                terminationReason: member.terminationReason,
-              }
-            : { terminationDate: null, terminationReason: null }
-          : {}
-        await tx.user.update({
-          where: { id: match.id },
-          data: {
-            ...(member.username ? { username: member.username } : {}),
-            ...(passwordHash ? { passwordHash } : {}),
-            name: member.name,
-            ...(member.gender ? { gender: member.gender } : {}),
-            ...(member.nationality ? { nationality: member.nationality } : {}),
-            ...(member.phones.length > 0 ? { phones: member.phones } : {}),
-            ...(member.joinDate ? { joinDate: member.joinDate } : {}),
-            ...(member.hasTagsInput ? { tags: member.tags ?? [] } : {}),
-            ...(member.hasBirthDateInput ? { birthDate: member.birthDate } : {}),
-            ...(member.position ? { position: member.position } : {}),
-            ...(member.hasEmploymentStatusInput
-              ? { employmentStatus: member.employmentStatus ?? 'ACTIVE' }
-              : {}),
-            ...terminationPayload,
-            chineseProfile: shouldUpsertChineseProfile
+          const terminationPayload = member.hasEmploymentStatusInput
+            ? member.employmentStatus === 'TERMINATED'
               ? {
-                  upsert: {
-                    create: member.chineseProfile,
-                    update: chineseProfileUpdate,
-                  },
+                  terminationDate: member.terminationDate,
+                  terminationReason: member.terminationReason,
                 }
-              : undefined,
-            expatProfile: shouldUpsertExpatProfile
-              ? {
-                  upsert: {
-                    create: member.expatProfile,
-                    update: expatProfileUpdate,
-                  },
-                }
-              : undefined,
-            roles: canAssignRole
-              ? member.roleIds.length > 0
+              : { terminationDate: null, terminationReason: null }
+            : {}
+          if (canBypassHistory) {
+            const existingExpat = match.expatProfile ?? null
+            const resolvedTeam = member.expatProfile.team ?? existingExpat?.team ?? null
+            const teamKey = normalizeTeamKey(resolvedTeam)
+            const teamDefaults = teamKey ? teamSupervisorMap.get(teamKey) ?? null : null
+            const resolvedSupervisorId = teamKey
+              ? teamDefaults?.supervisorId ?? null
+              : existingExpat?.chineseSupervisorId ?? null
+            if (teamKey && !resolvedSupervisorId) {
+              throw new Error('班组未绑定中方负责人')
+            }
+            const shouldUpdateContractDates =
+              member.expatProfile.contractStartDate !== null ||
+              member.expatProfile.contractEndDate !== null
+            const resolvedContractStartDate =
+              !isChinese ? member.expatProfile.contractStartDate ?? resolvedJoinDate : null
+            const resolvedContractEndDate =
+              !isChinese
+                ? member.expatProfile.contractEndDate ??
+                  (resolvedContractStartDate ? addOneYear(resolvedContractStartDate) : null)
+                : null
+            const expatProfileUpdate = {
+              ...(resolvedTeam ? { chineseSupervisorId: resolvedSupervisorId } : {}),
+              ...(member.expatProfile.team ? { team: member.expatProfile.team } : {}),
+              ...(member.expatProfile.contractNumber
+                ? { contractNumber: member.expatProfile.contractNumber }
+                : {}),
+              ...(member.expatProfile.contractType
+                ? { contractType: member.expatProfile.contractType }
+                : {}),
+              ...(shouldUpdateContractDates
                 ? {
-                    deleteMany: {},
-                    create: member.roleIds.map((id) => ({
-                      role: { connect: { id } },
-                    })),
+                    contractStartDate: resolvedContractStartDate,
+                    contractEndDate: resolvedContractEndDate,
                   }
-                : undefined
-              : undefined,
-          },
-        })
-        if (shouldUpdateProjectAssignment) {
-          await applyProjectAssignment(tx, {
-            userId: match.id,
-            projectId: resolvedProjectId,
-            startDate: new Date(),
-            fallbackStartDate: resolvedJoinDate ?? match.joinDate ?? null,
-          })
-        }
-        if (shouldRecordHistory && shouldTrackExpatChanges && (contractChanged || payrollChanged)) {
-          const supervisorSnapshot = await resolveSupervisorSnapshot(nextExpat.chineseSupervisorId)
-          if (contractChanged) {
-            await createInitialContractChangeIfMissing(tx, {
-              userId: match.id,
-              expatProfile: existingExpatSnapshot,
-              joinDate: match.joinDate ?? null,
-              fallbackChangeDate: new Date(),
-              team: existingExpat?.team ?? null,
-              position: match.position ?? null,
-            })
-            await tx.userContractChange.create({
+                : {}),
+              ...(member.expatProfile.salaryCategory
+                ? { salaryCategory: member.expatProfile.salaryCategory }
+                : {}),
+              ...(member.expatProfile.prime ? { prime: member.expatProfile.prime } : {}),
+              ...(member.expatProfile.baseSalaryAmount
+                ? { baseSalaryAmount: member.expatProfile.baseSalaryAmount }
+                : {}),
+              ...(member.expatProfile.baseSalaryUnit
+                ? { baseSalaryUnit: member.expatProfile.baseSalaryUnit }
+                : {}),
+              ...(member.expatProfile.netMonthlyAmount
+                ? { netMonthlyAmount: member.expatProfile.netMonthlyAmount }
+                : {}),
+              ...(member.expatProfile.netMonthlyUnit
+                ? { netMonthlyUnit: member.expatProfile.netMonthlyUnit }
+                : {}),
+              ...(member.expatProfile.maritalStatus
+                ? { maritalStatus: member.expatProfile.maritalStatus }
+                : {}),
+              ...(member.expatProfile.childrenCount !== null
+                ? { childrenCount: member.expatProfile.childrenCount }
+                : {}),
+              ...(member.expatProfile.cnpsNumber
+                ? { cnpsNumber: member.expatProfile.cnpsNumber }
+                : {}),
+              ...(member.expatProfile.cnpsDeclarationCode
+                ? { cnpsDeclarationCode: member.expatProfile.cnpsDeclarationCode }
+                : {}),
+              ...(member.expatProfile.provenance
+                ? { provenance: member.expatProfile.provenance }
+                : {}),
+              ...(member.expatProfile.emergencyContactName
+                ? { emergencyContactName: member.expatProfile.emergencyContactName }
+                : {}),
+              ...(member.expatProfile.emergencyContactPhone
+                ? { emergencyContactPhone: member.expatProfile.emergencyContactPhone }
+                : {}),
+            }
+            const shouldUpdateProjectAssignment =
+              hasExplicitProject ||
+              normalizeTeamKey(resolvedTeam) !== normalizeTeamKey(existingExpat?.team ?? null)
+            const resolvedProjectId = explicitProjectId ?? teamDefaults?.projectId ?? null
+            await tx.user.update({
+              where: { id: match.id },
               data: {
-                userId: match.id,
-                team: nextExpat.team,
-                chineseSupervisorId: supervisorSnapshot.id,
-                chineseSupervisorName: supervisorSnapshot.name,
-                position: member.position ?? match.position ?? null,
-                contractNumber: nextExpat.contractNumber,
-                contractType: nextExpat.contractType,
-                salaryCategory: nextExpat.salaryCategory,
-                salaryAmount: nextExpat.baseSalaryAmount,
-                salaryUnit: nextExpat.baseSalaryUnit,
-                prime: nextExpat.prime,
-                startDate: nextExpat.contractStartDate,
-                endDate: nextExpat.contractEndDate,
+                ...(member.username ? { username: member.username } : {}),
+                ...(passwordHash ? { passwordHash } : {}),
+                name: member.name,
+                ...(member.gender ? { gender: member.gender } : {}),
+                ...(member.nationality ? { nationality: member.nationality } : {}),
+                ...(member.phones.length > 0 ? { phones: member.phones } : {}),
+                ...(member.joinDate ? { joinDate: member.joinDate } : {}),
+                ...(member.hasTagsInput ? { tags: member.tags ?? [] } : {}),
+                ...(member.hasBirthDateInput ? { birthDate: member.birthDate } : {}),
+                ...(member.position ? { position: member.position } : {}),
+                ...(member.hasEmploymentStatusInput
+                  ? { employmentStatus: member.employmentStatus ?? 'ACTIVE' }
+                  : {}),
+                ...terminationPayload,
+                chineseProfile: shouldUpsertChineseProfile
+                  ? {
+                      upsert: {
+                        create: member.chineseProfile,
+                        update: chineseProfileUpdate,
+                      },
+                    }
+                  : undefined,
+                expatProfile: !isChinese
+                  ? {
+                      upsert: {
+                        create: expatProfileUpdate,
+                        update: expatProfileUpdate,
+                      },
+                    }
+                  : undefined,
+                roles: canAssignRole
+                  ? member.roleIds.length > 0
+                    ? {
+                        deleteMany: {},
+                        create: member.roleIds.map((id) => ({
+                          role: { connect: { id } },
+                        })),
+                      }
+                    : undefined
+                  : undefined,
               },
             })
-          }
-          if (payrollChanged) {
-            await tx.userPayrollChange.create({
-              data: {
+            if (shouldUpdateProjectAssignment && resolvedProjectId) {
+              await applyProjectAssignment(tx, {
                 userId: match.id,
-                team: nextExpat.team,
-                chineseSupervisorId: supervisorSnapshot.id,
-                chineseSupervisorName: supervisorSnapshot.name,
-                salaryCategory: nextExpat.salaryCategory,
-                salaryAmount: nextExpat.baseSalaryAmount,
-                salaryUnit: nextExpat.baseSalaryUnit,
-                prime: nextExpat.prime,
-                baseSalaryAmount: nextExpat.baseSalaryAmount,
-                baseSalaryUnit: nextExpat.baseSalaryUnit,
-                netMonthlyAmount: nextExpat.netMonthlyAmount,
-                netMonthlyUnit: nextExpat.netMonthlyUnit,
+                projectId: resolvedProjectId,
+                startDate: new Date(),
+                fallbackStartDate: resolvedJoinDate ?? match.joinDate ?? null,
+              })
+            }
+          } else {
+            await tx.user.update({
+              where: { id: match.id },
+              data: {
+                ...(member.username ? { username: member.username } : {}),
+                ...(passwordHash ? { passwordHash } : {}),
+                ...(member.gender ? { gender: member.gender } : {}),
+                ...(member.nationality ? { nationality: member.nationality } : {}),
+                ...(member.phones.length > 0 ? { phones: member.phones } : {}),
+                ...(member.hasTagsInput ? { tags: member.tags ?? [] } : {}),
+                ...(member.hasEmploymentStatusInput
+                  ? { employmentStatus: member.employmentStatus ?? 'ACTIVE' }
+                  : {}),
+                ...terminationPayload,
+                chineseProfile: shouldUpsertChineseProfile
+                  ? {
+                      upsert: {
+                        create: member.chineseProfile,
+                        update: chineseProfileUpdate,
+                      },
+                    }
+                  : undefined,
+                expatProfile: !isChinese && hasAllowedExpatProfileUpdate
+                  ? {
+                      upsert: {
+                        create: allowedExpatProfileUpdate,
+                        update: allowedExpatProfileUpdate,
+                      },
+                    }
+                  : undefined,
+                roles: canAssignRole
+                  ? member.roleIds.length > 0
+                    ? {
+                        deleteMany: {},
+                        create: member.roleIds.map((id) => ({
+                          role: { connect: { id } },
+                        })),
+                      }
+                    : undefined
+                  : undefined,
               },
             })
+            if (hasExplicitProject && explicitProjectId) {
+              await applyProjectAssignment(tx, {
+                userId: match.id,
+                projectId: explicitProjectId,
+                startDate: new Date(),
+                fallbackStartDate: match.joinDate ?? null,
+              })
+            }
           }
         }
-      }
       },
       {
         maxWait: IMPORT_TRANSACTION_MAX_WAIT_MS,

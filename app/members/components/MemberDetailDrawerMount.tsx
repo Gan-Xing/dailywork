@@ -7,6 +7,7 @@ type MemberDetailDrawerMountProps = {
   onEdit: (member: Member) => void
   teamSupervisorMap: Map<string, { teamZh?: string | null }>
   canViewCompensation: boolean
+  viewerNationality: string | null
 }
 
 export function MemberDetailDrawerMount({
@@ -15,6 +16,7 @@ export function MemberDetailDrawerMount({
   onEdit,
   teamSupervisorMap,
   canViewCompensation,
+  viewerNationality,
 }: MemberDetailDrawerMountProps) {
   return (
     <MemberDetailDrawer
@@ -25,6 +27,7 @@ export function MemberDetailDrawerMount({
       onEdit={(member) => onEdit(member)}
       teamSupervisorMap={teamSupervisorMap}
       canViewCompensation={canViewCompensation}
+      viewerNationality={viewerNationality}
     />
   )
 }

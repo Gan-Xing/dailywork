@@ -25,6 +25,15 @@ export default async function MemberEditPage({ params }: { params: Promise<{ id:
   if (!member) return notFound()
 
   const canAssignRole = permissions.includes('role:update') || permissions.includes('role:manage')
+  const canDeleteMember = permissions.includes('member:delete')
+  const isViewerChinese = sessionUser?.nationality === 'china'
 
-  return <MemberEditClient member={member} canAssignRole={canAssignRole} />
+  return (
+    <MemberEditClient
+      member={member}
+      canAssignRole={canAssignRole}
+      canDeleteMember={canDeleteMember}
+      isViewerChinese={isViewerChinese}
+    />
+  )
 }
