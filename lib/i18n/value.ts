@@ -2,6 +2,10 @@ import type { PhaseMeasure } from '../progressTypes'
 import type { Locale } from './index'
 
 export type ProductionValueCopy = {
+  breadcrumbs: {
+    home: string
+    value: string
+  }
   card: {
     badge: string
     title: string
@@ -36,6 +40,10 @@ export type ProductionValueCopy = {
 
 export const productionValueCopy: Record<Locale, ProductionValueCopy> = {
   zh: {
+    breadcrumbs: {
+      home: '首页',
+      value: '产值计量'
+    },
     card: {
       badge: '产值计量',
       title: '产值计量',
@@ -69,6 +77,10 @@ export const productionValueCopy: Record<Locale, ProductionValueCopy> = {
     }
   },
   fr: {
+    breadcrumbs: {
+      home: 'Accueil',
+      value: 'Valeurs'
+    },
     card: {
       badge: 'Production',
       title: 'Calcul des valeurs',
@@ -104,6 +116,11 @@ export const productionValueCopy: Record<Locale, ProductionValueCopy> = {
 }
 
 export type PriceManagerCopy = {
+  breadcrumbs: {
+    home: string
+    value: string
+    prices: string
+  }
   title: string
   description: string
   note: string
@@ -126,6 +143,7 @@ export type PriceManagerCopy = {
   actions: {
     save: string
     delete: string
+    cancel: string
   }
   messages: {
     loading: string
@@ -153,6 +171,11 @@ export const measureLabels: Record<Locale, Record<PhaseMeasure, string>> = {
 
 export const priceManagerCopy: Record<Locale, PriceManagerCopy> = {
   zh: {
+    breadcrumbs: {
+      home: '首页',
+      value: '产值计量',
+      prices: '价格管理'
+    },
     title: '价格管理',
     description: '为每个分项定义绑定真实西非法郎单价，作为产值计算的基准。',
     note: '所有价格以西非法郎（XOF）计。',
@@ -174,7 +197,8 @@ export const priceManagerCopy: Record<Locale, PriceManagerCopy> = {
     },
     actions: {
       save: '保存',
-      delete: '删除'
+      delete: '删除',
+      cancel: '取消'
     },
     messages: {
       loading: '正在加载分项价格…',
@@ -189,6 +213,11 @@ export const priceManagerCopy: Record<Locale, PriceManagerCopy> = {
     }
   },
   fr: {
+    breadcrumbs: {
+      home: 'Accueil',
+      value: 'Valeurs',
+      prices: 'Gestion des prix'
+    },
     title: 'Gestion des prix',
     description: 'Attribuez un prix unitaire en franc CFA à chaque sous-ouvrage pour alimenter le calcul des valeurs.',
     note: 'Tous les montants sont en franc CFA (XOF).',
@@ -210,7 +239,8 @@ export const priceManagerCopy: Record<Locale, PriceManagerCopy> = {
     },
     actions: {
       save: 'Enregistrer',
-      delete: 'Supprimer'
+      delete: 'Supprimer',
+      cancel: 'Annuler'
     },
     messages: {
       loading: 'Chargement des prix…',

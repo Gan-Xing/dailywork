@@ -1,19 +1,19 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
-import type { PhaseMeasure } from '@/lib/progressTypes'
+import { AccessDenied } from '@/components/AccessDenied'
+import { AlertDialog } from '@/components/AlertDialog'
+import { Breadcrumbs } from '@/components/Breadcrumbs'
+import { LocaleSwitcher } from '@/components/LocaleSwitcher'
+import { useToast } from '@/components/ToastProvider'
 import { usePreferredLocale } from '@/lib/usePreferredLocale'
 import { locales, type Locale } from '@/lib/i18n'
 import { measureLabels, priceManagerCopy } from '@/lib/i18n/value'
 import type { PhasePriceItem, PhasePricingGroup } from '@/lib/server/phasePricingStore'
 
 type FetchStatus = 'idle' | 'loading' | 'success' | 'error'
-type RowFeedback = {
-  type: 'success' | 'error'
-  text: string
-}
 
 type EditableFields = {
   name?: string
@@ -37,8 +37,10 @@ const formatNumber = (value: number, localeId: string) =>
   new Intl.NumberFormat(localeId, { maximumFractionDigits: 2 }).format(Math.max(0, value))
 
 export default function PriceManagementPage() {
-  const { locale } = usePreferredLocale('zh', locales)
+  const { locale, setLocale } = usePreferredLocale('zh', locales)
+  const { addToast } = useToast()
   const copy = priceManagerCopy[locale]
+  const { home: breadcrumbHome, value: breadcrumbValue, prices: breadcrumbPrices } = copy.breadcrumbs
   const localeId = formatLocaleId(locale)
   const measureLabel = measureLabels[locale]
   const loadErrorMessage = copy.messages.error
@@ -47,13 +49,16 @@ export default function PriceManagementPage() {
   const [groups, setGroups] = useState<PhasePricingGroup[]>([])
   const [status, setStatus] = useState<FetchStatus>('idle')
   const [error, setError] = useState<string | null>(null)
+  const [permissionDenied, setPermissionDenied] = useState(false)
   const [editedRows, setEditedRows] = useState<Record<number, EditableFields>>({})
   const [savingIds, setSavingIds] = useState<number[]>([])
   const [deletingIds, setDeletingIds] = useState<number[]>([])
-  const [rowFeedback, setRowFeedback] = useState<Record<number, RowFeedback>>({})
   const [createValues, setCreateValues] = useState<Record<number, CreateFields>>({})
   const [creatingIds, setCreatingIds] = useState<number[]>([])
-  const [createFeedback, setCreateFeedback] = useState<Record<number, RowFeedback>>({})
+  const [deleteTarget, setDeleteTarget] = useState<{ groupId: number; item: PhasePriceItem } | null>(
+    null,
+  )
+  const errorToastRef = useRef<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -69,6 +74,9 @@ export default function PriceManagementPage() {
 
         if (!response.ok) {
           const message = response.status === 403 ? unauthorizedMessage : payload.message ?? loadErrorMessage
+          if (response.status === 403) {
+            setPermissionDenied(true)
+          }
           throw new Error(message)
         }
 
@@ -91,22 +99,23 @@ export default function PriceManagementPage() {
     }
   }, [locale, loadErrorMessage, unauthorizedMessage])
 
+  useEffect(() => {
+    if (permissionDenied) return
+    if (status !== 'error') return
+    const message = error ?? copy.messages.error
+    if (!message || message === errorToastRef.current) return
+    addToast(message, { tone: 'danger' })
+    errorToastRef.current = message
+  }, [addToast, copy.messages.error, error, permissionDenied, status])
+
   const handleRowChange = (itemId: number, field: keyof EditableFields, value: string) => {
     setEditedRows((prev) => ({
       ...prev,
       [itemId]: {
         ...prev[itemId],
-        [field]: value
-      }
+        [field]: value,
+      },
     }))
-    setRowFeedback((prev) => {
-      if (!prev[itemId]) {
-        return prev
-      }
-      const next = { ...prev }
-      delete next[itemId]
-      return next
-    })
   }
 
   const handleSave = async (groupId: number, item: PhasePriceItem) => {
@@ -121,15 +130,10 @@ export default function PriceManagementPage() {
         editing.unitPrice !== undefined
           ? editing.unitPrice.trim() || null
           : item.unitPrice !== null && item.unitPrice !== undefined
-          ? String(item.unitPrice)
-          : null
+            ? String(item.unitPrice)
+            : null,
     }
 
-    setRowFeedback((prev) => {
-      const next = { ...prev }
-      delete next[item.id]
-      return next
-    })
     setSavingIds((prev) => (prev.includes(item.id) ? prev : [...prev, item.id]))
 
     try {
@@ -137,13 +141,12 @@ export default function PriceManagementPage() {
         method: 'PATCH',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
       })
       const result = (await response.json().catch(() => ({}))) as { item?: PhasePriceItem; message?: string }
 
       if (!response.ok) {
-        const message =
-          response.status === 403 ? unauthorizedMessage : result.message ?? copy.messages.updateError
+        const message = response.status === 403 ? unauthorizedMessage : result.message ?? copy.messages.updateError
         throw new Error(message)
       }
 
@@ -155,11 +158,11 @@ export default function PriceManagementPage() {
               ? {
                   ...group,
                   priceItems: group.priceItems.map((entry) =>
-                    entry.id === updated.id ? updated : entry
-                  )
+                    entry.id === updated.id ? updated : entry,
+                  ),
                 }
-              : group
-          )
+              : group,
+          ),
         )
       }
 
@@ -168,33 +171,15 @@ export default function PriceManagementPage() {
         delete next[item.id]
         return next
       })
-      setRowFeedback((prev) => ({
-        ...prev,
-        [item.id]: { type: 'success', text: copy.messages.saved }
-      }))
+      addToast(copy.messages.saved, { tone: 'success' })
     } catch (saveError) {
-      setRowFeedback((prev) => ({
-        ...prev,
-        [item.id]: {
-          type: 'error',
-          text: (saveError as Error).message ?? copy.messages.updateError
-        }
-      }))
+      addToast((saveError as Error).message ?? copy.messages.updateError, { tone: 'danger' })
     } finally {
       setSavingIds((prev) => prev.filter((id) => id !== item.id))
     }
   }
 
   const handleDelete = async (groupId: number, item: PhasePriceItem) => {
-    if (typeof window !== 'undefined' && !window.confirm(copy.messages.deleteConfirm)) {
-      return
-    }
-
-    setRowFeedback((prev) => {
-      const next = { ...prev }
-      delete next[item.id]
-      return next
-    })
     setDeletingIds((prev) => (prev.includes(item.id) ? prev : [...prev, item.id]))
 
     try {
@@ -202,7 +187,7 @@ export default function PriceManagementPage() {
         method: 'DELETE',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ priceItemId: item.id })
+        body: JSON.stringify({ priceItemId: item.id }),
       })
       const result = (await response.json().catch(() => ({}))) as {
         item?: PhasePriceItem
@@ -210,8 +195,7 @@ export default function PriceManagementPage() {
       }
 
       if (!response.ok) {
-        const message =
-          response.status === 403 ? unauthorizedMessage : result.message ?? copy.messages.updateError
+        const message = response.status === 403 ? unauthorizedMessage : result.message ?? copy.messages.updateError
         throw new Error(message)
       }
 
@@ -220,48 +204,27 @@ export default function PriceManagementPage() {
           group.phaseDefinitionId === groupId
             ? {
                 ...group,
-                priceItems: group.priceItems.filter((entry) => entry.id !== item.id)
+                priceItems: group.priceItems.filter((entry) => entry.id !== item.id),
               }
-            : group
-        )
+            : group,
+        ),
       )
-      setRowFeedback((prev) => ({
-        ...prev,
-        [item.id]: { type: 'success', text: copy.messages.deleted }
-      }))
+      addToast(copy.messages.deleted, { tone: 'success' })
     } catch (deleteError) {
-      setRowFeedback((prev) => ({
-        ...prev,
-        [item.id]: {
-          type: 'error',
-          text: (deleteError as Error).message ?? copy.messages.updateError
-        }
-      }))
+      addToast((deleteError as Error).message ?? copy.messages.updateError, { tone: 'danger' })
     } finally {
       setDeletingIds((prev) => prev.filter((id) => id !== item.id))
     }
   }
 
-  const handleCreateChange = (
-    groupId: number,
-    field: keyof CreateFields,
-    value: string,
-  ) => {
+  const handleCreateChange = (groupId: number, field: keyof CreateFields, value: string) => {
     setCreateValues((prev) => ({
       ...prev,
       [groupId]: {
         ...prev[groupId],
-        [field]: value
-      }
+        [field]: value,
+      },
     }))
-    setCreateFeedback((prev) => {
-      if (!prev[groupId]) {
-        return prev
-      }
-      const next = { ...prev }
-      delete next[groupId]
-      return next
-    })
   }
 
   const handleCreate = async (group: PhasePricingGroup) => {
@@ -270,18 +233,12 @@ export default function PriceManagementPage() {
       spec: '',
       description: '',
       unitString: '',
-      unitPrice: ''
+      unitPrice: '',
     }
 
     const trimmedName = (values.name ?? '').trim()
     if (!trimmedName) {
-      setCreateFeedback((prev) => ({
-        ...prev,
-        [group.phaseDefinitionId]: {
-          type: 'error',
-          text: copy.messages.nameRequired
-        }
-      }))
+      addToast(copy.messages.nameRequired, { tone: 'warning' })
       return
     }
 
@@ -293,22 +250,19 @@ export default function PriceManagementPage() {
       spec: specValue,
       unitString: (values.unitString ?? '').trim() || undefined,
       description: (values.description ?? '').trim() || undefined,
-      unitPrice: (values.unitPrice ?? '').trim() || null
+      unitPrice: (values.unitPrice ?? '').trim() || null,
     }
 
-    setCreateFeedback((prev) => {
-      const next = { ...prev }
-      delete next[group.phaseDefinitionId]
-      return next
-    })
-    setCreatingIds((prev) => (prev.includes(group.phaseDefinitionId) ? prev : [...prev, group.phaseDefinitionId]))
+    setCreatingIds((prev) =>
+      prev.includes(group.phaseDefinitionId) ? prev : [...prev, group.phaseDefinitionId],
+    )
 
     try {
       const response = await fetch('/api/value/prices', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
       })
       const result = (await response.json().catch(() => ({}))) as {
         item?: PhasePriceItem
@@ -316,8 +270,7 @@ export default function PriceManagementPage() {
       }
 
       if (!response.ok) {
-        const message =
-          response.status === 403 ? unauthorizedMessage : result.message ?? copy.messages.updateError
+        const message = response.status === 403 ? unauthorizedMessage : result.message ?? copy.messages.updateError
         throw new Error(message)
       }
 
@@ -330,10 +283,10 @@ export default function PriceManagementPage() {
                   ...entry,
                   priceItems: [...entry.priceItems, created].sort((a, b) =>
                     a.priceableName.localeCompare(b.priceableName, localeId),
-                  )
+                  ),
                 }
-              : entry
-          )
+              : entry,
+          ),
         )
       }
 
@@ -342,18 +295,9 @@ export default function PriceManagementPage() {
         delete next[group.phaseDefinitionId]
         return next
       })
-      setCreateFeedback((prev) => ({
-        ...prev,
-        [group.phaseDefinitionId]: { type: 'success', text: copy.messages.saved }
-      }))
+      addToast(copy.messages.saved, { tone: 'success' })
     } catch (createError) {
-      setCreateFeedback((prev) => ({
-        ...prev,
-        [group.phaseDefinitionId]: {
-          type: 'error',
-          text: (createError as Error).message ?? copy.messages.updateError
-        }
-      }))
+      addToast((createError as Error).message ?? copy.messages.updateError, { tone: 'danger' })
     } finally {
       setCreatingIds((prev) => prev.filter((id) => id !== group.phaseDefinitionId))
     }
@@ -367,70 +311,99 @@ export default function PriceManagementPage() {
         spec: '',
         description: '',
         unitString: '',
-        unitPrice: ''
+        unitPrice: '',
       }
     })
     return defaults
   }, [groups])
 
+  if (permissionDenied) {
+    return (
+      <AccessDenied
+        locale={locale}
+        permissions={['value:view']}
+        hint={copy.messages.unauthorized}
+      />
+    )
+  }
+
   return (
-    <main className="min-h-screen bg-slate-950">
-      <section className="mx-auto max-w-5xl space-y-6 px-4 py-10 text-slate-50 sm:px-6 lg:px-8">
-        <div className="rounded-3xl border border-white/10 bg-white/5 p-6 text-sm text-slate-100 shadow-xl shadow-slate-950/40 backdrop-blur">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.3em] text-slate-300">
-            {copy.title}
-          </p>
-          <h1 className="mt-2 text-2xl font-semibold text-slate-50">{copy.title}</h1>
-          <p className="mt-2 text-sm text-slate-200/80">{copy.description}</p>
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs">
-            <p className="text-slate-300/80">{copy.note}</p>
+    <main className="min-h-screen bg-slate-50 text-slate-900">
+      <header className="sticky top-0 z-30 w-full border-b border-slate-200 bg-white/80 px-6 py-4 backdrop-blur-md sm:px-8 xl:px-12 2xl:px-14">
+        <div className="mx-auto flex max-w-[1700px] flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="space-y-3">
+            <Breadcrumbs
+              variant="light"
+              items={[
+                { label: breadcrumbHome, href: '/' },
+                { label: breadcrumbValue, href: '/value' },
+                { label: breadcrumbPrices },
+              ]}
+            />
+            <div>
+              <h1 className="text-xl font-bold text-slate-900 sm:text-2xl">{copy.title}</h1>
+              <p className="text-sm text-slate-600">{copy.description}</p>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
             <Link
               href="/value"
-              className="rounded-full border border-white/30 px-4 py-1 text-[11px] font-semibold uppercase tracking-[0.35em] text-slate-100 transition hover:border-white/60"
+              className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50"
             >
               {copy.backCta}
             </Link>
+            <LocaleSwitcher locale={locale} onChange={setLocale} variant="light" />
           </div>
         </div>
+      </header>
 
-        <div className="rounded-3xl border border-white/10 bg-slate-950/80 p-6 text-sm text-slate-200 backdrop-blur">
-          {status === 'loading' && <p className="text-xs text-slate-300">{copy.messages.loading}</p>}
-          {status === 'error' && <p className="text-xs text-amber-200">{error ?? copy.messages.error}</p>}
-          {status === 'success' && !groups.length && (
-            <p className="text-xs text-slate-300">{copy.messages.empty}</p>
-          )}
+      <section className="mx-auto w-full max-w-[1700px] px-6 pb-14 pt-6 sm:px-8 xl:px-12 2xl:px-14">
+        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xl shadow-slate-900/5">
+          <p className="text-xs font-semibold text-slate-500">{copy.note}</p>
+          <div className="mt-3 space-y-2 text-sm text-slate-600">
+            {status === 'loading' && <p className="text-xs text-slate-500">{copy.messages.loading}</p>}
+            {status === 'error' && (
+              <p className="text-xs text-rose-600">{error ?? copy.messages.error}</p>
+            )}
+            {status === 'success' && !groups.length && (
+              <p className="text-xs text-slate-400">{copy.messages.empty}</p>
+            )}
+          </div>
           {!!groups.length && status !== 'error' && (
-            <div className="space-y-10">
+            <div className="mt-6 space-y-10">
               {groups.map((group) => {
-                const formValues = createValues[group.phaseDefinitionId] ?? createFormDefaults[group.phaseDefinitionId]
+                const formValues =
+                  createValues[group.phaseDefinitionId] ?? createFormDefaults[group.phaseDefinitionId]
                 const creating = creatingIds.includes(group.phaseDefinitionId)
-                const groupFeedback = createFeedback[group.phaseDefinitionId]
                 return (
-                  <div key={group.phaseDefinitionId} className="space-y-4 rounded-2xl border border-white/5 bg-slate-950/70 p-5">
+                  <div
+                    key={group.phaseDefinitionId}
+                    className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-5"
+                  >
                     <div className="flex flex-wrap items-center justify-between gap-4">
                       <div>
-                        <p className="text-sm font-medium text-slate-50">{group.definitionName}</p>
-                        <p className="text-[11px] text-slate-400">
+                        <p className="text-sm font-semibold text-slate-900">{group.definitionName}</p>
+                        <p className="text-[11px] text-slate-500">
                           {measureLabel[group.measure] ?? group.measure} · {copy.group.defaultPriceLabel}：
                           {group.defaultUnitPrice != null ? (
-                            <span className="text-slate-200">
+                            <span className="text-slate-700">
                               {' '}
                               {formatNumber(group.defaultUnitPrice, localeId)}
                             </span>
                           ) : (
-                            <span className="text-amber-200">—</span>
+                            <span className="text-rose-500">—</span>
                           )}
                         </p>
                       </div>
-                      <p className="text-[11px] text-slate-500">
+                      <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold text-slate-500">
                         {group.priceItems.length} {copy.tableHeaders.name}
-                      </p>
+                      </span>
                     </div>
                     {group.priceItems.length ? (
-                      <div className="overflow-x-auto">
-                        <table className="min-w-full border-collapse text-left">
-                          <thead>
-                            <tr className="text-[11px] uppercase tracking-[0.4em] text-slate-400">
+                      <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
+                        <table className="min-w-full border-collapse text-left text-sm">
+                          <thead className="bg-slate-100">
+                            <tr className="text-[11px] uppercase tracking-[0.3em] text-slate-500">
                               <th className="whitespace-nowrap px-3 py-2 font-semibold">
                                 {copy.tableHeaders.name}
                               </th>
@@ -448,7 +421,7 @@ export default function PriceManagementPage() {
                               </th>
                             </tr>
                           </thead>
-                          <tbody className="divide-y divide-white/5">
+                          <tbody className="divide-y divide-slate-200">
                             {group.priceItems.map((item) => {
                               const editing = editedRows[item.id] ?? {}
                               const nameValue = editing.name ?? item.priceableName
@@ -468,34 +441,35 @@ export default function PriceManagementPage() {
                                 ].filter(Boolean)),
                               )
                               const isSaving = savingIds.includes(item.id)
-                              const feedback = rowFeedback[item.id]
                               return (
-                                <tr key={item.id} className="bg-white/1">
+                                <tr key={item.id} className="transition hover:bg-slate-50">
                                   <td className="px-3 py-3">
                                     <input
                                       type="text"
                                       value={nameValue}
                                       onChange={(event) => handleRowChange(item.id, 'name', event.target.value)}
-                                      className="w-full rounded border border-white/10 bg-slate-950/60 px-2 py-1 text-sm text-slate-50 shadow-inner shadow-black/50 focus:border-white focus:outline-none"
+                                      className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1 text-sm text-slate-900 shadow-sm focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-100"
                                     />
                                     {unitStringValue && (
-                                      <p className="text-[10px] text-slate-400">{unitStringValue}</p>
+                                      <p className="text-[10px] text-slate-500">{unitStringValue}</p>
                                     )}
                                   </td>
-                          <td className="px-3 py-3">
-                            <select
-                              value={specValue}
-                              onChange={(event) => handleRowChange(item.id, 'spec', event.target.value)}
-                              className="w-full rounded border border-white/10 bg-slate-950/60 px-2 py-1 text-sm text-slate-50 shadow-inner shadow-black/50 focus:border-white focus:outline-none"
-                            >
-                              <option value="">{copy.group.defaultPriceLabel}</option>
-                              {specChoices.map((option) => (
-                                <option key={option} value={option}>
-                                  {option}
-                                </option>
-                              ))}
-                            </select>
-                          </td>
+                                  <td className="px-3 py-3">
+                                    <select
+                                      value={specValue}
+                                      onChange={(event) =>
+                                        handleRowChange(item.id, 'spec', event.target.value)
+                                      }
+                                      className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1 text-sm text-slate-900 shadow-sm focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-100"
+                                    >
+                                      <option value="">{copy.group.defaultPriceLabel}</option>
+                                      {specChoices.map((option) => (
+                                        <option key={option} value={option}>
+                                          {option}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </td>
                                   <td className="px-3 py-3">
                                     <input
                                       type="text"
@@ -503,7 +477,7 @@ export default function PriceManagementPage() {
                                       onChange={(event) =>
                                         handleRowChange(item.id, 'description', event.target.value)
                                       }
-                                      className="w-full rounded border border-white/10 bg-slate-950/60 px-2 py-1 text-sm text-slate-50 shadow-inner shadow-black/50 focus:border-white focus:outline-none"
+                                      className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1 text-sm text-slate-900 shadow-sm focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-100"
                                     />
                                   </td>
                                   <td className="px-3 py-3">
@@ -511,44 +485,41 @@ export default function PriceManagementPage() {
                                       type="text"
                                       inputMode="decimal"
                                       value={priceValue}
-                                      onChange={(event) => handleRowChange(item.id, 'unitPrice', event.target.value)}
-                                      className="w-full rounded border border-white/10 bg-slate-950/60 px-2 py-1 text-sm text-slate-50 shadow-inner shadow-black/50 focus:border-white focus:outline-none"
+                                      onChange={(event) =>
+                                        handleRowChange(item.id, 'unitPrice', event.target.value)
+                                      }
+                                      className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1 text-sm text-slate-900 shadow-sm focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-100"
                                     />
                                     {item.unitPrice !== null && (
-                                      <p className="text-[10px] text-slate-400">
+                                      <p className="text-[10px] text-slate-500">
                                         {formatNumber(item.unitPrice, localeId)}
                                       </p>
                                     )}
                                   </td>
-                                <td className="px-3 py-3">
-                                  <div className="flex flex-wrap gap-2">
-                                    <button
-                                      type="button"
-                                      className="inline-flex items-center rounded-full border border-white/20 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.35em] text-slate-100 transition hover:border-white/60 disabled:cursor-not-allowed disabled:border-white/10 disabled:text-slate-500"
-                                      onClick={() => handleSave(group.phaseDefinitionId, item)}
-                                      disabled={isSaving}
-                                    >
-                                      {isSaving ? `${copy.actions.save}…` : copy.actions.save}
-                                    </button>
-                                    <button
-                                      type="button"
-                                      className="inline-flex items-center rounded-full border border-red-500/40 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.35em] text-red-200 transition hover:border-red-300 focus:outline-none disabled:cursor-not-allowed disabled:border-red-600/40 disabled:text-red-500"
-                                      onClick={() => handleDelete(group.phaseDefinitionId, item)}
-                                      disabled={deletingIds.includes(item.id)}
-                                    >
-                                      {deletingIds.includes(item.id) ? `${copy.actions.delete}…` : copy.actions.delete}
-                                    </button>
-                                  </div>
-                                  {feedback && (
-                                    <p
-                                      className={`mt-1 text-[11px] ${
-                                        feedback.type === 'success' ? 'text-emerald-300' : 'text-amber-300'
-                                      }`}
-                                    >
-                                      {feedback.text}
-                                    </p>
-                                  )}
-                                </td>
+                                  <td className="px-3 py-3">
+                                    <div className="flex flex-wrap gap-2">
+                                      <button
+                                        type="button"
+                                        className="inline-flex items-center rounded-full bg-emerald-500 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.25em] text-white shadow-sm shadow-emerald-200/60 transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+                                        onClick={() => handleSave(group.phaseDefinitionId, item)}
+                                        disabled={isSaving}
+                                      >
+                                        {isSaving ? `${copy.actions.save}…` : copy.actions.save}
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="inline-flex items-center rounded-full border border-rose-200 bg-rose-50 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.25em] text-rose-600 transition hover:-translate-y-0.5 hover:border-rose-300 disabled:cursor-not-allowed disabled:opacity-60"
+                                        onClick={() =>
+                                          setDeleteTarget({ groupId: group.phaseDefinitionId, item })
+                                        }
+                                        disabled={deletingIds.includes(item.id)}
+                                      >
+                                        {deletingIds.includes(item.id)
+                                          ? `${copy.actions.delete}…`
+                                          : copy.actions.delete}
+                                      </button>
+                                    </div>
+                                  </td>
                                 </tr>
                               )
                             })}
@@ -559,7 +530,7 @@ export default function PriceManagementPage() {
                       <p className="text-xs text-slate-400">{copy.messages.empty}</p>
                     )}
                     <div className="space-y-2">
-                      <p className="text-[11px] uppercase tracking-[0.4em] text-slate-400">
+                      <p className="text-[11px] uppercase tracking-[0.3em] text-slate-500">
                         {copy.group.newItemTitle}
                       </p>
                       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
@@ -570,14 +541,14 @@ export default function PriceManagementPage() {
                             handleCreateChange(group.phaseDefinitionId, 'name', event.target.value)
                           }
                           placeholder={copy.group.newItemNamePlaceholder}
-                          className="w-full rounded border border-white/10 bg-slate-950/60 px-3 py-2 text-sm text-slate-50 shadow-inner shadow-black/50 focus:border-white focus:outline-none"
+                          className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-100"
                         />
                         <select
                           value={formValues?.spec ?? ''}
                           onChange={(event) =>
                             handleCreateChange(group.phaseDefinitionId, 'spec', event.target.value)
                           }
-                          className="w-full rounded border border-white/10 bg-slate-950/60 px-3 py-2 text-sm text-slate-50 shadow-inner shadow-black/50 focus:border-white focus:outline-none"
+                          className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-100"
                         >
                           <option value="">{copy.group.defaultPriceLabel}</option>
                           {group.specOptions.map((option) => (
@@ -593,7 +564,7 @@ export default function PriceManagementPage() {
                             handleCreateChange(group.phaseDefinitionId, 'description', event.target.value)
                           }
                           placeholder={copy.group.newItemDescriptionPlaceholder}
-                          className="w-full rounded border border-white/10 bg-slate-950/60 px-3 py-2 text-sm text-slate-50 shadow-inner shadow-black/50 focus:border-white focus:outline-none"
+                          className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-100"
                         />
                         <input
                           type="text"
@@ -602,7 +573,7 @@ export default function PriceManagementPage() {
                             handleCreateChange(group.phaseDefinitionId, 'unitString', event.target.value)
                           }
                           placeholder={copy.group.newItemUnitPlaceholder}
-                          className="w-full rounded border border-white/10 bg-slate-950/60 px-3 py-2 text-sm text-slate-50 shadow-inner shadow-black/50 focus:border-white focus:outline-none"
+                          className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-100"
                         />
                         <input
                           type="text"
@@ -612,26 +583,17 @@ export default function PriceManagementPage() {
                             handleCreateChange(group.phaseDefinitionId, 'unitPrice', event.target.value)
                           }
                           placeholder="0.00"
-                          className="w-full rounded border border-white/10 bg-slate-950/60 px-3 py-2 text-sm text-slate-50 shadow-inner shadow-black/50 focus:border-white focus:outline-none"
+                          className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-100"
                         />
                         <button
                           type="button"
-                          className="inline-flex items-center justify-center rounded-full border border-white/20 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.35em] text-slate-100 transition hover:border-white/60 disabled:cursor-not-allowed disabled:border-white/10 disabled:text-slate-500"
+                          className="inline-flex items-center justify-center rounded-full bg-emerald-500 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.25em] text-white shadow-sm shadow-emerald-200/60 transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
                           onClick={() => handleCreate(group)}
                           disabled={creating}
                         >
                           {creating ? `${copy.actions.save}…` : copy.actions.save}
                         </button>
                       </div>
-                      {groupFeedback && (
-                        <p
-                          className={`text-[11px] ${
-                            groupFeedback.type === 'success' ? 'text-emerald-300' : 'text-amber-300'
-                          }`}
-                        >
-                          {groupFeedback.text}
-                        </p>
-                      )}
                     </div>
                   </div>
                 )
@@ -640,6 +602,20 @@ export default function PriceManagementPage() {
           )}
         </div>
       </section>
+
+      <AlertDialog
+        open={!!deleteTarget}
+        title={copy.actions.delete}
+        description={copy.messages.deleteConfirm}
+        tone="danger"
+        actionLabel={copy.actions.delete}
+        cancelLabel={copy.actions.cancel}
+        onClose={() => setDeleteTarget(null)}
+        onAction={() => {
+          if (!deleteTarget) return
+          handleDelete(deleteTarget.groupId, deleteTarget.item)
+        }}
+      />
     </main>
   )
 }
