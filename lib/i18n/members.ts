@@ -78,6 +78,7 @@ export const memberCopy: Record<
         missingPhoneHint: string
         missingCnps: string
         missingCnpsWithoutDeclaration: string
+        expiringSoon: string
         overdue: string
         beyond: string
         scopeAll: string
@@ -699,6 +700,7 @@ export const memberCopy: Record<
         missingPhoneHint: '含 0500000000 视为缺失',
         missingCnps: '缺失 CNPS 编号',
         missingCnpsWithoutDeclaration: '缺失 CNPS 编号且无申报码',
+        expiringSoon: '未来 3 个月',
         overdue: '已到期',
         beyond: '超过 3 个月',
         scopeAll: '全员范围',
@@ -728,7 +730,7 @@ export const memberCopy: Record<
         delta: '较上月',
         payoutTotal: '发放总额',
         dataQualityHint: '这些字段需要人工补录或核对',
-        compareHint: '对比模式暂未开放。',
+        compareHint: '请选择至少 2 个班组进行对比。',
       },
       helpers: {
         salaryRule: '合同口径：CTJ 时薪按 22 天 × 8 小时折算月薪；月薪优先取实发工资，否则用基础工资 + 津贴。',
@@ -1335,6 +1337,7 @@ export const memberCopy: Record<
         missingPhoneHint: '0500000000 est compté comme manquant',
         missingCnps: 'N° CNPS manquant',
         missingCnpsWithoutDeclaration: 'N° CNPS manquant et aucun code CNPS',
+        expiringSoon: 'Échéances sous 3 mois',
         overdue: 'Déjà expiré',
         beyond: 'Au-delà de 3 mois',
         scopeAll: 'Tous',
@@ -1365,7 +1368,7 @@ export const memberCopy: Record<
         delta: 'Δ vs M-1',
         payoutTotal: 'Total versé',
         dataQualityHint: 'Champs à compléter ou vérifier manuellement',
-        compareHint: 'Le mode comparaison n’est pas encore disponible.',
+        compareHint: 'Sélectionnez au moins 2 équipes pour comparer.',
       },
       helpers: {
         salaryRule:

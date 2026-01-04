@@ -88,6 +88,13 @@ type PayoutRecordRow = {
   total: number
 }
 
+type CompareLineSeries = {
+  key: string
+  label: string
+  color: string
+  values: number[]
+}
+
 type SelectableBarItem = BarItem & {
   key: string
 }
@@ -98,6 +105,38 @@ type PositionGroupItem = {
   value: number
   color: string
   rawItems: Array<{ label: string; value: number }>
+}
+
+type ContractExpirySummary = {
+  upcoming: number
+  overdue: number
+  beyond: number
+  missing: number
+}
+
+type CompareTeamStats = {
+  key: string
+  label: string
+  headcount: number
+  activeCount: number
+  onLeaveCount: number
+  terminatedCount: number
+  payrollTotal: number
+  payrollAverage: number
+  payrollMedian: number
+  contractType: {
+    ctj: number
+    cdd: number
+    other: number
+  }
+  contractTypePayroll: {
+    ctj: number
+    cdd: number
+    other: number
+  }
+  contractExpiry: ContractExpirySummary
+  topPositions: Array<{ label: string; value: number }>
+  positionMissing: number
 }
 
 type SupervisorTeamDetail = {
@@ -456,6 +495,43 @@ const calculateMedian = (values: number[]) => {
   const sorted = [...values].sort((a, b) => a - b)
   const mid = Math.floor(sorted.length / 2)
   return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2
+}
+
+const buildContractExpirySummary = (members: Member[]): ContractExpirySummary => {
+  const now = new Date()
+  const months: string[] = []
+  for (let i = 0; i < 3; i += 1) {
+    const date = new Date(now.getFullYear(), now.getMonth() + i, 1)
+    months.push(date.toISOString().slice(0, 7))
+  }
+  const counts = new Map(months.map((key) => [key, 0]))
+  let overdue = 0
+  let beyond = 0
+  let missing = 0
+  members.forEach((member) => {
+    const endDate = member.expatProfile?.contractEndDate
+    if (!endDate) {
+      missing += 1
+      return
+    }
+    const parsed = new Date(endDate)
+    if (Number.isNaN(parsed.getTime())) {
+      missing += 1
+      return
+    }
+    if (parsed < now) {
+      overdue += 1
+      return
+    }
+    const key = parsed.toISOString().slice(0, 7)
+    if (counts.has(key)) {
+      counts.set(key, (counts.get(key) ?? 0) + 1)
+    } else {
+      beyond += 1
+    }
+  })
+  const upcoming = Array.from(counts.values()).reduce((sum, value) => sum + value, 0)
+  return { upcoming, overdue, beyond, missing }
 }
 
 const normalizePositionKey = (value: string) => {
@@ -1663,6 +1739,255 @@ const LineChart = ({
   )
 }
 
+const MultiLineChart = ({
+  labels,
+  series,
+  formatValue,
+  emptyLabel,
+}: {
+  labels: string[]
+  series: CompareLineSeries[]
+  formatValue: (value: number) => string
+  emptyLabel: string
+}) => {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
+  const [size, setSize] = useState({ width: 0, height: 0 })
+
+  useEffect(() => {
+    if (!containerRef.current) return
+    const resizeObserver = new ResizeObserver((entries) => {
+      const entry = entries[0]
+      setSize({ width: entry.contentRect.width, height: entry.contentRect.height })
+    })
+    resizeObserver.observe(containerRef.current)
+    return () => resizeObserver.disconnect()
+  }, [])
+
+  const chart = useMemo(() => {
+    if (labels.length === 0 || series.length === 0 || size.width === 0 || size.height === 0) {
+      return null
+    }
+    const padding = { top: 14, bottom: 18, left: 10, right: 10 }
+    const values = series.flatMap((item) => item.values)
+    const dataMin = Math.min(...values)
+    const dataMax = Math.max(...values)
+    const rangePadding = (dataMax - dataMin) * 0.2
+    const effectivePadding = rangePadding === 0 ? (dataMax * 0.1 || 10) : rangePadding
+    const minValue = Math.max(0, dataMin - effectivePadding)
+    const maxValue = dataMax + effectivePadding
+    const range = maxValue - minValue || 1
+    const plotWidth = size.width - padding.left - padding.right
+    const plotHeight = size.height - padding.top - padding.bottom
+    const xPositions = labels.map((_, index) => {
+      return labels.length === 1
+        ? padding.left + plotWidth / 2
+        : padding.left + (index / (labels.length - 1)) * plotWidth
+    })
+    const pointsBySeries = series.map((item) => {
+      const points = item.values.map((value, index) => {
+        const normalized = (value - minValue) / range
+        const y = padding.top + (1 - normalized) * plotHeight
+        const x = xPositions[index] ?? padding.left
+        return {
+          x,
+          y,
+          xPercent: size.width ? (x / size.width) * 100 : 0,
+          yPercent: size.height ? (y / size.height) * 100 : 0,
+          value,
+        }
+      })
+      return { ...item, points }
+    })
+    return {
+      padding,
+      plotWidth,
+      plotHeight,
+      minValue,
+      maxValue,
+      xPositions,
+      pointsBySeries,
+    }
+  }, [labels, series, size.height, size.width])
+
+  useEffect(() => {
+    if (!canvasRef.current || !chart) return
+    const canvas = canvasRef.current
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    const dpr = window.devicePixelRatio || 1
+    canvas.width = size.width * dpr
+    canvas.height = size.height * dpr
+    canvas.style.width = `${size.width}px`
+    canvas.style.height = `${size.height}px`
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+    ctx.clearRect(0, 0, size.width, size.height)
+
+    const { padding, plotHeight, xPositions, pointsBySeries } = chart
+
+    ctx.strokeStyle = '#f1f5f9'
+    ctx.lineWidth = 1
+    xPositions.forEach((x) => {
+      ctx.beginPath()
+      ctx.moveTo(x, padding.top)
+      ctx.lineTo(x, padding.top + plotHeight)
+      ctx.stroke()
+    })
+
+    pointsBySeries.forEach((item) => {
+      ctx.strokeStyle = item.color
+      ctx.lineWidth = 2
+      ctx.lineJoin = 'round'
+      ctx.lineCap = 'round'
+      ctx.beginPath()
+      item.points.forEach((point, index) => {
+        if (index === 0) ctx.moveTo(point.x, point.y)
+        else ctx.lineTo(point.x, point.y)
+      })
+      ctx.stroke()
+
+      item.points.forEach((point, idx) => {
+        const isActive = idx === hoveredIndex
+        const radius = isActive ? 4 : 2.5
+        ctx.beginPath()
+        ctx.arc(point.x, point.y, radius, 0, Math.PI * 2)
+        ctx.fillStyle = isActive ? '#ffffff' : item.color
+        ctx.strokeStyle = isActive ? item.color : '#ffffff'
+        ctx.lineWidth = isActive ? 2 : 1
+        ctx.fill()
+        ctx.stroke()
+      })
+    })
+
+    if (hoveredIndex !== null && xPositions[hoveredIndex] !== undefined) {
+      ctx.save()
+      ctx.strokeStyle = 'rgba(148,163,184,0.7)'
+      ctx.setLineDash([4, 4])
+      ctx.beginPath()
+      ctx.moveTo(xPositions[hoveredIndex], padding.top)
+      ctx.lineTo(xPositions[hoveredIndex], padding.top + plotHeight)
+      ctx.stroke()
+      ctx.restore()
+    }
+  }, [chart, hoveredIndex, size.height, size.width])
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!size.width || labels.length <= 1) return
+    const rect = containerRef.current?.getBoundingClientRect()
+    if (!rect) return
+    const x = e.clientX - rect.left
+    const percent = Math.max(0, Math.min(1, x / rect.width))
+    const index = Math.round(percent * (labels.length - 1))
+    setHoveredIndex(index)
+  }
+
+  const handleMouseLeave = () => {
+    setHoveredIndex(null)
+  }
+
+  if (labels.length === 0 || series.length === 0) {
+    return (
+      <div className="flex h-full items-center justify-center p-4">
+        <p className="text-sm font-medium text-slate-400">{emptyLabel}</p>
+      </div>
+    )
+  }
+
+  const activeIndex = hoveredIndex ?? null
+  const tooltipAlign =
+    activeIndex === null
+      ? 'center'
+      : activeIndex <= 1
+        ? 'left'
+        : activeIndex >= labels.length - 2
+          ? 'right'
+          : 'center'
+
+  return (
+    <div
+      className="group relative w-full select-none pt-2 pb-2"
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
+    >
+      <div className="mb-3 flex flex-wrap gap-3 text-[10px] text-slate-500">
+        {series.map((item) => (
+          <div key={item.key} className="flex items-center gap-2">
+            <span
+              className="h-2 w-2 rounded-full"
+              style={{ backgroundColor: item.color }}
+            />
+            <span className="font-semibold text-slate-700">{item.label}</span>
+          </div>
+        ))}
+      </div>
+      <div ref={containerRef} className="relative h-56 w-full cursor-crosshair">
+        <canvas ref={canvasRef} className="h-full w-full" />
+        {activeIndex !== null && chart ? (
+          <div
+            className="absolute pointer-events-none z-10 px-2 pb-2 transition-all duration-75 ease-out"
+            style={{
+              left: `${chart.pointsBySeries[0]?.points[activeIndex]?.xPercent ?? 0}%`,
+              top: `${chart.pointsBySeries[0]?.points[activeIndex]?.yPercent ?? 0}%`,
+              transform:
+                tooltipAlign === 'left'
+                  ? 'translate(0%, -100%)'
+                  : tooltipAlign === 'right'
+                    ? 'translate(-100%, -100%)'
+                    : 'translate(-50%, -100%)',
+            }}
+          >
+            <div className="min-w-[180px] rounded-lg bg-slate-900/90 px-2 py-1 text-white shadow-xl backdrop-blur-sm">
+              <span className="text-[10px] font-medium">{labels[activeIndex]}</span>
+              <div className="mt-1 space-y-0.5 text-[10px]">
+                {series.map((item) => (
+                  <div key={item.key} className="flex items-center justify-between gap-3">
+                    <span className="flex items-center gap-1">
+                      <span
+                        className="h-1.5 w-1.5 rounded-full"
+                        style={{ backgroundColor: item.color }}
+                      />
+                      {item.label}
+                    </span>
+                    <span className="font-semibold">
+                      {formatValue(item.values[activeIndex] ?? 0)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        ) : null}
+      </div>
+
+      <div
+        className="mt-3 grid gap-2 text-[10px]"
+        style={{ gridTemplateColumns: `repeat(${labels.length}, minmax(0, 1fr))` }}
+      >
+        {labels.map((label, idx) => {
+          const isFirst = idx === 0
+          const isLast = idx === labels.length - 1
+          const showDense = labels.length <= 6
+          const showAlternate = labels.length <= 12 && idx % 2 === 0
+          const shouldShow = showDense || showAlternate || isFirst || isLast
+          return (
+            <div key={label} className="flex min-w-0 flex-col items-center">
+              <span
+                className={`max-w-full truncate text-[9px] ${
+                  shouldShow ? 'text-slate-500' : 'text-transparent'
+                }`}
+                title={label}
+              >
+                {label}
+              </span>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 const ContractTypeTrendList = ({
   items,
   formatNumber,
@@ -1926,6 +2251,148 @@ const PositionDetailModal = ({
           />
         </div>
       </div>
+    </div>
+  )
+}
+
+const CompareSummaryTable = ({
+  rows,
+  showPayroll,
+  formatNumber,
+  formatMoney,
+  emptyLabel,
+  labels,
+  statusLabels,
+}: {
+  rows: CompareTeamStats[]
+  showPayroll: boolean
+  formatNumber: (value: number) => string
+  formatMoney: (value: number) => string
+  emptyLabel: string
+  labels: {
+    team: string
+    people: string
+    payrollTotal: string
+    payrollAverage: string
+    payrollMedian: string
+    ctj: string
+    cdd: string
+    other: string
+    expiringSoon: string
+    overdue: string
+    missing: string
+  }
+  statusLabels: {
+    active: string
+    onLeave: string
+    terminated: string
+  }
+}) => {
+  if (rows.length === 0) {
+    return <p className="text-sm text-slate-500">{emptyLabel}</p>
+  }
+  return (
+    <div className="overflow-x-auto rounded-2xl border border-slate-100">
+      <table className="min-w-max w-full text-xs text-slate-700">
+        <thead className="bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500">
+          <tr>
+            <th className="px-4 py-3 text-left">{labels.team}</th>
+            <th className="px-4 py-3 text-right">{labels.people}</th>
+            <th className="px-4 py-3 text-right">{statusLabels.active}</th>
+            <th className="px-4 py-3 text-right">{statusLabels.onLeave}</th>
+            <th className="px-4 py-3 text-right">{statusLabels.terminated}</th>
+            {showPayroll ? (
+              <>
+                <th className="px-4 py-3 text-right">{labels.payrollTotal}</th>
+                <th className="px-4 py-3 text-right">{labels.payrollAverage}</th>
+                <th className="px-4 py-3 text-right">{labels.payrollMedian}</th>
+              </>
+            ) : null}
+            <th className="px-4 py-3 text-right">{labels.ctj}</th>
+            <th className="px-4 py-3 text-right">{labels.cdd}</th>
+            <th className="px-4 py-3 text-right">{labels.other}</th>
+            <th className="px-4 py-3 text-right">{labels.expiringSoon}</th>
+            <th className="px-4 py-3 text-right">{labels.overdue}</th>
+            <th className="px-4 py-3 text-right">{labels.missing}</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-100">
+          {rows.map((row) => (
+            <tr key={row.key} className="hover:bg-slate-50">
+              <td className="px-4 py-2 font-semibold text-slate-800">{row.label}</td>
+              <td className="px-4 py-2 text-right">{formatNumber(row.headcount)}</td>
+              <td className="px-4 py-2 text-right">{formatNumber(row.activeCount)}</td>
+              <td className="px-4 py-2 text-right">{formatNumber(row.onLeaveCount)}</td>
+              <td className="px-4 py-2 text-right">{formatNumber(row.terminatedCount)}</td>
+              {showPayroll ? (
+                <>
+                  <td className="px-4 py-2 text-right">{formatMoney(row.payrollTotal)}</td>
+                  <td className="px-4 py-2 text-right">{formatMoney(row.payrollAverage)}</td>
+                  <td className="px-4 py-2 text-right">{formatMoney(row.payrollMedian)}</td>
+                </>
+              ) : null}
+              <td className="px-4 py-2 text-right">{formatNumber(row.contractType.ctj)}</td>
+              <td className="px-4 py-2 text-right">{formatNumber(row.contractType.cdd)}</td>
+              <td className="px-4 py-2 text-right">{formatNumber(row.contractType.other)}</td>
+              <td className="px-4 py-2 text-right">{formatNumber(row.contractExpiry.upcoming)}</td>
+              <td className="px-4 py-2 text-right">{formatNumber(row.contractExpiry.overdue)}</td>
+              <td className="px-4 py-2 text-right">{formatNumber(row.contractExpiry.missing)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+const PositionCompareList = ({
+  rows,
+  formatNumber,
+  emptyLabel,
+  labels,
+}: {
+  rows: Array<{
+    key: string
+    label: string
+    topPositions: Array<{ label: string; value: number }>
+    positionMissing: number
+  }>
+  formatNumber: (value: number) => string
+  emptyLabel: string
+  labels: {
+    people: string
+    missingPosition: string
+  }
+}) => {
+  if (rows.length === 0) {
+    return <p className="text-sm text-slate-500">{emptyLabel}</p>
+  }
+  return (
+    <div className="space-y-4">
+      {rows.map((row) => (
+        <div key={row.key} className="rounded-xl border border-slate-100 bg-slate-50/60 p-4">
+          <p className="text-sm font-semibold text-slate-800">{row.label}</p>
+          <div className="mt-2 space-y-1 text-xs text-slate-600">
+            {row.topPositions.length === 0 ? (
+              <p className="text-slate-400">{emptyLabel}</p>
+            ) : (
+              row.topPositions.map((item) => (
+                <div key={item.label} className="flex items-center justify-between gap-2">
+                  <span className="truncate">{item.label}</span>
+                  <span className="shrink-0 font-semibold text-slate-700">
+                    {formatNumber(item.value)} {labels.people}
+                  </span>
+                </div>
+              ))
+            )}
+          </div>
+          {row.positionMissing ? (
+            <p className="mt-2 text-[10px] text-slate-400">
+              {labels.missingPosition}: {formatNumber(row.positionMissing)}
+            </p>
+          ) : null}
+        </div>
+      ))}
     </div>
   )
 }
@@ -2819,9 +3286,44 @@ export function MembersOverviewTab({
       if (mode === 'detail') {
         triggerDetailAutoMonths()
       }
+      if (mode === 'compare') {
+        const selectedTeams = teamFilters.filter(
+          (team) => team && team !== EMPTY_FILTER_VALUE,
+        )
+        if (selectedTeams.length < 2) {
+          const options = teamFilterOptions
+            .map((option) => option.value)
+            .filter((value) => value && value !== EMPTY_FILTER_VALUE)
+          if (options.length > 0) {
+            if (selectedTeams.length === 0) {
+              onTeamFiltersChange(options.slice(0, 2))
+            } else {
+              const fallback = options.find((value) => value !== selectedTeams[0])
+              if (fallback) {
+                onTeamFiltersChange([selectedTeams[0], fallback])
+              }
+            }
+          }
+        }
+        const defaultMonths = payrollMonthOptions.slice(0, 5).map((option) => option.value)
+        if (defaultMonths.length > 0) {
+          setPayrollMonthFilters(defaultMonths)
+        }
+        setDetailMonthOptions([])
+        setDetailAutoMonthsPending(false)
+      }
       setViewMode(mode)
     },
-    [defaultDetailTeam, defaultPayrollMonth, detailTeams.length, triggerDetailAutoMonths],
+    [
+      defaultDetailTeam,
+      defaultPayrollMonth,
+      detailTeams.length,
+      onTeamFiltersChange,
+      payrollMonthOptions,
+      teamFilterOptions,
+      teamFilters,
+      triggerDetailAutoMonths,
+    ],
   )
 
   const supervisorStats = useMemo(() => {
@@ -3054,6 +3556,250 @@ export function MembersOverviewTab({
       ),
     [localMembers, detailTeamSet],
   )
+
+  const compareTeamKeys = useMemo(() => {
+    const seen = new Set<string>()
+    const list: string[] = []
+    teamFilters.forEach((team) => {
+      const key = normalizeText(team)
+      if (!key || key === EMPTY_FILTER_VALUE || seen.has(key)) return
+      seen.add(key)
+      list.push(key)
+    })
+    return list
+  }, [teamFilters])
+
+  const compareMonthLabels = useMemo(
+    () => sortMonthValues(activePayrollMonths),
+    [activePayrollMonths],
+  )
+
+  const compareTeamStats = useMemo(() => {
+    return compareTeamKeys.map((teamKey) => {
+      const teamMembers = localMembers.filter(
+        (member) =>
+          member.nationality !== 'china' &&
+          normalizeText(member.expatProfile?.team) === teamKey,
+      )
+      const headcount = teamMembers.length
+      const activeCount = teamMembers.filter(
+        (member) => member.employmentStatus === 'ACTIVE',
+      ).length
+      const onLeaveCount = teamMembers.filter(
+        (member) => member.employmentStatus === 'ON_LEAVE',
+      ).length
+      const terminatedCount = teamMembers.filter(
+        (member) => member.employmentStatus === 'TERMINATED',
+      ).length
+      const payrollTotals = showTeamPayroll
+        ? teamMembers.map((member) => payrollPayoutsByMemberId.get(member.id) ?? 0)
+        : []
+      const payrollTotal = showTeamPayroll
+        ? payrollTotals.reduce((sum, value) => sum + value, 0)
+        : 0
+      const payrollAverage =
+        showTeamPayroll && headcount > 0 ? payrollTotal / headcount : 0
+      const payrollMedian = showTeamPayroll ? calculateMedian(payrollTotals) : 0
+      const contractType = { ctj: 0, cdd: 0, other: 0 }
+      const contractTypePayroll = { ctj: 0, cdd: 0, other: 0 }
+      teamMembers.forEach((member) => {
+        const type = member.expatProfile?.contractType ?? null
+        if (type === 'CTJ') {
+          contractType.ctj += 1
+        } else if (type === 'CDD') {
+          contractType.cdd += 1
+        } else {
+          contractType.other += 1
+        }
+        if (showTeamPayroll) {
+          const payout = payrollPayoutsByMemberId.get(member.id) ?? 0
+          if (type === 'CTJ') contractTypePayroll.ctj += payout
+          else if (type === 'CDD') contractTypePayroll.cdd += payout
+          else contractTypePayroll.other += payout
+        }
+      })
+      const contractExpiry = buildContractExpirySummary(teamMembers)
+      const positionStats = buildPositionStats(
+        teamMembers,
+        nameCollator,
+        t.overview.positionGroups,
+      )
+      const topPositions = [...positionStats.items]
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 3)
+        .map((item) => ({ label: item.label, value: item.value }))
+      return {
+        key: teamKey,
+        label: resolveTeamLabel(teamKey),
+        headcount,
+        activeCount,
+        onLeaveCount,
+        terminatedCount,
+        payrollTotal,
+        payrollAverage,
+        payrollMedian,
+        contractType,
+        contractTypePayroll,
+        contractExpiry,
+        topPositions,
+        positionMissing: positionStats.missing,
+      } as CompareTeamStats
+    })
+  }, [
+    compareTeamKeys,
+    localMembers,
+    nameCollator,
+    payrollPayoutsByMemberId,
+    resolveTeamLabel,
+    showTeamPayroll,
+    t.overview.positionGroups,
+  ])
+
+  const compareMonthlySeries = useMemo(() => {
+    if (!showTeamPayroll || compareMonthLabels.length === 0) {
+      return { totalSeries: [], averageSeries: [] }
+    }
+    const monthIndex = new Map(compareMonthLabels.map((label, idx) => [label, idx]))
+    const totalsByTeam = new Map<string, number[]>()
+    const memberSetsByTeam = new Map<string, Array<Set<number>>>()
+    compareTeamKeys.forEach((teamKey) => {
+      totalsByTeam.set(teamKey, Array(compareMonthLabels.length).fill(0))
+      memberSetsByTeam.set(
+        teamKey,
+        Array.from({ length: compareMonthLabels.length }, () => new Set<number>()),
+      )
+    })
+    const memberTeamMap = new Map<number, string>()
+    localMembers.forEach((member) => {
+      if (member.nationality === 'china') return
+      const teamKey = normalizeText(member.expatProfile?.team)
+      if (!teamKey || !totalsByTeam.has(teamKey)) return
+      memberTeamMap.set(member.id, teamKey)
+    })
+    payrollPayouts.forEach((payout) => {
+      const teamKey = memberTeamMap.get(payout.userId)
+      if (!teamKey) return
+      const run = payrollRunsById.get(payout.runId)
+      const monthKey = run
+        ? formatMonthValue(run.year, run.month)
+        : payout.payoutDate.slice(0, 7)
+      const index = monthIndex.get(monthKey)
+      if (index === undefined) return
+      const amount = parseNumber(payout.amount)
+      if (amount === null) return
+      const totals = totalsByTeam.get(teamKey)
+      if (!totals) return
+      totals[index] += amount
+      const memberSets = memberSetsByTeam.get(teamKey)
+      if (memberSets) {
+        memberSets[index]?.add(payout.userId)
+      }
+    })
+    const totalSeries = compareTeamKeys.map((teamKey, idx) => ({
+      key: teamKey,
+      label: resolveTeamLabel(teamKey),
+      color: CHART_COLORS[idx % CHART_COLORS.length],
+      values: totalsByTeam.get(teamKey) ?? Array(compareMonthLabels.length).fill(0),
+    }))
+    const averageSeries = compareTeamKeys.map((teamKey, idx) => {
+      const totals = totalsByTeam.get(teamKey) ?? Array(compareMonthLabels.length).fill(0)
+      const memberSets = memberSetsByTeam.get(teamKey) ?? []
+      const values = totals.map((total, index) => {
+        const count = memberSets[index]?.size ?? 0
+        return count > 0 ? total / count : 0
+      })
+      return {
+        key: teamKey,
+        label: resolveTeamLabel(teamKey),
+        color: CHART_COLORS[idx % CHART_COLORS.length],
+        values,
+      }
+    })
+    return { totalSeries, averageSeries }
+  }, [
+    compareMonthLabels,
+    compareTeamKeys,
+    localMembers,
+    payrollPayouts,
+    payrollRunsById,
+    resolveTeamLabel,
+    showTeamPayroll,
+  ])
+
+  const compareHeatmapItems = useMemo(
+    () =>
+      compareTeamStats.map((team) => ({
+        label: team.key,
+        value: team.headcount,
+        payrollTotal: team.payrollTotal,
+        payrollAverage: team.payrollAverage,
+        payrollMedian: team.payrollMedian,
+      })),
+    [compareTeamStats],
+  )
+
+  const compareHeadcountItems = useMemo(
+    () =>
+      compareTeamStats.map((team, idx) => ({
+        label: team.label,
+        value: team.headcount,
+        color: CHART_COLORS[idx % CHART_COLORS.length],
+      })),
+    [compareTeamStats],
+  )
+
+  const comparePayrollItems = useMemo(() => {
+    if (!showTeamPayroll) return []
+    return compareTeamStats.map((team, idx) => ({
+      label: team.label,
+      value: team.payrollTotal,
+      color: CHART_COLORS[idx % CHART_COLORS.length],
+    }))
+  }, [compareTeamStats, showTeamPayroll])
+
+  const compareExpiryItems = useMemo(
+    () =>
+      compareTeamStats.map((team, idx) => ({
+        label: team.label,
+        value: team.contractExpiry.upcoming,
+        color: CHART_COLORS[idx % CHART_COLORS.length],
+      })),
+    [compareTeamStats],
+  )
+
+  const compareExpiryTotals = useMemo(
+    () =>
+      compareTeamStats.reduce(
+        (acc, team) => ({
+          overdue: acc.overdue + team.contractExpiry.overdue,
+          missing: acc.missing + team.contractExpiry.missing,
+        }),
+        { overdue: 0, missing: 0 },
+      ),
+    [compareTeamStats],
+  )
+
+  const compareHeatmapClass = useMemo(
+    () => (compareTeamStats.length > 4 ? 'md:col-span-2' : 'md:col-span-1'),
+    [compareTeamStats.length],
+  )
+  const compareChartColumnsClass = useMemo(
+    () => (compareTeamStats.length > 4 ? 'md:grid-cols-2' : 'md:grid-cols-3'),
+    [compareTeamStats.length],
+  )
+
+  const comparePositionRows = useMemo(
+    () =>
+      compareTeamStats.map((team) => ({
+        key: team.key,
+        label: team.label,
+        topPositions: team.topPositions,
+        positionMissing: team.positionMissing,
+      })),
+    [compareTeamStats],
+  )
+
+  const compareReady = compareTeamKeys.length >= 2
 
   const missingPhoneCount = useMemo(() => countMissingPhones(scopedMembers), [scopedMembers])
   const detailMissingPhoneCount = useMemo(
@@ -4578,9 +5324,151 @@ export function MembersOverviewTab({
       ) : null}
 
       {viewMode === 'compare' ? (
-        <div className="rounded-2xl border border-slate-200 bg-white p-8 text-sm text-slate-500 shadow-sm">
-          {t.overview.labels.compareHint}
-        </div>
+        compareReady ? (
+          <div className="space-y-6">
+            <OverviewCard title={t.overview.charts.team} badge={t.overview.labels.localScope}>
+              <CompareSummaryTable
+                rows={compareTeamStats}
+                showPayroll={showTeamPayroll}
+                formatNumber={formatNumber}
+                formatMoney={formatMoney}
+                emptyLabel={t.overview.labels.noData}
+                labels={{
+                  team: t.table.team,
+                  people: t.overview.labels.people,
+                  payrollTotal: t.overview.labels.payoutTotal,
+                  payrollAverage: t.overview.labels.payrollAverage,
+                  payrollMedian: t.overview.labels.payrollMedian,
+                  ctj: t.overview.labels.ctj,
+                  cdd: t.overview.labels.cdd,
+                  other: t.overview.labels.other,
+                  expiringSoon: t.overview.labels.expiringSoon,
+                  overdue: t.overview.labels.overdue,
+                  missing: t.overview.labels.missingContractDate,
+                }}
+                statusLabels={{
+                  active: t.status.ACTIVE,
+                  onLeave: t.status.ON_LEAVE,
+                  terminated: t.status.TERMINATED,
+                }}
+              />
+              {showTeamPayroll ? (
+                <p className="mt-3 text-xs text-slate-500">
+                  {t.filters.payrollMonth}: {activePayrollMonths.join(', ')}
+                </p>
+              ) : null}
+            </OverviewCard>
+
+            {showTeamPayroll ? (
+              <div className={`grid gap-6 ${compareChartColumnsClass}`}>
+                <div className={compareHeatmapClass}>
+                  <OverviewCard
+                    title={t.overview.charts.teamCostScatter}
+                    badge={t.overview.labels.localScope}
+                  >
+                    <TeamCostHeatmap
+                      items={compareHeatmapItems}
+                      resolveTeamLabel={resolveTeamLabel}
+                      formatMoney={formatMoney}
+                      formatNumber={formatNumber}
+                      formatRatio={formatRatio}
+                      emptyLabel={t.overview.labels.noData}
+                      hint={t.overview.labels.scatterHint}
+                      labels={{
+                        team: t.table.team,
+                        people: t.overview.labels.people,
+                        payrollTotal: t.overview.labels.payoutTotal,
+                        payrollAverage: t.overview.labels.payrollAverage,
+                        payrollMedian: t.overview.labels.payrollMedian,
+                        payrollRatio: t.overview.labels.payrollRatio,
+                      }}
+                    />
+                  </OverviewCard>
+                </div>
+                <div className="md:col-span-1">
+                  <OverviewCard
+                    title={t.overview.charts.detailPayrollTotal}
+                    badge={t.overview.labels.localScope}
+                  >
+                    <MultiLineChart
+                      labels={compareMonthLabels}
+                      series={compareMonthlySeries.totalSeries}
+                      formatValue={formatMoney}
+                      emptyLabel={t.overview.labels.noData}
+                    />
+                  </OverviewCard>
+                </div>
+                <div className="md:col-span-1">
+                  <OverviewCard
+                    title={t.overview.charts.detailPayrollAverage}
+                    badge={t.overview.labels.localScope}
+                  >
+                    <MultiLineChart
+                      labels={compareMonthLabels}
+                      series={compareMonthlySeries.averageSeries}
+                      formatValue={formatMoney}
+                      emptyLabel={t.overview.labels.noData}
+                    />
+                  </OverviewCard>
+                </div>
+              </div>
+            ) : null}
+
+            <div className="grid gap-6 md:grid-cols-2">
+              <OverviewCard title={t.overview.charts.contractExpiry} badge={t.overview.labels.localScope}>
+                <BarList
+                  items={compareExpiryItems}
+                  formatValue={(value) => `${formatNumber(value)} ${t.overview.labels.people}`}
+                  emptyLabel={t.overview.labels.noData}
+                />
+                <div className="mt-2 flex flex-wrap gap-3 text-xs text-slate-500">
+                  <span>
+                    {t.overview.labels.overdue}: {formatNumber(compareExpiryTotals.overdue)}
+                  </span>
+                  <span>
+                    {t.overview.labels.missingContractDate}: {formatNumber(compareExpiryTotals.missing)}
+                  </span>
+                </div>
+              </OverviewCard>
+
+              <OverviewCard title={t.overview.charts.position} badge={t.overview.labels.localScope}>
+                <PositionCompareList
+                  rows={comparePositionRows}
+                  formatNumber={formatNumber}
+                  emptyLabel={t.overview.labels.noData}
+                  labels={{
+                    people: t.overview.labels.people,
+                    missingPosition: t.overview.labels.missingPosition,
+                  }}
+                />
+              </OverviewCard>
+            </div>
+
+            <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+              <OverviewCard title={t.overview.labels.teamSortCount} badge={t.overview.labels.localScope}>
+                <BarList
+                  items={compareHeadcountItems}
+                  formatValue={(value) => `${formatNumber(value)} ${t.overview.labels.people}`}
+                  emptyLabel={t.overview.labels.noData}
+                />
+              </OverviewCard>
+
+              {showTeamPayroll ? (
+                <OverviewCard title={t.overview.labels.payoutTotal} badge={t.overview.labels.localScope}>
+                  <BarList
+                    items={comparePayrollItems}
+                    formatValue={formatMoney}
+                    emptyLabel={t.overview.labels.noData}
+                  />
+                </OverviewCard>
+              ) : null}
+            </div>
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-slate-200 bg-white p-8 text-sm text-slate-500 shadow-sm">
+            {t.overview.labels.compareHint}
+          </div>
+        )
       ) : null}
 
       <ContractExpiryModal
