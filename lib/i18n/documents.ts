@@ -211,6 +211,7 @@ export type DocumentsCopy = {
       saveFinal: string
       savingFinal: string
       exportPdf: string
+      exporting: string
     }
     preview: {
       title: string
@@ -218,6 +219,7 @@ export type DocumentsCopy = {
       templateEmpty: string
       refresh: string
       exportPdf: string
+      exporting: string
       emptyHint: string
       frameTitle: string
     }
@@ -603,6 +605,7 @@ export const documentsCopy: Record<Locale, DocumentsCopy> = {
         saveFinal: '完成并保存',
         savingFinal: '完成中...',
         exportPdf: '导出 PDF',
+        exporting: '导出中...',
       },
       preview: {
         title: '预览',
@@ -610,6 +613,7 @@ export const documentsCopy: Record<Locale, DocumentsCopy> = {
         templateEmpty: '未选',
         refresh: '刷新预览',
         exportPdf: '导出 PDF',
+        exporting: '导出中...',
         emptyHint: '填写表单后点击“刷新预览”查看输出。',
         frameTitle: '提交单预览',
       },
@@ -993,6 +997,7 @@ export const documentsCopy: Record<Locale, DocumentsCopy> = {
         saveFinal: 'Finaliser et enregistrer',
         savingFinal: 'Finalisation...',
         exportPdf: 'Exporter PDF',
+        exporting: 'Exportation...',
       },
       preview: {
         title: 'Aperçu',
@@ -1000,6 +1005,7 @@ export const documentsCopy: Record<Locale, DocumentsCopy> = {
         templateEmpty: 'Non sélectionné',
         refresh: "Actualiser l'aperçu",
         exportPdf: 'Exporter PDF',
+        exporting: 'Exportation...',
         emptyHint: 'Remplissez le formulaire puis cliquez sur « Actualiser l’aperçu ».',
         frameTitle: 'apercu-bordereau',
       },

@@ -69,6 +69,7 @@ export default function SubmissionEditor({ initialSubmission, canManage = false,
   const [loadingTpls, setLoadingTpls] = useState(false)
   const [saving, setSaving] = useState(false)
   const [rendering, setRendering] = useState(false)
+  const [downloadingPdf, setDownloadingPdf] = useState(false)
   const [activeTab, setActiveTab] = useState<'form' | 'preview'>('form')
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(initialSubmission?.templateId ?? 'file-bordereau')
   const [data, setData] = useState<SubmissionData>(initialSubmission?.data ?? buildDefaultData())
@@ -414,7 +415,7 @@ export default function SubmissionEditor({ initialSubmission, canManage = false,
             return buildInspectionDescription(merged).trim()
           })
           .filter((desc) => desc && !existingDesignations.has(desc))
-          .map((desc) => ({ designation: desc, quantity: 2, observation: '' })) ?? []
+          .map((desc) => ({ designation: desc, quantity: 1, observation: '' })) ?? []
       const itemsPayload = [...baseItems, ...autoItems]
 
       const payload = {
@@ -458,11 +459,16 @@ export default function SubmissionEditor({ initialSubmission, canManage = false,
   const handleDownloadPdf = async () => {
     if (!validateForm()) return
     setError(null)
+    setDownloadingPdf(true)
     try {
       const res = await fetch('/api/documents/submissions/pdf', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ templateId: selectedTemplateId, data }),
+        body: JSON.stringify({
+          templateId: selectedTemplateId,
+          data,
+          submissionId: initialSubmission?.id,
+        }),
       })
       if (!res.ok) {
         throw new Error(await parseErrorMessage(res))
@@ -481,6 +487,8 @@ export default function SubmissionEditor({ initialSubmission, canManage = false,
       window.URL.revokeObjectURL(url)
     } catch (err) {
       setError((err as Error).message)
+    } finally {
+      setDownloadingPdf(false)
     }
   }
 
@@ -699,15 +707,58 @@ export default function SubmissionEditor({ initialSubmission, canManage = false,
               </div>
 
               <div className="space-y-2">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-wrap items-center justify-between gap-3">
                   <p className="text-sm font-semibold text-slate-900">{copy.submissionEditor.items.title}</p>
-                  <button
-                    type="button"
-                    onClick={addItem}
-                    className="rounded-full border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-700 hover:border-slate-400 hover:bg-slate-100"
-                  >
-                    {copy.submissionEditor.items.add}
-                  </button>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleRender}
+                      disabled={rendering}
+                      className="rounded-full bg-emerald-500 px-3 py-1 text-xs font-semibold text-white shadow-md shadow-emerald-300/30 transition hover:-translate-y-0.5 hover:shadow-emerald-400/40 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {rendering ? copy.submissionEditor.actions.rendering : copy.submissionEditor.actions.render}
+                    </button>
+                    {canEdit ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => handleSave(DocumentStatus.DRAFT)}
+                          disabled={saving}
+                          className="rounded-full border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-800 hover:border-slate-400 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {saving && status === DocumentStatus.DRAFT
+                            ? copy.submissionEditor.actions.savingDraft
+                            : copy.submissionEditor.actions.saveDraft}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleSave(DocumentStatus.FINAL)}
+                          disabled={saving}
+                          className="rounded-full bg-sky-500 px-3 py-1 text-xs font-semibold text-white shadow-md shadow-sky-300/30 transition hover:-translate-y-0.5 hover:shadow-sky-400/40 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {saving && status === DocumentStatus.FINAL
+                            ? copy.submissionEditor.actions.savingFinal
+                            : copy.submissionEditor.actions.saveFinal}
+                        </button>
+                      </>
+                    ) : null}
+                    <button
+                      type="button"
+                      onClick={handleDownloadPdf}
+                      disabled={downloadingPdf}
+                      className="rounded-full border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-800 hover:border-slate-400 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {downloadingPdf ? copy.submissionEditor.actions.exporting : copy.submissionEditor.actions.exportPdf}
+                    </button>
+                    <div className="mx-2 h-4 w-px bg-slate-300"></div>
+                    <button
+                      type="button"
+                      onClick={addItem}
+                      className="rounded-full border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-700 hover:border-slate-400 hover:bg-slate-100"
+                    >
+                      {copy.submissionEditor.items.add}
+                    </button>
+                  </div>
                 </div>
                 <div className="space-y-3">
                   {(data.items || []).map((item, idx) => (
@@ -927,45 +978,7 @@ export default function SubmissionEditor({ initialSubmission, canManage = false,
             </fieldset>
 
             <div className="flex flex-wrap gap-2 text-xs font-semibold">
-              <button
-                type="button"
-                onClick={handleRender}
-                disabled={rendering}
-                className="rounded-full bg-emerald-500 px-4 py-2 text-white shadow-md shadow-emerald-300/30 transition hover:-translate-y-0.5 hover:shadow-emerald-400/40 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {rendering ? copy.submissionEditor.actions.rendering : copy.submissionEditor.actions.render}
-              </button>
-              {canEdit ? (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => handleSave(DocumentStatus.DRAFT)}
-                    disabled={saving}
-                    className="rounded-full border border-slate-300 px-4 py-2 text-slate-800 hover:border-slate-400 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {saving && status === DocumentStatus.DRAFT
-                      ? copy.submissionEditor.actions.savingDraft
-                      : copy.submissionEditor.actions.saveDraft}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleSave(DocumentStatus.FINAL)}
-                    disabled={saving}
-                    className="rounded-full bg-sky-500 px-4 py-2 text-white shadow-md shadow-sky-300/30 transition hover:-translate-y-0.5 hover:shadow-sky-400/40 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {saving && status === DocumentStatus.FINAL
-                      ? copy.submissionEditor.actions.savingFinal
-                      : copy.submissionEditor.actions.saveFinal}
-                  </button>
-                </>
-              ) : null}
-              <button
-                type="button"
-                onClick={handleDownloadPdf}
-                className="rounded-full border border-slate-300 px-4 py-2 text-slate-800 hover:border-slate-400 hover:bg-slate-100"
-              >
-                {copy.submissionEditor.actions.exportPdf}
-              </button>
+              {/* Actions moved to items header */}
             </div>
           </div>
         ) : null}
@@ -993,9 +1006,10 @@ export default function SubmissionEditor({ initialSubmission, canManage = false,
                 <button
                   type="button"
                   onClick={handleDownloadPdf}
-                  className="rounded-full border border-slate-300 px-4 py-2 text-slate-800 hover:border-slate-400 hover:bg-slate-100"
+                  disabled={downloadingPdf}
+                  className="rounded-full border border-slate-300 px-4 py-2 text-slate-800 hover:border-slate-400 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {copy.submissionEditor.preview.exportPdf}
+                  {downloadingPdf ? copy.submissionEditor.preview.exporting : copy.submissionEditor.preview.exportPdf}
                 </button>
               </div>
             </div>
