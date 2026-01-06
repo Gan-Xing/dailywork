@@ -1,0 +1,287 @@
+/* Reset */
+* {
+    box-sizing: border-box;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+}
+
+@page {
+    size: A4 landscape;
+    margin: 0;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    background-color: #f0f0f0;
+    font-family: "Times New Roman", Times, serif;
+    /* Matches the serif look in image */
+    font-size: 10pt;
+    color: black;
+}
+
+/* Page Setup */
+.page {
+    width: 297mm;
+    height: 210mm;
+    padding: 5mm 10mm;
+    /* Reduced top/bottom padding */
+    margin: 0 auto;
+    background: white;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Header */
+.header-section {
+    text-align: center;
+    margin-bottom: 0;
+    border: 0.5mm solid black;
+    border-bottom: none;
+    padding: 1mm;
+}
+
+.header-main {
+    font-weight: bold;
+    font-size: 11pt;
+    margin-bottom: 1mm;
+    text-transform: uppercase;
+}
+
+.header-sub {
+    font-weight: bold;
+    font-size: 10pt;
+    margin-bottom: 0.5mm;
+}
+
+/* Employee Info Grid */
+.employee-info-grid {
+    display: flex;
+    border: 0.5mm solid black;
+    border-bottom: none;
+    margin-bottom: 0;
+}
+
+.info-cell {
+    padding: 1.5mm;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    border-right: 0.3mm solid black;
+    font-size: 11pt;
+}
+
+/* Specific alignments based on Main Table Columns Groups */
+/*
+   Groups:
+   1. Date + Matin = 10% + 22% = 32%
+   2. Soir = 22%
+   3. Other = 20%
+   4. Sig+Rem = 26%
+*/
+.info-cell:nth-child(1) {
+    width: 32%;
+}
+
+.info-cell:nth-child(2) {
+    width: 22%;
+    text-transform: uppercase;
+}
+
+.info-cell:nth-child(3) {
+    width: 20%;
+}
+
+.info-cell:nth-child(4) {
+    width: 26%;
+    text-transform: uppercase;
+    border-right: none;
+}
+
+
+/* Main Table */
+.main-table {
+    width: 100%;
+    border-collapse: collapse;
+    border: 0.5mm solid black;
+    /* Top border provided by components above being seamless */
+    font-size: 9pt;
+}
+
+.main-table th,
+.main-table td {
+    border: 0.3mm solid black;
+    padding: 1mm;
+    text-align: center;
+    vertical-align: middle;
+}
+
+.main-table th {
+    font-weight: bold;
+    padding: 1mm;
+}
+
+/* Column Widths */
+.col-date {
+    width: 10%;
+}
+
+.col-time {
+    width: 22%;
+}
+
+.col-hours {
+    width: 10%;
+}
+
+.col-sig {
+    width: 10%;
+}
+
+.col-remark {
+    width: 6%;
+}
+
+.th-top {
+    font-size: 9pt;
+    margin-bottom: 0.5mm;
+}
+
+.th-bottom {
+    font-size: 7.5pt;
+}
+
+/* Rows */
+.main-table tbody tr {
+    height: 7mm;
+    /* Increased height */
+}
+
+.bg-gray {
+    background-color: #bfbfbf;
+    /* Gray matching the image */
+}
+
+/* Slash Cell (Diagonal Line) */
+.slash-cell {
+    position: relative;
+    background: linear-gradient(to top right, transparent calc(50% - 0.5px), black, transparent calc(50% + 0.5px));
+}
+
+/* Alternative Slash if gradient is too blurry for print: use SVG or just accept gradient. Gradient is usually fine for this scale. */
+
+/* Footer in Table (Totals) */
+.total-cell-center {
+    font-weight: bold;
+    font-size: 8pt;
+}
+
+tfoot tr {
+    height: 15mm;
+}
+
+
+/* Footer Section (Detached Table) */
+.footer-section {
+    border: 0.5mm solid black;
+    border-top: none;
+    font-size: 8.5pt;
+}
+
+.footer-row {
+    display: flex;
+    border-bottom: 0.5mm solid black;
+    min-height: 12mm;
+}
+
+.footer-row:last-child {
+    border-bottom: none;
+}
+
+.footer-cell {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    border-right: 0.3mm solid black;
+    padding: 0.5mm 1mm;
+    font-weight: bold;
+}
+
+.footer-cell:last-child {
+    border-right: none;
+}
+
+/* Row 1: Totals Alignment with Table Columns */
+/* 
+   Col 1: 10%, Col 2: 22%, Col 3: 22%, Col 4: 10%, Col 5: 10%, Col 6: 10%, Col 7: 10%, Col 8: 6%
+*/
+.l-1 {
+    width: 10%;
+}
+
+.v-1 {
+    width: 22%;
+    background: white;
+}
+
+.l-2 {
+    width: 22%;
+}
+
+.v-2 {
+    width: 10%;
+    background: white;
+}
+
+.f-empty {
+    width: 10%;
+}
+
+.l-3 {
+    width: 10%;
+    font-size: 7.5pt;
+}
+
+.v-3 {
+    width: 10%;
+    background: white;
+}
+
+.l-4 {
+    width: 10%;
+    font-size: 7.5pt;
+}
+
+/* Borrowing 4% from Remark for L4+V4 */
+.v-4 {
+    width: 6%;
+    background: white;
+}
+
+/* Row 2: Jour Total */
+.f-label-jour {
+    width: 25%;
+    /* Spans Col 1 to 4 + extra? Matches line after L2/V2 in Row 1 */
+    text-align: center;
+}
+
+.f-value-jour {
+    flex: 1;
+    background: white;
+}
+
+/* Row 3: Signatures (4 equal columns) */
+.sig-label,
+.sig-value {
+    width: 25%;
+    height: 16mm;
+    font-size: 10pt;
+}
+
+.sig-value {
+    background: white;
+}

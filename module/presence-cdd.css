@@ -1,0 +1,272 @@
+/* Reset */
+* {
+    box-sizing: border-box;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+}
+
+@page {
+    size: A4 portrait;
+    margin: 0;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    background-color: #f0f0f0;
+    font-family: "Times New Roman", Times, serif;
+    font-size: 9pt;
+    color: black;
+}
+
+/* Page Setup */
+.page {
+    width: 210mm;
+    height: 297mm;
+    padding: 8mm 10mm;
+    margin: 0 auto;
+    background: white;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Header */
+.header-section {
+    text-align: center;
+    margin-bottom: 0;
+    border: 0.4mm solid black;
+    border-bottom: none;
+    padding: 2mm;
+}
+
+.header-main {
+    font-weight: bold;
+    font-size: 11pt;
+    margin-bottom: 1mm;
+}
+
+.header-sub {
+    font-weight: bold;
+    font-size: 10pt;
+}
+
+/* Employee Info Grid */
+.employee-info-grid {
+    display: flex;
+    border: 0.4mm solid black;
+    border-bottom: none;
+    margin-bottom: 0;
+}
+
+.info-cell {
+    padding: 1.5mm;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    border-right: 0.3mm solid black;
+    font-size: 9.5pt;
+    text-align: center;
+}
+
+.info-cell:nth-child(1) {
+    width: 12%;
+    /* Aligns with col-date */
+}
+
+.info-cell:nth-child(2) {
+    width: 42.5%;
+    /* Aligns with Matin + Soir + Normal Hours */
+    text-transform: uppercase;
+}
+
+.info-cell:nth-child(3) {
+    width: 24%;
+    /* Aligns with Extra Hours + Sig Emp */
+}
+
+.info-cell:nth-child(4) {
+    width: 21.5%;
+    /* Aligns with Sig Chef + Remark */
+    text-transform: uppercase;
+    border-right: none;
+}
+
+/* Main Table */
+.main-table {
+    width: 100%;
+    border-collapse: collapse;
+    border: 0.4mm solid black;
+    font-size: 8pt;
+}
+
+.main-table th,
+.main-table td {
+    border: 0.3mm solid black;
+    padding: 0.8mm 0.5mm;
+    text-align: center;
+    vertical-align: middle;
+}
+
+.main-table th {
+    font-weight: bold;
+}
+
+/* Column Widths */
+.col-date {
+    width: 12%;
+}
+
+.col-time {
+    width: 15%;
+}
+
+.col-hours {
+    width: 12.5%;
+}
+
+.col-sig {
+    width: 11.5%;
+}
+
+.col-remark {
+    width: 10%;
+}
+
+.th-top {
+    font-size: 8.5pt;
+    margin-bottom: 1mm;
+    font-weight: bold;
+}
+
+.th-bottom {
+    font-size: 7.5pt;
+    font-weight: normal;
+}
+
+/* Rows */
+.main-table tbody tr {
+    height: 6.2mm;
+}
+
+.bg-gray {
+    background-color: #bfbfbf;
+}
+
+/* Slash Cell (Diagonal Line) */
+.slash-cell {
+    position: relative;
+    background: linear-gradient(to top right, transparent calc(50% - 0.4px), black, transparent calc(50% + 0.4px));
+}
+
+/* Footer Section */
+.footer-section {
+    border: 0.4mm solid black;
+    border-top: none;
+    font-size: 8.5pt;
+}
+
+.footer-row {
+    display: flex;
+    border-bottom: 0.3mm solid black;
+}
+
+.footer-row:last-child {
+    border-bottom: none;
+}
+
+.footer-cell {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    border-right: 0.3mm solid black;
+    padding: 1mm;
+    font-weight: bold;
+}
+
+.footer-cell:last-child {
+    border-right: none;
+}
+
+/* Footer Row 1: Totals (8 cells total - Aligned with table columns) */
+.footer-row.totals-row {
+    height: 18mm;
+}
+
+.footer-row.totals-row .footer-cell:nth-child(1) {
+    width: 12%;
+    font-size: 7.5pt;
+}
+
+/* Date Col */
+.footer-row.totals-row .footer-cell:nth-child(2) {
+    width: 15%;
+    background: white;
+}
+
+/* Matin Col */
+.footer-row.totals-row .footer-cell:nth-child(3) {
+    width: 15%;
+    font-size: 7.5pt;
+}
+
+/* Soir Col */
+.footer-row.totals-row .footer-cell:nth-child(4) {
+    width: 12.5%;
+    background: white;
+}
+
+/* Normal Hrs Col */
+.footer-row.totals-row .footer-cell:nth-child(5) {
+    width: 12.5%;
+    font-size: 7.5pt;
+}
+
+/* Extra Hrs Col */
+.footer-row.totals-row .footer-cell:nth-child(6) {
+    width: 11.5%;
+    background: white;
+}
+
+/* Sig Emp Col */
+.footer-row.totals-row .footer-cell:nth-child(7) {
+    width: 11.5%;
+    font-size: 7.5pt;
+}
+
+/* Sig Chef Col */
+.footer-row.totals-row .footer-cell:nth-child(8) {
+    width: 10%;
+    background: white;
+}
+
+/* Remark Col */
+
+.footer-row.totals-row .footer-cell {
+    padding: 0.5mm !important;
+}
+
+/* Footer Row 2: Jour total */
+.f-label-jour {
+    width: 44.5%;
+    /* Roughly 3 columns width */
+    height: 8mm;
+}
+
+.f-value-jour {
+    width: 55.5%;
+}
+
+/* Footer Row 3: Signatures (4 columns) */
+.sig-label,
+.sig-value {
+    width: 25%;
+    height: 18mm;
+}
+
+.sig-value {
+    background: white;
+}
