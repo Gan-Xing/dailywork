@@ -1256,6 +1256,8 @@ export const memberCopy: Record<
         clearPaste: '清空',
         exportPdf: '导出工资',
         exportingPdf: '导出中...',
+        exportAttendance: '导出考勤表',
+        exportingAttendance: '导出考勤中...',
       },
       confirm: {
         clearRun: (label: string) => `确认清空 ${label} 的发放记录吗？此操作不可恢复。`,
@@ -1280,6 +1282,7 @@ export const memberCopy: Record<
         saveFailed: '保存工资发放失败',
         missingAmount: (count: number) => `仍有 ${count} 人未填写金额`,
         exportFailed: '导出工资失败，请稍后重试。',
+        exportAttendanceFailed: '导出考勤表失败，请稍后重试。',
         importInvalidTargets: '没有可用的发放日期',
         importErrorTitle: '导入错误',
         importErrorSummary: (count: number) => `发现 ${count} 条错误，请修正后重试。`,
@@ -1923,6 +1926,8 @@ export const memberCopy: Record<
         clearPaste: 'Effacer',
         exportPdf: 'Exporter salaires',
         exportingPdf: 'Export en cours...',
+        exportAttendance: 'Exporter la présence',
+        exportingAttendance: 'Export des présences...',
       },
       confirm: {
         clearRun: (label: string) =>
@@ -1948,6 +1953,7 @@ export const memberCopy: Record<
         saveFailed: "Échec de l'enregistrement",
         missingAmount: (count: number) => `Montant manquant pour ${count} personne(s)`,
         exportFailed: "Échec de l'export des salaires",
+        exportAttendanceFailed: "Échec de l'export des présences",
         importInvalidTargets: 'Aucune date de versement valide',
         importErrorTitle: "Erreurs d'import",
         importErrorSummary: (count: number) =>

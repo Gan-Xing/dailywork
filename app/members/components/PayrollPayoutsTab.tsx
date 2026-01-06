@@ -137,6 +137,7 @@ export function PayrollPayoutsTab({
   const [bulkOpen, setBulkOpen] = useState<Record<number, boolean>>({})
   const [bulkInputs, setBulkInputs] = useState<Record<number, string>>({})
   const [exportingRunId, setExportingRunId] = useState<number | null>(null)
+  const [exportingAttendanceRunId, setExportingAttendanceRunId] = useState<number | null>(null)
   const [nameFilters, setNameFilters] = useState<string[]>([])
   const [teamFilters, setTeamFilters] = useState<string[]>([])
   const [supervisorFilters, setSupervisorFilters] = useState<string[]>([])
@@ -1081,6 +1082,38 @@ export function PayrollPayoutsTab({
     }
   }
 
+  const exportAttendanceZip = async (run: PayrollRun) => {
+    if (exportingAttendanceRunId) return
+    setExportingAttendanceRunId(run.id)
+    setError(null)
+    try {
+      const res = await fetch(`/api/payroll-runs/${run.id}/attendance-zip`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ locale }),
+      })
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { message?: string }
+        throw new Error(data.message ?? t.payroll.errors.exportAttendanceFailed)
+      }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const filename = `attendance-${selectedMonth}-run-${run.sequence}.zip`
+      const link = document.createElement('a')
+      link.href = url
+      link.download = filename
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.setTimeout(() => URL.revokeObjectURL(url), 30_000)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : t.payroll.errors.exportAttendanceFailed
+      setError(message)
+    } finally {
+      setExportingAttendanceRunId(null)
+    }
+  }
+
   const sumRun = (runId: number | undefined, members: Member[]) => {
     if (!runId) return 0
     return members.reduce((total, member) => {
@@ -1246,7 +1279,8 @@ export function PayrollPayoutsTab({
           const isSavingRun = savingRuns[run.id]
           const isBulkOpen = bulkOpen[run.id]
           const isExporting = exportingRunId === run.id
-          const isExportBusy = exportingRunId !== null
+          const isAttendanceExporting = exportingAttendanceRunId === run.id
+          const isExportBusy = exportingRunId !== null || exportingAttendanceRunId !== null
           const hasPayouts = (payoutMap.get(run.id)?.size ?? 0) > 0
           return (
             <div key={run.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
@@ -1337,6 +1371,16 @@ export function PayrollPayoutsTab({
                   className="rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700"
                 >
                   {t.payroll.actions.bulkPaste}
+                </button>
+                <button
+                  type="button"
+                  disabled={isExportBusy}
+                  onClick={() => exportAttendanceZip(run)}
+                  className="rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700 disabled:opacity-60"
+                >
+                  {isAttendanceExporting
+                    ? t.payroll.actions.exportingAttendance
+                    : t.payroll.actions.exportAttendance}
                 </button>
                 <button
                   type="button"
