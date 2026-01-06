@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import archiver from 'archiver'
 import { PDFDocument } from 'pdf-lib'
-import puppeteer from 'puppeteer'
+import puppeteer, { type Browser } from 'puppeteer'
 import { PassThrough, Readable } from 'stream'
 
 import { prisma } from '@/lib/prisma'
@@ -178,7 +178,7 @@ const buildContentDisposition = (filename: string) => {
 }
 
 const generatePdfBuffer = async (
-  browser: puppeteer.Browser,
+  browser: Browser,
   html: string,
   landscape: boolean,
 ) => {
@@ -393,7 +393,7 @@ export async function POST(
   const archive = archiver('zip', { zlib: { level: 9 } })
   const stream = new PassThrough()
   let aborted = false
-  let browser: puppeteer.Browser | null = null
+  let browser: Browser | null = null
   const shouldAbort = () => aborted || stream.destroyed
   const abortExport = (error?: Error) => {
     if (aborted) return
@@ -427,7 +427,8 @@ export async function POST(
     }
   }
 
-  const response = new Response(Readable.toWeb(stream), {
+  const responseBody = Readable.toWeb(stream) as unknown as ReadableStream<Uint8Array>
+  const response = new Response(responseBody, {
     status: 200,
     headers: {
       'Content-Type': 'application/zip',

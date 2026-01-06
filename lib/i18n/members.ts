@@ -601,6 +601,8 @@ export const memberCopy: Record<
         clearPaste: string
         exportPdf: string
         exportingPdf: string
+        exportAttendance: string
+        exportingAttendance: string
       }
       confirm: {
         clearRun: (label: string) => string
@@ -625,6 +627,7 @@ export const memberCopy: Record<
         saveFailed: string
         missingAmount: (count: number) => string
         exportFailed: string
+        exportAttendanceFailed: string
         importInvalidTargets: string
         importErrorTitle: string
         importErrorSummary: (count: number) => string
