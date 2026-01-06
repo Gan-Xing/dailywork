@@ -437,6 +437,10 @@ model User {
   payrollChanges UserPayrollChange[]
   payrollPayouts UserPayrollPayout[]
   projectAssignments UserProjectAssignment[]
+  ownedFileAssets FileAsset[] @relation("FileAssetOwner")
+  createdFileAssets FileAsset[] @relation("FileAssetCreator")
+  signatures UserSignature[]
+  createdSignatures UserSignature[] @relation("UserSignatureCreator")
   createdById  Int?
   updatedById  Int?
   createdBy    User?      @relation("UserCreator", fields: [createdById], references: [id])
@@ -451,6 +455,44 @@ model User {
   updatedDocuments Document[] @relation("DocumentUpdater")
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
+}
+
+model FileAsset {
+  id           Int      @id @default(autoincrement())
+  category     String
+  storageKey   String   @unique
+  bucket       String
+  originalName String
+  mimeType     String
+  size         Int
+  checksum     String?
+  ownerUserId  Int?
+  createdById  Int?
+  ownerUser    User?    @relation("FileAssetOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
+  createdBy    User?    @relation("FileAssetCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  signatures   UserSignature[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([category])
+  @@index([ownerUserId])
+}
+
+model UserSignature {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  fileId      Int
+  version     Int
+  isActive    Boolean  @default(false)
+  createdById Int?
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  file        FileAsset @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  createdBy   User?    @relation("UserSignatureCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+
+  @@unique([userId, version])
+  @@index([userId])
+  @@index([fileId])
 }
 
 model RolePermission {

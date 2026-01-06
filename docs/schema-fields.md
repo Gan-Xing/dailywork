@@ -408,6 +408,7 @@
 
 - **Permission**：`code`（唯一标识，如 `road:manage`、`report:edit`）、`name`、`status`（`ACTIVE`/`ARCHIVED`，默认 `ACTIVE`）、`createdAt`、`updatedAt`；当前权限编码覆盖：
   - 成员/角色：`member:view`、`member:create`、`member:update`、`member:delete`、`role:view`、`role:create`、`role:update`、`role:delete`、`permission:view`、`permission:update`（保留 `member:edit`、`member:manage`、`role:manage` 作为兼容）
+  - 签名：`signature:view`、`signature:use`、`signature:upload`、`signature:delete`
   - 道路/进度/报检：`road:view`、`road:manage`、`progress:view`、`progress:edit`、`inspection:create`
   - 日报：`report:view`、`report:edit`
   - 文档管理（提交单/模板）：`submission:view`、`submission:create`、`submission:update`、`submission:delete`、`submission:manage`、`template:view`、`template:create`、`template:update`、`template:delete`
@@ -476,6 +477,28 @@
 - `cnpsDeclarationCode?`：CNPS 申报码。
 - `provenance?`：属地/来源。
 - `emergencyContactName?` / `emergencyContactPhone?`：紧急联系人及电话。
+
+### FileAsset（非结构化文件）
+- `id`：自增整型。
+- `category`：文件分类（如 `signature`、`attachment`）。
+- `storageKey`：存储桶对象键（唯一）。
+- `bucket`：存储桶名称。
+- `originalName`：原始文件名。
+- `mimeType`：文件类型（MIME）。
+- `size`：文件大小（字节）。
+- `checksum?`：可选校验值。
+- `ownerUserId?`：可选绑定成员 ID。
+- `createdById?`：上传人 ID。
+- `createdAt` / `updatedAt`：自动时间戳。
+
+### UserSignature（签名版本）
+- `id`：自增整型。
+- `userId`：关联 `User`。
+- `fileId`：关联 `FileAsset`。
+- `version`：版本号（同一用户递增）。
+- `isActive`：是否当前生效版本。
+- `createdById?`：上传人 ID。
+- `createdAt`：上传时间。
 
 ### 国籍列表（中文 / Français）
 - 中国 / Chine

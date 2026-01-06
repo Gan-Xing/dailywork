@@ -17,6 +17,7 @@ import { FormActions } from './components/FormActions'
 import { MemberEditHeader } from './components/MemberEditHeader'
 import { ProfileSection } from './components/ProfileSection'
 import { RoleSelector } from './components/RoleSelector'
+import { SignatureSection } from './components/SignatureSection'
 import { useMemberEditData } from './hooks/useMemberEditData'
 import { useMemberEditForm } from './hooks/useMemberEditForm'
 import { useTeamSupervisors } from '../hooks/useTeamSupervisors'
@@ -29,6 +30,9 @@ type Props = {
   canAssignRole: boolean
   canDeleteMember: boolean
   isViewerChinese: boolean
+  canViewSignature: boolean
+  canUploadSignature: boolean
+  canDeleteSignature: boolean
 }
 
 export function MemberEditClient({
@@ -36,6 +40,9 @@ export function MemberEditClient({
   canAssignRole,
   canDeleteMember,
   isViewerChinese,
+  canViewSignature,
+  canUploadSignature,
+  canDeleteSignature,
 }: Props) {
   const { locale, setLocale } = usePreferredLocale()
   const t = memberCopy[locale]
@@ -131,6 +138,14 @@ export function MemberEditClient({
               setFormState={setFormState}
               teamOptions={teamOptions}
               teamSupervisorMap={teamSupervisorMap}
+            />
+
+            <SignatureSection
+              t={t}
+              memberId={member.id}
+              canViewSignature={canViewSignature}
+              canUploadSignature={canUploadSignature}
+              canDeleteSignature={canDeleteSignature}
             />
 
             {isViewerChinese || member.nationality !== 'china' ? (

@@ -10,7 +10,7 @@
 - 前端/后端：Next.js（App Router + Server Actions 或 API Routes 即可）。
 - 数据库：Supabase Postgres（生产/预发共用），通过 Prisma 进行 schema 管理与迁移。
 - AI：服务端调用（OpenAI/自建模型均可），在写 DB 后触发润色与汇总。
-- 环境变量：`.env.local` 提供 `DATABASE_URL`（Supabase 连接池端点，对应 `POSTGRES_PRISMA_URL`）、`DIRECT_DATABASE_URL`（Supabase 非连接池端点 `POSTGRES_URL_NON_POOLING`，供 Prisma 迁移使用）以及 `DEEPSEEK_API_KEY`（DeepSeek Chat Key）。
+- 环境变量：`.env.local` 提供 `DATABASE_URL`（Supabase 连接池端点，对应 `POSTGRES_PRISMA_URL`）、`DIRECT_DATABASE_URL`（Supabase 非连接池端点 `POSTGRES_URL_NON_POOLING`，供 Prisma 迁移使用）、`DEEPSEEK_API_KEY`（DeepSeek Chat Key），以及 R2 存储所需的 `R2_ACCOUNT_ID`、`R2_BUCKET_NAME`、`R2_ENDPOINT`、`R2_ACCESS_KEY_ID`、`R2_SECRET_ACCESS_KEY`（可选 `R2_REGION`）。
 - 包管理器：统一使用 `pnpm`，本地与 CI 均不要使用 `npm`/`yarn` 以免锁文件漂移。
 - 构建约定：所有服务器/Vercel 构建在运行 `next build` 前必须执行 `prisma generate`（现由 `pnpm run build` 自动完成），以避免缓存造成的旧版 Prisma Client。
 - 部署：本地/预发统一连到 Supabase；正式环境可在 Vercel/自托管 Node 上运行，仍复用 Supabase 数据库。

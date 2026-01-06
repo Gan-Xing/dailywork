@@ -27,6 +27,9 @@ export default async function MemberEditPage({ params }: { params: Promise<{ id:
   const canAssignRole = permissions.includes('role:update') || permissions.includes('role:manage')
   const canDeleteMember = permissions.includes('member:delete')
   const isViewerChinese = sessionUser?.nationality === 'china'
+  const canViewSignature = permissions.includes('signature:view')
+  const canUploadSignature = permissions.includes('signature:upload')
+  const canDeleteSignature = permissions.includes('signature:delete')
 
   return (
     <MemberEditClient
@@ -34,6 +37,9 @@ export default async function MemberEditPage({ params }: { params: Promise<{ id:
       canAssignRole={canAssignRole}
       canDeleteMember={canDeleteMember}
       isViewerChinese={isViewerChinese}
+      canViewSignature={canViewSignature}
+      canUploadSignature={canUploadSignature}
+      canDeleteSignature={canDeleteSignature}
     />
   )
 }

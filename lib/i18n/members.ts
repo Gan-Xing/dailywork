@@ -409,6 +409,28 @@ export const memberCopy: Record<
       statusLabels: Record<'ACTIVE' | 'ARCHIVED', string>
       helper: string
     }
+    signaturePanel: {
+      title: string
+      hint: string
+      upload: string
+      uploading: string
+      current: string
+      history: string
+      empty: string
+      loading: string
+      previewAlt: string
+      viewDenied: string
+      setActive: string
+      activating: string
+      active: string
+      delete: string
+      deleting: string
+      loadError: string
+      uploadFailed: string
+      activateFailed: string
+      deleteFailed: string
+      versionLabel: (version: number) => string
+    }
     teamSupervisor: {
       title: string
       subtitle: string
@@ -1038,6 +1060,28 @@ export const memberCopy: Record<
         ARCHIVED: '归档',
       },
       helper: '权限遵循资源-动作编码，可直接复用到 API 鉴权策略。',
+    },
+    signaturePanel: {
+      title: '签名照',
+      hint: '上传 PNG/JPG/WebP 签名图片，可用于 PDF 导出。',
+      upload: '上传签名',
+      uploading: '上传中...',
+      current: '当前签名',
+      history: '历史版本',
+      empty: '暂无签名',
+      loading: '加载中...',
+      previewAlt: '签名预览',
+      viewDenied: '没有签名查看权限',
+      setActive: '设为当前',
+      activating: '切换中...',
+      active: '当前',
+      delete: '删除',
+      deleting: '删除中...',
+      loadError: '加载签名失败',
+      uploadFailed: '上传失败',
+      activateFailed: '切换失败',
+      deleteFailed: '删除失败',
+      versionLabel: (version: number) => `版本 ${version}`,
     },
     teamSupervisor: {
       title: '班组负责人',
@@ -1682,6 +1726,28 @@ export const memberCopy: Record<
       },
       helper:
         'Les permissions suivent le format ressource:action et peuvent être réutilisées côté API.',
+    },
+    signaturePanel: {
+      title: 'Signature',
+      hint: 'Téléversez une image PNG/JPG/WebP pour la signature (utilisée dans les PDF).',
+      upload: 'Téléverser la signature',
+      uploading: 'Téléversement...',
+      current: 'Signature active',
+      history: 'Historique',
+      empty: 'Aucune signature',
+      loading: 'Chargement...',
+      previewAlt: 'Aperçu de la signature',
+      viewDenied: 'Accès signature non autorisé',
+      setActive: 'Définir active',
+      activating: 'Activation...',
+      active: 'Active',
+      delete: 'Supprimer',
+      deleting: 'Suppression...',
+      loadError: 'Échec du chargement',
+      uploadFailed: 'Échec du téléversement',
+      activateFailed: 'Échec de l’activation',
+      deleteFailed: 'Échec de la suppression',
+      versionLabel: (version: number) => `Version ${version}`,
     },
     teamSupervisor: {
       title: "Responsables d'équipe",
