@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { memberCopy } from '@/lib/i18n/members'
 
@@ -55,7 +55,7 @@ export function SignatureSection({
     [signatures],
   )
 
-  const loadSignatures = async () => {
+  const loadSignatures = useCallback(async () => {
     if (!canViewSignature) return
     setLoading(true)
     setError(null)
@@ -71,13 +71,13 @@ export function SignatureSection({
     } finally {
       setLoading(false)
     }
-  }
+  }, [canViewSignature, memberId, t.signaturePanel.loadError])
 
   useEffect(() => {
     if (canViewSignature) {
       void loadSignatures()
     }
-  }, [canViewSignature, memberId])
+  }, [canViewSignature, loadSignatures])
 
   const handleUploadClick = () => {
     fileInputRef.current?.click()
@@ -241,6 +241,7 @@ export function SignatureSection({
             {activeSignature ? (
               <div className="mt-3 flex flex-col gap-3">
                 <div className="flex items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={activeSignature.file.url}
                     alt={t.signaturePanel.previewAlt}

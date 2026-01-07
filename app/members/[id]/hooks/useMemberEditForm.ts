@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 
 import { genderOptions, memberCopy, nationalityOptions, type EmploymentStatus } from '@/lib/i18n/members'
 import { normalizeTagsInput } from '@/lib/members/utils'
@@ -21,7 +21,7 @@ export function useMemberEditForm({ member, canAssignRole, t }: UseMemberEditFor
   const [showPhonePicker, setShowPhonePicker] = useState(false)
   const phonePickerRef = useRef<HTMLDivElement | null>(null)
   const [profileExpanded, setProfileExpanded] = useState(false)
-  const [formState, setFormState] = useState<FormState>(() => ({
+  const initialFormState: FormState = {
     username: member.username,
     password: '',
     name: member.name ?? '',
@@ -40,7 +40,13 @@ export function useMemberEditForm({ member, canAssignRole, t }: UseMemberEditFor
     projectId: member.project?.id ? String(member.project.id) : '',
     chineseProfile: buildChineseProfileForm(member.chineseProfile),
     expatProfile: buildExpatProfileForm(member.expatProfile),
-  }))
+  }
+  const [formState, setFormState] = useState<FormState>(initialFormState)
+  const initialSnapshotRef = useRef(JSON.stringify({ formState: initialFormState, phoneInput: '' }))
+  const isDirty = useMemo(
+    () => JSON.stringify({ formState, phoneInput }) !== initialSnapshotRef.current,
+    [formState, phoneInput],
+  )
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -79,8 +85,8 @@ export function useMemberEditForm({ member, canAssignRole, t }: UseMemberEditFor
     })
   }
 
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
+  const submitForm = async () => {
+    if (submitting) return false
     setSubmitting(true)
     setActionError(null)
     const phoneList = [
@@ -209,9 +215,17 @@ export function useMemberEditForm({ member, canAssignRole, t }: UseMemberEditFor
       }
     } catch (error) {
       setActionError(error instanceof Error ? error.message : t.feedback.submitError)
+      return false
     } finally {
       setSubmitting(false)
     }
+    initialSnapshotRef.current = JSON.stringify({ formState, phoneInput })
+    return true
+  }
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    await submitForm()
   }
 
   return {
@@ -226,9 +240,11 @@ export function useMemberEditForm({ member, canAssignRole, t }: UseMemberEditFor
     setProfileExpanded,
     submitting,
     actionError,
+    isDirty,
     toggleRole,
     addPhoneFromInput,
     removePhone,
     handleSubmit,
+    submitForm,
   }
 }

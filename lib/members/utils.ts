@@ -8,6 +8,12 @@ import type {
 
 export const normalizeText = (value?: string | null) => (value ?? '').trim()
 
+export const parseSearchTerms = (input?: string | null) =>
+  (input ?? '')
+    .split(/[,，]/)
+    .map((term) => normalizeText(term).toLowerCase())
+    .filter(Boolean)
+
 export const normalizeTeamKey = (value?: string | null) =>
   normalizeText(value).toLowerCase()
 

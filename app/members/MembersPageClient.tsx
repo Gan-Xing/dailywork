@@ -24,6 +24,7 @@ import {
   defaultSortStack,
   defaultVisibleColumns,
   MEMBER_COLUMN_STORAGE_KEY,
+  MEMBER_SEARCH_STORAGE_KEY,
   type ColumnKey,
   type SortField,
   type SortOrder,
@@ -169,6 +170,37 @@ export function MembersPageClient() {
     filtersHydrated,
     filtersLoadedFromStorage,
   } = useMemberTableState({ defaultPageSize: 20, defaultSortStack })
+  const [searchDraft, setSearchDraft] = useState('')
+  const [searchKeyword, setSearchKeyword] = useState('')
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      const stored = window.localStorage.getItem(MEMBER_SEARCH_STORAGE_KEY)
+      if (stored !== null) {
+        setSearchKeyword(stored)
+        setSearchDraft(stored)
+      }
+    } catch (error) {
+      console.error('Failed to load member search keyword', error)
+    }
+  }, [])
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      window.localStorage.setItem(MEMBER_SEARCH_STORAGE_KEY, searchKeyword)
+    } catch (error) {
+      console.error('Failed to persist member search keyword', error)
+    }
+  }, [searchKeyword])
+  const commitSearch = useCallback(() => {
+    const nextKeyword = searchDraft.trim()
+    setSearchKeyword(nextKeyword)
+    setSearchDraft(nextKeyword)
+  }, [searchDraft])
+  const clearSearch = useCallback(() => {
+    setSearchDraft('')
+    setSearchKeyword('')
+  }, [])
   const {
     nameFilters,
     usernameFilters,
@@ -400,6 +432,9 @@ export function MembersPageClient() {
   })
   const {
     positionOptions,
+    salaryCategoryOptions,
+    maritalStatusOptions,
+    provenanceOptions,
     teamOptions,
     nameFilterOptions,
     usernameFilterOptions,
@@ -470,8 +505,11 @@ export function MembersPageClient() {
     locale,
     findGenderLabel,
     findNationalityLabel,
+    statusLabels,
     resolveRoleName,
     canAssignRole,
+    keyword: searchKeyword,
+    teamSupervisorMap,
     nameFilters,
     usernameFilters,
     genderFilters,
@@ -556,6 +594,7 @@ export function MembersPageClient() {
     healthStatusFilters,
     createdAtFilters,
     updatedAtFilters,
+    keyword: searchKeyword,
     canAssignRole,
   })
   const {
@@ -645,6 +684,7 @@ export function MembersPageClient() {
 
   const clearFilters = () => {
     resetFilters()
+    clearSearch()
     applyDefaultFilters()
   }
 
@@ -1241,6 +1281,7 @@ export function MembersPageClient() {
   useEffect(() => {
     setPage(1)
   }, [
+    searchKeyword,
     nameFilters,
     usernameFilters,
     genderFilters,
@@ -1442,6 +1483,9 @@ export function MembersPageClient() {
                 onOpenFilterDrawer={() => setShowFilterDrawer(true)}
                 onCloseFilterDrawer={() => setShowFilterDrawer(false)}
                 onClearFilters={clearFilters}
+                searchDraft={searchDraft}
+                onSearchDraftChange={setSearchDraft}
+                onSearchCommit={commitSearch}
                 hasActiveFilters={hasActiveFilters}
                 activeFilterCount={activeFilterCount}
                 filterControlProps={filterControlProps}
@@ -1716,6 +1760,9 @@ export function MembersPageClient() {
           onClose={() => setShowCreateModal(false)}
           onSubmit={handleSubmit}
           positionOptions={positionOptions}
+          salaryCategoryOptions={salaryCategoryOptions}
+          maritalStatusOptions={maritalStatusOptions}
+          provenanceOptions={provenanceOptions}
           teamOptions={teamOptions}
           teamSupervisorMap={teamSupervisorMap}
           projectOptions={projectOptions}

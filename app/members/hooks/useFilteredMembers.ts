@@ -1,13 +1,16 @@
 import { useMemo } from 'react'
 
+import type { Locale } from '@/lib/i18n'
 import { type EmploymentStatus } from '@/lib/i18n/members'
 import { EMPTY_FILTER_VALUE, type SortField, type SortOrder } from '@/lib/members/constants'
 import {
   getMonthKey,
   formatSupervisorLabel,
   collectContractNumbers,
+  parseSearchTerms,
   normalizeTagKey,
   normalizeText,
+  resolveTeamDisplayName,
   toNumberFilterValue,
   toSalaryFilterValue,
 } from '@/lib/members/utils'
@@ -16,11 +19,14 @@ import type { Member } from '@/types/members'
 type UseFilteredMembersParams = {
   membersData: Member[]
   sortStack: Array<{ field: SortField; order: SortOrder }>
-  locale: string
+  locale: Locale
   findGenderLabel: (value: string | null) => string
   findNationalityLabel: (value: string | null) => string
+  statusLabels: Record<EmploymentStatus, string>
   resolveRoleName: (role: { id: number; name: string }) => string
   canAssignRole: boolean
+  keyword: string
+  teamSupervisorMap?: Map<string, { teamZh?: string | null }>
   nameFilters: string[]
   usernameFilters: string[]
   genderFilters: string[]
@@ -70,8 +76,11 @@ export function useFilteredMembers({
   locale,
   findGenderLabel,
   findNationalityLabel,
+  statusLabels,
   resolveRoleName,
   canAssignRole,
+  keyword,
+  teamSupervisorMap,
   nameFilters,
   usernameFilters,
   genderFilters,
@@ -115,6 +124,21 @@ export function useFilteredMembers({
   updatedAtFilters,
 }: UseFilteredMembersParams) {
   const filteredMembers = useMemo(() => {
+    const keywordTerms = parseSearchTerms(keyword)
+    const hasKeyword = keywordTerms.length > 0
+    const addSearchValue = (values: string[], value?: string | number | null) => {
+      if (value === null || value === undefined) return
+      const text = typeof value === 'number' ? String(value) : normalizeText(value)
+      if (!text) return
+      values.push(text.toLowerCase())
+    }
+    const addSearchValues = (
+      values: string[],
+      list?: Array<string | number | null | undefined>,
+    ) => {
+      if (!list) return
+      list.forEach((item) => addSearchValue(values, item ?? null))
+    }
     const matchesValueFilter = (value: string | null | undefined, filters: string[]) => {
       if (filters.length === 0) return true
       const normalized = normalizeText(value)
@@ -145,6 +169,80 @@ export function useFilteredMembers({
       if (filterKeys.length === 0) return true
       return normalized.some((value) => filterKeys.includes(value))
     }
+    const matchesKeyword = (
+      member: Member,
+      chineseProfile: Member['chineseProfile'],
+      expatProfile: Member['expatProfile'],
+      supervisorLabel: string,
+      emergencyContactName: string | null | undefined,
+      emergencyContactPhone: string | null | undefined,
+    ) => {
+      if (!hasKeyword) return true
+      const values: string[] = []
+      addSearchValue(values, member.name)
+      addSearchValue(values, member.username)
+      addSearchValue(values, member.gender)
+      addSearchValue(values, findGenderLabel(member.gender))
+      addSearchValue(values, member.nationality)
+      addSearchValue(values, findNationalityLabel(member.nationality))
+      addSearchValues(values, member.phones)
+      addSearchValues(values, member.tags)
+      addSearchValue(values, member.joinDate)
+      addSearchValue(values, member.birthDate)
+      addSearchValue(values, member.terminationDate)
+      addSearchValue(values, member.terminationReason)
+      addSearchValue(values, member.position)
+      addSearchValue(values, member.employmentStatus)
+      addSearchValue(values, statusLabels[member.employmentStatus])
+      addSearchValue(values, member.project?.name ?? null)
+      addSearchValue(values, member.project?.code ?? null)
+      addSearchValues(values, member.roles.map(resolveRoleName))
+      const teamDisplay = resolveTeamDisplayName(expatProfile?.team, locale, teamSupervisorMap)
+      addSearchValue(values, expatProfile?.team)
+      addSearchValue(values, teamDisplay)
+      addSearchValue(values, supervisorLabel)
+      addSearchValues(values, collectContractNumbers(expatProfile))
+      addSearchValue(values, expatProfile?.contractType)
+      addSearchValue(values, expatProfile?.contractStartDate)
+      addSearchValue(values, expatProfile?.contractEndDate)
+      addSearchValue(values, expatProfile?.salaryCategory)
+      addSearchValue(values, expatProfile?.prime)
+      addSearchValue(values, expatProfile?.baseSalaryAmount)
+      addSearchValue(values, expatProfile?.baseSalaryUnit)
+      addSearchValue(
+        values,
+        toSalaryFilterValue(expatProfile?.baseSalaryAmount, expatProfile?.baseSalaryUnit),
+      )
+      addSearchValue(values, expatProfile?.netMonthlyAmount)
+      addSearchValue(values, expatProfile?.netMonthlyUnit)
+      addSearchValue(
+        values,
+        toSalaryFilterValue(expatProfile?.netMonthlyAmount, expatProfile?.netMonthlyUnit, 'MONTH'),
+      )
+      addSearchValue(values, expatProfile?.maritalStatus)
+      addSearchValue(values, toNumberFilterValue(expatProfile?.childrenCount))
+      addSearchValue(values, expatProfile?.cnpsNumber)
+      addSearchValue(values, expatProfile?.cnpsDeclarationCode)
+      addSearchValue(values, expatProfile?.provenance)
+      addSearchValue(values, emergencyContactName)
+      addSearchValue(values, emergencyContactPhone)
+      addSearchValue(values, chineseProfile?.frenchName)
+      addSearchValue(values, chineseProfile?.idNumber)
+      addSearchValue(values, chineseProfile?.passportNumber)
+      addSearchValue(values, chineseProfile?.educationAndMajor)
+      addSearchValues(values, chineseProfile?.certifications)
+      addSearchValue(values, chineseProfile?.domesticMobile)
+      addSearchValue(values, chineseProfile?.emergencyContactName)
+      addSearchValue(values, chineseProfile?.emergencyContactPhone)
+      addSearchValue(values, toNumberFilterValue(chineseProfile?.redBookValidYears))
+      addSearchValue(values, toNumberFilterValue(chineseProfile?.cumulativeAbroadYears))
+      addSearchValue(values, chineseProfile?.birthplace)
+      addSearchValue(values, chineseProfile?.residenceInChina)
+      addSearchValue(values, chineseProfile?.medicalHistory)
+      addSearchValue(values, chineseProfile?.healthStatus)
+      const searchText = values.join(' ')
+      return keywordTerms.some((term) => searchText.includes(term))
+    }
 
     const list = membersData.filter((member) => {
       const chineseProfile = member.chineseProfile ?? null
@@ -153,6 +251,24 @@ export function useFilteredMembers({
         chineseProfile?.emergencyContactName ?? expatProfile?.emergencyContactName
       const emergencyContactPhone =
         chineseProfile?.emergencyContactPhone ?? expatProfile?.emergencyContactPhone
+      const supervisorLabel = normalizeText(
+        formatSupervisorLabel({
+          name: expatProfile?.chineseSupervisor?.name ?? null,
+          frenchName: expatProfile?.chineseSupervisor?.chineseProfile?.frenchName ?? null,
+          username: expatProfile?.chineseSupervisor?.username ?? null,
+        }),
+      )
+      if (
+        !matchesKeyword(
+          member,
+          chineseProfile,
+          expatProfile,
+          supervisorLabel,
+          emergencyContactName,
+          emergencyContactPhone,
+        )
+      )
+        return false
 
       if (!matchesValueFilter(member.name, nameFilters)) return false
       if (!matchesValueFilter(member.username, usernameFilters)) return false
@@ -172,13 +288,6 @@ export function useFilteredMembers({
       }
       if (!matchesTagFilter(member.tags, tagFilters)) return false
       if (!matchesValueFilter(member.project?.name, projectFilters)) return false
-      const supervisorLabel = normalizeText(
-        formatSupervisorLabel({
-          name: expatProfile?.chineseSupervisor?.name ?? null,
-          frenchName: expatProfile?.chineseSupervisor?.chineseProfile?.frenchName ?? null,
-          username: expatProfile?.chineseSupervisor?.username ?? null,
-        }),
-      )
       if (!matchesValueFilter(expatProfile?.team, teamFilters)) return false
       if (!matchesValueFilter(supervisorLabel, chineseSupervisorFilters)) return false
       if (!matchesListFilter(collectContractNumbers(expatProfile), contractNumberFilters))
@@ -595,7 +704,10 @@ export function useFilteredMembers({
     locale,
     findGenderLabel,
     findNationalityLabel,
+    statusLabels,
     resolveRoleName,
+    keyword,
+    teamSupervisorMap,
     nameFilters,
     usernameFilters,
     genderFilters,

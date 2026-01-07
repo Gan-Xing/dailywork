@@ -36,6 +36,9 @@ type MemberFormModalProps = {
   onClose: () => void
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
   positionOptions: string[]
+  salaryCategoryOptions: string[]
+  maritalStatusOptions: string[]
+  provenanceOptions: string[]
   teamOptions: string[]
   teamSupervisorMap: Map<string, TeamSupervisorItem>
   projectOptions: { value: string; label: string }[]
@@ -70,6 +73,9 @@ export function MemberFormModal({
   onClose,
   onSubmit,
   positionOptions,
+  salaryCategoryOptions,
+  maritalStatusOptions,
+  provenanceOptions,
   teamOptions,
   teamSupervisorMap,
   projectOptions,
@@ -796,6 +802,7 @@ export function MemberFormModal({
                   <label className="space-y-1 text-sm text-slate-700">
                     <span className="block font-semibold">{t.form.salaryCategory}</span>
                     <input
+                      list="salary-category-options"
                       value={formState.expatProfile.salaryCategory}
                       onChange={(event) =>
                         setFormState((prev) => ({
@@ -806,6 +813,11 @@ export function MemberFormModal({
                       disabled={formMode === 'view'}
                       className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
                     />
+                    <datalist id="salary-category-options">
+                      {salaryCategoryOptions.map((value) => (
+                        <option key={value} value={value} />
+                      ))}
+                    </datalist>
                   </label>
                   <label className="space-y-1 text-sm text-slate-700">
                     <span className="block font-semibold">{t.form.prime}</span>
@@ -902,6 +914,7 @@ export function MemberFormModal({
                   <label className="space-y-1 text-sm text-slate-700">
                     <span className="block font-semibold">{t.form.maritalStatus}</span>
                     <input
+                      list="marital-status-options"
                       value={formState.expatProfile.maritalStatus}
                       onChange={(event) =>
                         setFormState((prev) => ({
@@ -912,6 +925,11 @@ export function MemberFormModal({
                       disabled={formMode === 'view'}
                       className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
                     />
+                    <datalist id="marital-status-options">
+                      {maritalStatusOptions.map((value) => (
+                        <option key={value} value={value} />
+                      ))}
+                    </datalist>
                   </label>
                   <label className="space-y-1 text-sm text-slate-700">
                     <span className="block font-semibold">{t.form.childrenCount}</span>
@@ -960,6 +978,7 @@ export function MemberFormModal({
                   <label className="space-y-1 text-sm text-slate-700">
                     <span className="block font-semibold">{t.form.provenance}</span>
                     <input
+                      list="provenance-options"
                       value={formState.expatProfile.provenance}
                       onChange={(event) =>
                         setFormState((prev) => ({
@@ -970,6 +989,11 @@ export function MemberFormModal({
                       disabled={formMode === 'view'}
                       className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
                     />
+                    <datalist id="provenance-options">
+                      {provenanceOptions.map((value) => (
+                        <option key={value} value={value} />
+                      ))}
+                    </datalist>
                   </label>
                   <label className="space-y-1 text-sm text-slate-700">
                     <span className="block font-semibold">{t.form.emergencyContactName}</span>

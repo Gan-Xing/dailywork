@@ -21,6 +21,9 @@ type ProfileSectionProps = {
   setFormState: Dispatch<SetStateAction<FormState>>
   teamOptions: string[]
   teamSupervisorMap: Map<string, TeamSupervisorItem>
+  salaryCategoryOptions: string[]
+  maritalStatusOptions: string[]
+  provenanceOptions: string[]
 }
 
 export function ProfileSection({
@@ -34,6 +37,9 @@ export function ProfileSection({
   setFormState,
   teamOptions,
   teamSupervisorMap,
+  salaryCategoryOptions,
+  maritalStatusOptions,
+  provenanceOptions,
 }: ProfileSectionProps) {
   if (isChineseForm && !canViewChineseProfile) {
     return null
@@ -68,6 +74,9 @@ export function ProfileSection({
             setFormState={setFormState}
             teamOptions={teamOptions}
             teamSupervisorMap={teamSupervisorMap}
+            salaryCategoryOptions={salaryCategoryOptions}
+            maritalStatusOptions={maritalStatusOptions}
+            provenanceOptions={provenanceOptions}
           />
         )
       ) : null}

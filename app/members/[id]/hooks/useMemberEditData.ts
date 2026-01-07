@@ -38,6 +38,33 @@ export function useMemberEditData({
     return Array.from(set).sort(optionCollator.compare)
   }, [currentTeam, memberOptions, optionCollator])
 
+  const salaryCategoryOptions = useMemo(() => {
+    const set = new Set<string>()
+    memberOptions.forEach((memberOption) => {
+      const value = normalizeText(memberOption.expatProfile?.salaryCategory ?? null)
+      if (value) set.add(value)
+    })
+    return Array.from(set).sort(optionCollator.compare)
+  }, [memberOptions, optionCollator])
+
+  const maritalStatusOptions = useMemo(() => {
+    const set = new Set<string>()
+    memberOptions.forEach((memberOption) => {
+      const value = normalizeText(memberOption.expatProfile?.maritalStatus ?? null)
+      if (value) set.add(value)
+    })
+    return Array.from(set).sort(optionCollator.compare)
+  }, [memberOptions, optionCollator])
+
+  const provenanceOptions = useMemo(() => {
+    const set = new Set<string>()
+    memberOptions.forEach((memberOption) => {
+      const value = normalizeText(memberOption.expatProfile?.provenance ?? null)
+      if (value) set.add(value)
+    })
+    return Array.from(set).sort(optionCollator.compare)
+  }, [memberOptions, optionCollator])
+
 
   useEffect(() => {
     if (!canAssignRole) return
@@ -70,5 +97,12 @@ export function useMemberEditData({
 
   const resolvedRolesData = canAssignRole ? rolesData : []
 
-  return { rolesData: resolvedRolesData, teamOptions }
+  return {
+    rolesData: resolvedRolesData,
+    teamOptions,
+    memberOptions,
+    salaryCategoryOptions,
+    maritalStatusOptions,
+    provenanceOptions,
+  }
 }

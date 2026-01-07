@@ -1,5 +1,7 @@
 import { useMemo } from 'react'
 
+import { parseSearchTerms } from '@/lib/members/utils'
+
 export type MemberFiltersSummaryInput = {
   nameFilters: string[]
   usernameFilters: string[]
@@ -42,6 +44,7 @@ export type MemberFiltersSummaryInput = {
   healthStatusFilters: string[]
   createdAtFilters: string[]
   updatedAtFilters: string[]
+  keyword: string
   canAssignRole: boolean
 }
 
@@ -88,8 +91,11 @@ export function useMemberFilterSummary(filters: MemberFiltersSummaryInput) {
     healthStatusFilters,
     createdAtFilters,
     updatedAtFilters,
+    keyword,
     canAssignRole,
   } = filters
+  const keywordTerms = useMemo(() => parseSearchTerms(keyword), [keyword])
+  const hasKeyword = keywordTerms.length > 0
 
   const hasActiveFilters = useMemo(
     () =>
@@ -133,7 +139,8 @@ export function useMemberFilterSummary(filters: MemberFiltersSummaryInput) {
       medicalHistoryFilters.length > 0 ||
       healthStatusFilters.length > 0 ||
       createdAtFilters.length > 0 ||
-      updatedAtFilters.length > 0,
+      updatedAtFilters.length > 0 ||
+      hasKeyword,
     [
       nameFilters,
       usernameFilters,
@@ -176,6 +183,7 @@ export function useMemberFilterSummary(filters: MemberFiltersSummaryInput) {
       healthStatusFilters,
       createdAtFilters,
       updatedAtFilters,
+      hasKeyword,
       canAssignRole,
     ],
   )
@@ -222,7 +230,8 @@ export function useMemberFilterSummary(filters: MemberFiltersSummaryInput) {
       medicalHistoryFilters.length +
       healthStatusFilters.length +
       createdAtFilters.length +
-      updatedAtFilters.length
+      updatedAtFilters.length +
+      (hasKeyword ? 1 : 0)
     return count
   }, [
     nameFilters,
@@ -266,6 +275,7 @@ export function useMemberFilterSummary(filters: MemberFiltersSummaryInput) {
     healthStatusFilters,
     createdAtFilters,
     updatedAtFilters,
+    hasKeyword,
     canAssignRole,
   ])
 

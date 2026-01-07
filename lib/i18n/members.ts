@@ -239,6 +239,9 @@ export const memberCopy: Record<
       template: string
       contractChangeTemplate: string
       clearSort: string
+      search: string
+      saveAndSwitch: string
+      discardAndSwitch: string
       auditTrail: string
       view: string
       edit: string
@@ -543,6 +546,11 @@ export const memberCopy: Record<
       today: string
       close: string
       cleared: string
+      selectTeam: string
+      selectMember: string
+      unsavedTitle: string
+      unsavedDescription: string
+      unsavedBadge: string
     }
     compensation: {
       title: string
@@ -893,6 +901,9 @@ export const memberCopy: Record<
       template: '成员导入模板',
       contractChangeTemplate: '合同变更模板',
       clearSort: '清空排序',
+      search: '搜索',
+      saveAndSwitch: '保存并切换',
+      discardAndSwitch: '舍弃并切换',
       auditTrail: '审计日志',
       view: '详情',
       edit: '编辑',
@@ -1201,6 +1212,11 @@ export const memberCopy: Record<
       today: '今天',
       close: '关闭',
       cleared: '已清空',
+      selectTeam: '选择班组',
+      selectMember: '选择成员',
+      unsavedTitle: '未保存修改',
+      unsavedDescription: '检测到未保存修改，是否保存后切换成员？',
+      unsavedBadge: '提醒',
     },
     compensation: {
       title: '合同与薪酬管理',
@@ -1559,6 +1575,9 @@ export const memberCopy: Record<
       template: "Modèle d'import membres",
       contractChangeTemplate: 'Modèle changement de contrat',
       clearSort: 'Réinitialiser le tri',
+      search: 'Rechercher',
+      saveAndSwitch: 'Enregistrer et changer',
+      discardAndSwitch: 'Ignorer et changer',
       auditTrail: "Journal d'audit",
       view: 'Détails',
       edit: 'Éditer',
@@ -1871,6 +1890,11 @@ export const memberCopy: Record<
       today: "Aujourd'hui",
       close: 'Fermer',
       cleared: 'Vidé',
+      selectTeam: 'Choisir une équipe',
+      selectMember: 'Choisir un membre',
+      unsavedTitle: 'Modifications non enregistrées',
+      unsavedDescription: 'Des changements non enregistrés ont été détectés. Enregistrer avant de changer ?',
+      unsavedBadge: 'Alerte',
     },
     compensation: {
       title: 'Contrats et rémunération',

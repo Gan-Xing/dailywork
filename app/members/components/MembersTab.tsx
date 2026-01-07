@@ -75,6 +75,9 @@ type MembersTabProps = {
   onOpenFilterDrawer: () => void
   onCloseFilterDrawer: () => void
   onClearFilters: () => void
+  searchDraft: string
+  onSearchDraftChange: (next: string) => void
+  onSearchCommit: () => void
   hasActiveFilters: boolean
   activeFilterCount: number
   filterControlProps: FilterControlProps
@@ -294,6 +297,9 @@ type MembersTabProps = {
       onOpenFilterDrawer,
       onCloseFilterDrawer,
       onClearFilters,
+      searchDraft,
+      onSearchDraftChange,
+      onSearchCommit,
       hasActiveFilters,
       activeFilterCount,
       filterControlProps,
@@ -898,6 +904,29 @@ type MembersTabProps = {
           <ActionButton onClick={onClearSort} disabled={isSortDefault}>
             {t.actions.clearSort}
           </ActionButton>
+          <div className="ml-auto flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-700 shadow-sm">
+            <input
+              type="search"
+              value={searchDraft}
+              onChange={(event) => onSearchDraftChange(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault()
+                  onSearchCommit()
+                }
+              }}
+              placeholder={t.filters.searchPlaceholder}
+              aria-label={t.filters.searchPlaceholder}
+              className="w-40 bg-transparent text-xs text-slate-700 placeholder:text-slate-400 focus:outline-none sm:w-48"
+            />
+            <button
+              type="button"
+              onClick={onSearchCommit}
+              className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-600 transition hover:bg-slate-200"
+            >
+              {t.actions.search}
+            </button>
+          </div>
           <input
             ref={importInputRef}
             type="file"

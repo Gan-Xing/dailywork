@@ -72,6 +72,33 @@ export function useMemberFilterOptions({
     return Array.from(set).sort(optionCollator.compare)
   }, [membersData, optionCollator])
 
+  const salaryCategoryOptions = useMemo(() => {
+    const set = new Set<string>()
+    membersData.forEach((member) => {
+      const value = normalizeText(member.expatProfile?.salaryCategory)
+      if (value) set.add(value)
+    })
+    return Array.from(set).sort(optionCollator.compare)
+  }, [membersData, optionCollator])
+
+  const maritalStatusOptions = useMemo(() => {
+    const set = new Set<string>()
+    membersData.forEach((member) => {
+      const value = normalizeText(member.expatProfile?.maritalStatus)
+      if (value) set.add(value)
+    })
+    return Array.from(set).sort(optionCollator.compare)
+  }, [membersData, optionCollator])
+
+  const provenanceOptions = useMemo(() => {
+    const set = new Set<string>()
+    membersData.forEach((member) => {
+      const value = normalizeText(member.expatProfile?.provenance)
+      if (value) set.add(value)
+    })
+    return Array.from(set).sort(optionCollator.compare)
+  }, [membersData, optionCollator])
+
   const nameFilterOptions = useMemo(() => {
     const names = membersData.map((member) => normalizeText(member.name)).filter(Boolean)
     const unique = Array.from(new Set(names)).sort(optionCollator.compare)
@@ -327,19 +354,12 @@ export function useMemberFilterOptions({
   }, [membersData, t.labels.empty])
 
   const salaryCategoryFilterOptions = useMemo(() => {
-    const values = new Set<string>()
-    let hasEmpty = false
-    membersData.forEach((member) => {
-      const value = normalizeText(member.expatProfile?.salaryCategory)
-      if (value) values.add(value)
-      else hasEmpty = true
-    })
-    const options = Array.from(values)
-      .sort(optionCollator.compare)
-      .map((value) => ({ value, label: value }))
-    if (hasEmpty) options.unshift({ value: EMPTY_FILTER_VALUE, label: t.labels.empty })
+    const options = salaryCategoryOptions.map((value) => ({ value, label: value }))
+    if (membersData.some((member) => !normalizeText(member.expatProfile?.salaryCategory))) {
+      options.unshift({ value: EMPTY_FILTER_VALUE, label: t.labels.empty })
+    }
     return options
-  }, [membersData, optionCollator, t.labels.empty])
+  }, [membersData, salaryCategoryOptions, t.labels.empty])
 
   const baseSalaryFilterOptions = useMemo(() => {
     const values = new Set<string>()
@@ -379,19 +399,12 @@ export function useMemberFilterOptions({
   }, [membersData, optionCollator, t.labels.empty])
 
   const maritalStatusFilterOptions = useMemo(() => {
-    const values = new Set<string>()
-    let hasEmpty = false
-    membersData.forEach((member) => {
-      const value = normalizeText(member.expatProfile?.maritalStatus)
-      if (value) values.add(value)
-      else hasEmpty = true
-    })
-    const options = Array.from(values)
-      .sort(optionCollator.compare)
-      .map((value) => ({ value, label: value }))
-    if (hasEmpty) options.unshift({ value: EMPTY_FILTER_VALUE, label: t.labels.empty })
+    const options = maritalStatusOptions.map((value) => ({ value, label: value }))
+    if (membersData.some((member) => !normalizeText(member.expatProfile?.maritalStatus))) {
+      options.unshift({ value: EMPTY_FILTER_VALUE, label: t.labels.empty })
+    }
     return options
-  }, [membersData, optionCollator, t.labels.empty])
+  }, [membersData, maritalStatusOptions, t.labels.empty])
 
   const childrenCountFilterOptions = useMemo(() => {
     const values = new Set<string>()
@@ -439,19 +452,12 @@ export function useMemberFilterOptions({
   }, [membersData, optionCollator, t.labels.empty])
 
   const provenanceFilterOptions = useMemo(() => {
-    const values = new Set<string>()
-    let hasEmpty = false
-    membersData.forEach((member) => {
-      const value = normalizeText(member.expatProfile?.provenance)
-      if (value) values.add(value)
-      else hasEmpty = true
-    })
-    const options = Array.from(values)
-      .sort(optionCollator.compare)
-      .map((value) => ({ value, label: value }))
-    if (hasEmpty) options.unshift({ value: EMPTY_FILTER_VALUE, label: t.labels.empty })
+    const options = provenanceOptions.map((value) => ({ value, label: value }))
+    if (membersData.some((member) => !normalizeText(member.expatProfile?.provenance))) {
+      options.unshift({ value: EMPTY_FILTER_VALUE, label: t.labels.empty })
+    }
     return options
-  }, [membersData, optionCollator, t.labels.empty])
+  }, [membersData, provenanceOptions, t.labels.empty])
 
   const frenchNameFilterOptions = useMemo(() => {
     const values = new Set<string>()
@@ -706,6 +712,9 @@ export function useMemberFilterOptions({
   return {
     optionCollator,
     positionOptions,
+    salaryCategoryOptions,
+    maritalStatusOptions,
+    provenanceOptions,
     teamOptions,
     nameFilterOptions,
     usernameFilterOptions,

@@ -79,12 +79,16 @@ export type MemberOption = {
   id: number
   username: string
   name?: string | null
+  employmentStatus?: EmploymentStatus
   nationality: string | null
   chineseProfile?: {
     frenchName?: string | null
   } | null
   expatProfile?: {
     team?: string | null
+    salaryCategory?: string | null
+    maritalStatus?: string | null
+    provenance?: string | null
   } | null
 }
 

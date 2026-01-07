@@ -16,6 +16,9 @@ type ExpatProfileFieldsProps = {
   setFormState: Dispatch<SetStateAction<FormState>>
   teamOptions: string[]
   teamSupervisorMap: Map<string, TeamSupervisorItem>
+  salaryCategoryOptions: string[]
+  maritalStatusOptions: string[]
+  provenanceOptions: string[]
 }
 
 export function ExpatProfileFields({
@@ -25,6 +28,9 @@ export function ExpatProfileFields({
   setFormState,
   teamOptions,
   teamSupervisorMap,
+  salaryCategoryOptions,
+  maritalStatusOptions,
+  provenanceOptions,
 }: ExpatProfileFieldsProps) {
   useEffect(() => {
     const teamKey = normalizeTeamKey(formState.expatProfile.team)
@@ -184,6 +190,7 @@ export function ExpatProfileFields({
       <label className="space-y-1 text-sm text-slate-700">
         <span className="block font-semibold">{t.form.salaryCategory}</span>
         <input
+          list="salary-category-options"
           value={formState.expatProfile.salaryCategory}
           onChange={(event) =>
             setFormState((prev) => ({
@@ -193,6 +200,11 @@ export function ExpatProfileFields({
           }
           className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
         />
+        <datalist id="salary-category-options">
+          {salaryCategoryOptions.map((value) => (
+            <option key={value} value={value} />
+          ))}
+        </datalist>
       </label>
       <label className="space-y-1 text-sm text-slate-700">
         <span className="block font-semibold">{t.form.prime}</span>
@@ -285,6 +297,7 @@ export function ExpatProfileFields({
       <label className="space-y-1 text-sm text-slate-700">
         <span className="block font-semibold">{t.form.maritalStatus}</span>
         <input
+          list="marital-status-options"
           value={formState.expatProfile.maritalStatus}
           onChange={(event) =>
             setFormState((prev) => ({
@@ -294,6 +307,11 @@ export function ExpatProfileFields({
           }
           className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
         />
+        <datalist id="marital-status-options">
+          {maritalStatusOptions.map((value) => (
+            <option key={value} value={value} />
+          ))}
+        </datalist>
       </label>
       <label className="space-y-1 text-sm text-slate-700">
         <span className="block font-semibold">{t.form.childrenCount}</span>
@@ -342,6 +360,7 @@ export function ExpatProfileFields({
       <label className="space-y-1 text-sm text-slate-700">
         <span className="block font-semibold">{t.form.provenance}</span>
         <input
+          list="provenance-options"
           value={formState.expatProfile.provenance}
           onChange={(event) =>
             setFormState((prev) => ({
@@ -351,6 +370,11 @@ export function ExpatProfileFields({
           }
           className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
         />
+        <datalist id="provenance-options">
+          {provenanceOptions.map((value) => (
+            <option key={value} value={value} />
+          ))}
+        </datalist>
       </label>
       <label className="space-y-1 text-sm text-slate-700">
         <span className="block font-semibold">{t.form.emergencyContactName}</span>
