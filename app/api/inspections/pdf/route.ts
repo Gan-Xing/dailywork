@@ -8,6 +8,7 @@ import puppeteer from 'puppeteer'
 import { renderInspectionReportHtml } from '@/lib/templates/inspectionReport'
 import { getSessionUser, hasPermission } from '@/lib/server/authSession'
 import { aggregateEntriesAsListItems } from '@/lib/server/inspectionEntryStore'
+import { getInspectionSignatureUrls } from '@/lib/server/signatureStore'
 
 export const maxDuration = 60
 
@@ -98,6 +99,7 @@ export async function POST(request: Request) {
   if (!(await hasPermission('inspection:view'))) {
     return NextResponse.json({ message: '缺少报检查看权限' }, { status: 403 })
   }
+  const canUseSignature = await hasPermission('signature:use')
 
   let body: { ids?: unknown; locale?: string; mode?: 'preview' | 'download' }
   try {
@@ -129,7 +131,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: '未找到可导出的报检记录' }, { status: 404 })
     }
 
-    const html = renderInspectionReportHtml(items, { locale })
+    let signatures: Awaited<ReturnType<typeof getInspectionSignatureUrls>> | undefined
+    if (canUseSignature) {
+      try {
+        signatures = await getInspectionSignatureUrls()
+      } catch (error) {
+        console.warn(logPrefix, 'signature fetch failed', error)
+      }
+    }
+    const html = renderInspectionReportHtml(items, { locale, signatures })
 
     const { browser, userDataDir } = await withTimeout(launchBrowser(), '启动浏览器')
 

@@ -7,6 +7,7 @@ import { renderBordereauTemplate } from '@/lib/documents/render'
 import { loadBordereauTemplateFromFile } from '@/lib/documents/templateLoader'
 import { hasPermission } from '@/lib/server/authSession'
 import { aggregateEntriesAsListItems } from '@/lib/server/inspectionEntryStore'
+import { getInspectionSignatureUrls } from '@/lib/server/signatureStore'
 import { getTemplate } from '@/lib/server/templateStore'
 import { renderInspectionReportHtml } from '@/lib/templates/inspectionReport'
 
@@ -18,6 +19,7 @@ export async function POST(request: Request) {
     hasPermission('submission:create'),
     hasPermission('submission:update'),
   ])
+  const canUseSignature = await hasPermission('signature:use')
   if (!canView && !canCreate && !canUpdate) {
     return NextResponse.json({ message: '缺少提交单查看权限' }, { status: 403 })
   }
@@ -83,7 +85,15 @@ export async function POST(request: Request) {
       if (items.length > 0) {
         console.log('[PDF Export] Generating Inspection PDF...')
         // Assume locale 'fr' for consistency with submission or extract from payload if available
-        const inspectionHtml = renderInspectionReportHtml(items, { locale: 'fr' })
+        let signatures: Awaited<ReturnType<typeof getInspectionSignatureUrls>> | undefined
+        if (canUseSignature) {
+          try {
+            signatures = await getInspectionSignatureUrls()
+          } catch (error) {
+            console.warn('[PDF Export] signature fetch failed', error)
+          }
+        }
+        const inspectionHtml = renderInspectionReportHtml(items, { locale: 'fr', signatures })
         
         // Reuse page or create new? Reuse to be safe with memory but clear content
         await page.setContent(inspectionHtml, { waitUntil: 'load', timeout: 60000 })

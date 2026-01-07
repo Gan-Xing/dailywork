@@ -5,6 +5,10 @@ import type { InspectionListItem } from '@/lib/progressTypes'
 
 type RenderOptions = {
   locale?: Locale
+  signatures?: {
+    director?: string | null
+    quality?: string | null
+  }
 }
 
 const inlineCss = `/* Reset and Page Setup */
@@ -234,7 +238,22 @@ strong {
 }
 
 .sig-row.visa-row {
-    margin-top: 4mm;
+    margin: 0;
+    padding: 0;
+    align-items: center;
+    gap: 2mm;
+}
+.signature-image {
+    max-height: 14mm;
+    max-width: 55mm;
+    margin: 0;
+    object-fit: contain;
+}
+.signature-placeholder {
+    display: inline-block;
+    width: 55mm;
+    height: 14mm;
+    margin: 0;
 }
 
 .label {
@@ -352,7 +371,7 @@ strong {
     border: 0.3mm solid black;
     border-top: 0.3mm solid black;
     margin-top: 0;
-    height: 25mm;
+    height: 20mm;
 }
 
 .footer-left {
@@ -438,7 +457,11 @@ const formatDate = (value?: string | null, locale: Locale = 'fr') => {
   })
 }
 
-const buildPage = (inspection: InspectionListItem, locale: Locale) => {
+const buildPage = (
+  inspection: InspectionListItem,
+  locale: Locale,
+  signatures?: RenderOptions['signatures'],
+) => {
   const sideCopy: Record<string, string> =
     locale === 'fr'
       ? { LEFT: 'Gauche', RIGHT: 'Droite', BOTH: 'Deux côtés' }
@@ -476,6 +499,12 @@ const buildPage = (inspection: InspectionListItem, locale: Locale) => {
   const geoMark = mark(hasType(['geo', '试验', '实验']))
   const genieMark = mark(hasType(['génie', 'genie', 'civil', '现场']))
   const otherMark = mark(!hasType(['topo', '测量', 'geo', '试验', '实验', 'génie', 'genie', 'civil', '现场']))
+  const directorSignature = signatures?.director
+    ? `<img src="${escapeHtml(signatures.director)}" alt="Signature" class="signature-image">`
+    : '<span class="signature-placeholder"></span>'
+  const qualitySignature = signatures?.quality
+    ? `<img src="${escapeHtml(signatures.quality)}" alt="Signature" class="signature-image">`
+    : '<span class="signature-placeholder"></span>'
 
   return `<div class="page">
     <div class="header-section">
@@ -569,6 +598,7 @@ const buildPage = (inspection: InspectionListItem, locale: Locale) => {
         </div>
         <div class="sig-row visa-row">
           <span class="label">Visa:</span>
+          ${directorSignature}
         </div>
       </div>
       <div class="sig-col-right">
@@ -592,6 +622,7 @@ const buildPage = (inspection: InspectionListItem, locale: Locale) => {
           </div>
           <div class="sig-row visa-row">
             <span class="label">Visa:</span>
+            ${qualitySignature}
           </div>
         </div>
       </div>
@@ -695,7 +726,9 @@ const buildPage = (inspection: InspectionListItem, locale: Locale) => {
 
 export const renderInspectionReportHtml = (inspections: InspectionListItem[], options?: RenderOptions) => {
   const locale = options?.locale ?? 'fr'
-  const pages = inspections.map((inspection) => buildPage(inspection, locale)).join('\n')
+  const pages = inspections
+    .map((inspection) => buildPage(inspection, locale, options?.signatures))
+    .join('\n')
 
   return `<!DOCTYPE html>
   <html lang="fr">
