@@ -69,7 +69,13 @@ export function MultiSelectFilter({
     })
   }, [options, query, searchable])
 
-  const summaryText = selected.length === 0 ? allLabel : selectedLabel(selected.length)
+  const summaryText = useMemo(() => {
+    if (selected.length === 0) return allLabel
+    if (!multiple && selected.length === 1) {
+      return options.find((opt) => opt.value === selected[0])?.label ?? selectedLabel(1)
+    }
+    return selectedLabel(selected.length)
+  }, [selected, allLabel, multiple, options, selectedLabel])
 
   const isForm = variant === 'form'
   const buttonClassName = isForm

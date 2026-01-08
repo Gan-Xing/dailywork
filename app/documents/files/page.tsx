@@ -34,8 +34,8 @@ export default async function FilesPage({ searchParams }: { searchParams: Promis
   const categories = parseList(query.category).filter((item) =>
     FILE_CATEGORIES.includes(item as FileCategory),
   )
-  const entityType = typeof query.entityType === 'string' ? query.entityType.trim() : ''
-  const entityId = typeof query.entityId === 'string' ? query.entityId.trim() : ''
+  const entityTypes = parseList(query.entityType)
+  const entityIds = parseList(query.entityId)
   const createdFrom = typeof query.createdFrom === 'string' ? query.createdFrom.trim() : ''
   const createdTo = typeof query.createdTo === 'string' ? query.createdTo.trim() : ''
   const search = typeof query.search === 'string' ? query.search.trim() : ''
@@ -49,11 +49,11 @@ export default async function FilesPage({ searchParams }: { searchParams: Promis
   if (categories.length) {
     where.category = { in: categories }
   }
-  if (entityType || entityId) {
+  if (entityTypes.length || entityIds.length) {
     where.links = {
       some: {
-        ...(entityType ? { entityType } : null),
-        ...(entityId ? { entityId } : null),
+        ...(entityTypes.length ? { entityType: { in: entityTypes } } : null),
+        ...(entityIds.length ? { entityId: { in: entityIds } } : null),
       },
     }
   }

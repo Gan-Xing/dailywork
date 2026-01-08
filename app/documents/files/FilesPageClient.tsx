@@ -39,9 +39,9 @@ const formatBytes = (size: number) => {
   return `${(size / 1024 / 1024).toFixed(1)} MB`
 }
 
-const parseSingle = (value?: string | string[]) => {
+const parseString = (value?: string | string[]) => {
   if (!value) return ''
-  if (Array.isArray(value)) return value[0] ?? ''
+  if (Array.isArray(value)) return value.join(',')
   return value
 }
 
@@ -59,12 +59,12 @@ export function FilesPageClient({
   const router = useRouter()
   const { locale } = usePreferredLocale('zh', locales)
   const copy = getDocumentsCopy(locale)
-  const [search, setSearch] = useState(() => parseSingle(query.search).trim())
-  const [category, setCategory] = useState(() => parseSingle(query.category).trim())
-  const [entityType, setEntityType] = useState(() => parseSingle(query.entityType).trim())
-  const [entityId, setEntityId] = useState(() => parseSingle(query.entityId).trim())
-  const [createdFrom, setCreatedFrom] = useState(() => parseSingle(query.createdFrom).trim())
-  const [createdTo, setCreatedTo] = useState(() => parseSingle(query.createdTo).trim())
+  const [search, setSearch] = useState(() => parseString(query.search).trim())
+  const [category, setCategory] = useState(() => parseString(query.category).trim())
+  const [entityType, setEntityType] = useState(() => parseString(query.entityType).trim())
+  const [entityId, setEntityId] = useState(() => parseString(query.entityId).trim())
+  const [createdFrom, setCreatedFrom] = useState(() => parseString(query.createdFrom).trim())
+  const [createdTo, setCreatedTo] = useState(() => parseString(query.createdTo).trim())
   const [pageInput, setPageInput] = useState(String(page))
 
   const defaultUploadCategory = useMemo(() => {
@@ -99,7 +99,8 @@ export function FilesPageClient({
   const [loadingUsers, setLoadingUsers] = useState(false)
 
   useEffect(() => {
-    const needUsers = uploadEntityType === 'user' || (!!editingFile && editEntityType === 'user')
+    const needUsers =
+      uploadEntityType === 'user' || (!!editingFile && editEntityType === 'user') || entityType === 'user'
     if (needUsers && candidateUsers.length === 0 && !loadingUsers) {
       setLoadingUsers(true)
       fetch('/api/members?basic=true')
@@ -125,7 +126,7 @@ export function FilesPageClient({
         .catch(() => {})
         .finally(() => setLoadingUsers(false))
     }
-  }, [uploadEntityType, editEntityType, editingFile, candidateUsers.length, loadingUsers])
+  }, [uploadEntityType, editEntityType, editingFile, entityType, candidateUsers.length, loadingUsers])
 
   useEffect(() => {
     setPageInput(String(page))
@@ -615,18 +616,23 @@ export function FilesPageClient({
         <div className="mt-4 grid gap-4 lg:grid-cols-[1.2fr,1fr,1fr]">
           <label className="flex flex-col gap-2 text-sm text-slate-600">
             <span className="font-semibold text-slate-700">{copy.files.filters.categoryLabel}</span>
-            <select
-              value={category}
-              onChange={(event) => setCategory(event.target.value)}
-              className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 focus:border-emerald-300 focus:outline-none"
-            >
-              <option value="">{copy.files.filters.allLabel}</option>
-              {categories.map((value) => (
-                <option key={value} value={value}>
-                  {categoryLabels[value] ?? value}
-                </option>
-              ))}
-            </select>
+            <MultiSelectFilter
+              variant="form"
+              label=""
+              options={categories.map((value) => ({
+                value,
+                label: categoryLabels[value] ?? value,
+              }))}
+              selected={category ? category.split(',') : []}
+              onChange={(vals) => setCategory(vals.join(','))}
+              allLabel={copy.files.filters.allLabel}
+              selectedLabel={(count) => formatCopy(copy.files.dropdown.selected, { count })}
+              selectAllLabel={copy.files.dropdown.selectAll}
+              clearLabel={copy.files.dropdown.clear}
+              searchPlaceholder={copy.files.dropdown.search}
+              multiple={true}
+              zIndex={20}
+            />
           </label>
           <label className="flex flex-col gap-2 text-sm text-slate-600">
             <span className="font-semibold text-slate-700">{copy.files.filters.entityTypeLabel}</span>
@@ -637,24 +643,51 @@ export function FilesPageClient({
                 value: key,
                 label,
               }))}
-              selected={entityType ? [entityType] : []}
-              onChange={(vals) => setEntityType(vals[0] || '')}
-              allLabel={copy.files.dropdown.all}
+              selected={entityType ? entityType.split(',') : []}
+              onChange={(vals) => {
+                const next = vals.join(',')
+                setEntityType(next)
+                if (next === 'user') {
+                  setEntityId('')
+                }
+              }}
+              allLabel={copy.files.filters.allLabel}
               selectedLabel={(count) => formatCopy(copy.files.dropdown.selected, { count })}
               selectAllLabel={copy.files.dropdown.selectAll}
               clearLabel={copy.files.dropdown.clear}
               searchPlaceholder={copy.files.dropdown.search}
-              multiple={false}
+              multiple={true}
               zIndex={20}
             />
           </label>
           <label className="flex flex-col gap-2 text-sm text-slate-600">
             <span className="font-semibold text-slate-700">{copy.files.filters.entityIdLabel}</span>
-            <input
-              value={entityId}
-              onChange={(event) => setEntityId(event.target.value)}
-              className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 focus:border-emerald-300 focus:outline-none"
-            />
+            {entityType === 'user' ? (
+              <MultiSelectFilter
+                variant="form"
+                label=""
+                options={candidateUsers.map((user) => ({
+                  value: String(user.id),
+                  label: user.nationality === 'china' ? user.name : `${user.name} ${user.birthDate ? `(${user.birthDate.split('T')[0]})` : ''}`,
+                }))}
+                selected={entityId ? entityId.split(',') : []}
+                onChange={(vals) => setEntityId(vals.join(','))}
+                allLabel={copy.files.filters.allLabel}
+                selectedLabel={(count) => formatCopy(copy.files.dropdown.selected, { count })}
+                selectAllLabel={copy.files.dropdown.selectAll}
+                clearLabel={copy.files.dropdown.clear}
+                searchPlaceholder={copy.files.dropdown.search}
+                multiple={true}
+                disabled={loadingUsers}
+                zIndex={20}
+              />
+            ) : (
+              <input
+                value={entityId}
+                onChange={(event) => setEntityId(event.target.value)}
+                className="h-9 rounded-lg border border-slate-200 bg-white px-2 text-sm text-slate-700 focus:border-emerald-300 focus:outline-none"
+              />
+            )}
           </label>
           <label className="flex flex-col gap-2 text-sm text-slate-600">
             <span className="font-semibold text-slate-700">{copy.files.filters.dateFromLabel}</span>

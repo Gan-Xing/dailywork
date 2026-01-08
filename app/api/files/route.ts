@@ -31,8 +31,8 @@ export async function GET(request: NextRequest) {
   const categories = normalizeList(categoryParam).filter((item) =>
     FILE_CATEGORIES.includes(item as (typeof FILE_CATEGORIES)[number]),
   )
-  const entityType = searchParams.get('entityType')?.trim() ?? ''
-  const entityId = searchParams.get('entityId')?.trim() ?? ''
+  const entityTypes = normalizeList(searchParams.get('entityType'))
+  const entityIds = normalizeList(searchParams.get('entityId'))
   const createdFrom = searchParams.get('createdFrom')?.trim() ?? ''
   const createdTo = searchParams.get('createdTo')?.trim() ?? ''
   const page = Math.max(1, Number(searchParams.get('page') ?? 1) || 1)
@@ -45,11 +45,11 @@ export async function GET(request: NextRequest) {
   if (categories.length) {
     where.category = { in: categories }
   }
-  if (entityType || entityId) {
+  if (entityTypes.length || entityIds.length) {
     where.links = {
       some: {
-        ...(entityType ? { entityType } : null),
-        ...(entityId ? { entityId } : null),
+        ...(entityTypes.length ? { entityType: { in: entityTypes } } : null),
+        ...(entityIds.length ? { entityId: { in: entityIds } } : null),
       },
     }
   }
