@@ -552,6 +552,8 @@ type InspectionBoardCopy = {
     bulkDeleteFailed: string
     bulkFailed: string
     exportFailed: string
+    exportMissingColumns: string
+    exportNoData: string
   }
 }
 
@@ -1124,6 +1126,8 @@ const progressCopy: Record<Locale, ProgressCopy> = {
         bulkDeleteFailed: '批量删除失败',
         bulkFailed: '批量更新失败',
         exportFailed: '导出失败，请稍后重试',
+        exportMissingColumns: '请选择至少一列导出',
+        exportNoData: '无数据可导出',
       },
     },
   },
@@ -1701,6 +1705,8 @@ const progressCopy: Record<Locale, ProgressCopy> = {
         bulkDeleteFailed: 'Échec de la suppression groupée',
         bulkFailed: 'Échec de la mise à jour groupée',
         exportFailed: "Échec de l'export PDF",
+        exportMissingColumns: "Veuillez sélectionner au moins une colonne à exporter",
+        exportNoData: "Aucune donnée à exporter",
       },
     },
   },

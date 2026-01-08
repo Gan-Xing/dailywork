@@ -155,6 +155,7 @@ export interface InspectionEntryDTO extends InspectionEntryPayload {
 }
 
 export interface InspectionEntryFilter {
+  ids?: number[]
   roadSlug?: string
   roadSlugs?: string[]
   documentId?: number

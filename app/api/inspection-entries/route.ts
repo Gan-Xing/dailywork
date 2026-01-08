@@ -31,6 +31,12 @@ export async function GET(request: Request) {
     .map((value) => Number(value))
     .filter((value) => Number.isFinite(value))
   const checkParams = searchParams.getAll('checkName').filter(Boolean)
+  const idsParams = searchParams
+    .getAll('ids')
+    .map((val) => val.split(','))
+    .flat()
+    .map((val) => Number(val))
+    .filter((val) => Number.isFinite(val))
 
   type SortField = NonNullable<InspectionEntryFilter['sortField']>
 
@@ -72,6 +78,7 @@ export async function GET(request: Request) {
   const documentIdValue = searchParams.get('documentId')
   const submissionNumberValue = searchParams.get('submissionNumber')
   const filter = {
+    ids: idsParams.length ? idsParams : undefined,
     roadSlug: searchParams.get('roadSlug') ?? undefined,
     roadSlugs: roadParams.length ? roadParams : undefined,
     documentId:

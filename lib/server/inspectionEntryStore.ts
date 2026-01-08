@@ -456,7 +456,7 @@ const toOrderBy = (
 
 export const listInspectionEntries = async (filter: InspectionEntryFilter): Promise<InspectionEntryListResponse> => {
   const page = Math.max(1, filter.page || 1)
-  const pageSize = Math.max(1, Math.min(1000, filter.pageSize || 20))
+  const pageSize = Math.max(1, Math.min(10000, filter.pageSize || 20))
   const skip = (page - 1) * pageSize
   const sortStack = filter.sort?.length
     ? filter.sort
@@ -473,6 +473,9 @@ export const listInspectionEntries = async (filter: InspectionEntryFilter): Prom
 
   const where: Prisma.InspectionEntryWhereInput = {}
   const and: Prisma.InspectionEntryWhereInput[] = []
+  if (filter.ids && filter.ids.length) {
+    where.id = { in: filter.ids }
+  }
   if (filter.roadSlugs && filter.roadSlugs.length) {
     where.road = { slug: { in: filter.roadSlugs } }
   } else if (filter.roadSlug) {

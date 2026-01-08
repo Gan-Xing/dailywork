@@ -285,6 +285,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
   const [bulkDeletePending, setBulkDeletePending] = useState(false)
   const [bulkDeleteError, setBulkDeleteError] = useState<string | null>(null)
   const [pdfPending, setPdfPending] = useState(false)
+  const [exporting, setExporting] = useState(false)
   const [pdfError, setPdfError] = useState<string | null>(null)
   const columnOptions: { key: ColumnKey; label: string }[] = useMemo(
     () => [
@@ -998,6 +999,127 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
     }
   }
 
+  const handleExportExcel = async () => {
+    if (exporting) return
+    setExporting(true)
+    setError(null)
+    setPdfError(null)
+
+    try {
+      const selectedColumns = columnOptions.filter(
+        (opt) => visibleColumns.includes(opt.key) && opt.key !== 'action',
+      )
+      if (selectedColumns.length === 0) {
+        throw new Error(copy.errors.exportMissingColumns ?? '请选择至少一列导出')
+      }
+
+      const queryParams: Record<string, string | number | undefined | (string | number)[]> = {
+        ids: selectedIds.length ? selectedIds : undefined,
+        ...(selectedIds.length === 0
+          ? {
+              roadSlug: roadSlugs.length ? roadSlugs : undefined,
+              phaseDefinitionId: phaseDefinitionIds.length ? phaseDefinitionIds : undefined,
+              status: status.length ? status : undefined,
+              side: side || undefined,
+              layerName: layerFilterValues.length ? layerFilterValues : undefined,
+              type: types.length ? types : undefined,
+              checkName: checkFilters.length ? checkFilters : undefined,
+              keyword: keyword ? `remark:${keyword}` : undefined,
+              startDate: startDate || undefined,
+              endDate: endDate || undefined,
+              startPkFrom: startPkFrom || undefined,
+              startPkTo: startPkTo || undefined,
+              sort: sortStack.map((spec) => `${spec.field}:${spec.order}`),
+              pageSize: 10000,
+              page: 1,
+            }
+          : {}),
+      }
+
+      const query = buildQuery(queryParams)
+      const res = await fetch(`/api/inspection-entries?${query}`)
+      const data = (await res.json()) as {
+        message?: string
+        items?: InspectionEntryDTO[]
+      }
+
+      if (!res.ok) {
+        throw new Error(data.message ?? copy.errors.exportFailed ?? '导出失败')
+      }
+
+      if (!data.items || data.items.length === 0) {
+        throw new Error(copy.errors.exportNoData ?? '无数据可导出')
+      }
+
+      const list = data.items.map((entry) => mapEntryToListItem(entry))
+
+      const XLSX = await import('xlsx')
+      const headerRow = selectedColumns.map((col) => col.label)
+      const dataRows = list.map((item, index) => {
+        return selectedColumns.map((col) => {
+          const isPrefab = isPrefabItem(item)
+          switch (col.key) {
+            case 'sequence':
+              return index + 1
+            case 'road':
+              return isPrefab ? prefabRoadLabel : formatRoadName(item.roadSlug, item.roadName)
+            case 'phase':
+              return item.phaseName ? localizeProgressTerm('phase', item.phaseName, locale) : '—'
+            case 'side':
+              return isPrefab ? '—' : sideCopy[item.side] ?? item.side
+            case 'range':
+              return isPrefab ? '—' : `${formatPK(item.startPk)} → ${formatPK(item.endPk)}`
+            case 'layers':
+              return normalizeLayerLabels(
+                Array.isArray(item.layers) ? item.layers : [],
+                item.phaseName,
+              ).join(' / ')
+            case 'checks':
+              return normalizeCheckLabels(Array.isArray(item.checks) ? item.checks : []).join(' / ')
+            case 'types':
+              return normalizeTypeLabels(Array.isArray(item.types) ? item.types : []).join(' / ')
+            case 'submissionOrder':
+              return item.submissionNumber === null || item.submissionNumber === undefined
+                ? item.submissionOrder === null || item.submissionOrder === undefined
+                  ? '—'
+                  : item.submissionOrder
+                : item.submissionNumber
+            case 'status':
+              return statusCopy[item.status] ?? item.status
+            case 'appointmentDate':
+              return formatAppointmentDate(item.appointmentDate)
+            case 'submittedAt':
+              return formatDate(item.submittedAt)
+            case 'submittedBy':
+              return item.submittedBy?.username ?? '—'
+            case 'createdBy':
+              return item.createdBy?.username ?? '—'
+            case 'createdAt':
+              return formatDate(item.createdAt)
+            case 'updatedBy':
+              return item.updatedBy?.username ?? '—'
+            case 'updatedAt':
+              return formatDate(item.updatedAt)
+            case 'remark':
+              return item.remark ?? '—'
+            default:
+              return ''
+          }
+        })
+      })
+
+      const worksheet = XLSX.utils.aoa_to_sheet([headerRow, ...dataRows])
+      const workbook = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(workbook, worksheet, copy.title)
+      const filename = `inspection-export-${new Date().toISOString().slice(0, 10)}.xlsx`
+      XLSX.writeFile(workbook, filename, { bookType: 'xlsx' })
+    } catch (err) {
+      setPdfError((err as Error).message)
+    } finally {
+      setExporting(false)
+    }
+  }
+
   return (
     <main className="min-h-screen bg-slate-950 text-slate-50">
       <div className="relative mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8 xl:max-w-[1500px] xl:px-10 2xl:max-w-[1700px] 2xl:px-12">
@@ -1646,6 +1768,14 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
               >
                 {pdfPending ? copy.pdf.exporting : copy.pdf.export}
               </button>
+              <button
+                type="button"
+                className="rounded-xl bg-emerald-300 px-4 py-2 text-xs font-semibold text-slate-900 shadow-lg shadow-emerald-400/30 transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+                onClick={handleExportExcel}
+                disabled={exporting}
+              >
+                {exporting ? 'Exporting...' : 'Export Excel'}
+              </button>
             </div>
           </div>
           <div className="overflow-x-auto">
@@ -2000,7 +2130,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                   className="h-8 rounded-lg border border-white/20 bg-slate-900 px-2 py-1 text-xs text-slate-50 focus:border-emerald-300 focus:outline-none"
                   aria-label={copy.pagination.pageSizeLabel}
                 >
-                  {[10, 20, 30, 50, 100].map((size) => (
+                  {[10, 20, 30, 50, 100, 200, 500, 1000].map((size) => (
                     <option key={size} value={size}>
                       {size}
                     </option>
