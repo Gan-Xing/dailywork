@@ -1,6 +1,11 @@
 import { Prisma, PaymentStatus } from '@prisma/client'
 
 import financeCategories from '@/lib/data/finance-cost-categories.json'
+import {
+  DEFAULT_FINANCE_SORT_STACK,
+  type FinanceSortField,
+  type FinanceSortSpec,
+} from '@/lib/finance/constants'
 import { prisma } from '@/lib/prisma'
 
 type FinanceCategoryNode = {
@@ -82,16 +87,27 @@ export type FinanceEntryFilterOptions = {
   projectIds?: number[]
   categoryKeys?: string[]
   paymentTypeIds?: number[]
-  paymentStatus?: PaymentStatus
+  paymentStatuses?: PaymentStatus[]
+  unitIds?: number[]
   handlerIds?: number[]
+  createdByIds?: number[]
+  updatedByIds?: number[]
   reasonKeyword?: string
+  remarkKeyword?: string
   amountMin?: number
   amountMax?: number
+  taxMin?: number
+  taxMax?: number
+  sequenceMin?: number
+  sequenceMax?: number
   dateFrom?: string
   dateTo?: string
+  updatedFrom?: string
+  updatedTo?: string
   page?: number
   pageSize?: number
-  sortField?: 'paymentDate' | 'amount' | 'category' | 'updatedAt'
+  sortStack?: FinanceSortSpec[]
+  sortField?: FinanceSortField
   sortDir?: 'asc' | 'desc'
   includeDeleted?: boolean
 }
@@ -265,6 +281,41 @@ export const listFinanceMetadata = async () => {
     }),
   ])
 
+  const [creatorRows, updaterRows] = await Promise.all([
+    prisma.financeEntry.findMany({
+      where: { createdBy: { not: null } },
+      distinct: ['createdBy'],
+      select: { createdBy: true },
+    }),
+    prisma.financeEntry.findMany({
+      where: { updatedBy: { not: null } },
+      distinct: ['updatedBy'],
+      select: { updatedBy: true },
+    }),
+  ])
+
+  const creatorIds = creatorRows
+    .map((row) => row.createdBy)
+    .filter((id): id is number => Number.isFinite(id))
+  const updaterIds = updaterRows
+    .map((row) => row.updatedBy)
+    .filter((id): id is number => Number.isFinite(id))
+
+  const creators = creatorIds.length
+    ? await prisma.user.findMany({
+        where: { id: { in: creatorIds } },
+        orderBy: [{ name: 'asc' }, { username: 'asc' }],
+        select: { id: true, name: true, username: true },
+      })
+    : []
+  const updaters = updaterIds.length
+    ? await prisma.user.findMany({
+        where: { id: { in: updaterIds } },
+        orderBy: [{ name: 'asc' }, { username: 'asc' }],
+        select: { id: true, name: true, username: true },
+      })
+    : []
+
   const map = new Map<string, FinanceCategoryDTO>()
   categories.forEach((cat) =>
     map.set(cat.key, {
@@ -305,16 +356,38 @@ export const listFinanceMetadata = async () => {
       name: handler.name,
       username: handler.username,
     })),
+    creators: creators.map((creator) => ({
+      id: creator.id,
+      name: creator.name,
+      username: creator.username,
+    })),
+    updaters: updaters.map((updater) => ({
+      id: updater.id,
+      name: updater.name,
+      username: updater.username,
+    })),
   }
 }
 
 const buildEntryWhere = (options: FinanceEntryFilterOptions): Prisma.FinanceEntryWhereInput => {
   const andConditions: Prisma.FinanceEntryWhereInput[] = []
+  if (options.sequenceMin !== undefined) {
+    andConditions.push({ sequence: { gte: options.sequenceMin } })
+  }
+  if (options.sequenceMax !== undefined) {
+    andConditions.push({ sequence: { lte: options.sequenceMax } })
+  }
   if (options.amountMin !== undefined) {
     andConditions.push({ amount: { gte: new Prisma.Decimal(options.amountMin) } })
   }
   if (options.amountMax !== undefined) {
     andConditions.push({ amount: { lte: new Prisma.Decimal(options.amountMax) } })
+  }
+  if (options.taxMin !== undefined) {
+    andConditions.push({ tva: { gte: new Prisma.Decimal(options.taxMin) } })
+  }
+  if (options.taxMax !== undefined) {
+    andConditions.push({ tva: { lte: new Prisma.Decimal(options.taxMax) } })
   }
   if (options.dateFrom) {
     andConditions.push({ paymentDate: { gte: new Date(options.dateFrom) } })
@@ -322,8 +395,17 @@ const buildEntryWhere = (options: FinanceEntryFilterOptions): Prisma.FinanceEntr
   if (options.dateTo) {
     andConditions.push({ paymentDate: { lte: new Date(options.dateTo) } })
   }
+  if (options.updatedFrom) {
+    andConditions.push({ updatedAt: { gte: new Date(options.updatedFrom) } })
+  }
+  if (options.updatedTo) {
+    andConditions.push({ updatedAt: { lte: new Date(options.updatedTo) } })
+  }
   if (options.reasonKeyword) {
     andConditions.push({ reason: { contains: options.reasonKeyword, mode: 'insensitive' } })
+  }
+  if (options.remarkKeyword) {
+    andConditions.push({ remark: { contains: options.remarkKeyword, mode: 'insensitive' } })
   }
   if (options.categoryKeys?.length) {
     const orConditions = options.categoryKeys.flatMap((key) => [
@@ -335,9 +417,12 @@ const buildEntryWhere = (options: FinanceEntryFilterOptions): Prisma.FinanceEntr
 
   const where: Prisma.FinanceEntryWhereInput = {
     projectId: options.projectIds?.length ? { in: options.projectIds } : undefined,
+    unitId: options.unitIds?.length ? { in: options.unitIds } : undefined,
     paymentTypeId: options.paymentTypeIds?.length ? { in: options.paymentTypeIds } : undefined,
-    paymentStatus: options.paymentStatus ?? undefined,
+    paymentStatus: options.paymentStatuses?.length ? { in: options.paymentStatuses } : undefined,
     handlerId: options.handlerIds?.length ? { in: options.handlerIds } : undefined,
+    createdBy: options.createdByIds?.length ? { in: options.createdByIds } : undefined,
+    updatedBy: options.updatedByIds?.length ? { in: options.updatedByIds } : undefined,
     isDeleted: options.includeDeleted ? undefined : false,
     AND: andConditions.length ? andConditions : undefined,
   }
@@ -345,19 +430,78 @@ const buildEntryWhere = (options: FinanceEntryFilterOptions): Prisma.FinanceEntr
   return where
 }
 
-const buildEntryOrderBy = (options: FinanceEntryFilterOptions): Prisma.FinanceEntryOrderByWithRelationInput[] => {
-  const direction: Prisma.SortOrder = options.sortDir === 'asc' ? 'asc' : 'desc'
-  switch (options.sortField) {
-    case 'amount':
-      return [{ amount: direction }, { paymentDate: 'desc' as const }, { id: 'desc' as const }]
-    case 'category':
-      return [{ categoryKey: direction }, { paymentDate: 'desc' as const }, { id: 'desc' as const }]
-    case 'updatedAt':
-      return [{ updatedAt: direction }, { id: 'desc' as const }]
-    case 'paymentDate':
-    default:
-      return [{ paymentDate: direction }, { id: 'desc' as const }]
-  }
+const buildEntryOrderBy = (
+  options: FinanceEntryFilterOptions,
+): Prisma.FinanceEntryOrderByWithRelationInput[] => {
+  const stack: FinanceSortSpec[] =
+    options.sortStack && options.sortStack.length
+      ? options.sortStack
+      : options.sortField
+        ? [
+            {
+              field: options.sortField,
+              order: options.sortDir === 'asc' ? 'asc' : 'desc',
+            },
+          ]
+        : DEFAULT_FINANCE_SORT_STACK
+
+  const orderBy: Prisma.FinanceEntryOrderByWithRelationInput[] = []
+
+  stack.forEach((sort) => {
+    const direction = sort.order === 'asc' ? 'asc' : 'desc'
+    switch (sort.field) {
+      case 'sequence':
+        orderBy.push({ sequence: direction })
+        break
+      case 'project':
+        orderBy.push({ project: { name: direction } }, { project: { id: direction } })
+        break
+      case 'category':
+        orderBy.push({ category: { labelZh: direction } }, { categoryKey: direction })
+        break
+      case 'reason':
+        orderBy.push({ reason: direction })
+        break
+      case 'amount':
+        orderBy.push({ amount: direction })
+        break
+      case 'unit':
+        orderBy.push({ unit: { name: direction } })
+        break
+      case 'paymentType':
+        orderBy.push({ paymentType: { name: direction } })
+        break
+      case 'paymentDate':
+        orderBy.push({ paymentDate: direction })
+        break
+      case 'paymentStatus':
+        orderBy.push({ paymentStatus: direction })
+        break
+      case 'handler':
+        orderBy.push({ handler: { name: direction } }, { handler: { username: direction } })
+        break
+      case 'createdBy':
+        orderBy.push({ creator: { name: direction } }, { creator: { username: direction } })
+        break
+      case 'updatedBy':
+        orderBy.push({ updater: { name: direction } }, { updater: { username: direction } })
+        break
+      case 'remark':
+        orderBy.push({ remark: direction })
+        break
+      case 'tax':
+        orderBy.push({ tva: direction })
+        break
+      case 'updatedAt':
+        orderBy.push({ updatedAt: direction })
+        break
+      default:
+        break
+    }
+  })
+
+  orderBy.push({ id: 'desc' })
+  return orderBy
 }
 
 export type FinanceEntryListResult = {
@@ -371,7 +515,7 @@ export const listFinanceEntries = async (options: FinanceEntryFilterOptions): Pr
   assertFinanceModels()
   const where = buildEntryWhere(options)
   const page = Math.max(1, options.page ?? 1)
-  const pageSize = Math.max(1, Math.min(options.pageSize ?? 50, 200))
+  const pageSize = Math.max(1, Math.min(options.pageSize ?? 50, 1000))
   const skip = (page - 1) * pageSize
   const orderBy = buildEntryOrderBy(options)
 

@@ -1,10 +1,16 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
 
 import Link from 'next/link'
 
 import { AccessDenied } from '@/components/AccessDenied'
+import { MultiSelectFilter } from '@/components/MultiSelectFilter'
+import {
+  DEFAULT_FINANCE_SORT_STACK,
+  type FinanceSortField,
+  type FinanceSortSpec,
+} from '@/lib/finance/constants'
 
 export const dynamic = 'force-dynamic'
 
@@ -38,6 +44,8 @@ type Metadata = {
   paymentTypes: PaymentType[]
   categories: FinanceCategoryDTO[]
   handlers: Handler[]
+  creators: Handler[]
+  updaters: Handler[]
 }
 
 type FinanceEntry = {
@@ -105,24 +113,63 @@ type EntryForm = {
   remark: string
 }
 
+type BulkEntryPatch = Partial<{
+  projectId: number
+  reason: string
+  categoryKey: string
+  amount: string
+  unitId: number
+  paymentTypeId: number
+  handlerId: number
+  paymentDate: string
+  paymentStatus: PaymentStatus
+  tva: string
+  remark: string
+}>
+
 type ListFilters = {
   projectIds: number[]
   categoryKeys: string[]
   paymentTypeIds: number[]
-  paymentStatus: '' | PaymentStatus
+  paymentStatuses: PaymentStatus[]
+  unitIds: number[]
   handlerIds: number[]
+  createdByIds: number[]
+  updatedByIds: number[]
   reasonKeyword: string
+  remarkKeyword: string
   amountMin: string
   amountMax: string
+  taxMin: string
+  taxMax: string
+  sequenceMin: string
+  sequenceMax: string
   dateFrom: string
   dateTo: string
-  sortField: 'paymentDate' | 'amount' | 'category' | 'updatedAt'
-  sortDir: 'asc' | 'desc'
+  updatedFrom: string
+  updatedTo: string
+  sortStack: FinanceSortSpec[]
   page: number
   pageSize: number
 }
 
 const formatDateInput = (iso: string) => iso.split('T')[0]
+
+const isPaymentStatus = (value: string): value is PaymentStatus =>
+  value === 'PAID' || value === 'PENDING'
+
+const parseNumberList = (values: string[]) =>
+  values
+    .map((value) => Number(value))
+    .filter((value) => Number.isFinite(value))
+
+const formatUserLabel = (user: { name: string; username: string }) => {
+  const name = user.name.trim()
+  if (name) {
+    return user.username && user.username !== name ? `${name} (${user.username})` : name
+  }
+  return user.username
+}
 
 const buildCategoryOptions = (nodes: FinanceCategoryDTO[], parentLabel: string): { key: string; label: string }[] =>
   nodes.flatMap((node) => {
@@ -150,9 +197,6 @@ const findCategoryNode = (nodes: FinanceCategoryDTO[], key: string): FinanceCate
   }
   return null
 }
-
-const toggleValue = <T,>(list: T[], value: T) =>
-  list.includes(value) ? list.filter((item) => item !== value) : [...list, value]
 
 const paymentStatusOptions: { value: PaymentStatus; label: string }[] = [
   { value: 'PAID', label: '已支付' },
@@ -235,15 +279,24 @@ export default function FinancePage() {
     projectIds: [],
     categoryKeys: [],
     paymentTypeIds: [],
-    paymentStatus: '',
+    paymentStatuses: [],
+    unitIds: [],
     handlerIds: [],
+    createdByIds: [],
+    updatedByIds: [],
     reasonKeyword: '',
+    remarkKeyword: '',
     amountMin: '',
     amountMax: '',
+    taxMin: '',
+    taxMax: '',
+    sequenceMin: '',
+    sequenceMax: '',
     dateFrom: '',
     dateTo: '',
-    sortField: 'paymentDate',
-    sortDir: 'desc',
+    updatedFrom: '',
+    updatedTo: '',
+    sortStack: DEFAULT_FINANCE_SORT_STACK,
     page: 1,
     pageSize: 20,
   })
@@ -251,25 +304,31 @@ export default function FinancePage() {
     projectIds: [],
     categoryKeys: [],
     paymentTypeIds: [],
-    paymentStatus: '',
+    paymentStatuses: [],
+    unitIds: [],
     handlerIds: [],
+    createdByIds: [],
+    updatedByIds: [],
     reasonKeyword: '',
+    remarkKeyword: '',
     amountMin: '',
     amountMax: '',
+    taxMin: '',
+    taxMax: '',
+    sequenceMin: '',
+    sequenceMax: '',
     dateFrom: '',
     dateTo: '',
-    sortField: 'paymentDate',
-    sortDir: 'desc',
+    updatedFrom: '',
+    updatedTo: '',
+    sortStack: DEFAULT_FINANCE_SORT_STACK,
     page: 1,
     pageSize: 20,
   })
-  const [categorySearch, setCategorySearch] = useState('')
-  const [projectOpen, setProjectOpen] = useState(false)
-  const [paymentOpen, setPaymentOpen] = useState(false)
-  const [handlerOpen, setHandlerOpen] = useState(false)
-  const [categoryOpen, setCategoryOpen] = useState(false)
   const [formCategoryOpen, setFormCategoryOpen] = useState(false)
   const [formCategorySearch, setFormCategorySearch] = useState('')
+  const [bulkCategoryOpen, setBulkCategoryOpen] = useState(false)
+  const [bulkCategorySearch, setBulkCategorySearch] = useState('')
   const [loading, setLoading] = useState(false)
   const [insightsLoading, setInsightsLoading] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
@@ -302,6 +361,9 @@ export default function FinancePage() {
   })
   const [editingId, setEditingId] = useState<number | null>(null)
   const [showEntryModal, setShowEntryModal] = useState(false)
+  const [showBulkEditModal, setShowBulkEditModal] = useState(false)
+  const [bulkPatch, setBulkPatch] = useState<BulkEntryPatch>({})
+  const [bulkSaving, setBulkSaving] = useState(false)
   const [manageProject, setManageProject] = useState({ name: '', code: '', isActive: true })
   const [manageUnit, setManageUnit] = useState({ name: '', symbol: '', isActive: true })
   const [managePayment, setManagePayment] = useState({ name: '', isActive: true })
@@ -321,12 +383,12 @@ export default function FinancePage() {
   const [viewingEntry, setViewingEntry] = useState<{ entry: FinanceEntry; displayIndex: number } | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<FinanceEntry | null>(null)
   const [deletingId, setDeletingId] = useState<number | null>(null)
-  const projectRef = useRef<HTMLDivElement | null>(null)
-  const paymentRef = useRef<HTMLDivElement | null>(null)
-  const handlerRef = useRef<HTMLDivElement | null>(null)
+  const [selectedEntryIds, setSelectedEntryIds] = useState<number[]>([])
+  const [bulkDeleting, setBulkDeleting] = useState(false)
   const columnChooserRef = useRef<HTMLDivElement | null>(null)
-  const categoryRef = useRef<HTMLDivElement | null>(null)
   const formCategoryRef = useRef<HTMLDivElement | null>(null)
+  const bulkCategoryRef = useRef<HTMLDivElement | null>(null)
+  const selectAllRef = useRef<HTMLInputElement | null>(null)
 
   const canView = session?.permissions.includes('finance:view') ?? false
   const canEdit = session?.permissions.includes('finance:edit') ?? false
@@ -348,11 +410,11 @@ export default function FinancePage() {
     if (!keyword) return categoryOptions
     return categoryOptions.filter((cat) => cat.label.toLowerCase().includes(keyword))
   }, [categoryOptions, formCategorySearch])
-  const filteredCategoryOptions = useMemo(() => {
-    const keyword = categorySearch.trim().toLowerCase()
-    if (!keyword) return categoryOptionsWithParents
-    return categoryOptionsWithParents.filter((cat) => cat.label.toLowerCase().includes(keyword))
-  }, [categoryOptionsWithParents, categorySearch])
+  const filteredBulkCategoryOptions = useMemo(() => {
+    const keyword = bulkCategorySearch.trim().toLowerCase()
+    if (!keyword) return categoryOptions
+    return categoryOptions.filter((cat) => cat.label.toLowerCase().includes(keyword))
+  }, [bulkCategorySearch, categoryOptions])
 
   const defaultHandlerId = useMemo(() => {
     if (!metadata?.handlers?.length || !session) return ''
@@ -362,45 +424,76 @@ export default function FinancePage() {
     return byUsername?.id ?? ''
   }, [metadata?.handlers, session])
 
-  const projectLabel = useMemo(() => {
-    if (!metadata?.projects?.length || !listDraft.projectIds.length) return '全部项目'
-    const names = metadata.projects
-      .filter((project) => listDraft.projectIds.includes(project.id))
-      .map((project) => project.name)
-    if (!names.length) return '全部项目'
-    return names.length <= 2 ? names.join('、') : `${names[0]}等${names.length}个`
-  }, [listDraft.projectIds, metadata?.projects])
+  const filterControlProps = {
+    allLabel: '全部',
+    selectedLabel: (count: number) => `已选 ${count} 项`,
+    selectAllLabel: '全选',
+    clearLabel: '清空',
+    noOptionsLabel: '暂无选项',
+    searchPlaceholder: '搜索',
+  }
+  const sharedFilterProps = { ...filterControlProps, className: 'w-full' }
 
-  const paymentLabel = useMemo(() => {
-    if (!metadata?.paymentTypes?.length || !listDraft.paymentTypeIds.length) return '全部支付方式'
-    const names = metadata.paymentTypes
-      .filter((type) => listDraft.paymentTypeIds.includes(type.id))
-      .map((type) => type.name)
-    if (!names.length) return '全部支付方式'
-    return names.length <= 2 ? names.join('、') : `${names[0]}等${names.length}个`
-  }, [listDraft.paymentTypeIds, metadata?.paymentTypes])
+  const projectFilterOptions = useMemo(
+    () =>
+      metadata?.projects.map((project) => ({ value: String(project.id), label: project.name })) ??
+      [],
+    [metadata?.projects],
+  )
+  const categoryFilterOptions = useMemo(
+    () => categoryOptionsWithParents.map((cat) => ({ value: cat.key, label: cat.label })),
+    [categoryOptionsWithParents],
+  )
+  const paymentTypeFilterOptions = useMemo(
+    () =>
+      metadata?.paymentTypes.map((type) => ({ value: String(type.id), label: type.name })) ?? [],
+    [metadata?.paymentTypes],
+  )
+  const unitFilterOptions = useMemo(
+    () =>
+      metadata?.units.map((unit) => ({
+        value: String(unit.id),
+        label: unit.symbol ? `${unit.name} (${unit.symbol})` : unit.name,
+      })) ?? [],
+    [metadata?.units],
+  )
+  const paymentStatusFilterOptions = useMemo(
+    () => paymentStatusOptions.map((status) => ({ value: status.value, label: status.label })),
+    [],
+  )
+  const handlerFilterOptions = useMemo(
+    () =>
+      metadata?.handlers.map((handler) => ({
+        value: String(handler.id),
+        label: formatUserLabel(handler),
+      })) ?? [],
+    [metadata?.handlers],
+  )
+  const creatorFilterOptions = useMemo(
+    () =>
+      metadata?.creators.map((creator) => ({
+        value: String(creator.id),
+        label: formatUserLabel(creator),
+      })) ?? [],
+    [metadata?.creators],
+  )
+  const updaterFilterOptions = useMemo(
+    () =>
+      metadata?.updaters.map((updater) => ({
+        value: String(updater.id),
+        label: formatUserLabel(updater),
+      })) ?? [],
+    [metadata?.updaters],
+  )
 
-  const handlerLabel = useMemo(() => {
-    if (!metadata?.handlers?.length || !listDraft.handlerIds.length) return '全部经办人'
-    const names = metadata.handlers
-      .filter((handler) => listDraft.handlerIds.includes(handler.id))
-      .map((handler) => handler.name || handler.username)
-    if (!names.length) return '全部经办人'
-    return names.length <= 2 ? names.join('、') : `${names[0]}等${names.length}个`
-  }, [listDraft.handlerIds, metadata?.handlers])
-
-  const categoryLabel = useMemo(() => {
-    if (!categoryOptionsWithParents.length || !listDraft.categoryKeys.length) return '全部分类'
-    const labels = categoryOptionsWithParents
-      .filter((cat) => listDraft.categoryKeys.includes(cat.key))
-      .map((cat) => cat.label)
-    if (!labels.length) return '全部分类'
-    return labels.length <= 2 ? labels.join('、') : `${labels[0]}等${labels.length}个`
-  }, [categoryOptionsWithParents, listDraft.categoryKeys])
   const selectedCategoryLabel = useMemo(() => {
     if (!form.categoryKey) return '选择分类'
     return categoryOptions.find((cat) => cat.key === form.categoryKey)?.label ?? '选择分类'
   }, [categoryOptions, form.categoryKey])
+  const selectedBulkCategoryLabel = useMemo(() => {
+    if (!bulkPatch.categoryKey) return '选择分类'
+    return categoryOptions.find((cat) => cat.key === bulkPatch.categoryKey)?.label ?? '选择分类'
+  }, [bulkPatch.categoryKey, categoryOptions])
 
   const categoryMap = useMemo(() => {
     const map = new Map<string, FinanceCategoryDTO>()
@@ -433,71 +526,40 @@ export default function FinancePage() {
     return list.sort((a, b) => a.sortOrder - b.sortOrder || a.label.localeCompare(b.label, 'zh-CN'))
   }, [metadata?.categories])
 
-  const filteredEntries = useMemo(() => {
-    let result = [...entries]
-    if (listFilters.categoryKeys.length) {
-      result = result.filter((e) => e.categoryPath.some((c) => listFilters.categoryKeys.includes(c.key)))
-    }
-    if (listFilters.projectIds.length) {
-      result = result.filter((e) => listFilters.projectIds.includes(e.projectId))
-    }
-    if (listFilters.paymentTypeIds.length) {
-      result = result.filter((e) => listFilters.paymentTypeIds.includes(e.paymentTypeId))
-    }
-    if (listFilters.paymentStatus) {
-      result = result.filter((e) => e.paymentStatus === listFilters.paymentStatus)
-    }
-    if (listFilters.handlerIds.length) {
-      result = result.filter((e) => (e.handlerId ? listFilters.handlerIds.includes(e.handlerId) : false))
-    }
-    if (listFilters.reasonKeyword.trim()) {
-      const keyword = listFilters.reasonKeyword.trim().toLowerCase()
-      result = result.filter((e) => e.reason.toLowerCase().includes(keyword))
-    }
-    if (listFilters.amountMin !== '') {
-      const min = Number(listFilters.amountMin)
-      if (Number.isFinite(min)) result = result.filter((e) => e.amount >= min)
-    }
-    if (listFilters.amountMax !== '') {
-      const max = Number(listFilters.amountMax)
-      if (Number.isFinite(max)) result = result.filter((e) => e.amount <= max)
-    }
-    if (listFilters.dateFrom) {
-      const from = new Date(listFilters.dateFrom).getTime()
-      result = result.filter((e) => new Date(e.paymentDate).getTime() >= from)
-    }
-    if (listFilters.dateTo) {
-      const to = new Date(listFilters.dateTo).getTime()
-      result = result.filter((e) => new Date(e.paymentDate).getTime() <= to)
-    }
-
-    const sorters: Record<ListFilters['sortField'], (a: FinanceEntry, b: FinanceEntry) => number> = {
-      paymentDate: (a, b) => new Date(a.paymentDate).getTime() - new Date(b.paymentDate).getTime(),
-      amount: (a, b) => a.amount - b.amount,
-      category: (a, b) =>
-        a.categoryPath
-          .map((c) => c.label)
-          .join(' / ')
-          .localeCompare(b.categoryPath.map((c) => c.label).join(' / ')),
-      updatedAt: (a, b) => new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime(),
-    }
-    const sortFn = sorters[listFilters.sortField]
-    result.sort((a, b) => {
-      const val = sortFn(a, b)
-      return listFilters.sortDir === 'asc' ? val : -val
-    })
-    return result
-  }, [entries, listFilters])
-
   const pendingEntries = useMemo(
-    () => filteredEntries.filter((entry) => entry.paymentStatus === 'PENDING'),
-    [filteredEntries],
+    () => entries.filter((entry) => entry.paymentStatus === 'PENDING'),
+    [entries],
   )
 
   const tableRows = useMemo(() => {
     const offset = (listFilters.page - 1) * listFilters.pageSize
-    return filteredEntries.map((entry, index) => ({ entry, displayIndex: offset + index + 1 }))
-  }, [filteredEntries, listFilters.page, listFilters.pageSize])
+    return entries.map((entry, index) => ({ entry, displayIndex: offset + index + 1 }))
+  }, [entries, listFilters.page, listFilters.pageSize])
+
+  const duplicateAmountIds = useMemo(() => {
+    const seen = new Set<string>()
+    const duplicates = new Set<number>()
+    tableRows.forEach(({ entry }) => {
+      const amountKey = entry.amount.toFixed(2)
+      if (seen.has(amountKey)) {
+        duplicates.add(entry.id)
+      } else {
+        seen.add(amountKey)
+      }
+    })
+    return duplicates
+  }, [tableRows])
+
+  const selectableEntryIds = useMemo(
+    () => entries.filter((entry) => !entry.isDeleted).map((entry) => entry.id),
+    [entries],
+  )
+  const selectedIdSet = useMemo(() => new Set(selectedEntryIds), [selectedEntryIds])
+  const allSelected =
+    selectableEntryIds.length > 0 && selectableEntryIds.every((id) => selectedIdSet.has(id))
+  const someSelected = selectableEntryIds.some((id) => selectedIdSet.has(id))
+  const tableColumnCount = visibleColumns.length + 1
+  const bulkPatchEmpty = useMemo(() => Object.keys(bulkPatch).length === 0, [bulkPatch])
 
   const totalPages = useMemo(
     () => Math.max(1, Math.ceil((totalEntries || 0) / Math.max(listFilters.pageSize, 1))),
@@ -522,7 +584,7 @@ export default function FinancePage() {
     { key: 'updatedAt', label: '最近更新' },
     { key: 'action', label: '操作' },
   ]
-  const pageSizeOptions = [10, 20, 50, 100, 200]
+  const pageSizeOptions = [10, 20, 50, 100, 200, 500, 1000]
 
   const changePage = (nextPage: number) => {
     const clamped = Math.min(Math.max(1, nextPage), totalPages || 1)
@@ -531,9 +593,32 @@ export default function FinancePage() {
   }
 
   const changePageSize = (nextSize: number) => {
-    const size = Math.min(Math.max(Math.round(nextSize), 1), 200)
+    const size = Math.min(Math.max(Math.round(nextSize), 1), 1000)
     setListFilters((prev) => ({ ...prev, pageSize: size, page: 1 }))
     setListDraft((prev) => ({ ...prev, pageSize: size, page: 1 }))
+  }
+
+  const buildSortStack = (stack: FinanceSortSpec[], field: FinanceSortField) => {
+    const existing = stack.find((item) => item.field === field)
+    const nextOrder: FinanceSortSpec['order'] =
+      existing ? (existing.order === 'asc' ? 'desc' : 'asc') : 'desc'
+    const filtered = stack.filter((item) => item.field !== field)
+    return [{ field, order: nextOrder }, ...filtered].slice(0, 4)
+  }
+
+  const handleSort = (field: FinanceSortField) => {
+    setListFilters((prev) => {
+      const nextSortStack = buildSortStack(prev.sortStack, field)
+      setListDraft((draft) => ({ ...draft, sortStack: nextSortStack, page: 1 }))
+      return { ...prev, sortStack: nextSortStack, page: 1 }
+    })
+  }
+
+  const sortIndicator = (field: FinanceSortField) => {
+    const idx = listFilters.sortStack.findIndex((item) => item.field === field)
+    if (idx === -1) return ''
+    const arrow = listFilters.sortStack[idx].order === 'asc' ? '↑' : '↓'
+    return `${arrow}${idx + 1}`
   }
 
   const toggleColumn = (key: string) => {
@@ -554,15 +639,26 @@ export default function FinancePage() {
     filtersInput.projectIds.forEach((id) => params.append('projectId', String(id)))
     filtersInput.categoryKeys.forEach((key) => params.append('categoryKey', key))
     filtersInput.paymentTypeIds.forEach((id) => params.append('paymentTypeId', String(id)))
-    if (filtersInput.paymentStatus) params.set('paymentStatus', filtersInput.paymentStatus)
+    filtersInput.paymentStatuses.forEach((status) => params.append('paymentStatus', status))
+    filtersInput.unitIds.forEach((id) => params.append('unitId', String(id)))
     filtersInput.handlerIds.forEach((id) => params.append('handlerId', String(id)))
+    filtersInput.createdByIds.forEach((id) => params.append('createdBy', String(id)))
+    filtersInput.updatedByIds.forEach((id) => params.append('updatedBy', String(id)))
     if (filtersInput.reasonKeyword.trim()) params.set('reasonKeyword', filtersInput.reasonKeyword.trim())
+    if (filtersInput.remarkKeyword.trim()) params.set('remarkKeyword', filtersInput.remarkKeyword.trim())
     if (filtersInput.amountMin !== '') params.set('amountMin', filtersInput.amountMin)
     if (filtersInput.amountMax !== '') params.set('amountMax', filtersInput.amountMax)
+    if (filtersInput.taxMin !== '') params.set('taxMin', filtersInput.taxMin)
+    if (filtersInput.taxMax !== '') params.set('taxMax', filtersInput.taxMax)
+    if (filtersInput.sequenceMin !== '') params.set('sequenceMin', filtersInput.sequenceMin)
+    if (filtersInput.sequenceMax !== '') params.set('sequenceMax', filtersInput.sequenceMax)
     if (filtersInput.dateFrom) params.set('dateFrom', filtersInput.dateFrom)
     if (filtersInput.dateTo) params.set('dateTo', filtersInput.dateTo)
-    params.set('sortField', filtersInput.sortField)
-    params.set('sortDir', filtersInput.sortDir)
+    if (filtersInput.updatedFrom) params.set('updatedFrom', filtersInput.updatedFrom)
+    if (filtersInput.updatedTo) params.set('updatedTo', filtersInput.updatedTo)
+    filtersInput.sortStack.forEach((sort) => {
+      params.append('sort', `${sort.field}:${sort.order}`)
+    })
     params.set('page', String(filtersInput.page))
     params.set('pageSize', String(filtersInput.pageSize))
     return params
@@ -594,6 +690,8 @@ export default function FinancePage() {
         paymentTypes: data.paymentTypes,
         categories: data.categories,
         handlers: data.handlers ?? [],
+        creators: data.creators ?? [],
+        updaters: data.updaters ?? [],
       })
       const defaultProject = data.projects.find((p) => p.name === '邦杜库市政路项目')
       const defaultPayment = data.paymentTypes.find((p) => p.name === '现金支票') ?? data.paymentTypes[0]
@@ -617,15 +715,24 @@ export default function FinancePage() {
         projectIds: [],
         categoryKeys: [],
         paymentTypeIds: [],
-        paymentStatus: '',
+        paymentStatuses: [],
+        unitIds: [],
         handlerIds: [],
+        createdByIds: [],
+        updatedByIds: [],
         reasonKeyword: '',
+        remarkKeyword: '',
         amountMin: '',
         amountMax: '',
+        taxMin: '',
+        taxMax: '',
+        sequenceMin: '',
+        sequenceMax: '',
         dateFrom: '',
         dateTo: '',
-        sortField: 'paymentDate',
-        sortDir: 'desc',
+        updatedFrom: '',
+        updatedTo: '',
+        sortStack: DEFAULT_FINANCE_SORT_STACK,
         page: 1,
         pageSize: 20,
       }
@@ -737,14 +844,21 @@ export default function FinancePage() {
   }, [columnsReady, visibleColumns])
 
   useEffect(() => {
+    if (selectAllRef.current) {
+      selectAllRef.current.indeterminate = !allSelected && someSelected
+    }
+  }, [allSelected, someSelected])
+
+  useEffect(() => {
+    setSelectedEntryIds((prev) => prev.filter((id) => selectableEntryIds.includes(id)))
+  }, [selectableEntryIds])
+
+  useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Node
-      if (projectRef.current && !projectRef.current.contains(target)) setProjectOpen(false)
-      if (paymentRef.current && !paymentRef.current.contains(target)) setPaymentOpen(false)
-      if (handlerRef.current && !handlerRef.current.contains(target)) setHandlerOpen(false)
       if (columnChooserRef.current && !columnChooserRef.current.contains(target)) setShowColumnChooser(false)
-      if (categoryRef.current && !categoryRef.current.contains(target)) setCategoryOpen(false)
       if (formCategoryRef.current && !formCategoryRef.current.contains(target)) setFormCategoryOpen(false)
+      if (bulkCategoryRef.current && !bulkCategoryRef.current.contains(target)) setBulkCategoryOpen(false)
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
@@ -760,15 +874,24 @@ export default function FinancePage() {
     projectIds: filtersProjectIds,
     categoryKeys: filtersCategoryKeys,
     paymentTypeIds: filtersPaymentTypeIds,
-    paymentStatus: filtersPaymentStatus,
+    paymentStatuses: filtersPaymentStatuses,
+    unitIds: filtersUnitIds,
     handlerIds: filtersHandlerIds,
+    createdByIds: filtersCreatedByIds,
+    updatedByIds: filtersUpdatedByIds,
     reasonKeyword: filtersReasonKeyword,
+    remarkKeyword: filtersRemarkKeyword,
     amountMin: filtersAmountMin,
     amountMax: filtersAmountMax,
+    taxMin: filtersTaxMin,
+    taxMax: filtersTaxMax,
+    sequenceMin: filtersSequenceMin,
+    sequenceMax: filtersSequenceMax,
     dateFrom: filtersDateFrom,
     dateTo: filtersDateTo,
-    sortField,
-    sortDir,
+    updatedFrom: filtersUpdatedFrom,
+    updatedTo: filtersUpdatedTo,
+    sortStack,
     page,
     pageSize,
   } = listFilters
@@ -779,15 +902,24 @@ export default function FinancePage() {
       projectIds: filtersProjectIds,
       categoryKeys: filtersCategoryKeys,
       paymentTypeIds: filtersPaymentTypeIds,
-      paymentStatus: filtersPaymentStatus,
+      paymentStatuses: filtersPaymentStatuses,
+      unitIds: filtersUnitIds,
       handlerIds: filtersHandlerIds,
+      createdByIds: filtersCreatedByIds,
+      updatedByIds: filtersUpdatedByIds,
       reasonKeyword: filtersReasonKeyword,
+      remarkKeyword: filtersRemarkKeyword,
       amountMin: filtersAmountMin,
       amountMax: filtersAmountMax,
+      taxMin: filtersTaxMin,
+      taxMax: filtersTaxMax,
+      sequenceMin: filtersSequenceMin,
+      sequenceMax: filtersSequenceMax,
       dateFrom: filtersDateFrom,
       dateTo: filtersDateTo,
-      sortField,
-      sortDir,
+      updatedFrom: filtersUpdatedFrom,
+      updatedTo: filtersUpdatedTo,
+      sortStack,
       page,
       pageSize,
     }
@@ -798,15 +930,24 @@ export default function FinancePage() {
     filtersProjectIds,
     filtersCategoryKeys,
     filtersPaymentTypeIds,
-    filtersPaymentStatus,
+    filtersPaymentStatuses,
+    filtersUnitIds,
     filtersHandlerIds,
+    filtersCreatedByIds,
+    filtersUpdatedByIds,
     filtersReasonKeyword,
+    filtersRemarkKeyword,
     filtersAmountMin,
     filtersAmountMax,
+    filtersTaxMin,
+    filtersTaxMax,
+    filtersSequenceMin,
+    filtersSequenceMax,
     filtersDateFrom,
     filtersDateTo,
-    sortField,
-    sortDir,
+    filtersUpdatedFrom,
+    filtersUpdatedTo,
+    sortStack,
     page,
     pageSize,
     loadEntries,
@@ -818,15 +959,24 @@ export default function FinancePage() {
       projectIds: filtersProjectIds,
       categoryKeys: filtersCategoryKeys,
       paymentTypeIds: filtersPaymentTypeIds,
-      paymentStatus: filtersPaymentStatus,
+      paymentStatuses: filtersPaymentStatuses,
+      unitIds: filtersUnitIds,
       handlerIds: filtersHandlerIds,
+      createdByIds: filtersCreatedByIds,
+      updatedByIds: filtersUpdatedByIds,
       reasonKeyword: filtersReasonKeyword,
+      remarkKeyword: filtersRemarkKeyword,
       amountMin: filtersAmountMin,
       amountMax: filtersAmountMax,
+      taxMin: filtersTaxMin,
+      taxMax: filtersTaxMax,
+      sequenceMin: filtersSequenceMin,
+      sequenceMax: filtersSequenceMax,
       dateFrom: filtersDateFrom,
       dateTo: filtersDateTo,
-      sortField,
-      sortDir,
+      updatedFrom: filtersUpdatedFrom,
+      updatedTo: filtersUpdatedTo,
+      sortStack,
       page,
       pageSize,
     }
@@ -838,15 +988,24 @@ export default function FinancePage() {
     filtersProjectIds,
     filtersCategoryKeys,
     filtersPaymentTypeIds,
-    filtersPaymentStatus,
+    filtersPaymentStatuses,
+    filtersUnitIds,
     filtersHandlerIds,
+    filtersCreatedByIds,
+    filtersUpdatedByIds,
     filtersReasonKeyword,
+    filtersRemarkKeyword,
     filtersAmountMin,
     filtersAmountMax,
+    filtersTaxMin,
+    filtersTaxMax,
+    filtersSequenceMin,
+    filtersSequenceMax,
     filtersDateFrom,
     filtersDateTo,
-    sortField,
-    sortDir,
+    filtersUpdatedFrom,
+    filtersUpdatedTo,
+    sortStack,
     page,
     pageSize,
     loadInsights,
@@ -1028,6 +1187,166 @@ export default function FinancePage() {
       setDeletingId(null)
       setLoading(false)
     }
+  }
+
+  const handleBulkDelete = async () => {
+    if (!canEdit || selectedEntryIds.length === 0) return
+    const count = selectedEntryIds.length
+    if (!confirm(`确认删除已选的 ${count} 条记录吗？删除后无法恢复。`)) return
+    setBulkDeleting(true)
+    setLoading(true)
+    try {
+      const results = await Promise.allSettled(
+        selectedEntryIds.map(async (id) => {
+          const res = await fetch(`/api/finance/entries/${id}`, {
+            method: 'DELETE',
+            credentials: 'include',
+          })
+          if (!res.ok) {
+            const data = (await res.json().catch(() => ({}))) as { message?: string }
+            throw new Error(data.message ?? `删除失败: ${id}`)
+          }
+        }),
+      )
+      const failures = results.filter((result) => result.status === 'rejected')
+      setMessage(failures.length ? `批量删除完成，失败 ${failures.length} 条` : '批量删除成功')
+      setSelectedEntryIds([])
+      await loadEntries(listFilters)
+      await loadInsights(listFilters)
+    } catch (error) {
+      setMessage((error as Error).message)
+    } finally {
+      setBulkDeleting(false)
+      setLoading(false)
+    }
+  }
+
+  const updateBulkPatchField = useCallback(
+    (field: keyof BulkEntryPatch, value: BulkEntryPatch[keyof BulkEntryPatch] | undefined) => {
+      setBulkPatch((prev) => {
+        if (value === undefined) {
+          const next = { ...prev } as BulkEntryPatch
+          delete next[field]
+          return next
+        }
+        return { ...prev, [field]: value } as BulkEntryPatch
+      })
+    },
+    [],
+  )
+
+  const openBulkEdit = () => {
+    if (!canEdit) return
+    if (selectedEntryIds.length === 0) {
+      setMessage('请先选择需要批量修改的记录')
+      return
+    }
+    setBulkPatch({})
+    setBulkCategoryOpen(false)
+    setBulkCategorySearch('')
+    setShowBulkEditModal(true)
+  }
+
+  const buildBulkPayload = (patch: BulkEntryPatch) => {
+    const payload: Record<string, unknown> = {}
+    if (patch.projectId !== undefined) payload.projectId = patch.projectId
+    if (patch.reason && patch.reason.trim()) payload.reason = patch.reason.trim()
+    if (patch.categoryKey) payload.categoryKey = patch.categoryKey
+    if (patch.amount !== undefined) {
+      const amount = Number(patch.amount)
+      if (!Number.isFinite(amount)) {
+        throw new Error('批量修改：金额必须为数字')
+      }
+      payload.amount = amount
+    }
+    if (patch.unitId !== undefined) payload.unitId = patch.unitId
+    if (patch.paymentTypeId !== undefined) payload.paymentTypeId = patch.paymentTypeId
+    if (patch.handlerId !== undefined) payload.handlerId = patch.handlerId
+    if (patch.paymentDate && patch.paymentDate.trim()) payload.paymentDate = patch.paymentDate.trim()
+    if (patch.paymentStatus) payload.paymentStatus = patch.paymentStatus
+    if (patch.tva !== undefined) {
+      const tva = Number(patch.tva)
+      if (!Number.isFinite(tva)) {
+        throw new Error('批量修改：税费必须为数字')
+      }
+      payload.tva = tva
+    }
+    if (patch.remark && patch.remark.trim()) payload.remark = patch.remark.trim()
+    return payload
+  }
+
+  const handleBulkSave = async () => {
+    if (!canEdit) return
+    if (selectedEntryIds.length === 0) {
+      setMessage('请先选择需要批量修改的记录')
+      return
+    }
+    let payload: Record<string, unknown> = {}
+    try {
+      payload = buildBulkPayload(bulkPatch)
+    } catch (error) {
+      setMessage((error as Error).message)
+      return
+    }
+    if (Object.keys(payload).length === 0) {
+      setMessage('请先填写需要批量修改的字段')
+      return
+    }
+    setBulkSaving(true)
+    setLoading(true)
+    try {
+      const res = await fetch('/api/finance/entries/bulk', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          items: selectedEntryIds.map((id) => ({ id, patch: payload })),
+        }),
+      })
+      const data = (await res.json().catch(() => ({}))) as {
+        results?: Array<{ id: number; ok: boolean; error?: string }>
+        message?: string
+      }
+      if (!res.ok) {
+        setMessage(data.message ?? '批量修改失败')
+        return
+      }
+      const results = Array.isArray(data.results) ? data.results : []
+      const failed = results.filter((item) => !item.ok)
+      const successCount = results.length - failed.length
+      if (failed.length > 0) {
+        const failedIds = failed.map((item) => item.id)
+        setSelectedEntryIds(failedIds)
+        setMessage(`批量修改完成，成功 ${successCount} 条，失败 ${failed.length} 条`)
+      } else {
+        setMessage(`批量修改成功，共 ${successCount} 条`)
+        setSelectedEntryIds([])
+        setBulkPatch({})
+        setShowBulkEditModal(false)
+      }
+      if (successCount > 0) {
+        await loadEntries(listFilters)
+        await loadInsights(listFilters)
+      }
+    } catch (error) {
+      setMessage((error as Error).message)
+    } finally {
+      setBulkSaving(false)
+      setLoading(false)
+    }
+  }
+
+  const toggleEntrySelection = (entryId: number) => {
+    setSelectedEntryIds((prev) =>
+      prev.includes(entryId) ? prev.filter((id) => id !== entryId) : [...prev, entryId],
+    )
+  }
+
+  const handleRowSelect = (entry: FinanceEntry) => (event: ReactMouseEvent<HTMLTableRowElement>) => {
+    if (!canEdit || entry.isDeleted) return
+    const target = event.target as HTMLElement | null
+    if (target?.closest('button, a, input, select, textarea, label')) return
+    toggleEntrySelection(entry.id)
   }
 
   type ManageRequest = {
@@ -1285,482 +1604,446 @@ export default function FinancePage() {
                 </div>
               </div>
             <div className="grid min-w-0 gap-3 md:grid-cols-12 xl:gap-4 2xl:gap-5">
-            <div className="min-w-0 md:col-span-6 lg:col-span-4 xl:col-span-3">
-              <label className="space-y-1 text-sm">
-                <span className="text-slate-700">项目</span>
-                <div className="relative" ref={projectRef}>
-                  <button
-                    type="button"
-                    onClick={() => setProjectOpen((prev) => !prev)}
-                    className="flex w-full max-w-full items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-left text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
-                  >
-                    <span className="truncate">{projectLabel}</span>
-                    <span className="text-xs text-slate-500">⌕</span>
-                  </button>
-                  {projectOpen && (
-                    <div
-                      className="absolute inset-x-0 z-20 mt-2 w-full max-w-full rounded-lg border border-slate-200 bg-white shadow-lg"
-                      onMouseLeave={() => setProjectOpen(false)}
-                    >
-                      <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2 text-xs text-slate-600">
-                        <span>已选 {listDraft.projectIds.length || '全部'}</span>
-                        <div className="flex gap-2">
-                          <button
-                            className="text-emerald-700 hover:underline"
-                            onClick={() =>
-                              setListDraft((prev) => ({
-                                ...prev,
-                                projectIds: metadata?.projects.map((p) => p.id) ?? [],
-                              }))
-                            }
-                          >
-                            全选
-                          </button>
-                          <button
-                            className="text-slate-600 hover:underline"
-                            onClick={() => setListDraft((prev) => ({ ...prev, projectIds: [] }))}
-                          >
-                            清空
-                          </button>
-                        </div>
-                      </div>
-                      <div className="max-h-56 space-y-1 overflow-y-auto p-2 text-sm">
-                        {metadata?.projects.map((project) => (
-                          <label
-                            key={project.id}
-                            className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 hover:bg-slate-50"
-                          >
-                            <input
-                              type="checkbox"
-                              className="h-4 w-4"
-                              checked={listDraft.projectIds.includes(project.id)}
-                              onChange={() =>
-                                setListDraft((prev) => ({
-                                  ...prev,
-                                  projectIds: toggleValue(prev.projectIds, project.id),
-                                }))
-                              }
-                            />
-                            <span className="truncate">{project.name}</span>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </label>
-            </div>
-
-            <div className="min-w-0 md:col-span-6 lg:col-span-4 xl:col-span-3">
-              <label className="space-y-1 text-sm">
-                <span className="text-slate-700">支付方式</span>
-                <div className="relative" ref={paymentRef}>
-                  <button
-                    type="button"
-                    onClick={() => setPaymentOpen((prev) => !prev)}
-                    className="flex w-full max-w-full items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-left text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
-                  >
-                    <span className="truncate">{paymentLabel}</span>
-                    <span className="text-xs text-slate-500">⌕</span>
-                  </button>
-                  {paymentOpen && (
-                    <div
-                      className="absolute inset-x-0 z-20 mt-2 w-full max-w-full rounded-lg border border-slate-200 bg-white shadow-lg"
-                      onMouseLeave={() => setPaymentOpen(false)}
-                    >
-                      <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2 text-xs text-slate-600">
-                        <span>已选 {listDraft.paymentTypeIds.length || '全部'}</span>
-                        <div className="flex gap-2">
-                          <button
-                            className="text-emerald-700 hover:underline"
-                            onClick={() =>
-                              setListDraft((prev) => ({
-                                ...prev,
-                                paymentTypeIds: metadata?.paymentTypes.map((p) => p.id) ?? [],
-                              }))
-                            }
-                          >
-                            全选
-                          </button>
-                          <button
-                            className="text-slate-600 hover:underline"
-                            onClick={() => setListDraft((prev) => ({ ...prev, paymentTypeIds: [] }))}
-                          >
-                            清空
-                          </button>
-                        </div>
-                      </div>
-                      <div className="max-h-56 space-y-1 overflow-y-auto p-2 text-sm">
-                        {metadata?.paymentTypes.map((type) => (
-                          <label
-                            key={type.id}
-                            className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 hover:bg-slate-50"
-                          >
-                            <input
-                              type="checkbox"
-                              className="h-4 w-4"
-                              checked={listDraft.paymentTypeIds.includes(type.id)}
-                              onChange={() =>
-                                setListDraft((prev) => ({
-                                  ...prev,
-                                  paymentTypeIds: toggleValue(prev.paymentTypeIds, type.id),
-                                }))
-                              }
-                            />
-                            <span className="truncate">{type.name}</span>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </label>
-            </div>
-
-            <div className="min-w-0 md:col-span-6 lg:col-span-4 xl:col-span-3">
-              <label className="space-y-1 text-sm">
-                <span className="text-slate-700">支付状态</span>
-                <select
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
-                  value={listDraft.paymentStatus}
-                  onChange={(e) =>
-                    setListDraft((prev) => ({
-                      ...prev,
-                      paymentStatus: e.target.value as PaymentStatus | '',
-                    }))
+              <div className="min-w-0 md:col-span-6 lg:col-span-4 xl:col-span-3">
+                <MultiSelectFilter
+                  label="项目"
+                  options={projectFilterOptions}
+                  selected={listDraft.projectIds.map(String)}
+                  onChange={(values) =>
+                    setListDraft((prev) => ({ ...prev, projectIds: parseNumberList(values) }))
                   }
-                >
-                  <option value="">全部状态</option>
-                  {paymentStatusOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-
-            <div className="min-w-0 md:col-span-6 lg:col-span-4 xl:col-span-3">
-              <label className="space-y-1 text-sm">
-                <span className="text-slate-700">经办人</span>
-                <div className="relative" ref={handlerRef}>
-                  <button
-                    type="button"
-                    onClick={() => setHandlerOpen((prev) => !prev)}
-                    className="flex w-full max-w-full items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-left text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
-                  >
-                    <span className="truncate">{handlerLabel}</span>
-                    <span className="text-xs text-slate-500">⌕</span>
-                  </button>
-                  {handlerOpen && (
-                    <div
-                      className="absolute inset-x-0 z-20 mt-2 w-full max-w-full rounded-lg border border-slate-200 bg-white shadow-lg"
-                      onMouseLeave={() => setHandlerOpen(false)}
-                    >
-                      <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2 text-xs text-slate-600">
-                        <span>已选 {listDraft.handlerIds.length || '全部'}</span>
-                        <div className="flex gap-2">
-                          <button
-                            className="text-emerald-700 hover:underline"
-                            onClick={() =>
-                              setListDraft((prev) => ({
-                                ...prev,
-                                handlerIds: metadata?.handlers.map((h) => h.id) ?? [],
-                              }))
-                            }
-                          >
-                            全选
-                          </button>
-                          <button
-                            className="text-slate-600 hover:underline"
-                            onClick={() => setListDraft((prev) => ({ ...prev, handlerIds: [] }))}
-                          >
-                            清空
-                          </button>
-                        </div>
-                      </div>
-                      <div className="max-h-56 space-y-1 overflow-y-auto p-2 text-sm">
-                        {metadata?.handlers.map((handler) => (
-                          <label
-                            key={handler.id}
-                            className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 hover:bg-slate-50"
-                          >
-                            <input
-                              type="checkbox"
-                              className="h-4 w-4"
-                              checked={listDraft.handlerIds.includes(handler.id)}
-                              onChange={() =>
-                                setListDraft((prev) => ({
-                                  ...prev,
-                                  handlerIds: toggleValue(prev.handlerIds, handler.id),
-                                }))
-                              }
-                            />
-                            <span className="truncate">{handler.name || handler.username}</span>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </label>
-            </div>
-
-            <div className="min-w-0 md:col-span-6 lg:col-span-4 xl:col-span-3">
-              <div className="relative space-y-1 text-sm" ref={columnChooserRef}>
-                <span className="text-slate-700">显示列</span>
-                <div>
-                  <button
-                    type="button"
-                    onClick={() => setShowColumnChooser((prev) => !prev)}
-                    className="flex w-full max-w-full items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-sm text-slate-800 shadow-sm hover:bg-slate-50"
-                  >
-                    <span className="truncate">
-                      {visibleColumns.length ? `已选 ${visibleColumns.length} 列` : '未选择列'}
-                    </span>
-                    <span className="text-xs text-slate-500">⌕</span>
-                  </button>
-                  {showColumnChooser && (
-                    <div
-                      className="absolute inset-x-0 z-30 mt-2 w-full max-w-full rounded-lg border border-slate-200 bg-white shadow-lg"
-                      onMouseLeave={() => setShowColumnChooser(false)}
-                    >
-                      <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2 text-xs text-slate-600">
-                        <button
-                          className="text-emerald-700 hover:underline"
-                          onClick={() => persistColumns(columnOptions.map((opt) => opt.key))}
-                        >
-                          全选
-                        </button>
-                        <div className="flex gap-2">
-                          <button
-                            className="text-slate-600 hover:underline"
-                            onClick={() => persistColumns([...defaultVisibleColumns])}
-                          >
-                            恢复默认
-                          </button>
-                          <button
-                            className="text-slate-600 hover:underline"
-                            onClick={() => persistColumns([])}
-                          >
-                            清空
-                          </button>
-                        </div>
-                      </div>
-                      <div className="max-h-64 space-y-1 overflow-y-auto p-2 text-sm">
-                        {columnOptions.map((opt) => (
-                          <label
-                            key={opt.key}
-                            className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 hover:bg-slate-50"
-                          >
-                            <input
-                              type="checkbox"
-                              className="h-4 w-4"
-                              checked={visibleColumns.includes(opt.key)}
-                              onChange={() => toggleColumn(opt.key)}
-                            />
-                            <span className="truncate">{opt.label}</span>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div className="min-w-0 md:col-span-12 lg:col-span-8 xl:col-span-6 flex items-center">
-              <div className="flex w-full items-center gap-3 text-sm">
-                <span className="shrink-0 text-slate-700">分类</span>
-                <div className="relative w-full" ref={categoryRef}>
-                  <button
-                    type="button"
-                    onClick={() => setCategoryOpen((prev) => !prev)}
-                    className="flex w-full items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-left text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
-                  >
-                    <span className="line-clamp-2 break-words">{categoryLabel}</span>
-                    <span className="text-xs text-slate-500">⌕</span>
-                  </button>
-                  {categoryOpen && (
-                    <div
-                      className="absolute inset-x-0 z-20 mt-2 w-full rounded-lg border border-slate-200 bg-white shadow-lg"
-                      onMouseLeave={() => setCategoryOpen(false)}
-                    >
-                      <div className="border-b border-slate-100 p-2">
-                        <input
-                          className="w-full rounded border px-2 py-1 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-100"
-                          placeholder="搜索分类"
-                          value={categorySearch}
-                          onChange={(e) => setCategorySearch(e.target.value)}
-                        />
-                        <div className="mt-2 flex items-center justify-between text-xs text-slate-600">
-                          <button
-                            className="text-emerald-700 hover:underline"
-                            onClick={() =>
-                              setListDraft((prev) => ({
-                                ...prev,
-                                categoryKeys: filteredCategoryOptions.map((cat) => cat.key),
-                              }))
-                            }
-                          >
-                            当前搜索全选
-                          </button>
-                          <button
-                            className="text-slate-600 hover:underline"
-                            onClick={() => setListDraft((prev) => ({ ...prev, categoryKeys: [] }))}
-                          >
-                            清空
-                          </button>
-                        </div>
-                      </div>
-                      <div className="max-h-56 space-y-1 overflow-y-auto p-2 text-sm">
-                        <button
-                          className="block w-full rounded px-2 py-1 text-left hover:bg-slate-50"
-                          onClick={() => {
-                            setListDraft((prev) => ({ ...prev, categoryKeys: [] }))
-                            setCategoryOpen(false)
-                          }}
-                        >
-                          全部分类
-                        </button>
-                        {filteredCategoryOptions.map((cat) => (
-                          <label
-                            key={cat.key}
-                            className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 hover:bg-emerald-50"
-                          >
-                            <input
-                              type="checkbox"
-                              className="h-4 w-4"
-                              checked={listDraft.categoryKeys.includes(cat.key)}
-                              onChange={() =>
-                                setListDraft((prev) => ({
-                                  ...prev,
-                                  categoryKeys: toggleValue(prev.categoryKeys, cat.key),
-                                }))
-                              }
-                            />
-                            <span className="break-words">{cat.label}</span>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div className="min-w-0 md:col-span-6 lg:col-span-6 xl:col-span-4 flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 p-3 shadow-sm">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-medium text-slate-700">金额范围</span>
-                <div className="flex items-center gap-2">
-                  <div className="flex items-center rounded-lg border border-slate-200">
-                    <button
-                      className="px-2 text-sm text-slate-600 hover:bg-slate-50"
-                      onClick={() =>
-                        setListDraft((prev) => ({
-                          ...prev,
-                          amountMin: prev.amountMin ? String(Number(prev.amountMin) - 1) : '0',
-                        }))
-                      }
-                    >
-                      -
-                    </button>
-                    <input
-                      className="w-20 border-x border-slate-200 px-2 py-1 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-100"
-                      type="number"
-                      value={listDraft.amountMin}
-                      placeholder="最小值"
-                      onChange={(e) => setListDraft((prev) => ({ ...prev, amountMin: e.target.value }))}
-                    />
-                    <button
-                      className="px-2 text-sm text-slate-600 hover:bg-slate-50"
-                      onClick={() =>
-                        setListDraft((prev) => ({
-                          ...prev,
-                          amountMin: prev.amountMin ? String(Number(prev.amountMin) + 1) : '1',
-                        }))
-                      }
-                    >
-                      +
-                    </button>
-                  </div>
-                  <span className="text-sm text-slate-500">—</span>
-                  <div className="flex items-center rounded-lg border border-slate-200">
-                    <button
-                      className="px-2 text-sm text-slate-600 hover:bg-slate-50"
-                      onClick={() =>
-                        setListDraft((prev) => ({
-                          ...prev,
-                          amountMax: prev.amountMax ? String(Number(prev.amountMax) - 1) : '0',
-                        }))
-                      }
-                    >
-                      -
-                    </button>
-                    <input
-                      className="w-20 border-x border-slate-200 px-2 py-1 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-100"
-                      type="number"
-                      value={listDraft.amountMax}
-                      placeholder="最大值"
-                      onChange={(e) => setListDraft((prev) => ({ ...prev, amountMax: e.target.value }))}
-                    />
-                    <button
-                      className="px-2 text-sm text-slate-600 hover:bg-slate-50"
-                      onClick={() =>
-                        setListDraft((prev) => ({
-                          ...prev,
-                          amountMax: prev.amountMax ? String(Number(prev.amountMax) + 1) : '1',
-                        }))
-                      }
-                    >
-                      +
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="min-w-0 md:col-span-6 lg:col-span-6 xl:col-span-4 flex flex-col gap-3 rounded-lg border border-slate-200 p-3 shadow-sm md:flex-row md:items-center md:justify-between md:gap-4">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-sm font-medium text-slate-700">日期范围</span>
-                <div className="flex items-center gap-2">
-                  <input
-                    className="w-36 rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
-                    type="date"
-                    value={listDraft.dateFrom}
-                    onChange={(e) => setListDraft((prev) => ({ ...prev, dateFrom: e.target.value }))}
-                  />
-                  <span className="text-sm text-slate-500">至</span>
-                  <input
-                    className="w-36 rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
-                    type="date"
-                    value={listDraft.dateTo}
-                    onChange={(e) => setListDraft((prev) => ({ ...prev, dateTo: e.target.value }))}
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="md:col-span-12 lg:col-span-12 xl:col-span-8 flex flex-col gap-3 rounded-lg border border-slate-200 p-3 shadow-sm md:flex-row md:items-center md:justify-between md:gap-4">
-              <div className="flex flex-1 flex-wrap items-center gap-2">
-                <span className="shrink-0 text-sm font-medium text-slate-700">事由</span>
-                <input
-                  className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
-                  placeholder="模糊搜索事由"
-                  value={listDraft.reasonKeyword}
-                  onChange={(e) => setListDraft((prev) => ({ ...prev, reasonKeyword: e.target.value }))}
+                  {...sharedFilterProps}
                 />
               </div>
-              <div className="flex flex-wrap items-center gap-2 md:justify-end">
+              <div className="min-w-0 md:col-span-6 lg:col-span-4 xl:col-span-3">
+                <MultiSelectFilter
+                  label="分类"
+                  options={categoryFilterOptions}
+                  selected={listDraft.categoryKeys}
+                  onChange={(values) => setListDraft((prev) => ({ ...prev, categoryKeys: values }))}
+                  {...sharedFilterProps}
+                />
+              </div>
+              <div className="min-w-0 md:col-span-6 lg:col-span-4 xl:col-span-3">
+                <MultiSelectFilter
+                  label="支付方式"
+                  options={paymentTypeFilterOptions}
+                  selected={listDraft.paymentTypeIds.map(String)}
+                  onChange={(values) =>
+                    setListDraft((prev) => ({ ...prev, paymentTypeIds: parseNumberList(values) }))
+                  }
+                  {...sharedFilterProps}
+                />
+              </div>
+              <div className="min-w-0 md:col-span-6 lg:col-span-4 xl:col-span-3">
+                <MultiSelectFilter
+                  label="支付状态"
+                  options={paymentStatusFilterOptions}
+                  selected={listDraft.paymentStatuses}
+                  onChange={(values) =>
+                    setListDraft((prev) => ({
+                      ...prev,
+                      paymentStatuses: values.filter(isPaymentStatus),
+                    }))
+                  }
+                  {...sharedFilterProps}
+                />
+              </div>
+              <div className="min-w-0 md:col-span-6 lg:col-span-4 xl:col-span-3">
+                <MultiSelectFilter
+                  label="金额单位"
+                  options={unitFilterOptions}
+                  selected={listDraft.unitIds.map(String)}
+                  onChange={(values) =>
+                    setListDraft((prev) => ({ ...prev, unitIds: parseNumberList(values) }))
+                  }
+                  {...sharedFilterProps}
+                />
+              </div>
+              <div className="min-w-0 md:col-span-6 lg:col-span-4 xl:col-span-3">
+                <MultiSelectFilter
+                  label="经办人"
+                  options={handlerFilterOptions}
+                  selected={listDraft.handlerIds.map(String)}
+                  onChange={(values) =>
+                    setListDraft((prev) => ({ ...prev, handlerIds: parseNumberList(values) }))
+                  }
+                  {...sharedFilterProps}
+                />
+              </div>
+              <div className="min-w-0 md:col-span-6 lg:col-span-4 xl:col-span-3">
+                <MultiSelectFilter
+                  label="创建人"
+                  options={creatorFilterOptions}
+                  selected={listDraft.createdByIds.map(String)}
+                  onChange={(values) =>
+                    setListDraft((prev) => ({ ...prev, createdByIds: parseNumberList(values) }))
+                  }
+                  {...sharedFilterProps}
+                />
+              </div>
+              <div className="min-w-0 md:col-span-6 lg:col-span-4 xl:col-span-3">
+                <MultiSelectFilter
+                  label="更新人"
+                  options={updaterFilterOptions}
+                  selected={listDraft.updatedByIds.map(String)}
+                  onChange={(values) =>
+                    setListDraft((prev) => ({ ...prev, updatedByIds: parseNumberList(values) }))
+                  }
+                  {...sharedFilterProps}
+                />
+              </div>
+
+              <div className="min-w-0 md:col-span-6 lg:col-span-4 xl:col-span-3">
+                <div className="relative space-y-1 text-sm" ref={columnChooserRef}>
+                  <span className="text-slate-700">显示列</span>
+                  <div>
+                    <button
+                      type="button"
+                      onClick={() => setShowColumnChooser((prev) => !prev)}
+                      className="flex w-full max-w-full items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-sm text-slate-800 shadow-sm hover:bg-slate-50"
+                    >
+                      <span className="truncate">
+                        {visibleColumns.length ? `已选 ${visibleColumns.length} 列` : '未选择列'}
+                      </span>
+                      <span className="text-xs text-slate-500">⌕</span>
+                    </button>
+                    {showColumnChooser && (
+                      <div
+                        className="absolute inset-x-0 z-30 mt-2 w-full max-w-full rounded-lg border border-slate-200 bg-white shadow-lg"
+                        onMouseLeave={() => setShowColumnChooser(false)}
+                      >
+                        <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2 text-xs text-slate-600">
+                          <button
+                            className="text-emerald-700 hover:underline"
+                            onClick={() => persistColumns(columnOptions.map((opt) => opt.key))}
+                          >
+                            全选
+                          </button>
+                          <div className="flex gap-2">
+                            <button
+                              className="text-slate-600 hover:underline"
+                              onClick={() => persistColumns([...defaultVisibleColumns])}
+                            >
+                              恢复默认
+                            </button>
+                            <button
+                              className="text-slate-600 hover:underline"
+                              onClick={() => persistColumns([])}
+                            >
+                              清空
+                            </button>
+                          </div>
+                        </div>
+                        <div className="max-h-64 space-y-1 overflow-y-auto p-2 text-sm">
+                          {columnOptions.map((opt) => (
+                            <label
+                              key={opt.key}
+                              className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 hover:bg-slate-50"
+                            >
+                              <input
+                                type="checkbox"
+                                className="h-4 w-4"
+                                checked={visibleColumns.includes(opt.key)}
+                                onChange={() => toggleColumn(opt.key)}
+                              />
+                              <span className="truncate">{opt.label}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="min-w-0 md:col-span-6 lg:col-span-6 xl:col-span-4 flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 p-3 shadow-sm">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-slate-700">序号范围</span>
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center rounded-lg border border-slate-200">
+                      <button
+                        className="px-2 text-sm text-slate-600 hover:bg-slate-50"
+                        onClick={() =>
+                          setListDraft((prev) => ({
+                            ...prev,
+                            sequenceMin: prev.sequenceMin ? String(Number(prev.sequenceMin) - 1) : '0',
+                          }))
+                        }
+                      >
+                        -
+                      </button>
+                      <input
+                        className="w-20 border-x border-slate-200 px-2 py-1 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-100"
+                        type="number"
+                        value={listDraft.sequenceMin}
+                        placeholder="最小值"
+                        onChange={(e) =>
+                          setListDraft((prev) => ({ ...prev, sequenceMin: e.target.value }))
+                        }
+                      />
+                      <button
+                        className="px-2 text-sm text-slate-600 hover:bg-slate-50"
+                        onClick={() =>
+                          setListDraft((prev) => ({
+                            ...prev,
+                            sequenceMin: prev.sequenceMin ? String(Number(prev.sequenceMin) + 1) : '1',
+                          }))
+                        }
+                      >
+                        +
+                      </button>
+                    </div>
+                    <span className="text-sm text-slate-500">—</span>
+                    <div className="flex items-center rounded-lg border border-slate-200">
+                      <button
+                        className="px-2 text-sm text-slate-600 hover:bg-slate-50"
+                        onClick={() =>
+                          setListDraft((prev) => ({
+                            ...prev,
+                            sequenceMax: prev.sequenceMax ? String(Number(prev.sequenceMax) - 1) : '0',
+                          }))
+                        }
+                      >
+                        -
+                      </button>
+                      <input
+                        className="w-20 border-x border-slate-200 px-2 py-1 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-100"
+                        type="number"
+                        value={listDraft.sequenceMax}
+                        placeholder="最大值"
+                        onChange={(e) =>
+                          setListDraft((prev) => ({ ...prev, sequenceMax: e.target.value }))
+                        }
+                      />
+                      <button
+                        className="px-2 text-sm text-slate-600 hover:bg-slate-50"
+                        onClick={() =>
+                          setListDraft((prev) => ({
+                            ...prev,
+                            sequenceMax: prev.sequenceMax ? String(Number(prev.sequenceMax) + 1) : '1',
+                          }))
+                        }
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="min-w-0 md:col-span-6 lg:col-span-6 xl:col-span-4 flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 p-3 shadow-sm">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-slate-700">金额范围</span>
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center rounded-lg border border-slate-200">
+                      <button
+                        className="px-2 text-sm text-slate-600 hover:bg-slate-50"
+                        onClick={() =>
+                          setListDraft((prev) => ({
+                            ...prev,
+                            amountMin: prev.amountMin ? String(Number(prev.amountMin) - 1) : '0',
+                          }))
+                        }
+                      >
+                        -
+                      </button>
+                      <input
+                        className="w-20 border-x border-slate-200 px-2 py-1 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-100"
+                        type="number"
+                        value={listDraft.amountMin}
+                        placeholder="最小值"
+                        onChange={(e) => setListDraft((prev) => ({ ...prev, amountMin: e.target.value }))}
+                      />
+                      <button
+                        className="px-2 text-sm text-slate-600 hover:bg-slate-50"
+                        onClick={() =>
+                          setListDraft((prev) => ({
+                            ...prev,
+                            amountMin: prev.amountMin ? String(Number(prev.amountMin) + 1) : '1',
+                          }))
+                        }
+                      >
+                        +
+                      </button>
+                    </div>
+                    <span className="text-sm text-slate-500">—</span>
+                    <div className="flex items-center rounded-lg border border-slate-200">
+                      <button
+                        className="px-2 text-sm text-slate-600 hover:bg-slate-50"
+                        onClick={() =>
+                          setListDraft((prev) => ({
+                            ...prev,
+                            amountMax: prev.amountMax ? String(Number(prev.amountMax) - 1) : '0',
+                          }))
+                        }
+                      >
+                        -
+                      </button>
+                      <input
+                        className="w-20 border-x border-slate-200 px-2 py-1 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-100"
+                        type="number"
+                        value={listDraft.amountMax}
+                        placeholder="最大值"
+                        onChange={(e) => setListDraft((prev) => ({ ...prev, amountMax: e.target.value }))}
+                      />
+                      <button
+                        className="px-2 text-sm text-slate-600 hover:bg-slate-50"
+                        onClick={() =>
+                          setListDraft((prev) => ({
+                            ...prev,
+                            amountMax: prev.amountMax ? String(Number(prev.amountMax) + 1) : '1',
+                          }))
+                        }
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="min-w-0 md:col-span-6 lg:col-span-6 xl:col-span-4 flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 p-3 shadow-sm">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-slate-700">税费范围</span>
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center rounded-lg border border-slate-200">
+                      <button
+                        className="px-2 text-sm text-slate-600 hover:bg-slate-50"
+                        onClick={() =>
+                          setListDraft((prev) => ({
+                            ...prev,
+                            taxMin: prev.taxMin ? String(Number(prev.taxMin) - 1) : '0',
+                          }))
+                        }
+                      >
+                        -
+                      </button>
+                      <input
+                        className="w-20 border-x border-slate-200 px-2 py-1 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-100"
+                        type="number"
+                        value={listDraft.taxMin}
+                        placeholder="最小值"
+                        onChange={(e) => setListDraft((prev) => ({ ...prev, taxMin: e.target.value }))}
+                      />
+                      <button
+                        className="px-2 text-sm text-slate-600 hover:bg-slate-50"
+                        onClick={() =>
+                          setListDraft((prev) => ({
+                            ...prev,
+                            taxMin: prev.taxMin ? String(Number(prev.taxMin) + 1) : '1',
+                          }))
+                        }
+                      >
+                        +
+                      </button>
+                    </div>
+                    <span className="text-sm text-slate-500">—</span>
+                    <div className="flex items-center rounded-lg border border-slate-200">
+                      <button
+                        className="px-2 text-sm text-slate-600 hover:bg-slate-50"
+                        onClick={() =>
+                          setListDraft((prev) => ({
+                            ...prev,
+                            taxMax: prev.taxMax ? String(Number(prev.taxMax) - 1) : '0',
+                          }))
+                        }
+                      >
+                        -
+                      </button>
+                      <input
+                        className="w-20 border-x border-slate-200 px-2 py-1 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-100"
+                        type="number"
+                        value={listDraft.taxMax}
+                        placeholder="最大值"
+                        onChange={(e) => setListDraft((prev) => ({ ...prev, taxMax: e.target.value }))}
+                      />
+                      <button
+                        className="px-2 text-sm text-slate-600 hover:bg-slate-50"
+                        onClick={() =>
+                          setListDraft((prev) => ({
+                            ...prev,
+                            taxMax: prev.taxMax ? String(Number(prev.taxMax) + 1) : '1',
+                          }))
+                        }
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="min-w-0 md:col-span-6 lg:col-span-6 xl:col-span-4 flex flex-col gap-3 rounded-lg border border-slate-200 p-3 shadow-sm md:flex-row md:items-center md:justify-between md:gap-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-sm font-medium text-slate-700">支付日期</span>
+                  <div className="flex items-center gap-2">
+                    <input
+                      className="w-36 rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
+                      type="date"
+                      value={listDraft.dateFrom}
+                      onChange={(e) => setListDraft((prev) => ({ ...prev, dateFrom: e.target.value }))}
+                    />
+                    <span className="text-sm text-slate-500">至</span>
+                    <input
+                      className="w-36 rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
+                      type="date"
+                      value={listDraft.dateTo}
+                      onChange={(e) => setListDraft((prev) => ({ ...prev, dateTo: e.target.value }))}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="min-w-0 md:col-span-6 lg:col-span-6 xl:col-span-4 flex flex-col gap-3 rounded-lg border border-slate-200 p-3 shadow-sm md:flex-row md:items-center md:justify-between md:gap-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-sm font-medium text-slate-700">最近更新</span>
+                  <div className="flex items-center gap-2">
+                    <input
+                      className="w-36 rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
+                      type="date"
+                      value={listDraft.updatedFrom}
+                      onChange={(e) => setListDraft((prev) => ({ ...prev, updatedFrom: e.target.value }))}
+                    />
+                    <span className="text-sm text-slate-500">至</span>
+                    <input
+                      className="w-36 rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
+                      type="date"
+                      value={listDraft.updatedTo}
+                      onChange={(e) => setListDraft((prev) => ({ ...prev, updatedTo: e.target.value }))}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="md:col-span-12 lg:col-span-12 xl:col-span-8 flex flex-col gap-3 rounded-lg border border-slate-200 p-3 shadow-sm md:flex-row md:items-center md:justify-between md:gap-4">
+                <div className="flex flex-1 flex-wrap items-center gap-2">
+                  <span className="shrink-0 text-sm font-medium text-slate-700">事由</span>
+                  <input
+                    className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
+                    placeholder="模糊搜索事由"
+                    value={listDraft.reasonKeyword}
+                    onChange={(e) => setListDraft((prev) => ({ ...prev, reasonKeyword: e.target.value }))}
+                  />
+                </div>
+                <div className="flex flex-1 flex-wrap items-center gap-2">
+                  <span className="shrink-0 text-sm font-medium text-slate-700">备注</span>
+                  <input
+                    className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
+                    placeholder="模糊搜索备注"
+                    value={listDraft.remarkKeyword}
+                    onChange={(e) => setListDraft((prev) => ({ ...prev, remarkKeyword: e.target.value }))}
+                  />
+                </div>
+              </div>
+
+              <div className="md:col-span-12 lg:col-span-12 xl:col-span-4 flex flex-wrap items-center justify-end gap-2 rounded-lg border border-slate-200 p-3 shadow-sm">
                 <button
                   onClick={() => {
                     const nextFilters = { ...listDraft, page: 1 }
                     setListDraft(nextFilters)
                     setListFilters(nextFilters)
-                    setProjectOpen(false)
-                    setPaymentOpen(false)
-                    setHandlerOpen(false)
-                    setCategoryOpen(false)
+                    setSelectedEntryIds([])
                     setShowColumnChooser(false)
                     setRefreshKey((prev) => prev + 1)
                   }}
@@ -1774,24 +2057,30 @@ export default function FinancePage() {
                       projectIds: [],
                       categoryKeys: [],
                       paymentTypeIds: [],
-                      paymentStatus: '',
+                      paymentStatuses: [],
+                      unitIds: [],
                       handlerIds: [],
+                      createdByIds: [],
+                      updatedByIds: [],
                       reasonKeyword: '',
+                      remarkKeyword: '',
                       amountMin: '',
                       amountMax: '',
+                      taxMin: '',
+                      taxMax: '',
+                      sequenceMin: '',
+                      sequenceMax: '',
                       dateFrom: '',
                       dateTo: '',
-                      sortField: 'paymentDate',
-                      sortDir: 'desc',
+                      updatedFrom: '',
+                      updatedTo: '',
+                      sortStack: DEFAULT_FINANCE_SORT_STACK,
                       page: 1,
                       pageSize: 20,
                     } satisfies ListFilters
                     setListDraft(reset)
                     setListFilters(reset)
-                    setProjectOpen(false)
-                    setPaymentOpen(false)
-                    setHandlerOpen(false)
-                    setCategoryOpen(false)
+                    setSelectedEntryIds([])
                     setShowColumnChooser(false)
                     setRefreshKey((prev) => prev + 1)
                   }}
@@ -1801,25 +2090,44 @@ export default function FinancePage() {
                 </button>
               </div>
             </div>
-          </div>
           <div className="flex items-center justify-between pt-2">
             <div>
               <h3 className="text-base font-semibold text-slate-900">数据视图</h3>
               <p className="text-xs text-slate-500">切换表格/图表，序号按当前筛选从 1 递增</p>
             </div>
-            <div className="flex rounded-full border border-slate-200 bg-slate-50 p-1 text-sm">
-              <button
-                className={`rounded-full px-3 py-1 transition ${viewMode === 'table' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
-                onClick={() => setViewMode('table')}
-              >
-                表格列表
-              </button>
-              <button
-                className={`rounded-full px-3 py-1 transition ${viewMode === 'charts' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
-                onClick={() => setViewMode('charts')}
-              >
-                图表分析
-              </button>
+            <div className="flex items-center gap-2">
+              {canEdit && (
+                <button
+                  className="rounded border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
+                  onClick={openBulkEdit}
+                  disabled={bulkSaving || selectedEntryIds.length === 0}
+                >
+                  批量编辑{selectedEntryIds.length ? ` (${selectedEntryIds.length})` : ''}
+                </button>
+              )}
+              {canEdit && (
+                <button
+                  className="rounded border border-red-200 bg-red-50 px-3 py-1.5 text-sm text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
+                  onClick={handleBulkDelete}
+                  disabled={bulkDeleting || selectedEntryIds.length === 0}
+                >
+                  批量删除{selectedEntryIds.length ? ` (${selectedEntryIds.length})` : ''}
+                </button>
+              )}
+              <div className="flex rounded-full border border-slate-200 bg-slate-50 p-1 text-sm">
+                <button
+                  className={`rounded-full px-3 py-1 transition ${viewMode === 'table' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
+                  onClick={() => setViewMode('table')}
+                >
+                  表格列表
+                </button>
+                <button
+                  className={`rounded-full px-3 py-1 transition ${viewMode === 'charts' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
+                  onClick={() => setViewMode('charts')}
+                >
+                  图表分析
+                </button>
+              </div>
             </div>
           </div>
           {loading && <p className="text-sm text-slate-600">加载中...</p>}
@@ -1829,71 +2137,137 @@ export default function FinancePage() {
                 <table className="min-w-full text-sm">
                   <thead>
                     <tr className="border-b text-left">
-                      {visibleColumns.includes('sequence') && <th className="px-3 py-2">序号</th>}
-                      {visibleColumns.includes('project') && <th className="px-3 py-2">项目</th>}
+                      <th className="w-10 px-3 py-2">
+                        <input
+                          ref={selectAllRef}
+                          type="checkbox"
+                          className="h-4 w-4 rounded border-slate-300 accent-emerald-600"
+                          checked={allSelected}
+                          disabled={!canEdit || selectableEntryIds.length === 0}
+                          onChange={() =>
+                            setSelectedEntryIds(allSelected ? [] : [...selectableEntryIds])
+                          }
+                          aria-label="全选当前页"
+                        />
+                      </th>
+                      {visibleColumns.includes('sequence') && (
+                        <th
+                          className="px-3 py-2 cursor-pointer select-none"
+                          onClick={() => handleSort('sequence')}
+                        >
+                          序号 {sortIndicator('sequence')}
+                        </th>
+                      )}
+                      {visibleColumns.includes('project') && (
+                        <th
+                          className="px-3 py-2 cursor-pointer select-none"
+                          onClick={() => handleSort('project')}
+                        >
+                          项目 {sortIndicator('project')}
+                        </th>
+                      )}
                       {visibleColumns.includes('category') && (
                         <th
                           className="px-3 py-2 cursor-pointer select-none"
-                          onClick={() =>
-                            setListFilters((prev) => {
-                              const dir = prev.sortField === 'category' && prev.sortDir === 'asc' ? 'desc' : 'asc'
-                              setListDraft((draft) => ({ ...draft, sortField: 'category', sortDir: dir, page: 1 }))
-                              return { ...prev, sortField: 'category', sortDir: dir, page: 1 }
-                            })
-                          }
+                          onClick={() => handleSort('category')}
                         >
-                          分类 {listFilters.sortField === 'category' ? (listFilters.sortDir === 'asc' ? '↑' : '↓') : ''}
+                          分类 {sortIndicator('category')}
                         </th>
                       )}
-                      {visibleColumns.includes('reason') && <th className="px-3 py-2">事由</th>}
+                      {visibleColumns.includes('reason') && (
+                        <th
+                          className="px-3 py-2 cursor-pointer select-none"
+                          onClick={() => handleSort('reason')}
+                        >
+                          事由 {sortIndicator('reason')}
+                        </th>
+                      )}
                       {visibleColumns.includes('amount') && (
                         <th
                           className="px-3 py-2 cursor-pointer select-none"
-                          onClick={() =>
-                            setListFilters((prev) => {
-                              const dir = prev.sortField === 'amount' && prev.sortDir === 'asc' ? 'desc' : 'asc'
-                              setListDraft((draft) => ({ ...draft, sortField: 'amount', sortDir: dir, page: 1 }))
-                              return { ...prev, sortField: 'amount', sortDir: dir, page: 1 }
-                            })
-                          }
+                          onClick={() => handleSort('amount')}
                         >
-                          金额 {listFilters.sortField === 'amount' ? (listFilters.sortDir === 'asc' ? '↑' : '↓') : ''}
+                          金额 {sortIndicator('amount')}
                         </th>
                       )}
-                      {visibleColumns.includes('unit') && <th className="px-3 py-2">单位</th>}
-                      {visibleColumns.includes('paymentType') && <th className="px-3 py-2">支付方式</th>}
+                      {visibleColumns.includes('unit') && (
+                        <th
+                          className="px-3 py-2 cursor-pointer select-none"
+                          onClick={() => handleSort('unit')}
+                        >
+                          单位 {sortIndicator('unit')}
+                        </th>
+                      )}
+                      {visibleColumns.includes('paymentType') && (
+                        <th
+                          className="px-3 py-2 cursor-pointer select-none"
+                          onClick={() => handleSort('paymentType')}
+                        >
+                          支付方式 {sortIndicator('paymentType')}
+                        </th>
+                      )}
                       {visibleColumns.includes('paymentDate') && (
                         <th
                           className="px-3 py-2 cursor-pointer select-none"
-                          onClick={() =>
-                            setListFilters((prev) => {
-                              const dir = prev.sortField === 'paymentDate' && prev.sortDir === 'asc' ? 'desc' : 'asc'
-                              setListDraft((draft) => ({ ...draft, sortField: 'paymentDate', sortDir: dir, page: 1 }))
-                              return { ...prev, sortField: 'paymentDate', sortDir: dir, page: 1 }
-                            })
-                          }
+                          onClick={() => handleSort('paymentDate')}
                         >
-                          支付日期 {listFilters.sortField === 'paymentDate' ? (listFilters.sortDir === 'asc' ? '↑' : '↓') : ''}
+                          支付日期 {sortIndicator('paymentDate')}
                         </th>
                       )}
-                      {visibleColumns.includes('paymentStatus') && <th className="px-3 py-2">支付状态</th>}
-                      {visibleColumns.includes('handler') && <th className="px-3 py-2">经办人</th>}
-                      {visibleColumns.includes('createdBy') && <th className="px-3 py-2">创建人</th>}
-                      {visibleColumns.includes('updatedBy') && <th className="px-3 py-2">更新人</th>}
-                      {visibleColumns.includes('remark') && <th className="px-3 py-2">备注</th>}
-                      {visibleColumns.includes('tax') && <th className="px-3 py-2">税费</th>}
+                      {visibleColumns.includes('paymentStatus') && (
+                        <th
+                          className="px-3 py-2 cursor-pointer select-none"
+                          onClick={() => handleSort('paymentStatus')}
+                        >
+                          支付状态 {sortIndicator('paymentStatus')}
+                        </th>
+                      )}
+                      {visibleColumns.includes('handler') && (
+                        <th
+                          className="px-3 py-2 cursor-pointer select-none"
+                          onClick={() => handleSort('handler')}
+                        >
+                          经办人 {sortIndicator('handler')}
+                        </th>
+                      )}
+                      {visibleColumns.includes('createdBy') && (
+                        <th
+                          className="px-3 py-2 cursor-pointer select-none"
+                          onClick={() => handleSort('createdBy')}
+                        >
+                          创建人 {sortIndicator('createdBy')}
+                        </th>
+                      )}
+                      {visibleColumns.includes('updatedBy') && (
+                        <th
+                          className="px-3 py-2 cursor-pointer select-none"
+                          onClick={() => handleSort('updatedBy')}
+                        >
+                          更新人 {sortIndicator('updatedBy')}
+                        </th>
+                      )}
+                      {visibleColumns.includes('remark') && (
+                        <th
+                          className="px-3 py-2 cursor-pointer select-none"
+                          onClick={() => handleSort('remark')}
+                        >
+                          备注 {sortIndicator('remark')}
+                        </th>
+                      )}
+                      {visibleColumns.includes('tax') && (
+                        <th
+                          className="px-3 py-2 cursor-pointer select-none"
+                          onClick={() => handleSort('tax')}
+                        >
+                          税费 {sortIndicator('tax')}
+                        </th>
+                      )}
                       {visibleColumns.includes('updatedAt') && (
                         <th
                           className="px-3 py-2 cursor-pointer select-none"
-                          onClick={() =>
-                            setListFilters((prev) => {
-                              const dir = prev.sortField === 'updatedAt' && prev.sortDir === 'asc' ? 'desc' : 'asc'
-                              setListDraft((draft) => ({ ...draft, sortField: 'updatedAt', sortDir: dir, page: 1 }))
-                              return { ...prev, sortField: 'updatedAt', sortDir: dir, page: 1 }
-                            })
-                          }
+                          onClick={() => handleSort('updatedAt')}
                         >
-                          最近更新 {listFilters.sortField === 'updatedAt' ? (listFilters.sortDir === 'asc' ? '↑' : '↓') : ''}
+                          最近更新 {sortIndicator('updatedAt')}
                         </th>
                       )}
                       {visibleColumns.includes('action') && <th className="w-36 px-3 py-2">操作</th>}
@@ -1901,7 +2275,25 @@ export default function FinancePage() {
                   </thead>
                   <tbody>
                     {tableRows.map(({ entry, displayIndex }) => (
-                      <tr key={entry.id} className={`border-b ${entry.isDeleted ? 'text-slate-400 line-through' : ''}`}>
+                      <tr
+                        key={entry.id}
+                        className={`border-b ${
+                          !entry.isDeleted && duplicateAmountIds.has(entry.id) ? 'bg-rose-50' : ''
+                        } ${entry.isDeleted ? 'text-slate-400 line-through' : ''} ${
+                          canEdit && !entry.isDeleted ? 'cursor-pointer' : ''
+                        }`}
+                        onClick={handleRowSelect(entry)}
+                      >
+                        <td className="px-3 py-2">
+                          <input
+                            type="checkbox"
+                            className="h-4 w-4 rounded border-slate-300 accent-emerald-600"
+                            checked={selectedIdSet.has(entry.id)}
+                            disabled={!canEdit || entry.isDeleted}
+                            onChange={() => toggleEntrySelection(entry.id)}
+                            aria-label={`选择记录 ${displayIndex}`}
+                          />
+                        </td>
                         {visibleColumns.includes('sequence') && <td className="px-3 py-2">{displayIndex}</td>}
                         {visibleColumns.includes('project') && <td className="px-3 py-2">{entry.projectName}</td>}
                         {visibleColumns.includes('category') && (
@@ -1983,7 +2375,7 @@ export default function FinancePage() {
                     ))}
                     {!tableRows.length && (
                       <tr>
-                        <td colSpan={visibleColumns.length || 1} className="px-3 py-6 text-center text-slate-500">
+                        <td colSpan={tableColumnCount} className="px-3 py-6 text-center text-slate-500">
                           暂无数据，调整筛选试试。
                         </td>
                       </tr>
@@ -2320,8 +2712,16 @@ export default function FinancePage() {
                         <button
                           key={item.status}
                           onClick={() => {
-                            setListDraft((prev) => ({ ...prev, paymentStatus: item.status, page: 1 }))
-                            setListFilters((prev) => ({ ...prev, paymentStatus: item.status, page: 1 }))
+                            setListDraft((prev) => ({
+                              ...prev,
+                              paymentStatuses: [item.status],
+                              page: 1,
+                            }))
+                            setListFilters((prev) => ({
+                              ...prev,
+                              paymentStatuses: [item.status],
+                              page: 1,
+                            }))
                             setViewMode('table')
                             setRefreshKey((prev) => prev + 1)
                           }}
@@ -2674,6 +3074,286 @@ export default function FinancePage() {
                   className="rounded-lg bg-emerald-600 px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-500 disabled:opacity-60"
                 >
                   确认保存
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {canEdit && showBulkEditModal && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 px-4 py-6 backdrop-blur-sm sm:py-8">
+          <div className="flex w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-slate-900/10 max-h-[80vh]">
+            <div className="flex items-center justify-between bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-500 px-6 py-4 text-white">
+              <div>
+                <h2 className="text-xl font-semibold">批量编辑财务记录</h2>
+                <p className="text-xs text-emerald-50">
+                  已选 {selectedEntryIds.length} 条 · 留空表示不修改
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setShowBulkEditModal(false)
+                  setBulkPatch({})
+                  setBulkCategoryOpen(false)
+                  setBulkCategorySearch('')
+                }}
+                className="rounded-full border border-white/30 px-3 py-1 text-sm font-medium text-white hover:bg-white/15"
+              >
+                关闭
+              </button>
+            </div>
+
+            <div className="flex-1 space-y-4 overflow-y-auto px-6 pb-6 pt-5">
+              <label className="space-y-1">
+                <span className="text-sm font-medium text-slate-700">所属项目</span>
+                <select
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
+                  value={bulkPatch.projectId ? String(bulkPatch.projectId) : ''}
+                  onChange={(e) =>
+                    updateBulkPatchField(
+                      'projectId',
+                      e.target.value ? Number(e.target.value) : undefined,
+                    )
+                  }
+                >
+                  <option value="">不修改</option>
+                  {metadata?.projects.map((project) => (
+                    <option key={project.id} value={project.id}>
+                      {project.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="space-y-1">
+                <span className="text-sm font-medium text-slate-700">支付方式</span>
+                <select
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
+                  value={bulkPatch.paymentTypeId ? String(bulkPatch.paymentTypeId) : ''}
+                  onChange={(e) =>
+                    updateBulkPatchField(
+                      'paymentTypeId',
+                      e.target.value ? Number(e.target.value) : undefined,
+                    )
+                  }
+                >
+                  <option value="">不修改</option>
+                  {metadata?.paymentTypes.map((type) => (
+                    <option key={type.id} value={type.id}>
+                      {type.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="space-y-1">
+                <span className="text-sm font-medium text-slate-700">事由</span>
+                <input
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
+                  placeholder="留空不修改"
+                  value={bulkPatch.reason ?? ''}
+                  onChange={(e) =>
+                    updateBulkPatchField(
+                      'reason',
+                      e.target.value.trim() ? e.target.value : undefined,
+                    )
+                  }
+                />
+              </label>
+
+              <div className="space-y-1">
+                <span className="text-sm font-medium text-slate-700">分类</span>
+                <div className="relative" ref={bulkCategoryRef}>
+                  <button
+                    type="button"
+                    onClick={() => setBulkCategoryOpen((prev) => !prev)}
+                    className="flex w-full items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-left text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
+                  >
+                    <span className="line-clamp-2 break-words text-slate-900">
+                      {selectedBulkCategoryLabel}
+                    </span>
+                    <span className="text-xs text-slate-500">⌕</span>
+                  </button>
+                  {bulkCategoryOpen && (
+                    <div
+                      className="absolute inset-x-0 z-30 mt-2 rounded-lg border border-slate-200 bg-white shadow-lg"
+                      onMouseLeave={() => setBulkCategoryOpen(false)}
+                    >
+                      <div className="border-b border-slate-100 p-2">
+                        <input
+                          className="w-full rounded border px-2 py-1 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-100"
+                          placeholder="搜索分类"
+                          value={bulkCategorySearch}
+                          onChange={(e) => setBulkCategorySearch(e.target.value)}
+                        />
+                      </div>
+                      <div className="max-h-56 space-y-1 overflow-y-auto p-2 text-sm">
+                        {filteredBulkCategoryOptions.length ? (
+                          filteredBulkCategoryOptions.map((cat) => (
+                            <button
+                              key={cat.key}
+                              className={`flex w-full items-center justify-between rounded px-2 py-1 text-left transition ${
+                                bulkPatch.categoryKey === cat.key
+                                  ? 'bg-emerald-50 text-emerald-700'
+                                  : 'hover:bg-slate-50'
+                              }`}
+                              onClick={() => {
+                                updateBulkPatchField('categoryKey', cat.key)
+                                setBulkCategoryOpen(false)
+                                setBulkCategorySearch('')
+                              }}
+                            >
+                              <span className="line-clamp-2 break-words">{cat.label}</span>
+                              {bulkPatch.categoryKey === cat.key && <span className="text-xs">已选</span>}
+                            </button>
+                          ))
+                        ) : (
+                          <p className="px-2 py-3 text-sm text-slate-500">无匹配分类</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid gap-3 md:grid-cols-[1.2fr_1fr_1fr]">
+                <label className="space-y-1">
+                  <span className="text-sm font-medium text-slate-700">金额</span>
+                  <input
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
+                    placeholder="留空不修改"
+                    value={bulkPatch.amount ?? ''}
+                    onChange={(e) =>
+                      updateBulkPatchField(
+                        'amount',
+                        e.target.value.trim() ? e.target.value : undefined,
+                      )
+                    }
+                  />
+                </label>
+                <label className="space-y-1">
+                  <span className="text-sm font-medium text-slate-700">单位</span>
+                  <select
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
+                    value={bulkPatch.unitId ? String(bulkPatch.unitId) : ''}
+                    onChange={(e) =>
+                      updateBulkPatchField(
+                        'unitId',
+                        e.target.value ? Number(e.target.value) : undefined,
+                      )
+                    }
+                  >
+                    <option value="">不修改</option>
+                    {metadata?.units.map((unit) => (
+                      <option key={unit.id} value={unit.id}>
+                        {unit.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="space-y-1">
+                  <span className="text-sm font-medium text-slate-700">税费 (可选)</span>
+                  <input
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
+                    placeholder="留空不修改"
+                    value={bulkPatch.tva ?? ''}
+                    onChange={(e) =>
+                      updateBulkPatchField(
+                        'tva',
+                        e.target.value.trim() ? e.target.value : undefined,
+                      )
+                    }
+                  />
+                </label>
+              </div>
+
+              <div className="grid gap-3 md:grid-cols-3">
+                <label className="space-y-1">
+                  <span className="text-sm font-medium text-slate-700">支付日期</span>
+                  <input
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
+                    type="date"
+                    value={bulkPatch.paymentDate ?? ''}
+                    onChange={(e) =>
+                      updateBulkPatchField(
+                        'paymentDate',
+                        e.target.value ? e.target.value : undefined,
+                      )
+                    }
+                  />
+                </label>
+                <label className="space-y-1">
+                  <span className="text-sm font-medium text-slate-700">支付状态</span>
+                  <select
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
+                    value={bulkPatch.paymentStatus ?? ''}
+                    onChange={(e) =>
+                      updateBulkPatchField(
+                        'paymentStatus',
+                        isPaymentStatus(e.target.value) ? e.target.value : undefined,
+                      )
+                    }
+                  >
+                    <option value="">不修改</option>
+                    {paymentStatusOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="space-y-1">
+                  <span className="text-sm font-medium text-slate-700">经办人</span>
+                  <select
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
+                    value={bulkPatch.handlerId ? String(bulkPatch.handlerId) : ''}
+                    onChange={(e) =>
+                      updateBulkPatchField(
+                        'handlerId',
+                        e.target.value ? Number(e.target.value) : undefined,
+                      )
+                    }
+                  >
+                    <option value="">不修改</option>
+                    {metadata?.handlers.map((handler) => (
+                      <option key={handler.id} value={handler.id}>
+                        {handler.name || handler.username}（{handler.username}）
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+
+              <label className="space-y-1">
+                <span className="text-sm font-medium text-slate-700">备注 (可选)</span>
+                <textarea
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
+                  placeholder="留空不修改"
+                  value={bulkPatch.remark ?? ''}
+                  rows={3}
+                  onChange={(e) =>
+                    updateBulkPatchField(
+                      'remark',
+                      e.target.value.trim() ? e.target.value : undefined,
+                    )
+                  }
+                />
+              </label>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  onClick={() => setBulkPatch({})}
+                  className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-white"
+                >
+                  重置
+                </button>
+                <button
+                  onClick={handleBulkSave}
+                  disabled={bulkSaving || bulkPatchEmpty}
+                  className="rounded-lg bg-emerald-600 px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-500 disabled:opacity-60"
+                >
+                  {bulkSaving ? '正在保存...' : '确认保存'}
                 </button>
               </div>
             </div>
