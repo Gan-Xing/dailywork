@@ -165,6 +165,13 @@ export type DocumentsCopy = {
       purposes: Record<string, string>
       purposePlaceholder: string
     }
+    dropdown: {
+      selected: string
+      selectAll: string
+      clear: string
+      search: string
+      all: string
+    }
     filters: {
       title: string
       categoryLabel: string
@@ -193,6 +200,7 @@ export type DocumentsCopy = {
         open: string
         delete: string
         edit: string
+        download: string
       }
       badges: {
         linked: string
@@ -648,8 +656,8 @@ export const documentsCopy: Record<Locale, DocumentsCopy> = {
         fileLabel: '选择文件',
         linkTitle: '关联信息（可选）',
         linkHint: '仅需绑定特定数据时填写。',
-        entityType: '关联对象',
-        entityId: '选择对象',
+        entityType: '关联分类',
+        entityId: '关联对象',
         purpose: '用途',
         label: '展示名',
         upload: '开始上传',
@@ -668,11 +676,18 @@ export const documentsCopy: Record<Locale, DocumentsCopy> = {
         },
         purposePlaceholder: '选择或输入用途',
       },
+      dropdown: {
+        selected: '{count} 已选',
+        selectAll: '全选',
+        clear: '清空',
+        search: '搜索...',
+        all: '请选择',
+      },
       filters: {
         title: '筛选条件',
         categoryLabel: '分类',
-        entityTypeLabel: '对象类型',
-        entityIdLabel: '对象 ID',
+        entityTypeLabel: '关联分类',
+        entityIdLabel: '关联对象',
         dateFromLabel: '开始日期',
         dateToLabel: '结束日期',
         keywordLabel: '关键词',
@@ -696,6 +711,7 @@ export const documentsCopy: Record<Locale, DocumentsCopy> = {
           open: '打开',
           delete: '删除',
           edit: '编辑',
+          download: '下载',
         },
         badges: {
           linked: '已关联',
@@ -1158,8 +1174,8 @@ export const documentsCopy: Record<Locale, DocumentsCopy> = {
         fileLabel: 'Fichier',
         linkTitle: 'Association (optionnel)',
         linkHint: 'Remplir pour lier à une donnée.',
-        entityType: 'Objet lié',
-        entityId: 'Sélectionner l’objet',
+        entityType: 'Catégorie de liaison',
+        entityId: 'Objet lié',
         purpose: 'Usage',
         label: 'Libellé',
         upload: 'Téléverser',
@@ -1178,11 +1194,18 @@ export const documentsCopy: Record<Locale, DocumentsCopy> = {
         },
         purposePlaceholder: 'Choisir ou saisir usage',
       },
+      dropdown: {
+        selected: '{count} sélectionné(s)',
+        selectAll: 'Tout',
+        clear: 'Vider',
+        search: 'Rechercher...',
+        all: 'Choisir',
+      },
       filters: {
         title: 'Filtres',
         categoryLabel: 'Catégorie',
-        entityTypeLabel: 'Type d’objet',
-        entityIdLabel: 'ID de l’objet',
+        entityTypeLabel: 'Catégorie de liaison',
+        entityIdLabel: 'Objet lié',
         dateFromLabel: 'Date début',
         dateToLabel: 'Date fin',
         keywordLabel: 'Mots-clés',
@@ -1206,6 +1229,7 @@ export const documentsCopy: Record<Locale, DocumentsCopy> = {
           open: 'Ouvrir',
           delete: 'Supprimer',
           edit: 'Éditer',
+          download: 'Télécharger',
         },
         badges: {
           linked: 'Lié',

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 import { Breadcrumbs } from '@/components/Breadcrumbs'
+import { MultiSelectFilter } from '@/components/MultiSelectFilter'
 import { formatCopy, locales } from '@/lib/i18n'
 import { getDocumentsCopy } from '@/lib/i18n/documents'
 import { usePreferredLocale } from '@/lib/usePreferredLocale'
@@ -27,6 +28,7 @@ type Props = {
 type CandidateUser = {
   id: number
   name: string
+  nationality: string | null
   birthDate: string | null
 }
 
@@ -75,6 +77,7 @@ export function FilesPageClient({
   const [uploadEntityId, setUploadEntityId] = useState('')
   const [uploadPurpose, setUploadPurpose] = useState('')
   const [uploadLabel, setUploadLabel] = useState('')
+  const [uploadUserIds, setUploadUserIds] = useState<string[]>([])
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
@@ -85,6 +88,7 @@ export function FilesPageClient({
   const [editName, setEditName] = useState('')
   const [editEntityType, setEditEntityType] = useState('')
   const [editEntityId, setEditEntityId] = useState('')
+  const [editUserIds, setEditUserIds] = useState<string[]>([])
   const [editPurpose, setEditPurpose] = useState('')
   const [editLabel, setEditLabel] = useState('')
   const [editLoading, setEditLoading] = useState(false)
@@ -101,13 +105,22 @@ export function FilesPageClient({
       fetch('/api/members?basic=true')
         .then((res) => res.json())
         .then((data: { members: any[] }) => {
-          setCandidateUsers(
-            data.members.map((m) => ({
-              id: m.id,
-              name: m.name,
-              birthDate: m.birthDate,
-            })),
-          )
+          const mapped = data.members.map((m) => ({
+            id: m.id,
+            name: m.name,
+            nationality: m.nationality,
+            birthDate: m.birthDate,
+          })) as CandidateUser[]
+
+          mapped.sort((a, b) => {
+            const aIsChina = a.nationality === 'china'
+            const bIsChina = b.nationality === 'china'
+            if (aIsChina && !bIsChina) return -1
+            if (!aIsChina && bIsChina) return 1
+            return 0
+          })
+
+          setCandidateUsers(mapped)
         })
         .catch(() => {})
         .finally(() => setLoadingUsers(false))
@@ -173,6 +186,7 @@ export function FilesPageClient({
     setSelectedFile(null)
     setUploadEntityType('')
     setUploadEntityId('')
+    setUploadUserIds([])
     setUploadPurpose('')
     setUploadLabel('')
     setUploadError(null)
@@ -191,7 +205,11 @@ export function FilesPageClient({
       setUploadError(copy.files.messages.missingCategory)
       return
     }
-    if ((uploadEntityType && !uploadEntityId) || (!uploadEntityType && uploadEntityId)) {
+    const isUserType = uploadEntityType === 'user'
+    const hasUserIds = isUserType && uploadUserIds.length > 0
+    const hasEntityId = !isUserType && uploadEntityType && uploadEntityId
+
+    if ((uploadEntityType && !hasUserIds && !hasEntityId) || (!uploadEntityType && (uploadEntityId || uploadUserIds.length > 0))) {
       setUploadError(copy.files.messages.invalidLink)
       return
     }
@@ -232,8 +250,17 @@ export function FilesPageClient({
         throw new Error(copy.files.messages.uploadFailed)
       }
 
-      const links = uploadEntityType && uploadEntityId
-        ? [
+      let links: any[] = []
+      if (uploadEntityType) {
+        if (isUserType) {
+          links = uploadUserIds.map((id) => ({
+            entityType: 'user',
+            entityId: id,
+            purpose: uploadPurpose.trim() || undefined,
+            label: uploadLabel.trim() || undefined,
+          }))
+        } else if (uploadEntityId) {
+          links = [
             {
               entityType: uploadEntityType.trim(),
               entityId: uploadEntityId.trim(),
@@ -241,7 +268,8 @@ export function FilesPageClient({
               label: uploadLabel.trim() || undefined,
             },
           ]
-        : []
+        }
+      }
 
       const finalizeRes = await fetch('/api/files', {
         method: 'POST',
@@ -293,13 +321,17 @@ export function FilesPageClient({
   const handleEditClick = (row: FileRow) => {
     setEditingFile(row)
     setEditName(row.originalName)
-    
+
     // Populate with first link if available
     const link = row.links[0]
     setEditEntityType(link?.entityType || '')
     setEditEntityId(link?.entityId || '')
     setEditPurpose(link?.purpose || '')
     setEditLabel(link?.label || '')
+
+    // Populate user IDs
+    const userLinks = row.links.filter((l) => l.entityType === 'user')
+    setEditUserIds(userLinks.map((l) => l.entityId))
   }
 
   const submitEdit = async (e: React.FormEvent) => {
@@ -307,14 +339,26 @@ export function FilesPageClient({
     if (!editingFile || !editName.trim()) return
     setEditLoading(true)
     try {
-      const links = (editEntityType && editEntityId)
-        ? [{
-            entityType: editEntityType.trim(),
-            entityId: editEntityId.trim(),
+      let links: any[] = []
+      if (editEntityType) {
+        if (editEntityType === 'user') {
+          links = editUserIds.map((id) => ({
+            entityType: 'user',
+            entityId: id,
             purpose: editPurpose.trim() || undefined,
             label: editLabel.trim() || undefined,
-          }]
-        : []
+          }))
+        } else if (editEntityId) {
+          links = [
+            {
+              entityType: editEntityType.trim(),
+              entityId: editEntityId.trim(),
+              purpose: editPurpose.trim() || undefined,
+              label: editLabel.trim() || undefined,
+            },
+          ]
+        }
+      }
 
       const res = await fetch(`/api/files/${editingFile.id}`, {
         method: 'PATCH',
@@ -331,6 +375,29 @@ export function FilesPageClient({
       alert(copy.files.editDialog.failed)
     } finally {
       setEditLoading(false)
+    }
+  }
+
+  const handleDownload = async (fileId: number, originalName: string) => {
+    try {
+      const res = await fetch(`/api/files/${fileId}?includeUrl=1`)
+      if (!res.ok) {
+        const errorBody = await res.json().catch(() => ({}))
+        throw new Error(errorBody.message ?? copy.files.messages.openFailed)
+      }
+      const payload = (await res.json()) as { file?: { url?: string } }
+      if (!payload.file?.url) {
+        throw new Error(copy.files.messages.openFailed)
+      }
+      const link = document.createElement('a')
+      link.href = payload.file.url
+      link.download = originalName
+      link.target = '_blank'
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+    } catch (error) {
+      alert((error as Error).message || copy.files.messages.openFailed)
     }
   }
 
@@ -442,40 +509,51 @@ export function FilesPageClient({
               <div className="grid gap-3 sm:grid-cols-2">
                 <label className="flex flex-col gap-2 text-xs text-slate-600">
                   <span>{copy.files.uploadPanel.entityType}</span>
-                  <select
-                    value={uploadEntityType}
-                    onChange={(event) => {
-                      setUploadEntityType(event.target.value)
-                      if (event.target.value === 'user') {
+                  <MultiSelectFilter
+                    variant="form"
+                    label=""
+                    options={Object.entries(copy.files.uploadPanel.entityTypes).map(([key, label]) => ({
+                      value: key,
+                      label,
+                    }))}
+                    selected={uploadEntityType ? [uploadEntityType] : []}
+                    onChange={(vals) => {
+                      const next = vals[0] || ''
+                      setUploadEntityType(next)
+                      if (next === 'user') {
                         setUploadEntityId('')
+                        setUploadUserIds([])
                       }
                     }}
-                    className="h-9 rounded-lg border border-slate-200 bg-white px-2 text-sm text-slate-700 focus:border-emerald-300 focus:outline-none"
-                  >
-                    <option value="">{copy.files.uploadPanel.categoryPlaceholder}</option>
-                    {Object.entries(copy.files.uploadPanel.entityTypes).map(([key, label]) => (
-                      <option key={key} value={key}>
-                        {label}
-                      </option>
-                    ))}
-                  </select>
+                    allLabel={copy.files.uploadPanel.categoryPlaceholder}
+                    selectedLabel={(count) => formatCopy(copy.files.dropdown.selected, { count })}
+                    selectAllLabel={copy.files.dropdown.selectAll}
+                    clearLabel={copy.files.dropdown.clear}
+                    searchPlaceholder={copy.files.dropdown.search}
+                    multiple={false}
+                    zIndex={30}
+                  />
                 </label>
                 <label className="flex flex-col gap-2 text-xs text-slate-600">
                   <span>{copy.files.uploadPanel.entityId}</span>
                   {uploadEntityType === 'user' ? (
-                    <select
-                      value={uploadEntityId}
-                      onChange={(event) => setUploadEntityId(event.target.value)}
+                    <MultiSelectFilter
+                      variant="form"
+                      label=""
+                      options={candidateUsers.map((user) => ({
+                        value: String(user.id),
+                        label: user.nationality === 'china' ? user.name : `${user.name} ${user.birthDate ? `(${user.birthDate.split('T')[0]})` : ''}`,
+                      }))}
+                      selected={uploadUserIds}
+                      onChange={setUploadUserIds}
+                      allLabel={loadingUsers ? 'Loading...' : copy.files.dropdown.all}
+                      selectedLabel={(count) => formatCopy(copy.files.dropdown.selected, { count })}
+                      selectAllLabel={copy.files.dropdown.selectAll}
+                      clearLabel={copy.files.dropdown.clear}
+                      searchPlaceholder={copy.files.dropdown.search}
                       disabled={loadingUsers}
-                      className="h-9 rounded-lg border border-slate-200 bg-white px-2 text-sm text-slate-700 focus:border-emerald-300 focus:outline-none disabled:bg-slate-100"
-                    >
-                      <option value="">{loadingUsers ? 'Loading...' : copy.files.uploadPanel.categoryPlaceholder}</option>
-                      {candidateUsers.map((user) => (
-                        <option key={user.id} value={user.id}>
-                          {user.name} {user.birthDate ? `(${user.birthDate.split('T')[0]})` : ''}
-                        </option>
-                      ))}
-                    </select>
+                      zIndex={30}
+                    />
                   ) : (
                     <input
                       value={uploadEntityId}
@@ -552,10 +630,22 @@ export function FilesPageClient({
           </label>
           <label className="flex flex-col gap-2 text-sm text-slate-600">
             <span className="font-semibold text-slate-700">{copy.files.filters.entityTypeLabel}</span>
-            <input
-              value={entityType}
-              onChange={(event) => setEntityType(event.target.value)}
-              className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 focus:border-emerald-300 focus:outline-none"
+            <MultiSelectFilter
+              variant="form"
+              label=""
+              options={Object.entries(copy.files.uploadPanel.entityTypes).map(([key, label]) => ({
+                value: key,
+                label,
+              }))}
+              selected={entityType ? [entityType] : []}
+              onChange={(vals) => setEntityType(vals[0] || '')}
+              allLabel={copy.files.dropdown.all}
+              selectedLabel={(count) => formatCopy(copy.files.dropdown.selected, { count })}
+              selectAllLabel={copy.files.dropdown.selectAll}
+              clearLabel={copy.files.dropdown.clear}
+              searchPlaceholder={copy.files.dropdown.search}
+              multiple={false}
+              zIndex={20}
             />
           </label>
           <label className="flex flex-col gap-2 text-sm text-slate-600">
@@ -671,11 +761,11 @@ export function FilesPageClient({
                       <td className="px-6 py-4">{row.createdBy || '—'}</td>
                       <td className="px-6 py-4" suppressHydrationWarning>{new Date(row.createdAt).toLocaleString()}</td>
                       <td className="px-6 py-4 text-right">
-                        <div className="flex flex-wrap items-center justify-end gap-2">
+                        <div className="grid grid-cols-2 justify-items-end gap-2">
                           <button
                             type="button"
                             onClick={() => handleEditClick(row)}
-                            className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-700 hover:border-slate-300 hover:bg-slate-50"
+                            className="w-full rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-700 hover:border-slate-300 hover:bg-slate-50"
                           >
                             {copy.files.table.actions.edit}
                           </button>
@@ -683,20 +773,27 @@ export function FilesPageClient({
                             type="button"
                             onClick={() => handleOpen(row.id)}
                             disabled={openingId === row.id}
-                            className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-700 hover:border-slate-300 hover:bg-slate-50 disabled:opacity-40"
+                            className="w-full rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-700 hover:border-slate-300 hover:bg-slate-50 disabled:opacity-40"
                           >
                             {copy.files.table.actions.open}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDownload(row.id, row.originalName)}
+                            className="w-full rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-700 hover:border-slate-300 hover:bg-slate-50"
+                          >
+                            {copy.files.table.actions.download}
                           </button>
                           {canDelete ? (
                             <button
                               type="button"
                               onClick={() => handleDelete(row.id, isLocked)}
                               disabled={deletingId === row.id}
-                              className="rounded-full border border-rose-200 px-3 py-1 text-xs font-semibold text-rose-600 hover:border-rose-300 hover:bg-rose-50 disabled:opacity-40"
+                              className="w-full rounded-full border border-rose-200 px-3 py-1 text-xs font-semibold text-rose-600 hover:border-rose-300 hover:bg-rose-50 disabled:opacity-40"
                             >
                               {copy.files.table.actions.delete}
                             </button>
-                          ) : null}
+                          ) : <span />}
                         </div>
                       </td>
                     </tr>
@@ -815,40 +912,51 @@ export function FilesPageClient({
                   <div className="grid gap-3">
                     <label className="flex flex-col gap-2 text-xs text-slate-600">
                       <span>{copy.files.uploadPanel.entityType}</span>
-                      <select
-                        value={editEntityType}
-                        onChange={(event) => {
-                          setEditEntityType(event.target.value)
-                          if (event.target.value === 'user') {
+                      <MultiSelectFilter
+                        variant="form"
+                        label=""
+                        options={Object.entries(copy.files.uploadPanel.entityTypes).map(([key, label]) => ({
+                          value: key,
+                          label,
+                        }))}
+                        selected={editEntityType ? [editEntityType] : []}
+                        onChange={(vals) => {
+                          const next = vals[0] || ''
+                          setEditEntityType(next)
+                          if (next === 'user') {
                             setEditEntityId('')
+                            setEditUserIds([])
                           }
                         }}
-                        className="h-9 rounded-lg border border-slate-200 bg-white px-2 text-sm text-slate-700 focus:border-emerald-300 focus:outline-none"
-                      >
-                        <option value="">{copy.files.uploadPanel.categoryPlaceholder}</option>
-                        {Object.entries(copy.files.uploadPanel.entityTypes).map(([key, label]) => (
-                          <option key={key} value={key}>
-                            {label}
-                          </option>
-                        ))}
-                      </select>
+                        allLabel={copy.files.uploadPanel.categoryPlaceholder}
+                        selectedLabel={(count) => formatCopy(copy.files.dropdown.selected, { count })}
+                        selectAllLabel={copy.files.dropdown.selectAll}
+                        clearLabel={copy.files.dropdown.clear}
+                        searchPlaceholder={copy.files.dropdown.search}
+                        multiple={false}
+                        zIndex={1300}
+                      />
                     </label>
                     <label className="flex flex-col gap-2 text-xs text-slate-600">
                       <span>{copy.files.uploadPanel.entityId}</span>
                       {editEntityType === 'user' ? (
-                        <select
-                          value={editEntityId}
-                          onChange={(event) => setEditEntityId(event.target.value)}
+                        <MultiSelectFilter
+                          variant="form"
+                          label=""
+                          options={candidateUsers.map((user) => ({
+                            value: String(user.id),
+                            label: user.nationality === 'china' ? user.name : `${user.name} ${user.birthDate ? `(${user.birthDate.split('T')[0]})` : ''}`,
+                          }))}
+                          selected={editUserIds}
+                          onChange={setEditUserIds}
+                          allLabel={loadingUsers ? 'Loading...' : copy.files.dropdown.all}
+                          selectedLabel={(count) => formatCopy(copy.files.dropdown.selected, { count })}
+                          selectAllLabel={copy.files.dropdown.selectAll}
+                          clearLabel={copy.files.dropdown.clear}
+                          searchPlaceholder={copy.files.dropdown.search}
                           disabled={loadingUsers}
-                          className="h-9 rounded-lg border border-slate-200 bg-white px-2 text-sm text-slate-700 focus:border-emerald-300 focus:outline-none disabled:bg-slate-100"
-                        >
-                          <option value="">{loadingUsers ? 'Loading...' : copy.files.uploadPanel.categoryPlaceholder}</option>
-                          {candidateUsers.map((user) => (
-                            <option key={user.id} value={user.id}>
-                              {user.name} {user.birthDate ? `(${user.birthDate.split('T')[0]})` : ''}
-                            </option>
-                          ))}
-                        </select>
+                          zIndex={1300}
+                        />
                       ) : (
                         <input
                           value={editEntityId}
