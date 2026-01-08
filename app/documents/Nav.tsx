@@ -15,6 +15,7 @@ export function DocumentsNav() {
   const copy = getDocumentsCopy(locale)
   const navItems = [
     { href: '/documents', label: copy.nav.items.overview },
+    { href: '/documents/files', label: copy.nav.items.files },
     { href: '/documents/submissions', label: copy.nav.items.submissions },
     { href: '/documents/templates', label: copy.nav.items.templates },
   ]

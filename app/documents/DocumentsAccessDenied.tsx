@@ -10,6 +10,7 @@ type AccessVariant =
   | 'submissionsList'
   | 'submissionCreate'
   | 'submissionDetail'
+  | 'filesList'
   | 'templatesList'
   | 'templateCreate'
   | 'templateDetail'

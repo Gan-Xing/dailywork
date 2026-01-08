@@ -36,6 +36,15 @@ export const buildSignatureStorageKey = (userId: number, originalName: string) =
   return `members/${userId}/signatures/${timestamp}-${randomUUID()}-${safeName}`
 }
 
+export const buildFileStorageKey = (category: string, originalName: string) => {
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
+  const normalizedName = originalName.trim().replace(/\s+/g, '-').replace(/[^a-zA-Z0-9._-]/g, '')
+  const safeName = normalizedName.length ? normalizedName : 'file'
+  const normalizedCategory = category.trim().replace(/[^a-zA-Z0-9._-]/g, '')
+  const safeCategory = normalizedCategory.length ? normalizedCategory : 'other'
+  return `files/${safeCategory}/${timestamp}-${randomUUID()}-${safeName}`
+}
+
 const hashSha256 = (payload: string) => createHash('sha256').update(payload).digest('hex')
 const hmacSha256 = (key: Buffer | string, payload: string) => createHmac('sha256', key).update(payload).digest()
 

@@ -5,6 +5,7 @@ export type DocumentsCopy = {
     title: string
     items: {
       overview: string
+      files: string
       submissions: string
       templates: string
     }
@@ -16,6 +17,7 @@ export type DocumentsCopy = {
   breadcrumbs: {
     home: string
     documents: string
+    files: string
     submissions: string
     submissionsNew: string
     submissionDetailWithNumber: string
@@ -29,6 +31,7 @@ export type DocumentsCopy = {
     submissionsList: string
     submissionCreate: string
     submissionDetail: string
+    filesList: string
     templatesList: string
     templateCreate: string
     templateDetail: string
@@ -53,6 +56,7 @@ export type DocumentsCopy = {
       title: string
       createSubmission: string
       manageTemplates: string
+      manageFiles: string
     }
     submissionsCard: {
       label: string
@@ -61,6 +65,12 @@ export type DocumentsCopy = {
       cta: string
     }
     templatesCard: {
+      label: string
+      title: string
+      description: string
+      cta: string
+    }
+    filesCard: {
       label: string
       title: string
       description: string
@@ -127,6 +137,96 @@ export type DocumentsCopy = {
       selectRow: string
     }
     empty: string
+  }
+  files: {
+    badge: {
+      title: string
+      suffix: string
+    }
+    title: string
+    description: string
+    uploadPanel: {
+      title: string
+      helper: string
+      hint: string
+      categoryLabel: string
+      categoryPlaceholder: string
+      fileLabel: string
+      linkTitle: string
+      linkHint: string
+      entityType: string
+      entityId: string
+      purpose: string
+      label: string
+      upload: string
+      uploading: string
+      reset: string
+      entityTypes: Record<string, string>
+      purposes: Record<string, string>
+      purposePlaceholder: string
+    }
+    filters: {
+      title: string
+      categoryLabel: string
+      entityTypeLabel: string
+      entityIdLabel: string
+      dateFromLabel: string
+      dateToLabel: string
+      keywordLabel: string
+      keywordPlaceholder: string
+      allLabel: string
+      apply: string
+      reset: string
+    }
+    table: {
+      title: string
+      columns: {
+        file: string
+        category: string
+        links: string
+        owner: string
+        createdBy: string
+        createdAt: string
+        actions: string
+      }
+      actions: {
+        open: string
+        delete: string
+        edit: string
+      }
+      badges: {
+        linked: string
+        signature: string
+      }
+      empty: string
+      deleteConfirm: string
+      deleteBlocked: string
+    }
+    editDialog: {
+      title: string
+      nameLabel: string
+      save: string
+      saving: string
+      cancel: string
+      success: string
+      failed: string
+    }
+    pagination: {
+      summary: string
+      prev: string
+      next: string
+      goTo: string
+      pageSizeLabel: string
+    }
+    categories: Record<string, string>
+    messages: {
+      uploadFailed: string
+      openFailed: string
+      deleteFailed: string
+      missingCategory: string
+      missingFile: string
+      invalidLink: string
+    }
   }
   submissionEditor: {
     badge: {
@@ -343,6 +443,7 @@ export const documentsCopy: Record<Locale, DocumentsCopy> = {
       title: '导航',
       items: {
         overview: '概览',
+        files: '文件管理',
         submissions: '提交单',
         templates: '模版管理',
       },
@@ -354,6 +455,7 @@ export const documentsCopy: Record<Locale, DocumentsCopy> = {
     breadcrumbs: {
       home: '首页',
       documents: '文档管理',
+      files: '文件管理',
       submissions: '提交单',
       submissionsNew: '新建提交单',
       submissionDetailWithNumber: '提交单 #{number}',
@@ -363,10 +465,11 @@ export const documentsCopy: Record<Locale, DocumentsCopy> = {
       templateDetailFallback: '模版详情',
     },
     access: {
-      hub: '需要提交单或模板权限才能进入文档管理。',
+      hub: '需要提交单、模板或文件权限才能进入文档管理。',
       submissionsList: '需要提交单查看权限才能查看列表。',
       submissionCreate: '需要提交单新增权限才能创建提交单。',
       submissionDetail: '需要提交单查看权限才能访问详情。',
+      filesList: '需要文件查看权限才能访问文件管理。',
       templatesList: '需要模板查看权限才能访问模版管理。',
       templateCreate: '需要模板新增权限才能创建模版。',
       templateDetail: '需要模板查看权限才能访问详情。',
@@ -400,6 +503,7 @@ export const documentsCopy: Record<Locale, DocumentsCopy> = {
         title: '快速动作',
         createSubmission: '新建提交单',
         manageTemplates: '管理模版',
+        manageFiles: '管理文件',
       },
       submissionsCard: {
         label: '提交单',
@@ -413,6 +517,12 @@ export const documentsCopy: Record<Locale, DocumentsCopy> = {
         description:
           '维护 `bordereau.html` 与占位符，发布/回滚；发布后用于创建提交单，支持字段自动生成表单。',
         cta: '前往模版管理 →',
+      },
+      filesCard: {
+        label: '文件',
+        title: '非结构化文件管理',
+        description: '集中查看签名、报检材料、签到表等文件，支持检索与在线打开。',
+        cta: '前往文件管理 →',
       },
     },
     submissions: {
@@ -521,6 +631,114 @@ export const documentsCopy: Record<Locale, DocumentsCopy> = {
         selectRow: '选择 {code}',
       },
       empty: '暂无提交单，点击“新建提交单”开始。',
+    },
+    files: {
+      badge: {
+        title: '文件',
+        suffix: '列表/上传',
+      },
+      title: '文件管理',
+      description: '集中管理签名、报检材料、签到表等非结构化文件，支持分类、关联与在线打开。',
+      uploadPanel: {
+        title: '上传新文件',
+        helper: '上传后可在文件管理中查询，并支持在业务模块中关联使用。',
+        hint: '提示：对象类型/ID 可留空，留空即不关联。',
+        categoryLabel: '文件分类',
+        categoryPlaceholder: '请选择分类',
+        fileLabel: '选择文件',
+        linkTitle: '关联信息（可选）',
+        linkHint: '仅需绑定特定数据时填写。',
+        entityType: '关联对象',
+        entityId: '选择对象',
+        purpose: '用途',
+        label: '展示名',
+        upload: '开始上传',
+        uploading: '上传中...',
+        reset: '清空',
+        entityTypes: {
+          user: '项目成员 (User)',
+          inspection: '报检单 (Inspection)',
+          submission: '提交单 (Submission)',
+          other: '其他 (Other)',
+        },
+        purposes: {
+          signature: '签名 (signature)',
+          avatar: '头像 (avatar)',
+          attachment: '附件 (attachment)',
+        },
+        purposePlaceholder: '选择或输入用途',
+      },
+      filters: {
+        title: '筛选条件',
+        categoryLabel: '分类',
+        entityTypeLabel: '对象类型',
+        entityIdLabel: '对象 ID',
+        dateFromLabel: '开始日期',
+        dateToLabel: '结束日期',
+        keywordLabel: '关键词',
+        keywordPlaceholder: '搜索文件名 / 上传人 / 关联信息',
+        allLabel: '全部',
+        apply: '应用筛选',
+        reset: '重置',
+      },
+      table: {
+        title: '文件列表',
+        columns: {
+          file: '文件',
+          category: '分类',
+          links: '关联',
+          owner: '所属成员',
+          createdBy: '上传人',
+          createdAt: '上传时间',
+          actions: '操作',
+        },
+        actions: {
+          open: '打开',
+          delete: '删除',
+          edit: '编辑',
+        },
+        badges: {
+          linked: '已关联',
+          signature: '签名',
+        },
+        empty: '暂无文件',
+        deleteConfirm: '确认删除该文件？',
+        deleteBlocked: '文件已被引用，无法删除。',
+      },
+      editDialog: {
+        title: '编辑文件',
+        nameLabel: '文件名',
+        cancel: '取消',
+        save: '保存',
+        saving: '保存中...',
+        success: '保存成功',
+        failed: '保存失败',
+      },
+      pagination: {
+        summary: '共 {total} 条，第 {page}/{totalPages} 页',
+        prev: '上一页',
+        next: '下一页',
+        goTo: '跳转页码',
+        pageSizeLabel: '每页',
+      },
+      categories: {
+        signature: '签名',
+        'inspection-receipt': '报检单签收版',
+        'inspection-acceptance': '报检验收材料',
+        'attendance-sheet': '签到表',
+        'letter-receipt': '函件签收件',
+        'face-photo': '人脸照片',
+        attachment: '附件',
+        other: '其他',
+      },
+      messages: {
+        uploadFailed: '上传失败',
+        openFailed: '打开失败',
+        deleteFailed: '删除失败',
+        missingCategory: '请选择文件分类',
+        missingFile: '请选择文件',
+        invalidLink: '对象类型与对象 ID 必须同时填写',
+      },
     },
     submissionEditor: {
       badge: {
@@ -735,6 +953,7 @@ export const documentsCopy: Record<Locale, DocumentsCopy> = {
       title: 'Navigation',
       items: {
         overview: 'Aperçu',
+        files: 'Fichiers',
         submissions: 'Bordereaux',
         templates: 'Modèles',
       },
@@ -746,6 +965,7 @@ export const documentsCopy: Record<Locale, DocumentsCopy> = {
     breadcrumbs: {
       home: 'Accueil',
       documents: 'Gestion documentaire',
+      files: 'Fichiers',
       submissions: 'Bordereaux',
       submissionsNew: 'Nouveau bordereau',
       submissionDetailWithNumber: 'Bordereau n°{number}',
@@ -755,10 +975,11 @@ export const documentsCopy: Record<Locale, DocumentsCopy> = {
       templateDetailFallback: 'Détail du modèle',
     },
     access: {
-      hub: "Les droits bordereau ou modèle sont requis pour accéder à la gestion documentaire.",
+      hub: "Les droits bordereau, modèle ou fichier sont requis pour accéder à la gestion documentaire.",
       submissionsList: "Le droit de consultation des bordereaux est requis pour voir la liste.",
       submissionCreate: "Le droit de création de bordereaux est requis pour créer un bordereau.",
       submissionDetail: "Le droit de consultation des bordereaux est requis pour voir le détail.",
+      filesList: "Le droit de consultation des fichiers est requis pour accéder à la gestion des fichiers.",
       templatesList: "Le droit de consultation des modèles est requis pour accéder à la gestion des modèles.",
       templateCreate: "Le droit de création de modèles est requis pour créer un modèle.",
       templateDetail: "Le droit de consultation des modèles est requis pour voir le détail.",
@@ -792,6 +1013,7 @@ export const documentsCopy: Record<Locale, DocumentsCopy> = {
         title: 'Actions rapides',
         createSubmission: 'Nouveau bordereau',
         manageTemplates: 'Gérer les modèles',
+        manageFiles: 'Gérer les fichiers',
       },
       submissionsCard: {
         label: 'Bordereaux',
@@ -805,6 +1027,12 @@ export const documentsCopy: Record<Locale, DocumentsCopy> = {
         description:
           'Maintenez `bordereau.html` et les placeholders; publiez ou restaurez pour alimenter la création.',
         cta: 'Accéder aux modèles →',
+      },
+      filesCard: {
+        label: 'Fichiers',
+        title: 'Gestion centralisée des fichiers',
+        description: "Consultez signatures, pièces d'acceptation, feuilles de présence et autres fichiers.",
+        cta: 'Accéder aux fichiers →',
       },
     },
     submissions: {
@@ -913,6 +1141,114 @@ export const documentsCopy: Record<Locale, DocumentsCopy> = {
         selectRow: 'Sélectionner {code}',
       },
       empty: 'Aucun bordereau, cliquez sur « Nouveau bordereau » pour commencer.',
+    },
+    files: {
+      badge: {
+        title: 'Fichiers',
+        suffix: 'Liste / téléversement',
+      },
+      title: 'Gestion des fichiers',
+      description: "Centralisez signatures, pièces d'acceptation, feuilles de présence et autres fichiers.",
+      uploadPanel: {
+        title: 'Téléverser un fichier',
+        helper: 'Le fichier sera disponible dans la gestion des fichiers et peut être lié aux modules.',
+        hint: "Astuce : laissez le type/ID vide pour ne pas associer.",
+        categoryLabel: 'Catégorie',
+        categoryPlaceholder: 'Choisir une catégorie',
+        fileLabel: 'Fichier',
+        linkTitle: 'Association (optionnel)',
+        linkHint: 'Remplir pour lier à une donnée.',
+        entityType: 'Objet lié',
+        entityId: 'Sélectionner l’objet',
+        purpose: 'Usage',
+        label: 'Libellé',
+        upload: 'Téléverser',
+        uploading: 'Téléversement...',
+        reset: 'Réinitialiser',
+        entityTypes: {
+          user: 'Membre (User)',
+          inspection: 'Inspection',
+          submission: 'Bordereau (Submission)',
+          other: 'Autre',
+        },
+        purposes: {
+          signature: 'Signature',
+          avatar: 'Avatar',
+          attachment: 'Pièce jointe',
+        },
+        purposePlaceholder: 'Choisir ou saisir usage',
+      },
+      filters: {
+        title: 'Filtres',
+        categoryLabel: 'Catégorie',
+        entityTypeLabel: 'Type d’objet',
+        entityIdLabel: 'ID de l’objet',
+        dateFromLabel: 'Date début',
+        dateToLabel: 'Date fin',
+        keywordLabel: 'Mots-clés',
+        keywordPlaceholder: 'Nom / auteur / association',
+        allLabel: 'Tous',
+        apply: 'Appliquer',
+        reset: 'Réinitialiser',
+      },
+      table: {
+        title: 'Liste des fichiers',
+        columns: {
+          file: 'Fichier',
+          category: 'Catégorie',
+          links: 'Associations',
+          owner: 'Membre',
+          createdBy: 'Téléversé par',
+          createdAt: 'Date',
+          actions: 'Actions',
+        },
+        actions: {
+          open: 'Ouvrir',
+          delete: 'Supprimer',
+          edit: 'Éditer',
+        },
+        badges: {
+          linked: 'Lié',
+          signature: 'Signature',
+        },
+        empty: 'Aucun fichier',
+        deleteConfirm: 'Supprimer ce fichier ?',
+        deleteBlocked: 'Fichier déjà référencé, suppression impossible.',
+      },
+      editDialog: {
+        title: 'Éditer le fichier',
+        nameLabel: 'Nom du fichier',
+        cancel: 'Annuler',
+        save: 'Enregistrer',
+        saving: 'Enregistrement...',
+        success: 'Enregistré avec succès',
+        failed: 'Échec de l’enregistrement',
+      },
+      pagination: {
+        summary: '{total} éléments, page {page}/{totalPages}',
+        prev: 'Précédent',
+        next: 'Suivant',
+        goTo: 'Aller à la page',
+        pageSizeLabel: 'Par page',
+      },
+      categories: {
+        signature: 'Signature',
+        'inspection-receipt': 'Accusé de réception',
+        'inspection-acceptance': "Pièces d'acceptation",
+        'attendance-sheet': 'Feuille de présence',
+        'letter-receipt': 'Réception de courrier',
+        'face-photo': 'Photo visage',
+        attachment: 'Pièce jointe',
+        other: 'Autre',
+      },
+      messages: {
+        uploadFailed: 'Échec du téléversement',
+        openFailed: "Échec de l'ouverture",
+        deleteFailed: 'Échec de la suppression',
+        missingCategory: 'Veuillez choisir une catégorie',
+        missingFile: 'Veuillez choisir un fichier',
+        invalidLink: 'Type et ID doivent être renseignés ensemble',
+      },
     },
     submissionEditor: {
       badge: {

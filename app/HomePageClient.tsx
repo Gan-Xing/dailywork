@@ -69,6 +69,11 @@ export default function HomePageClient() {
 			'/finance': ['finance:view'],
 			'/value': ['value:view'],
 			'/documents': [
+				'file:view',
+				'file:upload',
+				'file:update',
+				'file:delete',
+				'file:manage',
 				'submission:view',
 				'submission:create',
 				'submission:update',

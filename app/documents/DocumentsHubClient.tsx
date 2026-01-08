@@ -11,12 +11,14 @@ type Props = {
   canViewSubmissions: boolean
   canCreateSubmission: boolean
   canViewTemplates: boolean
+  canViewFiles: boolean
 }
 
 export function DocumentsHubClient({
   canViewSubmissions,
   canCreateSubmission,
   canViewTemplates,
+  canViewFiles,
 }: Props) {
   const { locale } = usePreferredLocale('zh', locales)
   const copy = getDocumentsCopy(locale)
@@ -81,11 +83,23 @@ export function DocumentsHubClient({
                   {copy.hub.quickActions.manageTemplates}
                 </span>
               )}
+              {canViewFiles ? (
+                <Link
+                  href="/documents/files"
+                  className="rounded-full border border-slate-200 px-3 py-2 text-center font-semibold text-slate-800 hover:border-slate-300 hover:bg-slate-100"
+                >
+                  {copy.hub.quickActions.manageFiles}
+                </Link>
+              ) : (
+                <span className="rounded-full bg-slate-100 px-3 py-2 text-center font-semibold text-slate-500">
+                  {copy.hub.quickActions.manageFiles}
+                </span>
+              )}
             </div>
           </div>
         </div>
 
-        <div className="mt-8 grid gap-4 md:grid-cols-2">
+        <div className="mt-8 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 shadow-sm">
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
               {copy.hub.submissionsCard.label}
@@ -129,6 +143,30 @@ export function DocumentsHubClient({
               ) : (
                 <span className="rounded-2xl border border-slate-200 px-4 py-2 text-slate-500">
                   {copy.hub.templatesCard.cta}
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+              {copy.hub.filesCard.label}
+            </p>
+            <h2 className="mt-1 text-xl font-semibold text-slate-900">
+              {copy.hub.filesCard.title}
+            </h2>
+            <p className="mt-2 text-sm text-slate-600">{copy.hub.filesCard.description}</p>
+            <div className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-emerald-700">
+              {canViewFiles ? (
+                <Link
+                  href="/documents/files"
+                  className="rounded-2xl bg-white px-4 py-2 text-slate-900 shadow-sm ring-1 ring-emerald-100 transition hover:-translate-y-0.5 hover:shadow-md hover:ring-emerald-200"
+                >
+                  {copy.hub.filesCard.cta}
+                </Link>
+              ) : (
+                <span className="rounded-2xl bg-slate-100 px-4 py-2 text-slate-500 ring-1 ring-slate-200">
+                  {copy.hub.filesCard.cta}
                 </span>
               )}
             </div>

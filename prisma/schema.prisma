@@ -439,6 +439,7 @@ model User {
   projectAssignments UserProjectAssignment[]
   ownedFileAssets FileAsset[] @relation("FileAssetOwner")
   createdFileAssets FileAsset[] @relation("FileAssetCreator")
+  createdFileLinks FileAssetLink[] @relation("FileAssetLinkCreator")
   signatures UserSignature[]
   createdSignatures UserSignature[] @relation("UserSignatureCreator")
   createdById  Int?
@@ -471,11 +472,30 @@ model FileAsset {
   ownerUser    User?    @relation("FileAssetOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
   createdBy    User?    @relation("FileAssetCreator", fields: [createdById], references: [id], onDelete: SetNull)
   signatures   UserSignature[]
+  links        FileAssetLink[]
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
   @@index([category])
   @@index([ownerUserId])
+}
+
+model FileAssetLink {
+  id          Int      @id @default(autoincrement())
+  fileId      Int
+  entityType  String
+  entityId    String
+  purpose     String?
+  label       String?
+  meta        Json?
+  createdById Int?
+  file        FileAsset @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  createdBy   User?    @relation("FileAssetLinkCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+
+  @@index([fileId])
+  @@index([entityType, entityId])
+  @@index([purpose])
 }
 
 model UserSignature {

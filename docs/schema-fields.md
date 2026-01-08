@@ -409,6 +409,7 @@
 - **Permission**：`code`（唯一标识，如 `road:manage`、`report:edit`）、`name`、`status`（`ACTIVE`/`ARCHIVED`，默认 `ACTIVE`）、`createdAt`、`updatedAt`；当前权限编码覆盖：
   - 成员/角色：`member:view`、`member:create`、`member:update`、`member:delete`、`role:view`、`role:create`、`role:update`、`role:delete`、`permission:view`、`permission:update`（保留 `member:edit`、`member:manage`、`role:manage` 作为兼容）
   - 签名：`signature:view`、`signature:use`、`signature:upload`、`signature:delete`
+  - 文件管理：`file:view`、`file:upload`、`file:update`、`file:delete`、`file:manage`
   - 道路/进度/报检：`road:view`、`road:manage`、`progress:view`、`progress:edit`、`inspection:create`
   - 日报：`report:view`、`report:edit`
   - 文档管理（提交单/模板）：`submission:view`、`submission:create`、`submission:update`、`submission:delete`、`submission:manage`、`template:view`、`template:create`、`template:update`、`template:delete`
@@ -480,7 +481,7 @@
 
 ### FileAsset（非结构化文件）
 - `id`：自增整型。
-- `category`：文件分类（如 `signature`、`attachment`）。
+- `category`：文件分类（初始枚举：`signature`、`inspection-receipt`、`inspection-acceptance`、`attendance-sheet`、`letter-receipt`、`face-photo`、`attachment`、`other`）。
 - `storageKey`：存储桶对象键（唯一）。
 - `bucket`：存储桶名称。
 - `originalName`：原始文件名。
@@ -490,6 +491,17 @@
 - `ownerUserId?`：可选绑定成员 ID。
 - `createdById?`：上传人 ID。
 - `createdAt` / `updatedAt`：自动时间戳。
+
+### FileAssetLink（文件关联）
+- `id`：自增整型。
+- `fileId`：关联 `FileAsset`。
+- `entityType`：关联对象类型（如 `USER`、`DOCUMENT`、`INSPECTION`）。
+- `entityId`：关联对象 ID（字符串，兼容数值 ID）。
+- `purpose?`：用途标识（如 `receipt`、`acceptance`、`attendance`）。
+- `label?`：前端展示用名称（可选）。
+- `meta?`：结构化扩展字段（JSON）。
+- `createdById?`：上传人 ID。
+- `createdAt`：创建时间。
 
 ### UserSignature（签名版本）
 - `id`：自增整型。
