@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 
+import { locales } from '@/lib/i18n'
 import { getDocumentsCopy } from '@/lib/i18n/documents'
 import { usePreferredLocale } from '@/lib/usePreferredLocale'
 
