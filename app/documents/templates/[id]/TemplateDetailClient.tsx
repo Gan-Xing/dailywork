@@ -1,6 +1,5 @@
 'use client'
 
-import { Breadcrumbs } from '@/components/Breadcrumbs'
 import { formatCopy, locales } from '@/lib/i18n'
 import { getDocumentsCopy } from '@/lib/i18n/documents'
 import { usePreferredLocale } from '@/lib/usePreferredLocale'
@@ -44,15 +43,6 @@ export function TemplateDetailClient({ template, source, showEditForm }: Props) 
 
   return (
     <div className="space-y-6">
-      <Breadcrumbs
-        variant="light"
-        items={[
-          { label: copy.breadcrumbs.home, href: '/' },
-          { label: copy.breadcrumbs.documents, href: '/documents' },
-          { label: copy.breadcrumbs.templates, href: '/documents/templates' },
-          { label: breadcrumbLabel },
-        ]}
-      />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">

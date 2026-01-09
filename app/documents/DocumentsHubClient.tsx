@@ -2,7 +2,6 @@
 
 import Link from 'next/link'
 
-import { Breadcrumbs } from '@/components/Breadcrumbs'
 import { locales } from '@/lib/i18n'
 import { getDocumentsCopy } from '@/lib/i18n/documents'
 import { usePreferredLocale } from '@/lib/usePreferredLocale'
@@ -25,13 +24,6 @@ export function DocumentsHubClient({
 
   return (
     <div className="space-y-6">
-      <Breadcrumbs
-        variant="light"
-        items={[
-          { label: copy.breadcrumbs.home, href: '/' },
-          { label: copy.breadcrumbs.documents },
-        ]}
-      />
       <div className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-4 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700">
         <span className="inline-block h-2 w-2 rounded-full bg-emerald-500" />
         {copy.hub.badge.title}

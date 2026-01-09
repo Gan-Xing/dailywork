@@ -1,6 +1,5 @@
 'use client'
 
-import { Breadcrumbs } from '@/components/Breadcrumbs'
 import { locales } from '@/lib/i18n'
 import { getDocumentsCopy } from '@/lib/i18n/documents'
 import { usePreferredLocale } from '@/lib/usePreferredLocale'
@@ -19,15 +18,6 @@ export function NewSubmissionPageClient({ canManage, canEdit, currentUser }: Pro
 
   return (
     <div className="space-y-6">
-      <Breadcrumbs
-        variant="light"
-        items={[
-          { label: copy.breadcrumbs.home, href: '/' },
-          { label: copy.breadcrumbs.documents, href: '/documents' },
-          { label: copy.breadcrumbs.submissions, href: '/documents/submissions' },
-          { label: copy.breadcrumbs.submissionsNew },
-        ]}
-      />
       <SubmissionEditor canManage={canManage} canEdit={canEdit} currentUser={currentUser} />
     </div>
   )

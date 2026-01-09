@@ -2,7 +2,6 @@
 
 import type { DocumentStatus } from '@prisma/client'
 
-import { Breadcrumbs } from '@/components/Breadcrumbs'
 import { formatCopy, locales } from '@/lib/i18n'
 import { getDocumentsCopy } from '@/lib/i18n/documents'
 import { usePreferredLocale } from '@/lib/usePreferredLocale'
@@ -40,15 +39,6 @@ export function SubmissionDetailClient({
 
   return (
     <div className="space-y-6">
-      <Breadcrumbs
-        variant="light"
-        items={[
-          { label: copy.breadcrumbs.home, href: '/' },
-          { label: copy.breadcrumbs.documents, href: '/documents' },
-          { label: copy.breadcrumbs.submissions, href: '/documents/submissions' },
-          { label: detailLabel },
-        ]}
-      />
       <SubmissionEditor
         initialSubmission={initialSubmission}
         canManage={canManage}
