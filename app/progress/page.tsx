@@ -1,6 +1,8 @@
 import { Suspense } from 'react'
 
+import { ProgressHeader } from './ProgressHeader'
 import { ProgressShell } from './ProgressShell'
+import { ProgressSectionNav } from './ProgressSectionNav'
 import { AccessDenied } from '@/components/AccessDenied'
 import { aggregatePhaseProgress } from '@/lib/progressAggregation'
 import type { RoadSectionProgressDTO, RoadSectionProgressSummaryDTO } from '@/lib/progressTypes'
@@ -12,6 +14,7 @@ import { prisma } from '@/lib/prisma'
 export const dynamic = 'force-dynamic'
 
 export default async function ProgressPage() {
+  const t = getProgressCopy('zh')
   const sessionUser = await getSessionUser()
   const canView =
     !sessionUser || sessionUser?.permissions.includes('progress:view') || false
@@ -19,15 +22,12 @@ export default async function ProgressPage() {
   const canViewInspections = sessionUser?.permissions.includes('inspection:view') || false
 
   if (!canView) {
-    const t = getProgressCopy('zh')
     return <AccessDenied permissions={['progress:view']} hint={t.access.progressViewHint} />
   }
 
   return (
     <Suspense
-      fallback={
-        <ProgressFallback canManage={canManage} canViewInspections={canViewInspections} />
-      }
+      fallback={<ProgressFallback />}
     >
       <ProgressContent canManage={canManage} canViewInspections={canViewInspections} />
     </Suspense>
@@ -90,70 +90,44 @@ async function ProgressContent({ canManage, canViewInspections }: ProgressConten
   )
 }
 
-type ProgressFallbackProps = {
-  canManage: boolean
-  canViewInspections: boolean
-}
-
-function ProgressFallback({ canManage, canViewInspections }: ProgressFallbackProps) {
+function ProgressFallback() {
   const t = getProgressCopy('zh')
 
   return (
-    <main className="min-h-screen bg-slate-950 text-slate-50">
-      <div className="relative mx-auto max-w-6xl px-6 py-14 sm:px-8 xl:max-w-[1500px] xl:px-10 2xl:max-w-[1700px] 2xl:px-12">
-        <div className="absolute inset-x-0 top-10 -z-10 h-48 bg-gradient-to-r from-emerald-300/20 via-blue-300/15 to-amber-200/20 blur-3xl" />
-        <header className="flex flex-col gap-3">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-100">
-            {t.hero.badge}
-          </p>
-          <h1 className="text-4xl font-semibold leading-tight text-slate-50">{t.hero.title}</h1>
-          <p className="max-w-2xl text-sm text-slate-200/80">{t.hero.description}</p>
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-2">
-              {canViewInspections ? (
-                <span className="inline-flex h-9 items-center rounded-full border border-emerald-200/60 px-4 py-2 text-xs font-semibold text-emerald-50 shadow-[0_0_0_1px_rgba(255,255,255,0.08)]">
-                  {t.nav.inspections}
-                </span>
-              ) : null}
-              {canManage ? (
-                <span className="inline-flex h-9 items-center rounded-full border border-blue-200/60 px-4 py-2 text-xs font-semibold text-blue-50 shadow-[0_0_0_1px_rgba(59,130,246,0.35)]">
-                  {t.workflow.badge}
-                </span>
-              ) : null}
-              {canManage ? (
-                <span className="inline-flex h-9 items-center rounded-full bg-emerald-300 px-4 py-2 text-xs font-semibold text-slate-950 shadow-lg shadow-emerald-400/30">
-                  {t.actions.add}
-                </span>
-              ) : null}
-            </div>
-            <span className="inline-flex h-9 items-center rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-slate-100">
-              {t.nav.progress}
-            </span>
-          </div>
-        </header>
-
-        <div className="mt-10 grid gap-4 md:grid-cols-2">
+    <main className="min-h-screen bg-slate-50 text-slate-900">
+      <ProgressHeader
+        title={t.hero.title}
+        subtitle={t.hero.description || undefined}
+        breadcrumbs={[
+          { label: t.nav.home, href: '/' },
+          { label: t.nav.progress },
+        ]}
+        right={<ProgressSectionNav />}
+      />
+      <div className="relative mx-auto max-w-6xl px-6 py-8 sm:px-8 xl:max-w-[1500px] xl:px-10 2xl:max-w-[1700px] 2xl:px-12">
+        <div className="absolute inset-x-0 top-0 -z-10 h-48 bg-gradient-to-r from-emerald-200/50 via-sky-200/40 to-amber-200/40 blur-3xl" />
+        <div className="mt-6 grid gap-4 md:grid-cols-2">
           {Array.from({ length: 4 }).map((_, index) => (
             <div
               // fallback skeleton only
               // eslint-disable-next-line react/no-array-index-key
               key={index}
-              className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-inner shadow-emerald-500/10"
+              className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
             >
               <div className="flex items-center justify-between">
-                <span className="h-4 w-28 rounded-full bg-white/10" />
-                <span className="h-4 w-12 rounded-full bg-white/10" />
+                <span className="h-4 w-28 rounded-full bg-slate-200" />
+                <span className="h-4 w-12 rounded-full bg-slate-200" />
               </div>
               <div className="mt-4 space-y-2">
-                <div className="h-3 w-full rounded-full bg-white/10" />
-                <div className="h-3 w-3/4 rounded-full bg-white/10" />
-                <div className="h-3 w-2/3 rounded-full bg-white/10" />
+                <div className="h-3 w-full rounded-full bg-slate-200" />
+                <div className="h-3 w-3/4 rounded-full bg-slate-200" />
+                <div className="h-3 w-2/3 rounded-full bg-slate-200" />
               </div>
-              <div className="mt-4 h-10 rounded-xl bg-white/5" />
+              <div className="mt-4 h-10 rounded-xl bg-slate-100" />
             </div>
           ))}
         </div>
-        <p className="mt-6 text-xs text-slate-300/80">加载进度数据中...</p>
+        <p className="mt-6 text-xs text-slate-500">加载进度数据中...</p>
       </div>
     </main>
   )

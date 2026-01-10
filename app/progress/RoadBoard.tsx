@@ -177,16 +177,16 @@ const RoadBoard = forwardRef<RoadBoardHandle, Props>(function RoadBoard(
   return (
     <div className="space-y-8">
       <section className="space-y-4">
-        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-200">
+        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
           {t.list.overview}
-          <span className="h-px w-12 bg-white/30" />
+          <span className="h-px w-12 bg-slate-200" />
           {sortedRoads.length === 0
             ? t.list.none
             : formatProgressCopy(t.list.count, { count: sortedRoads.length })}
         </div>
 
         {sortedRoads.length === 0 ? (
-          <div className="rounded-3xl border border-dashed border-white/15 bg-white/5 p-6 text-sm text-slate-200/80">
+          <div className="rounded-3xl border border-dashed border-slate-200 bg-slate-50 p-6 text-sm text-slate-600">
             {t.list.emptyHelp}
           </div>
         ) : (
@@ -237,7 +237,7 @@ interface RoadCardProps {
 }
 
 const chipTone =
-  'rounded-full bg-white/10 px-3 py-1 text-[11px] font-semibold text-slate-100 shadow-inner shadow-slate-900/30'
+  'rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-700 shadow-inner shadow-slate-200/60'
 
 const RoadCard = ({ road, onEdit, onDelete, canManage, locale }: RoadCardProps) => {
   const copy = getProgressCopy(locale)
@@ -257,17 +257,17 @@ const RoadCard = ({ road, onEdit, onDelete, canManage, locale }: RoadCardProps) 
       href={`/progress/${road.slug}`}
       className="group block"
     >
-      <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-white/5 p-5 shadow-xl shadow-slate-950/30 transition duration-150 group-hover:-translate-y-0.5 group-hover:border-white/25">
-        <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-300 via-blue-300 to-cyan-200" />
+      <div className="relative overflow-hidden rounded-3xl border border-slate-200 bg-white p-5 shadow-sm transition duration-150 group-hover:-translate-y-0.5 group-hover:border-slate-300">
+        <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-400 via-sky-400 to-cyan-300" />
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-xs text-slate-200/70">{copy.card.label}</p>
-            <h3 className="text-xl font-semibold text-slate-50">{resolveRoadName(road, locale)}</h3>
-            <p className="mt-1 text-xs text-slate-200/70">
+            <p className="text-xs text-slate-500">{copy.card.label}</p>
+            <h3 className="text-xl font-semibold text-slate-900">{resolveRoadName(road, locale)}</h3>
+            <p className="mt-1 text-xs text-slate-600">
               {copy.card.start} <span className={chipTone}>{road.startPk}</span> · {copy.card.end}{' '}
               <span className={chipTone}>{road.endPk}</span>
             </p>
-            <p className="mt-1 text-[11px] text-emerald-100/80">
+            <p className="mt-1 text-[11px] text-emerald-700">
               {copy.card.slug}：{road.slug}
             </p>
           </div>
@@ -279,7 +279,7 @@ const RoadCard = ({ road, onEdit, onDelete, canManage, locale }: RoadCardProps) 
                   event.preventDefault()
                   onEdit(road)
                 }}
-                className="rounded-xl border border-white/15 px-3 py-2 text-[11px] font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/10"
+                className="rounded-xl border border-slate-200 px-3 py-2 text-[11px] font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
               >
                 {copy.card.edit}
               </button>
@@ -289,7 +289,7 @@ const RoadCard = ({ road, onEdit, onDelete, canManage, locale }: RoadCardProps) 
                   event.preventDefault()
                   onDelete(road.id)
                 }}
-                className="rounded-xl border border-white/15 px-3 py-2 text-[11px] font-semibold text-rose-100 transition hover:border-rose-200/60 hover:bg-rose-200/10"
+                className="rounded-xl border border-rose-200 px-3 py-2 text-[11px] font-semibold text-rose-700 transition hover:border-rose-300 hover:bg-rose-50"
               >
                 {copy.card.delete}
               </button>
@@ -303,27 +303,27 @@ const RoadCard = ({ road, onEdit, onDelete, canManage, locale }: RoadCardProps) 
                 const progressWidth = Math.max(0, Math.min(100, phase.completedPercent))
                 const tone =
                   progressWidth >= 80
-                    ? 'from-cyan-500 via-sky-500 to-indigo-500'
+                    ? 'from-emerald-400 via-sky-400 to-cyan-400'
                     : progressWidth >= 50
-                      ? 'from-sky-500 via-blue-500 to-violet-500'
+                      ? 'from-emerald-300 via-sky-300 to-cyan-300'
                       : progressWidth > 0
-                        ? 'from-sky-400 via-cyan-400 to-blue-500'
-                        : 'from-slate-500 via-slate-600 to-slate-500'
+                        ? 'from-emerald-200 via-sky-200 to-cyan-200'
+                        : 'from-slate-200 via-slate-300 to-slate-200'
                 return (
-                  <div key={phase.phaseId} className="flex flex-wrap items-center gap-2 rounded-2xl border border-white/10 bg-slate-900/40 p-3 shadow-inner shadow-slate-900/30">
-                    <div className="relative flex-1 overflow-hidden rounded-xl bg-white/5">
+                  <div key={phase.phaseId} className="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-3 shadow-inner shadow-slate-100">
+                    <div className="relative flex-1 overflow-hidden rounded-xl bg-slate-100">
                       <div
                         className={`absolute inset-y-0 left-0 rounded-xl bg-gradient-to-r ${tone} transition-all`}
                         style={{ width: `${progressWidth}%` }}
                       />
-                      <div className="relative flex items-center justify-between px-3 py-2 text-[13px] font-semibold text-slate-50">
+                      <div className="relative flex items-center justify-between px-3 py-2 text-[13px] font-semibold text-slate-900">
                         <span className="truncate">
                           {localizeProgressTerm('phase', phase.phaseName, locale)}
                         </span>
                         <span className="text-xs font-bold">{progressWidth}%</span>
                       </div>
                     </div>
-                    <span className="rounded-full bg-white/10 px-3 py-1 text-[11px] font-semibold text-slate-200">
+                    <span className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-600">
                       {formatDesignLength(phase)}
                     </span>
                   </div>
@@ -331,9 +331,9 @@ const RoadCard = ({ road, onEdit, onDelete, canManage, locale }: RoadCardProps) 
               })}
             </div>
           ) : (
-            <p className="text-sm text-slate-300">{copy.phase.list.emptyHint}</p>
+            <p className="text-sm text-slate-600">{copy.phase.list.emptyHint}</p>
           )}
-          <p className="text-xs text-slate-400">
+          <p className="text-xs text-slate-500">
             {copy.card.updated}
             {new Date(road.updatedAt).toLocaleString(locale === 'fr' ? 'fr-FR' : 'zh-CN', {
               hour12: false,

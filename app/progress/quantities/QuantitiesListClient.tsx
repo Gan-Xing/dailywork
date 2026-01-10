@@ -6,6 +6,10 @@ import { useMemo, useState } from 'react'
 import type { MultiSelectOption } from '@/components/MultiSelectFilter'
 import { MultiSelectFilter } from '@/components/MultiSelectFilter'
 import type { RoadPhaseManagementRow } from '@/lib/phaseItemTypes'
+import { ProgressHeader } from '../ProgressHeader'
+import { ProgressSectionNav } from '../ProgressSectionNav'
+import { locales } from '@/lib/i18n'
+import { usePreferredLocale } from '@/lib/usePreferredLocale'
 
 type Props = {
   rows: RoadPhaseManagementRow[]
@@ -50,6 +54,7 @@ const compareText = (a: string, b: string) =>
   a.localeCompare(b, 'zh-CN', { sensitivity: 'base' })
 
 export default function QuantitiesListClient({ rows }: Props) {
+  const { locale, setLocale } = usePreferredLocale('zh', locales)
   const [selectedRoads, setSelectedRoads] = useState<string[]>([])
   const [selectedPhases, setSelectedPhases] = useState<string[]>([])
   const [selectedTemplates, setSelectedTemplates] = useState<string[]>([])
@@ -159,7 +164,7 @@ export default function QuantitiesListClient({ rows }: Props) {
     noOptionsLabel: '暂无选项',
     searchPlaceholder: '搜索',
   }
-  const sharedFilterProps = { ...filterControlProps, className: 'w-full text-slate-200' }
+  const sharedFilterProps = { ...filterControlProps, className: 'w-full text-slate-700' }
 
   const filteredRows = useMemo(() => {
     return rowsWithMeta.filter((row) => {
@@ -246,50 +251,30 @@ export default function QuantitiesListClient({ rows }: Props) {
   const renderSortIcon = (key: SortKey) => {
     if (sortKey !== key) return <span className="text-[10px] text-slate-400">↕</span>
     return (
-      <span className="text-[10px] text-emerald-200">{sortOrder === 'asc' ? '↑' : '↓'}</span>
+      <span className="text-[10px] text-emerald-600">{sortOrder === 'asc' ? '↑' : '↓'}</span>
     )
   }
 
   return (
-    <main className="min-h-screen bg-slate-950 text-slate-50">
-      <div className="relative mx-auto max-w-6xl px-6 py-14 sm:px-8 xl:max-w-[1500px] xl:px-10 2xl:max-w-[1700px] 2xl:px-12">
-        <div className="absolute inset-x-0 top-10 -z-10 h-48 bg-gradient-to-r from-emerald-300/20 via-blue-300/15 to-amber-200/20 blur-3xl" />
-        <header className="flex flex-col gap-3">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-100">
-            分项工程管理
-          </p>
-          <h1 className="text-4xl font-semibold leading-tight text-slate-50">
-            分项工程管理列表
-          </h1>
-          <p className="max-w-2xl text-sm text-slate-200/80">
-            汇总所有路段分项工程，进入详情页维护区间计量与公式配置。
-          </p>
-          <nav className="flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-200/80">
-            <Link
-              href="/"
-              className="rounded-full border border-white/10 bg-white/5 px-3 py-1 transition hover:border-white/25 hover:bg-white/10"
-            >
-              首页
-            </Link>
-            <span className="text-slate-500">/</span>
-            <Link
-              href="/progress"
-              className="rounded-full border border-white/10 bg-white/5 px-3 py-1 transition hover:border-white/25 hover:bg-white/10"
-            >
-              进度管理
-            </Link>
-            <span className="text-slate-500">/</span>
-            <span className="rounded-full border border-white/5 bg-white/5 px-3 py-1 text-slate-100">
-              分项工程管理
-            </span>
-          </nav>
-        </header>
-
-        <section className="mt-10 space-y-4">
-          <div className="rounded-3xl border border-white/10 bg-white/5 p-4 text-sm text-slate-200/80">
+    <main className="min-h-screen bg-slate-50 text-slate-900">
+      <ProgressHeader
+        title="分项列表"
+        breadcrumbs={[
+          { label: '首页', href: '/' },
+          { label: '进度管理', href: '/progress' },
+          { label: '分项列表' },
+        ]}
+        right={<ProgressSectionNav />}
+        locale={locale}
+        onLocaleChange={setLocale}
+      />
+      <div className="relative mx-auto max-w-6xl px-6 py-8 sm:px-8 xl:max-w-[1500px] xl:px-10 2xl:max-w-[1700px] 2xl:px-12">
+        <div className="absolute inset-x-0 top-0 -z-10 h-48 bg-gradient-to-r from-emerald-200/50 via-sky-200/40 to-amber-200/40 blur-3xl" />
+        <section className="space-y-4">
+          <div className="rounded-3xl border border-slate-200 bg-white p-4 text-sm text-slate-600 shadow-sm">
             共 {rowsWithMeta.length} 条分项工程记录，筛选后 {sortedRows.length} 条
           </div>
-          <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
+          <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
               <MultiSelectFilter
                 label="路段"
@@ -342,10 +327,10 @@ export default function QuantitiesListClient({ rows }: Props) {
               />
             </div>
           </div>
-          <div className="overflow-hidden rounded-3xl border border-white/10 bg-white/5">
+          <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
             <div className="overflow-x-auto">
               <table className="min-w-full text-sm">
-                <thead className="bg-white/5 text-xs uppercase tracking-[0.16em] text-slate-300">
+                <thead className="bg-slate-50 text-xs uppercase tracking-[0.16em] text-slate-500">
                   <tr>
                     <th className="px-4 py-3 text-left">
                       <button
@@ -417,38 +402,38 @@ export default function QuantitiesListClient({ rows }: Props) {
                         {renderSortIcon('updatedAt')}
                       </button>
                     </th>
-                    <th className="px-4 py-3 text-right">操作</th>
+                    <th className="px-4 py-3 text-right whitespace-nowrap">操作</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-white/10">
+                <tbody className="divide-y divide-slate-200">
                   {sortedRows.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="px-4 py-6 text-center text-slate-300">
+                      <td colSpan={8} className="px-4 py-6 text-center text-slate-500">
                         暂无分项工程
                       </td>
                     </tr>
                   ) : (
                     sortedRows.map((row) => (
-                      <tr key={row.phaseId} className="text-slate-100/90">
+                      <tr key={row.phaseId} className="text-slate-700">
                         <td className="px-4 py-3">
-                          <div className="font-semibold text-slate-50">{row.roadName}</div>
-                          <div className="text-xs text-slate-400">{row.roadSlug}</div>
+                          <div className="font-semibold text-slate-900">{row.roadName}</div>
+                          <div className="text-xs text-slate-500">{row.roadSlug}</div>
                         </td>
                         <td className="px-4 py-3">{row.phaseName}</td>
-                        <td className="px-4 py-3 text-slate-300">{row.definitionName}</td>
-                        <td className="px-4 py-3 text-slate-300">{row.displayLabel}</td>
-                        <td className="px-4 py-3 text-slate-300">{row.intervalCount}</td>
-                        <td className="px-4 py-3 text-slate-300">{row.projectLabel}</td>
-                        <td className="px-4 py-3 text-slate-400">
+                        <td className="px-4 py-3 text-slate-600">{row.definitionName}</td>
+                        <td className="px-4 py-3 text-slate-600">{row.displayLabel}</td>
+                        <td className="px-4 py-3 text-slate-600">{row.intervalCount}</td>
+                        <td className="px-4 py-3 text-slate-600">{row.projectLabel}</td>
+                        <td className="px-4 py-3 text-slate-500">
                           {new Date(row.updatedAt).toLocaleString('zh-CN', {
                             dateStyle: 'medium',
                             timeStyle: 'short',
                           })}
                         </td>
-                        <td className="px-4 py-3 text-right">
+                        <td className="px-4 py-3 text-right whitespace-nowrap">
                           <Link
                             href={`/progress/quantities/${row.phaseId}`}
-                            className="inline-flex items-center rounded-full border border-emerald-200/60 px-4 py-1 text-xs font-semibold text-emerald-50 transition hover:border-white/80 hover:bg-white/10"
+                            className="inline-flex items-center whitespace-nowrap rounded-full border border-emerald-200 bg-emerald-50 px-4 py-1 text-xs font-semibold text-emerald-700 transition hover:border-emerald-300 hover:bg-emerald-100"
                           >
                             进入详情
                           </Link>

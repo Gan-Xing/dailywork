@@ -1,6 +1,4 @@
 'use client'
-
-import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 
 import { useToast } from '@/components/ToastProvider'
@@ -13,6 +11,10 @@ import type {
   PhaseItemInputDTO,
   RoadPhaseQuantityDetailDTO,
 } from '@/lib/phaseItemTypes'
+import { ProgressHeader } from '../../ProgressHeader'
+import { ProgressSectionNav } from '../../ProgressSectionNav'
+import { locales } from '@/lib/i18n'
+import { usePreferredLocale } from '@/lib/usePreferredLocale'
 
 type Props = {
   detail: RoadPhaseQuantityDetailDTO
@@ -72,6 +74,7 @@ const calcIntervalLength = (startPk: number, endPk: number, side: string) => {
 }
 
 export default function QuantitiesDetailClient({ detail, canEdit }: Props) {
+  const { locale, setLocale } = usePreferredLocale('zh', locales)
   const { addToast } = useToast()
   const [activeTab, setActiveTab] = useState<'intervals' | 'config'>('intervals')
   const [phaseItems, setPhaseItems] = useState<PhaseItemDTO[]>(detail.phaseItems)
@@ -322,63 +325,42 @@ export default function QuantitiesDetailClient({ detail, canEdit }: Props) {
   }
 
   return (
-    <main className="min-h-screen bg-slate-950 text-slate-50">
-      <div className="relative mx-auto max-w-6xl px-6 py-14 sm:px-8 xl:max-w-[1500px] xl:px-10 2xl:max-w-[1700px] 2xl:px-12">
-        <div className="absolute inset-x-0 top-10 -z-10 h-48 bg-gradient-to-r from-emerald-300/20 via-blue-300/15 to-amber-200/20 blur-3xl" />
-        <header className="flex flex-col gap-3">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-100">
-            分项工程详情
-          </p>
-          <h1 className="text-4xl font-semibold leading-tight text-slate-50">
-            {detail.phase.name}
-          </h1>
-          <p className="max-w-2xl text-sm text-slate-200/80">
-            路段：{detail.road.name} · 模板：{detail.phase.definitionName}
-          </p>
-          <nav className="flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-200/80">
-            <Link
-              href="/"
-              className="rounded-full border border-white/10 bg-white/5 px-3 py-1 transition hover:border-white/25 hover:bg-white/10"
-            >
-              首页
-            </Link>
-            <span className="text-slate-500">/</span>
-            <Link
-              href="/progress"
-              className="rounded-full border border-white/10 bg-white/5 px-3 py-1 transition hover:border-white/25 hover:bg-white/10"
-            >
-              进度管理
-            </Link>
-            <span className="text-slate-500">/</span>
-            <Link
-              href="/progress/quantities"
-              className="rounded-full border border-white/10 bg-white/5 px-3 py-1 transition hover:border-white/25 hover:bg-white/10"
-            >
-              分项工程管理
-            </Link>
-            <span className="text-slate-500">/</span>
-            <span className="rounded-full border border-white/5 bg-white/5 px-3 py-1 text-slate-100">
-              详情
-            </span>
-          </nav>
-          <div className="flex flex-wrap gap-3 text-xs font-semibold text-slate-200/80">
-            <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">
-              显示方式：{detail.phase.measure === 'LINEAR' ? '延米' : '单体'}
-            </span>
-            <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">
-              项目：{detail.road.projectName ?? '未绑定项目'}
-            </span>
+    <main className="min-h-screen bg-slate-50 text-slate-900">
+      <ProgressHeader
+        title={detail.phase.name}
+        subtitle={`路段：${detail.road.name} · 模板：${detail.phase.definitionName}`}
+        breadcrumbs={[
+          { label: '首页', href: '/' },
+          { label: '进度管理', href: '/progress' },
+          { label: '分项列表', href: '/progress/quantities' },
+          { label: '详情' },
+        ]}
+        right={
+          <div className="flex flex-wrap items-center gap-3">
+            <ProgressSectionNav />
+            <div className="flex flex-wrap gap-2 text-xs font-semibold text-slate-600">
+              <span className="rounded-full border border-slate-200 bg-white px-3 py-1">
+                显示方式：{detail.phase.measure === 'LINEAR' ? '延米' : '单体'}
+              </span>
+              <span className="rounded-full border border-slate-200 bg-white px-3 py-1">
+                项目：{detail.road.projectName ?? '未绑定项目'}
+              </span>
+            </div>
           </div>
-        </header>
-
-        <div className="mt-8 flex flex-wrap items-center gap-2 text-xs font-semibold">
+        }
+        locale={locale}
+        onLocaleChange={setLocale}
+      />
+      <div className="relative mx-auto max-w-6xl px-6 py-8 sm:px-8 xl:max-w-[1500px] xl:px-10 2xl:max-w-[1700px] 2xl:px-12">
+        <div className="absolute inset-x-0 top-0 -z-10 h-48 bg-gradient-to-r from-emerald-200/50 via-sky-200/40 to-amber-200/40 blur-3xl" />
+        <div className="flex flex-wrap items-center gap-2 text-xs font-semibold">
           <button
             type="button"
             onClick={() => setActiveTab('intervals')}
             className={`rounded-full border px-4 py-1 transition ${
               activeTab === 'intervals'
-                ? 'border-transparent bg-emerald-300 text-slate-950 shadow-lg shadow-emerald-400/30'
-                : 'border-white/15 bg-white/5 text-slate-100 hover:border-white/40 hover:bg-white/10'
+                ? 'border-transparent bg-emerald-500 text-white shadow-lg shadow-emerald-200/60'
+                : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50'
             }`}
           >
             区间计量
@@ -388,8 +370,8 @@ export default function QuantitiesDetailClient({ detail, canEdit }: Props) {
             onClick={() => setActiveTab('config')}
             className={`rounded-full border px-4 py-1 transition ${
               activeTab === 'config'
-                ? 'border-transparent bg-emerald-300 text-slate-950 shadow-lg shadow-emerald-400/30'
-                : 'border-white/15 bg-white/5 text-slate-100 hover:border-white/40 hover:bg-white/10'
+                ? 'border-transparent bg-emerald-500 text-white shadow-lg shadow-emerald-200/60'
+                : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50'
             }`}
           >
             公式与清单绑定
@@ -397,12 +379,12 @@ export default function QuantitiesDetailClient({ detail, canEdit }: Props) {
         </div>
 
         <section className="mt-8 space-y-6">
-          <div className="flex flex-wrap items-center gap-3 rounded-3xl border border-white/10 bg-white/5 p-4">
-            <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-300">
+          <div className="flex flex-wrap items-center gap-3 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
               当前分项名称
             </div>
             <select
-              className="rounded-full border border-white/20 bg-slate-900/60 px-4 py-2 text-sm text-slate-100"
+              className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm text-slate-900"
               value={selectedPhaseItemId ?? ''}
               onChange={(event) => setSelectedPhaseItemId(Number(event.target.value) || null)}
             >
@@ -418,11 +400,11 @@ export default function QuantitiesDetailClient({ detail, canEdit }: Props) {
               )}
             </select>
             {selectedItem?.formula?.expression ? (
-              <span className="rounded-full border border-emerald-200/50 bg-emerald-300/10 px-3 py-1 text-xs text-emerald-100">
+              <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs text-emerald-700">
                 公式：{selectedItem.formula.expression}
               </span>
             ) : (
-              <span className="rounded-full border border-amber-200/40 bg-amber-200/10 px-3 py-1 text-xs text-amber-100">
+              <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs text-amber-700">
                 尚未配置公式
               </span>
             )}
@@ -431,7 +413,7 @@ export default function QuantitiesDetailClient({ detail, canEdit }: Props) {
           {activeTab === 'intervals' ? (
             <div className="space-y-4">
               {phaseItems.length === 0 ? (
-                <div className="rounded-3xl border border-white/10 bg-white/5 p-6 text-sm text-slate-200/80">
+                <div className="rounded-3xl border border-slate-200 bg-slate-50 p-6 text-sm text-slate-600">
                   当前分项模板暂无分项名称，无法录入计量。
                 </div>
               ) : (
@@ -454,31 +436,31 @@ export default function QuantitiesDetailClient({ detail, canEdit }: Props) {
                   return (
                     <div
                       key={interval.id}
-                      className="rounded-3xl border border-white/10 bg-white/5 p-4"
+                      className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm"
                     >
-                      <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-200/80">
-                        <div className="font-semibold text-slate-50">
+                      <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
+                        <div className="font-semibold text-slate-900">
                           PK {interval.startPk} - {interval.endPk} · {interval.side}
                           {interval.spec ? ` · ${interval.spec}` : ''}
                         </div>
-                        <div className="text-xs text-slate-400">
+                        <div className="text-xs text-slate-500">
                           计量长度：{formatNumber(length)}
                         </div>
                       </div>
                       {inputFields.length === 0 ? (
-                        <p className="mt-3 text-xs text-slate-400">
+                        <p className="mt-3 text-xs text-slate-500">
                           未配置输入字段，公式可直接使用 length、rawLength 等内置变量。
                         </p>
                       ) : (
                         <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                           {inputFields.map((field) => (
-                            <label key={field.key} className="flex flex-col gap-1 text-xs text-slate-300">
+                            <label key={field.key} className="flex flex-col gap-1 text-xs text-slate-600">
                               {field.label}
                               {field.unit ? (
                                 <span className="text-[10px] text-slate-500">{field.unit}</span>
                               ) : null}
                               <input
-                                className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
+                                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-emerald-300 focus:outline-none"
                                 value={draft?.values?.[field.key] ?? ''}
                                 onChange={(event) =>
                                   handleFieldChange(interval.id, field.key, event.target.value)
@@ -491,21 +473,21 @@ export default function QuantitiesDetailClient({ detail, canEdit }: Props) {
                         </div>
                       )}
                       <div className="mt-4 grid gap-3 md:grid-cols-3">
-                        <div className="rounded-2xl border border-white/10 bg-white/5 px-3 py-3 text-sm text-slate-200/80">
+                        <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-600">
                           计算值：{formatNumber(computed)}
                           {input?.computedError ? (
-                            <div className="mt-1 text-xs text-amber-200">
+                            <div className="mt-1 text-xs text-amber-700">
                               {input.computedError}
                             </div>
                           ) : null}
                         </div>
-                        <label className="flex flex-col gap-1 text-xs text-slate-300">
+                        <label className="flex flex-col gap-1 text-xs text-slate-600">
                           手动值
                           <input
-                            className={`rounded-xl border px-3 py-2 text-sm text-slate-50 focus:outline-none ${
+                            className={`rounded-xl border px-3 py-2 text-sm text-slate-900 focus:outline-none ${
                               mismatch
-                                ? 'border-amber-300 bg-amber-200/10'
-                                : 'border-white/15 bg-white/10 focus:border-emerald-300'
+                                ? 'border-amber-300 bg-amber-50'
+                                : 'border-slate-200 bg-white focus:border-emerald-300'
                             }`}
                             value={draft?.manualQuantity ?? ''}
                             onChange={(event) => handleManualChange(interval.id, event.target.value)}
@@ -518,7 +500,7 @@ export default function QuantitiesDetailClient({ detail, canEdit }: Props) {
                             type="button"
                             onClick={() => saveInterval(interval.id)}
                             disabled={!canEdit || savingIntervals.includes(interval.id)}
-                            className="inline-flex items-center rounded-full border border-emerald-200/60 px-4 py-2 text-xs font-semibold text-emerald-50 transition hover:border-white/80 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+                            className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-semibold text-emerald-700 transition hover:border-emerald-300 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
                           >
                             {savingIntervals.includes(interval.id) ? '保存中...' : '保存区间'}
                           </button>
@@ -531,13 +513,13 @@ export default function QuantitiesDetailClient({ detail, canEdit }: Props) {
             </div>
           ) : (
             <div className="grid gap-6 lg:grid-cols-2">
-              <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
-                <h2 className="text-sm font-semibold text-slate-50">公式配置</h2>
-                <div className="mt-4 space-y-3 text-sm text-slate-200/80">
-                  <label className="flex flex-col gap-2 text-xs text-slate-300">
+              <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
+                <h2 className="text-sm font-semibold text-slate-900">公式配置</h2>
+                <div className="mt-4 space-y-3 text-sm text-slate-600">
+                  <label className="flex flex-col gap-2 text-xs text-slate-600">
                     公式表达式
                     <input
-                      className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
+                      className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-emerald-300 focus:outline-none"
                       value={formulaDraft.expression}
                       onChange={(event) =>
                         setFormulaDraft((prev) => ({ ...prev, expression: event.target.value }))
@@ -546,10 +528,10 @@ export default function QuantitiesDetailClient({ detail, canEdit }: Props) {
                       disabled={!canEdit}
                     />
                   </label>
-                  <label className="flex flex-col gap-2 text-xs text-slate-300">
+                  <label className="flex flex-col gap-2 text-xs text-slate-600">
                     输出单位
                     <input
-                      className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
+                      className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-emerald-300 focus:outline-none"
                       value={formulaDraft.unitString}
                       onChange={(event) =>
                         setFormulaDraft((prev) => ({ ...prev, unitString: event.target.value }))
@@ -558,10 +540,10 @@ export default function QuantitiesDetailClient({ detail, canEdit }: Props) {
                       disabled={!canEdit}
                     />
                   </label>
-                  <label className="flex flex-col gap-2 text-xs text-slate-300">
+                  <label className="flex flex-col gap-2 text-xs text-slate-600">
                     输入字段 JSON
                     <textarea
-                      className="min-h-[180px] rounded-2xl border border-white/15 bg-white/10 px-3 py-2 text-xs text-slate-50 focus:border-emerald-300 focus:outline-none"
+                      className="min-h-[180px] rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 focus:border-emerald-300 focus:outline-none"
                       value={formulaDraft.inputSchema}
                       onChange={(event) =>
                         setFormulaDraft((prev) => ({ ...prev, inputSchema: event.target.value }))
@@ -574,20 +556,20 @@ export default function QuantitiesDetailClient({ detail, canEdit }: Props) {
                     type="button"
                     onClick={saveFormula}
                     disabled={!canEdit || savingFormula}
-                    className="inline-flex items-center rounded-full border border-emerald-200/60 px-4 py-2 text-xs font-semibold text-emerald-50 transition hover:border-white/80 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-semibold text-emerald-700 transition hover:border-emerald-300 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {savingFormula ? '保存中...' : '保存公式'}
                   </button>
                 </div>
               </div>
-              <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
-                <h2 className="text-sm font-semibold text-slate-50">清单绑定</h2>
+              <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
+                <h2 className="text-sm font-semibold text-slate-900">清单绑定</h2>
                 {detail.road.projectId ? (
-                  <div className="mt-4 space-y-4 text-sm text-slate-200/80">
-                    <label className="flex flex-col gap-2 text-xs text-slate-300">
+                  <div className="mt-4 space-y-4 text-sm text-slate-600">
+                    <label className="flex flex-col gap-2 text-xs text-slate-600">
                       当前项目清单条目
                       <select
-                        className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
+                        className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-emerald-300 focus:outline-none"
                         value={boqSelection}
                         onChange={(event) => setBoqSelection(event.target.value)}
                         disabled={!canEdit}
@@ -601,12 +583,12 @@ export default function QuantitiesDetailClient({ detail, canEdit }: Props) {
                       </select>
                     </label>
                     {selectedItem?.boqBinding ? (
-                      <div className="rounded-2xl border border-white/10 bg-white/5 p-3 text-xs text-slate-300">
+                      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
                         已绑定：{selectedItem.boqBinding.code} ·{' '}
                         {selectedItem.boqBinding.designationZh}
                       </div>
                     ) : (
-                      <div className="rounded-2xl border border-amber-200/40 bg-amber-200/10 p-3 text-xs text-amber-100">
+                      <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-700">
                         当前分项尚未绑定本项目清单条目
                       </div>
                     )}
@@ -614,13 +596,13 @@ export default function QuantitiesDetailClient({ detail, canEdit }: Props) {
                       type="button"
                       onClick={saveBoqBinding}
                       disabled={!canEdit || savingBoq}
-                      className="inline-flex items-center rounded-full border border-emerald-200/60 px-4 py-2 text-xs font-semibold text-emerald-50 transition hover:border-white/80 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+                      className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-semibold text-emerald-700 transition hover:border-emerald-300 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       {savingBoq ? '保存中...' : '保存绑定'}
                     </button>
                   </div>
                 ) : (
-                  <div className="mt-4 rounded-2xl border border-amber-200/40 bg-amber-200/10 p-3 text-xs text-amber-100">
+                  <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-700">
                     路段尚未绑定项目，无法筛选清单条目。
                   </div>
                 )}

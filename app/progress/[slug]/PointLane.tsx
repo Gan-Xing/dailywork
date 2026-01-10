@@ -135,19 +135,19 @@ export function PointLane({
   return (
     <div className={wrapperClassName}>
       {showHeader ? (
-        <div className="flex items-center justify-between text-xs text-slate-200/80">
+        <div className="flex items-center justify-between text-xs text-slate-600">
           {label ? (
-            <span className="rounded-full bg-white/10 px-2 py-1 text-[11px] font-semibold">
+            <span className="rounded-full bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-700">
               {label}
             </span>
           ) : null}
-          {rangeLabel ? <span className="text-slate-300">{rangeLabel}</span> : null}
+          {rangeLabel ? <span className="text-slate-500">{rangeLabel}</span> : null}
         </div>
       ) : null}
       <div className="space-y-3" ref={containerRef}>
         {rows.map((row, rowIndex) => (
           <div key={`${phase.id}-${rowIndex}`} className={containerClassName}>
-            <div className="absolute left-6 right-6 top-1/2 h-1 -translate-y-1/2 rounded-full bg-gradient-to-r from-slate-800 via-slate-900 to-slate-800" />
+            <div className="absolute left-6 right-6 top-1/2 h-1 -translate-y-1/2 rounded-full bg-gradient-to-r from-slate-200 via-slate-300 to-slate-200" />
             <div
               className="relative grid items-center gap-4"
               style={{ gridTemplateColumns: `repeat(${row.length}, minmax(0, 1fr))` }}
@@ -176,13 +176,13 @@ export function PointLane({
                     onClick={() => handlePointClick(item)}
                     title={`${rangeText} · ${sideLabelText}`}
                   >
-                    <div className="flex h-14 w-14 items-center justify-center rounded-full bg-slate-950/80 p-1 shadow-lg shadow-emerald-400/25 ring-2 ring-white/20">
+                    <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white p-1 shadow-lg shadow-emerald-200/50 ring-2 ring-slate-200">
                       <PointProgressWave percent={progress.percent} size={52} className="h-12 w-12" />
                     </div>
-                    <div className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-semibold text-slate-200">
+                    <div className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-700">
                       {formatPK(entry.centerPk)}
                     </div>
-                    <p className="text-[10px] text-slate-300">{sideLabelText}</p>
+                    <p className="text-[10px] text-slate-500">{sideLabelText}</p>
                   </button>
                 )
               })}

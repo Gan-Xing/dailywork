@@ -33,7 +33,7 @@ const createRoadSummary = (roads: string[]) => {
 export function PhaseAggregateBoard({ phases, aggregateCopy, locale }: Props) {
   if (!phases.length) {
     return (
-      <div className="rounded-3xl border border-dashed border-white/15 bg-white/5 p-6 text-sm text-slate-200/80">
+      <div className="rounded-3xl border border-dashed border-slate-200 bg-slate-50 p-6 text-sm text-slate-600">
         {aggregateCopy.empty}
       </div>
     )
@@ -62,13 +62,13 @@ export function PhaseAggregateBoard({ phases, aggregateCopy, locale }: Props) {
         return (
           <article
             key={phase.id}
-            className="rounded-3xl border border-white/10 bg-white/5 p-5 shadow-xl shadow-slate-950/30"
+            className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm"
           >
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <h3 className="text-lg font-semibold text-slate-50">{localizedName}</h3>
+                <h3 className="text-lg font-semibold text-slate-900">{localizedName}</h3>
                 {roadSummary ? (
-                  <p className="text-xs text-slate-400">
+                  <p className="text-xs text-slate-500">
                     {formatProgressCopy(aggregateCopy.roadsLabel, {
                       roads: roadSummary,
                     })}
@@ -76,23 +76,23 @@ export function PhaseAggregateBoard({ phases, aggregateCopy, locale }: Props) {
                 ) : null}
               </div>
               <div className="space-y-1 text-right">
-                <p className="text-sm font-semibold text-emerald-200">{percentLabel}%</p>
+                <p className="text-sm font-semibold text-emerald-700">{percentLabel}%</p>
                 {updatedAt ? (
-                  <p className="text-[11px] text-slate-400">{aggregateCopy.updatedLabel}{updatedAt}</p>
+                  <p className="text-[11px] text-slate-500">{aggregateCopy.updatedLabel}{updatedAt}</p>
                 ) : null}
               </div>
             </div>
 
             <div className="mt-4 space-y-3">
-              <div className="rounded-full bg-slate-900/70 p-1 shadow-inner shadow-slate-900/50">
-                <div className="relative h-2 rounded-full bg-slate-800/60">
+              <div className="rounded-full bg-slate-100 p-1 shadow-inner shadow-slate-200/60">
+                <div className="relative h-2 rounded-full bg-slate-200">
                   <div
                     className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-emerald-400 to-cyan-400"
                     style={{ width: `${percentLabel}%` }}
                   />
                 </div>
               </div>
-              <p className="text-xs text-slate-300">
+              <p className="text-xs text-slate-600">
                 {formatProgressCopy(
                   isPoint ? aggregateCopy.pointSummary : aggregateCopy.linearSummary,
                   {
@@ -111,14 +111,14 @@ export function PhaseAggregateBoard({ phases, aggregateCopy, locale }: Props) {
                         key={`${phase.id}-unit-${idx}`}
                         className={`h-5 w-5 rounded-full border ${
                           isCompleted
-                            ? 'border-emerald-300 bg-emerald-300/70 shadow shadow-emerald-300/40'
-                            : 'border-white/20 bg-slate-800/80'
+                            ? 'border-emerald-300 bg-emerald-300/70 shadow shadow-emerald-200/60'
+                            : 'border-slate-200 bg-slate-100'
                         }`}
                       />
                     )
                   })}
                   {extraDots > 0 ? (
-                    <span className="text-[11px] text-slate-400">
+                    <span className="text-[11px] text-slate-500">
                       {formatProgressCopy(aggregateCopy.moreUnits, { count: extraDots })}
                     </span>
                   ) : null}

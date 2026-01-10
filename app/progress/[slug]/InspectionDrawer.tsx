@@ -252,32 +252,32 @@ export function InspectionDrawer({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/80 px-4 py-6 backdrop-blur sm:items-center sm:py-10">
-      <div className="relative flex w-full max-w-3xl flex-col overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-b from-slate-900 to-slate-950 shadow-2xl shadow-slate-900/70 max-h-[calc(100vh-2rem)] sm:max-h-[calc(100vh-4rem)]">
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/40 px-4 py-6 backdrop-blur sm:items-center sm:py-10">
+      <div className="relative flex w-full max-w-3xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl shadow-slate-200/60 max-h-[calc(100vh-2rem)] sm:max-h-[calc(100vh-4rem)]">
         <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-300 via-cyan-300 to-blue-400" />
         <div className="relative flex flex-wrap items-center gap-3 px-6 pt-5 pr-12 sm:pr-16">
-          <div className="flex flex-wrap items-center gap-2 text-sm text-slate-100">
-            <span className="inline-flex items-center rounded-full bg-emerald-300/15 px-3 py-1.5 text-base font-semibold uppercase tracking-[0.2em] text-emerald-100 ring-1 ring-emerald-300/40">
+          <div className="flex flex-wrap items-center gap-2 text-sm text-slate-700">
+            <span className="inline-flex items-center rounded-full bg-emerald-300/15 px-3 py-1.5 text-base font-semibold uppercase tracking-[0.2em] text-emerald-700 ring-1 ring-emerald-300/40">
               {t.inspection.title}
             </span>
-            <span className="rounded-full bg-white/5 px-3 py-1 text-xs font-semibold text-slate-100 ring-1 ring-white/10">
+            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200">
               {displayPhaseName(selectedSegment.phase)}
             </span>
-            <span className="rounded-full bg-white/5 px-2.5 py-1 text-xs font-semibold text-slate-100 ring-1 ring-white/10">
+            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200">
               {selectedSegment.sideLabel}
             </span>
-            <span className="rounded-full bg-white/5 px-2.5 py-1 text-xs font-semibold text-slate-100 ring-1 ring-white/10">
+            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200">
               {formatPK(selectedSegment.start)} → {formatPK(selectedSegment.end)}
             </span>
             {selectedSegment.spec ? (
-              <span className="rounded-full bg-white/5 px-2.5 py-1 text-xs font-semibold text-slate-100 ring-1 ring-white/10">
+              <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200">
                 {t.form.intervalSpec}：{selectedSegment.spec}
               </span>
             ) : null}
           </div>
           <button
             type="button"
-            className="absolute right-4 top-4 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold text-slate-200 transition hover:border-white/40 hover:bg-white/20"
+            className="absolute right-4 top-4 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-100"
             onClick={onClose}
             aria-label={t.delete.close}
           >
@@ -286,10 +286,10 @@ export function InspectionDrawer({
         </div>
 
         <div className="mt-4 flex-1 overflow-y-auto">
-          <div className="grid gap-4 border-t border-white/5 bg-white/2 px-6 py-6 text-sm text-slate-100 lg:grid-cols-5">
+          <div className="grid gap-4 border-t border-slate-200 bg-slate-50 px-6 py-6 text-sm text-slate-700 lg:grid-cols-5">
             <div className="lg:col-span-5 space-y-4">
               <div className="grid gap-3 md:grid-cols-4">
-                <label className="flex flex-col gap-1 text-xs text-slate-200">
+                <label className="flex flex-col gap-1 text-xs text-slate-600">
                   <span className="font-semibold">{t.inspection.sideLabel}</span>
                   {(() => {
                     const sideOptionsForSelect = enforcedSide
@@ -311,7 +311,7 @@ export function InspectionDrawer({
                         ]
                     return (
                       <select
-                        className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 shadow-inner shadow-slate-900/40 focus:border-emerald-300 focus:outline-none"
+                        className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 shadow-inner shadow-slate-900/40 focus:border-emerald-300 focus:outline-none"
                         value={selectedSide}
                         onChange={(e) => setSelectedSide(e.target.value as IntervalSide)}
                         disabled={Boolean(enforcedSide)}
@@ -337,41 +337,41 @@ export function InspectionDrawer({
                     )
                   })()}
                 </label>
-                <label className="flex flex-col gap-1 text-xs text-slate-200">
+                <label className="flex flex-col gap-1 text-xs text-slate-600">
                   <span className="font-semibold">{t.inspection.startLabel}</span>
                   <input
                     type="number"
-                    className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 shadow-inner shadow-slate-900/40 focus:border-emerald-300 focus:outline-none"
+                    className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 shadow-inner shadow-slate-900/40 focus:border-emerald-300 focus:outline-none"
                     value={startPkInput}
                     onChange={(e) => setStartPkInput(e.target.value)}
                     placeholder={t.inspection.startPlaceholder}
                   />
                 </label>
-                <label className="flex flex-col gap-1 text-xs text-slate-200">
+                <label className="flex flex-col gap-1 text-xs text-slate-600">
                   <span className="font-semibold">{t.inspection.endLabel}</span>
                   <input
                     type="number"
-                    className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 shadow-inner shadow-slate-900/40 focus:border-emerald-300 focus:outline-none"
+                    className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 shadow-inner shadow-slate-900/40 focus:border-emerald-300 focus:outline-none"
                     value={endPkInput}
                     onChange={(e) => setEndPkInput(e.target.value)}
                     placeholder={t.inspection.endPlaceholder}
                   />
                 </label>
-                <label className="flex flex-col gap-1 text-xs text-slate-200">
+                <label className="flex flex-col gap-1 text-xs text-slate-600">
                   <span className="font-semibold">{t.inspection.appointmentLabel}</span>
                   <input
                     type="date"
-                    className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 shadow-inner shadow-slate-900/40 focus:border-emerald-300 focus:outline-none"
+                    className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 shadow-inner shadow-slate-900/40 focus:border-emerald-300 focus:outline-none"
                     value={appointmentDateInput}
                     onChange={(e) => setAppointmentDateInput(e.target.value)}
                     placeholder={t.inspection.appointmentPlaceholder}
                   />
                 </label>
-                <label className="flex flex-col gap-1 text-xs text-slate-200">
+                <label className="flex flex-col gap-1 text-xs text-slate-600">
                   <span className="font-semibold">提交单编号（可选）</span>
                   <input
                     type="number"
-                    className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 shadow-inner shadow-slate-900/40 focus:border-emerald-300 focus:outline-none"
+                    className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 shadow-inner shadow-slate-900/40 focus:border-emerald-300 focus:outline-none"
                     value={submissionNumberInput}
                     onChange={(e) => setSubmissionNumberInput(e.target.value)}
                     placeholder="填入提交单编号，不填则不绑定"
@@ -381,16 +381,16 @@ export function InspectionDrawer({
 
               {selectedSegment.workflow && selectedSegment.workflowLayers?.length ? (
                 selectedSegment.measure === 'POINT' ? (
-                  <div className="space-y-4 rounded-3xl border border-emerald-300/30 bg-slate-900/70 p-4 shadow-inner shadow-emerald-400/15">
-                    <div className="flex flex-wrap items-center gap-2 text-xs text-emerald-100">
-                      <span className="rounded-full bg-emerald-300/25 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-950">
+                  <div className="space-y-4 rounded-3xl border border-emerald-200 bg-emerald-50 p-4 shadow-sm">
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-emerald-700">
+                      <span className="rounded-full bg-emerald-300/25 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-900">
                         {workflowCopy.timelineBadge}
                       </span>
-                      <span className="font-semibold text-emerald-50">
+                      <span className="font-semibold text-emerald-700">
                         {localizedWorkflowPhaseName ?? selectedSegment.workflow.phaseName}
                       </span>
                       {localizedWorkflowSideRule ? (
-                        <span className="rounded-full bg-emerald-300/15 px-2 py-1 text-[10px] text-emerald-50">
+                        <span className="rounded-full bg-emerald-300/15 px-2 py-1 text-[10px] text-emerald-700">
                           {localizedWorkflowSideRule}
                         </span>
                       ) : null}
@@ -443,7 +443,7 @@ export function InspectionDrawer({
                           return (
                             <div
                               key={`${layer.id}-${sideKey}`}
-                              className="relative overflow-hidden rounded-2xl border border-white/10 bg-slate-900/60 p-4 shadow-inner shadow-slate-900/30"
+                              className="relative overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-inner shadow-slate-900/30"
                             >
                               <div className="absolute -left-[9px] top-5 h-4 w-4 rounded-full border border-emerald-200/70 bg-emerald-400/80 shadow-md shadow-emerald-400/50" />
                               <div className="flex flex-wrap items-start justify-between gap-3">
@@ -464,8 +464,8 @@ export function InspectionDrawer({
                                           : isLayerSelected(localizedLayerName)
                                             ? 'bg-emerald-300 text-slate-900 shadow shadow-emerald-400/30'
                                             : isLayerDisabled(localizedLayerName)
-                                              ? 'cursor-not-allowed bg-white/5 text-slate-400'
-                                              : 'bg-white/10 text-slate-50 hover:bg-white/20'
+                                              ? 'cursor-not-allowed bg-slate-100 text-slate-500'
+                                              : 'bg-slate-50 text-slate-900 hover:bg-slate-100'
                                       }`}
                                     >
                                       {localizedLayerName}
@@ -494,13 +494,13 @@ export function InspectionDrawer({
                                   </div>
                                   <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-300">
                                     {dependsNames.length ? (
-                                      <span className="rounded-full bg-white/5 px-2 py-0.5 text-[10px] text-slate-200">
+                                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-600">
                                         {formatProgressCopy(workflowCopy.timelineDepends, {
                                           deps: dependsNames.join(listJoiner),
                                         })}
                                       </span>
                                     ) : (
-                                      <span className="rounded-full bg-white/5 px-2 py-0.5 text-[10px] text-slate-200">
+                                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-600">
                                         {workflowCopy.timelineFree}
                                       </span>
                                     )}
@@ -520,10 +520,10 @@ export function InspectionDrawer({
                                     ) : null}
                                   </div>
                                   {localizedDescription ? (
-                                    <p className="text-[11px] text-slate-200">{localizedDescription}</p>
+                                    <p className="text-[11px] text-slate-600">{localizedDescription}</p>
                                   ) : null}
                                 </div>
-                                <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-semibold text-slate-200">
+                                <span className="rounded-full bg-slate-50 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
                                   {formatProgressCopy(workflowCopy.bindingChecks, {
                                     count: layer.checks.length,
                                   })}
@@ -555,7 +555,7 @@ export function InspectionDrawer({
                                   return (
                                     <div
                                       key={`${layer.id}-${idx}-${check.name}`}
-                                      className="rounded-xl border border-white/10 bg-white/5 p-3 shadow-inner shadow-slate-900/20"
+                                      className="rounded-xl border border-slate-200 bg-slate-100 p-3 shadow-inner shadow-slate-900/20"
                                     >
                                       <div className="flex flex-wrap items-center gap-2">
                                         {splitCheckStatus ? (
@@ -589,12 +589,12 @@ export function InspectionDrawer({
                                             checkLocked
                                               ? `${tone} cursor-not-allowed opacity-90`
                                               : !layerSelected
-                                                ? 'cursor-not-allowed bg-white/5 text-slate-400 opacity-60'
+                                                ? 'cursor-not-allowed bg-slate-100 text-slate-500 opacity-60'
                                                 : checkSelected
                                                   ? 'bg-emerald-300 text-slate-900 shadow shadow-emerald-400/30'
                                                   : allowedCheckSet && !allowedCheckSet.has(localizeProgressTerm('check', check.name, locale))
-                                                    ? 'cursor-not-allowed bg-white/5 text-slate-400'
-                                                    : 'bg-white/10 text-slate-50 hover:bg-white/20'
+                                                    ? 'cursor-not-allowed bg-slate-100 text-slate-500'
+                                                    : 'bg-slate-50 text-slate-900 hover:bg-slate-100'
                                           }`}
                                         >
                                           {localizeProgressTerm('check', check.name, locale)}
@@ -621,17 +621,17 @@ export function InspectionDrawer({
                     </div>
                   </div>
                 ) : (
-                  <div className="space-y-3 rounded-2xl border border-emerald-300/30 bg-emerald-400/5 p-4 shadow-inner shadow-emerald-400/20">
-                    <div className="flex flex-wrap items-center gap-2 text-xs text-emerald-100">
-                      <span className="rounded-full bg-emerald-300/25 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-50">
+                  <div className="space-y-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 shadow-sm">
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-emerald-700">
+                      <span className="rounded-full bg-emerald-300/25 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-700">
                         {workflowCopy.badge}
                       </span>
-                      <span className="font-semibold text-emerald-50">
+                      <span className="font-semibold text-emerald-700">
                         {localizedWorkflowPhaseName ?? selectedSegment.workflow.phaseName}
                       </span>
-                      <span className="text-emerald-100/80">{workflowCopy.ruleTitle}</span>
+                      <span className="text-emerald-600">{workflowCopy.ruleTitle}</span>
                       {localizedWorkflowSideRule ? (
-                        <span className="rounded-full bg-emerald-300/15 px-2 py-1 text-[10px] text-emerald-50">
+                        <span className="rounded-full bg-emerald-300/15 px-2 py-1 text-[10px] text-emerald-700">
                           {localizedWorkflowSideRule}
                         </span>
                       ) : null}
@@ -655,15 +655,15 @@ export function InspectionDrawer({
                         return (
                           <div
                             key={layer.id}
-                            className="rounded-2xl border border-emerald-200/30 bg-white/5 p-3 text-[11px] text-emerald-50 shadow-inner shadow-emerald-500/10"
+                            className="rounded-2xl border border-emerald-200/30 bg-slate-100 p-3 text-[11px] text-emerald-700 shadow-inner shadow-emerald-200/60"
                           >
                             <div className="flex items-center justify-between gap-2">
                               <span className="font-semibold">{localizedLayerName}</span>
-                              <span className="rounded-full bg-emerald-300/20 px-2 py-0.5 text-[10px] font-semibold text-emerald-950">
+                              <span className="rounded-full bg-emerald-300/20 px-2 py-0.5 text-[10px] font-semibold text-emerald-900">
                                 {formatProgressCopy(workflowCopy.stageName, { value: layer.stage })}
                               </span>
                             </div>
-                            <p className="mt-1 text-emerald-100/80">
+                            <p className="mt-1 text-emerald-600">
                               {dependsNames.length
                                 ? formatProgressCopy(workflowCopy.timelineDepends, {
                                     deps: dependsNames.join(listJoiner),
@@ -671,21 +671,21 @@ export function InspectionDrawer({
                                 : workflowCopy.timelineFree}
                             </p>
                             {lockNames.length ? (
-                              <p className="text-emerald-100/80">
+                              <p className="text-emerald-600">
                                 {formatProgressCopy(workflowCopy.lockedWith, {
                                   peers: lockNames.join(listJoiner),
                                 })}
                               </p>
                             ) : null}
                             {parallelNames.length ? (
-                              <p className="text-emerald-100/80">
+                              <p className="text-emerald-600">
                                 {formatProgressCopy(workflowCopy.parallelWith, {
                                   peers: parallelNames.join(listJoiner),
                                 })}
                               </p>
                             ) : null}
-                            {localizedDescription ? <p className="text-emerald-100/80">{localizedDescription}</p> : null}
-                            {checkSummary ? <p className="mt-1 text-emerald-50">{checkSummary}</p> : null}
+                            {localizedDescription ? <p className="text-emerald-600">{localizedDescription}</p> : null}
+                            {checkSummary ? <p className="mt-1 text-emerald-700">{checkSummary}</p> : null}
                           </div>
                         )
                       })}
@@ -696,8 +696,8 @@ export function InspectionDrawer({
 
               {showLegacySelection ? (
                 <>
-                  <div className="space-y-2 rounded-2xl border border-white/10 bg-white/5 p-4 shadow-inner shadow-slate-900/30">
-                    <p className="text-xs font-semibold text-slate-200">{t.inspection.layersLabel}</p>
+                  <div className="space-y-2 rounded-2xl border border-slate-200 bg-slate-100 p-4 shadow-inner shadow-slate-900/30">
+                    <p className="text-xs font-semibold text-slate-600">{t.inspection.layersLabel}</p>
                     {uniqueLayerOptions.length === 0 ? (
                       <p className="text-[11px] text-amber-200">{t.inspection.layersEmpty}</p>
                     ) : (
@@ -710,8 +710,8 @@ export function InspectionDrawer({
                               selectedLayers.includes(item)
                                 ? 'bg-emerald-300 text-slate-900 shadow shadow-emerald-300/40'
                                 : isLayerDisabled(item)
-                                  ? 'cursor-not-allowed bg-white/5 text-slate-400 opacity-60'
-                                  : 'bg-white/10 text-slate-100 hover:bg-white/15'
+                                  ? 'cursor-not-allowed bg-slate-100 text-slate-500 opacity-60'
+                                  : 'bg-slate-50 text-slate-700 hover:bg-slate-100'
                             }`}
                             onClick={() => {
                               toggleLayerSelection(item)
@@ -724,8 +724,8 @@ export function InspectionDrawer({
                     )}
                   </div>
 
-                  <div className="space-y-2 rounded-2xl border border-white/10 bg-white/5 p-4 shadow-inner shadow-slate-900/30">
-                    <p className="text-xs font-semibold text-slate-200">{t.inspection.checksLabel}</p>
+                  <div className="space-y-2 rounded-2xl border border-slate-200 bg-slate-100 p-4 shadow-inner shadow-slate-900/30">
+                    <p className="text-xs font-semibold text-slate-600">{t.inspection.checksLabel}</p>
                     {uniqueCheckOptions.length === 0 ? (
                       <p className="text-[11px] text-amber-200">{t.inspection.checksEmpty}</p>
                     ) : (
@@ -738,8 +738,8 @@ export function InspectionDrawer({
                               selectedChecks.includes(item)
                                 ? 'bg-emerald-300 text-slate-900 shadow shadow-emerald-300/40'
                                 : allowedCheckSet && !allowedCheckSet.has(item)
-                                  ? 'cursor-not-allowed bg-white/5 text-slate-400 opacity-60'
-                                  : 'bg-white/10 text-slate-100 hover:bg-white/15'
+                                  ? 'cursor-not-allowed bg-slate-100 text-slate-500 opacity-60'
+                                  : 'bg-slate-50 text-slate-700 hover:bg-slate-100'
                             }`}
                             onClick={() => {
                               if (allowedCheckSet && !allowedCheckSet.has(item)) return
@@ -755,8 +755,8 @@ export function InspectionDrawer({
                 </>
               ) : null}
 
-              <div className="space-y-2 rounded-2xl border border-white/10 bg-white/5 p-4 shadow-inner shadow-slate-900/30">
-                <p className="text-xs font-semibold text-slate-200">{t.inspection.typesLabel}</p>
+              <div className="space-y-2 rounded-2xl border border-slate-200 bg-slate-100 p-4 shadow-inner shadow-slate-900/30">
+                <p className="text-xs font-semibold text-slate-600">{t.inspection.typesLabel}</p>
                 <div className="flex flex-wrap gap-2">
                   {activeInspectionTypes.map((item) => (
                     <button
@@ -765,7 +765,7 @@ export function InspectionDrawer({
                       className={`rounded-full px-3 py-1 text-[11px] font-semibold transition ${
                         selectedTypes.includes(item)
                           ? 'bg-emerald-300 text-slate-900 shadow shadow-emerald-300/40'
-                          : 'bg-white/10 text-slate-100 hover:bg-white/15'
+                          : 'bg-slate-50 text-slate-700 hover:bg-slate-100'
                       }`}
                       onClick={() => toggleToken(item, selectedTypes, setSelectedTypes)}
                     >
@@ -775,10 +775,10 @@ export function InspectionDrawer({
                 </div>
               </div>
 
-              <div className="space-y-2 rounded-2xl border border-white/10 bg-white/5 p-4 shadow-inner shadow-slate-900/30">
-                <p className="text-xs font-semibold text-slate-200">{t.inspection.remarkLabel}</p>
+              <div className="space-y-2 rounded-2xl border border-slate-200 bg-slate-100 p-4 shadow-inner shadow-slate-900/30">
+                <p className="text-xs font-semibold text-slate-600">{t.inspection.remarkLabel}</p>
                 <textarea
-                  className="h-20 w-full rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 shadow-inner shadow-slate-900/40 placeholder:text-slate-200/60 focus:border-emerald-300 focus:outline-none"
+                  className="h-20 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 shadow-inner shadow-slate-900/40 placeholder:text-slate-600/60 focus:border-emerald-300 focus:outline-none"
                   value={remark}
                   onChange={(e) => setRemark(e.target.value)}
                   placeholder={t.inspection.remarkPlaceholder}
@@ -788,15 +788,15 @@ export function InspectionDrawer({
           </div>
         </div>
 
-        <div className="border-t border-white/10 bg-slate-900/60 px-6 py-5">
+        <div className="border-t border-slate-200 bg-slate-50 px-6 py-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className={`text-sm ${submitError ? 'font-semibold text-amber-200' : 'text-slate-200'}`}>
+            <p className={`text-sm ${submitError ? 'font-semibold text-amber-200' : 'text-slate-600'}`}>
               {submitError ? submitError : t.inspection.typesHint}
             </p>
             <div className="grid w-full gap-3 sm:w-auto sm:min-w-[320px] sm:grid-cols-2">
               <button
                 type="button"
-                className="w-full rounded-2xl border border-white/20 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/40 hover:bg-white/5"
+                className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-100"
                 onClick={() => {
                   onClose()
                   resetInspectionForm()

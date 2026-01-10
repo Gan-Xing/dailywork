@@ -561,9 +561,8 @@ const progressCopy: Record<Locale, ProgressCopy> = {
   zh: {
     hero: {
       badge: '进度',
-      title: '道路进度看板',
-      description:
-        '路段由管理员统一创建（名称 + 起点 + 终点），后续分项工程、报检与验收都会挂载在这些路段之下。当前页面先完成路段的增删改维护。',
+      title: '道路看板',
+      description: '',
       home: '返回首页',
       reports: '去填写日报',
       loadError: '加载路段列表失败：{message}。仍可尝试直接新增，保存后会刷新列表。',
@@ -803,7 +802,7 @@ const progressCopy: Record<Locale, ProgressCopy> = {
     workflow: {
       badge: '分项模板',
       title: '分项模板管理',
-      description: '集中维护分项模板、层次、验收内容及依赖关系，支持新增/删除模板并同步报检校验。',
+      description: '',
       localHint: '规则保存到后端数据库，默认已为常用分项创建模板；保存后即用于校验逻辑（后续报检校验会接入）。',
       accessHint: '需要道路管理权限才能维护验收关系。',
       actions: {
@@ -891,7 +890,7 @@ const progressCopy: Record<Locale, ProgressCopy> = {
     inspectionBoard: {
       badge: '报检列表',
       title: '所有报检记录',
-      description: '可按道路、分项、状态、侧别、时间等条件筛选，点击表头可排序；点击行仅勾选，详情请在操作中点击查看。',
+      description: '',
       breadcrumb: {
         home: '首页',
         progress: '进度管理',

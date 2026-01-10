@@ -75,7 +75,7 @@ export function PhaseFormModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/70 px-4 py-6 sm:items-center sm:py-10"
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/40 px-4 py-6 sm:items-center sm:py-10"
       onClick={(event) => {
         if (event.target === event.currentTarget) {
           onClose()
@@ -83,13 +83,13 @@ export function PhaseFormModal({
       }}
     >
       <div
-        className="relative w-full max-w-4xl overflow-hidden rounded-3xl border border-white/10 bg-slate-900/90 shadow-2xl shadow-emerald-500/20 backdrop-blur"
+        className="relative w-full max-w-4xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl shadow-emerald-200/30"
         role="dialog"
         aria-modal="true"
       >
         <button
           type="button"
-          className="absolute right-3 top-3 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/20 sm:right-4 sm:top-4"
+          className="absolute right-3 top-3 rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 sm:right-4 sm:top-4"
           onClick={onClose}
           aria-label={t.delete.close}
         >
@@ -98,22 +98,22 @@ export function PhaseFormModal({
         <div className="max-h-[90vh] overflow-y-auto p-5 sm:p-8">
           <div className="flex flex-wrap items-center gap-3">
             {editingId ? (
-              <span className="rounded-full bg-amber-200/80 px-3 py-1 text-xs font-semibold text-slate-900">
+              <span className="rounded-full bg-amber-200 px-3 py-1 text-xs font-semibold text-amber-900">
                 {formatProgressCopy(t.form.editingBadge, { id: editingId })}
               </span>
             ) : (
-              <span className="rounded-full bg-emerald-200/80 px-3 py-1 text-xs font-semibold text-slate-900">
+              <span className="rounded-full bg-emerald-200 px-3 py-1 text-xs font-semibold text-emerald-900">
                 {t.form.creatingBadge}
               </span>
             )}
             <button
               type="button"
-              className="rounded-full border border-white/20 px-3 py-1 text-[11px] font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/10"
+              className="rounded-full border border-slate-200 px-3 py-1 text-[11px] font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
               onClick={onReset}
             >
               {definitionId ? t.form.resetEdit : t.form.resetNew}
             </button>
-            <span className="text-xs text-slate-300">
+            <span className="text-xs text-slate-500">
               {formatProgressCopy(t.form.designSummary, {
                 length: roadLength || t.roadLengthUnknown,
                 design:
@@ -126,10 +126,10 @@ export function PhaseFormModal({
 
           <form className="mt-5 space-y-4" onSubmit={onSubmit}>
             <div className="grid gap-4 md:grid-cols-4">
-              <label className="flex flex-col gap-2 text-sm text-slate-100">
+              <label className="flex flex-col gap-2 text-sm text-slate-700">
                 {t.form.templateLabel}
                 <select
-                  className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
+                  className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 focus:border-emerald-300 focus:outline-none"
                   value={definitionId ?? ''}
                   onChange={(e) => {
                     const value = e.target.value
@@ -147,21 +147,21 @@ export function PhaseFormModal({
                   ))}
                 </select>
               </label>
-              <label className="flex flex-col gap-2 text-sm text-slate-100">
+              <label className="flex flex-col gap-2 text-sm text-slate-700">
                 {t.form.nameLabel}
                 <input
                   ref={nameInputRef}
-                  className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-slate-50 placeholder:text-slate-200/60 focus:border-emerald-300 focus:outline-none"
+                  className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-300 focus:outline-none"
                   value={name}
                   onChange={(e) => onNameChange(e.target.value)}
                   placeholder={t.form.namePlaceholder}
                   required
                 />
               </label>
-              <label className="flex flex-col gap-2 text-sm text-slate-100">
+              <label className="flex flex-col gap-2 text-sm text-slate-700">
                 {t.form.measureLabel}
                 <select
-                  className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
+                  className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 focus:border-emerald-300 focus:outline-none"
                   value={measure}
                   onChange={(e) => onMeasureChange(e.target.value as PhaseMeasure)}
                 >
@@ -169,35 +169,35 @@ export function PhaseFormModal({
                   <option value="POINT">{t.form.measureOptionPoint}</option>
                 </select>
               </label>
-              <div className="flex flex-col justify-end text-sm text-slate-100">
-                <span className="text-xs text-slate-300">
+              <div className="flex flex-col justify-end text-sm text-slate-700">
+                <span className="text-xs text-slate-500">
                   {t.form.designHintPrefix}
                   {measure === 'POINT'
                     ? formatProgressCopy(t.form.designHintPoint, { design: designLength })
                     : formatProgressCopy(t.form.designHintLinear, { design: designLength })}
                 </span>
                 {measure === 'POINT' ? (
-                  <label className="mt-2 flex items-center gap-2 text-[12px] text-slate-200">
+                  <label className="mt-2 flex items-center gap-2 text-[12px] text-slate-600">
                     <input
                       type="checkbox"
-                      className="h-4 w-4 accent-emerald-300"
+                      className="h-4 w-4 accent-emerald-500"
                       checked={pointHasSides}
                       onChange={(e) => onPointHasSidesChange(e.target.checked)}
                     />
                     <span className="font-semibold">{t.form.pointSidesLabel}</span>
-                    <span className="text-[11px] text-slate-400">{t.form.pointSidesHint}</span>
+                    <span className="text-[11px] text-slate-500">{t.form.pointSidesHint}</span>
                   </label>
                 ) : null}
               </div>
             </div>
 
-            <div className="space-y-3 rounded-2xl border border-white/10 bg-white/5 p-4">
-              <div className="flex items-center justify-between text-sm text-slate-100">
+            <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="flex items-center justify-between text-sm text-slate-700">
                 <p>{t.form.intervalTitle}</p>
                 <button
                   type="button"
                   onClick={onAddInterval}
-                  className="rounded-xl border border-white/20 px-3 py-2 text-xs font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/10"
+                  className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-white"
                 >
                   {t.form.intervalAdd}
                 </button>
@@ -207,13 +207,13 @@ export function PhaseFormModal({
                 {intervals.map((item, index) => (
                   <div
                     key={index}
-                    className="grid grid-cols-1 gap-3 rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-slate-100 md:grid-cols-6 md:items-center"
+                    className="grid grid-cols-1 gap-3 rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-700 md:grid-cols-6 md:items-center"
                   >
                     <label className="flex flex-col items-center gap-1 text-center">
                       {t.form.intervalStart}
                       <input
                         type="number"
-                        className="w-full rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
+                        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-emerald-300 focus:outline-none"
                         value={Number.isFinite(item.startPk) ? item.startPk : ''}
                         onChange={(e) =>
                           onIntervalChange(index, {
@@ -226,7 +226,7 @@ export function PhaseFormModal({
                       {t.form.intervalEnd}
                       <input
                         type="number"
-                        className="w-full rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
+                        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-emerald-300 focus:outline-none"
                         value={Number.isFinite(item.endPk) ? item.endPk : ''}
                         onChange={(e) =>
                           onIntervalChange(index, { endPk: e.target.value === '' ? Number.NaN : Number(e.target.value) })
@@ -236,7 +236,7 @@ export function PhaseFormModal({
                     <label className="flex flex-col items-center gap-1 text-center">
                       {t.form.intervalSide}
                       <select
-                        className="w-full rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
+                        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-emerald-300 focus:outline-none"
                         value={item.side}
                         onChange={(e) => onIntervalChange(index, { side: e.target.value as IntervalSide })}
                       >
@@ -251,7 +251,7 @@ export function PhaseFormModal({
                       {t.form.intervalSpec}
                       <input
                         type="text"
-                        className="w-full rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
+                        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-emerald-300 focus:outline-none"
                         value={item.spec ?? ''}
                         onChange={(e) => onIntervalChange(index, { spec: e.target.value })}
                         placeholder={t.form.intervalSpec}
@@ -262,7 +262,7 @@ export function PhaseFormModal({
                         {t.form.intervalBillQuantity}
                         <input
                           type="number"
-                          className="w-full rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
+                          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-emerald-300 focus:outline-none"
                           value={Number.isFinite(item.billQuantity ?? Number.NaN) ? item.billQuantity ?? '' : ''}
                           onChange={(e) =>
                             onIntervalChange(index, {
@@ -274,7 +274,7 @@ export function PhaseFormModal({
                       {intervals.length > 1 ? (
                         <button
                           type="button"
-                          className="w-full self-end rounded-xl border border-rose-200/60 px-3 py-2 text-xs font-semibold text-rose-100 transition hover:border-rose-200/60 hover:bg-rose-200/10 md:w-auto md:ml-auto md:self-center"
+                          className="w-full self-end rounded-xl border border-rose-200 px-3 py-2 text-xs font-semibold text-rose-700 transition hover:border-rose-300 hover:bg-rose-50 md:w-auto md:ml-auto md:self-center"
                           onClick={() => onRemoveInterval(index)}
                         >
                           {t.form.intervalDelete}
@@ -295,8 +295,8 @@ export function PhaseFormModal({
                               onClick={() => onToggleIntervalLayer(index, layer)}
                               className={`rounded-full px-3 py-1 text-[11px] font-semibold transition ${
                                 selected
-                                  ? 'bg-emerald-300 text-slate-900 shadow-lg shadow-emerald-400/30'
-                                  : 'bg-white/10 text-slate-200 hover:bg-white/20'
+                                  ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-200/60'
+                                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                               }`}
                             >
                               {layer}
@@ -314,14 +314,14 @@ export function PhaseFormModal({
               <button
                 type="submit"
                 disabled={isPending}
-                className="inline-flex items-center justify-center rounded-2xl bg-emerald-300 px-5 py-3 text-sm font-semibold text-slate-900 shadow-lg shadow-emerald-400/30 transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-70"
+                className="inline-flex items-center justify-center rounded-2xl bg-emerald-500 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-200/60 transition hover:-translate-y-0.5 hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-70"
               >
                 {t.form.save}
               </button>
-              {error ? <span className="text-sm text-amber-200">{error}</span> : null}
-              {isPending ? <span className="text-xs text-slate-200/70">{t.form.saving}</span> : null}
+              {error ? <span className="text-sm text-amber-700">{error}</span> : null}
+              {isPending ? <span className="text-xs text-slate-500">{t.form.saving}</span> : null}
             </div>
-            <p className="text-xs text-slate-300">{t.note.measure}</p>
+            <p className="text-xs text-slate-500">{t.note.measure}</p>
           </form>
         </div>
       </div>

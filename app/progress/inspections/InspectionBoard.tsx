@@ -1,6 +1,5 @@
 'use client'
 
-import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import type {
@@ -20,6 +19,8 @@ import {
 } from '@/lib/i18n/progressDictionary'
 import { locales } from '@/lib/i18n'
 import { usePreferredLocale } from '@/lib/usePreferredLocale'
+import { ProgressHeader } from '../ProgressHeader'
+import { ProgressSectionNav } from '../ProgressSectionNav'
 
 interface Props {
   roads: RoadSectionWithPhasesDTO[]
@@ -91,11 +92,11 @@ const defaultVisibleColumns: ColumnKey[] = [
 ]
 
 const statusTone: Record<InspectionStatus, string> = {
-  PENDING: 'bg-slate-800 text-slate-100 ring-1 ring-white/10',
+  PENDING: 'bg-slate-800 text-slate-700 ring-1 ring-white/10',
   SCHEDULED: 'bg-sky-900/60 text-sky-100 ring-1 ring-sky-300/40',
   SUBMITTED: 'bg-indigo-700/40 text-indigo-100 ring-1 ring-indigo-300/40',
-  IN_PROGRESS: 'bg-amber-200/30 text-amber-100 ring-1 ring-amber-200/50',
-  APPROVED: 'bg-emerald-300/20 text-emerald-100 ring-1 ring-emerald-300/40',
+  IN_PROGRESS: 'bg-amber-200/30 text-amber-700 ring-1 ring-amber-200/50',
+  APPROVED: 'bg-emerald-300/20 text-emerald-700 ring-1 ring-emerald-300/40',
 }
 
 const formatPK = (value: number) => {
@@ -195,7 +196,7 @@ type EditFormState = {
 }
 
 export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
-  const { locale } = usePreferredLocale('zh', locales)
+  const { locale, setLocale } = usePreferredLocale('zh', locales)
   const t = getProgressCopy(locale)
   const copy = t.inspectionBoard
   const statusCopy = copy.status as Record<InspectionStatus, string>
@@ -1121,58 +1122,46 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
   }
 
   return (
-    <main className="min-h-screen bg-slate-950 text-slate-50">
-      <div className="relative mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8 xl:max-w-[1500px] xl:px-10 2xl:max-w-[1700px] 2xl:px-12">
-        <div className="absolute inset-x-0 top-10 -z-10 h-48 bg-gradient-to-r from-emerald-300/15 via-blue-300/10 to-amber-200/10 blur-3xl" />
-        <header className="space-y-3">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-100">{copy.badge}</p>
-          <h1 className="text-3xl font-semibold leading-tight text-slate-50">{copy.title}</h1>
-          <p className="text-sm text-slate-200/80 whitespace-nowrap">{copy.description}</p>
-          <nav className="flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-200/80">
-            <Link
-              href="/"
-              className="rounded-full border border-white/10 bg-white/5 px-3 py-1 transition hover:border-white/25 hover:bg-white/10"
-            >
-              {copy.breadcrumb.home}
-            </Link>
-            <span className="text-slate-500">/</span>
-            <Link
-              href="/progress"
-              className="rounded-full border border-white/10 bg-white/5 px-3 py-1 transition hover:border-white/25 hover:bg-white/10"
-            >
-              {copy.breadcrumb.progress}
-            </Link>
-            <span className="text-slate-500">/</span>
-            <span className="rounded-full border border-white/5 bg-white/5 px-3 py-1 text-slate-100">
-              {copy.breadcrumb.current}
-            </span>
-          </nav>
-          {error ? (
-            <p className="text-sm text-amber-200">
-              {formatProgressCopy(copy.errorHint, { message: error })}
-            </p>
-          ) : null}
-        </header>
-        <section className="mt-6 space-y-4 rounded-3xl border border-white/10 bg-white/5 p-5 shadow-xl shadow-slate-900/30 backdrop-blur">
+    <main className="min-h-screen bg-slate-50 text-slate-900">
+      <ProgressHeader
+        title={copy.title}
+        subtitle={copy.description || undefined}
+        breadcrumbs={[
+          { label: copy.breadcrumb.home, href: '/' },
+          { label: copy.breadcrumb.progress, href: '/progress' },
+          { label: copy.breadcrumb.current },
+        ]}
+        right={<ProgressSectionNav />}
+        locale={locale}
+        onLocaleChange={setLocale}
+      />
+      <div className="relative mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 xl:max-w-[1500px] xl:px-10 2xl:max-w-[1700px] 2xl:px-12">
+        <div className="absolute inset-x-0 top-0 -z-10 h-48 bg-gradient-to-r from-emerald-200/50 via-sky-200/40 to-amber-200/40 blur-3xl" />
+        {error ? (
+          <p className="text-sm text-amber-700">
+            {formatProgressCopy(copy.errorHint, { message: error })}
+          </p>
+        ) : null}
+        <section className="mt-6 space-y-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-xl shadow-slate-900/30 backdrop-blur">
           <div className="grid gap-3 md:grid-cols-4">
-            <label className="flex flex-col gap-1 text-xs text-slate-200">
+            <label className="flex flex-col gap-1 text-xs text-slate-600">
               {copy.filters.road}
               <div className="relative" ref={roadSelectorRef}>
                 <button
                   type="button"
                   onClick={() => setRoadOpen((prev) => !prev)}
-                  className="flex w-full items-center justify-between rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-left text-sm text-slate-50 shadow-inner shadow-slate-900/30 focus:border-emerald-300 focus:outline-none"
+                  className="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-left text-sm text-slate-900 shadow-inner shadow-slate-900/30 focus:border-emerald-300 focus:outline-none"
                 >
                   <span className="truncate">
                     {roadSlugs.length === 0
                       ? copy.filters.all
                       : formatProgressCopy(copy.typePicker.selected, { count: roadSlugs.length })}
                   </span>
-                  <span className="text-xs text-slate-300">⌕</span>
+                  <span className="text-xs text-slate-600">⌕</span>
                 </button>
                 {roadOpen ? (
-                  <div className="absolute z-10 mt-2 w-full rounded-xl border border-white/15 bg-slate-900/95 p-3 text-xs text-slate-100 shadow-lg shadow-slate-900/40 backdrop-blur">
-                    <div className="flex items-center justify-between border-b border-white/10 pb-2 text-[11px] text-slate-300">
+                  <div className="absolute z-10 mt-2 w-full rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-700 shadow-lg shadow-slate-900/40 backdrop-blur">
+                    <div className="flex items-center justify-between border-b border-slate-200 pb-2 text-[11px] text-slate-600">
                       <span>
                         {formatProgressCopy(copy.typePicker.summary, {
                           count: roadSlugs.length ? roadSlugs.length : copy.typePicker.all,
@@ -1189,7 +1178,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                           {copy.typePicker.selectAll}
                         </button>
                         <button
-                          className="text-slate-400 hover:underline"
+                          className="text-slate-500 hover:underline"
                           onClick={() => {
                             setRoadSlugs([])
                             setPage(1)
@@ -1203,11 +1192,11 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                       {roads.map((road) => (
                         <label
                           key={road.id}
-                          className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 hover:bg-white/5"
+                          className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 hover:bg-white"
                         >
                           <input
                             type="checkbox"
-                            className="h-4 w-4 rounded border-white/30 bg-slate-900/60 accent-emerald-300"
+                            className="h-4 w-4 rounded border-slate-300 bg-white accent-emerald-300"
                             checked={roadSlugs.includes(road.slug)}
                             onChange={() => {
                               setRoadSlugs((prev) => toggleValue(prev, road.slug))
@@ -1222,24 +1211,24 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                 ) : null}
               </div>
             </label>
-            <label className="flex flex-col gap-1 text-xs text-slate-200">
+            <label className="flex flex-col gap-1 text-xs text-slate-600">
               {copy.filters.phase}
               <div className="relative" ref={phaseSelectorRef}>
                 <button
                   type="button"
                   onClick={() => setPhaseOpen((prev) => !prev)}
-                  className="flex w-full items-center justify-between rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-left text-sm text-slate-50 shadow-inner shadow-slate-900/30 focus:border-emerald-300 focus:outline-none"
+                  className="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-left text-sm text-slate-900 shadow-inner shadow-slate-900/30 focus:border-emerald-300 focus:outline-none"
                 >
                   <span className="truncate">
                     {phaseDefinitionIds.length === 0
                       ? copy.filters.all
                       : formatProgressCopy(copy.typePicker.selected, { count: phaseDefinitionIds.length })}
                   </span>
-                  <span className="text-xs text-slate-300">⌕</span>
+                  <span className="text-xs text-slate-600">⌕</span>
                 </button>
                 {phaseOpen ? (
-                  <div className="absolute z-10 mt-2 w-full rounded-xl border border-white/15 bg-slate-900/95 p-3 text-xs text-slate-100 shadow-lg shadow-slate-900/40 backdrop-blur">
-                    <div className="flex items-center justify-between border-b border-white/10 pb-2 text-[11px] text-slate-300">
+                  <div className="absolute z-10 mt-2 w-full rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-700 shadow-lg shadow-slate-900/40 backdrop-blur">
+                    <div className="flex items-center justify-between border-b border-slate-200 pb-2 text-[11px] text-slate-600">
                       <span>
                         {formatProgressCopy(copy.typePicker.summary, {
                           count: phaseDefinitionIds.length ? phaseDefinitionIds.length : copy.typePicker.all,
@@ -1256,7 +1245,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                           {copy.typePicker.selectAll}
                         </button>
                         <button
-                          className="text-slate-400 hover:underline"
+                          className="text-slate-500 hover:underline"
                           onClick={() => {
                             setPhaseDefinitionIds([])
                             setPage(1)
@@ -1270,11 +1259,11 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                       {phaseDefinitions.map((definition) => (
                         <label
                           key={definition.id}
-                          className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 hover:bg-white/5"
+                          className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 hover:bg-white"
                         >
                           <input
                             type="checkbox"
-                            className="h-4 w-4 rounded border-white/30 bg-slate-900/60 accent-emerald-300"
+                            className="h-4 w-4 rounded border-slate-300 bg-white accent-emerald-300"
                             checked={phaseDefinitionIds.includes(definition.id)}
                             onChange={() => {
                               setPhaseDefinitionIds((prev) => toggleValue(prev, definition.id))
@@ -1289,10 +1278,10 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                 ) : null}
               </div>
             </label>
-          <label className="flex flex-col gap-1 text-xs text-slate-200">
+          <label className="flex flex-col gap-1 text-xs text-slate-600">
             {copy.filters.side}
             <select
-              className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
+              className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:border-emerald-300 focus:outline-none"
               value={side}
               onChange={(e) => {
                 setSide(e.target.value)
@@ -1305,24 +1294,24 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
               <option value="BOTH">{copy.filters.sideBoth}</option>
             </select>
           </label>
-          <label className="flex flex-col gap-1 text-xs text-slate-200">
+          <label className="flex flex-col gap-1 text-xs text-slate-600">
             {copy.columns.layers}
             <div className="relative" ref={layerSelectorRef}>
               <button
                 type="button"
                 onClick={() => setLayerOpen((prev) => !prev)}
-                className="flex w-full items-center justify-between rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-left text-sm text-slate-50 shadow-inner shadow-slate-900/30 focus:border-emerald-300 focus:outline-none"
+                className="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-left text-sm text-slate-900 shadow-inner shadow-slate-900/30 focus:border-emerald-300 focus:outline-none"
               >
                 <span className="truncate">
                   {layerFilters.length === 0
                     ? copy.filters.all
                     : formatProgressCopy(copy.typePicker.selected, { count: layerFilters.length })}
                 </span>
-                <span className="text-xs text-slate-300">⌕</span>
+                <span className="text-xs text-slate-600">⌕</span>
               </button>
               {layerOpen ? (
-                <div className="absolute z-10 mt-2 w-full rounded-xl border border-white/15 bg-slate-900/95 p-3 text-xs text-slate-100 shadow-lg shadow-slate-900/40 backdrop-blur">
-                  <div className="flex items-center justify-between border-b border-white/10 pb-2 text-[11px] text-slate-300">
+                <div className="absolute z-10 mt-2 w-full rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-700 shadow-lg shadow-slate-900/40 backdrop-blur">
+                  <div className="flex items-center justify-between border-b border-slate-200 pb-2 text-[11px] text-slate-600">
                     <span>
                       {formatProgressCopy(copy.typePicker.summary, {
                         count: layerFilters.length ? layerFilters.length : copy.typePicker.all,
@@ -1339,7 +1328,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                         {copy.typePicker.selectAll}
                       </button>
                       <button
-                        className="text-slate-400 hover:underline"
+                        className="text-slate-500 hover:underline"
                         onClick={() => {
                           setLayerFilters([])
                           setPage(1)
@@ -1353,11 +1342,11 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                     {layerOptions.map((option) => (
                       <label
                         key={option}
-                        className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 hover:bg-white/5"
+                        className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 hover:bg-white"
                       >
                         <input
                           type="checkbox"
-                          className="h-4 w-4 rounded border-white/30 bg-slate-900/60 accent-emerald-300"
+                          className="h-4 w-4 rounded border-slate-300 bg-white accent-emerald-300"
                           checked={layerFilters.includes(option)}
                           onChange={() => {
                             setLayerFilters((prev) => toggleValue(prev, option))
@@ -1368,31 +1357,31 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                       </label>
                     ))}
                     {layerOptions.length === 0 ? (
-                      <p className="px-2 py-1 text-[11px] text-slate-300">{copy.filters.loading}</p>
+                      <p className="px-2 py-1 text-[11px] text-slate-600">{copy.filters.loading}</p>
                     ) : null}
                   </div>
                 </div>
               ) : null}
             </div>
           </label>
-          <label className="flex flex-col gap-1 text-xs text-slate-200">
+          <label className="flex flex-col gap-1 text-xs text-slate-600">
             {copy.filters.type}
             <div className="relative" ref={typeSelectorRef}>
               <button
                 type="button"
                 onClick={() => setTypeOpen((prev) => !prev)}
-                className="flex w-full items-center justify-between rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-left text-sm text-slate-50 shadow-inner shadow-slate-900/30 focus:border-emerald-300 focus:outline-none"
+                className="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-left text-sm text-slate-900 shadow-inner shadow-slate-900/30 focus:border-emerald-300 focus:outline-none"
               >
                 <span className="truncate">
                   {types.length === 0
                     ? copy.typePicker.placeholder
                     : formatProgressCopy(copy.typePicker.selected, { count: types.length })}
                 </span>
-                <span className="text-xs text-slate-300">⌕</span>
+                <span className="text-xs text-slate-600">⌕</span>
               </button>
               {typeOpen ? (
-                <div className="absolute z-10 mt-2 w-full rounded-xl border border-white/15 bg-slate-900/95 p-3 text-xs text-slate-100 shadow-lg shadow-slate-900/40 backdrop-blur">
-                  <div className="flex items-center justify-between border-b border-white/10 pb-2 text-[11px] text-slate-300">
+                <div className="absolute z-10 mt-2 w-full rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-700 shadow-lg shadow-slate-900/40 backdrop-blur">
+                  <div className="flex items-center justify-between border-b border-slate-200 pb-2 text-[11px] text-slate-600">
                     <span>
                       {formatProgressCopy(copy.typePicker.summary, {
                         count: types.length ? types.length : copy.typePicker.all,
@@ -1409,7 +1398,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                         {copy.typePicker.selectAll}
                       </button>
                       <button
-                        className="text-slate-400 hover:underline"
+                        className="text-slate-500 hover:underline"
                         onClick={() => {
                           setTypes([])
                           setPage(1)
@@ -1423,11 +1412,11 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                     {inspectionTypeOptions.map((option) => (
                       <label
                         key={option}
-                        className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 hover:bg-white/5"
+                        className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 hover:bg-white"
                       >
                         <input
                           type="checkbox"
-                          className="h-4 w-4 rounded border-white/30 bg-slate-900/60 accent-emerald-300"
+                          className="h-4 w-4 rounded border-slate-300 bg-white accent-emerald-300"
                           checked={types.includes(option)}
                           onChange={() => {
                             setTypes((prev) => toggleValue(prev, option))
@@ -1442,24 +1431,24 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
               ) : null}
             </div>
           </label>
-          <label className="flex flex-col gap-1 text-xs text-slate-200">
+          <label className="flex flex-col gap-1 text-xs text-slate-600">
             {copy.filters.check}
             <div className="relative" ref={checkSelectorRef}>
               <button
                 type="button"
                 onClick={() => setCheckOpen((prev) => !prev)}
-                className="flex w-full items-center justify-between rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-left text-sm text-slate-50 shadow-inner shadow-slate-900/30 focus:border-emerald-300 focus:outline-none"
+                className="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-left text-sm text-slate-900 shadow-inner shadow-slate-900/30 focus:border-emerald-300 focus:outline-none"
               >
                 <span className="truncate">
                   {checkFilters.length === 0
                     ? copy.filters.all
                     : formatProgressCopy(copy.typePicker.selected, { count: checkFilters.length })}
                 </span>
-                <span className="text-xs text-slate-300">⌕</span>
+                <span className="text-xs text-slate-600">⌕</span>
               </button>
               {checkOpen ? (
-                <div className="absolute z-10 mt-2 w-full rounded-xl border border-white/15 bg-slate-900/95 p-3 text-xs text-slate-100 shadow-lg shadow-slate-900/40 backdrop-blur">
-                  <div className="flex items-center justify-between border-b border-white/10 pb-2 text-[11px] text-slate-300">
+                <div className="absolute z-10 mt-2 w-full rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-700 shadow-lg shadow-slate-900/40 backdrop-blur">
+                  <div className="flex items-center justify-between border-b border-slate-200 pb-2 text-[11px] text-slate-600">
                     <span>
                       {formatProgressCopy(copy.typePicker.summary, {
                         count: checkFilters.length ? checkFilters.length : copy.typePicker.all,
@@ -1476,7 +1465,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                         {copy.typePicker.selectAll}
                       </button>
                       <button
-                        className="text-slate-400 hover:underline"
+                        className="text-slate-500 hover:underline"
                         onClick={() => {
                           setCheckFilters([])
                           setPage(1)
@@ -1490,11 +1479,11 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                     {checkOptions.map((option) => (
                       <label
                         key={option}
-                        className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 hover:bg-white/5"
+                        className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 hover:bg-white"
                       >
                         <input
                           type="checkbox"
-                          className="h-4 w-4 rounded border-white/30 bg-slate-900/60 accent-emerald-300"
+                          className="h-4 w-4 rounded border-slate-300 bg-white accent-emerald-300"
                           checked={checkFilters.includes(option)}
                           onChange={() => {
                             setCheckFilters((prev) => toggleValue(prev, option))
@@ -1505,34 +1494,34 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                       </label>
                     ))}
                     {checkOptionsLoading ? (
-                      <span className="px-2 text-[11px] text-slate-300">{copy.filters.loading}</span>
+                      <span className="px-2 text-[11px] text-slate-600">{copy.filters.loading}</span>
                     ) : null}
                     {checkOptionsError ? (
-                      <span className="px-2 text-[11px] text-amber-200">{checkOptionsError}</span>
+                      <span className="px-2 text-[11px] text-amber-700">{checkOptionsError}</span>
                     ) : null}
                   </div>
                 </div>
               ) : null}
             </div>
           </label>
-          <label className="flex flex-col gap-1 text-xs text-slate-200">
+          <label className="flex flex-col gap-1 text-xs text-slate-600">
             {copy.filters.status}
             <div className="relative" ref={statusSelectorRef}>
               <button
                 type="button"
                 onClick={() => setStatusOpen((prev) => !prev)}
-                className="flex w-full items-center justify-between rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-left text-sm text-slate-50 shadow-inner shadow-slate-900/30 focus:border-emerald-300 focus:outline-none"
+                className="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-left text-sm text-slate-900 shadow-inner shadow-slate-900/30 focus:border-emerald-300 focus:outline-none"
               >
                 <span className="truncate">
                   {status.length === 0
                     ? copy.filters.all
                     : formatProgressCopy(copy.typePicker.selected, { count: status.length })}
                 </span>
-                <span className="text-xs text-slate-300">⌕</span>
+                <span className="text-xs text-slate-600">⌕</span>
               </button>
               {statusOpen ? (
-                <div className="absolute z-10 mt-2 w-full rounded-xl border border-white/15 bg-slate-900/95 p-3 text-xs text-slate-100 shadow-lg shadow-slate-900/40 backdrop-blur">
-                  <div className="flex items-center justify-between border-b border-white/10 pb-2 text-[11px] text-slate-300">
+                <div className="absolute z-10 mt-2 w-full rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-700 shadow-lg shadow-slate-900/40 backdrop-blur">
+                  <div className="flex items-center justify-between border-b border-slate-200 pb-2 text-[11px] text-slate-600">
                     <span>
                       {formatProgressCopy(copy.typePicker.summary, {
                         count: status.length ? status.length : copy.typePicker.all,
@@ -1549,7 +1538,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                         {copy.typePicker.selectAll}
                       </button>
                       <button
-                        className="text-slate-400 hover:underline"
+                        className="text-slate-500 hover:underline"
                         onClick={() => {
                           setStatus([])
                           setPage(1)
@@ -1563,11 +1552,11 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                     {statusOptions.map((option) => (
                       <label
                         key={option}
-                        className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 hover:bg-white/5"
+                        className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 hover:bg-white"
                       >
                         <input
                           type="checkbox"
-                          className="h-4 w-4 rounded border-white/30 bg-slate-900/60 accent-emerald-300"
+                          className="h-4 w-4 rounded border-slate-300 bg-white accent-emerald-300"
                           checked={status.includes(option)}
                           onChange={() => {
                             setStatus((prev) => toggleValue(prev, option))
@@ -1582,11 +1571,11 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
               ) : null}
             </div>
           </label>
-            <label className="flex flex-col gap-1 text-xs text-slate-200">
+            <label className="flex flex-col gap-1 text-xs text-slate-600">
               {copy.filters.startDate}
               <input
                 type="date"
-                className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
+                className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:border-emerald-300 focus:outline-none"
                 value={startDate}
                 onChange={(e) => {
                   setStartDate(e.target.value)
@@ -1594,11 +1583,11 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                 }}
               />
             </label>
-            <label className="flex flex-col gap-1 text-xs text-slate-200">
+            <label className="flex flex-col gap-1 text-xs text-slate-600">
               {copy.filters.endDate}
               <input
                 type="date"
-                className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
+                className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:border-emerald-300 focus:outline-none"
                 value={endDate}
                 onChange={(e) => {
                   setEndDate(e.target.value)
@@ -1606,12 +1595,12 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                 }}
               />
             </label>
-            <label className="flex flex-col gap-1 text-xs text-slate-200">
+            <label className="flex flex-col gap-1 text-xs text-slate-600">
               {copy.filters.startPkFrom ?? '起点桩号 >=（米）'}
               <input
                 type="number"
                 inputMode="decimal"
-                className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
+                className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:border-emerald-300 focus:outline-none"
                 value={startPkFrom}
                 onChange={(e) => {
                   setStartPkFrom(e.target.value)
@@ -1620,12 +1609,12 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                 placeholder="例：480"
               />
             </label>
-            <label className="flex flex-col gap-1 text-xs text-slate-200">
+            <label className="flex flex-col gap-1 text-xs text-slate-600">
               {copy.filters.startPkTo ?? '终点桩号 <=（米）'}
               <input
                 type="number"
                 inputMode="decimal"
-                className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
+                className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:border-emerald-300 focus:outline-none"
                 value={startPkTo}
                 onChange={(e) => {
                   setStartPkTo(e.target.value)
@@ -1634,11 +1623,11 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                 placeholder="例：1500"
               />
             </label>
-            <div className="flex flex-col gap-1 text-xs text-slate-200 md:col-span-2">
+            <div className="flex flex-col gap-1 text-xs text-slate-600 md:col-span-2">
               {copy.filters.keyword}
               <div className="flex flex-col gap-2 md:flex-row md:items-end md:gap-3">
                 <input
-                  className="h-10 flex-1 rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-200/60 focus:border-emerald-300 focus:outline-none"
+                  className="h-10 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-600/60 focus:border-emerald-300 focus:outline-none"
                   value={keyword}
                   onChange={(e) => {
                     setKeyword(e.target.value)
@@ -1649,7 +1638,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    className="h-10 rounded-xl border border-white/20 px-4 text-xs font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/10"
+                    className="h-10 rounded-xl border border-slate-200 px-4 text-xs font-semibold text-slate-900 transition hover:border-slate-300 hover:bg-slate-50"
                     onClick={resetFilters}
                   >
                     {copy.filters.reset}
@@ -1664,27 +1653,27 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                   >
                     {copy.filters.search}
                   </button>
-                  {loading ? <span className="text-xs text-slate-200">{copy.filters.loading}</span> : null}
+                  {loading ? <span className="text-xs text-slate-600">{copy.filters.loading}</span> : null}
                 </div>
               </div>
             </div>
           </div>
         </section>
 
-        <section className="mt-6 rounded-3xl border border-white/10 bg-white/5 shadow-xl shadow-slate-900/30">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-5 py-3 text-sm text-slate-200">
+        <section className="mt-6 rounded-3xl border border-slate-200 bg-white shadow-xl shadow-slate-900/30">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-5 py-3 text-sm text-slate-600">
             <div className="flex items-center gap-3">
-              <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-50">
+              <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-slate-900">
                 {formatProgressCopy(copy.bulk.selectedCount, { count: selectedIds.length })}
               </span>
-              {bulkError ? <span className="text-xs text-amber-200">{bulkError}</span> : null}
-              {pdfError ? <span className="text-xs text-amber-200">{pdfError}</span> : null}
+              {bulkError ? <span className="text-xs text-amber-700">{bulkError}</span> : null}
+              {pdfError ? <span className="text-xs text-amber-700">{pdfError}</span> : null}
             </div>
             <div className="flex flex-wrap items-center gap-3">
               <div className="relative" ref={columnSelectorRef}>
                 <button
                   type="button"
-                  className="flex min-w-[140px] items-center justify-between rounded-xl border border-white/20 px-3 py-2 text-left text-xs font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/10"
+                  className="flex min-w-[140px] items-center justify-between rounded-xl border border-slate-200 px-3 py-2 text-left text-xs font-semibold text-slate-900 transition hover:border-slate-300 hover:bg-slate-50"
                   onClick={() => setShowColumnSelector((prev) => !prev)}
                 >
                   <span className="truncate">
@@ -1692,32 +1681,32 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                       ? formatProgressCopy(copy.columnSelector.selectedCount, { count: visibleColumns.length })
                       : copy.columnSelector.noneSelected}
                   </span>
-                  <span className="text-xs text-slate-400">⌕</span>
+                  <span className="text-xs text-slate-500">⌕</span>
                 </button>
                 {showColumnSelector ? (
-                  <div className="absolute right-0 z-10 mt-2 w-80 max-w-sm rounded-xl border border-white/15 bg-slate-900/95 p-3 text-xs text-slate-100 shadow-lg shadow-slate-900/40 backdrop-blur">
-                    <div className="flex items-center justify-between border-b border-white/10 pb-2 text-[11px] text-slate-300">
+                  <div className="absolute right-0 z-10 mt-2 w-80 max-w-sm rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-700 shadow-lg shadow-slate-900/40 backdrop-blur">
+                    <div className="flex items-center justify-between border-b border-slate-200 pb-2 text-[11px] text-slate-600">
                       <button className="text-emerald-300 hover:underline" onClick={handleSelectAllColumns}>
                         {copy.columnSelector.selectAll}
                       </button>
                       <div className="flex gap-2">
-                        <button className="text-slate-400 hover:underline" onClick={handleRestoreDefaultColumns}>
+                        <button className="text-slate-500 hover:underline" onClick={handleRestoreDefaultColumns}>
                           {copy.columnSelector.restore}
                         </button>
-                        <button className="text-slate-400 hover:underline" onClick={handleClearColumns}>
+                        <button className="text-slate-500 hover:underline" onClick={handleClearColumns}>
                           {copy.columnSelector.clear}
                         </button>
                       </div>
                     </div>
-                    <div className="max-h-56 space-y-1 overflow-y-auto p-2 text-xs text-slate-100">
+                    <div className="max-h-56 space-y-1 overflow-y-auto p-2 text-xs text-slate-700">
                       {columnOptions.map((option) => (
                         <label
                           key={option.key}
-                          className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 hover:bg-white/5"
+                          className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 hover:bg-white"
                         >
                           <input
                             type="checkbox"
-                            className="h-4 w-4 rounded border-white/30 bg-slate-900/60 accent-emerald-300"
+                            className="h-4 w-4 rounded border-slate-300 bg-white accent-emerald-300"
                             checked={visibleColumns.includes(option.key)}
                             onChange={() => toggleColumnVisibility(option.key)}
                           />
@@ -1754,7 +1743,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
               ) : null}
               <button
                 type="button"
-                className="rounded-xl border border-white/20 px-4 py-2 text-xs font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+                className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-900 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
                 onClick={() => handleExportPdf('preview')}
                 disabled={pdfPending || selectedIds.length === 0}
               >
@@ -1779,14 +1768,14 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
             </div>
           </div>
           <div className="overflow-x-auto">
-            <table className="min-w-full text-left text-sm text-slate-100">
-              <thead className="bg-white/5 text-xs uppercase tracking-wider text-slate-300">
+            <table className="min-w-full text-left text-sm text-slate-700">
+              <thead className="bg-white text-xs uppercase tracking-wider text-slate-600">
                 <tr>
                   <th className="w-24 px-4 py-3">
                     <div className="flex items-center gap-2">
                       <input
                         type="checkbox"
-                        className="h-4 w-4 rounded border-white/30 bg-slate-900/60 accent-emerald-300"
+                        className="h-4 w-4 rounded border-slate-300 bg-white accent-emerald-300"
                         checked={allSelected}
                         onChange={toggleSelectAll}
                         aria-label={copy.table.selectPage}
@@ -1944,7 +1933,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
               <tbody>
                 {items.length === 0 ? (
                   <tr>
-                    <td colSpan={columnCount} className="px-4 py-6 text-center text-sm text-slate-300">
+                    <td colSpan={columnCount} className="px-4 py-6 text-center text-sm text-slate-600">
                       {loading ? copy.table.loading : copy.table.empty}
                     </td>
                   </tr>
@@ -1972,14 +1961,14 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                   return (
                     <tr
                       key={item.id}
-                      className={`border-t border-white/5 transition ${isRowSelected ? 'bg-emerald-400/10' : 'bg-white/0'} hover:bg-white/5`}
+                      className={`border-t border-slate-200 transition ${isRowSelected ? 'bg-emerald-400/10' : 'bg-white/0'} hover:bg-white`}
                       onClick={() => toggleSelect(item.id)}
                     >
-                      <td className="px-4 py-3 text-xs text-slate-300">
+                      <td className="px-4 py-3 text-xs text-slate-600">
                         <div className="flex items-center gap-2">
                           <input
                             type="checkbox"
-                            className="h-4 w-4 rounded border-white/30 bg-slate-900/60 accent-emerald-300"
+                            className="h-4 w-4 rounded border-slate-300 bg-white accent-emerald-300"
                             checked={selectedIds.includes(item.id)}
                             onChange={(event) => {
                               event.stopPropagation()
@@ -1991,7 +1980,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                         </div>
                       </td>
                       {isVisible('sequence') ? (
-                        <td className="px-4 py-3 text-xs text-slate-300">{displayIndex}</td>
+                        <td className="px-4 py-3 text-xs text-slate-600">{displayIndex}</td>
                       ) : null}
                       {isVisible('road') ? <td className="px-4 py-3 whitespace-nowrap">{roadText}</td> : null}
                       {isVisible('phase') ? (
@@ -2039,38 +2028,38 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                       ) : null}
                       {isVisible('status') ? (
                         <td className="px-4 py-3 min-w-[120px]">
-                          <span className={`rounded-full px-2 py-1 text-[11px] font-semibold ${statusTone[item.status] ?? 'bg-white/10 text-slate-100'}`}>
+                          <span className={`rounded-full px-2 py-1 text-[11px] font-semibold ${statusTone[item.status] ?? 'bg-slate-50 text-slate-700'}`}>
                             {statusCopy[item.status] ?? item.status}
                           </span>
                         </td>
                       ) : null}
                       {isVisible('appointmentDate') ? (
-                        <td className="px-4 py-3 text-xs text-slate-300">{appointmentText}</td>
+                        <td className="px-4 py-3 text-xs text-slate-600">{appointmentText}</td>
                       ) : null}
                       {isVisible('submittedAt') ? (
-                        <td className="px-4 py-3 text-xs text-slate-300">{formatDate(item.submittedAt)}</td>
+                        <td className="px-4 py-3 text-xs text-slate-600">{formatDate(item.submittedAt)}</td>
                       ) : null}
                       {isVisible('submittedBy') ? (
-                        <td className="px-4 py-3 text-xs text-slate-300">{submittedByText}</td>
+                        <td className="px-4 py-3 text-xs text-slate-600">{submittedByText}</td>
                       ) : null}
                       {isVisible('createdBy') ? (
-                        <td className="px-4 py-3 text-xs text-slate-300">{createdByText}</td>
+                        <td className="px-4 py-3 text-xs text-slate-600">{createdByText}</td>
                       ) : null}
                       {isVisible('createdAt') ? (
-                        <td className="px-4 py-3 text-xs text-slate-300">{formatDate(item.createdAt)}</td>
+                        <td className="px-4 py-3 text-xs text-slate-600">{formatDate(item.createdAt)}</td>
                       ) : null}
                       {isVisible('updatedBy') ? (
-                        <td className="px-4 py-3 text-xs text-slate-300">{updatedByText}</td>
+                        <td className="px-4 py-3 text-xs text-slate-600">{updatedByText}</td>
                       ) : null}
                       {isVisible('updatedAt') ? (
-                        <td className="px-4 py-3 text-xs text-slate-300">{formatDate(item.updatedAt)}</td>
+                        <td className="px-4 py-3 text-xs text-slate-600">{formatDate(item.updatedAt)}</td>
                       ) : null}
                       {isVisible('action') ? (
                         <td className="px-4 py-3 text-center">
                           <div className="flex items-center justify-center gap-2">
                             <button
                               type="button"
-                              className="rounded-lg border border-white/20 px-3 py-1 text-xs font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/10"
+                              className="rounded-lg border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-900 transition hover:border-slate-300 hover:bg-slate-50"
                               onClick={(event) => {
                                 event.stopPropagation()
                                 setSelected(item)
@@ -2080,7 +2069,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                             </button>
                             <button
                               type="button"
-                              className="rounded-lg border border-white/20 px-3 py-1 text-xs font-semibold text-slate-50 transition hover:border-emerald-200/70 hover:bg-emerald-200/15"
+                              className="rounded-lg border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-900 transition hover:border-emerald-200/70 hover:bg-emerald-200/15"
                               onClick={(event) => {
                                 event.stopPropagation()
                                 setSelected(null)
@@ -2091,7 +2080,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                             </button>
                             <button
                               type="button"
-                              className="rounded-lg border border-white/20 px-3 py-1 text-xs font-semibold text-amber-100 transition hover:border-amber-200/70 hover:bg-amber-200/15"
+                              className="rounded-lg border border-slate-200 px-3 py-1 text-xs font-semibold text-amber-700 transition hover:border-amber-200/70 hover:bg-amber-200/15"
                               onClick={(event) => {
                                 event.stopPropagation()
                                 setSelected(null)
@@ -2105,7 +2094,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                         </td>
                       ) : null}
                       {isVisible('remark') ? (
-                        <td className="px-4 py-3 text-xs text-slate-300">{remarkText}</td>
+                        <td className="px-4 py-3 text-xs text-slate-600">{remarkText}</td>
                       ) : null}
                     </tr>
                     )
@@ -2114,11 +2103,11 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
               </tbody>
             </table>
           </div>
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/10 px-5 py-3 text-sm text-slate-200">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 px-5 py-3 text-sm text-slate-600">
             <span>{formatProgressCopy(copy.pagination.summary, { total, page, totalPages })}</span>
             <div className="flex items-center gap-2">
-              <label className="flex items-center gap-2 text-xs text-slate-200">
-                <span className="text-slate-400">{copy.pagination.pageSizeLabel}</span>
+              <label className="flex items-center gap-2 text-xs text-slate-600">
+                <span className="text-slate-500">{copy.pagination.pageSizeLabel}</span>
                 <select
                   value={pageSize}
                   onChange={(e) => {
@@ -2127,7 +2116,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                     setPageSize(value)
                     setPage(1)
                   }}
-                  className="h-8 rounded-lg border border-white/20 bg-slate-900 px-2 py-1 text-xs text-slate-50 focus:border-emerald-300 focus:outline-none"
+                  className="h-8 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-900 focus:border-emerald-300 focus:outline-none"
                   aria-label={copy.pagination.pageSizeLabel}
                 >
                   {[10, 20, 30, 50, 100, 200, 500, 1000].map((size) => (
@@ -2139,13 +2128,13 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
               </label>
               <button
                 type="button"
-                className="rounded-xl border border-white/20 px-3 py-1 text-xs text-slate-100 transition hover:border-white/40 hover:bg-white/10 disabled:opacity-40"
+                className="rounded-xl border border-slate-200 px-3 py-1 text-xs text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:opacity-40"
                 disabled={page <= 1}
                 onClick={() => setPage((prev) => Math.max(1, prev - 1))}
               >
                 {copy.pagination.prev}
               </button>
-              <div className="flex items-center gap-1 text-xs text-slate-200">
+              <div className="flex items-center gap-1 text-xs text-slate-600">
                 <input
                   type="number"
                   min={1}
@@ -2170,14 +2159,14 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                       setPageInput(String(next))
                     }
                   }}
-                  className="h-8 w-14 rounded-lg border border-white/20 bg-slate-900 px-2 py-1 text-center text-xs text-slate-50 focus:border-emerald-300 focus:outline-none"
+                  className="h-8 w-14 rounded-lg border border-slate-200 bg-white px-2 py-1 text-center text-xs text-slate-900 focus:border-emerald-300 focus:outline-none"
                   aria-label={copy.pagination.goTo}
                 />
-                <span className="text-slate-400">/ {totalPages}</span>
+                <span className="text-slate-500">/ {totalPages}</span>
               </div>
               <button
                 type="button"
-                className="rounded-xl border border-white/20 px-3 py-1 text-xs text-slate-100 transition hover:border-white/40 hover:bg-white/10 disabled:opacity-40"
+                className="rounded-xl border border-slate-200 px-3 py-1 text-xs text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:opacity-40"
                 disabled={page >= totalPages}
                 onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
               >
@@ -2189,7 +2178,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
 
         {selected ? (
           <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 px-4 py-6"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4 py-6"
             onClick={(e) => {
               if (e.target === e.currentTarget) setSelected(null)
             }}
@@ -2213,96 +2202,96 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                     : String(selected.submissionOrder)
                   : String(selected.submissionNumber)
               return (
-            <div className="w-full max-w-3xl rounded-3xl border border-white/10 bg-slate-900/95 p-6 shadow-2xl shadow-slate-900/50 backdrop-blur">
+            <div className="w-full max-w-3xl rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl shadow-slate-900/50 backdrop-blur">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-xs uppercase tracking-[0.2em] text-emerald-100">{copy.detailModal.badge}</p>
-                  <h2 className="text-xl font-semibold text-slate-50">
+                  <p className="text-xs uppercase tracking-[0.2em] text-emerald-700">{copy.detailModal.badge}</p>
+                  <h2 className="text-xl font-semibold text-slate-900">
                     {localizeProgressTerm('phase', selected.phaseName, locale)} · {sideText}
                   </h2>
-                  <p className="text-sm text-slate-300">
+                  <p className="text-sm text-slate-600">
                     {roadText} · {rangeText}
                   </p>
                 </div>
                 <button
                   type="button"
-                  className="rounded-full border border-white/20 px-3 py-1 text-xs font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/20"
+                  className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-900 transition hover:border-slate-300 hover:bg-slate-100"
                   onClick={() => setSelected(null)}
                   aria-label={copy.detailModal.closeAria}
                 >
                   ×
                 </button>
               </div>
-              <div className="mt-4 grid gap-3 text-sm text-slate-200 md:grid-cols-2">
+              <div className="mt-4 grid gap-3 text-sm text-slate-600 md:grid-cols-2">
                 <div className="space-y-1">
-                  <p className="text-xs text-slate-400">{copy.columns.road}</p>
-                  <p className="rounded-xl bg-white/5 px-3 py-2 text-sm">{roadText}</p>
+                  <p className="text-xs text-slate-500">{copy.columns.road}</p>
+                  <p className="rounded-xl bg-white px-3 py-2 text-sm">{roadText}</p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-xs text-slate-400">{copy.columns.phase}</p>
-                  <p className="rounded-xl bg-white/5 px-3 py-2 text-sm">
+                  <p className="text-xs text-slate-500">{copy.columns.phase}</p>
+                  <p className="rounded-xl bg-white px-3 py-2 text-sm">
                     {localizeProgressTerm('phase', selected.phaseName, locale)}
                   </p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-xs text-slate-400">{copy.columns.side}</p>
-                  <p className="rounded-xl bg-white/5 px-3 py-2 text-sm">{sideText}</p>
+                  <p className="text-xs text-slate-500">{copy.columns.side}</p>
+                  <p className="rounded-xl bg-white px-3 py-2 text-sm">{sideText}</p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-xs text-slate-400">{copy.columns.range}</p>
-                  <p className="rounded-xl bg-white/5 px-3 py-2 text-sm">{rangeText}</p>
+                  <p className="text-xs text-slate-500">{copy.columns.range}</p>
+                  <p className="rounded-xl bg-white px-3 py-2 text-sm">{rangeText}</p>
                 </div>
                 <div className="space-y-1 md:col-span-2">
-                  <p className="text-xs text-slate-400">{copy.columns.layers}</p>
-                  <p className="rounded-xl bg-white/5 px-3 py-2 text-sm">{layerText}</p>
+                  <p className="text-xs text-slate-500">{copy.columns.layers}</p>
+                  <p className="rounded-xl bg-white px-3 py-2 text-sm">{layerText}</p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-xs text-slate-400">{copy.detailModal.contentsLabel}</p>
-                  <p className="rounded-xl bg-white/5 px-3 py-2 text-sm">{checksText}</p>
+                  <p className="text-xs text-slate-500">{copy.detailModal.contentsLabel}</p>
+                  <p className="rounded-xl bg-white px-3 py-2 text-sm">{checksText}</p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-xs text-slate-400">{copy.detailModal.typesLabel}</p>
-                  <p className="rounded-xl bg-white/5 px-3 py-2 text-sm">{typesText}</p>
+                  <p className="text-xs text-slate-500">{copy.detailModal.typesLabel}</p>
+                  <p className="rounded-xl bg-white px-3 py-2 text-sm">{typesText}</p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-xs text-slate-400">{copy.detailModal.statusLabel}</p>
+                  <p className="text-xs text-slate-500">{copy.detailModal.statusLabel}</p>
                   <p>
-                    <span className={`rounded-full px-3 py-1 text-[11px] font-semibold ${statusTone[selected.status] ?? 'bg-white/10 text-slate-100'}`}>
+                    <span className={`rounded-full px-3 py-1 text-[11px] font-semibold ${statusTone[selected.status] ?? 'bg-slate-50 text-slate-700'}`}>
                       {statusCopy[selected.status] ?? selected.status}
                     </span>
                   </p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-xs text-slate-400">{copy.columns.submissionOrder}</p>
-                  <p className="rounded-xl bg-white/5 px-3 py-2 text-sm">{submissionOrderText}</p>
+                  <p className="text-xs text-slate-500">{copy.columns.submissionOrder}</p>
+                  <p className="rounded-xl bg-white px-3 py-2 text-sm">{submissionOrderText}</p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-xs text-slate-400">{copy.detailModal.submittedAt}</p>
+                  <p className="text-xs text-slate-500">{copy.detailModal.submittedAt}</p>
                   <p>{formatDate(selected.submittedAt)}</p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-xs text-slate-400">{copy.detailModal.updatedAt}</p>
+                  <p className="text-xs text-slate-500">{copy.detailModal.updatedAt}</p>
                   <p>{formatDate(selected.updatedAt)}</p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-xs text-slate-400">{copy.detailModal.submittedBy}</p>
+                  <p className="text-xs text-slate-500">{copy.detailModal.submittedBy}</p>
                   <p>{submittedByText}</p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-xs text-slate-400">{copy.columns.createdBy}</p>
+                  <p className="text-xs text-slate-500">{copy.columns.createdBy}</p>
                   <p>{createdByText}</p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-xs text-slate-400">{copy.columns.createdAt}</p>
+                  <p className="text-xs text-slate-500">{copy.columns.createdAt}</p>
                   <p>{formatDate(selected.createdAt)}</p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-xs text-slate-400">{copy.columns.updatedBy}</p>
+                  <p className="text-xs text-slate-500">{copy.columns.updatedBy}</p>
                   <p>{updatedByText}</p>
                 </div>
                 <div className="space-y-1 md:col-span-2">
-                  <p className="text-xs text-slate-400">{copy.detailModal.remarkLabel}</p>
-                  <p className="rounded-xl bg-white/5 px-3 py-2 text-sm">
+                  <p className="text-xs text-slate-500">{copy.detailModal.remarkLabel}</p>
+                  <p className="rounded-xl bg-white px-3 py-2 text-sm">
                     {selected.remark || copy.detailModal.remarkEmpty}
                   </p>
                 </div>
@@ -2315,7 +2304,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
 
         {bulkDeleteOpen ? (
           <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 px-4 py-6"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4 py-6"
             onClick={(e) => {
               if (e.target === e.currentTarget) {
                 setBulkDeleteOpen(false)
@@ -2323,19 +2312,19 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
               }
             }}
           >
-            <div className="w-full max-w-2xl rounded-3xl border border-white/10 bg-slate-900/95 p-6 text-sm text-slate-100 shadow-2xl shadow-rose-400/30 backdrop-blur">
+            <div className="w-full max-w-2xl rounded-3xl border border-slate-200 bg-white p-6 text-sm text-slate-700 shadow-2xl shadow-rose-400/30 backdrop-blur">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-xs uppercase tracking-[0.2em] text-amber-100">{copy.bulkDelete.badge}</p>
-                  <h2 className="text-xl font-semibold text-slate-50">{copy.bulkDelete.title}</h2>
-                  <p className="text-sm text-slate-300">
+                  <p className="text-xs uppercase tracking-[0.2em] text-amber-700">{copy.bulkDelete.badge}</p>
+                  <h2 className="text-xl font-semibold text-slate-900">{copy.bulkDelete.title}</h2>
+                  <p className="text-sm text-slate-600">
                     {formatProgressCopy(copy.bulk.selectedCount, { count: selectedIds.length })}
                   </p>
-                  <p className="text-xs text-slate-400">{copy.bulkDelete.hint}</p>
+                  <p className="text-xs text-slate-500">{copy.bulkDelete.hint}</p>
                 </div>
                 <button
                   type="button"
-                  className="rounded-full border border-white/20 px-3 py-1 text-xs font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/20"
+                  className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-900 transition hover:border-slate-300 hover:bg-slate-100"
                   onClick={() => {
                     setBulkDeleteOpen(false)
                     setBulkDeleteError(null)
@@ -2346,12 +2335,12 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                 </button>
               </div>
               {bulkDeleteError ? (
-                <p className="mt-3 text-xs text-amber-200">{bulkDeleteError}</p>
+                <p className="mt-3 text-xs text-amber-700">{bulkDeleteError}</p>
               ) : null}
               <div className="mt-5 flex items-center justify-end gap-3">
                 <button
                   type="button"
-                  className="rounded-xl border border-white/20 px-4 py-2 text-xs font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/10"
+                  className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-900 transition hover:border-slate-300 hover:bg-slate-50"
                   onClick={() => {
                     setBulkDeleteOpen(false)
                     setBulkDeleteError(null)
@@ -2374,7 +2363,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
 
         {bulkEditOpen ? (
           <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 px-4 py-6"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4 py-6"
             onClick={(e) => {
               if (e.target === e.currentTarget) {
                 setBulkEditOpen(false)
@@ -2382,19 +2371,19 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
               }
             }}
           >
-            <div className="w-full max-w-5xl rounded-3xl border border-white/10 bg-slate-900/95 p-6 text-sm text-slate-100 shadow-2xl shadow-emerald-400/30 backdrop-blur">
+            <div className="w-full max-w-5xl rounded-3xl border border-slate-200 bg-white p-6 text-sm text-slate-700 shadow-2xl shadow-emerald-400/30 backdrop-blur">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-xs uppercase tracking-[0.2em] text-emerald-100">{copy.bulkEdit.badge}</p>
-                  <h2 className="text-xl font-semibold text-slate-50">{copy.bulkEdit.title}</h2>
-                  <p className="text-sm text-slate-300">
+                  <p className="text-xs uppercase tracking-[0.2em] text-emerald-700">{copy.bulkEdit.badge}</p>
+                  <h2 className="text-xl font-semibold text-slate-900">{copy.bulkEdit.title}</h2>
+                  <p className="text-sm text-slate-600">
                     {formatProgressCopy(copy.bulk.selectedCount, { count: selectedIds.length })}
                   </p>
-                  <p className="text-xs text-slate-400">{copy.bulkEdit.hint}</p>
+                  <p className="text-xs text-slate-500">{copy.bulkEdit.hint}</p>
                 </div>
                 <button
                   type="button"
-                  className="rounded-full border border-white/20 px-3 py-1 text-xs font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/20"
+                  className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-900 transition hover:border-slate-300 hover:bg-slate-100"
                   onClick={() => {
                     setBulkEditOpen(false)
                     resetBulkEditForm()
@@ -2405,12 +2394,12 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                 </button>
               </div>
 
-              <div className="mt-4 space-y-4 text-sm text-slate-200">
+              <div className="mt-4 space-y-4 text-sm text-slate-600">
                 <div className="grid gap-3 md:grid-cols-2">
                   <label className="flex flex-col gap-1">
                     {copy.editModal.phaseLabel}
                     <select
-                      className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
+                      className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:border-emerald-300 focus:outline-none"
                       value={bulkEditForm.phaseId}
                       onChange={(e) =>
                         setBulkEditForm((prev) => ({
@@ -2431,7 +2420,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                   <label className="flex flex-col gap-1">
                     {copy.editModal.sideLabel}
                     <select
-                      className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
+                      className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:border-emerald-300 focus:outline-none"
                       value={bulkEditForm.side}
                       onChange={(e) => setBulkEditForm((prev) => ({ ...prev, side: e.target.value as IntervalSide }))}
                     >
@@ -2447,11 +2436,11 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                   <label className="flex flex-col gap-1">
                     <span className="flex items-center justify-between gap-2">
                       <span>{copy.editModal.startLabel}</span>
-                      <span className="text-[11px] text-slate-400">{copy.bulkEdit.noChange}</span>
+                      <span className="text-[11px] text-slate-500">{copy.bulkEdit.noChange}</span>
                     </span>
                     <input
                       type="number"
-                      className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
+                      className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:border-emerald-300 focus:outline-none"
                       value={bulkEditForm.startPk}
                       onChange={(e) => setBulkEditForm((prev) => ({ ...prev, startPk: e.target.value }))}
                       placeholder={copy.bulkEdit.rangeHint}
@@ -2461,7 +2450,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                     {copy.editModal.endLabel}
                     <input
                       type="number"
-                      className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
+                      className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:border-emerald-300 focus:outline-none"
                       value={bulkEditForm.endPk}
                       onChange={(e) => setBulkEditForm((prev) => ({ ...prev, endPk: e.target.value }))}
                       placeholder={copy.bulkEdit.rangeHint}
@@ -2473,7 +2462,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                   <label className="flex flex-col gap-1">
                     {copy.editModal.layersLabel}
                     <input
-                      className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-200/60 focus:border-emerald-300 focus:outline-none"
+                      className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-600/60 focus:border-emerald-300 focus:outline-none"
                       value={bulkEditForm.layers}
                       onChange={(e) => setBulkEditForm((prev) => ({ ...prev, layers: e.target.value }))}
                       placeholder={copy.bulkEdit.tokenHint}
@@ -2482,7 +2471,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                   <label className="flex flex-col gap-1">
                     {copy.editModal.checksLabel}
                     <input
-                      className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-200/60 focus:border-emerald-300 focus:outline-none"
+                      className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-600/60 focus:border-emerald-300 focus:outline-none"
                       value={bulkEditForm.checks}
                       onChange={(e) => setBulkEditForm((prev) => ({ ...prev, checks: e.target.value }))}
                       placeholder={copy.bulkEdit.tokenHint}
@@ -2493,7 +2482,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                   <label className="flex flex-col gap-1">
                     {copy.editModal.typesLabel}
                     <input
-                      className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-200/60 focus:border-emerald-300 focus:outline-none"
+                      className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-600/60 focus:border-emerald-300 focus:outline-none"
                       value={bulkEditForm.types}
                       onChange={(e) => setBulkEditForm((prev) => ({ ...prev, types: e.target.value }))}
                       placeholder={copy.bulkEdit.tokenHint}
@@ -2503,7 +2492,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                     {copy.editModal.appointmentLabel}
                     <input
                       type="date"
-                      className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
+                      className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:border-emerald-300 focus:outline-none"
                       value={bulkEditForm.appointmentDate}
                       onChange={(e) => setBulkEditForm((prev) => ({ ...prev, appointmentDate: e.target.value }))}
                     />
@@ -2512,7 +2501,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                     {copy.editModal.submittedAtLabel}
                     <input
                       type="datetime-local"
-                      className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
+                      className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:border-emerald-300 focus:outline-none"
                       value={bulkEditForm.submittedAt}
                       onChange={(e) => setBulkEditForm((prev) => ({ ...prev, submittedAt: e.target.value }))}
                     />
@@ -2520,7 +2509,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                   <label className="flex flex-col gap-1">
                     {copy.editModal.statusLabel}
                     <select
-                      className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
+                      className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:border-emerald-300 focus:outline-none"
                       value={bulkEditForm.status}
                       onChange={(e) => setBulkEditForm((prev) => ({ ...prev, status: e.target.value as InspectionStatus }))}
                     >
@@ -2536,7 +2525,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                     {copy.editModal.submissionOrderLabel}
                     <input
                       type="number"
-                      className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
+                      className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:border-emerald-300 focus:outline-none"
                       value={bulkEditForm.submissionOrder}
                       onChange={(e) => setBulkEditForm((prev) => ({ ...prev, submissionOrder: e.target.value }))}
                       placeholder={copy.editModal.submissionOrderPlaceholder}
@@ -2546,19 +2535,19 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                 <label className="flex flex-col gap-1">
                   {copy.editModal.remarkLabel}
                   <textarea
-                    className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-200/60 focus:border-emerald-300 focus:outline-none"
+                    className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-600/60 focus:border-emerald-300 focus:outline-none"
                     rows={3}
                     value={bulkEditForm.remark}
                     onChange={(e) => setBulkEditForm((prev) => ({ ...prev, remark: e.target.value }))}
                     placeholder={copy.bulkEdit.remarkHint}
                   />
                 </label>
-                <p className="text-xs text-slate-400">{copy.bulkEdit.noChangeHint}</p>
-                {bulkEditError ? <p className="text-xs text-amber-200">{bulkEditError}</p> : null}
+                <p className="text-xs text-slate-500">{copy.bulkEdit.noChangeHint}</p>
+                {bulkEditError ? <p className="text-xs text-amber-700">{bulkEditError}</p> : null}
                 <div className="flex items-center justify-end gap-3">
                   <button
                     type="button"
-                    className="rounded-xl border border-white/20 px-4 py-2 text-xs font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/10"
+                    className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-900 transition hover:border-slate-300 hover:bg-slate-50"
                     onClick={() => {
                       setBulkEditOpen(false)
                       resetBulkEditForm()
@@ -2582,7 +2571,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
 
         {editing ? (
           <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 px-4 py-6"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4 py-6"
             onClick={(e) => {
               if (e.target === e.currentTarget) setEditing(null)
             }}
@@ -2592,32 +2581,32 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
               const roadText = isPrefab ? prefabRoadLabel : formatRoadName(editing.roadSlug, editing.roadName)
               const rangeText = isPrefab ? '—' : `${formatPK(editing.startPk)} → ${formatPK(editing.endPk)}`
               return (
-            <div className="w-full max-w-4xl rounded-3xl border border-white/10 bg-slate-900/95 p-6 shadow-2xl shadow-emerald-500/20 backdrop-blur">
+            <div className="w-full max-w-4xl rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl shadow-emerald-500/20 backdrop-blur">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-xs uppercase tracking-[0.2em] text-emerald-100">{copy.editModal.badge}</p>
-                  <h2 className="text-xl font-semibold text-slate-50">
+                  <p className="text-xs uppercase tracking-[0.2em] text-emerald-700">{copy.editModal.badge}</p>
+                  <h2 className="text-xl font-semibold text-slate-900">
                     {roadText} · {localizeProgressTerm('phase', editing.phaseName, locale)}
                   </h2>
-                  <p className="text-sm text-slate-300">
+                  <p className="text-sm text-slate-600">
                     {rangeText}
                   </p>
                 </div>
                 <button
                   type="button"
-                  className="rounded-full border border-white/20 px-3 py-1 text-xs font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/20"
+                  className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-900 transition hover:border-slate-300 hover:bg-slate-100"
                   onClick={() => setEditing(null)}
                   aria-label={copy.editModal.closeAria}
                 >
                   ×
                 </button>
               </div>
-              <div className="mt-4 space-y-4 text-sm text-slate-200">
+              <div className="mt-4 space-y-4 text-sm text-slate-600">
                 <div className="grid gap-3 md:grid-cols-2">
                   <label className="flex flex-col gap-1">
                     {copy.editModal.phaseLabel}
                     <select
-                      className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
+                      className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:border-emerald-300 focus:outline-none"
                       value={editForm.phaseId}
                       onChange={(e) => setEditForm((prev) => ({ ...prev, phaseId: e.target.value ? Number(e.target.value) : '' }))}
                     >
@@ -2630,15 +2619,15 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                       </select>
                     </label>
                   {isPrefab ? (
-                    <div className="flex flex-col gap-1 rounded-xl border border-white/10 bg-white/5 px-3 py-2">
-                      <span className="text-xs text-slate-300">{copy.editModal.sideLabel}</span>
+                    <div className="flex flex-col gap-1 rounded-xl border border-slate-200 bg-white px-3 py-2">
+                      <span className="text-xs text-slate-600">{copy.editModal.sideLabel}</span>
                       <span>{copy.editModal.sidePrefabNote}</span>
                     </div>
                   ) : (
                     <label className="flex flex-col gap-1">
                       {copy.editModal.sideLabel}
                       <select
-                        className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
+                        className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:border-emerald-300 focus:outline-none"
                         value={editForm.side}
                         onChange={(e) => setEditForm((prev) => ({ ...prev, side: e.target.value as IntervalSide }))}
                       >
@@ -2652,8 +2641,8 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                 </div>
                 {isPrefab ? (
                   <div className="grid gap-3 md:grid-cols-2">
-                    <div className="flex flex-col gap-1 rounded-xl border border-white/10 bg-white/5 px-3 py-2">
-                      <span className="text-xs text-slate-300">{copy.editModal.rangeLabel}</span>
+                    <div className="flex flex-col gap-1 rounded-xl border border-slate-200 bg-white px-3 py-2">
+                      <span className="text-xs text-slate-600">{copy.editModal.rangeLabel}</span>
                       <span>{copy.editModal.rangePrefabNote}</span>
                     </div>
                   </div>
@@ -2663,7 +2652,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                       {copy.editModal.startLabel}
                       <input
                         type="number"
-                        className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
+                        className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:border-emerald-300 focus:outline-none"
                         value={editForm.startPk}
                         onChange={(e) => setEditForm((prev) => ({ ...prev, startPk: e.target.value }))}
                       />
@@ -2672,7 +2661,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                       {copy.editModal.endLabel}
                       <input
                         type="number"
-                        className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
+                        className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:border-emerald-300 focus:outline-none"
                         value={editForm.endPk}
                         onChange={(e) => setEditForm((prev) => ({ ...prev, endPk: e.target.value }))}
                       />
@@ -2683,7 +2672,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                   <label className="flex flex-col gap-1">
                     {copy.editModal.layersLabel}
                     <input
-                      className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-200/60 focus:border-emerald-300 focus:outline-none"
+                      className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-600/60 focus:border-emerald-300 focus:outline-none"
                       value={editForm.layers}
                       onChange={(e) => setEditForm((prev) => ({ ...prev, layers: e.target.value }))}
                       placeholder={copy.editModal.layersPlaceholder}
@@ -2692,7 +2681,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                   <label className="flex flex-col gap-1">
                     {copy.editModal.checksLabel}
                     <input
-                      className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-200/60 focus:border-emerald-300 focus:outline-none"
+                      className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-600/60 focus:border-emerald-300 focus:outline-none"
                       value={editForm.checks}
                       onChange={(e) => setEditForm((prev) => ({ ...prev, checks: e.target.value }))}
                       placeholder={copy.editModal.checksPlaceholder}
@@ -2703,7 +2692,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                   <label className="flex flex-col gap-1">
                     {copy.editModal.typesLabel}
                     <input
-                      className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-200/60 focus:border-emerald-300 focus:outline-none"
+                      className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-600/60 focus:border-emerald-300 focus:outline-none"
                       value={editForm.types}
                       onChange={(e) => setEditForm((prev) => ({ ...prev, types: e.target.value }))}
                       placeholder={copy.editModal.typesPlaceholder}
@@ -2713,7 +2702,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                     {copy.editModal.appointmentLabel}
                     <input
                       type="date"
-                      className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
+                      className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:border-emerald-300 focus:outline-none"
                       value={editForm.appointmentDate}
                       onChange={(e) => setEditForm((prev) => ({ ...prev, appointmentDate: e.target.value }))}
                     />
@@ -2722,7 +2711,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                     {copy.editModal.submittedAtLabel}
                     <input
                       type="datetime-local"
-                      className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
+                      className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:border-emerald-300 focus:outline-none"
                       value={editForm.submittedAt}
                       onChange={(e) => setEditForm((prev) => ({ ...prev, submittedAt: e.target.value }))}
                     />
@@ -2730,7 +2719,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                   <label className="flex flex-col gap-1">
                     {copy.editModal.statusLabel}
                     <select
-                      className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
+                      className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:border-emerald-300 focus:outline-none"
                       value={editForm.status}
                       onChange={(e) => setEditForm((prev) => ({ ...prev, status: e.target.value as InspectionStatus }))}
                     >
@@ -2746,7 +2735,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                     {copy.editModal.submissionOrderLabel}
                     <input
                       type="number"
-                      className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
+                      className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:border-emerald-300 focus:outline-none"
                       value={editForm.submissionOrder}
                       onChange={(e) => setEditForm((prev) => ({ ...prev, submissionOrder: e.target.value }))}
                       placeholder={copy.editModal.submissionOrderPlaceholder}
@@ -2756,18 +2745,18 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                 <label className="flex flex-col gap-1">
                   {copy.editModal.remarkLabel}
                   <textarea
-                    className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-200/60 focus:border-emerald-300 focus:outline-none"
+                    className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-600/60 focus:border-emerald-300 focus:outline-none"
                     rows={3}
                     value={editForm.remark}
                     onChange={(e) => setEditForm((prev) => ({ ...prev, remark: e.target.value }))}
                     placeholder={copy.editModal.remarkPlaceholder}
                   />
                 </label>
-                {editError ? <p className="text-xs text-amber-200">{editError}</p> : null}
+                {editError ? <p className="text-xs text-amber-700">{editError}</p> : null}
                 <div className="flex items-center justify-end gap-3">
                   <button
                     type="button"
-                    className="rounded-xl border border-white/20 px-4 py-2 text-xs font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/10"
+                    className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-900 transition hover:border-slate-300 hover:bg-slate-50"
                     onClick={() => setEditing(null)}
                   >
                     {copy.editModal.cancel}
@@ -2790,19 +2779,19 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
 
         {deleteTarget ? (
           <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 px-4 py-6"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4 py-6"
             onClick={(e) => {
               if (e.target === e.currentTarget) setDeleteTarget(null)
             }}
           >
-            <div className="w-full max-w-xl rounded-3xl border border-white/10 bg-slate-900/95 p-6 text-sm text-slate-100 shadow-2xl shadow-rose-500/20 backdrop-blur">
+            <div className="w-full max-w-xl rounded-3xl border border-slate-200 bg-white p-6 text-sm text-slate-700 shadow-2xl shadow-rose-500/20 backdrop-blur">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-xs uppercase tracking-[0.2em] text-amber-100">{copy.deleteModal.badge}</p>
-                  <h3 className="text-lg font-semibold text-slate-50">
+                  <p className="text-xs uppercase tracking-[0.2em] text-amber-700">{copy.deleteModal.badge}</p>
+                  <h3 className="text-lg font-semibold text-slate-900">
                     {localizeProgressTerm('phase', deleteTarget.phaseName, locale)}
                   </h3>
-                  <p className="text-sm text-slate-300">
+                  <p className="text-sm text-slate-600">
                     {isPrefabItem(deleteTarget)
                       ? prefabRoadLabel
                       : formatRoadName(deleteTarget.roadSlug, deleteTarget.roadName)}{' '}
@@ -2811,19 +2800,19 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                 </div>
                 <button
                   type="button"
-                  className="rounded-full border border-white/20 px-3 py-1 text-xs font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/20"
+                  className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-900 transition hover:border-slate-300 hover:bg-slate-100"
                   onClick={() => setDeleteTarget(null)}
                   aria-label={copy.deleteModal.closeAria}
                 >
                   ×
                 </button>
               </div>
-              <p className="mt-4 text-sm text-slate-200">{copy.deleteModal.confirmText}</p>
-              {deleteError ? <p className="mt-2 text-xs text-amber-200">{deleteError}</p> : null}
+              <p className="mt-4 text-sm text-slate-600">{copy.deleteModal.confirmText}</p>
+              {deleteError ? <p className="mt-2 text-xs text-amber-700">{deleteError}</p> : null}
               <div className="mt-4 flex items-center justify-end gap-3">
                 <button
                   type="button"
-                  className="rounded-xl border border-white/20 px-4 py-2 text-xs font-semibold text-slate-50 transition hover:border-white/40 hover:bg-white/10"
+                  className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-900 transition hover:border-slate-300 hover:bg-slate-50"
                   onClick={() => setDeleteTarget(null)}
                 >
                   {copy.deleteModal.cancel}
