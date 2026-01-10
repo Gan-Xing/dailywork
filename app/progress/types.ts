@@ -3,4 +3,5 @@ export interface RoadFormState {
   name: string
   startPk: string
   endPk: string
+  projectId: string
 }

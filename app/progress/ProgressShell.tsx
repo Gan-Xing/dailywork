@@ -16,6 +16,7 @@ interface Props {
   loadError: string | null
   canManage: boolean
   canViewInspections: boolean
+  projects: Array<{ id: number; name: string; code: string | null }>
 }
 
 export function ProgressShell({
@@ -24,6 +25,7 @@ export function ProgressShell({
   loadError,
   canManage,
   canViewInspections,
+  projects,
 }: Props) {
   const { locale } = usePreferredLocale('zh', locales)
   const t = getProgressCopy(locale)
@@ -57,6 +59,13 @@ export function ProgressShell({
               </span>
             </nav>
             <div className="flex items-center gap-2">
+              <Link
+                href="/progress/quantities"
+                prefetch={false}
+                className="inline-flex items-center gap-2 rounded-full border border-emerald-200/60 px-4 py-2 text-xs font-semibold text-emerald-50 shadow-[0_0_0_1px_rgba(255,255,255,0.08)] transition hover:-translate-y-0.5 hover:border-white/80 hover:bg-white/10"
+              >
+                分项工程管理
+              </Link>
               {canViewInspections ? (
                 <Link
                   href="/progress/inspections"
@@ -121,7 +130,12 @@ export function ProgressShell({
 
         <div className="mt-10">
           {viewMode === 'road' ? (
-            <RoadBoard ref={roadBoardRef} initialRoads={roads} canManage={canManage} />
+            <RoadBoard
+              ref={roadBoardRef}
+              initialRoads={roads}
+              projects={projects}
+              canManage={canManage}
+            />
           ) : (
             <PhaseAggregateBoard
               phases={aggregatedPhases}

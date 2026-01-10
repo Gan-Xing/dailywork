@@ -251,7 +251,8 @@
      1. `name`：路段名称，文本，必填。
      2. `startPk`：起点标识，文本，支持 `PK0+000` 或交叉口描述，必填。
      3. `endPk`：终点标识，文本，必填。
-     4. `createdAt` / `updatedAt`：系统维护的时间戳，用于审计与排序。
+     4. `projectId?`：关联 `Project`，用于按项目筛选 BoqItem，可空。
+     5. `createdAt` / `updatedAt`：系统维护的时间戳，用于审计与排序。
 
 ## 分项定义（PhaseDefinition）
 
@@ -266,9 +267,9 @@
      5. `isActive`：布尔，控制是否可被新实例选择，默认 `true`。
    6. `createdAt` / `updatedAt`：系统时间戳。
 
-## 可报价分项名称（PhasePriceItem）
+## 分项名称（PhaseItem）
 
-- **用途**：为每个分项模板维护一个或多个“可计价的分项名称”（如涵洞的混凝土、模板、钢筋部分），每条记录包含独立单价与计价说明，供产值/财务模块直接使用。管理界面支持新增/修改/删除操作，方便按规范或构成拆分价格。
+- **用途**：为每个分项模板维护一个或多个“分项名称”（如涵洞的混凝土、模板、钢筋部分），用于绑定工程量清单条目与计量公式。单价字段继续保留用于现有 `/value/prices` 维护与过渡期参考，产值计量将逐步迁移为以绑定的 `BoqItem` 单价为准。
 - **字段**
      1. `id`：唯一标识。
      2. `phaseDefinitionId`：关联 `PhaseDefinition`（必填）。
@@ -277,11 +278,42 @@
      5. `measure`：枚举 `LINEAR` / `POINT`，默认继承分项的计量方式，也可重新指定。
      6. `unitString?`：计价单位（如 `m³`、`m²`），仅在 UI 上展示。
      7. `description?`：可填写计价依据、构成组件等说明文字。
-     8. `unitPrice?`：金额（decimal，西非法郎），可空表示使用分项定义自身 `unitPrice` 作为回退值。
+     8. `unitPrice?`：金额（decimal，西非法郎），可空，用于现有价格维护与过渡期参考。
      9. `isActive`：布尔，控制此条是否参与列表与产值计算，默认 `true`。
     10. `createdAt` / `updatedAt`：时间戳。
 
-> 说明：产值页面会优先尝试匹配 `phaseDefinitionId + spec` 的可报价条目，再使用分项默认价格；管理页面通过 `/value/prices` 提供增删改查入口，确保每个可报价名称与对应价格一一对应。
+## 分项计量公式（PhaseItemFormula）
+
+- **用途**：为单个分项名称维护一条计量公式（1:1），用于产值计量时计算工程量。
+- **字段**
+     1. `id`：唯一标识。
+     2. `phaseItemId`：关联 `PhaseItem`（唯一）。
+     3. `expression`：公式文本（如 `length * width * thickness`）。
+     4. `inputSchema?`：JSON 形式的输入参数定义（字段名、单位、提示等）。
+     5. `unitString?`：公式输出单位，仅用于展示。
+     6. `createdAt` / `updatedAt`：时间戳。
+
+## 分项-清单绑定（PhaseItemBoqItem）
+
+- **用途**：将分项名称与工程量清单条目绑定，支持同一分项名称关联多个项目的合同清单条目（`CONTRACT` + `ITEM`）。
+- **字段**
+     1. `id`：唯一标识。
+     2. `phaseItemId`：关联 `PhaseItem`（必填）。
+     3. `boqItemId`：关联 `BoqItem`（必填）。
+     4. `isActive`：布尔，控制是否参与计价。
+     5. `createdAt` / `updatedAt`：时间戳。
+
+## 分项计量输入（PhaseItemInput）
+
+- **用途**：按分项区间录入基础参数（如宽度、厚度、数量等），供公式计算工程量；同时记录手动修订值并用于差异标记。
+- **字段**
+     1. `id`：唯一标识。
+     2. `phaseItemId`：关联 `PhaseItem`（必填）。
+     3. `intervalId`：关联 `PhaseInterval`（必填）。
+     4. `values`：JSON 形式的输入参数值。
+     5. `computedQuantity?`：公式计算结果。
+     6. `manualQuantity?`：手动调整值。
+     7. `createdAt` / `updatedAt`：时间戳。
 
 ## 工程量清单条目（BoqItem）
 
@@ -518,7 +550,6 @@
 - 中非：喀麦隆 / Cameroun、乍得 / Tchad、刚果（布）/ Congo、刚果（金）/ RDC、中非共和国 / Centrafrique、加蓬 / Gabon、赤道几内亚 / Guinée équatoriale、卢旺达 / Rwanda
 - 东非：吉布提 / Djibouti、科摩罗 / Comores、塞舌尔 / Seychelles、马达加斯加 / Madagascar、毛里求斯 / Maurice
 - 南部非洲：刚果（金） / RDC、刚果（布） / Congo、布隆迪 / Burundi、莫桑比克 / Mozambique
-> 说明：`spec` 可选，当多个规格共享一个单价时留空即可，系统会将该价格视为默认；若某个规格或构件需要独立价格（如边沟的特定规格或涵洞的各组成），需新增一条记录并在 `spec` 中写明规格/构件名。页面会根据 `phaseDefinitionId + spec` 匹配价格，没找到时再退回到分项默认价值。
 
 ## 开发路线（RoadmapIdea）
 

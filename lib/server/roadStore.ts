@@ -22,6 +22,7 @@ const normalizePayload = (payload: RoadSectionPayload): RoadSectionPayload => ({
   name: normalizeValue(payload.name),
   startPk: normalizeValue(payload.startPk),
   endPk: normalizeValue(payload.endPk),
+  projectId: payload.projectId ?? null,
 })
 
 const validatePayload = (payload: RoadSectionPayload) => {
@@ -43,10 +44,16 @@ const validatePayload = (payload: RoadSectionPayload) => {
   if (payload.startPk.length > 60 || payload.endPk.length > 60) {
     throw new Error('起点或终点字段过长')
   }
+  if (payload.projectId !== null && payload.projectId !== undefined) {
+    if (!Number.isInteger(payload.projectId) || payload.projectId <= 0) {
+      throw new Error('项目编号无效')
+    }
+  }
 }
 
 const mapToDTO = (row: {
   id: number
+  projectId: number | null
   slug: string
   name: string
   startPk: string
@@ -60,12 +67,23 @@ const mapToDTO = (row: {
   labels: resolveRoadLabels({ slug: row.slug, name: row.name }),
   startPk: row.startPk,
   endPk: row.endPk,
+  projectId: row.projectId ?? null,
   createdAt: row.createdAt.toISOString(),
   updatedAt: row.updatedAt.toISOString(),
 })
 
 export const listRoadSections = async () => {
   const rows = await prisma.roadSection.findMany({
+    select: {
+      id: true,
+      projectId: true,
+      slug: true,
+      name: true,
+      startPk: true,
+      endPk: true,
+      createdAt: true,
+      updatedAt: true,
+    },
     orderBy: { createdAt: 'asc' },
   })
   return rows.map(mapToDTO)
@@ -335,6 +353,7 @@ export const listRoadSectionsWithProgress = async (): Promise<RoadSectionProgres
     orderBy: { createdAt: 'asc' },
     select: {
       id: true,
+      projectId: true,
       slug: true,
       name: true,
       startPk: true,
@@ -528,6 +547,7 @@ export const listRoadSectionsWithProgress = async (): Promise<RoadSectionProgres
 
     return {
       id: road.id,
+      projectId: road.projectId ?? null,
       slug: road.slug,
       name: road.name,
       labels: resolveRoadLabels({ slug: road.slug, name: road.name }),

@@ -23,10 +23,17 @@ import { locales, type Locale } from '@/lib/i18n'
 import { usePreferredLocale } from '@/lib/usePreferredLocale'
 import type { RoadFormState } from './types'
 
+type ProjectOption = {
+  id: number
+  name: string
+  code: string | null
+}
+
 const RoadFormModal = dynamic(() => import('./RoadFormModal'), { ssr: false })
 
 interface Props {
   initialRoads: RoadSectionProgressSummaryDTO[]
+  projects: ProjectOption[]
   canManage: boolean
 }
 
@@ -39,6 +46,7 @@ const emptyForm: RoadFormState = {
   name: '',
   startPk: '',
   endPk: '',
+  projectId: '',
 }
 
 const sortRoads = (roads: RoadSectionProgressSummaryDTO[], locale: Locale) =>
@@ -50,7 +58,7 @@ const sortRoads = (roads: RoadSectionProgressSummaryDTO[], locale: Locale) =>
   )
 
 const RoadBoard = forwardRef<RoadBoardHandle, Props>(function RoadBoard(
-  { initialRoads, canManage }: Props,
+  { initialRoads, projects, canManage }: Props,
   ref,
 ) {
   const { locale } = usePreferredLocale('zh', locales)
@@ -159,6 +167,7 @@ const RoadBoard = forwardRef<RoadBoardHandle, Props>(function RoadBoard(
       name: road.name,
       startPk: road.startPk,
       endPk: road.endPk,
+      projectId: road.projectId ? String(road.projectId) : '',
     })
     setEditingId(road.id)
     setError(null)
@@ -204,6 +213,7 @@ const RoadBoard = forwardRef<RoadBoardHandle, Props>(function RoadBoard(
           error={error}
           isPending={isPending}
           copy={t}
+          projects={projects}
           onClose={closeFormModal}
           onChange={handleFormChange}
           onReset={resetForm}

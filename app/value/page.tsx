@@ -11,7 +11,7 @@ import type { AggregatedPhaseProgress } from '@/lib/progressTypes'
 import { usePreferredLocale } from '@/lib/usePreferredLocale'
 import { locales, type Locale } from '@/lib/i18n'
 import { productionValueCopy } from '@/lib/i18n/value'
-import type { PhasePriceItem, PhasePricingGroup } from '@/lib/server/phasePricingStore'
+import type { PhaseItem, PhasePricingGroup } from '@/lib/server/phasePricingStore'
 import { getPhaseUnitPrice, type PhasePriceMap } from '@/lib/phasePricing'
 
 type BoqLocalizedText = { zh: string; fr: string }
@@ -446,7 +446,7 @@ export default function ProductionValuePage() {
   }, [addToast, boqItemsError, boqItemsStatus, permissionDenied, productionError])
 
   const priceItemMap = useMemo(() => {
-    const map = new Map<string, PhasePriceItem>()
+    const map = new Map<string, PhaseItem>()
     priceGroups.forEach((group) => {
       group.priceItems.forEach((item) => {
         const key = `${group.phaseDefinitionId}::${item.spec ?? ''}`

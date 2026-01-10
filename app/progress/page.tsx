@@ -7,6 +7,7 @@ import type { RoadSectionProgressDTO, RoadSectionProgressSummaryDTO } from '@/li
 import { getProgressCopy } from '@/lib/i18n/progress'
 import { getSessionUser } from '@/lib/server/authSession'
 import { listRoadSectionsWithProgress } from '@/lib/server/roadStore'
+import { prisma } from '@/lib/prisma'
 
 export const dynamic = 'force-dynamic'
 
@@ -41,9 +42,16 @@ type ProgressContentProps = {
 async function ProgressContent({ canManage, canViewInspections }: ProgressContentProps) {
   let roads: RoadSectionProgressDTO[] = []
   let loadError: string | null = null
+  let projects: Array<{ id: number; name: string; code: string | null }> = []
 
   try {
     roads = await listRoadSectionsWithProgress()
+    if (canManage) {
+      projects = await prisma.project.findMany({
+        select: { id: true, name: true, code: true },
+        orderBy: [{ name: 'asc' }, { id: 'asc' }],
+      })
+    }
   } catch (error) {
     loadError = (error as Error).message
   }
@@ -56,6 +64,7 @@ async function ProgressContent({ canManage, canViewInspections }: ProgressConten
     labels: road.labels,
     startPk: road.startPk,
     endPk: road.endPk,
+    projectId: road.projectId ?? null,
     createdAt: road.createdAt,
     updatedAt: road.updatedAt,
     phases: road.phases.map((phase) => ({
@@ -76,6 +85,7 @@ async function ProgressContent({ canManage, canViewInspections }: ProgressConten
       loadError={loadError}
       canManage={canManage}
       canViewInspections={canViewInspections}
+      projects={projects}
     />
   )
 }

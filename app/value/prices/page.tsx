@@ -11,7 +11,7 @@ import { useToast } from '@/components/ToastProvider'
 import { usePreferredLocale } from '@/lib/usePreferredLocale'
 import { locales, type Locale } from '@/lib/i18n'
 import { measureLabels, priceManagerCopy } from '@/lib/i18n/value'
-import type { PhasePriceItem, PhasePricingGroup } from '@/lib/server/phasePricingStore'
+import type { PhaseItem, PhasePricingGroup } from '@/lib/server/phasePricingStore'
 
 type FetchStatus = 'idle' | 'loading' | 'success' | 'error'
 
@@ -55,7 +55,7 @@ export default function PriceManagementPage() {
   const [deletingIds, setDeletingIds] = useState<number[]>([])
   const [createValues, setCreateValues] = useState<Record<number, CreateFields>>({})
   const [creatingIds, setCreatingIds] = useState<number[]>([])
-  const [deleteTarget, setDeleteTarget] = useState<{ groupId: number; item: PhasePriceItem } | null>(
+  const [deleteTarget, setDeleteTarget] = useState<{ groupId: number; item: PhaseItem } | null>(
     null,
   )
   const errorToastRef = useRef<string | null>(null)
@@ -118,11 +118,11 @@ export default function PriceManagementPage() {
     }))
   }
 
-  const handleSave = async (groupId: number, item: PhasePriceItem) => {
+  const handleSave = async (groupId: number, item: PhaseItem) => {
     const editing = editedRows[item.id] ?? {}
     const payload = {
       priceItemId: item.id,
-      name: editing.name?.trim() ?? item.priceableName,
+      name: editing.name?.trim() ?? item.name,
       spec: editing.spec?.trim() ?? item.spec ?? undefined,
       unitString: editing.unitString?.trim() ?? item.unitString ?? undefined,
       description: editing.description?.trim() ?? item.description ?? undefined,
@@ -143,7 +143,7 @@ export default function PriceManagementPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       })
-      const result = (await response.json().catch(() => ({}))) as { item?: PhasePriceItem; message?: string }
+      const result = (await response.json().catch(() => ({}))) as { item?: PhaseItem; message?: string }
 
       if (!response.ok) {
         const message = response.status === 403 ? unauthorizedMessage : result.message ?? copy.messages.updateError
@@ -179,7 +179,7 @@ export default function PriceManagementPage() {
     }
   }
 
-  const handleDelete = async (groupId: number, item: PhasePriceItem) => {
+  const handleDelete = async (groupId: number, item: PhaseItem) => {
     setDeletingIds((prev) => (prev.includes(item.id) ? prev : [...prev, item.id]))
 
     try {
@@ -190,7 +190,7 @@ export default function PriceManagementPage() {
         body: JSON.stringify({ priceItemId: item.id }),
       })
       const result = (await response.json().catch(() => ({}))) as {
-        item?: PhasePriceItem
+        item?: PhaseItem
         message?: string
       }
 
@@ -265,7 +265,7 @@ export default function PriceManagementPage() {
         body: JSON.stringify(payload),
       })
       const result = (await response.json().catch(() => ({}))) as {
-        item?: PhasePriceItem
+        item?: PhaseItem
         message?: string
       }
 
@@ -282,7 +282,7 @@ export default function PriceManagementPage() {
               ? {
                   ...entry,
                   priceItems: [...entry.priceItems, created].sort((a, b) =>
-                    a.priceableName.localeCompare(b.priceableName, localeId),
+                    a.name.localeCompare(b.name, localeId),
                   ),
                 }
               : entry,
@@ -424,7 +424,7 @@ export default function PriceManagementPage() {
                           <tbody className="divide-y divide-slate-200">
                             {group.priceItems.map((item) => {
                               const editing = editedRows[item.id] ?? {}
-                              const nameValue = editing.name ?? item.priceableName
+                              const nameValue = editing.name ?? item.name
                               const specValue = editing.spec ?? item.spec ?? ''
                               const descriptionValue = editing.description ?? item.description ?? ''
                               const unitStringValue = editing.unitString ?? item.unitString ?? ''

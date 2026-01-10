@@ -4,10 +4,10 @@ import { PhaseMeasure } from '@prisma/client'
 
 import { hasPermission } from '@/lib/server/authSession'
 import {
-  createPhasePriceItem,
-  deactivatePhasePriceItem,
+  createPhaseItem,
+  deactivatePhaseItem,
   listPhasePricing,
-  updatePhasePriceItem,
+  updatePhaseItem,
 } from '@/lib/server/phasePricingStore'
 import { listRoadSectionsWithProgress } from '@/lib/server/roadStore'
 import { aggregatePhaseProgress } from '@/lib/progressAggregation'
@@ -147,7 +147,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const created = await createPhasePriceItem({
+    const created = await createPhaseItem({
       phaseDefinitionId: definitionId,
       name,
       spec,
@@ -236,7 +236,7 @@ export async function PATCH(request: Request) {
       : undefined
 
   try {
-    const updated = await updatePhasePriceItem(id, {
+    const updated = await updatePhaseItem(id, {
       name,
       spec,
       unitString,
@@ -273,7 +273,7 @@ export async function DELETE(request: Request) {
   }
 
   try {
-    const removed = await deactivatePhasePriceItem(id)
+    const removed = await deactivatePhaseItem(id)
     return NextResponse.json({ item: removed })
   } catch (error) {
     return respond((error as Error).message ?? '删除价格项失败', 500)

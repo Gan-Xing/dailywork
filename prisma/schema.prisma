@@ -106,7 +106,7 @@ model PhaseDefinition {
   defaultLayers  PhaseDefinitionLayer[]
   defaultChecks  PhaseDefinitionCheck[]
   phases         RoadPhase[]
-  priceItems     PhasePriceItem[]
+  priceItems     PhaseItem[]
   workflows      PhaseWorkflowDefinition[]
   createdAt      DateTime                @default(now())
   updatedAt      DateTime                @updatedAt
@@ -171,15 +171,19 @@ model DailyReport {
 
 model RoadSection {
   id        Int      @id @default(autoincrement())
+  projectId Int?
   slug      String   @unique
   name      String
   startPk   String
   endPk     String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  project   Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
   phases    RoadPhase[]
   inspections InspectionRequest[]
   inspectionEntries InspectionEntry[]
+
+  @@index([projectId])
 }
 
 model RoadPhase {
@@ -201,19 +205,67 @@ model RoadPhase {
   updatedAt         DateTime            @updatedAt
 }
 
-model PhasePriceItem {
-  id                Int             @id @default(autoincrement())
+model PhaseItem {
+  id                Int                 @id @default(autoincrement())
   phaseDefinitionId Int
-  phaseDefinition   PhaseDefinition @relation(fields: [phaseDefinitionId], references: [id], onDelete: Cascade)
+  phaseDefinition   PhaseDefinition     @relation(fields: [phaseDefinitionId], references: [id], onDelete: Cascade)
   name              String
   spec              String?
   measure           PhaseMeasure
   unitString        String?
   description       String?
-  unitPrice         Decimal?        @db.Decimal(18, 2)
-  isActive          Boolean         @default(true)
-  createdAt         DateTime        @default(now())
-  updatedAt         DateTime        @updatedAt
+  unitPrice         Decimal?            @db.Decimal(18, 2)
+  isActive          Boolean             @default(true)
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  formula           PhaseItemFormula?
+  boqLinks          PhaseItemBoqItem[]
+  inputs            PhaseItemInput[]
+
+  @@map("PhasePriceItem")
+}
+
+model PhaseItemFormula {
+  id          Int       @id @default(autoincrement())
+  phaseItemId Int       @unique
+  phaseItem   PhaseItem @relation(fields: [phaseItemId], references: [id], onDelete: Cascade)
+  expression  String
+  inputSchema Json?
+  unitString  String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model PhaseItemBoqItem {
+  id          Int       @id @default(autoincrement())
+  phaseItemId Int
+  boqItemId   Int
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  phaseItem PhaseItem @relation(fields: [phaseItemId], references: [id], onDelete: Cascade)
+  boqItem   BoqItem   @relation(fields: [boqItemId], references: [id], onDelete: Cascade)
+
+  @@unique([phaseItemId, boqItemId])
+  @@index([boqItemId])
+}
+
+model PhaseItemInput {
+  id               Int       @id @default(autoincrement())
+  phaseItemId      Int
+  intervalId       Int
+  values           Json
+  computedQuantity Decimal?  @db.Decimal(18, 4)
+  manualQuantity   Decimal?  @db.Decimal(18, 4)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  phaseItem PhaseItem   @relation(fields: [phaseItemId], references: [id], onDelete: Cascade)
+  interval  PhaseInterval @relation(fields: [intervalId], references: [id], onDelete: Cascade)
+
+  @@unique([phaseItemId, intervalId])
+  @@index([intervalId])
 }
 
 model PhaseInterval {
@@ -227,6 +279,7 @@ model PhaseInterval {
   layers    String[]      @default([])
   layerIds  Int[]         @default([])
   billQuantity Float?
+  phaseItemInputs PhaseItemInput[]
   createdAt DateTime      @default(now())
   updatedAt DateTime      @updatedAt
 }
@@ -717,6 +770,7 @@ model Project {
   memberAssignments UserProjectAssignment[]
   boqItems BoqItem[]
   boqMeasurements BoqMeasurement[]
+  roadSections RoadSection[]
 }
 
 model BoqItem {
@@ -741,6 +795,7 @@ model BoqItem {
   contractItem   BoqItem?     @relation("BoqItemContractLink", fields: [contractItemId], references: [id])
   derivedItems   BoqItem[]    @relation("BoqItemContractLink")
   measurements   BoqMeasurement[]
+  phaseItemLinks PhaseItemBoqItem[]
 
   @@index([projectId, sheetType, sortOrder])
   @@index([projectId, sheetType, code])

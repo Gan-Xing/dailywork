@@ -2,11 +2,11 @@ import { Prisma, type PhaseMeasure } from '@prisma/client'
 
 import { prisma } from '@/lib/prisma'
 
-export interface PhasePriceItem {
+export interface PhaseItem {
   id: number
   phaseDefinitionId: number
   phaseDefinitionName: string
-  priceableName: string
+  name: string
   spec: string | null
   measure: PhaseMeasure
   unitString: string | null
@@ -20,7 +20,7 @@ export interface PhasePricingGroup {
   definitionName: string
   measure: PhaseMeasure
   defaultUnitPrice: number | null
-  priceItems: PhasePriceItem[]
+  priceItems: PhaseItem[]
   specOptions: string[]
 }
 
@@ -42,28 +42,28 @@ export const listPhasePricing = async (): Promise<PhasePricingGroup[]> => {
     },
     orderBy: { name: 'asc' },
   })
-    return definitions.map((definition) => ({
-      phaseDefinitionId: definition.id,
-      definitionName: definition.name,
-      measure: definition.measure,
-      defaultUnitPrice: toOptionalNumber(definition.unitPrice),
-      priceItems: definition.priceItems.map((item) => ({
-        id: item.id,
+  return definitions.map((definition) => ({
+    phaseDefinitionId: definition.id,
+    definitionName: definition.name,
+    measure: definition.measure,
+    defaultUnitPrice: toOptionalNumber(definition.unitPrice),
+    priceItems: definition.priceItems.map((item) => ({
+      id: item.id,
       phaseDefinitionId: definition.id,
       phaseDefinitionName: definition.name,
-      priceableName: item.name,
+      name: item.name,
       spec: item.spec,
       measure: item.measure,
       unitString: item.unitString,
       description: item.description,
       unitPrice: toOptionalNumber(item.unitPrice),
       isActive: item.isActive,
-      })),
-      specOptions: [],
-    }))
-  }
+    })),
+    specOptions: [],
+  }))
+}
 
-export const createPhasePriceItem = async (payload: {
+export const createPhaseItem = async (payload: {
   phaseDefinitionId: number
   name: string
   spec?: string | null
@@ -72,7 +72,7 @@ export const createPhasePriceItem = async (payload: {
   description?: string | null
   unitPrice?: number | null
 }) => {
-  const created = await prisma.phasePriceItem.create({
+  const created = await prisma.phaseItem.create({
     data: {
       phaseDefinitionId: payload.phaseDefinitionId,
       name: payload.name,
@@ -95,7 +95,7 @@ export const createPhasePriceItem = async (payload: {
     id: created.id,
     phaseDefinitionId: created.phaseDefinitionId,
     phaseDefinitionName: created.phaseDefinition.name,
-    priceableName: created.name,
+    name: created.name,
     spec: created.spec,
     measure: created.measure,
     unitString: created.unitString,
@@ -105,7 +105,7 @@ export const createPhasePriceItem = async (payload: {
   }
 }
 
-export const updatePhasePriceItem = async (
+export const updatePhaseItem = async (
   priceItemId: number,
   payload: {
     name?: string
@@ -117,7 +117,7 @@ export const updatePhasePriceItem = async (
   },
 ) => {
   try {
-    const updated = await prisma.phasePriceItem.update({
+    const updated = await prisma.phaseItem.update({
       where: { id: priceItemId },
       data: {
         name: payload.name,
@@ -140,7 +140,7 @@ export const updatePhasePriceItem = async (
       id: updated.id,
       phaseDefinitionId: updated.phaseDefinitionId,
       phaseDefinitionName: updated.phaseDefinition.name,
-      priceableName: updated.name,
+      name: updated.name,
       spec: updated.spec,
       measure: updated.measure,
       unitString: updated.unitString,
@@ -153,15 +153,15 @@ export const updatePhasePriceItem = async (
       error instanceof Prisma.PrismaClientKnownRequestError &&
       error.code === 'P2025'
     ) {
-      throw new Error('可报价分项不存在')
+      throw new Error('分项名称不存在')
     }
     throw error
   }
 }
 
-export const deactivatePhasePriceItem = async (priceItemId: number) => {
+export const deactivatePhaseItem = async (priceItemId: number) => {
   try {
-    const updated = await prisma.phasePriceItem.update({
+    const updated = await prisma.phaseItem.update({
       where: { id: priceItemId },
       data: { isActive: false },
       include: {
@@ -174,7 +174,7 @@ export const deactivatePhasePriceItem = async (priceItemId: number) => {
       id: updated.id,
       phaseDefinitionId: updated.phaseDefinitionId,
       phaseDefinitionName: updated.phaseDefinition.name,
-      priceableName: updated.name,
+      name: updated.name,
       spec: updated.spec,
       measure: updated.measure,
       unitString: updated.unitString,
@@ -187,7 +187,7 @@ export const deactivatePhasePriceItem = async (priceItemId: number) => {
       error instanceof Prisma.PrismaClientKnownRequestError &&
       error.code === 'P2025'
     ) {
-      throw new Error('可报价分项不存在')
+      throw new Error('分项名称不存在')
     }
     throw error
   }

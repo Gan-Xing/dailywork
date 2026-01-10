@@ -13,6 +13,7 @@ interface Props {
   error: string | null
   isPending: boolean
   copy: ReturnType<typeof getProgressCopy>
+  projects: Array<{ id: number; name: string; code: string | null }>
   onClose: () => void
   onChange: (updates: Partial<RoadFormState>) => void
   onReset: () => void
@@ -26,6 +27,7 @@ export default function RoadFormModal({
   error,
   isPending,
   copy,
+  projects,
   onClose,
   onChange,
   onReset,
@@ -129,6 +131,21 @@ export default function RoadFormModal({
                   </button>
                 ) : null}
               </div>
+            </label>
+            <label className="flex flex-col gap-2 text-sm text-slate-100 md:col-span-2">
+              项目归属
+              <select
+                className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-slate-50 focus:border-emerald-300 focus:outline-none"
+                value={form.projectId}
+                onChange={(event) => onChange({ projectId: event.target.value })}
+              >
+                <option value="">未绑定项目</option>
+                {projects.map((project) => (
+                  <option key={project.id} value={String(project.id)}>
+                    {project.code ? `${project.name}（${project.code}）` : project.name}
+                  </option>
+                ))}
+              </select>
             </label>
           </div>
           <div className="flex flex-wrap items-center gap-3">

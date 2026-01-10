@@ -20,13 +20,14 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     return invalidIdResponse
   }
 
-  let payload: { slug?: string; name?: string; startPk?: string; endPk?: string }
+  let payload: { slug?: string; name?: string; startPk?: string; endPk?: string; projectId?: unknown }
   try {
     payload = (await request.json()) as {
       slug?: string
       name?: string
       startPk?: string
       endPk?: string
+      projectId?: unknown
     }
   } catch {
     return NextResponse.json({ message: 'Invalid JSON body' }, { status: 400 })
@@ -36,12 +37,21 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     return NextResponse.json({ message: '缺少必填字段：路由、名称、起点、终点' }, { status: 400 })
   }
 
+  const parsedProjectId =
+    payload.projectId === null || payload.projectId === undefined || payload.projectId === ''
+      ? null
+      : Number(payload.projectId)
+  if (parsedProjectId !== null && (!Number.isInteger(parsedProjectId) || parsedProjectId <= 0)) {
+    return NextResponse.json({ message: '项目编号无效' }, { status: 400 })
+  }
+
   try {
     const road = await updateRoadSection(id, {
       slug: payload.slug,
       name: payload.name,
       startPk: payload.startPk,
       endPk: payload.endPk,
+      projectId: parsedProjectId,
     })
     return NextResponse.json({ road })
   } catch (error) {

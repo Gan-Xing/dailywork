@@ -5,6 +5,7 @@ export interface RoadSectionPayload {
   name: string
   startPk: string
   endPk: string
+  projectId?: number | null
 }
 
 export interface RoadSectionDTO extends RoadSectionPayload {
