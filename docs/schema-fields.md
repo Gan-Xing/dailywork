@@ -572,7 +572,7 @@
 - 模板来源：现有文件 `/module/bordereau.html` + `/module/bordereau.css`（内容为硬编码值，无 `{{ }}` 占位符），以及旧版 `/module/index.html`（含 `{{ NUMERO }}` 等占位符）。建议以 `/module/bordereau.html` 为源，补充占位符并复制到正式模板目录，同时保留原文件以便回溯。
 
 ### 枚举（计划新增）
-- `DocumentType`：`SUBMISSION`（预留 `LETTER`、`MINUTES`、`SUPPLY_REQUEST`）。
+- `DocumentType`：`SUBMISSION` / `LETTER` / `MINUTES` / `SUPPLY_REQUEST`（`LETTER` 已用于函件管理）。
 - `TemplateStatus`：`DRAFT` / `PUBLISHED` / `ARCHIVED`。
 - `SubmissionStatus`：`DRAFT` / `FINAL` / `ARCHIVED`。
 
@@ -629,3 +629,22 @@
     11. 明细表：`items` 数组，每行渲染为 `designation`/`quantity`/`observation`；不足 12 行自动补空白以保持版式。
     12. 页脚备注：`{{comments}}`
     13. 如需页码水印，可保持 “第 1 页”为静态或替换为 `{{pageNumber}}`。
+
+## 函件（Letter）
+
+- **用途**：正式管理新增分项的函件（含签收件），每条函件对应一个 `Document`（`type=LETTER`），并绑定具体工程量清单条目（`BoqItem`）。
+- **字段**
+     1. `id`：唯一标识。
+     2. `documentId`：关联 `Document`（必填，`type=LETTER`）。
+     3. `projectId`：关联 `Project`（必填）。
+     4. `boqItemId?`：可选关联 `BoqItem`（不强制绑定分项）。
+     5. `letterNumber`：项目内递增序号（必填）。
+     6. `subject`：函件标题/主题（必填）。
+     7. `senderOrg?` / `recipientOrg?`：发/收函单位（可选）。
+     8. `issuedAt?` / `receivedAt?`：发函/签收日期（可选）。
+     9. `remark?`：备注（可选）。
+    10. `createdAt` / `updatedAt`：时间戳。
+- **关联规则**：
+     - `Document.status` 作为函件状态来源（`DRAFT`/`FINAL`/`ARCHIVED`）。
+     - 附件通过 `FileAssetLink` 绑定至 `Document`（`entityType=document`，`entityId=Document.id`），签收件使用 `letter-receipt` 分类。
+     - 函件正文写入 `Document.data.content`，收/发件人姓名可写入 `Document.data.senderName` / `Document.data.recipientName`。

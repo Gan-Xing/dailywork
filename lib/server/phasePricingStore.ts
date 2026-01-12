@@ -13,6 +13,8 @@ export interface PhaseItem {
   description: string | null
   unitPrice: number | null
   isActive: boolean
+  formulaConfigured: boolean
+  boqBindingCount: number
 }
 
 export interface PhasePricingGroup {
@@ -38,6 +40,16 @@ export const listPhasePricing = async (): Promise<PhasePricingGroup[]> => {
       priceItems: {
         where: { isActive: true },
         orderBy: { name: 'asc' },
+        include: {
+          formula: { select: { id: true } },
+          boqLinks: {
+            where: {
+              isActive: true,
+              boqItem: { isActive: true },
+            },
+            select: { id: true },
+          },
+        },
       },
     },
     orderBy: { name: 'asc' },
@@ -58,6 +70,8 @@ export const listPhasePricing = async (): Promise<PhasePricingGroup[]> => {
       description: item.description,
       unitPrice: toOptionalNumber(item.unitPrice),
       isActive: item.isActive,
+      formulaConfigured: Boolean(item.formula),
+      boqBindingCount: item.boqLinks.length,
     })),
     specOptions: [],
   }))
@@ -89,6 +103,14 @@ export const createPhaseItem = async (payload: {
           id: true,
         },
       },
+      formula: { select: { id: true } },
+      boqLinks: {
+        where: {
+          isActive: true,
+          boqItem: { isActive: true },
+        },
+        select: { id: true },
+      },
     },
   })
   return {
@@ -102,6 +124,8 @@ export const createPhaseItem = async (payload: {
     description: created.description,
     unitPrice: toOptionalNumber(created.unitPrice),
     isActive: created.isActive,
+    formulaConfigured: Boolean(created.formula),
+    boqBindingCount: created.boqLinks.length,
   }
 }
 
@@ -134,6 +158,14 @@ export const updatePhaseItem = async (
             name: true,
           },
         },
+        formula: { select: { id: true } },
+        boqLinks: {
+          where: {
+            isActive: true,
+            boqItem: { isActive: true },
+          },
+          select: { id: true },
+        },
       },
     })
     return {
@@ -147,6 +179,8 @@ export const updatePhaseItem = async (
       description: updated.description,
       unitPrice: toOptionalNumber(updated.unitPrice),
       isActive: updated.isActive,
+      formulaConfigured: Boolean(updated.formula),
+      boqBindingCount: updated.boqLinks.length,
     }
   } catch (error) {
     if (
@@ -168,6 +202,14 @@ export const deactivatePhaseItem = async (priceItemId: number) => {
         phaseDefinition: {
           select: { id: true, name: true },
         },
+        formula: { select: { id: true } },
+        boqLinks: {
+          where: {
+            isActive: true,
+            boqItem: { isActive: true },
+          },
+          select: { id: true },
+        },
       },
     })
     return {
@@ -181,6 +223,8 @@ export const deactivatePhaseItem = async (priceItemId: number) => {
       description: updated.description,
       unitPrice: toOptionalNumber(updated.unitPrice),
       isActive: updated.isActive,
+      formulaConfigured: Boolean(updated.formula),
+      boqBindingCount: updated.boqLinks.length,
     }
   } catch (error) {
     if (

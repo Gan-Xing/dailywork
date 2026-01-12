@@ -8,6 +8,7 @@ export type DocumentsCopy = {
       files: string
       submissions: string
       templates: string
+      letters: string
     }
     aria: {
       expand: string
@@ -22,6 +23,9 @@ export type DocumentsCopy = {
     submissionsNew: string
     submissionDetailWithNumber: string
     submissionDetailFallback: string
+    letters: string
+    lettersNew: string
+    letterDetailFallback: string
     templates: string
     templatesNew: string
     templateDetailFallback: string
@@ -31,6 +35,9 @@ export type DocumentsCopy = {
     submissionsList: string
     submissionCreate: string
     submissionDetail: string
+    lettersList: string
+    letterCreate: string
+    letterDetail: string
     filesList: string
     templatesList: string
     templateCreate: string
@@ -55,6 +62,7 @@ export type DocumentsCopy = {
     quickActions: {
       title: string
       createSubmission: string
+      createLetter: string
       manageTemplates: string
       manageFiles: string
     }
@@ -76,6 +84,12 @@ export type DocumentsCopy = {
       description: string
       cta: string
     }
+    lettersCard: {
+      label: string
+      title: string
+      description: string
+      cta: string
+    }
   }
   submissions: {
     badge: {
@@ -84,6 +98,68 @@ export type DocumentsCopy = {
     }
     manageTemplates: string
     createSubmission: string
+  }
+  letters: {
+    title: string
+    description: string
+    create: string
+    filters: {
+      searchLabel: string
+      searchPlaceholder: string
+      statusLabel: string
+      projectLabel: string
+      allLabel: string
+    }
+    table: {
+      code: string
+      subject: string
+      recipient: string
+      project: string
+      status: string
+      updatedAt: string
+      attachments: string
+      actions: string
+      empty: string
+    }
+    form: {
+      newTitle: string
+      editTitle: string
+      project: string
+      code: string
+      codeHint: string
+      subject: string
+      senderOrg: string
+      senderName: string
+      recipientOrg: string
+      recipientName: string
+      issuedAt: string
+      receivedAt: string
+      status: string
+      content: string
+      remark: string
+      attachments: string
+      upload: string
+      save: string
+      cancel: string
+      delete: string
+    }
+    messages: {
+      loadError: string
+      loading: string
+      saving: string
+      saved: string
+      requiredProject: string
+      requiredSubject: string
+      deleteConfirm: string
+      deleteSuccess: string
+      uploadFailed: string
+      attachmentsEmpty: string
+    }
+    actions: {
+      edit: string
+      view: string
+      delete: string
+    }
   }
   submissionsFilters: {
     statusLabel: string
@@ -152,6 +228,13 @@ export type DocumentsCopy = {
       categoryLabel: string
       categoryPlaceholder: string
       fileLabel: string
+      dropTitle: string
+      dropSubtitle: string
+      dropAction: string
+      dropHint: string
+      selectedLabel: string
+      selectedCount: string
+      selectedMore: string
       linkTitle: string
       linkHint: string
       entityType: string
@@ -454,6 +537,7 @@ export const documentsCopy: Record<Locale, DocumentsCopy> = {
         files: '文件管理',
         submissions: '提交单',
         templates: '模版管理',
+        letters: '函件',
       },
       aria: {
         expand: '展开导航',
@@ -468,6 +552,9 @@ export const documentsCopy: Record<Locale, DocumentsCopy> = {
       submissionsNew: '新建提交单',
       submissionDetailWithNumber: '提交单 #{number}',
       submissionDetailFallback: '提交单详情',
+      letters: '函件',
+      lettersNew: '新建函件',
+      letterDetailFallback: '函件详情',
       templates: '模版',
       templatesNew: '新建模版',
       templateDetailFallback: '模版详情',
@@ -477,6 +564,9 @@ export const documentsCopy: Record<Locale, DocumentsCopy> = {
       submissionsList: '需要提交单查看权限才能查看列表。',
       submissionCreate: '需要提交单新增权限才能创建提交单。',
       submissionDetail: '需要提交单查看权限才能访问详情。',
+      lettersList: '需要函件查看权限才能查看列表。',
+      letterCreate: '需要函件新增权限才能创建函件。',
+      letterDetail: '需要函件查看权限才能访问详情。',
       filesList: '需要文件查看权限才能访问文件管理。',
       templatesList: '需要模板查看权限才能访问模版管理。',
       templateCreate: '需要模板新增权限才能创建模版。',
@@ -510,6 +600,7 @@ export const documentsCopy: Record<Locale, DocumentsCopy> = {
       quickActions: {
         title: '快速动作',
         createSubmission: '新建提交单',
+        createLetter: '新建函件',
         manageTemplates: '管理模版',
         manageFiles: '管理文件',
       },
@@ -532,6 +623,12 @@ export const documentsCopy: Record<Locale, DocumentsCopy> = {
         description: '集中查看签名、报检材料、签到表等文件，支持检索与在线打开。',
         cta: '前往文件管理 →',
       },
+      lettersCard: {
+        label: '函件',
+        title: '函件记录与附件',
+        description: '记录函件收发信息、编号与正文，集中管理函件附件。',
+        cta: '前往函件 →',
+      },
     },
     submissions: {
       badge: {
@@ -540,6 +637,68 @@ export const documentsCopy: Record<Locale, DocumentsCopy> = {
       },
       manageTemplates: '模版管理 →',
       createSubmission: '新建提交单',
+    },
+    letters: {
+      title: '函件管理',
+      description: '记录函件收发信息、编号与正文，支持附件上传。',
+      create: '新建函件',
+      filters: {
+        searchLabel: '检索',
+        searchPlaceholder: '搜索编号/主题/收件方',
+        statusLabel: '状态',
+        projectLabel: '项目',
+        allLabel: '全部',
+      },
+      table: {
+        code: '函件编号',
+        subject: '主题',
+        recipient: '收件方',
+        project: '项目',
+        status: '状态',
+        updatedAt: '更新时间',
+        attachments: '附件',
+        actions: '操作',
+        empty: '暂无函件记录',
+      },
+      form: {
+        newTitle: '新建函件',
+        editTitle: '函件详情',
+        project: '项目',
+        code: '函件编号',
+        codeHint: '留空自动生成，格式如 N°001/2025/DG/BDK/CRBC',
+        subject: '主题',
+        senderOrg: '发函单位',
+        senderName: '发函人',
+        recipientOrg: '收函单位',
+        recipientName: '收函人',
+        issuedAt: '发函日期',
+        receivedAt: '签收日期',
+        status: '状态',
+        content: '函件内容',
+        remark: '备注',
+        attachments: '函件附件',
+        upload: '上传附件',
+        save: '保存',
+        cancel: '取消',
+        delete: '删除',
+      },
+      messages: {
+        loadError: '加载失败，请稍后重试',
+        loading: '正在加载…',
+        saving: '正在保存…',
+        saved: '保存成功',
+        requiredProject: '请选择项目',
+        requiredSubject: '请填写函件主题',
+        deleteConfirm: '确认删除该函件？',
+        deleteSuccess: '已删除函件',
+        uploadFailed: '附件上传失败',
+        attachmentsEmpty: '暂无附件',
+      },
+      actions: {
+        edit: '编辑',
+        view: '查看',
+        delete: '删除',
+      },
     },
     submissionsFilters: {
       statusLabel: '状态',
@@ -654,6 +813,13 @@ export const documentsCopy: Record<Locale, DocumentsCopy> = {
         categoryLabel: '文件分类',
         categoryPlaceholder: '请选择分类',
         fileLabel: '选择文件',
+        dropTitle: '拖拽文件到此处',
+        dropSubtitle: '或点击选择文件',
+        dropAction: '浏览文件',
+        dropHint: '支持批量上传',
+        selectedLabel: '已选择',
+        selectedCount: '{count} 个文件',
+        selectedMore: '还有 {count} 个文件',
         linkTitle: '关联信息（可选）',
         linkHint: '仅需绑定特定数据时填写。',
         entityType: '关联分类',
@@ -972,6 +1138,7 @@ export const documentsCopy: Record<Locale, DocumentsCopy> = {
         files: 'Fichiers',
         submissions: 'Bordereaux',
         templates: 'Modèles',
+        letters: 'Courriers',
       },
       aria: {
         expand: 'Déplier la navigation',
@@ -986,6 +1153,9 @@ export const documentsCopy: Record<Locale, DocumentsCopy> = {
       submissionsNew: 'Nouveau bordereau',
       submissionDetailWithNumber: 'Bordereau n°{number}',
       submissionDetailFallback: 'Détail du bordereau',
+      letters: 'Courriers',
+      lettersNew: 'Nouveau courrier',
+      letterDetailFallback: 'Détail du courrier',
       templates: 'Modèles',
       templatesNew: 'Nouveau modèle',
       templateDetailFallback: 'Détail du modèle',
@@ -995,6 +1165,9 @@ export const documentsCopy: Record<Locale, DocumentsCopy> = {
       submissionsList: "Le droit de consultation des bordereaux est requis pour voir la liste.",
       submissionCreate: "Le droit de création de bordereaux est requis pour créer un bordereau.",
       submissionDetail: "Le droit de consultation des bordereaux est requis pour voir le détail.",
+      lettersList: "Le droit de consultation des courriers est requis pour voir la liste.",
+      letterCreate: "Le droit de création de courriers est requis pour créer un courrier.",
+      letterDetail: "Le droit de consultation des courriers est requis pour voir le détail.",
       filesList: "Le droit de consultation des fichiers est requis pour accéder à la gestion des fichiers.",
       templatesList: "Le droit de consultation des modèles est requis pour accéder à la gestion des modèles.",
       templateCreate: "Le droit de création de modèles est requis pour créer un modèle.",
@@ -1028,6 +1201,7 @@ export const documentsCopy: Record<Locale, DocumentsCopy> = {
       quickActions: {
         title: 'Actions rapides',
         createSubmission: 'Nouveau bordereau',
+        createLetter: 'Nouveau courrier',
         manageTemplates: 'Gérer les modèles',
         manageFiles: 'Gérer les fichiers',
       },
@@ -1050,6 +1224,12 @@ export const documentsCopy: Record<Locale, DocumentsCopy> = {
         description: "Consultez signatures, pièces d'acceptation, feuilles de présence et autres fichiers.",
         cta: 'Accéder aux fichiers →',
       },
+      lettersCard: {
+        label: 'Courriers',
+        title: 'Gestion des courriers',
+        description: 'Suivi des informations de réception, du numéro et du contenu.',
+        cta: 'Accéder aux courriers →',
+      },
     },
     submissions: {
       badge: {
@@ -1058,6 +1238,68 @@ export const documentsCopy: Record<Locale, DocumentsCopy> = {
       },
       manageTemplates: 'Gestion des modèles →',
       createSubmission: 'Nouveau bordereau',
+    },
+    letters: {
+      title: 'Gestion des courriers',
+      description: 'Enregistrez les informations, le numéro et le contenu du courrier.',
+      create: 'Nouveau courrier',
+      filters: {
+        searchLabel: 'Recherche',
+        searchPlaceholder: 'Rechercher par numéro / objet / destinataire',
+        statusLabel: 'Statut',
+        projectLabel: 'Projet',
+        allLabel: 'Tous',
+      },
+      table: {
+        code: 'N° courrier',
+        subject: 'Objet',
+        recipient: 'Destinataire',
+        project: 'Projet',
+        status: 'Statut',
+        updatedAt: 'Mise à jour',
+        attachments: 'Pièces',
+        actions: 'Actions',
+        empty: 'Aucun courrier',
+      },
+      form: {
+        newTitle: 'Nouveau courrier',
+        editTitle: 'Détail du courrier',
+        project: 'Projet',
+        code: 'N° courrier',
+        codeHint: 'Laissez vide pour générer (ex: N°001/2025/DG/BDK/CRBC)',
+        subject: 'Objet',
+        senderOrg: 'Organisation émettrice',
+        senderName: 'Nom émetteur',
+        recipientOrg: 'Organisation destinataire',
+        recipientName: 'Nom destinataire',
+        issuedAt: 'Date émission',
+        receivedAt: 'Date réception',
+        status: 'Statut',
+        content: 'Contenu',
+        remark: 'Remarque',
+        attachments: 'Pièces jointes',
+        upload: 'Téléverser',
+        save: 'Enregistrer',
+        cancel: 'Annuler',
+        delete: 'Supprimer',
+      },
+      messages: {
+        loadError: 'Chargement impossible',
+        loading: 'Chargement…',
+        saving: 'Enregistrement…',
+        saved: 'Enregistré',
+        requiredProject: 'Sélectionner un projet',
+        requiredSubject: 'Objet requis',
+        deleteConfirm: 'Supprimer ce courrier ?',
+        deleteSuccess: 'Courrier supprimé',
+        uploadFailed: 'Téléversement échoué',
+        attachmentsEmpty: 'Aucune pièce jointe',
+      },
+      actions: {
+        edit: 'Modifier',
+        view: 'Voir',
+        delete: 'Supprimer',
+      },
     },
     submissionsFilters: {
       statusLabel: 'Statut',
@@ -1172,6 +1414,13 @@ export const documentsCopy: Record<Locale, DocumentsCopy> = {
         categoryLabel: 'Catégorie',
         categoryPlaceholder: 'Choisir une catégorie',
         fileLabel: 'Fichier',
+        dropTitle: 'Glissez-déposez le fichier ici',
+        dropSubtitle: 'ou cliquez pour choisir',
+        dropAction: 'Parcourir',
+        dropHint: 'Téléversement multiple pris en charge',
+        selectedLabel: 'Sélectionné',
+        selectedCount: '{count} fichier(s)',
+        selectedMore: '+{count} autres fichiers',
         linkTitle: 'Association (optionnel)',
         linkHint: 'Remplir pour lier à une donnée.',
         entityType: 'Catégorie de liaison',

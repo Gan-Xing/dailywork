@@ -2,7 +2,10 @@ import { NextResponse } from 'next/server'
 
 import { hasPermission } from '@/lib/server/authSession'
 import { normalizeInputValues } from '@/lib/phaseItemFormula'
-import { upsertPhaseItemInput } from '@/lib/server/phaseItemManagement'
+import {
+  isPhaseItemInputValidationError,
+  upsertPhaseItemInput,
+} from '@/lib/server/phaseItemManagement'
 
 const respond = (message: string, status: number) =>
   NextResponse.json({ message }, { status })
@@ -78,6 +81,9 @@ export async function POST(request: Request) {
     })
     return NextResponse.json(result)
   } catch (error) {
+    if (isPhaseItemInputValidationError(error)) {
+      return respond(error.message, 400)
+    }
     return respond((error as Error).message ?? '保存计量输入失败', 500)
   }
 }

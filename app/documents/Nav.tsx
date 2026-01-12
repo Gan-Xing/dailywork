@@ -18,6 +18,7 @@ export function DocumentsNav() {
     { href: '/documents', label: copy.nav.items.overview },
     { href: '/documents/files', label: copy.nav.items.files },
     { href: '/documents/submissions', label: copy.nav.items.submissions },
+    { href: '/documents/letters', label: copy.nav.items.letters },
     { href: '/documents/templates', label: copy.nav.items.templates },
   ]
 
@@ -36,6 +37,9 @@ export function DocumentsNav() {
   } else if (pathname?.startsWith('/documents/submissions')) {
     currentPageTitle = copy.breadcrumbs.submissions
     breadcrumbItem = { href: '/documents/submissions', label: copy.breadcrumbs.submissions }
+  } else if (pathname?.startsWith('/documents/letters')) {
+    currentPageTitle = copy.breadcrumbs.letters
+    breadcrumbItem = { href: '/documents/letters', label: copy.breadcrumbs.letters }
   } else if (pathname?.startsWith('/documents/templates')) {
     currentPageTitle = copy.breadcrumbs.templates
     breadcrumbItem = { href: '/documents/templates', label: copy.breadcrumbs.templates }

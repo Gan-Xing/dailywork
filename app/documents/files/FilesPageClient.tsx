@@ -38,6 +38,21 @@ const formatBytes = (size: number) => {
   return `${(size / 1024 / 1024).toFixed(1)} MB`
 }
 
+const fileKey = (file: File) => `${file.name}-${file.size}-${file.lastModified}`
+
+const mergeFiles = (current: File[], incoming: File[]) => {
+  if (incoming.length === 0) return current
+  const seen = new Set(current.map(fileKey))
+  const next = [...current]
+  incoming.forEach((file) => {
+    const key = fileKey(file)
+    if (seen.has(key)) return
+    seen.add(key)
+    next.push(file)
+  })
+  return next
+}
+
 const parseString = (value?: string | string[]) => {
   if (!value) return ''
   if (Array.isArray(value)) return value.join(',')
@@ -77,7 +92,8 @@ export function FilesPageClient({
   const [uploadPurpose, setUploadPurpose] = useState('')
   const [uploadLabel, setUploadLabel] = useState('')
   const [uploadUserIds, setUploadUserIds] = useState<string[]>([])
-  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([])
+  const [isDragging, setIsDragging] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [openingId, setOpeningId] = useState<number | null>(null)
@@ -85,6 +101,7 @@ export function FilesPageClient({
 
   const [editingFile, setEditingFile] = useState<FileRow | null>(null)
   const [editName, setEditName] = useState('')
+  const [editCategory, setEditCategory] = useState('')
   const [editEntityType, setEditEntityType] = useState('')
   const [editEntityId, setEditEntityId] = useState('')
   const [editUserIds, setEditUserIds] = useState<string[]>([])
@@ -93,6 +110,7 @@ export function FilesPageClient({
   const [editLoading, setEditLoading] = useState(false)
 
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const dragDepthRef = useRef(0)
 
   const [candidateUsers, setCandidateUsers] = useState<CandidateUser[]>([])
   const [loadingUsers, setLoadingUsers] = useState(false)
@@ -177,13 +195,72 @@ export function FilesPageClient({
     router.push(`/documents/files?${params.toString()}`)
   }
 
+  const setFileSelection = (files: File[]) => {
+    const next = files.filter((file) => file instanceof File)
+    if (next.length === 0) return
+    setSelectedFiles((current) => mergeFiles(current, next))
+    setUploadError(null)
+  }
+
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0] ?? null
-    setSelectedFile(file)
+    const files = event.target.files ? Array.from(event.target.files) : []
+    setFileSelection(files)
+  }
+
+  const openFileDialog = () => {
+    if (uploading) return
+    fileInputRef.current?.click()
+  }
+
+  const handleDropzoneKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault()
+      openFileDialog()
+    }
+  }
+
+  const handleDragEnter = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault()
+    event.stopPropagation()
+    dragDepthRef.current += 1
+    setIsDragging(true)
+  }
+
+  const handleDragOver = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault()
+    event.stopPropagation()
+    event.dataTransfer.dropEffect = 'copy'
+    if (!isDragging) {
+      setIsDragging(true)
+    }
+  }
+
+  const handleDragLeave = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault()
+    event.stopPropagation()
+    dragDepthRef.current -= 1
+    if (dragDepthRef.current <= 0) {
+      dragDepthRef.current = 0
+      setIsDragging(false)
+    }
+  }
+
+  const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault()
+    event.stopPropagation()
+    dragDepthRef.current = 0
+    setIsDragging(false)
+    if (uploading) return
+    const files = event.dataTransfer.files ? Array.from(event.dataTransfer.files) : []
+    if (files.length > 0) {
+      setFileSelection(files)
+    }
   }
 
   const resetUpload = () => {
-    setSelectedFile(null)
+    setSelectedFiles([])
+    setIsDragging(false)
+    dragDepthRef.current = 0
     setUploadEntityType('')
     setUploadEntityId('')
     setUploadUserIds([])
@@ -197,7 +274,7 @@ export function FilesPageClient({
 
   const handleUpload = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    if (!selectedFile) {
+    if (selectedFiles.length === 0) {
       setUploadError(copy.files.messages.missingFile)
       return
     }
@@ -214,79 +291,81 @@ export function FilesPageClient({
       return
     }
 
+    let links: any[] = []
+    if (uploadEntityType) {
+      if (isUserType) {
+        links = uploadUserIds.map((id) => ({
+          entityType: 'user',
+          entityId: id,
+          purpose: uploadPurpose.trim() || undefined,
+          label: uploadLabel.trim() || undefined,
+        }))
+      } else if (uploadEntityId) {
+        links = [
+          {
+            entityType: uploadEntityType.trim(),
+            entityId: uploadEntityId.trim(),
+            purpose: uploadPurpose.trim() || undefined,
+            label: uploadLabel.trim() || undefined,
+          },
+        ]
+      }
+    }
+
     setUploading(true)
     setUploadError(null)
     try {
-      const contentType = selectedFile.type || 'application/octet-stream'
-      const uploadRes = await fetch('/api/files/upload-url', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          filename: selectedFile.name,
-          contentType,
-          size: selectedFile.size,
-          category: uploadCategory,
-        }),
-      })
+      for (const file of selectedFiles) {
+        const contentType = file.type || 'application/octet-stream'
+        const uploadRes = await fetch('/api/files/upload-url', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            filename: file.name,
+            contentType,
+            size: file.size,
+            category: uploadCategory,
+          }),
+        })
 
-      if (!uploadRes.ok) {
-        const errorBody = await uploadRes.json().catch(() => ({}))
-        throw new Error(errorBody.error ?? errorBody.message ?? copy.files.messages.uploadFailed)
-      }
-
-      const uploadPayload = (await uploadRes.json()) as {
-        uploadUrl: string
-        storageKey: string
-        requiredHeaders?: Record<string, string>
-      }
-
-      const putRes = await fetch(uploadPayload.uploadUrl, {
-        method: 'PUT',
-        headers: uploadPayload.requiredHeaders,
-        body: selectedFile,
-      })
-
-      if (!putRes.ok) {
-        throw new Error(copy.files.messages.uploadFailed)
-      }
-
-      let links: any[] = []
-      if (uploadEntityType) {
-        if (isUserType) {
-          links = uploadUserIds.map((id) => ({
-            entityType: 'user',
-            entityId: id,
-            purpose: uploadPurpose.trim() || undefined,
-            label: uploadLabel.trim() || undefined,
-          }))
-        } else if (uploadEntityId) {
-          links = [
-            {
-              entityType: uploadEntityType.trim(),
-              entityId: uploadEntityId.trim(),
-              purpose: uploadPurpose.trim() || undefined,
-              label: uploadLabel.trim() || undefined,
-            },
-          ]
+        if (!uploadRes.ok) {
+          const errorBody = await uploadRes.json().catch(() => ({}))
+          throw new Error(errorBody.error ?? errorBody.message ?? copy.files.messages.uploadFailed)
         }
-      }
 
-      const finalizeRes = await fetch('/api/files', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          storageKey: uploadPayload.storageKey,
-          originalName: selectedFile.name,
-          mimeType: contentType,
-          size: selectedFile.size,
-          category: uploadCategory,
-          links,
-        }),
-      })
+        const uploadPayload = (await uploadRes.json()) as {
+          uploadUrl: string
+          storageKey: string
+          requiredHeaders?: Record<string, string>
+        }
 
-      if (!finalizeRes.ok) {
-        const errorBody = await finalizeRes.json().catch(() => ({}))
-        throw new Error(errorBody.message ?? copy.files.messages.uploadFailed)
+        const putRes = await fetch(uploadPayload.uploadUrl, {
+          method: 'PUT',
+          headers: uploadPayload.requiredHeaders,
+          body: file,
+        })
+
+        if (!putRes.ok) {
+          throw new Error(copy.files.messages.uploadFailed)
+        }
+
+        const finalizeRes = await fetch('/api/files', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            storageKey: uploadPayload.storageKey,
+            originalName: file.name,
+            mimeType: contentType,
+            size: file.size,
+            category: uploadCategory,
+            links,
+          }),
+        })
+
+        if (!finalizeRes.ok) {
+          const errorBody = await finalizeRes.json().catch(() => ({}))
+          throw new Error(errorBody.message ?? copy.files.messages.uploadFailed)
+        }
       }
 
       resetUpload()
@@ -321,6 +400,7 @@ export function FilesPageClient({
   const handleEditClick = (row: FileRow) => {
     setEditingFile(row)
     setEditName(row.originalName)
+    setEditCategory(row.category)
 
     // Populate with first link if available
     const link = row.links[0]
@@ -337,6 +417,10 @@ export function FilesPageClient({
   const submitEdit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!editingFile || !editName.trim()) return
+    if (!editCategory) {
+      alert(copy.files.messages.missingCategory)
+      return
+    }
     setEditLoading(true)
     try {
       let links: any[] = []
@@ -365,6 +449,7 @@ export function FilesPageClient({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           originalName: editName.trim(),
+          category: editCategory,
           links,
         }),
       })
@@ -431,13 +516,6 @@ export function FilesPageClient({
 
   return (
     <div className="space-y-6">
-      <div className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-4 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700">
-        <span className="inline-block h-2 w-2 rounded-full bg-emerald-500" />
-        {copy.files.badge.title}
-        <span className="h-[1px] w-10 bg-emerald-200" />
-        {copy.files.badge.suffix}
-      </div>
-
       <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-md">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="space-y-2">
@@ -479,18 +557,83 @@ export function FilesPageClient({
                   ))}
                 </select>
               </label>
-              <label className="flex flex-col gap-2 text-sm text-slate-600">
+              <div className="space-y-2 text-sm text-slate-600">
                 <span className="font-semibold text-slate-700">{copy.files.uploadPanel.fileLabel}</span>
+                <div
+                  role="button"
+                  tabIndex={0}
+                  aria-disabled={uploading}
+                  aria-label={copy.files.uploadPanel.dropTitle}
+                  onClick={openFileDialog}
+                  onKeyDown={handleDropzoneKeyDown}
+                  onDragEnter={handleDragEnter}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                  className={`rounded-2xl border border-dashed px-4 py-4 transition ${
+                    isDragging
+                      ? 'border-emerald-300 bg-emerald-50/80 shadow-[0_0_0_4px_rgba(16,185,129,0.12)]'
+                      : selectedFiles.length > 0
+                        ? 'border-emerald-200 bg-emerald-50/40'
+                        : 'border-slate-200 bg-slate-50 hover:border-emerald-200 hover:bg-emerald-50/40'
+                  } ${uploading ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-200`}
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-start gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full border border-emerald-200 bg-white text-emerald-600">
+                        <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 16V7m0 0-3 3m3-3 3 3" />
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
+                        </svg>
+                      </div>
+                      <div>
+                        <div className="text-sm font-semibold text-slate-700">{copy.files.uploadPanel.dropTitle}</div>
+                        <div className="text-xs text-slate-500">{copy.files.uploadPanel.dropSubtitle}</div>
+                      </div>
+                    </div>
+                    <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600">
+                      {copy.files.uploadPanel.dropAction}
+                    </span>
+                  </div>
+                  {selectedFiles.length > 0 ? (
+                    <div className="mt-3 space-y-2 text-xs text-slate-600">
+                      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-emerald-100 bg-white/80 px-3 py-2">
+                        <span className="font-semibold text-emerald-700">{copy.files.uploadPanel.selectedLabel}</span>
+                        <span>{formatCopy(copy.files.uploadPanel.selectedCount, { count: selectedFiles.length })}</span>
+                        <span className="text-slate-400">•</span>
+                        <span>{formatBytes(selectedFiles.reduce((total, file) => total + file.size, 0))}</span>
+                      </div>
+                      <div className="grid gap-1">
+                        {selectedFiles.slice(0, 3).map((file) => (
+                          <div
+                            key={`${file.name}-${file.size}-${file.lastModified}`}
+                            className="flex items-center justify-between gap-2 rounded-lg bg-white/70 px-2 py-1"
+                          >
+                            <span className="min-w-0 truncate text-slate-700">{file.name}</span>
+                            <span className="shrink-0 text-slate-400">{formatBytes(file.size)}</span>
+                          </div>
+                        ))}
+                        {selectedFiles.length > 3 ? (
+                          <div className="text-[11px] text-slate-500">
+                            {formatCopy(copy.files.uploadPanel.selectedMore, {
+                              count: selectedFiles.length - 3,
+                            })}
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="mt-3 text-xs text-slate-500">{copy.files.uploadPanel.dropHint}</div>
+                  )}
+                </div>
                 <input
                   ref={fileInputRef}
                   type="file"
+                  multiple
                   onChange={handleFileSelect}
-                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 file:mr-3 file:rounded-lg file:border-0 file:bg-emerald-100 file:px-3 file:py-1 file:text-xs file:font-semibold file:text-emerald-700"
+                  className="sr-only"
                 />
-                {selectedFile ? (
-                  <span className="text-xs text-slate-500">{selectedFile.name}</span>
-                ) : null}
-              </label>
+              </div>
             </div>
             <div className="space-y-4 rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4">
               <div>
@@ -925,6 +1068,21 @@ export function FilesPageClient({
                     className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 focus:border-emerald-300 focus:outline-none"
                     autoFocus
                   />
+                </label>
+                <label className="flex flex-col gap-2 text-sm text-slate-600">
+                  <span className="font-semibold text-slate-700">{copy.files.uploadPanel.categoryLabel}</span>
+                  <select
+                    value={editCategory}
+                    onChange={(event) => setEditCategory(event.target.value)}
+                    className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 focus:border-emerald-300 focus:outline-none"
+                  >
+                    <option value="">{copy.files.uploadPanel.categoryPlaceholder}</option>
+                    {categories.map((value) => (
+                      <option key={value} value={value}>
+                        {categoryLabels[value] ?? value}
+                      </option>
+                    ))}
+                  </select>
                 </label>
 
                 <div className="space-y-4 rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4">

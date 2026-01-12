@@ -1,42 +1,92 @@
 'use client'
 
 import Link from 'next/link'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import type { MultiSelectOption } from '@/components/MultiSelectFilter'
 import { MultiSelectFilter } from '@/components/MultiSelectFilter'
-import type { RoadPhaseManagementRow } from '@/lib/phaseItemTypes'
-import { ProgressHeader } from '../ProgressHeader'
-import { ProgressSectionNav } from '../ProgressSectionNav'
+import type { PhaseIntervalManagementRow } from '@/lib/phaseItemTypes'
 import { locales } from '@/lib/i18n'
 import { usePreferredLocale } from '@/lib/usePreferredLocale'
 
+import { ProgressHeader } from '../ProgressHeader'
+import { ProgressSectionNav } from '../ProgressSectionNav'
+
 type Props = {
-  rows: RoadPhaseManagementRow[]
+  rows: PhaseIntervalManagementRow[]
 }
 
 type SortKey =
+  | 'project'
   | 'road'
   | 'phase'
-  | 'template'
+  | 'startPk'
+  | 'endPk'
+  | 'side'
+  | 'quantity'
   | 'display'
-  | 'intervals'
-  | 'project'
+  | 'completed'
   | 'updatedAt'
 
-type DisplayRow = RoadPhaseManagementRow & {
+type ColumnKey =
+  | 'project'
+  | 'road'
+  | 'phase'
+  | 'startPk'
+  | 'endPk'
+  | 'side'
+  | 'quantity'
+  | 'display'
+  | 'completed'
+  | 'updatedAt'
+
+type DisplayRow = PhaseIntervalManagementRow & {
   displayLabel: string
   projectKey: string
   projectLabel: string
   updatedDate: string
+  sideLabel: string
+  completionBucket: string
 }
 
 const NO_PROJECT = '__none__'
+const COLUMN_STORAGE_KEY = 'progress-quantity-columns'
 
 const displayLabels: Record<string, string> = {
   LINEAR: '延米',
   POINT: '单体',
 }
+
+const sideLabels: Record<string, string> = {
+  LEFT: '左',
+  RIGHT: '右',
+  BOTH: '双侧',
+}
+
+const defaultVisibleColumns: ColumnKey[] = [
+  'road',
+  'phase',
+  'startPk',
+  'endPk',
+  'side',
+  'quantity',
+  'display',
+  'completed',
+  'updatedAt',
+]
+
+const columnOptions: Array<{ key: ColumnKey; label: string }> = [
+  { key: 'project', label: '项目' },
+  { key: 'road', label: '路段' },
+  { key: 'phase', label: '分项名称' },
+  { key: 'startPk', label: '起点 PK' },
+  { key: 'endPk', label: '终点 PK' },
+  { key: 'side', label: '位置' },
+  { key: 'quantity', label: '数量' },
+  { key: 'display', label: '显示方式' },
+  { key: 'completed', label: '完成率' },
+  { key: 'updatedAt', label: '更新时间' },
+]
 
 const buildOptions = (options: MultiSelectOption[]) => {
   const map = new Map<string, MultiSelectOption>()
@@ -50,20 +100,42 @@ const buildOptions = (options: MultiSelectOption[]) => {
 
 const formatUpdatedDate = (value: string) => value.slice(0, 10)
 
+const formatNumber = (value: number, digits = 2) =>
+  new Intl.NumberFormat('zh-CN', { maximumFractionDigits: digits }).format(value)
+
 const compareText = (a: string, b: string) =>
   a.localeCompare(b, 'zh-CN', { sensitivity: 'base' })
 
+const getCompletionBucket = (percent: number) => {
+  if (percent >= 100) return '100%'
+  if (percent >= 50) return '50-99%'
+  if (percent > 0) return '1-49%'
+  return '0%'
+}
+
+const sideSortWeight: Record<string, number> = {
+  LEFT: 1,
+  RIGHT: 2,
+  BOTH: 3,
+}
+
 export default function QuantitiesListClient({ rows }: Props) {
   const { locale, setLocale } = usePreferredLocale('zh', locales)
+  const [selectedProjects, setSelectedProjects] = useState<string[]>([])
   const [selectedRoads, setSelectedRoads] = useState<string[]>([])
   const [selectedPhases, setSelectedPhases] = useState<string[]>([])
-  const [selectedTemplates, setSelectedTemplates] = useState<string[]>([])
+  const [selectedStartPks, setSelectedStartPks] = useState<string[]>([])
+  const [selectedEndPks, setSelectedEndPks] = useState<string[]>([])
+  const [selectedSides, setSelectedSides] = useState<string[]>([])
   const [selectedDisplays, setSelectedDisplays] = useState<string[]>([])
-  const [selectedIntervals, setSelectedIntervals] = useState<string[]>([])
-  const [selectedProjects, setSelectedProjects] = useState<string[]>([])
+  const [selectedCompletions, setSelectedCompletions] = useState<string[]>([])
   const [selectedDates, setSelectedDates] = useState<string[]>([])
   const [sortKey, setSortKey] = useState<SortKey>('updatedAt')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
+  const [visibleColumns, setVisibleColumns] = useState<ColumnKey[]>(() => defaultVisibleColumns)
+  const [showColumnSelector, setShowColumnSelector] = useState(false)
+  const [columnsReady, setColumnsReady] = useState(false)
+  const columnSelectorRef = useRef<HTMLDivElement | null>(null)
 
   const rowsWithMeta = useMemo<DisplayRow[]>(
     () =>
@@ -74,17 +146,30 @@ export default function QuantitiesListClient({ rows }: Props) {
             ? `${row.projectName}（${row.projectCode}）`
             : row.projectName
           : '未绑定项目'
+        const completedPercent = Math.min(100, Math.max(0, row.completedPercent ?? 0))
         return {
           ...row,
           displayLabel: displayLabels[row.measure] ?? row.measure,
           projectKey,
           projectLabel,
           updatedDate: formatUpdatedDate(row.updatedAt),
+          sideLabel: sideLabels[row.side] ?? row.side,
+          completionBucket: getCompletionBucket(completedPercent),
         }
       }),
     [rows],
   )
 
+  const projectOptions = useMemo(
+    () =>
+      buildOptions(
+        rowsWithMeta.map((row) => ({
+          value: row.projectKey,
+          label: row.projectLabel,
+        })),
+      ).sort((a, b) => compareText(a.label, b.label)),
+    [rowsWithMeta],
+  )
   const roadOptions = useMemo(
     () =>
       buildOptions(
@@ -105,14 +190,34 @@ export default function QuantitiesListClient({ rows }: Props) {
       ).sort((a, b) => compareText(a.label, b.label)),
     [rowsWithMeta],
   )
-  const templateOptions = useMemo(
+  const startPkOptions = useMemo(
     () =>
       buildOptions(
         rowsWithMeta.map((row) => ({
-          value: row.definitionName,
-          label: row.definitionName,
+          value: String(row.startPk),
+          label: formatNumber(row.startPk, 3),
         })),
-      ).sort((a, b) => compareText(a.label, b.label)),
+      ).sort((a, b) => Number(a.value) - Number(b.value)),
+    [rowsWithMeta],
+  )
+  const endPkOptions = useMemo(
+    () =>
+      buildOptions(
+        rowsWithMeta.map((row) => ({
+          value: String(row.endPk),
+          label: formatNumber(row.endPk, 3),
+        })),
+      ).sort((a, b) => Number(a.value) - Number(b.value)),
+    [rowsWithMeta],
+  )
+  const sideOptions = useMemo(
+    () =>
+      buildOptions(
+        rowsWithMeta.map((row) => ({
+          value: row.side,
+          label: row.sideLabel,
+        })),
+      ).sort((a, b) => (sideSortWeight[a.value] ?? 99) - (sideSortWeight[b.value] ?? 99)),
     [rowsWithMeta],
   )
   const displayOptions = useMemo(
@@ -125,22 +230,12 @@ export default function QuantitiesListClient({ rows }: Props) {
       ).sort((a, b) => compareText(a.label, b.label)),
     [rowsWithMeta],
   )
-  const intervalOptions = useMemo(
+  const completionOptions = useMemo(
     () =>
       buildOptions(
         rowsWithMeta.map((row) => ({
-          value: String(row.intervalCount),
-          label: `${row.intervalCount} 段`,
-        })),
-      ).sort((a, b) => Number(a.value) - Number(b.value)),
-    [rowsWithMeta],
-  )
-  const projectOptions = useMemo(
-    () =>
-      buildOptions(
-        rowsWithMeta.map((row) => ({
-          value: row.projectKey,
-          label: row.projectLabel,
+          value: row.completionBucket,
+          label: row.completionBucket,
         })),
       ).sort((a, b) => compareText(a.label, b.label)),
     [rowsWithMeta],
@@ -168,22 +263,28 @@ export default function QuantitiesListClient({ rows }: Props) {
 
   const filteredRows = useMemo(() => {
     return rowsWithMeta.filter((row) => {
+      if (selectedProjects.length && !selectedProjects.includes(row.projectKey)) {
+        return false
+      }
       if (selectedRoads.length && !selectedRoads.includes(String(row.roadId))) {
         return false
       }
       if (selectedPhases.length && !selectedPhases.includes(row.phaseName)) {
         return false
       }
-      if (selectedTemplates.length && !selectedTemplates.includes(row.definitionName)) {
+      if (selectedStartPks.length && !selectedStartPks.includes(String(row.startPk))) {
+        return false
+      }
+      if (selectedEndPks.length && !selectedEndPks.includes(String(row.endPk))) {
+        return false
+      }
+      if (selectedSides.length && !selectedSides.includes(row.side)) {
         return false
       }
       if (selectedDisplays.length && !selectedDisplays.includes(row.measure)) {
         return false
       }
-      if (selectedIntervals.length && !selectedIntervals.includes(String(row.intervalCount))) {
-        return false
-      }
-      if (selectedProjects.length && !selectedProjects.includes(row.projectKey)) {
+      if (selectedCompletions.length && !selectedCompletions.includes(row.completionBucket)) {
         return false
       }
       if (selectedDates.length && !selectedDates.includes(row.updatedDate)) {
@@ -193,12 +294,14 @@ export default function QuantitiesListClient({ rows }: Props) {
     })
   }, [
     rowsWithMeta,
+    selectedProjects,
     selectedRoads,
     selectedPhases,
-    selectedTemplates,
+    selectedStartPks,
+    selectedEndPks,
+    selectedSides,
     selectedDisplays,
-    selectedIntervals,
-    selectedProjects,
+    selectedCompletions,
     selectedDates,
   ])
 
@@ -207,23 +310,32 @@ export default function QuantitiesListClient({ rows }: Props) {
     const sorted = [...filteredRows].sort((a, b) => {
       let result = 0
       switch (sortKey) {
+        case 'project':
+          result = compareText(a.projectLabel, b.projectLabel)
+          break
         case 'road':
           result = compareText(a.roadName, b.roadName)
           break
         case 'phase':
           result = compareText(a.phaseName, b.phaseName)
           break
-        case 'template':
-          result = compareText(a.definitionName, b.definitionName)
+        case 'startPk':
+          result = a.startPk - b.startPk
+          break
+        case 'endPk':
+          result = a.endPk - b.endPk
+          break
+        case 'side':
+          result = (sideSortWeight[a.side] ?? 99) - (sideSortWeight[b.side] ?? 99)
+          break
+        case 'quantity':
+          result = a.quantity - b.quantity
           break
         case 'display':
           result = compareText(a.displayLabel, b.displayLabel)
           break
-        case 'intervals':
-          result = a.intervalCount - b.intervalCount
-          break
-        case 'project':
-          result = compareText(a.projectLabel, b.projectLabel)
+        case 'completed':
+          result = a.completedPercent - b.completedPercent
           break
         case 'updatedAt':
           result = new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime()
@@ -232,7 +344,7 @@ export default function QuantitiesListClient({ rows }: Props) {
           result = 0
       }
       if (result === 0) {
-        return (a.phaseId - b.phaseId) * direction
+        return (a.intervalId - b.intervalId) * direction
       }
       return result * direction
     })
@@ -255,14 +367,75 @@ export default function QuantitiesListClient({ rows }: Props) {
     )
   }
 
+  const isVisible = (key: ColumnKey) => visibleColumns.includes(key)
+
+  const persistVisibleColumns = (next: ColumnKey[]) => {
+    setVisibleColumns(next)
+  }
+
+  const handleSelectAllColumns = () =>
+    persistVisibleColumns(columnOptions.map((option) => option.key))
+  const handleRestoreDefaultColumns = () => persistVisibleColumns([...defaultVisibleColumns])
+  const handleClearColumns = () => persistVisibleColumns([])
+
+  const toggleColumnVisibility = (key: ColumnKey) => {
+    persistVisibleColumns(
+      visibleColumns.includes(key)
+        ? visibleColumns.filter((item) => item !== key)
+        : [...visibleColumns, key],
+    )
+  }
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(COLUMN_STORAGE_KEY)
+      if (raw) {
+        const parsed = JSON.parse(raw)
+        const filtered = (Array.isArray(parsed)
+          ? parsed.filter((item) => typeof item === 'string')
+          : []) as ColumnKey[]
+        const valid = filtered.filter((item) => columnOptions.some((opt) => opt.key === item))
+        setVisibleColumns(valid.length ? valid : [...defaultVisibleColumns])
+      } else {
+        setVisibleColumns([...defaultVisibleColumns])
+      }
+    } catch {
+      setVisibleColumns([...defaultVisibleColumns])
+    } finally {
+      setColumnsReady(true)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!columnsReady) return
+    try {
+      localStorage.setItem(COLUMN_STORAGE_KEY, JSON.stringify(visibleColumns))
+    } catch {
+      // ignore
+    }
+  }, [columnsReady, visibleColumns])
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (columnSelectorRef.current && !columnSelectorRef.current.contains(event.target as Node)) {
+        setShowColumnSelector(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  const columnCount = visibleColumns.length + 1
+
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900">
       <ProgressHeader
-        title="分项列表"
+        title="分项工程管理列表"
+        subtitle="按区间查看分项工程进度，进入详情可配置公式与清单绑定。"
         breadcrumbs={[
           { label: '首页', href: '/' },
           { label: '进度管理', href: '/progress' },
-          { label: '分项列表' },
+          { label: '分项工程管理' },
         ]}
         right={<ProgressSectionNav />}
         locale={locale}
@@ -271,11 +444,66 @@ export default function QuantitiesListClient({ rows }: Props) {
       <div className="relative mx-auto max-w-6xl px-6 py-8 sm:px-8 xl:max-w-[1500px] xl:px-10 2xl:max-w-[1700px] 2xl:px-12">
         <div className="absolute inset-x-0 top-0 -z-10 h-48 bg-gradient-to-r from-emerald-200/50 via-sky-200/40 to-amber-200/40 blur-3xl" />
         <section className="space-y-4">
-          <div className="rounded-3xl border border-slate-200 bg-white p-4 text-sm text-slate-600 shadow-sm">
-            共 {rowsWithMeta.length} 条分项工程记录，筛选后 {sortedRows.length} 条
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-slate-200 bg-white p-4 text-sm text-slate-600 shadow-sm">
+            <span>
+              共 {rowsWithMeta.length} 条区间记录，筛选后 {sortedRows.length} 条
+            </span>
+            <div className="relative" ref={columnSelectorRef}>
+              <button
+                type="button"
+                className="flex min-w-[140px] items-center justify-between rounded-xl border border-slate-200 px-3 py-2 text-left text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+                onClick={() => setShowColumnSelector((prev) => !prev)}
+              >
+                <span className="truncate">
+                  {visibleColumns.length ? `已选 ${visibleColumns.length} 列` : '未选择列'}
+                </span>
+                <span className="text-xs text-slate-400">⌕</span>
+              </button>
+              {showColumnSelector ? (
+                <div className="absolute right-0 z-10 mt-2 w-80 max-w-sm rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-700 shadow-lg shadow-slate-900/10">
+                  <div className="flex items-center justify-between border-b border-slate-200 pb-2 text-[11px] text-slate-600">
+                    <button className="text-emerald-600 hover:underline" onClick={handleSelectAllColumns}>
+                      全选
+                    </button>
+                    <div className="flex gap-2">
+                      <button className="text-slate-500 hover:underline" onClick={handleRestoreDefaultColumns}>
+                        恢复默认
+                      </button>
+                      <button className="text-slate-500 hover:underline" onClick={handleClearColumns}>
+                        清空
+                      </button>
+                    </div>
+                  </div>
+                  <div className="max-h-56 space-y-1 overflow-y-auto p-2 text-xs text-slate-700">
+                    {columnOptions.map((option) => (
+                      <label
+                        key={option.key}
+                        className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 hover:bg-slate-50"
+                      >
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 rounded border-slate-300 bg-white accent-emerald-500"
+                          checked={visibleColumns.includes(option.key)}
+                          onChange={() => toggleColumnVisibility(option.key)}
+                        />
+                        <span className="break-words whitespace-normal">{option.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+            </div>
           </div>
+
           <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <MultiSelectFilter
+                label="项目"
+                options={projectOptions}
+                selected={selectedProjects}
+                onChange={setSelectedProjects}
+                {...sharedFilterProps}
+              />
               <MultiSelectFilter
                 label="路段"
                 options={roadOptions}
@@ -291,10 +519,24 @@ export default function QuantitiesListClient({ rows }: Props) {
                 {...sharedFilterProps}
               />
               <MultiSelectFilter
-                label="模板"
-                options={templateOptions}
-                selected={selectedTemplates}
-                onChange={setSelectedTemplates}
+                label="起点 PK"
+                options={startPkOptions}
+                selected={selectedStartPks}
+                onChange={setSelectedStartPks}
+                {...sharedFilterProps}
+              />
+              <MultiSelectFilter
+                label="终点 PK"
+                options={endPkOptions}
+                selected={selectedEndPks}
+                onChange={setSelectedEndPks}
+                {...sharedFilterProps}
+              />
+              <MultiSelectFilter
+                label="位置"
+                options={sideOptions}
+                selected={selectedSides}
+                onChange={setSelectedSides}
                 {...sharedFilterProps}
               />
               <MultiSelectFilter
@@ -305,17 +547,10 @@ export default function QuantitiesListClient({ rows }: Props) {
                 {...sharedFilterProps}
               />
               <MultiSelectFilter
-                label="区间数"
-                options={intervalOptions}
-                selected={selectedIntervals}
-                onChange={setSelectedIntervals}
-                {...sharedFilterProps}
-              />
-              <MultiSelectFilter
-                label="项目"
-                options={projectOptions}
-                selected={selectedProjects}
-                onChange={setSelectedProjects}
+                label="完成率"
+                options={completionOptions}
+                selected={selectedCompletions}
+                onChange={setSelectedCompletions}
                 {...sharedFilterProps}
               />
               <MultiSelectFilter
@@ -327,119 +562,224 @@ export default function QuantitiesListClient({ rows }: Props) {
               />
             </div>
           </div>
+
           <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
             <div className="overflow-x-auto">
               <table className="min-w-full text-sm">
                 <thead className="bg-slate-50 text-xs uppercase tracking-[0.16em] text-slate-500">
                   <tr>
-                    <th className="px-4 py-3 text-left">
-                      <button
-                        type="button"
-                        onClick={() => handleSort('road')}
-                        className="flex items-center gap-2 text-left"
-                      >
-                        路段
-                        {renderSortIcon('road')}
-                      </button>
-                    </th>
-                    <th className="px-4 py-3 text-left">
-                      <button
-                        type="button"
-                        onClick={() => handleSort('phase')}
-                        className="flex items-center gap-2 text-left"
-                      >
-                        分项名称
-                        {renderSortIcon('phase')}
-                      </button>
-                    </th>
-                    <th className="px-4 py-3 text-left">
-                      <button
-                        type="button"
-                        onClick={() => handleSort('template')}
-                        className="flex items-center gap-2 text-left"
-                      >
-                        模板
-                        {renderSortIcon('template')}
-                      </button>
-                    </th>
-                    <th className="px-4 py-3 text-left">
-                      <button
-                        type="button"
-                        onClick={() => handleSort('display')}
-                        className="flex items-center gap-2 text-left"
-                      >
-                        显示方式
-                        {renderSortIcon('display')}
-                      </button>
-                    </th>
-                    <th className="px-4 py-3 text-left">
-                      <button
-                        type="button"
-                        onClick={() => handleSort('intervals')}
-                        className="flex items-center gap-2 text-left"
-                      >
-                        区间数
-                        {renderSortIcon('intervals')}
-                      </button>
-                    </th>
-                    <th className="px-4 py-3 text-left">
-                      <button
-                        type="button"
-                        onClick={() => handleSort('project')}
-                        className="flex items-center gap-2 text-left"
-                      >
-                        项目
-                        {renderSortIcon('project')}
-                      </button>
-                    </th>
-                    <th className="px-4 py-3 text-left">
-                      <button
-                        type="button"
-                        onClick={() => handleSort('updatedAt')}
-                        className="flex items-center gap-2 text-left"
-                      >
-                        更新时间
-                        {renderSortIcon('updatedAt')}
-                      </button>
-                    </th>
+                    {isVisible('project') ? (
+                      <th className="px-4 py-3 text-left">
+                        <button
+                          type="button"
+                          onClick={() => handleSort('project')}
+                          className="flex items-center gap-2 text-left"
+                        >
+                          项目
+                          {renderSortIcon('project')}
+                        </button>
+                      </th>
+                    ) : null}
+                    {isVisible('road') ? (
+                      <th className="px-4 py-3 text-left">
+                        <button
+                          type="button"
+                          onClick={() => handleSort('road')}
+                          className="flex items-center gap-2 text-left"
+                        >
+                          路段
+                          {renderSortIcon('road')}
+                        </button>
+                      </th>
+                    ) : null}
+                    {isVisible('phase') ? (
+                      <th className="px-4 py-3 text-left">
+                        <button
+                          type="button"
+                          onClick={() => handleSort('phase')}
+                          className="flex items-center gap-2 text-left"
+                        >
+                          分项名称
+                          {renderSortIcon('phase')}
+                        </button>
+                      </th>
+                    ) : null}
+                    {isVisible('startPk') ? (
+                      <th className="px-4 py-3 text-left">
+                        <button
+                          type="button"
+                          onClick={() => handleSort('startPk')}
+                          className="flex items-center gap-2 text-left"
+                        >
+                          起点 PK
+                          {renderSortIcon('startPk')}
+                        </button>
+                      </th>
+                    ) : null}
+                    {isVisible('endPk') ? (
+                      <th className="px-4 py-3 text-left">
+                        <button
+                          type="button"
+                          onClick={() => handleSort('endPk')}
+                          className="flex items-center gap-2 text-left"
+                        >
+                          终点 PK
+                          {renderSortIcon('endPk')}
+                        </button>
+                      </th>
+                    ) : null}
+                    {isVisible('side') ? (
+                      <th className="px-4 py-3 text-left">
+                        <button
+                          type="button"
+                          onClick={() => handleSort('side')}
+                          className="flex items-center gap-2 text-left"
+                        >
+                          位置
+                          {renderSortIcon('side')}
+                        </button>
+                      </th>
+                    ) : null}
+                    {isVisible('quantity') ? (
+                      <th className="px-4 py-3 text-left">
+                        <button
+                          type="button"
+                          onClick={() => handleSort('quantity')}
+                          className="flex items-center gap-2 text-left"
+                        >
+                          数量
+                          {renderSortIcon('quantity')}
+                        </button>
+                      </th>
+                    ) : null}
+                    {isVisible('display') ? (
+                      <th className="px-4 py-3 text-left">
+                        <button
+                          type="button"
+                          onClick={() => handleSort('display')}
+                          className="flex items-center gap-2 text-left"
+                        >
+                          显示方式
+                          {renderSortIcon('display')}
+                        </button>
+                      </th>
+                    ) : null}
+                    {isVisible('completed') ? (
+                      <th className="px-4 py-3 text-left">
+                        <button
+                          type="button"
+                          onClick={() => handleSort('completed')}
+                          className="flex items-center gap-2 text-left"
+                        >
+                          完成率
+                          {renderSortIcon('completed')}
+                        </button>
+                      </th>
+                    ) : null}
+                    {isVisible('updatedAt') ? (
+                      <th className="px-4 py-3 text-left">
+                        <button
+                          type="button"
+                          onClick={() => handleSort('updatedAt')}
+                          className="flex items-center gap-2 text-left"
+                        >
+                          更新时间
+                          {renderSortIcon('updatedAt')}
+                        </button>
+                      </th>
+                    ) : null}
                     <th className="px-4 py-3 text-right whitespace-nowrap">操作</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
                   {sortedRows.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="px-4 py-6 text-center text-slate-500">
-                        暂无分项工程
+                      <td colSpan={columnCount} className="px-4 py-6 text-center text-slate-500">
+                        暂无区间记录
                       </td>
                     </tr>
                   ) : (
-                    sortedRows.map((row) => (
-                      <tr key={row.phaseId} className="text-slate-700">
-                        <td className="px-4 py-3">
-                          <div className="font-semibold text-slate-900">{row.roadName}</div>
-                          <div className="text-xs text-slate-500">{row.roadSlug}</div>
-                        </td>
-                        <td className="px-4 py-3">{row.phaseName}</td>
-                        <td className="px-4 py-3 text-slate-600">{row.definitionName}</td>
-                        <td className="px-4 py-3 text-slate-600">{row.displayLabel}</td>
-                        <td className="px-4 py-3 text-slate-600">{row.intervalCount}</td>
-                        <td className="px-4 py-3 text-slate-600">{row.projectLabel}</td>
-                        <td className="px-4 py-3 text-slate-500">
-                          {new Date(row.updatedAt).toLocaleString('zh-CN', {
-                            dateStyle: 'medium',
-                            timeStyle: 'short',
-                          })}
-                        </td>
-                        <td className="px-4 py-3 text-right whitespace-nowrap">
-                          <Link
-                            href={`/progress/quantities/${row.phaseId}`}
-                            className="inline-flex items-center whitespace-nowrap rounded-full border border-emerald-200 bg-emerald-50 px-4 py-1 text-xs font-semibold text-emerald-700 transition hover:border-emerald-300 hover:bg-emerald-100"
-                          >
-                            进入详情
-                          </Link>
-                        </td>
-                      </tr>
-                    ))
+                    sortedRows.map((row) => {
+                      const percent = Math.min(100, Math.max(0, row.completedPercent))
+                      return (
+                        <tr key={row.intervalId} className="text-slate-700">
+                          {isVisible('project') ? (
+                            <td className="px-4 py-3 text-slate-600">{row.projectLabel}</td>
+                          ) : null}
+                          {isVisible('road') ? (
+                            <td className="px-4 py-3">
+                              <div className="font-semibold text-slate-900">{row.roadName}</div>
+                              <div className="text-xs text-slate-500">{row.roadSlug}</div>
+                            </td>
+                          ) : null}
+                          {isVisible('phase') ? (
+                            <td className="px-4 py-3">{row.phaseName}</td>
+                          ) : null}
+                          {isVisible('startPk') ? (
+                            <td className="px-4 py-3 text-slate-600">
+                              {formatNumber(row.startPk, 3)}
+                            </td>
+                          ) : null}
+                          {isVisible('endPk') ? (
+                            <td className="px-4 py-3 text-slate-600">
+                              {formatNumber(row.endPk, 3)}
+                            </td>
+                          ) : null}
+                          {isVisible('side') ? (
+                            <td className="px-4 py-3 text-slate-600">{row.sideLabel}</td>
+                          ) : null}
+                          {isVisible('quantity') ? (
+                            <td className="px-4 py-3 text-slate-600">
+                              <div className="flex items-center gap-2">
+                                <span>{formatNumber(row.quantity, 3)}</span>
+                                {row.quantityOverridden ? (
+                                  <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
+                                    手动
+                                  </span>
+                                ) : null}
+                              </div>
+                              {row.quantityOverridden ? (
+                                <div className="mt-1 text-[10px] text-slate-400">
+                                  PK差 {formatNumber(row.rawQuantity, 3)}
+                                </div>
+                              ) : null}
+                            </td>
+                          ) : null}
+                          {isVisible('display') ? (
+                            <td className="px-4 py-3 text-slate-600">{row.displayLabel}</td>
+                          ) : null}
+                          {isVisible('completed') ? (
+                            <td className="px-4 py-3 text-slate-600">
+                              <div className="flex items-center gap-2">
+                                <div className="h-1.5 w-20 rounded-full bg-slate-200">
+                                  <div
+                                    className="h-1.5 rounded-full bg-emerald-400"
+                                    style={{ width: `${percent}%` }}
+                                  />
+                                </div>
+                                <span>{percent}%</span>
+                              </div>
+                            </td>
+                          ) : null}
+                          {isVisible('updatedAt') ? (
+                            <td className="px-4 py-3 text-slate-500">
+                              {new Date(row.updatedAt).toLocaleString('zh-CN', {
+                                dateStyle: 'medium',
+                                timeStyle: 'short',
+                              })}
+                            </td>
+                          ) : null}
+                          <td className="px-4 py-3 text-right whitespace-nowrap">
+                            <Link
+                              href={`/progress/quantities/${row.phaseId}?intervalId=${row.intervalId}`}
+                              className="inline-flex items-center whitespace-nowrap rounded-full border border-emerald-200 bg-emerald-50 px-4 py-1 text-xs font-semibold text-emerald-700 transition hover:border-emerald-300 hover:bg-emerald-100"
+                            >
+                              进入详情
+                            </Link>
+                          </td>
+                        </tr>
+                      )
+                    })
                   )}
                 </tbody>
               </table>

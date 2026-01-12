@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 
 import { AccessDenied } from '@/components/AccessDenied'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
@@ -160,8 +161,9 @@ export default function ProductionValuePage() {
   } = copy.page.messages
   const priceUnauthorizedMessage = productionUnauthorized
 
-  const tabs: ValueTabKey[] = ['production', 'boq']
-  const [activeTab, setActiveTab] = useState<ValueTabKey>('production')
+  const searchParams = useSearchParams()
+  const tabParam = searchParams?.get('tab') ?? null
+  const activeTab: ValueTabKey = tabParam === 'boq' ? 'boq' : 'production'
   const [boqProjects, setBoqProjects] = useState<BoqProject[]>([])
   const [boqProjectsStatus, setBoqProjectsStatus] = useState<FetchStatus>('idle')
   const [boqProjectsError, setBoqProjectsError] = useState<string | null>(null)
@@ -573,6 +575,11 @@ export default function ProductionValuePage() {
   const tabDescription =
     activeTab === 'production' ? copy.page.description : copy.boq.description
   const tabBadge = activeTab === 'production' ? copy.card.badge : copy.tabs.boq
+  const tabItems = [
+    { key: 'production', label: copy.tabs.production, href: '/value' },
+    { key: 'boq', label: copy.tabs.boq, href: '/value?tab=boq' },
+    { key: 'manage', label: copy.tabs.manage, href: '/value/prices' },
+  ] as const
 
   if (permissionDenied) {
     return (
@@ -594,49 +601,33 @@ export default function ProductionValuePage() {
               items={[{ label: breadcrumbHome, href: '/' }, { label: breadcrumbValue }]}
             />
             <div className="space-y-2">
-              <div className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-4 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700">
-                <span className="inline-block h-2 w-2 rounded-full bg-emerald-500" />
-                {tabBadge}
-              </div>
               <div>
                 <h1 className="text-xl font-bold text-slate-900 sm:text-2xl">{tabTitle}</h1>
-                <p className="text-sm text-slate-600">{tabDescription}</p>
+                {tabDescription ? (
+                  <p className="text-sm text-slate-600">{tabDescription}</p>
+                ) : null}
               </div>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex items-center rounded-lg bg-slate-100 p-1">
-              {tabs.map((tab) => {
-                const isActive = activeTab === tab
+              {tabItems.map((tab) => {
+                const isActive = tab.key === activeTab
                 return (
-                  <button
-                    key={tab}
-                    type="button"
-                    onClick={() => setActiveTab(tab)}
+                  <Link
+                    key={tab.key}
+                    href={tab.href}
                     className={`rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${
                       isActive
                         ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-200'
                         : 'text-slate-500 hover:bg-slate-200/50 hover:text-slate-900'
                     }`}
                   >
-                    {copy.tabs[tab]}
-                  </button>
+                    {tab.label}
+                  </Link>
                 )
               })}
             </div>
-            {activeTab === 'production' ? (
-              <>
-                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-                  {copy.page.unitLabel}
-                </span>
-                <Link
-                  href="/value/prices"
-                  className="rounded-full bg-emerald-500 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-emerald-300/30 transition hover:-translate-y-0.5 hover:shadow-emerald-400/40"
-                >
-                  {copy.page.managePricesCta}
-                </Link>
-              </>
-            ) : null}
             <LocaleSwitcher locale={locale} onChange={setLocale} variant="light" />
           </div>
         </div>
@@ -790,6 +781,12 @@ export default function ProductionValuePage() {
                         </button>
                       </div>
                     </div>
+                    <Link
+                      href="/value/boq/manage"
+                      className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-semibold text-emerald-700 transition hover:-translate-y-0.5 hover:border-emerald-300 hover:bg-emerald-100"
+                    >
+                      {copy.boq.actions.manageCta}
+                    </Link>
                   </div>
                 </div>
 

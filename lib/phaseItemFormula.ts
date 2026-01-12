@@ -257,12 +257,16 @@ export const buildFormulaVariables = (params: {
   startPk: number
   endPk: number
   side: IntervalSide
+  billQuantity?: number | null
   values?: Record<string, unknown> | null
 }) => {
   const raw = Math.abs(params.endPk - params.startPk)
   const base = raw === 0 ? 1 : Math.max(raw, 0)
   const sideFactor = params.side === 'BOTH' ? 2 : 1
-  const length = base * sideFactor
+  const computedLength = base * sideFactor
+  const hasBillQuantity =
+    typeof params.billQuantity === 'number' && Number.isFinite(params.billQuantity)
+  const length = hasBillQuantity ? (params.billQuantity as number) : computedLength
 
   const variables: Record<string, number> = {
     startPk: params.startPk,

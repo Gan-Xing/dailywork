@@ -33,6 +33,9 @@ export default async function DocumentsPage() {
   const canViewSubmissions =
     permissions.includes('submission:view') || permissions.includes('submission:update')
   const canCreateSubmission = permissions.includes('submission:create')
+  const canViewLetters =
+    permissions.includes('submission:view') || permissions.includes('submission:update')
+  const canCreateLetter = permissions.includes('submission:create')
   const canViewTemplates =
     permissions.includes('template:view') || permissions.includes('template:update')
   const canViewFiles = permissions.includes('file:view') || permissions.includes('file:manage')
@@ -41,6 +44,8 @@ export default async function DocumentsPage() {
     <DocumentsHubClient
       canViewSubmissions={canViewSubmissions}
       canCreateSubmission={canCreateSubmission}
+      canViewLetters={canViewLetters}
+      canCreateLetter={canCreateLetter}
       canViewTemplates={canViewTemplates}
       canViewFiles={canViewFiles}
     />

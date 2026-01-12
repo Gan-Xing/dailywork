@@ -333,11 +333,35 @@ model Document {
   updatedAt       DateTime           @updatedAt
   entries         InspectionEntry[]
   submission      Submission?
+  letter          Letter?
   items           SubmissionItem[]
 
   @@index([type, status])
   @@index([createdAt])
   @@index([updatedAt])
+}
+
+model Letter {
+  id           Int            @id @default(autoincrement())
+  documentId   Int            @unique
+  projectId    Int
+  boqItemId    Int?
+  letterNumber Int
+  subject      String
+  senderOrg    String?
+  recipientOrg String?
+  issuedAt     DateTime?
+  receivedAt   DateTime?
+  remark       String?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  document     Document       @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  project      Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  boqItem      BoqItem?       @relation(fields: [boqItemId], references: [id], onDelete: SetNull)
+
+  @@unique([projectId, letterNumber])
+  @@index([boqItemId])
 }
 
 model InspectionEntry {
@@ -770,6 +794,7 @@ model Project {
   memberAssignments UserProjectAssignment[]
   boqItems BoqItem[]
   boqMeasurements BoqMeasurement[]
+  letters   Letter[]
   roadSections RoadSection[]
 }
 
@@ -796,6 +821,7 @@ model BoqItem {
   derivedItems   BoqItem[]    @relation("BoqItemContractLink")
   measurements   BoqMeasurement[]
   phaseItemLinks PhaseItemBoqItem[]
+  letters        Letter[]
 
   @@index([projectId, sheetType, sortOrder])
   @@index([projectId, sheetType, code])

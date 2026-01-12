@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
 
+import { FILE_CATEGORIES, type FileCategory } from '@/lib/constants/fileCategories'
 import { prisma } from '@/lib/prisma'
 import { getSessionUser, hasPermission } from '@/lib/server/authSession'
 import { createPresignedUrl, deleteObject } from '@/lib/server/r2'
@@ -140,12 +141,22 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
   const body = (await request.json().catch(() => ({}))) as {
     originalName?: string
+    category?: string
     links?: Array<{ entityType: string; entityId: string; purpose?: string; label?: string }>
   }
   const originalName = body.originalName?.trim()
+  const category = typeof body.category === 'string' ? body.category.trim() : undefined
 
   if (!originalName) {
     return NextResponse.json({ message: '文件名不能为空' }, { status: 400 })
+  }
+  if (category !== undefined) {
+    if (!category) {
+      return NextResponse.json({ message: '文件分类不能为空' }, { status: 400 })
+    }
+    if (!FILE_CATEGORIES.includes(category as FileCategory)) {
+      return NextResponse.json({ message: '文件分类无效' }, { status: 400 })
+    }
   }
 
   const file = await prisma.fileAsset.findUnique({ where: { id: fileId } })
@@ -159,7 +170,10 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const result = await prisma.$transaction(async (tx) => {
     const updatedFile = await tx.fileAsset.update({
       where: { id: fileId },
-      data: { originalName },
+      data: {
+        originalName,
+        ...(category ? { category } : {}),
+      },
     })
 
     let currentLinks = []

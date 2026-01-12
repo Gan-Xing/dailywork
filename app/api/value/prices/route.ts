@@ -141,7 +141,7 @@ export async function POST(request: Request) {
 
   let unitPrice: number | null
   try {
-    unitPrice = parseUnitPrice(parsed.unitPrice)
+    unitPrice = parsed.unitPrice === undefined ? null : parseUnitPrice(parsed.unitPrice)
   } catch (error) {
     return respond((error as Error).message ?? '价格格式错误', 400)
   }
@@ -223,7 +223,7 @@ export async function PATCH(request: Request) {
 
   let unitPrice: number | null | undefined
   try {
-    unitPrice = parseUnitPrice(parsed.unitPrice)
+    unitPrice = parsed.unitPrice === undefined ? undefined : parseUnitPrice(parsed.unitPrice)
   } catch (error) {
     return respond((error as Error).message ?? '价格格式错误', 400)
   }

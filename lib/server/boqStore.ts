@@ -47,15 +47,36 @@ export const listBoqItems = async (params: {
   projectId: number
   sheetType: BoqSheetType
   includeInactive?: boolean
+  tone?: BoqItemTone | null
 }) => {
-  const { projectId, sheetType, includeInactive = false } = params
+  const { projectId, sheetType, includeInactive = false, tone = null } = params
   return prisma.boqItem.findMany({
     where: {
       projectId,
       sheetType,
+      ...(tone ? { tone } : {}),
       ...(includeInactive ? {} : { isActive: true }),
     },
     orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
+  })
+}
+
+export const listBoqItemsWithProject = async (params: {
+  sheetType: BoqSheetType
+  includeInactive?: boolean
+  tone?: BoqItemTone | null
+}) => {
+  const { sheetType, includeInactive = false, tone = null } = params
+  return prisma.boqItem.findMany({
+    where: {
+      sheetType,
+      ...(tone ? { tone } : {}),
+      ...(includeInactive ? {} : { isActive: true }),
+    },
+    orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
+    include: {
+      project: { select: { id: true, name: true, code: true } },
+    },
   })
 }
 

@@ -650,7 +650,7 @@ export function WorkflowManager({ initialWorkflows }: Props) {
                     disabled={!selected}
                     className={`inline-flex items-center justify-center gap-2 rounded-full border px-4 py-2 text-xs font-semibold transition ${
                       selected
-                        ? 'border-rose-200/60 bg-rose-200/20 text-rose-50 hover:-translate-y-0.5 hover:bg-rose-200/30'
+                        ? 'border-rose-200 bg-rose-50 text-rose-700 hover:-translate-y-0.5 hover:bg-rose-100'
                         : 'cursor-not-allowed border-slate-200 bg-white text-slate-500'
                     }`}
                   >

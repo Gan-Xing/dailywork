@@ -1,9 +1,9 @@
 import type { IntervalSide, PhaseMeasure } from '@/lib/progressTypes'
 
-export type RoadPhaseManagementRow = {
+export type PhaseIntervalManagementRow = {
+  intervalId: number
   phaseId: number
   phaseName: string
-  definitionName: string
   measure: PhaseMeasure
   roadId: number
   roadName: string
@@ -11,7 +11,13 @@ export type RoadPhaseManagementRow = {
   projectId: number | null
   projectName: string | null
   projectCode: string | null
-  intervalCount: number
+  startPk: number
+  endPk: number
+  side: IntervalSide
+  quantity: number
+  rawQuantity: number
+  quantityOverridden: boolean
+  completedPercent: number
   updatedAt: string
 }
 
