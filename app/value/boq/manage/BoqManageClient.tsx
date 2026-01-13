@@ -317,6 +317,13 @@ const extractCodeNumber = (code: string) => {
   return match ? Number(match[1]) : null
 }
 
+const isMajorSubsectionCode = (code: string) => {
+  const normalized = normalizeBoqCode(code)
+  if (!/^\d{3}$/.test(normalized)) return false
+  const parsed = Number(normalized)
+  return Number.isFinite(parsed) && parsed % 100 === 0
+}
+
 const resolveSectionKey = (code: string) => {
   if (!code) return Number.MAX_SAFE_INTEGER
   if (isVatCode(code) || isTotalWithTaxCode(code)) return Number.MAX_SAFE_INTEGER - 1
@@ -1304,52 +1311,65 @@ export default function BoqManageClient() {
                     <th className="w-[10%] px-3 py-3 text-right">{copy.tableHeaders.quantity}</th>
                     <th className="w-[12%] px-3 py-3 text-right">{copy.tableHeaders.totalPrice}</th>
                   </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200/70">
-                  {displayRows.map((row) => (
-                    <tr
-                      key={row.id}
-                      draggable={canDragSort}
-                      onDragStart={() => handleDragStart(row.id)}
-                      onDragOver={(event) => handleDragOver(event, row.id)}
-                      onDrop={() => handleDrop(row.id)}
-                      onDragEnd={() => {
-                        setDraggingId(null)
-                        setDragOverId(null)
-                      }}
-                      onClick={() => openEditModal(row)}
-                      className={`transition ${
-                        row.tone === 'ITEM' ? 'hover:bg-slate-50' : ''
-                      } ${boqRowToneStyles[row.tone]} ${
-                        draggingId === row.id
-                          ? 'opacity-60'
-                          : dragOverId === row.id
-                          ? 'ring-2 ring-emerald-200'
-                          : ''
-                      }`}
-                    >
-                      <td className="whitespace-nowrap px-3 py-3 text-xs tracking-[0.2em]">
-                        {row.code}
-                      </td>
-                      <td className="whitespace-pre-line px-3 py-3 leading-relaxed">
-                        <div className="text-sm">{row.designation}</div>
-                      </td>
-                      <td className="whitespace-nowrap px-3 py-3">{formatBoqCell(row.unit)}</td>
-                      <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums">
-                        {formatBoqCell(row.unitPrice, localeId)}
-                      </td>
-                      <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums">
-                        {formatBoqCell(row.quantity, localeId)}
-                      </td>
-                      <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums">
-                        {formatBoqCell(resolveRowTotalPrice(row), localeId)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
+	                </thead>
+	                <tbody className="divide-y divide-slate-200/70">
+	                  {displayRows.map((row) => {
+	                    const normalizedCode = normalizeBoqCode(row.code)
+	                    const displayOnly =
+	                      row.tone === 'SECTION' ||
+	                      (row.tone === 'SUBSECTION' &&
+	                        !isMajorSubsectionCode(normalizedCode) &&
+	                        !isVatCode(normalizedCode))
+	                    return (
+	                      <tr
+	                        key={row.id}
+	                        draggable={canDragSort}
+	                        onDragStart={() => handleDragStart(row.id)}
+	                        onDragOver={(event) => handleDragOver(event, row.id)}
+	                        onDrop={() => handleDrop(row.id)}
+	                        onDragEnd={() => {
+	                          setDraggingId(null)
+	                          setDragOverId(null)
+	                        }}
+	                        onClick={() => openEditModal(row)}
+	                        className={`transition ${
+	                          row.tone === 'ITEM' ? 'hover:bg-slate-50' : ''
+	                        } ${boqRowToneStyles[row.tone]} ${
+	                          draggingId === row.id
+	                            ? 'opacity-60'
+	                            : dragOverId === row.id
+	                              ? 'ring-2 ring-emerald-200'
+	                              : ''
+	                        }`}
+	                      >
+	                        <td className="whitespace-nowrap px-3 py-3 text-xs tracking-[0.2em]">
+	                          {row.code}
+	                        </td>
+	                        <td className="whitespace-pre-line px-3 py-3 leading-relaxed">
+	                          <div className="text-sm">{row.designation}</div>
+	                        </td>
+	                        <td className="whitespace-nowrap px-3 py-3">
+	                          {formatBoqCell(displayOnly ? null : row.unit)}
+	                        </td>
+	                        <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums">
+	                          {formatBoqCell(displayOnly ? null : row.unitPrice, localeId)}
+	                        </td>
+	                        <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums">
+	                          {formatBoqCell(displayOnly ? null : row.quantity, localeId)}
+	                        </td>
+	                        <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums">
+	                          {formatBoqCell(
+	                            displayOnly ? null : resolveRowTotalPrice(row),
+	                            localeId,
+	                          )}
+	                        </td>
+	                      </tr>
+	                    )
+	                  })}
+	                </tbody>
+	              </table>
+	            </div>
+	          ) : (
             <p className="mt-4 text-sm text-slate-500">{copy.messages.empty}</p>
           )}
           <div className="mt-4 text-xs text-slate-500">{copy.actions.sortHint}</div>

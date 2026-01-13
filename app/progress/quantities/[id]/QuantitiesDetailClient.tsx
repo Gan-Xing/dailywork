@@ -214,7 +214,6 @@ export default function QuantitiesDetailClient({ detail, canEdit }: Props) {
     <main className="min-h-screen bg-slate-50 text-slate-900">
       <ProgressHeader
         title={detail.phase.name}
-        subtitle={`路段：${detail.road.name} · 模板：${detail.phase.definitionName}`}
         breadcrumbs={[
           { label: '首页', href: '/' },
           { label: '进度管理', href: '/progress' },
@@ -225,18 +224,21 @@ export default function QuantitiesDetailClient({ detail, canEdit }: Props) {
         locale={locale}
         onLocaleChange={setLocale}
       />
-      <div className="relative mx-auto max-w-6xl px-6 py-8 sm:px-8 xl:max-w-[1500px] xl:px-10 2xl:max-w-[1700px] 2xl:px-12">
-        <div className="absolute inset-x-0 top-0 -z-10 h-48 bg-gradient-to-r from-emerald-200/50 via-sky-200/40 to-amber-200/40 blur-3xl" />
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap gap-2 text-xs font-semibold text-slate-600">
-            <span className="rounded-full border border-slate-200 bg-white px-3 py-1">
-              显示方式：{detail.phase.measure === 'LINEAR' ? '延米' : '单体'}
-            </span>
-            <span className="rounded-full border border-slate-200 bg-white px-3 py-1">
-              项目：{detail.road.projectName ?? '未绑定项目'}
-            </span>
-          </div>
-        </div>
+	      <div className="relative mx-auto max-w-6xl px-6 py-8 sm:px-8 xl:max-w-[1500px] xl:px-10 2xl:max-w-[1700px] 2xl:px-12">
+	        <div className="absolute inset-x-0 top-0 -z-10 h-48 bg-gradient-to-r from-emerald-200/50 via-sky-200/40 to-amber-200/40 blur-3xl" />
+	        <div className="flex flex-wrap items-center justify-between gap-3">
+	          <div className="flex flex-wrap gap-2 text-xs font-semibold text-slate-600">
+	            <span className="rounded-full border border-slate-200 bg-white px-3 py-1">
+	              显示方式：{detail.phase.measure === 'LINEAR' ? '延米' : '单体'}
+	            </span>
+	            <span className="rounded-full border border-slate-200 bg-white px-3 py-1">
+	              项目：{detail.road.projectName ?? '未绑定项目'}
+	            </span>
+	            <span className="rounded-full border border-slate-200 bg-white px-3 py-1">
+	              路段：{detail.road.name} · 模板：{detail.phase.definitionName}
+	            </span>
+	          </div>
+	        </div>
 
         <section className="mt-6 space-y-6">
           <div className="flex flex-wrap items-center gap-3 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
