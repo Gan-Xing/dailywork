@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useMemo, useState } from 'react'
 
+import { SingleSelect } from '@/components/SingleSelect'
 import { useToast } from '@/components/ToastProvider'
 import type {
   PhaseItemDTO,
@@ -15,6 +16,7 @@ import { usePreferredLocale } from '@/lib/usePreferredLocale'
 type Props = {
   detail: RoadPhaseQuantityDetailDTO
   canEdit: boolean
+  variant?: 'page' | 'modal'
 }
 
 type InputField = {
@@ -78,7 +80,7 @@ const calcIntervalLength = (
   return { length, computedLength, overridden }
 }
 
-export default function QuantitiesDetailClient({ detail, canEdit }: Props) {
+export default function QuantitiesDetailClient({ detail, canEdit, variant = 'page' }: Props) {
   const { locale, setLocale } = usePreferredLocale('zh', locales)
   const { addToast } = useToast()
   const [phaseItems, setPhaseItems] = useState<PhaseItemDTO[]>(detail.phaseItems)
@@ -209,6 +211,167 @@ export default function QuantitiesDetailClient({ detail, canEdit }: Props) {
     }
   }
 
+  const body = (
+    <div className="relative mx-auto max-w-6xl px-6 py-8 sm:px-8 xl:max-w-[1500px] xl:px-10 2xl:max-w-[1700px] 2xl:px-12">
+      {variant === 'page' ? (
+        <div className="absolute inset-x-0 top-0 -z-10 h-48 bg-gradient-to-r from-emerald-200/50 via-sky-200/40 to-amber-200/40 blur-3xl" />
+      ) : null}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap gap-2 text-xs font-semibold text-slate-600">
+          <span className="rounded-full border border-slate-200 bg-white px-3 py-1">
+            显示方式：{detail.phase.measure === 'LINEAR' ? '延米' : '单体'}
+          </span>
+          <span className="rounded-full border border-slate-200 bg-white px-3 py-1">
+            项目：{detail.road.projectName ?? '未绑定项目'}
+          </span>
+          <span className="rounded-full border border-slate-200 bg-white px-3 py-1">
+            路段：{detail.road.name} · 模板：{detail.phase.definitionName}
+          </span>
+        </div>
+      </div>
+
+      <section className="mt-6 space-y-6">
+        <div className="flex flex-wrap items-center gap-3 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+            当前分项名称
+          </div>
+          <div className="min-w-[260px]">
+            <SingleSelect
+              label=""
+              value={selectedPhaseItemId ? String(selectedPhaseItemId) : ''}
+              options={phaseItems.map((item) => ({
+                value: String(item.id),
+                label: `${item.name}${item.spec ? `（${item.spec}）` : ''}`,
+                searchText: `${item.name} ${item.spec ?? ''}`,
+              }))}
+              placeholder={phaseItems.length ? '请选择…' : '暂无分项名称'}
+              searchPlaceholder="搜索分项内容…"
+              emptyLabel="暂无分项内容"
+              onChange={(value) => setSelectedPhaseItemId(Number(value) || null)}
+              disabled={phaseItems.length === 0}
+            />
+          </div>
+        </div>
+        <div className="space-y-4">
+          {phaseItems.length === 0 ? (
+            <div className="rounded-3xl border border-slate-200 bg-slate-50 p-6 text-sm text-slate-600">
+              当前分项模板暂无分项名称，无法录入计量。
+            </div>
+          ) : (
+            detail.intervals.map((interval) => {
+              const input = inputMap.get(interval.id)
+              const draft = drafts[interval.id]
+              const computed = input?.computedQuantity ?? null
+              const manual = input?.manualQuantity ?? null
+              const mismatch =
+                computed !== null &&
+                manual !== null &&
+                Number.isFinite(computed) &&
+                Number.isFinite(manual) &&
+                computed !== manual
+              const lengthResult = calcIntervalLength(
+                interval.startPk,
+                interval.endPk,
+                interval.side,
+                interval.billQuantity,
+              )
+              const hasFormula = Boolean(selectedItem?.formula?.expression)
+              return (
+                <div
+                  key={interval.id}
+                  className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
+                    <div className="font-semibold text-slate-900">
+                      PK {interval.startPk} - {interval.endPk} · {interval.side}
+                      {interval.spec ? ` · ${interval.spec}` : ''}
+                    </div>
+                    <div className="text-xs text-slate-500">
+                      计量长度：{formatNumber(lengthResult.length)}
+                      {lengthResult.overridden ? (
+                        <span className="ml-2 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
+                          手动
+                        </span>
+                      ) : null}
+                      {lengthResult.overridden ? (
+                        <span className="ml-2 text-[10px] text-slate-400">
+                          PK差 {formatNumber(lengthResult.computedLength)}
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
+                  {inputFields.length === 0 ? (
+                    <p className="mt-3 text-xs text-slate-500">
+                      未配置输入字段，公式可直接使用 length（优先手动延米）、rawLength（PK差）等内置变量。
+                    </p>
+                  ) : (
+                    <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                      {inputFields.map((field) => (
+                        <label
+                          key={field.key}
+                          className="flex flex-col gap-1 text-xs text-slate-600"
+                        >
+                          {field.label}
+                          {field.unit ? (
+                            <span className="text-[10px] text-slate-500">{field.unit}</span>
+                          ) : null}
+                          <input
+                            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-emerald-300 focus:outline-none"
+                            value={draft?.values?.[field.key] ?? ''}
+                            onChange={(event) =>
+                              handleFieldChange(interval.id, field.key, event.target.value)
+                            }
+                            placeholder={field.hint ?? '请输入数值'}
+                            disabled={!canEdit}
+                          />
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                  <div className="mt-4 grid gap-3 md:grid-cols-3">
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-600">
+                      计算值：{formatNumber(computed)}
+                      {input?.computedError ? (
+                        <div className="mt-1 text-xs text-amber-700">{input.computedError}</div>
+                      ) : null}
+                    </div>
+                    <label className="flex flex-col gap-1 text-xs text-slate-600">
+                      手动值
+                      <input
+                        className={`rounded-xl border px-3 py-2 text-sm text-slate-900 focus:outline-none ${
+                          mismatch
+                            ? 'border-amber-300 bg-amber-50'
+                            : 'border-slate-200 bg-white focus:border-emerald-300'
+                        }`}
+                        value={draft?.manualQuantity ?? ''}
+                        onChange={(event) => handleManualChange(interval.id, event.target.value)}
+                        placeholder={hasFormula ? '留空表示采用计算值' : '必填'}
+                        disabled={!canEdit}
+                      />
+                    </label>
+                    <div className="flex items-end">
+                      <button
+                        type="button"
+                        onClick={() => saveInterval(interval.id)}
+                        disabled={!canEdit || savingIntervals.includes(interval.id)}
+                        className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-semibold text-emerald-700 transition hover:border-emerald-300 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {savingIntervals.includes(interval.id) ? '保存中...' : '保存区间'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )
+            })
+          )}
+        </div>
+      </section>
+    </div>
+  )
+
+  if (variant === 'modal') {
+    return <div className="bg-slate-50 text-slate-900">{body}</div>
+  }
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900">
@@ -224,158 +387,7 @@ export default function QuantitiesDetailClient({ detail, canEdit }: Props) {
         locale={locale}
         onLocaleChange={setLocale}
       />
-	      <div className="relative mx-auto max-w-6xl px-6 py-8 sm:px-8 xl:max-w-[1500px] xl:px-10 2xl:max-w-[1700px] 2xl:px-12">
-	        <div className="absolute inset-x-0 top-0 -z-10 h-48 bg-gradient-to-r from-emerald-200/50 via-sky-200/40 to-amber-200/40 blur-3xl" />
-	        <div className="flex flex-wrap items-center justify-between gap-3">
-	          <div className="flex flex-wrap gap-2 text-xs font-semibold text-slate-600">
-	            <span className="rounded-full border border-slate-200 bg-white px-3 py-1">
-	              显示方式：{detail.phase.measure === 'LINEAR' ? '延米' : '单体'}
-	            </span>
-	            <span className="rounded-full border border-slate-200 bg-white px-3 py-1">
-	              项目：{detail.road.projectName ?? '未绑定项目'}
-	            </span>
-	            <span className="rounded-full border border-slate-200 bg-white px-3 py-1">
-	              路段：{detail.road.name} · 模板：{detail.phase.definitionName}
-	            </span>
-	          </div>
-	        </div>
-
-        <section className="mt-6 space-y-6">
-          <div className="flex flex-wrap items-center gap-3 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-              当前分项名称
-            </div>
-            <select
-              className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm text-slate-900"
-              value={selectedPhaseItemId ?? ''}
-              onChange={(event) => setSelectedPhaseItemId(Number(event.target.value) || null)}
-            >
-              {phaseItems.length === 0 ? (
-                <option value="">暂无分项名称</option>
-              ) : (
-                phaseItems.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.name}
-                    {item.spec ? `（${item.spec}）` : ''}
-                  </option>
-                ))
-              )}
-            </select>
-          </div>
-          <div className="space-y-4">
-            {phaseItems.length === 0 ? (
-              <div className="rounded-3xl border border-slate-200 bg-slate-50 p-6 text-sm text-slate-600">
-                当前分项模板暂无分项名称，无法录入计量。
-              </div>
-            ) : (
-              detail.intervals.map((interval) => {
-                const input = inputMap.get(interval.id)
-                const draft = drafts[interval.id]
-                const computed = input?.computedQuantity ?? null
-                const manual = input?.manualQuantity ?? null
-                const mismatch =
-                  computed !== null &&
-                  manual !== null &&
-                  Number.isFinite(computed) &&
-                  Number.isFinite(manual) &&
-                  computed !== manual
-                const lengthResult = calcIntervalLength(
-                  interval.startPk,
-                  interval.endPk,
-                  interval.side,
-                  interval.billQuantity,
-                )
-                const hasFormula = Boolean(selectedItem?.formula?.expression)
-                return (
-                  <div
-                    key={interval.id}
-                    className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm"
-                  >
-                    <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
-                      <div className="font-semibold text-slate-900">
-                        PK {interval.startPk} - {interval.endPk} · {interval.side}
-                        {interval.spec ? ` · ${interval.spec}` : ''}
-                      </div>
-                      <div className="text-xs text-slate-500">
-                        计量长度：{formatNumber(lengthResult.length)}
-                        {lengthResult.overridden ? (
-                          <span className="ml-2 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
-                            手动
-                          </span>
-                        ) : null}
-                        {lengthResult.overridden ? (
-                          <span className="ml-2 text-[10px] text-slate-400">
-                            PK差 {formatNumber(lengthResult.computedLength)}
-                          </span>
-                        ) : null}
-                      </div>
-                    </div>
-                    {inputFields.length === 0 ? (
-                      <p className="mt-3 text-xs text-slate-500">
-                        未配置输入字段，公式可直接使用 length（优先手动延米）、rawLength（PK差）等内置变量。
-                      </p>
-                    ) : (
-                      <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                        {inputFields.map((field) => (
-                          <label key={field.key} className="flex flex-col gap-1 text-xs text-slate-600">
-                            {field.label}
-                            {field.unit ? (
-                              <span className="text-[10px] text-slate-500">{field.unit}</span>
-                            ) : null}
-                            <input
-                              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-emerald-300 focus:outline-none"
-                              value={draft?.values?.[field.key] ?? ''}
-                              onChange={(event) =>
-                                handleFieldChange(interval.id, field.key, event.target.value)
-                              }
-                              placeholder={field.hint ?? '请输入数值'}
-                              disabled={!canEdit}
-                            />
-                          </label>
-                        ))}
-                      </div>
-                    )}
-                    <div className="mt-4 grid gap-3 md:grid-cols-3">
-                      <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-600">
-                        计算值：{formatNumber(computed)}
-                        {input?.computedError ? (
-                          <div className="mt-1 text-xs text-amber-700">
-                            {input.computedError}
-                          </div>
-                        ) : null}
-                      </div>
-                      <label className="flex flex-col gap-1 text-xs text-slate-600">
-                        手动值
-                        <input
-                          className={`rounded-xl border px-3 py-2 text-sm text-slate-900 focus:outline-none ${
-                            mismatch
-                              ? 'border-amber-300 bg-amber-50'
-                              : 'border-slate-200 bg-white focus:border-emerald-300'
-                          }`}
-                          value={draft?.manualQuantity ?? ''}
-                          onChange={(event) => handleManualChange(interval.id, event.target.value)}
-                          placeholder={hasFormula ? '留空表示采用计算值' : '必填'}
-                          disabled={!canEdit}
-                        />
-                      </label>
-                      <div className="flex items-end">
-                        <button
-                          type="button"
-                          onClick={() => saveInterval(interval.id)}
-                          disabled={!canEdit || savingIntervals.includes(interval.id)}
-                          className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-semibold text-emerald-700 transition hover:border-emerald-300 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          {savingIntervals.includes(interval.id) ? '保存中...' : '保存区间'}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )
-              })
-            )}
-          </div>
-        </section>
-      </div>
+      {body}
     </main>
   )
 }

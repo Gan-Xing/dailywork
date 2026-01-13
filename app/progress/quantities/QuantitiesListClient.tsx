@@ -1,6 +1,5 @@
 'use client'
 
-import Link from 'next/link'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import type { MultiSelectOption } from '@/components/MultiSelectFilter'
@@ -11,6 +10,7 @@ import { usePreferredLocale } from '@/lib/usePreferredLocale'
 
 import { ProgressHeader } from '../ProgressHeader'
 import { ProgressSectionNav } from '../ProgressSectionNav'
+import { QuantitiesDetailModal } from './QuantitiesDetailModal'
 
 type Props = {
   rows: PhaseIntervalManagementRow[]
@@ -121,6 +121,9 @@ const sideSortWeight: Record<string, number> = {
 
 export default function QuantitiesListClient({ rows }: Props) {
   const { locale, setLocale } = usePreferredLocale('zh', locales)
+  const [detailOpen, setDetailOpen] = useState(false)
+  const [detailPhaseId, setDetailPhaseId] = useState<number | null>(null)
+  const [detailIntervalId, setDetailIntervalId] = useState<number | null>(null)
   const [selectedProjects, setSelectedProjects] = useState<string[]>([])
   const [selectedRoads, setSelectedRoads] = useState<string[]>([])
   const [selectedPhases, setSelectedPhases] = useState<string[]>([])
@@ -426,6 +429,12 @@ export default function QuantitiesListClient({ rows }: Props) {
   }, [])
 
   const columnCount = visibleColumns.length + 1
+
+  const openDetail = (phaseId: number, intervalId: number) => {
+    setDetailPhaseId(phaseId)
+    setDetailIntervalId(intervalId)
+    setDetailOpen(true)
+  }
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900">
@@ -770,14 +779,13 @@ export default function QuantitiesListClient({ rows }: Props) {
                             </td>
                           ) : null}
                           <td className="px-4 py-3 text-right whitespace-nowrap">
-                            <Link
-                              href={`/progress/quantities/${row.phaseId}?intervalId=${row.intervalId}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
+                            <button
+                              type="button"
+                              onClick={() => openDetail(row.phaseId, row.intervalId)}
                               className="inline-flex items-center whitespace-nowrap rounded-full border border-emerald-200 bg-emerald-50 px-4 py-1 text-xs font-semibold text-emerald-700 transition hover:border-emerald-300 hover:bg-emerald-100"
                             >
                               进入详情
-                            </Link>
+                            </button>
                           </td>
                         </tr>
                       )
@@ -789,6 +797,12 @@ export default function QuantitiesListClient({ rows }: Props) {
           </div>
         </section>
       </div>
+      <QuantitiesDetailModal
+        open={detailOpen}
+        phaseId={detailPhaseId}
+        intervalId={detailIntervalId}
+        onClose={() => setDetailOpen(false)}
+      />
     </main>
   )
 }
