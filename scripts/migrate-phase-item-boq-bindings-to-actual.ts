@@ -73,7 +73,7 @@ const pickActualItem = (
   if (fallback && fallback.length) {
     return { item: fallback[0], multiple: fallback.length > 1, source: 'code' as const }
   }
-  return { item: null, multiple: false, source: null as const }
+  return { item: null, multiple: false, source: null }
 }
 
 const main = async () => {

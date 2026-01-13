@@ -17,6 +17,7 @@ import type {
   PhaseItemInputDTO,
   PhaseIntervalDTO,
   PhaseIntervalManagementRow,
+  IntervalBoundPhaseItemDTO,
   RoadPhaseQuantityDetailDTO,
 } from '@/lib/phaseItemTypes'
 
@@ -372,6 +373,7 @@ export const listPhaseIntervalManagementRows = async (): Promise<PhaseIntervalMa
         intervalId: interval.id,
         phaseId: phase.id,
         phaseName: phase.name,
+        spec: interval.spec ?? null,
         measure: phase.measure,
         roadId: phase.road.id,
         roadName: phase.road.name,
@@ -392,6 +394,156 @@ export const listPhaseIntervalManagementRows = async (): Promise<PhaseIntervalMa
   })
 
   return rows
+}
+
+export const listIntervalBoundPhaseItems = async (
+  intervalId: number,
+): Promise<IntervalBoundPhaseItemDTO[]> => {
+  if (!Number.isInteger(intervalId) || intervalId <= 0) {
+    throw new Error('区间无效')
+  }
+
+  const inputs = await prisma.phaseItemInput.findMany({
+    where: { intervalId },
+    orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
+    select: {
+      id: true,
+      intervalId: true,
+      phaseItemId: true,
+      manualQuantity: true,
+      computedQuantity: true,
+      updatedAt: true,
+      interval: { select: { spec: true } },
+      phaseItem: {
+        select: {
+          name: true,
+          spec: true,
+          boqLinks: {
+            where: { isActive: true },
+            orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
+            select: {
+              boqItem: {
+                select: {
+                  id: true,
+                  code: true,
+                  unit: true,
+                  sheetType: true,
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  })
+
+  return inputs.map((input) => {
+    const actualLink = input.phaseItem.boqLinks.find((link) => link.boqItem.sheetType === 'ACTUAL')
+    const fallbackLink = input.phaseItem.boqLinks[0]
+    const boqItem = (actualLink ?? fallbackLink)?.boqItem ?? null
+    const manualQuantity = toOptionalNumber(input.manualQuantity)
+    const computedQuantity = toOptionalNumber(input.computedQuantity)
+    const effectiveQuantity = manualQuantity ?? computedQuantity
+    return {
+      inputId: input.id,
+      intervalId: input.intervalId,
+      intervalSpec: input.interval.spec ?? null,
+      phaseItemId: input.phaseItemId,
+      phaseItemName: input.phaseItem.name,
+      phaseItemSpec: input.phaseItem.spec ?? null,
+      manualQuantity,
+      computedQuantity,
+      effectiveQuantity,
+      unit: boqItem?.unit ?? null,
+      boqItemId: boqItem?.id ?? null,
+      boqCode: boqItem?.code ?? null,
+      updatedAt: input.updatedAt.toISOString(),
+    }
+  })
+}
+
+export const listIntervalsBoundPhaseItems = async (
+  intervalIds: number[],
+): Promise<Map<number, IntervalBoundPhaseItemDTO[]>> => {
+  const ids = Array.from(
+    new Set(
+      intervalIds
+        .map((id) => Number(id))
+        .filter((id) => Number.isInteger(id) && id > 0),
+    ),
+  )
+  if (!ids.length) return new Map()
+
+  const inputs = await prisma.phaseItemInput.findMany({
+    where: { intervalId: { in: ids } },
+    orderBy: [{ intervalId: 'asc' }, { updatedAt: 'desc' }, { id: 'desc' }],
+    select: {
+      id: true,
+      intervalId: true,
+      phaseItemId: true,
+      manualQuantity: true,
+      computedQuantity: true,
+      updatedAt: true,
+      interval: { select: { spec: true } },
+      phaseItem: {
+        select: {
+          name: true,
+          spec: true,
+          boqLinks: {
+            where: { isActive: true },
+            orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
+            select: {
+              boqItem: {
+                select: {
+                  id: true,
+                  code: true,
+                  unit: true,
+                  sheetType: true,
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  })
+
+  const map = new Map<number, IntervalBoundPhaseItemDTO[]>()
+  inputs.forEach((input) => {
+    const actualLink = input.phaseItem.boqLinks.find((link) => link.boqItem.sheetType === 'ACTUAL')
+    const fallbackLink = input.phaseItem.boqLinks[0]
+    const boqItem = (actualLink ?? fallbackLink)?.boqItem ?? null
+    const manualQuantity = toOptionalNumber(input.manualQuantity)
+    const computedQuantity = toOptionalNumber(input.computedQuantity)
+    const effectiveQuantity = manualQuantity ?? computedQuantity
+    const dto: IntervalBoundPhaseItemDTO = {
+      inputId: input.id,
+      intervalId: input.intervalId,
+      intervalSpec: input.interval.spec ?? null,
+      phaseItemId: input.phaseItemId,
+      phaseItemName: input.phaseItem.name,
+      phaseItemSpec: input.phaseItem.spec ?? null,
+      manualQuantity,
+      computedQuantity,
+      effectiveQuantity,
+      unit: boqItem?.unit ?? null,
+      boqItemId: boqItem?.id ?? null,
+      boqCode: boqItem?.code ?? null,
+      updatedAt: input.updatedAt.toISOString(),
+    }
+    const list = map.get(input.intervalId) ?? []
+    list.push(dto)
+    map.set(input.intervalId, list)
+  })
+
+  return map
+}
+
+export const deletePhaseItemInput = async (inputId: number) => {
+  if (!Number.isInteger(inputId) || inputId <= 0) {
+    throw new Error('输入记录无效')
+  }
+  await prisma.phaseItemInput.delete({ where: { id: inputId } })
 }
 
 export const getRoadPhaseQuantityDetail = async (

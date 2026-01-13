@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { hasPermission } from '@/lib/server/authSession'
 import { normalizeInputValues } from '@/lib/phaseItemFormula'
 import {
+  deletePhaseItemInput,
   isPhaseItemInputValidationError,
   upsertPhaseItemInput,
 } from '@/lib/server/phaseItemManagement'
@@ -85,5 +86,25 @@ export async function POST(request: Request) {
       return respond(error.message, 400)
     }
     return respond((error as Error).message ?? '保存计量输入失败', 500)
+  }
+}
+
+export async function DELETE(request: Request) {
+  if (!(await hasPermission('progress:edit'))) {
+    return respond('缺少进度编辑权限', 403)
+  }
+
+  const { searchParams } = new URL(request.url)
+  const inputIdParam = searchParams.get('inputId')
+  const inputId = Number(inputIdParam)
+  if (!Number.isInteger(inputId) || inputId <= 0) {
+    return respond('输入记录无效', 400)
+  }
+
+  try {
+    await deletePhaseItemInput(inputId)
+    return NextResponse.json({ ok: true })
+  } catch (error) {
+    return respond((error as Error).message ?? '解绑失败', 500)
   }
 }

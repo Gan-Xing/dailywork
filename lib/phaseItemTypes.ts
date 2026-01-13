@@ -4,6 +4,7 @@ export type PhaseIntervalManagementRow = {
   intervalId: number
   phaseId: number
   phaseName: string
+  spec: string | null
   measure: PhaseMeasure
   roadId: number
   roadName: string
@@ -18,6 +19,22 @@ export type PhaseIntervalManagementRow = {
   rawQuantity: number
   quantityOverridden: boolean
   completedPercent: number
+  updatedAt: string
+}
+
+export type IntervalBoundPhaseItemDTO = {
+  inputId: number
+  intervalId: number
+  intervalSpec: string | null
+  phaseItemId: number
+  phaseItemName: string
+  phaseItemSpec: string | null
+  manualQuantity: number | null
+  computedQuantity: number | null
+  effectiveQuantity: number | null
+  unit: string | null
+  boqItemId: number | null
+  boqCode: string | null
   updatedAt: string
 }
 

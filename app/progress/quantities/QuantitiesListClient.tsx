@@ -1,10 +1,11 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 
 import type { MultiSelectOption } from '@/components/MultiSelectFilter'
 import { MultiSelectFilter } from '@/components/MultiSelectFilter'
-import type { PhaseIntervalManagementRow } from '@/lib/phaseItemTypes'
+import { useToast } from '@/components/ToastProvider'
+import type { IntervalBoundPhaseItemDTO, PhaseIntervalManagementRow } from '@/lib/phaseItemTypes'
 import { locales } from '@/lib/i18n'
 import { usePreferredLocale } from '@/lib/usePreferredLocale'
 
@@ -14,6 +15,7 @@ import { QuantitiesDetailModal } from './QuantitiesDetailModal'
 
 type Props = {
   rows: PhaseIntervalManagementRow[]
+  canEdit: boolean
 }
 
 type SortKey =
@@ -119,11 +121,18 @@ const sideSortWeight: Record<string, number> = {
   BOTH: 3,
 }
 
-export default function QuantitiesListClient({ rows }: Props) {
+export default function QuantitiesListClient({ rows, canEdit }: Props) {
   const { locale, setLocale } = usePreferredLocale('zh', locales)
+  const { addToast } = useToast()
   const [detailOpen, setDetailOpen] = useState(false)
   const [detailPhaseId, setDetailPhaseId] = useState<number | null>(null)
   const [detailIntervalId, setDetailIntervalId] = useState<number | null>(null)
+  const [showAllDetails, setShowAllDetails] = useState(false)
+  const [boundItemsByInterval, setBoundItemsByInterval] = useState<
+    Map<number, IntervalBoundPhaseItemDTO[]>
+  >(() => new Map())
+  const [boundLoading, setBoundLoading] = useState<Set<number>>(() => new Set())
+  const [boundErrors, setBoundErrors] = useState<Map<number, string>>(() => new Map())
   const [selectedProjects, setSelectedProjects] = useState<string[]>([])
   const [selectedRoads, setSelectedRoads] = useState<string[]>([])
   const [selectedPhases, setSelectedPhases] = useState<string[]>([])
@@ -436,6 +445,94 @@ export default function QuantitiesListClient({ rows }: Props) {
     setDetailOpen(true)
   }
 
+  const unbindInput = async (intervalId: number, inputId: number) => {
+    if (!canEdit) return
+    try {
+      const response = await fetch(`/api/progress/quantities/input?inputId=${inputId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      })
+      const payload = (await response.json().catch(() => ({}))) as { message?: string }
+      if (!response.ok) {
+        throw new Error(payload.message ?? '解绑失败')
+      }
+      setBoundItemsByInterval((prev) => {
+        const next = new Map(prev)
+        const current = next.get(intervalId) ?? []
+        next.set(
+          intervalId,
+          current.filter((item) => item.inputId !== inputId),
+        )
+        return next
+      })
+      addToast('已解绑该分项内容', { tone: 'success' })
+    } catch (error) {
+      addToast((error as Error).message ?? '解绑失败', { tone: 'danger' })
+    }
+  }
+
+  const loadBoundItemsBatch = async (intervalIds: number[]) => {
+    const pending = intervalIds.filter((id) => !boundItemsByInterval.has(id) && !boundLoading.has(id))
+    if (!pending.length) return
+    setBoundLoading((prev) => {
+      const next = new Set(prev)
+      pending.forEach((id) => next.add(id))
+      return next
+    })
+    setBoundErrors((prev) => {
+      const next = new Map(prev)
+      pending.forEach((id) => next.delete(id))
+      return next
+    })
+    try {
+      const response = await fetch('/api/progress/quantities/bound-items/batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ intervalIds: pending }),
+      })
+      const payload = (await response.json().catch(() => ({}))) as {
+        itemsByInterval?: Record<string, IntervalBoundPhaseItemDTO[]>
+        message?: string
+      }
+      if (!response.ok) {
+        throw new Error(payload.message ?? '加载绑定明细失败')
+      }
+      const itemsByInterval = payload.itemsByInterval ?? {}
+      setBoundItemsByInterval((prev) => {
+        const next = new Map(prev)
+        Object.entries(itemsByInterval).forEach(([key, items]) => {
+          const id = Number(key)
+          if (Number.isInteger(id) && id > 0) {
+            next.set(id, Array.isArray(items) ? items : [])
+          }
+        })
+        pending.forEach((id) => {
+          if (!next.has(id)) next.set(id, [])
+        })
+        return next
+      })
+    } catch (error) {
+      setBoundErrors((prev) => {
+        const next = new Map(prev)
+        pending.forEach((id) => next.set(id, (error as Error).message ?? '加载失败'))
+        return next
+      })
+    } finally {
+      setBoundLoading((prev) => {
+        const next = new Set(prev)
+        pending.forEach((id) => next.delete(id))
+        return next
+      })
+    }
+  }
+
+  useEffect(() => {
+    if (!showAllDetails) return
+    void loadBoundItemsBatch(sortedRows.map((row) => row.intervalId))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showAllDetails, sortedRows])
+
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900">
       <ProgressHeader
@@ -457,7 +554,15 @@ export default function QuantitiesListClient({ rows }: Props) {
             <span>
               共 {rowsWithMeta.length} 条区间记录，筛选后 {sortedRows.length} 条
             </span>
-            <div className="relative" ref={columnSelectorRef}>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setShowAllDetails((prev) => !prev)}
+                className="inline-flex items-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+              >
+                {showAllDetails ? '收起全部明细' : '展开全部明细'}
+              </button>
+              <div className="relative" ref={columnSelectorRef}>
               <button
                 type="button"
                 className="flex min-w-[140px] items-center justify-between rounded-xl border border-slate-200 px-3 py-2 text-left text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
@@ -501,6 +606,7 @@ export default function QuantitiesListClient({ rows }: Props) {
                   </div>
                 </div>
               ) : null}
+            </div>
             </div>
           </div>
 
@@ -710,84 +816,183 @@ export default function QuantitiesListClient({ rows }: Props) {
                   ) : (
                     sortedRows.map((row) => {
                       const percent = Math.min(100, Math.max(0, row.completedPercent))
+                      const isExpanded = showAllDetails
+                      const boundItems = boundItemsByInterval.get(row.intervalId)
+                      const boundError = boundErrors.get(row.intervalId) ?? null
+                      const isBoundLoading = boundLoading.has(row.intervalId)
                       return (
-                        <tr key={row.intervalId} className="text-slate-700">
-                          {isVisible('project') ? (
-                            <td className="px-4 py-3 text-slate-600">{row.projectLabel}</td>
-                          ) : null}
-                          {isVisible('road') ? (
-                            <td className="px-4 py-3">
-                              <div className="font-semibold text-slate-900">{row.roadName}</div>
-                              <div className="text-xs text-slate-500">{row.roadSlug}</div>
-                            </td>
-                          ) : null}
+                        <Fragment key={row.intervalId}>
+                          <tr className="text-slate-700">
+                            {isVisible('project') ? (
+                              <td className="px-4 py-3 text-slate-600">{row.projectLabel}</td>
+                            ) : null}
+                            {isVisible('road') ? (
+                              <td className="px-4 py-3">
+                                <div className="font-semibold text-slate-900">{row.roadName}</div>
+                                <div className="text-xs text-slate-500">{row.roadSlug}</div>
+                              </td>
+                            ) : null}
                           {isVisible('phase') ? (
-                            <td className="px-4 py-3">{row.phaseName}</td>
-                          ) : null}
-                          {isVisible('startPk') ? (
-                            <td className="px-4 py-3 text-slate-600">
-                              {formatNumber(row.startPk, 3)}
+                            <td className="px-4 py-3">
+                              {row.phaseName}
+                              {row.spec ? `（${row.spec}）` : ''}
                             </td>
                           ) : null}
-                          {isVisible('endPk') ? (
-                            <td className="px-4 py-3 text-slate-600">
-                              {formatNumber(row.endPk, 3)}
-                            </td>
-                          ) : null}
-                          {isVisible('side') ? (
-                            <td className="px-4 py-3 text-slate-600">{row.sideLabel}</td>
-                          ) : null}
-                          {isVisible('quantity') ? (
-                            <td className="px-4 py-3 text-slate-600">
-                              <div className="flex items-center gap-2">
-                                <span>{formatNumber(row.quantity, 3)}</span>
+                            {isVisible('startPk') ? (
+                              <td className="px-4 py-3 text-slate-600">
+                                {formatNumber(row.startPk, 3)}
+                              </td>
+                            ) : null}
+                            {isVisible('endPk') ? (
+                              <td className="px-4 py-3 text-slate-600">
+                                {formatNumber(row.endPk, 3)}
+                              </td>
+                            ) : null}
+                            {isVisible('side') ? (
+                              <td className="px-4 py-3 text-slate-600">{row.sideLabel}</td>
+                            ) : null}
+                            {isVisible('quantity') ? (
+                              <td className="px-4 py-3 text-slate-600">
+                                <div className="flex items-center gap-2">
+                                  <span>{formatNumber(row.quantity, 3)}</span>
+                                  {row.quantityOverridden ? (
+                                    <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
+                                      手动
+                                    </span>
+                                  ) : null}
+                                </div>
                                 {row.quantityOverridden ? (
-                                  <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
-                                    手动
-                                  </span>
+                                  <div className="mt-1 text-[10px] text-slate-400">
+                                    PK差 {formatNumber(row.rawQuantity, 3)}
+                                  </div>
                                 ) : null}
-                              </div>
-                              {row.quantityOverridden ? (
-                                <div className="mt-1 text-[10px] text-slate-400">
-                                  PK差 {formatNumber(row.rawQuantity, 3)}
+                              </td>
+                            ) : null}
+                            {isVisible('display') ? (
+                              <td className="px-4 py-3 text-slate-600">{row.displayLabel}</td>
+                            ) : null}
+                            {isVisible('completed') ? (
+                              <td className="px-4 py-3 text-slate-600">
+                                <div className="flex items-center gap-2">
+                                  <div className="h-1.5 w-20 rounded-full bg-slate-200">
+                                    <div
+                                      className="h-1.5 rounded-full bg-emerald-400"
+                                      style={{ width: `${percent}%` }}
+                                    />
+                                  </div>
+                                  <span>{percent}%</span>
                                 </div>
-                              ) : null}
-                            </td>
-                          ) : null}
-                          {isVisible('display') ? (
-                            <td className="px-4 py-3 text-slate-600">{row.displayLabel}</td>
-                          ) : null}
-                          {isVisible('completed') ? (
-                            <td className="px-4 py-3 text-slate-600">
-                              <div className="flex items-center gap-2">
-                                <div className="h-1.5 w-20 rounded-full bg-slate-200">
-                                  <div
-                                    className="h-1.5 rounded-full bg-emerald-400"
-                                    style={{ width: `${percent}%` }}
-                                  />
-                                </div>
-                                <span>{percent}%</span>
+                              </td>
+                            ) : null}
+                            {isVisible('updatedAt') ? (
+                              <td className="px-4 py-3 text-slate-500">
+                                {new Date(row.updatedAt).toLocaleString('zh-CN', {
+                                  dateStyle: 'medium',
+                                  timeStyle: 'short',
+                                })}
+                              </td>
+                            ) : null}
+                            <td className="px-4 py-3 text-right whitespace-nowrap">
+                              <div className="flex flex-wrap justify-end gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => openDetail(row.phaseId, row.intervalId)}
+                                  className="inline-flex items-center whitespace-nowrap rounded-full border border-emerald-200 bg-emerald-50 px-4 py-1 text-xs font-semibold text-emerald-700 transition hover:border-emerald-300 hover:bg-emerald-100"
+                                >
+                                  进入详情
+                                </button>
                               </div>
                             </td>
+                          </tr>
+                          {isExpanded ? (
+                            <tr className="bg-slate-50/80">
+                              <td colSpan={columnCount} className="px-4 py-4">
+                                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                                  <div className="flex items-center justify-between gap-3">
+                                    <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                      已绑定分项内容
+                                    </div>
+                                    <div className="text-xs text-slate-500">区间 #{row.intervalId}</div>
+                                  </div>
+
+                                  {isBoundLoading ? (
+                                    <div className="mt-3 text-sm text-slate-500">正在加载…</div>
+                                  ) : boundError ? (
+                                    <div className="mt-3 text-sm text-rose-600">{boundError}</div>
+                                  ) : !boundItems || boundItems.length === 0 ? (
+                                    <div className="mt-3 text-sm text-slate-500">暂无绑定明细</div>
+                                  ) : (
+                                    <div className="mt-3 overflow-x-auto">
+                                      <table className="min-w-full text-sm">
+                                        <thead className="bg-slate-50 text-xs uppercase tracking-[0.16em] text-slate-500">
+                                          <tr>
+                                            <th className="px-3 py-2 text-left">分项内容</th>
+                                            <th className="px-3 py-2 text-right">工程量</th>
+                                            <th className="px-3 py-2 text-left">单位</th>
+                                            <th className="px-3 py-2 text-left">清单编号</th>
+                                            <th className="px-3 py-2 text-right">操作</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-200">
+                                          {boundItems.map((item) => {
+                                            const name = `${item.phaseItemName}${item.phaseItemSpec ? `（${item.phaseItemSpec}）` : ''}`
+                                            const intervalSpec = item.intervalSpec ? `【${item.intervalSpec}】` : ''
+                                            const hasManual = item.manualQuantity !== null
+                                            const quantityLabel =
+                                              item.effectiveQuantity === null
+                                                ? '—'
+                                                : formatNumber(item.effectiveQuantity, 3)
+                                            return (
+                                              <tr key={item.inputId} className="text-slate-700">
+                                                <td className="px-3 py-2">
+                                                  <div className="font-semibold text-slate-900">
+                                                    {intervalSpec} {name}
+                                                  </div>
+                                                  <div className="mt-0.5 text-[11px] text-slate-500">
+                                                    inputId {item.inputId} ·{' '}
+                                                    {new Date(item.updatedAt).toLocaleString('zh-CN', {
+                                                      dateStyle: 'medium',
+                                                      timeStyle: 'short',
+                                                    })}
+                                                  </div>
+                                                </td>
+                                                <td className="px-3 py-2 text-right tabular-nums">
+                                                  <div className="flex items-center justify-end gap-2">
+                                                    <span>{quantityLabel}</span>
+                                                    {hasManual ? (
+                                                      <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
+                                                        手动
+                                                      </span>
+                                                    ) : null}
+                                                  </div>
+                                                </td>
+                                                <td className="px-3 py-2 text-slate-600">{item.unit ?? '—'}</td>
+                                                <td className="px-3 py-2 text-slate-600">{item.boqCode ?? '—'}</td>
+                                                <td className="px-3 py-2 text-right">
+                                                  {canEdit ? (
+                                                    <button
+                                                      type="button"
+                                                      onClick={() => unbindInput(row.intervalId, item.inputId)}
+                                                      className="inline-flex items-center rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-700 transition hover:border-rose-300 hover:bg-rose-100"
+                                                    >
+                                                      解绑
+                                                    </button>
+                                                  ) : (
+                                                    <span className="text-xs text-slate-400">无权限</span>
+                                                  )}
+                                                </td>
+                                              </tr>
+                                            )
+                                          })}
+                                        </tbody>
+                                      </table>
+                                    </div>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
                           ) : null}
-                          {isVisible('updatedAt') ? (
-                            <td className="px-4 py-3 text-slate-500">
-                              {new Date(row.updatedAt).toLocaleString('zh-CN', {
-                                dateStyle: 'medium',
-                                timeStyle: 'short',
-                              })}
-                            </td>
-                          ) : null}
-                          <td className="px-4 py-3 text-right whitespace-nowrap">
-                            <button
-                              type="button"
-                              onClick={() => openDetail(row.phaseId, row.intervalId)}
-                              className="inline-flex items-center whitespace-nowrap rounded-full border border-emerald-200 bg-emerald-50 px-4 py-1 text-xs font-semibold text-emerald-700 transition hover:border-emerald-300 hover:bg-emerald-100"
-                            >
-                              进入详情
-                            </button>
-                          </td>
-                        </tr>
+                        </Fragment>
                       )
                     })
                   )}

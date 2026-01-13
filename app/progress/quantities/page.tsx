@@ -10,6 +10,7 @@ export default async function PhaseQuantityListPage() {
   const sessionUser = await getSessionUser()
   const canView =
     !sessionUser || sessionUser?.permissions.includes('progress:view') || false
+  const canEdit = sessionUser?.permissions.includes('progress:edit') || false
 
   if (!canView) {
     return <AccessDenied permissions={['progress:view']} hint="需要进度查看权限" />
@@ -17,5 +18,5 @@ export default async function PhaseQuantityListPage() {
 
   const rows = await listPhaseIntervalManagementRows()
 
-  return <QuantitiesListClient rows={rows} />
+  return <QuantitiesListClient rows={rows} canEdit={canEdit} />
 }
