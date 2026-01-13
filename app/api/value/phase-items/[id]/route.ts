@@ -27,9 +27,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
           where: {
             isActive: true,
             boqItem: {
-              sheetType: 'CONTRACT',
               tone: 'ITEM',
               isActive: true,
+              OR: [{ sheetType: 'CONTRACT' }, { sheetType: 'ACTUAL', contractItemId: null }],
             },
           },
           select: { boqItemId: true },

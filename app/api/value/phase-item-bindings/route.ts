@@ -25,9 +25,9 @@ export async function GET(request: Request) {
         isActive: true,
         boqItem: {
           ...(scope === 'all' ? {} : { projectId }),
-          sheetType: 'CONTRACT',
           tone: 'ITEM',
           isActive: true,
+          OR: [{ sheetType: 'CONTRACT' }, { sheetType: 'ACTUAL', contractItemId: null }],
         },
       },
       select: { phaseItemId: true, boqItemId: true },

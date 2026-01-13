@@ -513,9 +513,9 @@ export const getRoadPhaseQuantityDetail = async (
     ? await prisma.boqItem.findMany({
         where: {
           projectId,
-          sheetType: 'CONTRACT',
           tone: 'ITEM',
           isActive: true,
+          OR: [{ sheetType: 'CONTRACT' }, { sheetType: 'ACTUAL', contractItemId: null }],
         },
         orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
       })
@@ -719,8 +719,9 @@ export const setPhaseItemBoqBinding = async (payload: {
       where: {
         id: payload.boqItemId,
         projectId: payload.projectId,
-        sheetType: 'CONTRACT',
         tone: 'ITEM',
+        isActive: true,
+        OR: [{ sheetType: 'CONTRACT' }, { sheetType: 'ACTUAL', contractItemId: null }],
       },
     })
     if (!record) {
@@ -774,9 +775,9 @@ export const setPhaseItemBoqBindings = async (payload: {
   const records = await prisma.boqItem.findMany({
     where: {
       id: { in: normalizedIds },
-      sheetType: 'CONTRACT',
       tone: 'ITEM',
       isActive: true,
+      OR: [{ sheetType: 'CONTRACT' }, { sheetType: 'ACTUAL', contractItemId: null }],
     },
     select: { id: true, projectId: true },
   })
