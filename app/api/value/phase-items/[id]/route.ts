@@ -29,7 +29,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
             boqItem: {
               tone: 'ITEM',
               isActive: true,
-              OR: [{ sheetType: 'CONTRACT' }, { sheetType: 'ACTUAL', contractItemId: null }],
+              sheetType: 'ACTUAL',
             },
           },
           select: { boqItemId: true },

@@ -515,7 +515,7 @@ export const getRoadPhaseQuantityDetail = async (
           projectId,
           tone: 'ITEM',
           isActive: true,
-          OR: [{ sheetType: 'CONTRACT' }, { sheetType: 'ACTUAL', contractItemId: null }],
+          sheetType: 'ACTUAL',
         },
         orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
       })
@@ -721,7 +721,7 @@ export const setPhaseItemBoqBinding = async (payload: {
         projectId: payload.projectId,
         tone: 'ITEM',
         isActive: true,
-        OR: [{ sheetType: 'CONTRACT' }, { sheetType: 'ACTUAL', contractItemId: null }],
+        sheetType: 'ACTUAL',
       },
     })
     if (!record) {
@@ -777,7 +777,7 @@ export const setPhaseItemBoqBindings = async (payload: {
       id: { in: normalizedIds },
       tone: 'ITEM',
       isActive: true,
-      OR: [{ sheetType: 'CONTRACT' }, { sheetType: 'ACTUAL', contractItemId: null }],
+      sheetType: 'ACTUAL',
     },
     select: { id: true, projectId: true },
   })

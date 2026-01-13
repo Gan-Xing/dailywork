@@ -189,25 +189,17 @@ export default function PhaseItemDetailPage() {
       setBoqItemsStatus('loading')
       setBoqItemsError(null)
       try {
-        const [contractRes, actualRes] = await Promise.all([
-          fetch('/api/value/boq-items?scope=all&sheetType=CONTRACT&tone=ITEM', {
-            credentials: 'include',
-          }),
-          fetch('/api/value/boq-items?scope=all&sheetType=ACTUAL&tone=ITEM', {
-            credentials: 'include',
-          }),
-        ])
-        const [contractPayload, actualPayload] = await Promise.all([
-          contractRes.json().catch(() => ({})),
-          actualRes.json().catch(() => ({})),
-        ]) as Array<{ items?: BoqItemOption[]; message?: string }>
+        const response = await fetch('/api/value/boq-items?scope=all&sheetType=ACTUAL&tone=ITEM', {
+          credentials: 'include',
+        })
+        const payload = (await response.json().catch(() => ({}))) as {
+          items?: BoqItemOption[]
+          message?: string
+        }
 
-        if (!contractRes.ok || !actualRes.ok) {
-          const message =
-            contractRes.status === 403 || actualRes.status === 403
-              ? copy.messages.unauthorized
-              : contractPayload.message ?? actualPayload.message ?? '无法加载清单'
-          if (contractRes.status === 403 || actualRes.status === 403) {
+        if (!response.ok) {
+          const message = response.status === 403 ? copy.messages.unauthorized : payload.message ?? '无法加载清单'
+          if (response.status === 403) {
             setPermissionDenied(true)
           }
           throw new Error(message)
@@ -215,15 +207,10 @@ export default function PhaseItemDetailPage() {
 
         if (cancelled) return
 
-        const contractItems = (contractPayload.items ?? []).filter(
+        const items = (payload.items ?? []).filter(
           (entry) => entry.designationZh || entry.designationFr,
         )
-        const actualCustomItems = (actualPayload.items ?? []).filter(
-          (entry) =>
-            (entry.designationZh || entry.designationFr) && entry.contractItemId === null,
-        )
-        const merged = [...contractItems, ...actualCustomItems]
-        setBoqItems(merged)
+        setBoqItems(items)
         setBoqItemsStatus('success')
       } catch (fetchError) {
         if (cancelled) return
@@ -735,7 +722,7 @@ export default function PhaseItemDetailPage() {
                           <thead className="text-[10px] uppercase tracking-[0.16em] text-slate-400">
                             <tr>
                               <th className="px-2 py-2 font-semibold">名称</th>
-                              <th className="px-2 py-2 font-semibold">合同量</th>
+                              <th className="px-2 py-2 font-semibold">预估工程量</th>
                               <th className="px-2 py-2 font-semibold">单位</th>
                               <th className="px-2 py-2 font-semibold">单价</th>
                             </tr>
