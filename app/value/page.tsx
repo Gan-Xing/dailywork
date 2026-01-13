@@ -35,6 +35,12 @@ type BoqItemRecord = {
   isActive: boolean
 }
 
+type BoqCompletionRecord = {
+  boqItemId: number
+  bindingCount: number
+  completedQuantity: number | null
+}
+
 type FetchStatus = 'idle' | 'loading' | 'success' | 'error'
 
 const formatLocaleId = (locale: Locale) => (locale === 'fr' ? 'fr-FR' : 'zh-CN')
@@ -63,6 +69,27 @@ const formatBoqCell = (
   }
   return trimmed
 }
+
+const parseBoqNumber = (value?: string | number | null) => {
+  if (value === undefined || value === null) return null
+  const trimmed = String(value).trim()
+  if (!trimmed || trimmed === '-') return null
+  const normalized = trimmed.replace(/,/g, '')
+  const parsed = Number(normalized)
+  if (!Number.isFinite(parsed)) return null
+  return parsed
+}
+
+const formatPercent = (value: number | null, localeId: string) => {
+  if (value === null || !Number.isFinite(value)) return '—'
+  const formatter = new Intl.NumberFormat(localeId, { maximumFractionDigits: 2 })
+  return `${formatter.format(value)}%`
+}
+
+const normalizeBoqCode = (value?: string | null) => (value ?? '').trim().toUpperCase()
+const isVatCode = (code: string) => code === 'TVA'
+const isTotalHtvaCode = (code: string) => code.startsWith('TOTAL HTVA')
+const isTotalWithTaxCode = (code: string) => code.startsWith('TOTAL TTC')
 
 const boqRowToneStyles: Record<BoqRowTone, string> = {
   section: 'bg-slate-100/70 text-slate-900 font-semibold',
@@ -136,7 +163,14 @@ const mapBoqTone = (tone: BoqItemRecord['tone']): BoqRowTone => {
   }
 }
 
-type ValueTabKey = 'production' | 'boq'
+type ValueTabKey = 'production' | 'completion' | 'boq'
+
+type CompletionTotals = {
+  completedQuantity: number
+  completedValue: number
+  totalPrice: number
+  itemCount: number
+}
 
 type ValueRow = AggregatedPhaseProgress & {
   designAmount: number
@@ -163,7 +197,8 @@ export default function ProductionValuePage() {
 
   const searchParams = useSearchParams()
   const tabParam = searchParams?.get('tab') ?? null
-  const activeTab: ValueTabKey = tabParam === 'boq' ? 'boq' : 'production'
+  const activeTab: ValueTabKey =
+    tabParam === 'completion' ? 'completion' : tabParam === 'boq' ? 'boq' : 'production'
   const [boqProjects, setBoqProjects] = useState<BoqProject[]>([])
   const [boqProjectsStatus, setBoqProjectsStatus] = useState<FetchStatus>('idle')
   const [boqProjectsError, setBoqProjectsError] = useState<string | null>(null)
@@ -171,9 +206,17 @@ export default function ProductionValuePage() {
   const [boqItems, setBoqItems] = useState<BoqItemRecord[]>([])
   const [boqItemsStatus, setBoqItemsStatus] = useState<FetchStatus>('idle')
   const [boqItemsError, setBoqItemsError] = useState<string | null>(null)
+  const [completionItems, setCompletionItems] = useState<BoqItemRecord[]>([])
+  const [completionStatus, setCompletionStatus] = useState<FetchStatus>('idle')
+  const [completionError, setCompletionError] = useState<string | null>(null)
+  const [completionMap, setCompletionMap] = useState<Map<number, BoqCompletionRecord>>(
+    new Map(),
+  )
   const boqSheetType: BoqSheetType = 'CONTRACT'
   const [boqSearch, setBoqSearch] = useState('')
   const [boqViewMode, setBoqViewMode] = useState<'full' | 'summary'>('full')
+  const [completionSearch, setCompletionSearch] = useState('')
+  const [completionViewMode, setCompletionViewMode] = useState<'full' | 'summary'>('full')
 
   const [rows, setRows] = useState<AggregatedPhaseProgress[]>([])
   const [status, setStatus] = useState<FetchStatus>('idle')
@@ -187,6 +230,7 @@ export default function ProductionValuePage() {
   const priceToastRef = useRef<string | null>(null)
   const boqProjectsToastRef = useRef<string | null>(null)
   const boqItemsToastRef = useRef<string | null>(null)
+  const completionToastRef = useRef<string | null>(null)
 
   const selectedBoqProject = useMemo(() => {
     if (!selectedProjectId) return null
@@ -412,6 +456,60 @@ export default function ProductionValuePage() {
   }, [boqSheetType, productionError, productionUnauthorized, selectedProjectId])
 
   useEffect(() => {
+    if (!selectedProjectId || activeTab !== 'completion') return
+    let cancelled = false
+
+    const loadCompletion = async () => {
+      setCompletionStatus('loading')
+      setCompletionError(null)
+      try {
+        const response = await fetch(
+          `/api/value/boq-completion?projectId=${selectedProjectId}`,
+          { credentials: 'include' },
+        )
+        const payload = (await response
+          .json()
+          .catch(() => ({}))) as {
+          items?: BoqItemRecord[]
+          completion?: BoqCompletionRecord[]
+          message?: string
+        }
+
+        if (!response.ok) {
+          const message =
+            response.status === 403
+              ? productionUnauthorized
+              : payload.message ?? copy.completion.messages.loadError
+          if (response.status === 403) {
+            setPermissionDenied(true)
+          }
+          throw new Error(message)
+        }
+
+        if (cancelled) return
+
+        setCompletionItems(payload.items ?? [])
+        const map = new Map<number, BoqCompletionRecord>()
+        ;(payload.completion ?? []).forEach((entry) => {
+          map.set(entry.boqItemId, entry)
+        })
+        setCompletionMap(map)
+        setCompletionStatus('success')
+      } catch (fetchError) {
+        if (cancelled) return
+        setCompletionStatus('error')
+        setCompletionError((fetchError as Error).message)
+      }
+    }
+
+    loadCompletion()
+
+    return () => {
+      cancelled = true
+    }
+  }, [activeTab, copy.completion.messages.loadError, productionUnauthorized, selectedProjectId])
+
+  useEffect(() => {
     if (permissionDenied) return
     if (status !== 'error') return
     const message = error ?? productionError
@@ -446,6 +544,21 @@ export default function ProductionValuePage() {
     addToast(message, { tone: 'danger' })
     boqItemsToastRef.current = message
   }, [addToast, boqItemsError, boqItemsStatus, permissionDenied, productionError])
+
+  useEffect(() => {
+    if (permissionDenied) return
+    if (completionStatus !== 'error') return
+    const message = completionError ?? copy.completion.messages.loadError
+    if (!message || message === completionToastRef.current) return
+    addToast(message, { tone: 'danger' })
+    completionToastRef.current = message
+  }, [
+    addToast,
+    completionError,
+    completionStatus,
+    copy.completion.messages.loadError,
+    permissionDenied,
+  ])
 
   const priceItemMap = useMemo(() => {
     const map = new Map<string, PhaseItem>()
@@ -513,9 +626,181 @@ export default function ProductionValuePage() {
     })
   }, [boqItems, locale])
 
+  const completionRowData = useMemo(() => {
+    if (!completionItems.length) return []
+    const sorted = [...completionItems].sort(
+      (a, b) => a.sortOrder - b.sortOrder || a.id - b.id,
+    )
+    const baseRows = sorted.map((item, index) => {
+      const designation = locale === 'fr' ? item.designationFr : item.designationZh
+      const searchable = `${item.code} ${designation}`.toLowerCase()
+      const completionRecord = completionMap.get(item.id)
+      const rawCompletedQuantity = completionRecord?.completedQuantity ?? null
+      const completedQuantity =
+        rawCompletedQuantity !== null && Number.isFinite(rawCompletedQuantity)
+          ? rawCompletedQuantity
+          : 0
+      const unitPriceValue = parseBoqNumber(item.unitPrice)
+      const unitPriceMissing = unitPriceValue === null || unitPriceValue === 0
+      const quantityValue = parseBoqNumber(item.quantity)
+      const totalPriceValue =
+        parseBoqNumber(item.totalPrice) ??
+        (item.tone === 'ITEM' && quantityValue !== null && unitPriceValue !== null
+          ? quantityValue * unitPriceValue
+          : null)
+      const completedValue =
+        item.tone === 'ITEM'
+          ? unitPriceMissing
+            ? 0
+            : completedQuantity * (unitPriceValue ?? 0)
+          : null
+      const completedPercent =
+        item.tone === 'ITEM' && totalPriceValue !== null && totalPriceValue > 0
+          ? (completedValue ?? 0) / totalPriceValue * 100
+          : null
+      const completionRisk =
+        item.tone === 'ITEM' && unitPriceMissing && completedQuantity !== 0
+
+      return {
+        index,
+        id: item.id,
+        code: item.code,
+        designation,
+        unit: item.unit,
+        unitPrice: item.unitPrice,
+        quantity: item.quantity,
+        totalPrice: item.totalPrice,
+        tone: mapBoqTone(item.tone),
+        completedQuantity: item.tone === 'ITEM' ? completedQuantity : null,
+        completedValue,
+        completedPercent,
+        totalPriceValue,
+        completionRisk,
+        searchable,
+      }
+    })
+
+    const totalsBySection = new Map<number, CompletionTotals>()
+    const totalsBySubsection = new Map<number, CompletionTotals>()
+    const overallTotals: CompletionTotals = {
+      completedQuantity: 0,
+      completedValue: 0,
+      totalPrice: 0,
+      itemCount: 0,
+    }
+    const sectionIndexByRow: Array<number | null> = []
+    let currentSectionIndex: number | null = null
+    let currentSubsectionIndex: number | null = null
+
+    const addTotals = (target: CompletionTotals, addition: CompletionTotals) => {
+      target.completedQuantity += addition.completedQuantity
+      target.completedValue += addition.completedValue
+      target.totalPrice += addition.totalPrice
+      target.itemCount += addition.itemCount
+    }
+
+    const addToMap = (
+      map: Map<number, CompletionTotals>,
+      key: number,
+      addition: CompletionTotals,
+    ) => {
+      const existing = map.get(key) ?? {
+        completedQuantity: 0,
+        completedValue: 0,
+        totalPrice: 0,
+        itemCount: 0,
+      }
+      addTotals(existing, addition)
+      map.set(key, existing)
+    }
+
+    baseRows.forEach((row, index) => {
+      if (row.tone === 'section') {
+        currentSectionIndex = index
+        currentSubsectionIndex = null
+      } else if (row.tone === 'subsection') {
+        currentSubsectionIndex = index
+      }
+      sectionIndexByRow[index] = currentSectionIndex
+      if (row.tone !== 'item') return
+      const addition: CompletionTotals = {
+        completedQuantity: row.completedQuantity ?? 0,
+        completedValue: row.completedValue ?? 0,
+        totalPrice: row.totalPriceValue ?? 0,
+        itemCount: 1,
+      }
+      addTotals(overallTotals, addition)
+      if (currentSectionIndex !== null) {
+        addToMap(totalsBySection, currentSectionIndex, addition)
+      }
+      if (currentSubsectionIndex !== null) {
+        addToMap(totalsBySubsection, currentSubsectionIndex, addition)
+      }
+    })
+
+    const applyTotals = (
+      row: (typeof baseRows)[number],
+      totals: CompletionTotals | undefined,
+    ) => {
+      if (!totals || totals.itemCount === 0) {
+        return {
+          ...row,
+          completedQuantity: null,
+          completedValue: null,
+          completedPercent: null,
+          completionRisk: false,
+        }
+      }
+      const completedPercent =
+        totals.totalPrice > 0 ? (totals.completedValue / totals.totalPrice) * 100 : null
+      return {
+        ...row,
+        completedQuantity: totals.completedQuantity,
+        completedValue: totals.completedValue,
+        completedPercent,
+        completionRisk: false,
+      }
+    }
+
+    return baseRows.map((row, index) => {
+      if (row.tone === 'subsection') {
+        return applyTotals(row, totalsBySubsection.get(index))
+      }
+      if (row.tone === 'total') {
+        const normalizedCode = normalizeBoqCode(row.code)
+        const useOverall =
+          isVatCode(normalizedCode) ||
+          isTotalHtvaCode(normalizedCode) ||
+          isTotalWithTaxCode(normalizedCode)
+        const sectionIndex = sectionIndexByRow[index]
+        const totals = useOverall
+          ? overallTotals
+          : sectionIndex !== null
+            ? totalsBySection.get(sectionIndex)
+            : overallTotals
+        return applyTotals(row, totals)
+      }
+      if (row.tone === 'section') {
+        return {
+          ...row,
+          completedQuantity: null,
+          completedValue: null,
+          completedPercent: null,
+          completionRisk: false,
+        }
+      }
+      return row
+    })
+  }, [completionItems, completionMap, locale])
+
   const boqSearchTokens = useMemo(
     () => boqSearch.trim().toLowerCase().split(/\s+/).filter(Boolean),
     [boqSearch],
+  )
+
+  const completionSearchTokens = useMemo(
+    () => completionSearch.trim().toLowerCase().split(/\s+/).filter(Boolean),
+    [completionSearch],
   )
 
   const { displayBoqRows, highlightedBoqIndices } = useMemo(() => {
@@ -569,14 +854,78 @@ export default function ProductionValuePage() {
     return { displayBoqRows: displayRows, highlightedBoqIndices: highlightedIndices }
   }, [boqRowData, boqSearchTokens, boqViewMode])
 
+  const { displayCompletionRows, highlightedCompletionIndices } = useMemo(() => {
+    if (!completionRowData.length) {
+      return { displayCompletionRows: [], highlightedCompletionIndices: new Set<number>() }
+    }
+
+    const summaryCodes = new Set([
+      '000',
+      '100',
+      '200',
+      '300',
+      '400',
+      '500',
+      '600',
+      'TOTAL HTVA',
+      'TVA',
+      'TOTAL TTC',
+    ])
+    const baseRows =
+      completionViewMode === 'summary'
+        ? completionRowData.filter(
+            (row) =>
+              summaryCodes.has(normalizeBoqCode(row.code)) &&
+              (row.tone === 'subsection' || row.tone === 'total'),
+          )
+        : completionRowData
+
+    const visibleIndices = new Set<number>()
+    const highlightedIndices = new Set<number>()
+
+    if (completionSearchTokens.length) {
+      baseRows.forEach((row) => {
+        const isMatch = completionSearchTokens.every((token) =>
+          row.searchable.includes(token),
+        )
+        if (!isMatch) return
+        highlightedIndices.add(row.index)
+        visibleIndices.add(row.index)
+        if (completionViewMode !== 'summary') {
+          for (let i = row.index - 1; i >= 0; i -= 1) {
+            if (completionRowData[i]?.tone === 'section') {
+              visibleIndices.add(i)
+              break
+            }
+          }
+        }
+      })
+    } else {
+      baseRows.forEach((row) => visibleIndices.add(row.index))
+    }
+
+    const displayRows = completionRowData.filter((row) => visibleIndices.has(row.index))
+    return { displayCompletionRows: displayRows, highlightedCompletionIndices: highlightedIndices }
+  }, [completionRowData, completionSearchTokens, completionViewMode])
+
   const headers = copy.page.tableHeaders
   const boqHeaders = copy.boq.tableHeaders
-  const tabTitle = activeTab === 'production' ? copy.page.title : copy.boq.title
+  const completionHeaders = copy.completion.tableHeaders
+  const tabTitle =
+    activeTab === 'production'
+      ? copy.page.title
+      : activeTab === 'completion'
+        ? copy.completion.title
+        : copy.boq.title
   const tabDescription =
-    activeTab === 'production' ? copy.page.description : copy.boq.description
-  const tabBadge = activeTab === 'production' ? copy.card.badge : copy.tabs.boq
+    activeTab === 'production'
+      ? copy.page.description
+      : activeTab === 'completion'
+        ? copy.completion.description
+        : copy.boq.description
   const tabItems = [
     { key: 'production', label: copy.tabs.production, href: '/value' },
+    { key: 'completion', label: copy.tabs.completion, href: '/value?tab=completion' },
     { key: 'boq', label: copy.tabs.boq, href: '/value?tab=boq' },
     { key: 'manage', label: copy.tabs.manage, href: '/value/prices' },
   ] as const
@@ -715,6 +1064,219 @@ export default function ProductionValuePage() {
                   </table>
                 </div>
               )}
+            </div>
+          ) : null}
+
+          {activeTab === 'completion' ? (
+            <div className="p-6">
+              <div className="space-y-5">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="space-y-1">
+                    <h2 className="text-lg font-semibold text-slate-900">
+                      {copy.completion.title}
+                    </h2>
+                    <p className="text-sm text-slate-600">{copy.completion.description}</p>
+                  </div>
+                  <div className="flex flex-wrap items-end gap-3">
+                    <label className="text-sm font-semibold text-slate-700">
+                      <span className="mb-1 block">{copy.completion.projectLabel}</span>
+                      <select
+                        className="w-full min-w-[200px] rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+                        value={selectedProjectId}
+                        onChange={(event) => setSelectedProjectId(event.target.value)}
+                      >
+                        {!boqProjects.length ? (
+                          <option value="">{copy.completion.projectPlaceholder}</option>
+                        ) : null}
+                        {boqProjects.map((project) => (
+                          <option key={project.id} value={String(project.id)}>
+                            {resolveProjectLabel(project)}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="text-sm font-semibold text-slate-700">
+                      <span className="mb-1 block">{copy.completion.actions.searchLabel}</span>
+                      <input
+                        type="search"
+                        className="w-full min-w-[220px] rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+                        value={completionSearch}
+                        onChange={(event) => setCompletionSearch(event.target.value)}
+                        placeholder={copy.completion.actions.searchPlaceholder}
+                      />
+                    </label>
+                    <div className="text-sm font-semibold text-slate-700">
+                      <span className="mb-1 block">{copy.completion.actions.viewLabel}</span>
+                      <div className="flex items-center rounded-lg bg-slate-100 p-1">
+                        <button
+                          type="button"
+                          onClick={() => setCompletionViewMode('full')}
+                          className={`rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${
+                            completionViewMode === 'full'
+                              ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-200'
+                              : 'text-slate-500 hover:bg-slate-200/50 hover:text-slate-900'
+                          }`}
+                        >
+                          {copy.completion.actions.viewAll}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setCompletionViewMode('summary')}
+                          className={`rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${
+                            completionViewMode === 'summary'
+                              ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-200'
+                              : 'text-slate-500 hover:bg-slate-200/50 hover:text-slate-900'
+                          }`}
+                        >
+                          {copy.completion.actions.viewSummary}
+                        </button>
+                      </div>
+                    </div>
+                    <Link
+                      href="/value/boq/manage"
+                      className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-semibold text-emerald-700 transition hover:-translate-y-0.5 hover:border-emerald-300 hover:bg-emerald-100"
+                    >
+                      {copy.completion.actions.manageCta}
+                    </Link>
+                  </div>
+                </div>
+
+                <div className="space-y-1 text-xs text-slate-500">
+                  {boqProjectsStatus === 'loading' && (
+                    <p>{copy.completion.messages.projectLoading}</p>
+                  )}
+                  {boqProjectsStatus === 'error' && (
+                    <p className="text-rose-600">
+                      {boqProjectsError ?? copy.completion.messages.loadError}
+                    </p>
+                  )}
+                  {completionStatus === 'loading' && (
+                    <p>{copy.completion.messages.loading}</p>
+                  )}
+                  {completionStatus === 'error' && (
+                    <p className="text-rose-600">
+                      {completionError ?? copy.completion.messages.loadError}
+                    </p>
+                  )}
+                </div>
+
+                {hasBoqHeader ? (
+                  <div className="rounded-2xl border border-slate-200 bg-gradient-to-b from-white to-slate-50 px-6 py-5 text-sm text-slate-700 shadow-sm">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      {headerLeftLine ? (
+                        <p className="text-left text-base font-semibold text-slate-900">
+                          {headerLeftLine}
+                        </p>
+                      ) : null}
+                      {headerRightLine ? (
+                        <p className="text-left text-sm font-medium text-slate-700 sm:text-right sm:text-base">
+                          {headerRightLine}
+                        </p>
+                      ) : null}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/60 p-4 text-sm text-slate-400">
+                    {copy.boq.messages.noHeader}
+                  </div>
+                )}
+
+                {displayCompletionRows.length ? (
+                  <div className="overflow-x-auto rounded-2xl border border-slate-200">
+                    <table className="min-w-full border-collapse text-left text-sm">
+                      <thead className="bg-slate-100/70">
+                        <tr
+                          className={`text-[11px] font-semibold text-slate-500 ${
+                            isFrenchLocale ? 'uppercase tracking-[0.24em]' : 'tracking-[0.12em]'
+                          }`}
+                        >
+                          <th className="w-[10%] px-3 py-3 text-left">
+                            {completionHeaders.code}
+                          </th>
+                          <th className="px-3 py-3 text-left">
+                            {completionHeaders.designation}
+                          </th>
+                          <th className="w-[8%] px-3 py-3 text-left">
+                            {completionHeaders.unit}
+                          </th>
+                          <th className="w-[12%] px-3 py-3 text-right">
+                            {completionHeaders.unitPrice}
+                          </th>
+                          <th className="w-[10%] px-3 py-3 text-right">
+                            {completionHeaders.quantity}
+                          </th>
+                          <th className="w-[12%] px-3 py-3 text-right">
+                            {completionHeaders.totalPrice}
+                          </th>
+                          <th className="w-[12%] px-3 py-3 text-right">
+                            {completionHeaders.completedQuantity}
+                          </th>
+                          <th className="w-[12%] px-3 py-3 text-right">
+                            {completionHeaders.completedValue}
+                          </th>
+                          <th className="w-[10%] px-3 py-3 text-right">
+                            {completionHeaders.percent}
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-200/70">
+                        {displayCompletionRows.map((row) => {
+                          const tone = row.tone ?? 'item'
+                          const isHighlighted = highlightedCompletionIndices.has(row.index)
+                          return (
+                            <tr
+                              key={`${row.code}-${row.index}`}
+                              className={`transition ${
+                                tone === 'item' ? 'hover:bg-slate-50' : ''
+                              } ${boqRowToneStyles[tone]} ${
+                                isHighlighted ? 'bg-amber-50/70' : ''
+                              } ${row.completionRisk ? 'bg-rose-50/80' : ''}`}
+                            >
+                              <td className="whitespace-nowrap px-3 py-3 text-xs tracking-[0.2em]">
+                                {row.code}
+                              </td>
+                              <td className="whitespace-pre-line px-3 py-3 leading-relaxed">
+                                {row.designation}
+                              </td>
+                              <td className="whitespace-nowrap px-3 py-3">
+                                {formatBoqCell(row.unit)}
+                              </td>
+                              <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums">
+                                {formatBoqCell(row.unitPrice, { numeric: true, localeId })}
+                              </td>
+                              <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums">
+                                {formatBoqCell(row.quantity, { numeric: true, localeId })}
+                              </td>
+                              <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums">
+                                {formatBoqCell(row.totalPrice, { numeric: true, localeId })}
+                              </td>
+                              <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums">
+                                {formatBoqCell(row.completedQuantity, {
+                                  numeric: true,
+                                  localeId,
+                                })}
+                              </td>
+                              <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums">
+                                {formatBoqCell(row.completedValue, {
+                                  numeric: true,
+                                  localeId,
+                                })}
+                              </td>
+                              <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums">
+                                {formatPercent(row.completedPercent, localeId)}
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : completionSearchTokens.length ? (
+                  <p className="text-sm text-slate-500">{copy.completion.messages.noMatches}</p>
+                ) : completionStatus === 'success' ? (
+                  <p className="text-sm text-slate-500">{copy.completion.messages.empty}</p>
+                ) : null}
+              </div>
             </div>
           ) : null}
 

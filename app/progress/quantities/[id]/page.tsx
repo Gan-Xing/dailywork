@@ -9,11 +9,21 @@ export const dynamic = 'force-dynamic'
 
 export default async function PhaseQuantityDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>
+  searchParams?: Promise<{ intervalId?: string | string[] }>
 }) {
   const { id } = await params
+  const query = searchParams ? await searchParams : {}
   const phaseId = Number(id)
+  const intervalParam =
+    typeof query.intervalId === 'string'
+      ? query.intervalId
+      : Array.isArray(query.intervalId)
+        ? query.intervalId[0]
+        : undefined
+  const intervalId = intervalParam ? Number(intervalParam) : NaN
   const sessionUser = await getSessionUser()
   const canView =
     !sessionUser || sessionUser?.permissions.includes('progress:view') || false
@@ -32,5 +42,18 @@ export default async function PhaseQuantityDetailPage({
     return <ProgressNotFound />
   }
 
-  return <QuantitiesDetailClient detail={detail} canEdit={canEdit} />
+  const hasInterval =
+    Number.isInteger(intervalId) && intervalId > 0
+      ? detail.intervals.some((interval) => interval.id === intervalId)
+      : false
+
+  const scopedDetail = hasInterval
+    ? {
+        ...detail,
+        intervals: detail.intervals.filter((interval) => interval.id === intervalId),
+        inputs: detail.inputs.filter((input) => input.intervalId === intervalId),
+      }
+    : detail
+
+  return <QuantitiesDetailClient detail={scopedDetail} canEdit={canEdit} />
 }

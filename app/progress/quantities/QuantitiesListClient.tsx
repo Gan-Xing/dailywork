@@ -772,6 +772,8 @@ export default function QuantitiesListClient({ rows }: Props) {
                           <td className="px-4 py-3 text-right whitespace-nowrap">
                             <Link
                               href={`/progress/quantities/${row.phaseId}?intervalId=${row.intervalId}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
                               className="inline-flex items-center whitespace-nowrap rounded-full border border-emerald-200 bg-emerald-50 px-4 py-1 text-xs font-semibold text-emerald-700 transition hover:border-emerald-300 hover:bg-emerald-100"
                             >
                               进入详情

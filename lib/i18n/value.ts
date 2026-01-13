@@ -14,6 +14,7 @@ export type ProductionValueCopy = {
   }
   tabs: {
     production: string
+    completion: string
     boq: string
     manage: string
   }
@@ -71,6 +72,38 @@ export type ProductionValueCopy = {
       noMatches: string
     }
   }
+  completion: {
+    title: string
+    description: string
+    projectLabel: string
+    projectPlaceholder: string
+    actions: {
+      searchLabel: string
+      searchPlaceholder: string
+      viewLabel: string
+      viewAll: string
+      viewSummary: string
+      manageCta: string
+    }
+    tableHeaders: {
+      code: string
+      designation: string
+      unit: string
+      unitPrice: string
+      quantity: string
+      totalPrice: string
+      completedQuantity: string
+      completedValue: string
+      percent: string
+    }
+    messages: {
+      loading: string
+      projectLoading: string
+      loadError: string
+      empty: string
+      noMatches: string
+    }
+  }
 }
 
 export const productionValueCopy: Record<Locale, ProductionValueCopy> = {
@@ -88,6 +121,7 @@ export const productionValueCopy: Record<Locale, ProductionValueCopy> = {
     },
     tabs: {
       production: '产值计量',
+      completion: '产值界面',
       boq: '工程量清单',
       manage: '分项管理'
     },
@@ -144,6 +178,38 @@ export const productionValueCopy: Record<Locale, ProductionValueCopy> = {
         noHeader: '暂无表头信息',
         noMatches: '未找到匹配的工程量清单记录'
       }
+    },
+    completion: {
+      title: '产值界面',
+      description: '基于实际工程量清单汇总已完成产值与占比。',
+      projectLabel: '项目',
+      projectPlaceholder: '选择项目',
+      actions: {
+        searchLabel: '检索',
+        searchPlaceholder: '输入编号或名称…',
+        viewLabel: '视图',
+        viewAll: '全部',
+        viewSummary: '仅汇总',
+        manageCta: '实际工程量清单'
+      },
+      tableHeaders: {
+        code: '编号',
+        designation: '工程内容',
+        unit: '单位',
+        unitPrice: '单价（F CFA）',
+        quantity: '数量',
+        totalPrice: '合价（F CFA）',
+        completedQuantity: '实际完成工程量',
+        completedValue: '完成产值',
+        percent: '完成产值占比'
+      },
+      messages: {
+        loading: '正在加载产值清单…',
+        projectLoading: '正在加载项目列表…',
+        loadError: '产值清单加载失败，请稍后重试',
+        empty: '该项目暂无实际工程量清单记录',
+        noMatches: '未找到匹配的产值记录'
+      }
     }
   },
   fr: {
@@ -160,6 +226,7 @@ export const productionValueCopy: Record<Locale, ProductionValueCopy> = {
     },
     tabs: {
       production: 'Valeurs',
+      completion: 'Valeurs réalisées',
       boq: 'Devis quantitatif',
       manage: 'Postes'
     },
@@ -216,6 +283,38 @@ export const productionValueCopy: Record<Locale, ProductionValueCopy> = {
         empty: 'Aucun devis quantitatif pour ce projet.',
         noHeader: 'En-tête indisponible pour ce projet.',
         noMatches: 'Aucun élément ne correspond à la recherche.'
+      }
+    },
+    completion: {
+      title: 'Valeurs réalisées',
+      description: 'Tableau des quantités réalisées basé sur le devis réel.',
+      projectLabel: 'Projet',
+      projectPlaceholder: 'Sélectionner un projet',
+      actions: {
+        searchLabel: 'Recherche',
+        searchPlaceholder: 'Rechercher par code ou désignation…',
+        viewLabel: 'Vue',
+        viewAll: 'Tout',
+        viewSummary: 'Synthèse',
+        manageCta: 'Devis réel'
+      },
+      tableHeaders: {
+        code: 'N° Prix',
+        designation: 'Désignation',
+        unit: 'Unité',
+        unitPrice: 'Prix unitaire (F CFA)',
+        quantity: 'Quantité',
+        totalPrice: 'Prix total (F CFA)',
+        completedQuantity: 'Quantité réalisée',
+        completedValue: 'Montant réalisé',
+        percent: 'Part réalisée'
+      },
+      messages: {
+        loading: 'Chargement des valeurs réalisées…',
+        projectLoading: 'Chargement des projets…',
+        loadError: 'Impossible de charger les valeurs réalisées',
+        empty: 'Aucune ligne de devis réel pour ce projet',
+        noMatches: 'Aucune ligne correspondante'
       }
     }
   }

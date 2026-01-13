@@ -187,6 +187,7 @@ export default function PhaseDefinitionDetailPage() {
             <div className="flex items-center rounded-lg bg-slate-100 p-1">
               {[
                 { key: 'production', label: tabCopy.tabs.production, href: '/value' },
+                { key: 'completion', label: tabCopy.tabs.completion, href: '/value?tab=completion' },
                 { key: 'boq', label: tabCopy.tabs.boq, href: '/value?tab=boq' },
                 { key: 'manage', label: tabCopy.tabs.manage, href: '/value/prices' },
               ].map((tab) => {

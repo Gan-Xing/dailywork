@@ -175,3 +175,110 @@ export const listBoqMeasurements = async (params: {
     orderBy: [{ period: 'asc' }, { id: 'asc' }],
   })
 }
+
+export type BoqCompletionRecord = {
+  boqItemId: number
+  bindingCount: number
+  completedQuantity: number | null
+}
+
+const toOptionalNumber = (value: Prisma.Decimal | number | null | undefined) => {
+  if (value === null || value === undefined) return null
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+export const listBoqCompletion = async (params: {
+  projectId: number
+  sheetType?: BoqSheetType
+}): Promise<BoqCompletionRecord[]> => {
+  const { projectId, sheetType = 'ACTUAL' } = params
+  const boqItems = await prisma.boqItem.findMany({
+    where: {
+      projectId,
+      sheetType,
+      isActive: true,
+    },
+    orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
+    select: { id: true },
+  })
+
+  if (!boqItems.length) return []
+
+  const sourceIdList = boqItems.map((item) => item.id)
+  if (!sourceIdList.length) {
+    return boqItems.map((item) => ({
+      boqItemId: item.id,
+      bindingCount: 0,
+      completedQuantity: null,
+    }))
+  }
+
+  const bindings = await prisma.phaseItemBoqItem.findMany({
+    where: {
+      boqItemId: { in: sourceIdList },
+      isActive: true,
+      phaseItem: { isActive: true },
+    },
+    select: { boqItemId: true, phaseItemId: true },
+  })
+
+  if (!bindings.length) {
+    return boqItems.map((item) => ({
+      boqItemId: item.id,
+      bindingCount: 0,
+      completedQuantity: null,
+    }))
+  }
+
+  const bindingMap = new Map<number, Set<number>>()
+  bindings.forEach((binding) => {
+    const set = bindingMap.get(binding.boqItemId) ?? new Set<number>()
+    set.add(binding.phaseItemId)
+    bindingMap.set(binding.boqItemId, set)
+  })
+
+  const phaseItemIds = Array.from(
+    new Set(bindings.map((binding) => binding.phaseItemId)),
+  )
+
+  const inputs = await prisma.phaseItemInput.findMany({
+    where: {
+      phaseItemId: { in: phaseItemIds },
+      interval: { phase: { road: { projectId } } },
+    },
+    select: {
+      phaseItemId: true,
+      manualQuantity: true,
+      computedQuantity: true,
+    },
+  })
+
+  const phaseItemTotals = new Map<number, number>()
+  inputs.forEach((input) => {
+    const manual = toOptionalNumber(input.manualQuantity)
+    const computed = toOptionalNumber(input.computedQuantity)
+    const value = manual ?? computed
+    if (value === null) return
+    phaseItemTotals.set(input.phaseItemId, (phaseItemTotals.get(input.phaseItemId) ?? 0) + value)
+  })
+
+  return boqItems.map((item) => {
+    const phaseItemSet = new Set<number>()
+    const bound = bindingMap.get(item.id)
+    if (bound) {
+      bound.forEach((phaseItemId) => phaseItemSet.add(phaseItemId))
+    }
+
+    if (!phaseItemSet.size) {
+      return { boqItemId: item.id, bindingCount: 0, completedQuantity: null }
+    }
+
+    let total = 0
+    phaseItemSet.forEach((phaseItemId) => {
+      total += phaseItemTotals.get(phaseItemId) ?? 0
+    })
+
+    return { boqItemId: item.id, bindingCount: phaseItemSet.size, completedQuantity: total }
+  })
+}
