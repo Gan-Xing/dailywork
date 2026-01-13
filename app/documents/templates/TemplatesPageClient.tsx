@@ -31,20 +31,7 @@ export function TemplatesPageClient({ items, canCreate, canUpdate }: Props) {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-4 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700">
-          <span className="inline-block h-2 w-2 rounded-full bg-emerald-500" />
-          {copy.templates.badge.title}
-          <span className="h-[1px] w-10 bg-emerald-200" />
-          {copy.templates.badge.suffix}
-        </div>
-        <Link
-          href="/documents/submissions"
-          className="rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700 hover:border-slate-300 hover:bg-slate-100"
-        >
-          {copy.templates.backToSubmissions}
-        </Link>
-      </div>
+
 
       <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-md">
         <div className="flex flex-wrap items-center justify-between gap-3">

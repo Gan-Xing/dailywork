@@ -212,12 +212,13 @@ const compareSortValues = (a: string | number | null, b: string | number | null,
 
 type SubmissionsTableProps = {
   rows: SubmissionRow[]
+  canCreate?: boolean
   canUpdate?: boolean
   canDelete?: boolean
   canView?: boolean
 }
 
-export default function SubmissionsTable({ rows, canUpdate = false, canDelete = false, canView = false }: SubmissionsTableProps) {
+export default function SubmissionsTable({ rows, canCreate = false, canUpdate = false, canDelete = false, canView = false }: SubmissionsTableProps) {
   const { locale } = usePreferredLocale('zh', locales)
   const copy = getDocumentsCopy(locale)
   const [selected, setSelected] = useState<number[]>([])
@@ -651,6 +652,14 @@ export default function SubmissionsTable({ rows, canUpdate = false, canDelete = 
           >
             {copy.submissionsTable.bulkActions.delete}
           </button>
+          {canCreate ? (
+            <Link
+              href="/documents/submissions/new"
+              className="rounded-full bg-emerald-500 px-3 py-1 text-[11px] font-semibold text-white shadow-md shadow-emerald-300/30 transition hover:-translate-y-0.5 hover:shadow-emerald-400/40"
+            >
+              {copy.submissions.createSubmission}
+            </Link>
+          ) : null}
         </div>
       </div>
       <div className="overflow-x-auto">

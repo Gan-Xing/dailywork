@@ -540,10 +540,7 @@ export default function SubmissionEditor({ initialSubmission, canManage = false,
     <>
       <div className="space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-4 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700">
-            <span className="inline-block h-2 w-2 rounded-full bg-emerald-500" />
-            {initialSubmission ? copy.submissionEditor.badge.edit : copy.submissionEditor.badge.create}
-          </div>
+
           <div className="flex gap-2 text-xs font-semibold">
             <Link
               href="/documents/submissions"
