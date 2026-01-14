@@ -109,6 +109,8 @@ export async function POST(
           id: true,
           name: true,
           username: true,
+          employmentStatus: true,
+          terminationDate: true,
           expatProfile: {
             select: {
               contractNumber: true,
@@ -177,8 +179,25 @@ export async function POST(
 
   const teamFallback = TEAM_FALLBACK_LABEL
   const teams = new Map<string, { label: string; zh: string; fr: string; items: typeof payouts }>()
+  const resignedItems: typeof payouts = []
+  const resignedGroupKey = 'resigned'
+  const resignedTeamFr = 'DÉMISSIONNAIRES'
+  const resignedTeamZh = '离职人员'
 
   payouts.forEach((payout) => {
+    const amountValue = parseAmount(payout.amount)
+    const terminationDate = payout.user.terminationDate
+    const isResigned =
+      amountValue !== null &&
+      amountValue > 0 &&
+      payout.user.employmentStatus === 'TERMINATED' &&
+      terminationDate &&
+      periodEnd &&
+      terminationDate.getTime() <= periodEnd.getTime()
+    if (isResigned) {
+      resignedItems.push(payout)
+      return
+    }
     const rawTeam = normalizeText(payout.team) || normalizeText(payout.user.expatProfile?.team)
     const teamKey = normalizeTeamKey(rawTeam)
     const teamZh = teamKey ? teamZhByKey.get(teamKey) ?? '' : ''
@@ -196,6 +215,15 @@ export async function POST(
   const sortedTeams = Array.from(teams.values()).sort((left, right) =>
     collator.compare(left.label, right.label),
   )
+
+  if (resignedItems.length > 0) {
+    sortedTeams.push({
+      label: `${resignedTeamZh} / ${resignedTeamFr}`,
+      zh: resignedTeamZh,
+      fr: resignedTeamFr,
+      items: resignedItems,
+    })
+  }
 
   sortedTeams.forEach(({ label, zh, fr, items }) => {
     const sortedItems = [...items].sort((left, right) => {
