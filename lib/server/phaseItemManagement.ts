@@ -251,6 +251,19 @@ export const listPhaseIntervalManagementRows = async (): Promise<PhaseIntervalMa
     }),
   ])
 
+  const intervalIds = phases.flatMap((phase) => phase.intervals.map((interval) => interval.id))
+  const boundCounts = intervalIds.length
+    ? await prisma.phaseItemInput.groupBy({
+        by: ['intervalId'],
+        where: { intervalId: { in: intervalIds } },
+        _count: { intervalId: true },
+      })
+    : []
+  const boundCountByInterval = new Map<number, number>()
+  boundCounts.forEach((entry) => {
+    boundCountByInterval.set(entry.intervalId, entry._count.intervalId ?? 0)
+  })
+
   const phaseProgressMap = new Map<
     number,
     { inspections: { startPk: number; endPk: number; side: IntervalSide }[] }
@@ -388,6 +401,7 @@ export const listPhaseIntervalManagementRows = async (): Promise<PhaseIntervalMa
         rawQuantity,
         quantityOverridden,
         completedPercent,
+        hasBoundItems: (boundCountByInterval.get(interval.id) ?? 0) > 0,
         updatedAt: interval.updatedAt.toISOString(),
       })
     })

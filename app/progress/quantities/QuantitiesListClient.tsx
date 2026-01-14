@@ -49,6 +49,8 @@ type DisplayRow = PhaseIntervalManagementRow & {
   updatedDate: string
   sideLabel: string
   completionBucket: string
+  bindingStatus: 'BOUND' | 'UNBOUND'
+  bindingLabel: string
 }
 
 const NO_PROJECT = '__none__'
@@ -63,6 +65,11 @@ const sideLabels: Record<string, string> = {
   LEFT: '左',
   RIGHT: '右',
   BOTH: '双侧',
+}
+
+const bindingLabels: Record<DisplayRow['bindingStatus'], string> = {
+  BOUND: '已绑定',
+  UNBOUND: '未绑定',
 }
 
 const defaultVisibleColumns: ColumnKey[] = [
@@ -142,6 +149,7 @@ export default function QuantitiesListClient({ rows, canEdit }: Props) {
   const [selectedDisplays, setSelectedDisplays] = useState<string[]>([])
   const [selectedCompletions, setSelectedCompletions] = useState<string[]>([])
   const [selectedDates, setSelectedDates] = useState<string[]>([])
+  const [selectedBindings, setSelectedBindings] = useState<string[]>([])
   const [sortKey, setSortKey] = useState<SortKey>('updatedAt')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
   const [visibleColumns, setVisibleColumns] = useState<ColumnKey[]>(() => defaultVisibleColumns)
@@ -159,6 +167,7 @@ export default function QuantitiesListClient({ rows, canEdit }: Props) {
             : row.projectName
           : '未绑定项目'
         const completedPercent = Math.min(100, Math.max(0, row.completedPercent ?? 0))
+        const bindingStatus = row.hasBoundItems ? 'BOUND' : 'UNBOUND'
         return {
           ...row,
           displayLabel: displayLabels[row.measure] ?? row.measure,
@@ -167,6 +176,8 @@ export default function QuantitiesListClient({ rows, canEdit }: Props) {
           updatedDate: formatUpdatedDate(row.updatedAt),
           sideLabel: sideLabels[row.side] ?? row.side,
           completionBucket: getCompletionBucket(completedPercent),
+          bindingStatus,
+          bindingLabel: bindingLabels[bindingStatus],
         }
       }),
     [rows],
@@ -252,6 +263,16 @@ export default function QuantitiesListClient({ rows, canEdit }: Props) {
       ).sort((a, b) => compareText(a.label, b.label)),
     [rowsWithMeta],
   )
+  const bindingOptions = useMemo(
+    () =>
+      buildOptions(
+        rowsWithMeta.map((row) => ({
+          value: row.bindingStatus,
+          label: row.bindingLabel,
+        })),
+      ).sort((a, b) => compareText(a.label, b.label)),
+    [rowsWithMeta],
+  )
   const updatedOptions = useMemo(
     () =>
       buildOptions(
@@ -299,6 +320,9 @@ export default function QuantitiesListClient({ rows, canEdit }: Props) {
       if (selectedCompletions.length && !selectedCompletions.includes(row.completionBucket)) {
         return false
       }
+      if (selectedBindings.length && !selectedBindings.includes(row.bindingStatus)) {
+        return false
+      }
       if (selectedDates.length && !selectedDates.includes(row.updatedDate)) {
         return false
       }
@@ -314,6 +338,7 @@ export default function QuantitiesListClient({ rows, canEdit }: Props) {
     selectedSides,
     selectedDisplays,
     selectedCompletions,
+    selectedBindings,
     selectedDates,
   ])
 
@@ -666,6 +691,13 @@ export default function QuantitiesListClient({ rows, canEdit }: Props) {
                 options={completionOptions}
                 selected={selectedCompletions}
                 onChange={setSelectedCompletions}
+                {...sharedFilterProps}
+              />
+              <MultiSelectFilter
+                label="绑定状态"
+                options={bindingOptions}
+                selected={selectedBindings}
+                onChange={setSelectedBindings}
                 {...sharedFilterProps}
               />
               <MultiSelectFilter

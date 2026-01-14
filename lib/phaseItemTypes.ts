@@ -19,6 +19,7 @@ export type PhaseIntervalManagementRow = {
   rawQuantity: number
   quantityOverridden: boolean
   completedPercent: number
+  hasBoundItems: boolean
   updatedAt: string
 }
 
