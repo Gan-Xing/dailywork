@@ -199,6 +199,10 @@ export async function POST(
 
   sortedTeams.forEach(({ label, zh, fr, items }) => {
     const sortedItems = [...items].sort((left, right) => {
+      const leftContract = normalizeText(left.user.expatProfile?.contractNumber)
+      const rightContract = normalizeText(right.user.expatProfile?.contractNumber)
+      const contractCompare = collator.compare(leftContract, rightContract)
+      if (contractCompare !== 0) return contractCompare
       const leftName = normalizeText(left.user.name) || normalizeText(left.user.username)
       const rightName = normalizeText(right.user.name) || normalizeText(right.user.username)
       const nameCompare = collator.compare(leftName, rightName)
