@@ -64,6 +64,7 @@ export default function HomePageClient() {
 	const modulePermissions: Record<string, string[]> = useMemo(
 		() => ({
 			'/reports': ['report:view', 'report:edit'],
+			'/leader-logs': ['report:view', 'report:edit'],
 			'/progress': ['progress:view'],
 			'/members': ['member:view'],
 			'/finance': ['finance:view'],

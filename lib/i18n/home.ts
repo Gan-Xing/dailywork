@@ -94,7 +94,7 @@ export const homeCopy: Record<Locale, HomeCopy> = {
       progress: '进度',
       suffix: '。',
       description:
-        '把一线更新、项目里程碑放在同一块操作面板，保持团队节奏一致。当前开放 5 个核心入口（含成员管理、产值计量与财务记账），后续模块可随时接入。',
+        '把一线更新、项目里程碑放在同一块操作面板，保持团队节奏一致。当前开放 7 个核心入口（含负责人日志、成员管理、产值计量与财务记账），后续模块可随时接入。',
       primaryCta: '立即填写日报',
       secondaryCta: '查看项目进度'
     },
@@ -116,6 +116,14 @@ export const homeCopy: Record<Locale, HomeCopy> = {
         description: '快速进入日报录入与日历视图，保持现场信息连续更新。',
         tags: ['创建/编辑', '月历视图', '最近更新'],
         cta: '进入日报'
+      },
+      {
+        title: '负责人日志',
+        href: '/leader-logs',
+        tone: 'from-emerald-300/80 via-teal-300/80 to-sky-300/70',
+        description: '记录施工负责人每日现场日志，支持历史补录与后续 AI 汇总。',
+        tags: ['施工负责人', '原始日志', '每日记录'],
+        cta: '进入负责人日志'
       },
       {
         title: '项目进度',
@@ -153,9 +161,9 @@ export const homeCopy: Record<Locale, HomeCopy> = {
     ],
     stats: {
       entriesLabel: '当前入口',
-      entriesValue: '6',
+      entriesValue: '7',
       recentLabel: '最近更新',
-      recentValue: '新增文档管理（提交单）入口；成员管理、产值计量上线，日报/进度/财务持续维护',
+      recentValue: '新增负责人日志入口；成员管理、产值计量上线，日报/进度/财务持续维护',
       upcomingTitle: '即将推出',
       upcomingBody: '支持更多入口：质量巡检、物资追踪、风险复盘。'
     },
@@ -233,7 +241,7 @@ export const homeCopy: Record<Locale, HomeCopy> = {
       progress: "suivi d'avancement",
       suffix: '.',
       description:
-        'Regroupez les mises à jour terrain et les jalons projet sur le même tableau de bord. Cinq accès clés (dont la gestion des membres, le calcul des valeurs et la comptabilité) sont prêts, les suivants se brancheront facilement.',
+        "Regroupez les mises à jour terrain et les jalons projet sur le même tableau de bord. Sept accès clés (dont le journal du responsable, la gestion des membres, les valeurs et la comptabilité) sont prêts, les suivants se brancheront facilement.",
       primaryCta: 'Remplir un rapport',
       secondaryCta: "Voir l'avancement"
     },
@@ -257,6 +265,15 @@ export const homeCopy: Record<Locale, HomeCopy> = {
           'Accès direct à la saisie, au calendrier et aux derniers rapports pour garder le terrain synchronisé.',
         tags: ['Créer/éditer', 'Vue calendrier', 'Dernières mises à jour'],
         cta: 'Ouvrir le rapport'
+      },
+      {
+        title: 'Journal du responsable',
+        href: '/leader-logs',
+        tone: 'from-emerald-300/80 via-teal-300/80 to-sky-300/70',
+        description:
+          'Saisie quotidienne des responsables de chantier pour alimenter la synthèse IA.',
+        tags: ['Responsables', 'Texte brut', 'Quotidien'],
+        cta: 'Ouvrir les journaux'
       },
       {
         title: 'Avancement du projet',
@@ -296,9 +313,10 @@ export const homeCopy: Record<Locale, HomeCopy> = {
     ],
     stats: {
       entriesLabel: 'Entrées actives',
-      entriesValue: '6',
+      entriesValue: '7',
       recentLabel: 'Mise à jour',
-      recentValue: 'Nouveau hub “Documents” (bordereau) ajouté ; membres et valeurs en ligne, autres modules maintenus',
+      recentValue:
+        'Nouveau journal du responsable ; modules membres/valeurs en ligne, rapports/progrès/finance maintenus',
       upcomingTitle: 'Prochainement',
       upcomingBody: 'Inspection qualité, flux matériaux, revues de risques.'
     },

@@ -238,6 +238,21 @@
 - `team`（EQUIPE）：当时班组快照，可空。
 - `chineseSupervisorId`（RESPONSABLE CHINOIS）：中方负责人 ID，可空。
 - `chineseSupervisorName`：中方负责人快照名（`name + frenchName`），可空。
+
+## 负责人日志（LeaderDailyLog）
+
+- **用途**：记录“施工负责人”每日现场日志（原始文本），作为后续 AI 汇总与模板结构化的原始数据来源。
+- **来源**：负责人列表来自角色 `施工负责人`；班组信息写入正文，不再结构化绑定。
+- **字段**
+     1. `logDate`：日志日期（YYYY-MM-DD），必填。
+     2. `supervisorId`：负责人用户 ID，必填。
+     3. `supervisorName`：负责人姓名快照（`name + frenchName`），必填。
+     4. `contentRaw`：现场日志原文（文本，需写明涉及班组），必填。
+     5. `createdById` / `updatedById`：创建/更新用户 ID，可空。
+     6. `createdAt` / `updatedAt`：创建/更新时间戳。
+- **约束**
+     1. `logDate + supervisorId` 组合唯一，确保每位负责人每天仅一条日志。
+     2. 权限复用 `report:view` / `report:edit`，但保存时需后端校验本人或 Admin。
 - `payoutDate`：发放日期。
 - `amount`：发放金额。
 - `currency`：币种（默认 `XOF`）。
