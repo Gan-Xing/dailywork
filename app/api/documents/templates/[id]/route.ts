@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 
-import { TemplateStatus } from '@prisma/client'
+import { DocumentType, TemplateStatus } from '@prisma/client'
 
 import { getSessionUser, hasPermission } from '@/lib/server/authSession'
 import { archiveTemplate, deleteTemplate, getTemplate, updateTemplate } from '@/lib/server/templateStore'
@@ -32,7 +32,14 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   if (!id) {
     return NextResponse.json({ message: 'id 必填' }, { status: 400 })
   }
-  let payload: { name?: string; html?: string; status?: TemplateStatus; language?: string; version?: number }
+  let payload: {
+    name?: string
+    html?: string
+    status?: TemplateStatus
+    language?: string
+    version?: number
+    type?: DocumentType
+  }
   try {
     payload = (await request.json()) as typeof payload
   } catch {

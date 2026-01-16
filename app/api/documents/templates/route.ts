@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 
-import { TemplateStatus } from '@prisma/client'
+import { DocumentType, TemplateStatus } from '@prisma/client'
 
 import { hasPermission, getSessionUser } from '@/lib/server/authSession'
 import { archiveTemplate, createTemplate, listTemplates } from '@/lib/server/templateStore'
@@ -25,7 +25,14 @@ export async function POST(request: Request) {
   if (!(await hasPermission('template:create'))) {
     return NextResponse.json({ message: '缺少模板新增权限' }, { status: 403 })
   }
-  let payload: { name?: string; html?: string; status?: TemplateStatus; language?: string; version?: number }
+  let payload: {
+    name?: string
+    html?: string
+    status?: TemplateStatus
+    language?: string
+    version?: number
+    type?: DocumentType
+  }
   try {
     payload = (await request.json()) as typeof payload
   } catch {
@@ -41,6 +48,7 @@ export async function POST(request: Request) {
       status: payload.status,
       language: payload.language,
       version: payload.version,
+      type: payload.type,
       userId: sessionUser.id,
     })
     return NextResponse.json({ template: tpl })

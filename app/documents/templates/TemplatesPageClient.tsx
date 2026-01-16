@@ -11,6 +11,7 @@ import TemplateActions from './TemplateActions'
 type TemplateItem = {
   id: string
   name: string
+  type?: string | null
   status: string
   version: number
   language?: string | null
@@ -54,8 +55,9 @@ export function TemplatesPageClient({ items, canCreate, canUpdate }: Props) {
         </div>
 
         <div className="mt-6 overflow-hidden rounded-2xl border border-slate-200">
-          <div className="grid grid-cols-6 gap-2 bg-slate-50 px-4 py-3 text-xs font-semibold uppercase tracking-[0.08em] text-slate-600">
+          <div className="grid grid-cols-7 gap-2 bg-slate-50 px-4 py-3 text-xs font-semibold uppercase tracking-[0.08em] text-slate-600">
             <span>{copy.templates.columns.name}</span>
+            <span>{copy.templates.columns.type}</span>
             <span>{copy.templates.columns.status}</span>
             <span>{copy.templates.columns.version}</span>
             <span>{copy.templates.columns.language}</span>
@@ -64,8 +66,11 @@ export function TemplatesPageClient({ items, canCreate, canUpdate }: Props) {
           </div>
           <div className="divide-y divide-slate-100 bg-white">
             {items.map((tpl) => (
-              <div key={tpl.id} className="grid grid-cols-6 items-center gap-2 px-4 py-3 text-sm text-slate-800">
+              <div key={tpl.id} className="grid grid-cols-7 items-center gap-2 px-4 py-3 text-sm text-slate-800">
                 <span className="font-semibold text-slate-900">{formatName(tpl.name)}</span>
+                <span className="text-xs text-slate-600">
+                  {copy.documentType?.[tpl.type ?? ''] ?? tpl.type ?? '-'}
+                </span>
                 <span className="text-xs text-emerald-700">
                   {copy.status.template[tpl.status] ?? tpl.status}
                 </span>

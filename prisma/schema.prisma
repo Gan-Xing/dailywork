@@ -65,6 +65,7 @@ enum DocumentType {
   LETTER
   MINUTES
   SUPPLY_REQUEST
+  DAILY_REPORT
 }
 
 enum TemplateStatus {

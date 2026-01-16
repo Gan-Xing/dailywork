@@ -26,6 +26,7 @@ export default async function TemplatesPage() {
   const templateItems = items.map((tpl) => ({
     id: String(tpl.id),
     name: tpl.name,
+    type: (tpl as { type?: string | null }).type ?? null,
     status: tpl.status,
     version: tpl.version,
     language: tpl.language ?? '',

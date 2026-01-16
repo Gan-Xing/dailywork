@@ -47,6 +47,7 @@ export type DocumentsCopy = {
     document: Record<string, string>
     template: Record<string, string>
   }
+  documentType?: Record<string, string>
   hub: {
     badge: {
       title: string
@@ -470,6 +471,7 @@ export type DocumentsCopy = {
     create: string
     columns: {
       name: string
+      type: string
       status: string
       version: string
       language: string
@@ -500,12 +502,14 @@ export type DocumentsCopy = {
       empty: string
       pathTemplate: string
     }
+    typeLabel: string
   }
   templateEditForm: {
     title: string
     saved: string
     fields: {
       name: string
+      type: string
       status: string
       version: string
       language: string
@@ -522,6 +526,7 @@ export type DocumentsCopy = {
     saved: string
     fields: {
       name: string
+      type: string
       status: string
       version: string
       language: string
@@ -592,6 +597,13 @@ export const documentsCopy: Record<Locale, DocumentsCopy> = {
         PUBLISHED: '已发布',
         ARCHIVED: '归档',
       },
+    },
+    documentType: {
+      SUBMISSION: '提交单',
+      LETTER: '函件',
+      MINUTES: '会议纪要',
+      SUPPLY_REQUEST: '物资申请',
+      DAILY_REPORT: '日报',
     },
     hub: {
       badge: {
@@ -1084,6 +1096,7 @@ export const documentsCopy: Record<Locale, DocumentsCopy> = {
       create: '新建模版',
       columns: {
         name: '名称',
+        type: '类型',
         status: '状态',
         version: '版本',
         language: '语言',
@@ -1114,12 +1127,14 @@ export const documentsCopy: Record<Locale, DocumentsCopy> = {
         empty: '暂无占位符，请检查模版内容。',
         pathTemplate: 'path: {path}',
       },
+      typeLabel: '类型：{type}',
     },
     templateEditForm: {
       title: '编辑模版',
       saved: '已保存模版',
       fields: {
         name: '名称',
+        type: '类型',
         status: '状态',
         version: '版本',
         language: '语言',
@@ -1136,6 +1151,7 @@ export const documentsCopy: Record<Locale, DocumentsCopy> = {
       saved: '模版已保存',
       fields: {
         name: '名称',
+        type: '类型',
         status: '状态',
         version: '版本',
         language: '语言',
@@ -1204,6 +1220,13 @@ export const documentsCopy: Record<Locale, DocumentsCopy> = {
         PUBLISHED: 'Publié',
         ARCHIVED: 'Archivé',
       },
+    },
+    documentType: {
+      SUBMISSION: 'Bordereau',
+      LETTER: 'Courrier',
+      MINUTES: 'Compte rendu',
+      SUPPLY_REQUEST: 'Demande matériel',
+      DAILY_REPORT: 'Rapport journalier',
     },
     hub: {
       badge: {
@@ -1696,6 +1719,7 @@ export const documentsCopy: Record<Locale, DocumentsCopy> = {
       create: 'Nouveau modèle',
       columns: {
         name: 'Nom',
+        type: 'Type',
         status: 'Statut',
         version: 'Version',
         language: 'Langue',
@@ -1726,12 +1750,14 @@ export const documentsCopy: Record<Locale, DocumentsCopy> = {
         empty: 'Aucun placeholder, vérifiez le contenu du modèle.',
         pathTemplate: 'chemin : {path}',
       },
+      typeLabel: 'Type : {type}',
     },
     templateEditForm: {
       title: 'Modifier le modèle',
       saved: 'Modèle enregistré',
       fields: {
         name: 'Nom',
+        type: 'Type',
         status: 'Statut',
         version: 'Version',
         language: 'Langue',
@@ -1748,6 +1774,7 @@ export const documentsCopy: Record<Locale, DocumentsCopy> = {
       saved: 'Modèle enregistré',
       fields: {
         name: 'Nom',
+        type: 'Type',
         status: 'Statut',
         version: 'Version',
         language: 'Langue',

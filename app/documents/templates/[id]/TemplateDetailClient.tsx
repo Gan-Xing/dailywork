@@ -11,6 +11,7 @@ type Placeholder = { key: string; path?: string }
 type TemplateDetail = {
   id: string
   name: string
+  type?: string | null
   status: string
   version: number
   language?: string | null
@@ -27,10 +28,10 @@ type Props = {
 export function TemplateDetailClient({ template, source, showEditForm }: Props) {
   const { locale } = usePreferredLocale('zh', locales)
   const copy = getDocumentsCopy(locale)
-  const breadcrumbLabel = template.name || copy.breadcrumbs.templateDetailFallback
   const statusLabel = copy.status.template[template.status] ?? template.status
   const sourceLabel =
     source === 'file' ? copy.templateDetail.source.file : copy.templateDetail.source.database
+  const typeLabel = copy.documentType?.[template.type ?? ''] ?? template.type ?? '-'
   const statusText = formatCopy(copy.templateDetail.statusTemplate, {
     status: statusLabel,
     version: template.version,
@@ -41,6 +42,12 @@ export function TemplateDetailClient({ template, source, showEditForm }: Props) 
     count: placeholders.length,
   })
 
+  // Edit Mode: Show the new unified editor
+  if (showEditForm) {
+    return <TemplateEditForm template={template} placeholders={placeholders} />
+  }
+
+  // Read-Only Mode: Show the existing Preview layout
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -76,6 +83,9 @@ export function TemplateDetailClient({ template, source, showEditForm }: Props) 
               {placeholderCount}
             </span>
           </div>
+          <p className="mt-3 text-xs text-slate-600">
+            {formatCopy(copy.templateDetail.typeLabel, { type: typeLabel })}
+          </p>
           <div className="mt-3 space-y-2 text-xs text-slate-800">
             {placeholders.length ? (
               placeholders.map((ph) => (
@@ -94,12 +104,6 @@ export function TemplateDetailClient({ template, source, showEditForm }: Props) 
           </div>
         </div>
       </div>
-
-      {showEditForm ? (
-        <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-md">
-          <TemplateEditForm template={template} />
-        </div>
-      ) : null}
     </div>
   )
 }

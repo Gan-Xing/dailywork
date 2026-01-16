@@ -590,7 +590,7 @@
 - 模板来源：现有文件 `/module/bordereau.html` + `/module/bordereau.css`（内容为硬编码值，无 `{{ }}` 占位符），以及旧版 `/module/index.html`（含 `{{ NUMERO }}` 等占位符）。建议以 `/module/bordereau.html` 为源，补充占位符并复制到正式模板目录，同时保留原文件以便回溯。
 
 ### 枚举（计划新增）
-- `DocumentType`：`SUBMISSION` / `LETTER` / `MINUTES` / `SUPPLY_REQUEST`（`LETTER` 已用于函件管理）。
+- `DocumentType`：`SUBMISSION` / `LETTER` / `MINUTES` / `SUPPLY_REQUEST` / `DAILY_REPORT`（`LETTER` 已用于函件管理）。
 - `TemplateStatus`：`DRAFT` / `PUBLISHED` / `ARCHIVED`。
 - `SubmissionStatus`：`DRAFT` / `FINAL` / `ARCHIVED`。
 

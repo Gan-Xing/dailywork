@@ -1,4 +1,4 @@
-import { TemplateStatus } from '@prisma/client'
+import { DocumentType, TemplateStatus } from '@prisma/client'
 
 import { extractPlaceholderKeys } from '@/lib/documents/templateLoader'
 
@@ -23,6 +23,7 @@ type CreateTemplateInput = {
   status?: TemplateStatus
   language?: string
   version?: number
+  type?: DocumentType
   userId?: number | null
 }
 
@@ -36,6 +37,7 @@ export const createTemplate = async (input: CreateTemplateInput) => {
       status: input.status ?? TemplateStatus.DRAFT,
       language: input.language ?? 'fr',
       version: input.version ?? 1,
+      type: input.type ?? DocumentType.SUBMISSION,
       createdById: input.userId ?? undefined,
       updatedById: input.userId ?? undefined,
     },
@@ -48,6 +50,7 @@ type UpdateTemplateInput = {
   status?: TemplateStatus
   language?: string
   version?: number
+  type?: DocumentType
   userId?: number | null
 }
 
@@ -58,6 +61,7 @@ export const updateTemplate = async (id: string, input: UpdateTemplateInput) => 
     status: input.status ?? undefined,
     language: input.language ?? undefined,
     version: input.version ?? undefined,
+    type: input.type ?? undefined,
     updatedById: input.userId ?? undefined,
   }
   if (input.html !== undefined) {
