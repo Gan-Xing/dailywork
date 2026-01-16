@@ -1,0 +1,485 @@
+/* Page Setup */
+@page {
+    size: A3 landscape;
+    margin: 0;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    background-color: #f2f2f2;
+    /* bg-slate-200 equivalent for browser preview */
+    font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-size: 8px;
+    /* Base font size */
+    color: #000000;
+    /* text-slate-700 equivalent */
+    display: flex;
+    justify-content: center;
+}
+
+.page-container {
+    width: 420mm;
+    height: 297mm;
+    background-color: white;
+    border: 1mm solid #000000;
+    overflow: hidden;
+    /* Ensure content fits */
+    display: flex;
+    flex-direction: column;
+}
+
+@media print {
+    body {
+        background-color: white;
+    }
+
+    .page-container {
+        width: 420mm;
+        height: 297mm;
+    }
+}
+
+/* Base Layout Utilities */
+.flex {
+    display: flex;
+}
+
+.flex-col {
+    display: flex;
+    flex-direction: column;
+}
+
+.flex-row {
+    display: flex;
+    flex-direction: row;
+}
+
+.items-center {
+    align-items: center;
+}
+
+.items-stretch {
+    align-items: stretch;
+}
+
+.justify-center {
+    justify-content: center;
+}
+
+.justify-between {
+    justify-content: space-between;
+}
+
+.grow {
+    flex: 1;
+}
+
+.w-full {
+    width: 100%;
+}
+
+.h-full {
+    height: 100%;
+}
+
+.relative {
+    position: relative;
+}
+
+.overflow-hidden {
+    overflow: hidden;
+}
+
+/* Borders & Colors */
+.border-r {
+    border-right: 1px solid #000000;
+}
+
+/* border-slate-300 */
+.border-b {
+    border-bottom: 1px solid #000000;
+}
+
+.border-all {
+    border: 1px solid #000000;
+}
+
+/* border-slate-200 */
+.bg-white {
+    background-color: white;
+}
+
+.bg-gray-50 {
+    background-color: #f2f2f2;
+}
+
+/* bg-slate-50 */
+.text-center {
+    text-align: center;
+}
+
+.text-left {
+    text-align: left;
+}
+
+.text-right {
+    text-align: right;
+}
+
+.font-bold {
+    font-weight: 600;
+}
+
+.uppercase {
+    text-transform: uppercase;
+}
+
+/* Header Section */
+.header-row {
+    height: 50mm;
+    border-bottom: 1px solid #000000;
+}
+
+.header-col-25 {
+    width: 25%;
+    border-right: 1px solid #000000;
+}
+
+.header-row > .header-col-25:first-child {
+    display: grid;
+    grid-template-rows: 1fr 1fr 1fr;
+}
+
+.header-col-50 {
+    width: 50%;
+}
+
+.logo-container {
+    height: 4rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #f2f2f2;
+}
+
+.logo-img {
+    max-height: 3.5rem;
+    width: auto;
+    object-fit: contain;
+}
+
+.ministry-title {
+    font-size: 7px;
+    line-height: 1.25;
+    padding: 2px 4px;
+    text-align: center;
+}
+
+.project-title-box {
+    border-top: 1px solid #000000;
+    padding: 6px 8px;
+    font-size: 7px;
+    line-height: 1.25;
+    display: flex;
+    align-items: center;
+}
+
+/* Stakeholders */
+.stakeholder-row {
+    border-bottom: 1px solid #000000;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.stakeholder-row:last-child {
+    border-bottom: none;
+}
+
+.stakeholder-label {
+    padding-left: 4px;
+    font-size: 8px;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.stakeholder-logo-box {
+    width: 5rem;
+    height: 100%;
+    background-color: #f2f2f2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.stakeholder-img {
+    max-height: 1.5rem;
+    width: auto;
+}
+
+/* Journal Info */
+.journal-title-row {
+    height: 40%;
+    padding: 4px;
+    display: flex;
+    gap: 4px;
+}
+
+.journal-main-title {
+    flex: 1;
+    border: 1px solid #000000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: #000000;
+    /* slate-800 */
+}
+
+.journal-meta-box {
+    width: 22%;
+    border: 1px solid #000000;
+    font-size: 8px;
+    font-weight: 600;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.meta-item {
+    background-color: #f2f2f2;
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.weather-row {
+    height: 60%;
+    padding: 0 4px 4px 4px;
+    display: flex;
+    gap: 4px;
+}
+
+.weather-side-col {
+    width: 22%;
+}
+
+.weather-mention-cell {
+    width: 22%;
+}
+
+.weather-table-container {
+    flex: 1;
+    border: 0;
+    overflow: hidden;
+}
+
+/* Tables Generic */
+table {
+    width: 100%;
+    height: 100%;
+    border: 1px solid #000000;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+
+th,
+td {
+    border: 1px solid #000000;
+    padding: 0;
+    vertical-align: middle;
+}
+
+.table-header {
+    background-color: #f2f2f2;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: #000000;
+    /* slate-500 */
+}
+
+/* Section Titles */
+.section-header {
+    background-color: #f2f2f2;
+    border-bottom: 0;
+    padding: 2px 0;
+    text-align: center;
+    font-size: 9px;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: #000000;
+    /* slate-700 */
+}
+
+/* Vertical Text */
+.vertical-text-cell {
+    background-color: #f2f2f2;
+    text-align: center;
+    vertical-align: middle;
+    width: 20px;
+}
+
+.writing-vertical {
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+    display: inline-block;
+    font-size: 6px;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: #000000;
+}
+
+/* Specific Columns Widths */
+.col-designation {
+    width: 50%;
+}
+
+.col-num {
+    width: 8%;
+}
+
+/* Layout Columns */
+.content-col-25 {
+    width: 25%;
+    border-right: 1px solid #000000;
+}
+
+.content-col-75 {
+    width: 75%;
+}
+
+.content-col-40 {
+    width: 40%;
+    border-right: 1px solid #000000;
+}
+
+.content-col-60 {
+    width: 60%;
+}
+
+/* Avoid double borders where column dividers touch table borders */
+.content-col-25 table {
+    border-right: 0;
+}
+
+.content-col-75 table {
+    border-left: 0;
+}
+
+.content-col-40 table {
+    border-right: 0;
+}
+
+.content-col-60 table {
+    border-left: 0;
+}
+
+/* Remove only the touching cell borders between adjacent tables */
+.content-col-25 table th:last-child,
+.content-col-25 table td:last-child {
+    border-right: 0;
+}
+
+.content-col-40 table th:first-child,
+.content-col-40 table td:first-child {
+    border-left: 0;
+}
+
+.content-col-40 table th:last-child,
+.content-col-40 table td:last-child {
+    border-right: 0;
+}
+
+/* Grid for Observations */
+.obs-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    gap: 8px;
+    height: 100%;
+    padding: 8px;
+}
+
+.obs-box {
+    border: 1px dashed #000000;
+    display: flex;
+    flex-direction: column;
+}
+
+.obs-title {
+    font-weight: 600;
+    text-transform: uppercase;
+    color: #000000;
+    font-size: 8px;
+    margin-bottom: 2px;
+}
+
+.obs-content {
+    flex: 1;
+    border: 0;
+    border-top: 1px solid #000000;
+    padding: 4px;
+    word-wrap: break-word;
+    white-space: pre-wrap;
+}
+
+/* Narratives */
+.narrative-col {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.narrative-list {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 8px 12px;
+}
+
+.narrative-item {
+    flex: 1;
+    border: 1px solid #000000;
+    padding: 4px 12px;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Visa Section */
+.visa-box {
+    flex: 1.5;
+    border: 1px solid #000000;
+    display: flex;
+    flex-direction: column;
+}
+
+.visa-header {
+    border-bottom: 1px solid #000000;
+    padding: 4px;
+    text-align: center;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.visa-content {
+    flex: 1;
+    display: flex;
+}
+
+.visa-half {
+    flex: 1;
+    padding: 8px;
+    text-align: center;
+    font-weight: 600;
+}

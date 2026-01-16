@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Report Preview A3 Landscape</title>
+    <link rel="stylesheet" href="report-prototype.css">
+</head>
+
+<body>
+
+    <div class="page-container">
+        <!-- Header Row -->
+        <div class="header-row flex-row">
+            <!-- Identity (25%) -->
+            <div class="header-col-25 flex-col justify-between">
+                <div class="logo-container">
+                    <img src="../public/meer.png" alt="MEER" class="logo-img">
+                </div>
+                <p class="ministry-title">
+                    MINISTERE DE L'EQUIPEMENT ET DE L'ENTRETIEN ROUTIER (MEER)<br>
+                </p>
+                <div class="project-title-box">
+                    TRAVAUX DE RENFORCEMENT DE LA ROUTE BONDOUKOU - BOUNA Y COMPRIS L'AMENAGEMENT DES TRAVERSEES DE
+                    BOUNA, BONDOUKOU ET AGNIBILEKROU (MARCHE 2024 - 0 - 11 - 00 - 2 - 0560/-330)
+                </div>
+            </div>
+
+            <!-- Stakeholders (25%) -->
+            <div class="header-col-25 flex-col">
+                <div class="stakeholder-row grow">
+                    <div class="stakeholder-label">Maître d'ouvrage délégué</div>
+                    <div class="stakeholder-logo-box">
+                        <img src="../public/ageroute.png" alt="Ageroute" class="stakeholder-img">
+                    </div>
+                </div>
+                <div class="stakeholder-row grow">
+                    <div class="stakeholder-label">Maître d'œuvre</div>
+                    <div class="stakeholder-logo-box">
+                        <img src="../public/bnetd_logo.svg" alt="BNETD" class="stakeholder-img">
+                    </div>
+                </div>
+                <div class="stakeholder-row grow">
+                    <div class="stakeholder-label">Entrepreneur</div>
+                    <div class="stakeholder-logo-box">
+                        <img src="../public/logo_porteo_btp.svg" alt="Porteo" class="stakeholder-img">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Journal Info (50%) -->
+            <div class="header-col-50 flex-col">
+                <div class="journal-title-row">
+                    <div class="journal-main-title">
+                        JOURNAL DE CHANTIER DU MOIS DE — 2026
+                    </div>
+                    <div class="journal-meta-box">
+                        <div class="meta-item">QUA - JDC - F2527</div>
+                        <div class="meta-item">Date : —</div>
+                        <div class="meta-item">Indice : 01</div>
+                    </div>
+                </div>
+                    <div class="weather-row">
+                    <div class="weather-table-container">
+                        <table>
+                            <tbody>
+                                <tr>
+                                    <td style="width: 20%; position: relative; padding: 4px;">
+                                        <span
+                                            style="position: absolute; top: 2px; left: 4px; font-weight: 600;">Objet</span>
+                                        <span style="position: absolute; bottom: 2px; right: 4px;">Période</span>
+                                    </td>
+                                    <td class="text-center font-bold">Relevé à 7h30</td>
+                                    <td class="text-center font-bold">Relevé à 12h30</td>
+                                    <td class="text-center font-bold">Relevé à 17h30</td>
+                                    <td rowspan="3" class="weather-mention-cell" style="vertical-align: top;">
+                                        <div class="flex-col h-full">
+                                            <div class="text-center border-b font-bold p-1">Mention possible</div>
+                                            <div class="flex-col grow justify-center gap-1 p-2 font-bold">
+                                                <span>E = Ensoleillé</span>
+                                                <span>C = Couvert</span>
+                                                <span>B = Brouillard</span>
+                                                <span>P = Pluie</span>
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="text-left font-bold pl-1">Condition météorologique</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                </tr>
+                                <tr>
+                                    <td class="text-left font-bold pl-1">Pluviométrie (mm)</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="weather-side-col flex-col" style="gap: 4px;">
+                        <div class="grow border-all flex-col items-center justify-center p-1"
+                            style="border-style: dashed;">
+                            <div class="font-bold uppercase text-center" style="color: #64748b;">Horaires</div>
+                            <div class="font-bold text-center">—</div>
+                        </div>
+                        <div class="grow border-all flex-col p-1" style="border-style: dashed;">
+                            <div class="font-bold uppercase text-center" style="color: #64748b;">Arrêt exceptionnel
+                            </div>
+                            <div class="grow text-center">—</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Content Sections -->
+        <div class="flex-row grow">
+            <!-- Col 1: Equipment & Material (25%) -->
+            <div class="content-col-25 flex-col bg-white">
+                <!-- Equipment -->
+                <div class="flex-col" style="flex: 2; border-bottom: 1px solid #cbd5e1;">
+                    <div class="section-header">MATÉRIEL SUR LE CHANTIER</div>
+                    <div class="grow overflow-hidden">
+                        <table>
+                            <thead>
+                                <tr class="table-header" style="height: 20px;">
+                                    <th colspan="2">Désignation</th>
+                                    <th>Total</th>
+                                    <th>Marche</th>
+                                    <th>Panne</th>
+                                    <th>Arrêt</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Camion -->
+                                <tr>
+                                    <td rowspan="9" class="vertical-text-cell border-r"><span
+                                            class="writing-vertical">Camion</span></td>
+                                    <td class="pl-1">Camion benne 4x2</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                </tr>
+                                <tr>
+                                    <td class="pl-1">Camion benne 6x4</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                </tr>
+                                <tr>
+                                    <td class="pl-1">Camion benne 8x4</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                </tr>
+                                <tr>
+                                    <td class="pl-1">Camion semi-remorque</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                </tr>
+                                <tr>
+                                    <td class="pl-1">Citerne à eau</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                </tr>
+                                <tr>
+                                    <td class="pl-1">Ravitailleur Go</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                </tr>
+                                <tr>
+                                    <td class="pl-1">Plateau / Hyab</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                </tr>
+                                <tr>
+                                    <td class="pl-1">Porte-chars</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                </tr>
+                                <tr>
+                                    <td class="pl-1">Tracteur routier</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                </tr>
+
+                                <!-- Compacteur -->
+                                <tr>
+                                    <td rowspan="4" class="vertical-text-cell border-r"><span
+                                            class="writing-vertical">Compacteur</span></td>
+                                    <td class="pl-1">Double bille</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                </tr>
+                                <tr>
+                                    <td class="pl-1">Monobille</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                </tr>
+                                <tr>
+                                    <td class="pl-1">Pied de mouton</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                </tr>
+                                <tr>
+                                    <td class="pl-1">Rouleaux à pneu</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                </tr>
+
+                                <!-- Engins -->
+                                <tr>
+                                    <td rowspan="8" class="vertical-text-cell border-r"><span
+                                            class="writing-vertical">Engins</span></td>
+                                    <td class="pl-1">Bulldozers</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                </tr>
+                                <tr>
+                                    <td class="pl-1">Chargeurs</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                </tr>
+                                <tr>
+                                    <td class="pl-1">Tractopelle</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                </tr>
+                                <tr>
+                                    <td class="pl-1">Finisseur</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                </tr>
+                                <tr>
+                                    <td class="pl-1">Niveleuses</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                </tr>
+                                <tr>
+                                    <td class="pl-1">Pelle à chenille</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                </tr>
+                                <tr>
+                                    <td class="pl-1">Recycleuse</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                </tr>
+                                <tr>
+                                    <td class="pl-1">Tracteur agricole</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                </tr>
+
+                                <!-- Total -->
+                                <tr class="table-header" style="height: 24px;">
+                                    <td colspan="2" class="text-right" style="padding-right: 8px;">Total</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Materials -->
+                <div class="flex-col grow">
+                    <div class="section-header">APPROVISIONNEMENT EN MATERIAUX</div>
+                    <div class="grow">
+                        <table>
+                            <thead>
+                                <tr class="table-header" style="height: 20px;">
+                                    <th style="width: 40%;" class="pl-1 text-left">Désignation</th>
+                                    <th>Stock préc.</th>
+                                    <th>Entrée</th>
+                                    <th>Sortie</th>
+                                    <th>Stock</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td class="pl-1">Gasoil (l)</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                </tr>
+                                <tr>
+                                    <td class="pl-1">Essence (l)</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                </tr>
+                                <tr>
+                                    <td class="pl-1">Bitumes (t)</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                </tr>
+                                <tr>
+                                    <td class="pl-1">Ciment (t)</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                </tr>
+                                <tr>
+                                    <td class="pl-1">Fer à béton (t)</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                </tr>
+                                <tr>
+                                    <td class="pl-1">Sable (t)</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Col 2: Rest (75%) -->
+            <div class="content-col-75 flex-col">
+                <!-- Top Half: Personnel + Obs -->
+                <div class="flex-row" style="height: 50%; border-bottom: 1px solid #cbd5e1;">
+                    <!-- Personnel (40%) -->
+                    <div class="content-col-40 flex-col">
+                        <div class="section-header">PERSONNEL SUR LE CHANTIER</div>
+                        <div class="grow">
+                            <table>
+                                <thead>
+                                    <tr class="table-header" style="height: 20px;">
+                                        <th class="pl-1 text-left" style="width: 36%">FONCTION</th>
+                                        <th style="width: 7%">P</th>
+                                        <th style="width: 7%">A</th>
+                                        <th class="pl-1 text-left" style="width: 36%">FONCTION</th>
+                                        <th style="width: 7%">P</th>
+                                        <th style="width: 7%">A</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td class="pl-1">Directeur Projet</td>
+                                        <td class="text-center">—</td>
+                                        <td class="text-center">—</td>
+                                        <td class="pl-1">Chef d'Equipe</td>
+                                        <td class="text-center">—</td>
+                                        <td class="text-center">—</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="pl-1">Dir. Technique</td>
+                                        <td class="text-center">—</td>
+                                        <td class="text-center">—</td>
+                                        <td class="pl-1">Pointeurs</td>
+                                        <td class="text-center">—</td>
+                                        <td class="text-center">—</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="pl-1">Dir. Travaux</td>
+                                        <td class="text-center">—</td>
+                                        <td class="text-center">—</td>
+                                        <td class="pl-1">Conducteurs engins</td>
+                                        <td class="text-center">—</td>
+                                        <td class="text-center">—</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="pl-1">Resp. Admin</td>
+                                        <td class="text-center">—</td>
+                                        <td class="text-center">—</td>
+                                        <td class="pl-1">Chauffeurs camion</td>
+                                        <td class="text-center">—</td>
+                                        <td class="text-center">—</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="pl-1">Ing. Travaux</td>
+                                        <td class="text-center">—</td>
+                                        <td class="text-center">—</td>
+                                        <td class="pl-1">Chauffeurs voiture</td>
+                                        <td class="text-center">—</td>
+                                        <td class="text-center">—</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="pl-1">Cond. Travaux</td>
+                                        <td class="text-center">—</td>
+                                        <td class="text-center">—</td>
+                                        <td class="pl-1">Ouvriers + Man.</td>
+                                        <td class="text-center">—</td>
+                                        <td class="text-center">—</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="pl-1">Resp. Qualité</td>
+                                        <td class="text-center">—</td>
+                                        <td class="text-center">—</td>
+                                        <td class="pl-1">Mécaniciens</td>
+                                        <td class="text-center">—</td>
+                                        <td class="text-center">—</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="pl-1">Resp. Topo</td>
+                                        <td class="text-center">—</td>
+                                        <td class="text-center">—</td>
+                                        <td class="pl-1">Equipe Labo</td>
+                                        <td class="text-center">—</td>
+                                        <td class="text-center">—</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="pl-1">Resp. Labo</td>
+                                        <td class="text-center">—</td>
+                                        <td class="text-center">—</td>
+                                        <td class="pl-1">Equipe Topo</td>
+                                        <td class="text-center">—</td>
+                                        <td class="text-center">—</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="pl-1">Resp. HSE</td>
+                                        <td class="text-center">—</td>
+                                        <td class="text-center">—</td>
+                                        <td class="pl-1">Cuisiniers</td>
+                                        <td class="text-center">—</td>
+                                        <td class="text-center">—</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="pl-1">Agent Admin</td>
+                                        <td class="text-center">—</td>
+                                        <td class="text-center">—</td>
+                                        <td class="pl-1">Sécurité</td>
+                                        <td class="text-center">—</td>
+                                        <td class="text-center">—</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="pl-1">Médecins</td>
+                                        <td class="text-center">—</td>
+                                        <td class="text-center">—</td>
+                                        <td class="pl-1">TOTAL</td>
+                                        <td class="text-center font-bold">—</td>
+                                        <td class="text-center font-bold">—</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="pl-1">Chef Chantier</td>
+                                        <td class="text-center">—</td>
+                                        <td class="text-center">—</td>
+                                        <td class="pl-1">Dont Expatrié</td>
+                                        <td class="text-center">—</td>
+                                        <td class="text-center">—</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <!-- Observations (60%) -->
+                    <div class="content-col-60 flex-col">
+                        <div class="obs-grid">
+                            <div class="obs-box">
+                                <div class="obs-title">Sûreté</div>
+                                <div class="obs-content">RAS</div>
+                            </div>
+                            <div class="obs-box">
+                                <div class="obs-title">Environnement</div>
+                                <div class="obs-content">RAS</div>
+                            </div>
+                            <div class="obs-box">
+                                <div class="obs-title">Constatations</div>
+                                <div class="obs-content">RAS</div>
+                            </div>
+                            <div class="obs-box">
+                                <div class="obs-title">Evènements particuliers</div>
+                                <div class="obs-content">RAS</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Bottom Half: Narratives -->
+                <div class="flex-row grow">
+                    <!-- Travaux Executes (50%) -->
+                    <div class="flex-col" style="width: 50%; border-right: 1px solid #cbd5e1;">
+                        <div class="section-header">TRAVAUX EXECUTES</div>
+                        <div class="narrative-col">
+                            <div class="narrative-list">
+                                <div class="narrative-item">
+                                    <div class="obs-title">Préparation</div>
+                                    <div>RAS</div>
+                                </div>
+                                <div class="narrative-item">
+                                    <div class="obs-title">Terrassement</div>
+                                    <div>RAS</div>
+                                </div>
+                                <div class="narrative-item">
+                                    <div class="obs-title">Chaussée</div>
+                                    <div>RAS</div>
+                                </div>
+                                <div class="narrative-item">
+                                    <div class="obs-title">Assainissement</div>
+                                    <div>RAS</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Controles + Visa (50%) -->
+                    <div class="flex-col" style="width: 50%;">
+                        <div class="section-header">CONTRÔLES</div>
+                        <div class="narrative-col">
+                            <div class="narrative-list">
+                                <div class="narrative-item">
+                                    <div class="obs-title">BE / Topographie</div>
+                                    <div>RAS</div>
+                                </div>
+                                <div class="narrative-item">
+                                    <div class="obs-title">Carrière</div>
+                                    <div>RAS</div>
+                                </div>
+                                <div class="narrative-item">
+                                    <div class="obs-title">Travaux sous-traités</div>
+                                    <div>RAS</div>
+                                </div>
+                                <!-- Visa -->
+                                <div class="visa-box">
+                                    <div class="visa-header">VISA</div>
+                                    <div class="visa-content">
+                                        <div class="visa-half border-r">POUR LA MAITRISE D'OEUVRE</div>
+                                        <div class="visa-half">POUR L'ENTREPRENEUR</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</body>
+
+</html>
