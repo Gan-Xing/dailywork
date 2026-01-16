@@ -4,6 +4,7 @@ export type FileLink = {
   entityId: string
   purpose: string | null
   label: string | null
+  meta?: unknown
 }
 
 export type FileRow = {
@@ -13,6 +14,9 @@ export type FileRow = {
   mimeType: string
   size: number
   storageKey: string
+  previewStorageKey?: string | null
+  previewMimeType?: string | null
+  previewSize?: number | null
   createdAt: string
   createdBy: string
   createdById: number | null

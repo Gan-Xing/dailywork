@@ -1510,7 +1510,7 @@ export const memberCopy: Record<
     listHeading: 'Liste des membres',
     status: {
       ACTIVE: 'Actif',
-      TERMINATED: 'Sorti',
+      TERMINATED: 'Résilié',
       ON_LEAVE: 'En congé',
     },
     table: {

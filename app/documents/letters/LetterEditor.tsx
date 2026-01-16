@@ -228,11 +228,14 @@ export function LetterEditor({ projects, initialLetter, canEdit, canDelete }: Pr
   const handleOpenFile = async (fileId: number) => {
     try {
       const res = await fetch(`/api/files/${fileId}?includeUrl=1`)
-      const payload = (await res.json().catch(() => ({}))) as { file?: { url?: string } }
-      if (!res.ok || !payload.file?.url) {
+      const payload = (await res.json().catch(() => ({}))) as {
+        file?: { url?: string; previewUrl?: string }
+      }
+      const targetUrl = payload.file?.previewUrl || payload.file?.url
+      if (!res.ok || !targetUrl) {
         throw new Error(copy.letters.messages.loadError)
       }
-      window.open(payload.file.url, '_blank', 'noopener,noreferrer')
+      window.open(targetUrl, '_blank', 'noopener,noreferrer')
     } catch (error) {
       addToast((error as Error).message, { tone: 'danger' })
     }

@@ -244,6 +244,8 @@ export type DocumentsCopy = {
       upload: string
       uploading: string
       reset: string
+      cameraAction: string
+      albumAction: string
       entityTypes: Record<string, string>
       purposes: Record<string, string>
       purposePlaceholder: string
@@ -296,6 +298,11 @@ export type DocumentsCopy = {
     editDialog: {
       title: string
       nameLabel: string
+      linksTitle: string
+      linksEmpty: string
+      addLinkTitle: string
+      addLinkAction: string
+      removeLinkAction: string
       save: string
       saving: string
       cancel: string
@@ -317,6 +324,8 @@ export type DocumentsCopy = {
       missingCategory: string
       missingFile: string
       invalidLink: string
+      boqItemSearchHint: string
+      boqItemLoadFailed: string
     }
   }
   submissionEditor: {
@@ -829,10 +838,13 @@ export const documentsCopy: Record<Locale, DocumentsCopy> = {
         upload: '开始上传',
         uploading: '上传中...',
         reset: '清空',
+        cameraAction: '拍照',
+        albumAction: '从相册选择',
         entityTypes: {
           user: '项目成员 (User)',
           inspection: '报检单 (Inspection)',
           submission: '提交单 (Submission)',
+          'actual-boq-item': '工程内容',
           other: '其他 (Other)',
         },
         purposes: {
@@ -890,6 +902,11 @@ export const documentsCopy: Record<Locale, DocumentsCopy> = {
       editDialog: {
         title: '编辑文件',
         nameLabel: '文件名',
+        linksTitle: '已绑定关系',
+        linksEmpty: '暂无绑定',
+        addLinkTitle: '新增绑定',
+        addLinkAction: '添加绑定',
+        removeLinkAction: '解绑',
         cancel: '取消',
         save: '保存',
         saving: '保存中...',
@@ -910,6 +927,7 @@ export const documentsCopy: Record<Locale, DocumentsCopy> = {
         'attendance-sheet': '签到表',
         'letter-receipt': '函件签收件',
         'face-photo': '人脸照片',
+        'site-photo': '现场照片',
         attachment: '附件',
         other: '其他',
       },
@@ -920,6 +938,8 @@ export const documentsCopy: Record<Locale, DocumentsCopy> = {
         missingCategory: '请选择文件分类',
         missingFile: '请选择文件',
         invalidLink: '对象类型与对象 ID 必须同时填写',
+        boqItemSearchHint: '输入关键词搜索工程内容',
+        boqItemLoadFailed: '工程内容加载失败',
       },
     },
     submissionEditor: {
@@ -1430,10 +1450,13 @@ export const documentsCopy: Record<Locale, DocumentsCopy> = {
         upload: 'Téléverser',
         uploading: 'Téléversement...',
         reset: 'Réinitialiser',
+        cameraAction: 'Prendre une photo',
+        albumAction: 'Choisir depuis l’album',
         entityTypes: {
           user: 'Membre (User)',
           inspection: 'Inspection',
           submission: 'Bordereau (Submission)',
+          'actual-boq-item': 'BoqItem',
           other: 'Autre',
         },
         purposes: {
@@ -1491,6 +1514,11 @@ export const documentsCopy: Record<Locale, DocumentsCopy> = {
       editDialog: {
         title: 'Éditer le fichier',
         nameLabel: 'Nom du fichier',
+        linksTitle: 'Liens existants',
+        linksEmpty: 'Aucun lien',
+        addLinkTitle: 'Ajouter un lien',
+        addLinkAction: 'Ajouter',
+        removeLinkAction: 'Détacher',
         cancel: 'Annuler',
         save: 'Enregistrer',
         saving: 'Enregistrement...',
@@ -1511,6 +1539,7 @@ export const documentsCopy: Record<Locale, DocumentsCopy> = {
         'attendance-sheet': 'Feuille de présence',
         'letter-receipt': 'Réception de courrier',
         'face-photo': 'Photo visage',
+        'site-photo': 'Photo de chantier',
         attachment: 'Pièce jointe',
         other: 'Autre',
       },
@@ -1521,6 +1550,8 @@ export const documentsCopy: Record<Locale, DocumentsCopy> = {
         missingCategory: 'Veuillez choisir une catégorie',
         missingFile: 'Veuillez choisir un fichier',
         invalidLink: 'Type et ID doivent être renseignés ensemble',
+        boqItemSearchHint: 'Saisissez un mot-clé pour rechercher',
+        boqItemLoadFailed: 'Chargement des BoqItem impossible',
       },
     },
     submissionEditor: {

@@ -119,14 +119,14 @@ const boqProjectMeta: Record<string, BoqProjectMeta> = {
   'project-bondoukou-border': {
     label: { zh: '邦杜库边境路项目', fr: 'Route frontaliere de Bondoukou' },
   },
-  'project-danda-city': {
-    label: { zh: '丹达市政路', fr: 'Voiries de Danda' },
+  'project-tanda-city': {
+    label: { zh: '丹达市政路', fr: 'Voiries de Tanda' },
   },
 }
 
 const allowedBoqProjectCodes = [
   'project-bondoukou-city',
-  'project-danda-city',
+  'project-tanda-city',
   'project-bondoukou-border',
 ]
 const allowedBoqProjectNames = new Set([
@@ -136,7 +136,7 @@ const allowedBoqProjectNames = new Set([
 ])
 const allowedBoqProjectOrder = new Map([
   ['project-bondoukou-city', 0],
-  ['project-danda-city', 1],
+  ['project-tanda-city', 1],
   ['project-bondoukou-border', 2],
   ['邦杜库市政路项目', 0],
   ['丹达市政路项目', 1],

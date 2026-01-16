@@ -45,6 +45,15 @@ export const buildFileStorageKey = (category: string, originalName: string) => {
   return `files/${safeCategory}/${timestamp}-${randomUUID()}-${safeName}`
 }
 
+export const buildFilePreviewStorageKey = (category: string, originalName: string) => {
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
+  const normalizedName = originalName.trim().replace(/\s+/g, '-').replace(/[^a-zA-Z0-9._-]/g, '')
+  const safeName = normalizedName.length ? normalizedName : 'preview'
+  const normalizedCategory = category.trim().replace(/[^a-zA-Z0-9._-]/g, '')
+  const safeCategory = normalizedCategory.length ? normalizedCategory : 'other'
+  return `files/${safeCategory}/previews/${timestamp}-${randomUUID()}-${safeName}`
+}
+
 const hashSha256 = (payload: string) => createHash('sha256').update(payload).digest('hex')
 const hmacSha256 = (key: Buffer | string, payload: string) => createHmac('sha256', key).update(payload).digest()
 
@@ -172,5 +181,36 @@ export const deleteObject = async (storageKey: string) => {
   if (!res.ok && res.status !== 404) {
     const body = await res.text()
     throw new Error(`R2 delete failed: ${res.status} ${res.statusText} ${body}`)
+  }
+}
+
+export const downloadObjectBuffer = async (storageKey: string): Promise<Buffer> => {
+  const url = createPresignedUrl({ method: 'GET', storageKey, expiresInSeconds: 600 })
+  const res = await fetch(url)
+  if (!res.ok) {
+    const body = await res.text().catch(() => '')
+    throw new Error(`R2 download failed: ${res.status} ${res.statusText} ${body}`)
+  }
+  const arrayBuffer = await res.arrayBuffer()
+  return Buffer.from(arrayBuffer) as Buffer
+}
+
+export const uploadObjectBuffer = async (
+  storageKey: string,
+  body: Uint8Array,
+  contentType: string,
+) => {
+  const payload = new Uint8Array(body.buffer as ArrayBuffer, body.byteOffset, body.byteLength)
+  const url = createPresignedUrl({ method: 'PUT', storageKey, expiresInSeconds: 600 })
+  const res = await fetch(url, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': contentType,
+    },
+    body: payload,
+  })
+  if (!res.ok) {
+    const text = await res.text().catch(() => '')
+    throw new Error(`R2 upload failed: ${res.status} ${res.statusText} ${text}`)
   }
 }

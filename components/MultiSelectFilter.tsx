@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 export type MultiSelectOption = {
   value: string
@@ -20,6 +20,8 @@ type Props = {
   searchPlaceholder?: string
   noOptionsLabel?: string
   searchable?: boolean
+  searchValue?: string
+  onSearchChange?: (value: string) => void
   disabled?: boolean
   multiple?: boolean
   variant?: 'filter' | 'form'
@@ -39,14 +41,27 @@ export function MultiSelectFilter({
   searchPlaceholder,
   noOptionsLabel,
   searchable = true,
+  searchValue,
+  onSearchChange,
   disabled = false,
   multiple = true,
   variant = 'filter',
   zIndex = 20,
 }: Props) {
   const [open, setOpen] = useState(false)
-  const [query, setQuery] = useState('')
+  const [internalQuery, setInternalQuery] = useState('')
   const containerRef = useRef<HTMLDivElement | null>(null)
+  const query = searchValue ?? internalQuery
+  const setQuery = useCallback(
+    (value: string) => {
+      if (onSearchChange) {
+        onSearchChange(value)
+      } else {
+        setInternalQuery(value)
+      }
+    },
+    [onSearchChange],
+  )
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -57,7 +72,7 @@ export function MultiSelectFilter({
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
+  }, [setQuery])
 
   const filteredOptions = useMemo(() => {
     if (!searchable || query.trim() === '') return options

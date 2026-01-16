@@ -543,6 +543,9 @@ model FileAsset {
   originalName String
   mimeType     String
   size         Int
+  previewStorageKey String?
+  previewMimeType   String?
+  previewSize       Int?
   checksum     String?
   ownerUserId  Int?
   createdById  Int?

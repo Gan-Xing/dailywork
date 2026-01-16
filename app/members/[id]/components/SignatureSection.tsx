@@ -15,6 +15,7 @@ type SignatureEntry = {
     originalName: string
     mimeType: string
     size: number
+    previewUrl?: string | null
     url: string
   }
 }
@@ -243,7 +244,7 @@ export function SignatureSection({
                 <div className="flex items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={activeSignature.file.url}
+                    src={activeSignature.file.previewUrl || activeSignature.file.url}
                     alt={t.signaturePanel.previewAlt}
                     className="max-h-32 object-contain"
                   />

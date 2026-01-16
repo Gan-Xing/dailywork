@@ -3,7 +3,8 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { FILE_CATEGORIES } from '@/lib/constants/fileCategories'
 import { getSessionUser, hasPermission } from '@/lib/server/authSession'
-import { getR2Config } from '@/lib/server/r2'
+import { deleteObject, getR2Config } from '@/lib/server/r2'
+import { processImageAsset } from '@/lib/server/imageProcessing'
 
 const DEFAULT_PAGE_SIZE = 50
 const MAX_PAGE_SIZE = 200
@@ -89,6 +90,7 @@ export async function GET(request: NextRequest) {
             entityId: true,
             purpose: true,
             label: true,
+            meta: true,
           },
           orderBy: { id: 'desc' },
         },
@@ -106,6 +108,9 @@ export async function GET(request: NextRequest) {
     size: item.size,
     bucket: item.bucket,
     storageKey: item.storageKey,
+    previewStorageKey: item.previewStorageKey ?? null,
+    previewMimeType: item.previewMimeType ?? null,
+    previewSize: item.previewSize ?? null,
     createdAt: item.createdAt.toISOString(),
     updatedAt: item.updatedAt.toISOString(),
     createdBy: item.createdBy,
@@ -204,6 +209,33 @@ export async function POST(request: NextRequest) {
   const validLinks = normalizedLinks as Exclude<(typeof normalizedLinks)[number], null>[]
 
   const { bucket } = getR2Config()
+  let processedName = originalName
+  let processedMimeType = mimeType
+  let processedSize = parsedSize
+  let preview: { storageKey: string; mimeType: string; size: number } | undefined
+
+  try {
+    const processed = await processImageAsset({
+      storageKey,
+      originalName,
+      mimeType,
+      size: parsedSize,
+      category,
+    })
+    if (processed) {
+      processedName = processed.original.originalName
+      processedMimeType = processed.original.mimeType
+      processedSize = processed.original.size
+      preview = processed.preview
+    }
+  } catch (error) {
+    try {
+      await deleteObject(storageKey)
+    } catch (cleanupError) {
+      console.error('[FileAsset Upload] Cleanup failed', cleanupError)
+    }
+    return NextResponse.json({ message: (error as Error).message || '图片处理失败' }, { status: 400 })
+  }
 
   const result = await prisma.$transaction(async (tx) => {
     const file = await tx.fileAsset.create({
@@ -211,9 +243,12 @@ export async function POST(request: NextRequest) {
         category,
         storageKey,
         bucket,
-        originalName,
-        mimeType,
-        size: parsedSize,
+        originalName: processedName,
+        mimeType: processedMimeType,
+        size: processedSize,
+        previewStorageKey: preview?.storageKey ?? null,
+        previewMimeType: preview?.mimeType ?? null,
+        previewSize: preview?.size ?? null,
         checksum: checksum || null,
         ownerUserId: Number.isFinite(ownerUserId) ? ownerUserId : null,
         createdById: sessionUser.id,
@@ -265,6 +300,9 @@ export async function POST(request: NextRequest) {
         size: result.file.size,
         bucket: result.file.bucket,
         storageKey: result.file.storageKey,
+        previewStorageKey: result.file.previewStorageKey ?? null,
+        previewMimeType: result.file.previewMimeType ?? null,
+        previewSize: result.file.previewSize ?? null,
         createdAt: result.file.createdAt.toISOString(),
         updatedAt: result.file.updatedAt.toISOString(),
         createdBy: result.file.createdBy,

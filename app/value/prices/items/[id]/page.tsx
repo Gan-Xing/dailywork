@@ -245,9 +245,9 @@ export default function PhaseItemDetailPage() {
     const rawProjectName = normalizeLabelText(entry.projectName || '')
     const projectCode = entry.projectCode ?? ''
     const isBondoukou = projectCode === 'project-bondoukou-city' || rawProjectName.includes('邦杜库')
-    const isDanda = projectCode === 'project-danda-city' || rawProjectName.includes('丹达')
+    const isTanda = projectCode === 'project-tanda-city' || rawProjectName.includes('丹达')
     if (isBondoukou) return isFrenchLocale ? 'Voiries de Bondoukou' : '邦杜库市政'
-    if (isDanda) return isFrenchLocale ? 'Voiries de Tanda' : '丹达市政'
+    if (isTanda) return isFrenchLocale ? 'Voiries de Tanda' : '丹达市政'
     if (rawProjectName) return rawProjectName
     return isFrenchLocale ? 'Projet sans nom' : '未命名项目'
   }, [isFrenchLocale])

@@ -1,5 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 
+import type { Prisma } from '@prisma/client'
+
 import { FILE_CATEGORIES, type FileCategory } from '@/lib/constants/fileCategories'
 import { prisma } from '@/lib/prisma'
 import { getSessionUser, hasPermission } from '@/lib/server/authSession'
@@ -58,6 +60,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       size: file.size,
       bucket: file.bucket,
       storageKey: file.storageKey,
+      previewStorageKey: file.previewStorageKey ?? null,
+      previewMimeType: file.previewMimeType ?? null,
+      previewSize: file.previewSize ?? null,
       createdAt: file.createdAt.toISOString(),
       updatedAt: file.updatedAt.toISOString(),
       createdBy: file.createdBy,
@@ -79,6 +84,14 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
             expiresInSeconds: FILE_URL_TTL,
           })
         : null,
+      previewUrl:
+        includeUrl && file.previewStorageKey
+          ? createPresignedUrl({
+              method: 'GET',
+              storageKey: file.previewStorageKey,
+              expiresInSeconds: FILE_URL_TTL,
+            })
+          : null,
     },
   })
 }
@@ -117,6 +130,9 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
 
   try {
     await deleteObject(file.storageKey)
+    if (file.previewStorageKey) {
+      await deleteObject(file.previewStorageKey)
+    }
   } catch (error) {
     console.error('[FileAsset Delete] R2 cleanup failed', error)
   }
@@ -142,7 +158,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const body = (await request.json().catch(() => ({}))) as {
     originalName?: string
     category?: string
-    links?: Array<{ entityType: string; entityId: string; purpose?: string; label?: string }>
+    links?: Array<{ entityType: string; entityId: string; purpose?: string; label?: string; meta?: unknown }>
   }
   const originalName = body.originalName?.trim()
   const category = typeof body.category === 'string' ? body.category.trim() : undefined
@@ -187,12 +203,14 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           const eType = link.entityType?.trim()
           const eId = link.entityId?.trim()
           if (!eType || !eId) return null
+          const meta = link.meta === null || link.meta === undefined ? undefined : (link.meta as Prisma.InputJsonValue)
           return {
             fileId,
             entityType: eType,
             entityId: eId,
             purpose: link.purpose?.trim() || null,
             label: link.label?.trim() || null,
+            meta,
             createdById: userId,
           }
         })

@@ -3,7 +3,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
-import { MultiSelectFilter } from '@/components/MultiSelectFilter'
+import { MultiSelectFilter, type MultiSelectOption } from '@/components/MultiSelectFilter'
+import { FILE_LINK_ENTITY_TYPES } from '@/lib/constants/fileLinkEntityTypes'
+import { PHOTO_CATEGORIES } from '@/lib/constants/fileCategories'
 import { formatCopy, locales } from '@/lib/i18n'
 import { getDocumentsCopy } from '@/lib/i18n/documents'
 import { usePreferredLocale } from '@/lib/usePreferredLocale'
@@ -29,6 +31,36 @@ type CandidateUser = {
   name: string
   nationality: string | null
   birthDate: string | null
+}
+
+type BoqItemRecord = {
+  id: number
+  code: string
+  designationZh: string
+  designationFr: string
+  unit: string | null
+  projectId: number
+  project: { id: number; name: string; code: string | null }
+}
+
+type BoqItemMeta = {
+  id: number
+  code: string
+  designationZh: string
+  designationFr: string
+  unit: string | null
+  projectId: number
+  projectName: string
+  projectCode: string | null
+}
+
+type EditableFileLink = {
+  id?: number
+  entityType: string
+  entityId: string
+  purpose?: string | null
+  label?: string | null
+  meta?: unknown
 }
 
 const formatBytes = (size: number) => {
@@ -57,6 +89,114 @@ const parseString = (value?: string | string[]) => {
   if (!value) return ''
   if (Array.isArray(value)) return value.join(',')
   return value
+}
+
+const normalizeBoqLabelText = (value: string) => value.replace(/\s+/g, ' ').trim()
+
+const resolveBoqProjectLabel = (projectName: string, projectCode: string | null, locale: string) => {
+  const rawProjectName = normalizeBoqLabelText(projectName || '')
+  const code = projectCode ?? ''
+  const isBondoukou = code === 'project-bondoukou-city' || rawProjectName.includes('邦杜库')
+  const isTanda = code === 'project-tanda-city' || rawProjectName.includes('丹达')
+  if (isBondoukou) return locale === 'fr' ? 'Voiries de Bondoukou' : '邦杜库市政'
+  if (isTanda) return locale === 'fr' ? 'Voiries de Tanda' : '丹达市政'
+  if (rawProjectName) return rawProjectName
+  return locale === 'fr' ? 'Projet sans nom' : '未命名项目'
+}
+
+const resolveBoqDesignation = (designationZh: string, designationFr: string, locale: string) => {
+  const zh = normalizeBoqLabelText(designationZh || '')
+  const fr = normalizeBoqLabelText(designationFr || '')
+  if (locale === 'fr') return fr || zh
+  return zh || fr
+}
+
+const toBoqItemMeta = (item: BoqItemRecord): BoqItemMeta => ({
+  id: item.id,
+  code: item.code,
+  designationZh: item.designationZh,
+  designationFr: item.designationFr,
+  unit: item.unit,
+  projectId: item.projectId,
+  projectName: item.project.name,
+  projectCode: item.project.code,
+})
+
+const formatBoqItemLabel = (item: BoqItemMeta, locale: string) => {
+  const projectLabel = resolveBoqProjectLabel(item.projectName, item.projectCode, locale)
+  const designation = resolveBoqDesignation(item.designationZh, item.designationFr, locale)
+  const code = normalizeBoqLabelText(item.code || '')
+  return [projectLabel, code, designation].filter(Boolean).join(' · ')
+}
+
+const formatBoqMetaLabel = (meta: {
+  boqItemCode?: string
+  designationZh?: string
+  designationFr?: string
+  projectName?: string
+  projectCode?: string | null
+}, locale: string) => {
+  const projectLabel = resolveBoqProjectLabel(meta.projectName ?? '', meta.projectCode ?? null, locale)
+  const designation = resolveBoqDesignation(meta.designationZh ?? '', meta.designationFr ?? '', locale)
+  const code = normalizeBoqLabelText(meta.boqItemCode ?? '')
+  if (!projectLabel && !code && !designation) return ''
+  return [projectLabel, code, designation].filter(Boolean).join(' · ')
+}
+
+const buildBoqLinkMeta = (item: BoqItemMeta) => ({
+  boqItemCode: item.code,
+  designationZh: item.designationZh,
+  designationFr: item.designationFr,
+  projectId: item.projectId,
+  projectName: item.projectName,
+  projectCode: item.projectCode,
+  unit: item.unit,
+})
+
+const useBoqItemSearch = (locale: string, cacheRef: { current: Map<string, BoqItemMeta> }) => {
+  const [search, setSearch] = useState('')
+  const [options, setOptions] = useState<MultiSelectOption[]>([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const term = search.trim()
+    const controller = new AbortController()
+    const handle = setTimeout(() => {
+      setLoading(true)
+      const query = term ? `?search=${encodeURIComponent(term)}` : ''
+      fetch(`/api/value/boq-items/search${query}`, { signal: controller.signal })
+        .then((res) => {
+          if (!res.ok) throw new Error('failed')
+          return res.json()
+        })
+        .then((data: { items?: BoqItemRecord[] }) => {
+          const items = Array.isArray(data.items) ? data.items : []
+          const metas = items.map(toBoqItemMeta)
+          metas.forEach((meta) => cacheRef.current.set(String(meta.id), meta))
+          setOptions(
+            metas.map((meta) => ({
+              value: String(meta.id),
+              label: formatBoqItemLabel(meta, locale),
+            })),
+          )
+          setError(null)
+        })
+        .catch((err) => {
+          if ((err as Error).name === 'AbortError') return
+          setOptions([])
+          setError('failed')
+        })
+        .finally(() => setLoading(false))
+    }, 250)
+
+    return () => {
+      clearTimeout(handle)
+      controller.abort()
+    }
+  }, [search, locale, cacheRef])
+
+  return { search, setSearch, options, loading, error }
 }
 
 export function FilesPageClient({
@@ -107,13 +247,20 @@ export function FilesPageClient({
   const [editUserIds, setEditUserIds] = useState<string[]>([])
   const [editPurpose, setEditPurpose] = useState('')
   const [editLabel, setEditLabel] = useState('')
+  const [editLinks, setEditLinks] = useState<EditableFileLink[]>([])
+  const [editLinkError, setEditLinkError] = useState<string | null>(null)
   const [editLoading, setEditLoading] = useState(false)
 
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const cameraInputRef = useRef<HTMLInputElement | null>(null)
   const dragDepthRef = useRef(0)
+  const boqItemCacheRef = useRef(new Map<string, BoqItemMeta>())
 
   const [candidateUsers, setCandidateUsers] = useState<CandidateUser[]>([])
   const [loadingUsers, setLoadingUsers] = useState(false)
+  const uploadBoqSearch = useBoqItemSearch(locale, boqItemCacheRef)
+  const editBoqSearch = useBoqItemSearch(locale, boqItemCacheRef)
+  const filterBoqSearch = useBoqItemSearch(locale, boqItemCacheRef)
 
   useEffect(() => {
     const needUsers =
@@ -150,6 +297,72 @@ export function FilesPageClient({
   }, [page])
 
   const categoryLabels = useMemo(() => copy.files.categories, [copy])
+  const entityTypeOptions = useMemo(
+    () =>
+      FILE_LINK_ENTITY_TYPES.map((key) => ({
+        value: key,
+        label: copy.files.uploadPanel.entityTypes[key] ?? key,
+      })),
+    [copy],
+  )
+  const isPhotoCategory = useMemo(
+    () => PHOTO_CATEGORIES.includes(uploadCategory as (typeof PHOTO_CATEGORIES)[number]),
+    [uploadCategory],
+  )
+
+  const buildBoqLinkPayload = (entityId: string, labelOverride?: string) => {
+    const meta = boqItemCacheRef.current.get(entityId)
+    const label = labelOverride?.trim() || (meta ? formatBoqItemLabel(meta, locale) : '')
+    return {
+      entityType: 'actual-boq-item',
+      entityId,
+      label: label || undefined,
+      meta: meta ? buildBoqLinkMeta(meta) : undefined,
+    }
+  }
+
+  const renderBoqItemSelect = ({
+    selected,
+    onChange,
+    searchState,
+    multiple,
+    zIndex,
+    allLabel,
+    disabled,
+  }: {
+    selected: string[]
+    onChange: (next: string[]) => void
+    searchState: ReturnType<typeof useBoqItemSearch>
+    multiple: boolean
+    zIndex: number
+    allLabel: string
+    disabled?: boolean
+  }) => {
+    const noOptionsLabel = searchState.error
+      ? copy.files.messages.boqItemLoadFailed
+      : copy.files.messages.boqItemSearchHint
+
+    return (
+      <MultiSelectFilter
+        variant="form"
+        label=""
+        options={searchState.options}
+        selected={selected}
+        onChange={onChange}
+        allLabel={allLabel}
+        selectedLabel={(count) => formatCopy(copy.files.dropdown.selected, { count })}
+        selectAllLabel={copy.files.dropdown.selectAll}
+        clearLabel={copy.files.dropdown.clear}
+        searchPlaceholder={copy.files.dropdown.search}
+        noOptionsLabel={noOptionsLabel}
+        multiple={multiple}
+        zIndex={zIndex}
+        disabled={disabled}
+        searchValue={searchState.search}
+        onSearchChange={searchState.setSearch}
+      />
+    )
+  }
 
   const buildParams = (overrides: Partial<Record<string, string | number>>) => {
     const params = new URLSearchParams()
@@ -212,6 +425,11 @@ export function FilesPageClient({
     fileInputRef.current?.click()
   }
 
+  const openCameraDialog = () => {
+    if (uploading) return
+    cameraInputRef.current?.click()
+  }
+
   const handleDropzoneKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault()
@@ -267,8 +485,12 @@ export function FilesPageClient({
     setUploadPurpose('')
     setUploadLabel('')
     setUploadError(null)
+    uploadBoqSearch.setSearch('')
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
+    }
+    if (cameraInputRef.current) {
+      cameraInputRef.current.value = ''
     }
   }
 
@@ -301,14 +523,24 @@ export function FilesPageClient({
           label: uploadLabel.trim() || undefined,
         }))
       } else if (uploadEntityId) {
-        links = [
-          {
-            entityType: uploadEntityType.trim(),
-            entityId: uploadEntityId.trim(),
-            purpose: uploadPurpose.trim() || undefined,
-            label: uploadLabel.trim() || undefined,
-          },
-        ]
+        if (uploadEntityType === 'actual-boq-item') {
+          const payload = buildBoqLinkPayload(uploadEntityId.trim(), uploadLabel.trim() || undefined)
+          links = [
+            {
+              ...payload,
+              purpose: uploadPurpose.trim() || undefined,
+            },
+          ]
+        } else {
+          links = [
+            {
+              entityType: uploadEntityType.trim(),
+              entityId: uploadEntityId.trim(),
+              purpose: uploadPurpose.trim() || undefined,
+              label: uploadLabel.trim() || undefined,
+            },
+          ]
+        }
       }
     }
 
@@ -385,11 +617,12 @@ export function FilesPageClient({
         const errorBody = await res.json().catch(() => ({}))
         throw new Error(errorBody.message ?? copy.files.messages.openFailed)
       }
-      const payload = (await res.json()) as { file?: { url?: string } }
-      if (!payload.file?.url) {
+      const payload = (await res.json()) as { file?: { url?: string; previewUrl?: string } }
+      const targetUrl = payload.file?.previewUrl || payload.file?.url
+      if (!targetUrl) {
         throw new Error(copy.files.messages.openFailed)
       }
-      window.open(payload.file.url, '_blank', 'noopener,noreferrer')
+      window.open(targetUrl, '_blank', 'noopener,noreferrer')
     } catch (error) {
       alert((error as Error).message || copy.files.messages.openFailed)
     } finally {
@@ -401,17 +634,99 @@ export function FilesPageClient({
     setEditingFile(row)
     setEditName(row.originalName)
     setEditCategory(row.category)
+    setEditLinks(
+      row.links.map((link) => ({
+        id: link.id,
+        entityType: link.entityType,
+        entityId: link.entityId,
+        purpose: link.purpose,
+        label: link.label,
+        meta: link.meta ?? null,
+      })),
+    )
+    setEditEntityType('')
+    setEditEntityId('')
+    setEditUserIds([])
+    setEditPurpose('')
+    setEditLabel('')
+    setEditLinkError(null)
+    editBoqSearch.setSearch('')
+  }
 
-    // Populate with first link if available
-    const link = row.links[0]
-    setEditEntityType(link?.entityType || '')
-    setEditEntityId(link?.entityId || '')
-    setEditPurpose(link?.purpose || '')
-    setEditLabel(link?.label || '')
+  const handleAddEditLink = () => {
+    setEditLinkError(null)
+    const nextType = editEntityType.trim()
+    const nextPurpose = editPurpose.trim() || undefined
+    const nextLabel = editLabel.trim() || undefined
 
-    // Populate user IDs
-    const userLinks = row.links.filter((l) => l.entityType === 'user')
-    setEditUserIds(userLinks.map((l) => l.entityId))
+    if (!nextType) {
+      setEditLinkError(copy.files.messages.invalidLink)
+      return
+    }
+
+    const existing = new Set(editLinks.map((link) => `${link.entityType}:${link.entityId}`))
+    const nextLinks: EditableFileLink[] = []
+
+    if (nextType === 'user') {
+      if (editUserIds.length === 0) {
+        setEditLinkError(copy.files.messages.invalidLink)
+        return
+      }
+      editUserIds.forEach((id) => {
+        const key = `${nextType}:${id}`
+        if (existing.has(key)) return
+        existing.add(key)
+        nextLinks.push({
+          entityType: 'user',
+          entityId: id,
+          purpose: nextPurpose ?? null,
+          label: nextLabel ?? null,
+        })
+      })
+    } else {
+      const entityId = editEntityId.trim()
+      if (!entityId) {
+        setEditLinkError(copy.files.messages.invalidLink)
+        return
+      }
+      const key = `${nextType}:${entityId}`
+      if (!existing.has(key)) {
+        if (nextType === 'actual-boq-item') {
+          const payload = buildBoqLinkPayload(entityId, nextLabel)
+          nextLinks.push({
+            entityType: payload.entityType,
+            entityId: payload.entityId,
+            purpose: nextPurpose ?? null,
+            label: payload.label ?? null,
+            meta: payload.meta ?? null,
+          })
+        } else {
+          nextLinks.push({
+            entityType: nextType,
+            entityId,
+            purpose: nextPurpose ?? null,
+            label: nextLabel ?? null,
+          })
+        }
+      }
+    }
+
+    if (nextLinks.length === 0) {
+      setEditLinkError(copy.files.messages.invalidLink)
+      return
+    }
+
+    setEditLinks((current) => [...current, ...nextLinks])
+    setEditEntityId('')
+    setEditUserIds([])
+    setEditPurpose('')
+    setEditLabel('')
+    setEditLinkError(null)
+    editBoqSearch.setSearch('')
+  }
+
+  const handleRemoveEditLink = (index: number) => {
+    setEditLinks((current) => current.filter((_, idx) => idx !== index))
   }
 
   const submitEdit = async (e: React.FormEvent) => {
@@ -423,25 +738,17 @@ export function FilesPageClient({
     }
     setEditLoading(true)
     try {
-      let links: any[] = []
-      if (editEntityType) {
-        if (editEntityType === 'user') {
-          links = editUserIds.map((id) => ({
-            entityType: 'user',
-            entityId: id,
-            purpose: editPurpose.trim() || undefined,
-            label: editLabel.trim() || undefined,
-          }))
-        } else if (editEntityId) {
-          links = [
-            {
-              entityType: editEntityType.trim(),
-              entityId: editEntityId.trim(),
-              purpose: editPurpose.trim() || undefined,
-              label: editLabel.trim() || undefined,
-            },
-          ]
-        }
+      const links = editLinks.map((link) => ({
+        entityType: link.entityType.trim(),
+        entityId: link.entityId.trim(),
+        purpose: link.purpose?.trim() || undefined,
+        label: link.label?.trim() || undefined,
+        meta: link.meta ?? undefined,
+      }))
+
+      if (links.some((link) => !link.entityType || !link.entityId)) {
+        alert(copy.files.messages.invalidLink)
+        return
       }
 
       const res = await fetch(`/api/files/${editingFile.id}`, {
@@ -509,7 +816,21 @@ export function FilesPageClient({
 
   const renderLinkSummary = (links: FileRow['links']) => {
     if (!links.length) return '-'
-    const labels = links.map((link) => link.label || `${link.entityType}#${link.entityId}`)
+    const labels = links.map((link) => {
+      const directLabel = link.label?.trim()
+      if (directLabel) return directLabel
+      const metaRecord = link.meta as
+        | {
+            boqItemCode?: string
+            designationZh?: string
+            designationFr?: string
+            projectName?: string
+            projectCode?: string | null
+          }
+        | null
+      const metaLabel = metaRecord ? formatBoqMetaLabel(metaRecord, locale) : ''
+      return metaLabel || `${link.entityType}#${link.entityId}`
+    })
     if (labels.length <= 2) return labels.join(', ')
     return `${labels.slice(0, 2).join(', ')} +${labels.length - 2}`
   }
@@ -559,6 +880,72 @@ export function FilesPageClient({
               </label>
               <div className="space-y-2 text-sm text-slate-600">
                 <span className="font-semibold text-slate-700">{copy.files.uploadPanel.fileLabel}</span>
+                {isPhotoCategory ? (
+                  <div className="grid gap-3 sm:hidden">
+                    <button
+                      type="button"
+                      onClick={openCameraDialog}
+                      disabled={uploading}
+                      className="group flex items-center justify-between gap-3 rounded-2xl border border-emerald-200 bg-emerald-50/60 px-4 py-3 text-left text-sm font-semibold text-emerald-700 transition hover:-translate-y-0.5 hover:shadow-[0_8px_20px_-12px_rgba(16,185,129,0.6)] disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <span>{copy.files.uploadPanel.cameraAction}</span>
+                      <span className="rounded-full border border-emerald-200 bg-white px-2 py-1 text-[11px] text-emerald-700">
+                        {copy.files.uploadPanel.dropAction}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={openFileDialog}
+                      disabled={uploading}
+                      className="group flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm font-semibold text-slate-700 transition hover:-translate-y-0.5 hover:shadow-[0_8px_20px_-12px_rgba(15,23,42,0.25)] disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <span>{copy.files.uploadPanel.albumAction}</span>
+                      <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] text-slate-600">
+                        {copy.files.uploadPanel.dropAction}
+                      </span>
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={openFileDialog}
+                    disabled={uploading}
+                    className="group flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm font-semibold text-slate-700 transition hover:-translate-y-0.5 hover:shadow-[0_8px_20px_-12px_rgba(15,23,42,0.25)] disabled:cursor-not-allowed disabled:opacity-60 sm:hidden"
+                  >
+                    <span>{copy.files.uploadPanel.fileLabel}</span>
+                    <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] text-slate-600">
+                      {copy.files.uploadPanel.dropAction}
+                    </span>
+                  </button>
+                )}
+                {selectedFiles.length > 0 ? (
+                  <div className="mt-2 space-y-2 text-xs text-slate-600 sm:hidden">
+                    <div className="flex flex-wrap items-center gap-2 rounded-xl border border-emerald-100 bg-white/80 px-3 py-2">
+                      <span className="font-semibold text-emerald-700">{copy.files.uploadPanel.selectedLabel}</span>
+                      <span>{formatCopy(copy.files.uploadPanel.selectedCount, { count: selectedFiles.length })}</span>
+                      <span className="text-slate-400">•</span>
+                      <span>{formatBytes(selectedFiles.reduce((total, file) => total + file.size, 0))}</span>
+                    </div>
+                    <div className="grid gap-1">
+                      {selectedFiles.slice(0, 3).map((file) => (
+                        <div
+                          key={`${file.name}-${file.size}-${file.lastModified}`}
+                          className="flex items-center justify-between gap-2 rounded-lg bg-white/70 px-2 py-1"
+                        >
+                          <span className="min-w-0 truncate text-slate-700">{file.name}</span>
+                          <span className="shrink-0 text-slate-400">{formatBytes(file.size)}</span>
+                        </div>
+                      ))}
+                      {selectedFiles.length > 3 ? (
+                        <div className="text-[11px] text-slate-500">
+                          {formatCopy(copy.files.uploadPanel.selectedMore, {
+                            count: selectedFiles.length - 3,
+                          })}
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                ) : null}
                 <div
                   role="button"
                   tabIndex={0}
@@ -570,7 +957,7 @@ export function FilesPageClient({
                   onDragOver={handleDragOver}
                   onDragLeave={handleDragLeave}
                   onDrop={handleDrop}
-                  className={`rounded-2xl border border-dashed px-4 py-4 transition ${
+                  className={`hidden rounded-2xl border border-dashed px-4 py-4 transition sm:block ${
                     isDragging
                       ? 'border-emerald-300 bg-emerald-50/80 shadow-[0_0_0_4px_rgba(16,185,129,0.12)]'
                       : selectedFiles.length > 0
@@ -631,6 +1018,15 @@ export function FilesPageClient({
                   type="file"
                   multiple
                   onChange={handleFileSelect}
+                  accept={isPhotoCategory ? 'image/*' : undefined}
+                  className="sr-only"
+                />
+                <input
+                  ref={cameraInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  onChange={handleFileSelect}
                   className="sr-only"
                 />
               </div>
@@ -646,18 +1042,14 @@ export function FilesPageClient({
                   <MultiSelectFilter
                     variant="form"
                     label=""
-                    options={Object.entries(copy.files.uploadPanel.entityTypes).map(([key, label]) => ({
-                      value: key,
-                      label,
-                    }))}
+                    options={entityTypeOptions}
                     selected={uploadEntityType ? [uploadEntityType] : []}
                     onChange={(vals) => {
                       const next = vals[0] || ''
                       setUploadEntityType(next)
-                      if (next === 'user') {
-                        setUploadEntityId('')
-                        setUploadUserIds([])
-                      }
+                      setUploadEntityId('')
+                      setUploadUserIds([])
+                      uploadBoqSearch.setSearch('')
                     }}
                     allLabel={copy.files.uploadPanel.categoryPlaceholder}
                     selectedLabel={(count) => formatCopy(copy.files.dropdown.selected, { count })}
@@ -688,6 +1080,15 @@ export function FilesPageClient({
                       disabled={loadingUsers}
                       zIndex={30}
                     />
+                  ) : uploadEntityType === 'actual-boq-item' ? (
+                    renderBoqItemSelect({
+                      selected: uploadEntityId ? [uploadEntityId] : [],
+                      onChange: (vals) => setUploadEntityId(vals[0] || ''),
+                      searchState: uploadBoqSearch,
+                      multiple: false,
+                      zIndex: 30,
+                      allLabel: copy.files.dropdown.all,
+                    })
                   ) : (
                     <input
                       value={uploadEntityId}
@@ -772,16 +1173,14 @@ export function FilesPageClient({
             <MultiSelectFilter
               variant="form"
               label=""
-              options={Object.entries(copy.files.uploadPanel.entityTypes).map(([key, label]) => ({
-                value: key,
-                label,
-              }))}
+              options={entityTypeOptions}
               selected={entityType ? entityType.split(',') : []}
               onChange={(vals) => {
                 const next = vals.join(',')
                 setEntityType(next)
-                if (next === 'user') {
+                if (next === 'user' || next === 'actual-boq-item') {
                   setEntityId('')
+                  filterBoqSearch.setSearch('')
                 }
               }}
               allLabel={copy.files.filters.allLabel}
@@ -814,6 +1213,15 @@ export function FilesPageClient({
                 disabled={loadingUsers}
                 zIndex={20}
               />
+            ) : entityType === 'actual-boq-item' ? (
+              renderBoqItemSelect({
+                selected: entityId ? entityId.split(',') : [],
+                onChange: (vals) => setEntityId(vals.join(',')),
+                searchState: filterBoqSearch,
+                multiple: true,
+                zIndex: 20,
+                allLabel: copy.files.filters.allLabel,
+              })
             ) : (
               <input
                 value={entityId}
@@ -1090,24 +1498,65 @@ export function FilesPageClient({
                     <div className="text-sm font-semibold text-slate-700">{copy.files.uploadPanel.linkTitle}</div>
                     <div className="text-xs text-slate-500">{copy.files.uploadPanel.linkHint}</div>
                   </div>
+                  <div className="space-y-2">
+                    <div className="text-xs font-semibold text-slate-600">{copy.files.editDialog.linksTitle}</div>
+                    {editLinks.length > 0 ? (
+                      <div className="space-y-2">
+                        {editLinks.map((link, index) => {
+                          const typeLabel = copy.files.uploadPanel.entityTypes[link.entityType] ?? link.entityType
+                          const metaRecord = link.meta as
+                            | {
+                                boqItemCode?: string
+                                designationZh?: string
+                                designationFr?: string
+                                projectName?: string
+                                projectCode?: string | null
+                              }
+                            | null
+                          const metaLabel = metaRecord ? formatBoqMetaLabel(metaRecord, locale) : ''
+                          const displayLabel = link.label?.trim() || metaLabel || `${link.entityType}#${link.entityId}`
+                          return (
+                            <div
+                              key={link.id ?? `${link.entityType}-${link.entityId}-${index}`}
+                              className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600"
+                            >
+                              <div className="min-w-0">
+                                <div className="truncate text-xs font-semibold text-slate-700">{typeLabel}</div>
+                                <div className="truncate text-[11px] text-slate-500">{displayLabel}</div>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveEditLink(index)}
+                                className="shrink-0 rounded-full border border-rose-200 px-2 py-1 text-[11px] font-semibold text-rose-600 hover:border-rose-300 hover:bg-rose-50"
+                              >
+                                {copy.files.editDialog.removeLinkAction}
+                              </button>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    ) : (
+                      <div className="text-[11px] text-slate-400">{copy.files.editDialog.linksEmpty}</div>
+                    )}
+                  </div>
+                  <div className="border-t border-slate-200 pt-4">
+                    <div className="text-xs font-semibold text-slate-600">{copy.files.editDialog.addLinkTitle}</div>
+                  </div>
                   <div className="grid gap-3">
                     <label className="flex flex-col gap-2 text-xs text-slate-600">
                       <span>{copy.files.uploadPanel.entityType}</span>
                       <MultiSelectFilter
                         variant="form"
                         label=""
-                        options={Object.entries(copy.files.uploadPanel.entityTypes).map(([key, label]) => ({
-                          value: key,
-                          label,
-                        }))}
+                        options={entityTypeOptions}
                         selected={editEntityType ? [editEntityType] : []}
                         onChange={(vals) => {
                           const next = vals[0] || ''
                           setEditEntityType(next)
-                          if (next === 'user') {
-                            setEditEntityId('')
-                            setEditUserIds([])
-                          }
+                          setEditEntityId('')
+                          setEditUserIds([])
+                          editBoqSearch.setSearch('')
+                          setEditLinkError(null)
                         }}
                         allLabel={copy.files.uploadPanel.categoryPlaceholder}
                         selectedLabel={(count) => formatCopy(copy.files.dropdown.selected, { count })}
@@ -1138,6 +1587,15 @@ export function FilesPageClient({
                           disabled={loadingUsers}
                           zIndex={1300}
                         />
+                      ) : editEntityType === 'actual-boq-item' ? (
+                        renderBoqItemSelect({
+                          selected: editEntityId ? [editEntityId] : [],
+                          onChange: (vals) => setEditEntityId(vals[0] || ''),
+                          searchState: editBoqSearch,
+                          multiple: false,
+                          zIndex: 1300,
+                          allLabel: copy.files.dropdown.all,
+                        })
                       ) : (
                         <input
                           value={editEntityId}
@@ -1173,6 +1631,20 @@ export function FilesPageClient({
                         className="h-9 rounded-lg border border-slate-200 bg-white px-2 text-sm text-slate-700 focus:border-emerald-300 focus:outline-none"
                       />
                     </label>
+                  </div>
+                  {editLinkError ? (
+                    <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-600">
+                      {editLinkError}
+                    </div>
+                  ) : null}
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      onClick={handleAddEditLink}
+                      className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600 hover:border-slate-300 hover:bg-slate-50"
+                    >
+                      {copy.files.editDialog.addLinkAction}
+                    </button>
                   </div>
                 </div>
               </div>

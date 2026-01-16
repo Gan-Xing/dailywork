@@ -75,6 +75,13 @@ export async function PATCH(_request: NextRequest, { params }: { params: Promise
         originalName: updated.file.originalName,
         mimeType: updated.file.mimeType,
         size: updated.file.size,
+        previewUrl: updated.file.previewStorageKey
+          ? createPresignedUrl({
+              method: 'GET',
+              storageKey: updated.file.previewStorageKey,
+              expiresInSeconds: SIGNATURE_URL_TTL,
+            })
+          : null,
         url: createPresignedUrl({
           method: 'GET',
           storageKey: updated.file.storageKey,
@@ -127,6 +134,9 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
 
   try {
     await deleteObject(signature.file.storageKey)
+    if (signature.file.previewStorageKey) {
+      await deleteObject(signature.file.previewStorageKey)
+    }
   } catch (error) {
     console.error('[Signature Delete] R2 cleanup failed', error)
   }

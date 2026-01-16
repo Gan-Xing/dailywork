@@ -1,9 +1,10 @@
 import { NextResponse, type NextRequest } from 'next/server'
 
 import { getSessionUser, hasPermission } from '@/lib/server/authSession'
-import { createPresignedUrl, getR2Config } from '@/lib/server/r2'
+import { createPresignedUrl, deleteObject, getR2Config } from '@/lib/server/r2'
 import { SIGNATURE_ALLOWED_MIME_TYPES, SIGNATURE_MAX_SIZE } from '@/lib/server/signatureConfig'
 import { prisma } from '@/lib/prisma'
+import { processImageAsset } from '@/lib/server/imageProcessing'
 
 const SIGNATURE_URL_TTL = 300
 
@@ -51,6 +52,13 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
       originalName: signature.file.originalName,
       mimeType: signature.file.mimeType,
       size: signature.file.size,
+      previewUrl: signature.file.previewStorageKey
+        ? createPresignedUrl({
+            method: 'GET',
+            storageKey: signature.file.previewStorageKey,
+            expiresInSeconds: SIGNATURE_URL_TTL,
+          })
+        : null,
       url: createPresignedUrl({
         method: 'GET',
         storageKey: signature.file.storageKey,
@@ -108,6 +116,33 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   }
 
   const { bucket } = getR2Config()
+  let processedName = safeName
+  let processedMimeType = safeMimeType
+  let processedSize = parsedSize
+  let preview: { storageKey: string; mimeType: string; size: number } | undefined
+
+  try {
+    const processed = await processImageAsset({
+      storageKey: safeStorageKey,
+      originalName: safeName,
+      mimeType: safeMimeType,
+      size: parsedSize,
+      category: 'signature',
+    })
+    if (processed) {
+      processedName = processed.original.originalName
+      processedMimeType = processed.original.mimeType
+      processedSize = processed.original.size
+      preview = processed.preview
+    }
+  } catch (error) {
+    try {
+      await deleteObject(safeStorageKey)
+    } catch (cleanupError) {
+      console.error('[Signature Upload] Cleanup failed', cleanupError)
+    }
+    return NextResponse.json({ error: (error as Error).message || '签名处理失败' }, { status: 400 })
+  }
 
   const result = await prisma.$transaction(async (tx) => {
     const latest = await tx.userSignature.aggregate({
@@ -126,9 +161,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         category: 'signature',
         storageKey: safeStorageKey,
         bucket,
-        originalName: safeName,
-        mimeType: safeMimeType,
-        size: parsedSize,
+        originalName: processedName,
+        mimeType: processedMimeType,
+        size: processedSize,
+        previewStorageKey: preview?.storageKey ?? null,
+        previewMimeType: preview?.mimeType ?? null,
+        previewSize: preview?.size ?? null,
         ownerUserId: userId,
         createdById: sessionUser.id,
       },
@@ -174,6 +212,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         originalName: result.file.originalName,
         mimeType: result.file.mimeType,
         size: result.file.size,
+        previewUrl: result.file.previewStorageKey
+          ? createPresignedUrl({
+              method: 'GET',
+              storageKey: result.file.previewStorageKey,
+              expiresInSeconds: SIGNATURE_URL_TTL,
+            })
+          : null,
         url: createPresignedUrl({
           method: 'GET',
           storageKey: result.file.storageKey,

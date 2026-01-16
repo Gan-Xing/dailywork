@@ -513,12 +513,15 @@
 
 ### FileAsset（非结构化文件）
 - `id`：自增整型。
-- `category`：文件分类（初始枚举：`signature`、`inspection-receipt`、`inspection-acceptance`、`attendance-sheet`、`letter-receipt`、`face-photo`、`attachment`、`other`）。
+- `category`：文件分类（初始枚举：`signature`、`inspection-receipt`、`inspection-acceptance`、`attendance-sheet`、`letter-receipt`、`face-photo`、`site-photo`、`attachment`、`other`）。
 - `storageKey`：存储桶对象键（唯一）。
 - `bucket`：存储桶名称。
 - `originalName`：原始文件名。
 - `mimeType`：文件类型（MIME）。
 - `size`：文件大小（字节）。
+- `previewStorageKey?`：预览图对象键（图片生成小图时填充）。
+- `previewMimeType?`：预览图 MIME。
+- `previewSize?`：预览图大小（字节）。
 - `checksum?`：可选校验值。
 - `ownerUserId?`：可选绑定成员 ID。
 - `createdById?`：上传人 ID。
@@ -527,7 +530,7 @@
 ### FileAssetLink（文件关联）
 - `id`：自增整型。
 - `fileId`：关联 `FileAsset`。
-- `entityType`：关联对象类型（如 `USER`、`DOCUMENT`、`INSPECTION`）。
+- `entityType`：关联对象类型（如 `user`、`document`、`inspection`、`actual-boq-item`）。
 - `entityId`：关联对象 ID（字符串，兼容数值 ID）。
 - `purpose?`：用途标识（如 `receipt`、`acceptance`、`attendance`）。
 - `label?`：前端展示用名称（可选）。

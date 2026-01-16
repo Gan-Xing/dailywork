@@ -20,6 +20,7 @@
     "react": "19.3.0-canary-b061b597-20251212",
     "react-dom": "19.3.0-canary-b061b597-20251212",
     "react-liquid-gauge": "^1.2.4",
+    "sharp": "^0.34.4",
     "server-only": "^0.0.1",
     "xlsx": "^0.18.5"
   },

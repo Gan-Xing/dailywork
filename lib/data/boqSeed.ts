@@ -1253,10 +1253,10 @@ export const boqProjects: BoqProject[] = [
     ],
   },
   {
-    id: 'project-danda-city',
+    id: 'project-tanda-city',
     name: {
       zh: '丹达市政路',
-      fr: 'Voiries de Danda',
+      fr: 'Voiries de Tanda',
     },
     headerLines: [],
     rows: [],
