@@ -5,8 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 
 import { AccessDenied } from '@/components/AccessDenied'
-import { Breadcrumbs } from '@/components/Breadcrumbs'
-import { LocaleSwitcher } from '@/components/LocaleSwitcher'
+import { PageHeaderNav } from '@/components/PageHeaderNav'
 import { useToast } from '@/components/ToastProvider'
 import type { AggregatedPhaseProgress } from '@/lib/progressTypes'
 import { usePreferredLocale } from '@/lib/usePreferredLocale'
@@ -971,6 +970,12 @@ export default function ProductionValuePage() {
     { key: 'boq', label: copy.tabs.boq, href: '/value?tab=boq' },
     { key: 'manage', label: copy.tabs.manage, href: '/value/prices' },
   ] as const
+  const tabs = tabItems.map((tab) => ({
+    key: tab.key,
+    label: tab.label,
+    href: tab.href,
+    active: tab.key === activeTab,
+  }))
 
   if (permissionDenied) {
     return (
@@ -984,45 +989,17 @@ export default function ProductionValuePage() {
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900">
-      <header className="sticky top-0 z-30 w-full border-b border-slate-200 bg-white/80 px-6 py-4 backdrop-blur-md sm:px-8 xl:px-12 2xl:px-14">
-        <div className="mx-auto flex max-w-[1700px] flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div className="space-y-3">
-            <Breadcrumbs
-              variant="light"
-              items={[{ label: breadcrumbHome, href: '/' }, { label: breadcrumbValue }]}
-            />
-            <div className="space-y-2">
-              <div>
-                <h1 className="text-xl font-bold text-slate-900 sm:text-2xl">{tabTitle}</h1>
-                {tabDescription ? (
-                  <p className="text-sm text-slate-600">{tabDescription}</p>
-                ) : null}
-              </div>
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center rounded-lg bg-slate-100 p-1">
-              {tabItems.map((tab) => {
-                const isActive = tab.key === activeTab
-                return (
-                  <Link
-                    key={tab.key}
-                    href={tab.href}
-                    className={`rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${
-                      isActive
-                        ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-200'
-                        : 'text-slate-500 hover:bg-slate-200/50 hover:text-slate-900'
-                    }`}
-                  >
-                    {tab.label}
-                  </Link>
-                )
-              })}
-            </div>
-            <LocaleSwitcher locale={locale} onChange={setLocale} variant="light" />
-          </div>
-        </div>
-      </header>
+      <PageHeaderNav
+        className="z-30 py-4"
+        breadcrumbs={[{ label: breadcrumbHome, href: '/' }, { label: breadcrumbValue }]}
+        title={tabTitle}
+        subtitle={tabDescription || undefined}
+        tabs={tabs}
+        locale={locale}
+        onLocaleChange={setLocale}
+        localeVariant="light"
+        breadcrumbVariant="light"
+      />
       <section className="mx-auto w-full max-w-[1700px] px-6 pb-14 pt-6 sm:px-8 xl:px-12 2xl:px-14">
         <div className="rounded-3xl border border-slate-200 bg-white shadow-xl shadow-slate-900/5">
           {activeTab === 'production' ? (

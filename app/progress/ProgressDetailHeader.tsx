@@ -2,7 +2,6 @@
 
 import { LocalizedRoadName } from './LocalizedRoadName'
 import { ProgressHeader } from './ProgressHeader'
-import { ProgressSectionNav } from './ProgressSectionNav'
 import type { RoadSectionDTO } from '@/lib/progressTypes'
 import { getProgressCopy, formatProgressCopy } from '@/lib/i18n/progress'
 import { locales } from '@/lib/i18n'
@@ -27,7 +26,6 @@ export function ProgressDetailHeader({ road }: { road: RoadSectionDTO }) {
         { label: breadcrumbProgress, href: '/progress' },
         { label: <LocalizedRoadName road={road} /> },
       ]}
-      right={<ProgressSectionNav />}
       locale={locale}
       onLocaleChange={setLocale}
     />

@@ -15,7 +15,6 @@ import { getProgressCopy, formatProgressCopy } from '@/lib/i18n/progress'
 import { localizeProgressTerm } from '@/lib/i18n/progressDictionary'
 import { usePreferredLocale } from '@/lib/usePreferredLocale'
 import { ProgressHeader } from '../ProgressHeader'
-import { ProgressSectionNav } from '../ProgressSectionNav'
 
 type WorkflowItem = WorkflowBinding
 
@@ -468,11 +467,6 @@ export function WorkflowManager({ initialWorkflows }: Props) {
         title={copy.title}
         subtitle={copy.description || undefined}
         breadcrumbs={breadcrumbItems}
-        right={
-          <div className="flex flex-wrap items-center gap-3">
-            <ProgressSectionNav />
-          </div>
-        }
         locale={locale}
         onLocaleChange={setLocale}
       />

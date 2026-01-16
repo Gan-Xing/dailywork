@@ -5,8 +5,7 @@ import { useParams } from 'next/navigation'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { AccessDenied } from '@/components/AccessDenied'
-import { Breadcrumbs } from '@/components/Breadcrumbs'
-import { LocaleSwitcher } from '@/components/LocaleSwitcher'
+import { PageHeaderNav } from '@/components/PageHeaderNav'
 import { useToast } from '@/components/ToastProvider'
 import { usePreferredLocale } from '@/lib/usePreferredLocale'
 import { locales, type Locale } from '@/lib/i18n'
@@ -158,59 +157,34 @@ export default function PhaseDefinitionDetailPage() {
     )
   }
 
+  const tabs = [
+    { key: 'production', label: tabCopy.tabs.production, href: '/value' },
+    { key: 'completion', label: tabCopy.tabs.completion, href: '/value?tab=completion' },
+    { key: 'boq', label: tabCopy.tabs.boq, href: '/value?tab=boq' },
+    { key: 'manage', label: tabCopy.tabs.manage, href: '/value/prices' },
+  ].map((tab) => ({
+    ...tab,
+    active: tab.key === 'manage',
+  }))
+
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900">
-      <header className="sticky top-0 z-30 w-full border-b border-slate-200 bg-white/80 px-6 py-4 backdrop-blur-md sm:px-8 xl:px-12 2xl:px-14">
-        <div className="mx-auto flex max-w-[1700px] flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div className="space-y-3">
-            <Breadcrumbs
-              variant="light"
-              items={[
-                { label: breadcrumbHome, href: '/' },
-                { label: breadcrumbValue, href: '/value' },
-                { label: breadcrumbPrices, href: '/value/prices' },
-                { label: group?.definitionName ?? '' },
-              ]}
-            />
-            <div>
-              <h1 className="text-xl font-bold text-slate-900 sm:text-2xl">
-                {group?.definitionName ?? copy.title}
-              </h1>
-              {group ? (
-                <p className="text-sm text-slate-600">
-                  {measureLabel[group.measure] ?? group.measure}
-                </p>
-              ) : null}
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center rounded-lg bg-slate-100 p-1">
-              {[
-                { key: 'production', label: tabCopy.tabs.production, href: '/value' },
-                { key: 'completion', label: tabCopy.tabs.completion, href: '/value?tab=completion' },
-                { key: 'boq', label: tabCopy.tabs.boq, href: '/value?tab=boq' },
-                { key: 'manage', label: tabCopy.tabs.manage, href: '/value/prices' },
-              ].map((tab) => {
-                const isActive = tab.key === 'manage'
-                return (
-                  <Link
-                    key={tab.key}
-                    href={tab.href}
-                    className={`rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${
-                      isActive
-                        ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-200'
-                        : 'text-slate-500 hover:bg-slate-200/50 hover:text-slate-900'
-                    }`}
-                  >
-                    {tab.label}
-                  </Link>
-                )
-              })}
-            </div>
-            <LocaleSwitcher locale={locale} onChange={setLocale} variant="light" />
-          </div>
-        </div>
-      </header>
+      <PageHeaderNav
+        className="z-30 py-4"
+        breadcrumbs={[
+          { label: breadcrumbHome, href: '/' },
+          { label: breadcrumbValue, href: '/value' },
+          { label: breadcrumbPrices, href: '/value/prices' },
+          { label: group?.definitionName ?? '' },
+        ]}
+        title={group?.definitionName ?? copy.title}
+        subtitle={group ? measureLabel[group.measure] ?? group.measure : undefined}
+        tabs={tabs}
+        locale={locale}
+        onLocaleChange={setLocale}
+        localeVariant="light"
+        breadcrumbVariant="light"
+      />
 
       <section className="mx-auto w-full max-w-[1700px] px-6 pb-14 pt-6 sm:px-8 xl:px-12 2xl:px-14">
         <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xl shadow-slate-900/5">

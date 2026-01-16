@@ -6,7 +6,6 @@ import { getProgressCopy } from '@/lib/i18n/progress'
 import { locales } from '@/lib/i18n'
 import { usePreferredLocale } from '@/lib/usePreferredLocale'
 import { ProgressHeader } from './ProgressHeader'
-import { ProgressSectionNav } from './ProgressSectionNav'
 
 export function ProgressNotFound() {
   const { locale, setLocale } = usePreferredLocale('zh', locales)
@@ -17,15 +16,14 @@ export function ProgressNotFound() {
       <ProgressHeader
         title={t.detail.notFoundTitle}
         subtitle={t.detail.notFoundBody}
-      breadcrumbs={[
-        { label: t.nav.home, href: '/' },
-        { label: t.nav.progress, href: '/progress' },
-        { label: t.detail.notFoundTitle },
-      ]}
-      right={<ProgressSectionNav />}
-      locale={locale}
-      onLocaleChange={setLocale}
-    />
+        breadcrumbs={[
+          { label: t.nav.home, href: '/' },
+          { label: t.nav.progress, href: '/progress' },
+          { label: t.detail.notFoundTitle },
+        ]}
+        locale={locale}
+        onLocaleChange={setLocale}
+      />
       <div className="mx-auto max-w-4xl px-6 py-8 sm:px-8">
         <div className="rounded-3xl border border-slate-200 bg-white p-6 text-sm text-slate-600 shadow-sm">
           <h2 className="text-lg font-semibold text-slate-900">{t.detail.notFoundTitle}</h2>

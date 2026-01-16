@@ -10,7 +10,6 @@ import { locales } from '@/lib/i18n'
 import { usePreferredLocale } from '@/lib/usePreferredLocale'
 
 import { ProgressHeader } from '../ProgressHeader'
-import { ProgressSectionNav } from '../ProgressSectionNav'
 import { QuantitiesDetailModal } from './QuantitiesDetailModal'
 
 type Props = {
@@ -568,7 +567,6 @@ export default function QuantitiesListClient({ rows, canEdit }: Props) {
           { label: '进度管理', href: '/progress' },
           { label: '分项工程管理' },
         ]}
-        right={<ProgressSectionNav />}
         locale={locale}
         onLocaleChange={setLocale}
       />

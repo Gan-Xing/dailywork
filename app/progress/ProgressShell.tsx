@@ -4,7 +4,6 @@ import { useRef, useState } from 'react'
 
 import { PhaseAggregateBoard } from './PhaseAggregateBoard'
 import { ProgressHeader } from './ProgressHeader'
-import { ProgressSectionNav } from './ProgressSectionNav'
 import { RoadBoard, type RoadBoardHandle } from './RoadBoard'
 import type { AggregatedPhaseProgress, RoadSectionProgressSummaryDTO } from '@/lib/progressTypes'
 import { getProgressCopy, formatProgressCopy } from '@/lib/i18n/progress'
@@ -44,7 +43,6 @@ export function ProgressShell({
           { label: breadcrumbHome, href: '/' },
           { label: breadcrumbProgress },
         ]}
-        right={<ProgressSectionNav />}
         locale={locale}
         onLocaleChange={setLocale}
       />

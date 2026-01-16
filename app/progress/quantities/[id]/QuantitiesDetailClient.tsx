@@ -9,7 +9,6 @@ import type {
   RoadPhaseQuantityDetailDTO,
 } from '@/lib/phaseItemTypes'
 import { ProgressHeader } from '../../ProgressHeader'
-import { ProgressSectionNav } from '../../ProgressSectionNav'
 import { locales } from '@/lib/i18n'
 import { usePreferredLocale } from '@/lib/usePreferredLocale'
 
@@ -383,7 +382,6 @@ export default function QuantitiesDetailClient({ detail, canEdit, variant = 'pag
           { label: '分项列表', href: '/progress/quantities' },
           { label: '详情' },
         ]}
-        right={<ProgressSectionNav />}
         locale={locale}
         onLocaleChange={setLocale}
       />

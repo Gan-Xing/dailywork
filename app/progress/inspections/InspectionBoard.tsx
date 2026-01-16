@@ -20,7 +20,6 @@ import {
 import { locales } from '@/lib/i18n'
 import { usePreferredLocale } from '@/lib/usePreferredLocale'
 import { ProgressHeader } from '../ProgressHeader'
-import { ProgressSectionNav } from '../ProgressSectionNav'
 
 interface Props {
   roads: RoadSectionWithPhasesDTO[]
@@ -1131,7 +1130,6 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
           { label: copy.breadcrumb.progress, href: '/progress' },
           { label: copy.breadcrumb.current },
         ]}
-        right={<ProgressSectionNav />}
         locale={locale}
         onLocaleChange={setLocale}
       />

@@ -2,7 +2,6 @@ import { Suspense } from 'react'
 
 import { ProgressHeader } from './ProgressHeader'
 import { ProgressShell } from './ProgressShell'
-import { ProgressSectionNav } from './ProgressSectionNav'
 import { AccessDenied } from '@/components/AccessDenied'
 import { aggregatePhaseProgress } from '@/lib/progressAggregation'
 import type { RoadSectionProgressDTO, RoadSectionProgressSummaryDTO } from '@/lib/progressTypes'
@@ -102,7 +101,6 @@ function ProgressFallback() {
           { label: t.nav.home, href: '/' },
           { label: t.nav.progress },
         ]}
-        right={<ProgressSectionNav />}
       />
       <div className="relative mx-auto max-w-6xl px-6 py-8 sm:px-8 xl:max-w-[1500px] xl:px-10 2xl:max-w-[1700px] 2xl:px-12">
         <div className="absolute inset-x-0 top-0 -z-10 h-48 bg-gradient-to-r from-emerald-200/50 via-sky-200/40 to-amber-200/40 blur-3xl" />

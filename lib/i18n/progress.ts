@@ -17,6 +17,12 @@ type ProgressCopy = {
     home: string
     progress: string
     inspections: string
+    tabs: {
+      board: string
+      quantities: string
+      inspections: string
+      workflows: string
+    }
   }
   access: {
     progressViewHint: string
@@ -571,6 +577,12 @@ const progressCopy: Record<Locale, ProgressCopy> = {
       home: '首页',
       progress: '进度管理',
       inspections: '报检记录',
+      tabs: {
+        board: '道路看板',
+        quantities: '分项列表',
+        inspections: '报检记录',
+        workflows: '分项模板',
+      },
     },
     access: {
       progressViewHint: '开通查看权限后可使用甘特与里程碑视图。',
@@ -1134,8 +1146,7 @@ const progressCopy: Record<Locale, ProgressCopy> = {
     hero: {
       badge: 'Avancement',
       title: 'Tableau des routes',
-      description:
-        'Les tronçons sont créés par les admins (nom + PK début/fin). Les phases, demandes de contrôle et validations se grefferont dessus. Cette page sert d’abord à gérer la liste.',
+      description: '',
       home: "Retour à l'accueil",
       reports: 'Ouvrir un rapport',
       loadError:
@@ -1145,6 +1156,12 @@ const progressCopy: Record<Locale, ProgressCopy> = {
       home: 'Accueil',
       progress: "Suivi d'avancement",
       inspections: 'Contrôles',
+      tabs: {
+        board: 'Tableau des routes',
+        quantities: 'Liste des phases',
+        inspections: 'Contrôles',
+        workflows: 'Modèles de phases',
+      },
     },
     access: {
       progressViewHint: "Obtenez le droit progress:view pour accéder au Gantt et aux jalons.",

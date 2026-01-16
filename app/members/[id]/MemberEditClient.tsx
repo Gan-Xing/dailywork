@@ -18,6 +18,7 @@ import { BasicInfoSection } from './components/BasicInfoSection'
 import { EmploymentSection } from './components/EmploymentSection'
 import { FormActions } from './components/FormActions'
 import { MemberEditHeader } from './components/MemberEditHeader'
+import { MemberSwitchSelect } from './components/MemberSwitchSelect'
 import { UnsavedChangesDialog } from './components/UnsavedChangesDialog'
 import { ProfileSection } from './components/ProfileSection'
 import { RoleSelector } from './components/RoleSelector'
@@ -218,19 +219,34 @@ export function MemberEditClient({
     : t.form.phonePlaceholder
 
   return (
-    <main className="min-h-screen bg-slate-50">
-      <div className="mx-auto flex max-w-6xl flex-col gap-6 px-6 pb-16 pt-10 sm:px-8 xl:max-w-[1500px] xl:px-12 2xl:max-w-[1700px] 2xl:px-14">
-        <MemberEditHeader
-          t={t}
-          locale={locale}
-          onLocaleChange={setLocale}
-          teamOptions={teamSelectOptions}
-          memberOptions={memberSelectOptions}
-          selectedTeam={selectedTeam}
-          selectedMemberId={selectedMemberId}
-          onTeamSelect={handleTeamSelect}
-          onMemberSelect={handleMemberSelect}
-        />
+    <main className="min-h-screen bg-slate-50 text-slate-900">
+      <MemberEditHeader t={t} locale={locale} onLocaleChange={setLocale} />
+
+      <div className="mx-auto flex max-w-6xl flex-col gap-6 px-6 pb-16 pt-6 sm:px-8 xl:max-w-[1500px] xl:px-12 2xl:max-w-[1700px] 2xl:px-14">
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-900/5">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <MemberSwitchSelect
+              label={t.form.team}
+              value={selectedTeam}
+              options={teamSelectOptions}
+              placeholder={t.labels.selectTeam}
+              searchPlaceholder={t.filters.searchPlaceholder}
+              emptyLabel={t.filters.noOptions}
+              onChange={handleTeamSelect}
+              className="min-w-[200px]"
+            />
+            <MemberSwitchSelect
+              label={t.form.name}
+              value={selectedMemberId}
+              options={memberSelectOptions}
+              placeholder={t.labels.selectMember}
+              searchPlaceholder={t.filters.searchPlaceholder}
+              emptyLabel={t.filters.noOptions}
+              onChange={handleMemberSelect}
+              className="min-w-[240px]"
+            />
+          </div>
+        </div>
 
         <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xl shadow-slate-900/5">
           <form className="grid gap-4" onSubmit={handleSubmit}>
