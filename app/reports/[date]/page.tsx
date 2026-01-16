@@ -333,7 +333,7 @@ export default function ReportEditorPage() {
 				// ignore storage quota errors
 			}
 		}
-		router.push(`/reports/${activeDate}/preview?locale=${locale}`);
+		router.push(`/reports/${activeDate}/template-preview?locale=${locale}`);
 	};
 
 	const equipmentTotals = useMemo(
