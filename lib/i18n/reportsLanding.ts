@@ -29,6 +29,26 @@ export type ReportsLandingCopy = {
     view: string
     updatedPrefix: string
   }
+  exportSection: {
+    badge: string
+    title: string
+    description: string
+    hint: string
+    selectAll: string
+    clearSelection: string
+    exportButton: string
+    exporting: string
+    selectedCount: string
+    missingSelection: string
+    exportFailed: string
+    empty: string
+    loading: string
+    error: string
+    dateLabel: string
+    updatedLabel: string
+    actionLabel: string
+    view: string
+  }
   alerts: {
     title: string
     createDenied: string
@@ -68,6 +88,26 @@ export const reportsLandingCopy: Record<Locale, ReportsLandingCopy> = {
       view: '查看',
       updatedPrefix: '最近更新：'
     },
+    exportSection: {
+      badge: 'PDF 导出',
+      title: '批量导出日报',
+      description: '仅可导出已填写的日报，支持多选合并为一个 PDF。',
+      hint: '仅显示已填写的日报。',
+      selectAll: '全选本月',
+      clearSelection: '清空选择',
+      exportButton: '导出 PDF',
+      exporting: '正在导出...',
+      selectedCount: '已选 {count} 条',
+      missingSelection: '请先选择要导出的日报。',
+      exportFailed: '导出日报失败，请稍后重试。',
+      empty: '当前月份没有可导出的日报。',
+      loading: '加载可导出日报...',
+      error: '加载可导出日报失败。',
+      dateLabel: '日期',
+      updatedLabel: '最近更新',
+      actionLabel: '操作',
+      view: '查看'
+    },
     alerts: {
       title: '权限提醒',
       createDenied: '缺少 report:edit 权限，无法创建或修改日报。',
@@ -105,6 +145,26 @@ export const reportsLandingCopy: Record<Locale, ReportsLandingCopy> = {
       empty: 'Aucun rapport pour le moment, créez le premier.',
       view: 'Voir',
       updatedPrefix: 'Dernière mise à jour : '
+    },
+    exportSection: {
+      badge: 'Export PDF',
+      title: 'Exporter les rapports',
+      description: 'Seuls les rapports remplis sont exportables. Sélection multiple combinée en un PDF.',
+      hint: 'Affiche uniquement les rapports remplis.',
+      selectAll: 'Tout sélectionner',
+      clearSelection: 'Effacer la sélection',
+      exportButton: 'Exporter en PDF',
+      exporting: 'Export en cours...',
+      selectedCount: '{count} sélectionné(s)',
+      missingSelection: 'Sélectionnez au moins un rapport à exporter.',
+      exportFailed: "Échec de l'export PDF, veuillez réessayer.",
+      empty: 'Aucun rapport exportable pour ce mois.',
+      loading: 'Chargement des rapports exportables...',
+      error: "Impossible de charger les rapports exportables.",
+      dateLabel: 'Date',
+      updatedLabel: 'Dernière mise à jour',
+      actionLabel: 'Action',
+      view: 'Voir'
     },
     alerts: {
       title: 'Alerte de droits',

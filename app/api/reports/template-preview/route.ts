@@ -13,6 +13,14 @@ import { prepareReportForDate } from '@/lib/server/reportStore'
 const invalidDateResponse = NextResponse.json({ message: 'Invalid date' }, { status: 400 })
 
 const resolveLocale = (value?: string | null): Locale => (value === 'fr' ? 'fr' : 'zh')
+const resolveBaseUrl = (request: Request) => {
+  const forwardedProto = request.headers.get('x-forwarded-proto')?.split(',')[0]?.trim()
+  const forwardedHost = request.headers.get('x-forwarded-host')?.split(',')[0]?.trim()
+  const host = forwardedHost ?? request.headers.get('host')
+  if (!host) return undefined
+  const proto = forwardedProto ?? 'http'
+  return `${proto}://${host}`
+}
 
 const getTemplate = async (locale: Locale) => {
   const published = await prisma.documentTemplate.findFirst({
@@ -72,6 +80,8 @@ export async function POST(request: Request) {
     report = recalcReportMaterials(prepared.report)
   }
 
-  const html = renderDailyReportTemplate(template.html, report, locale)
+  const html = renderDailyReportTemplate(template.html, report, locale, {
+    baseUrl: resolveBaseUrl(request),
+  })
   return NextResponse.json({ html, templateId: template.id })
 }

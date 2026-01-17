@@ -1,33 +1,29 @@
-import { SkeletonBar, SkeletonBlock, SkeletonCircle } from '@/components/Skeletons'
+import { PageHeaderNav } from '@/components/PageHeaderNav'
+import { SkeletonBar, SkeletonBlock, SkeletonCircle, SkeletonText } from '@/components/Skeletons'
 
 export default function Loading() {
   return (
-    <main className="mx-auto flex max-w-6xl flex-col gap-8 px-4 py-10 lg:px-8 lg:py-12 xl:max-w-[1500px] xl:px-10 2xl:max-w-[1700px] 2xl:px-12">
-      <nav className="flex flex-wrap items-center gap-2">
-        <SkeletonBar className="h-6 w-16" />
-        <SkeletonBar className="h-6 w-24" />
-        <SkeletonBar className="h-6 w-20" />
-      </nav>
-
-      <div className="rounded-3xl border border-slate-200 bg-white/80 p-5 shadow-sm">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <SkeletonBar className="h-10 w-32" />
-          <div className="space-y-2 text-center sm:text-left">
-            <SkeletonBar className="h-3 w-28" />
-            <SkeletonBar className="h-7 w-44" />
+    <main className="min-h-screen bg-slate-50 text-slate-900">
+      <PageHeaderNav
+        className="z-30 py-4"
+        breadcrumbs={[
+          { label: <SkeletonText className="h-5 w-16" />, href: '/' },
+          { label: <SkeletonText className="h-5 w-24" />, href: '/reports' },
+          { label: <SkeletonText className="h-5 w-20" /> },
+        ]}
+        title={<SkeletonText className="h-7 w-40" />}
+        subtitle={<SkeletonText className="h-4 w-24" />}
+        rightSlot={
+          <div className="flex items-center gap-2">
+            <SkeletonBar className="h-9 w-24" />
+            <SkeletonBar className="h-9 w-24" />
+            <SkeletonBar className="h-9 w-24" />
           </div>
-          <div className="flex gap-2">
-            <SkeletonBar className="h-10 w-28" />
-            <SkeletonBar className="h-10 w-28" />
-          </div>
-        </div>
-      </div>
-
-      <div className="flex justify-end">
-        <SkeletonBar className="h-6 w-32" />
-      </div>
-
-      <div className="rounded-3xl border border-slate-200 bg-white/80 p-8 shadow-sm shadow-slate-100">
+        }
+        breadcrumbVariant="light"
+      />
+      <section className="mx-auto flex w-full max-w-[1700px] flex-col gap-8 px-4 pb-12 pt-6 lg:px-8 xl:px-10 2xl:px-12">
+        <div className="rounded-3xl border border-slate-200 bg-white/80 p-8 shadow-sm shadow-slate-100">
         <div className="grid gap-6 lg:grid-cols-2">
           <SkeletonBlock className="h-48 border border-slate-100 bg-slate-50" />
           <SkeletonBlock className="h-48 border border-slate-100 bg-slate-50" />
@@ -44,7 +40,7 @@ export default function Loading() {
         </div>
       </div>
 
-      <section className="space-y-5">
+        <section className="space-y-5">
         {Array.from({ length: 4 }).map((_, index) => (
           <div
             // skeleton section only
@@ -66,6 +62,7 @@ export default function Loading() {
             </div>
           </div>
         ))}
+        </section>
       </section>
     </main>
   )

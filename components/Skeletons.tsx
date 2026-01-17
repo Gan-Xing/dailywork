@@ -18,6 +18,20 @@ export function SkeletonBar({ className, tone = 'light' }: { className?: string;
   )
 }
 
+export function SkeletonText({
+  className,
+  tone = 'light',
+}: {
+  className?: string
+  tone?: SkeletonTone
+}) {
+  return (
+    <span
+      className={`inline-block animate-pulse rounded-full ${toneBar[tone]} ${className ?? ''}`.trim()}
+    />
+  )
+}
+
 export function SkeletonBlock({
   className,
   tone = 'light',

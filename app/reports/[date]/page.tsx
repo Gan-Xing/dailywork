@@ -2,11 +2,11 @@
 
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 
-import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 
 import Image from 'next/image';
 
+import { PageHeaderNav } from '@/components/PageHeaderNav';
 import { EquipmentTable } from '@/components/report/EquipmentTable';
 import { MaterialsTable } from '@/components/report/MaterialsTable';
 import { PersonnelTable } from '@/components/report/PersonnelTable';
@@ -24,7 +24,7 @@ import {
 	type WeatherPeriod,
 	type WorkBlock
 } from '@/lib/reportSchema';
-import { formatCopy, getCopy, localeLabels, locales, type Locale } from '@/lib/i18n';
+import { formatCopy, getCopy, type Locale } from '@/lib/i18n';
 import {
 	createInitialReportState,
 	type DailyReport,
@@ -639,26 +639,56 @@ export default function ReportEditorPage() {
 
 	if (!isReady) {
 		return (
-			<main className='mx-auto flex max-w-5xl flex-col gap-6 px-4 py-10 sm:px-6 lg:px-8 xl:max-w-[1500px] xl:px-10 2xl:max-w-[1700px] 2xl:px-12'>
-				<p className='text-center text-sm text-slate-500'>
-					加载中...
-				</p>
+			<main className='min-h-screen bg-slate-50 text-slate-900'>
+				<PageHeaderNav
+					className='z-30 py-4'
+					breadcrumbs={[
+						{ label: breadcrumbHome, href: '/' },
+						{ label: breadcrumbReports, href: '/reports' },
+						{ label: breadcrumbDate }
+					]}
+					title={breadcrumbDate}
+					subtitle={reportDateLabel}
+					locale={locale}
+					onLocaleChange={setLocale}
+					localeVariant='light'
+					breadcrumbVariant='light'
+				/>
+				<section className='mx-auto w-full max-w-[1700px] px-4 pb-12 pt-6 sm:px-6 lg:px-8 xl:px-10 2xl:px-12'>
+					<p className='text-center text-sm text-slate-500'>加载中...</p>
+				</section>
 			</main>
 		);
 	}
 
 	if (loadError) {
 		return (
-			<main className='mx-auto flex max-w-5xl flex-col gap-6 px-4 py-10 sm:px-6 lg:px-8 xl:max-w-[1500px] xl:px-10 2xl:max-w-[1700px] 2xl:px-12'>
-				<div className='rounded-3xl border border-red-200 bg-red-50 p-6 text-center text-sm text-red-700'>
-					{loadError}
-				</div>
-				<button
-					type='button'
-					className='mx-auto rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50'
-					onClick={handleBack}>
-					{homeButtonBase}
-				</button>
+			<main className='min-h-screen bg-slate-50 text-slate-900'>
+				<PageHeaderNav
+					className='z-30 py-4'
+					breadcrumbs={[
+						{ label: breadcrumbHome, href: '/' },
+						{ label: breadcrumbReports, href: '/reports' },
+						{ label: breadcrumbDate }
+					]}
+					title={breadcrumbDate}
+					subtitle={reportDateLabel}
+					locale={locale}
+					onLocaleChange={setLocale}
+					localeVariant='light'
+					breadcrumbVariant='light'
+				/>
+				<section className='mx-auto flex w-full max-w-[1700px] flex-col gap-6 px-4 pb-12 pt-6 sm:px-6 lg:px-8 xl:px-10 2xl:px-12'>
+					<div className='rounded-3xl border border-red-200 bg-red-50 p-6 text-center text-sm text-red-700'>
+						{loadError}
+					</div>
+					<button
+						type='button'
+						className='mx-auto rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50'
+						onClick={handleBack}>
+						{homeButtonBase}
+					</button>
+				</section>
 			</main>
 		);
 	}
@@ -674,81 +704,51 @@ export default function ReportEditorPage() {
 	});
 
 	return (
-		<>
-			<main className='mx-auto flex max-w-6xl flex-col gap-8 px-4 py-10 lg:px-8 lg:py-12 xl:max-w-[1500px] xl:px-10 2xl:max-w-[1700px] 2xl:px-12'>
-				<nav className='flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-600'>
-					<Link
-						href='/'
-						className='rounded-full border border-slate-200 bg-white/80 px-3 py-1 transition hover:bg-white'>
-						{breadcrumbHome}
-					</Link>
-					<span className='text-slate-400'>/</span>
-					<Link
-						href='/reports'
-						className='rounded-full border border-slate-200 bg-white/80 px-3 py-1 transition hover:bg-white'>
-						{breadcrumbReports}
-					</Link>
-					<span className='text-slate-400'>/</span>
-					<span className='rounded-full border border-slate-100 bg-slate-50 px-3 py-1 text-slate-800'>
-						{breadcrumbDate}
-					</span>
-				</nav>
-				<div className='rounded-3xl border border-slate-200 bg-white/80 p-5 shadow-sm'>
-					<div className='flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'>
+		<main className='min-h-screen bg-slate-50 text-slate-900'>
+			<PageHeaderNav
+				className='z-30 py-4'
+				breadcrumbs={[
+					{ label: breadcrumbHome, href: '/' },
+					{ label: breadcrumbReports, href: '/reports' },
+					{ label: breadcrumbDate }
+				]}
+				title={breadcrumbDate}
+				subtitle={reportDateLabel}
+				locale={locale}
+				onLocaleChange={setLocale}
+				localeVariant='light'
+				breadcrumbVariant='light'
+				rightSlot={
+					<div className='flex flex-wrap items-center gap-2'>
 						<button
 							type='button'
-							className='inline-flex items-center justify-center rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50'
+							className='inline-flex items-center justify-center rounded-2xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50'
 							onClick={handleBack}>
 							{homeButtonLabel}
 						</button>
-						<div className='text-center sm:text-left'>
-							<p className='text-xs font-semibold uppercase tracking-wide text-slate-500'>
-								{reportDateLabel}
-							</p>
-							<p className='text-2xl font-semibold text-slate-900'>
-								{report.metadata
-									.date ||
-									activeDate}
-							</p>
-						</div>
-						<div className='flex flex-col gap-2 sm:flex-row sm:items-center'>
-							<button
-								type='button'
-								className='inline-flex items-center justify-center rounded-2xl border border-blue-100 px-4 py-2 text-sm font-semibold text-blue-700 transition hover:bg-blue-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500'
-								onClick={
-									handlePreviewNavigate
-								}>
-								{
-									copy
-										.common
-										.previewButtonLabel
-								}
-							</button>
-							<button
-								type='button'
-								className='inline-flex items-center justify-center rounded-2xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-400'
-								onClick={handleSave}
-								disabled={isSaving}>
-								{isSaving
-									? savingButtonLabel
-									: saveButtonLabel}
-							</button>
-						</div>
+						<button
+							type='button'
+							className='inline-flex items-center justify-center rounded-2xl border border-blue-100 px-4 py-2 text-xs font-semibold text-blue-700 transition hover:bg-blue-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:cursor-not-allowed disabled:opacity-60'
+							onClick={handlePreviewNavigate}
+							disabled={!activeDate || !DATE_KEY_REGEX.test(activeDate)}>
+							{copy.common.previewButtonLabel}
+						</button>
+						<button
+							type='button'
+							className='inline-flex items-center justify-center rounded-2xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-400'
+							onClick={handleSave}
+							disabled={isSaving}>
+							{isSaving ? savingButtonLabel : saveButtonLabel}
+						</button>
 					</div>
-					{saveError ? (
-						<p className='mt-2 text-center text-xs text-red-600 sm:text-right'>
-							{saveError}
-						</p>
-					) : null}
-				</div>
-
-				<div className='flex justify-end'>
-					<LocaleToggle
-						label={copy.common.languageToggleLabel}
-						value={locale}
-						onChange={setLocale}
-					/>
-				</div>
+				}
+			/>
+			<section className='mx-auto flex w-full max-w-[1700px] flex-col gap-8 px-4 pb-12 pt-6 lg:px-8 xl:px-10 2xl:px-12'>
+				{saveError ? (
+					<p className='text-center text-xs text-red-600 sm:text-right'>
+						{saveError}
+					</p>
+				) : null}
 				<header className='rounded-3xl border border-slate-200 bg-white/80 p-8 shadow-sm shadow-slate-100'>
 					<div className='grid gap-6 lg:grid-cols-2'>
 						<div>
@@ -1427,47 +1427,8 @@ export default function ReportEditorPage() {
 						)}
 					</div>
 				</SectionCard>
-			</main>
-		</>
-	);
-}
-
-function LocaleToggle({
-	label,
-	value,
-	onChange
-}: {
-	label: string;
-	value: Locale;
-	onChange: (locale: Locale) => void;
-}) {
-	return (
-		<div className='flex items-center gap-3'>
-			<span className='text-xs font-semibold uppercase tracking-wide text-slate-500'>
-				{label}
-			</span>
-			<div className='inline-flex rounded-full border border-slate-200 bg-white p-1'>
-				{locales.map((option) => {
-					const isActive = option === value;
-					return (
-						<button
-							key={option}
-							type='button'
-							className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
-								isActive
-									? 'bg-slate-900 text-white'
-									: 'text-slate-500 hover:text-slate-900'
-							}`}
-							onClick={() =>
-								onChange(option)
-							}
-							aria-pressed={isActive}>
-							{localeLabels[option]}
-						</button>
-					);
-				})}
-			</div>
-		</div>
+			</section>
+		</main>
 	);
 }
 

@@ -3,6 +3,9 @@
 import { useEffect, useState } from 'react'
 import { useParams, useSearchParams } from 'next/navigation'
 
+import { PageHeaderNav } from '@/components/PageHeaderNav'
+import { getCopy } from '@/lib/i18n'
+import { reportLandingBreadcrumbs } from '@/lib/i18n/reportsLanding'
 import { getReportPreviewCopy } from '@/lib/i18n/reportPreview'
 import { DATE_KEY_REGEX } from '@/lib/reportUtils'
 import type { DailyReport } from '@/lib/reportState'
@@ -14,10 +17,27 @@ export default function ReportTemplatePreviewPage() {
   const searchParams = useSearchParams()
   const localeParam = searchParams?.get('locale') === 'fr' ? 'fr' : 'zh'
   const copy = getReportPreviewCopy(localeParam)
+  const uiCopy = getCopy(localeParam)
+  const breadcrumbsCopy = reportLandingBreadcrumbs[localeParam]
   const dateKey = typeof params?.date === 'string' ? params.date : ''
   const [html, setHtml] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const breadcrumbDate = dateKey || '--'
+
+  const header = (
+    <PageHeaderNav
+      className="z-30 py-4"
+      breadcrumbs={[
+        { label: breadcrumbsCopy.home, href: '/' },
+        { label: breadcrumbsCopy.reports, href: '/reports' },
+        { label: breadcrumbDate },
+      ]}
+      title={uiCopy.common.previewTitle}
+      subtitle={breadcrumbDate}
+      breadcrumbVariant="light"
+    />
+  )
 
   useEffect(() => {
     let isMounted = true
@@ -78,29 +98,38 @@ export default function ReportTemplatePreviewPage() {
 
   if (isLoading) {
     return (
-      <main className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-10">
-        <p className="text-center text-sm text-slate-500">{copy.loading}</p>
+      <main className="min-h-screen bg-slate-50 text-slate-900">
+        {header}
+        <section className="mx-auto w-full max-w-[1700px] px-4 pb-10 pt-6 sm:px-6 lg:px-8 xl:px-10 2xl:px-12">
+          <p className="text-center text-sm text-slate-500">{copy.loading}</p>
+        </section>
       </main>
     )
   }
 
   if (error || !html) {
     return (
-      <main className="mx-auto flex max-w-4xl flex-col gap-6 px-4 py-10">
-        <div className="rounded-3xl border border-red-200 bg-red-50 p-6 text-center text-sm text-red-700">
-          {error || copy.error}
-        </div>
+      <main className="min-h-screen bg-slate-50 text-slate-900">
+        {header}
+        <section className="mx-auto w-full max-w-[1700px] px-4 pb-10 pt-6 sm:px-6 lg:px-8 xl:px-10 2xl:px-12">
+          <div className="rounded-3xl border border-red-200 bg-red-50 p-6 text-center text-sm text-red-700">
+            {error || copy.error}
+          </div>
+        </section>
       </main>
     )
   }
 
   return (
-    <main className="flex min-h-screen w-full items-start justify-center bg-slate-200 p-4">
-      <iframe
-        title="Daily report template preview"
-        className="h-[90vh] w-full max-w-[1400px] rounded-3xl border border-slate-200 bg-white shadow-xl"
-        srcDoc={html}
-      />
+    <main className="min-h-screen bg-slate-50 text-slate-900">
+      {header}
+      <section className="flex w-full items-start justify-center bg-slate-200 px-4 pb-10 pt-6 sm:px-6 lg:px-8 xl:px-10 2xl:px-12">
+        <iframe
+          title="Daily report template preview"
+          className="h-[90vh] w-full max-w-[1400px] rounded-3xl border border-slate-200 bg-white shadow-xl"
+          srcDoc={html}
+        />
+      </section>
     </main>
   )
 }

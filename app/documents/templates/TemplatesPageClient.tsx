@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 
 import { locales } from '@/lib/i18n'
@@ -7,6 +8,8 @@ import { getDocumentsCopy } from '@/lib/i18n/documents'
 import { usePreferredLocale } from '@/lib/usePreferredLocale'
 
 import TemplateActions from './TemplateActions'
+import { getTemplateHtml } from './actions'
+import { TemplatePreviewModal } from './TemplatePreviewModal'
 
 type TemplateItem = {
   id: string
@@ -29,6 +32,23 @@ const formatName = (name: string) => name.replace(/\s+v\d+$/i, '').trim()
 export function TemplatesPageClient({ items, canCreate, canUpdate }: Props) {
   const { locale } = usePreferredLocale('zh', locales)
   const copy = getDocumentsCopy(locale)
+
+  const [loadingId, setLoadingId] = useState<string | null>(null)
+  const [previewHtml, setPreviewHtml] = useState<string | null>(null)
+  const [previewTitle, setPreviewTitle] = useState('')
+
+  const handlePreview = async (id: string, name: string) => {
+    setLoadingId(id)
+    try {
+      const html = await getTemplateHtml(id)
+      setPreviewHtml(html)
+      setPreviewTitle(name)
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setLoadingId(null)
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -78,9 +98,14 @@ export function TemplatesPageClient({ items, canCreate, canUpdate }: Props) {
                 <span className="text-xs text-slate-600">{tpl.language}</span>
                 <span className="text-xs text-slate-500">{tpl.updatedAt || ''}</span>
                 <div className="flex justify-end gap-2 text-xs font-semibold">
-                  <Link href={`/documents/templates/${tpl.id}`} className="rounded-full bg-emerald-500 px-3 py-1 text-white shadow">
-                    {copy.templates.actions.view}
-                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => handlePreview(tpl.id, formatName(tpl.name))}
+                    disabled={loadingId === tpl.id}
+                    className="rounded-full bg-emerald-500 px-3 py-1 text-white shadow disabled:opacity-70"
+                  >
+                    {loadingId === tpl.id ? '...' : copy.templates.actions.view}
+                  </button>
                   {canUpdate ? (
                     <>
                       <Link
@@ -101,6 +126,14 @@ export function TemplatesPageClient({ items, canCreate, canUpdate }: Props) {
           </div>
         </div>
       </div>
+
+      <TemplatePreviewModal
+        open={!!previewHtml}
+        title={previewTitle}
+        html={previewHtml ?? ''}
+        onClose={() => setPreviewHtml(null)}
+      />
     </div>
   )
 }
+

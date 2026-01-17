@@ -1,13 +1,13 @@
 'use client'
 
 import Link from 'next/link'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 import { AlertDialog, type AlertTone } from '@/components/AlertDialog'
 import { AccessDenied } from '@/components/AccessDenied'
-import { LocaleSwitcher } from '@/components/LocaleSwitcher'
-import { locales, type Locale } from '@/lib/i18n'
+import { PageHeaderNav } from '@/components/PageHeaderNav'
+import { formatCopy, locales, type Locale } from '@/lib/i18n'
 import {
   getReportsLandingCopy,
   reportDateLocales,
@@ -48,6 +48,12 @@ const buildCalendar = (anchor: Date) => {
 const formatMonthKey = (date: Date) =>
   `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
 
+const buildExportFilename = (dates: string[]) => {
+  if (dates.length === 1) return `daily-report-${dates[0]}.pdf`
+  const sorted = [...dates].sort()
+  return `daily-reports-${sorted[0]}-to-${sorted[sorted.length - 1]}.pdf`
+}
+
 type SessionUser = {
   id: number
   username: string
@@ -72,6 +78,10 @@ export default function ReportsLandingPage() {
   const [alertDialog, setAlertDialog] = useState<{ title: string; description: string; tone?: AlertTone } | null>(
     null,
   )
+  const [selectedExportDates, setSelectedExportDates] = useState<Set<string>>(() => new Set())
+  const [exportPending, setExportPending] = useState(false)
+  const [exportError, setExportError] = useState<string | null>(null)
+  const selectAllRef = useRef<HTMLInputElement | null>(null)
 
   const monthKey = useMemo(() => formatMonthKey(monthCursor), [monthCursor])
   const dateLocale = reportDateLocales[locale]
@@ -152,10 +162,28 @@ export default function ReportsLandingPage() {
     fetchRecentReports()
   }, [authLoaded, canView, fetchRecentReports])
 
+  useEffect(() => {
+    setSelectedExportDates(new Set())
+    setExportError(null)
+  }, [monthKey])
+
   const reportDates = useMemo(
     () => new Set(monthReports.map((entry) => entry.date)),
     [monthReports],
   )
+  const selectedExportList = useMemo(
+    () => Array.from(selectedExportDates).sort(),
+    [selectedExportDates],
+  )
+  const allExportSelected =
+    monthReports.length > 0 && selectedExportDates.size === monthReports.length
+  const someExportSelected = selectedExportDates.size > 0 && !allExportSelected
+
+  useEffect(() => {
+    if (selectAllRef.current) {
+      selectAllRef.current.indeterminate = !allExportSelected && someExportSelected
+    }
+  }, [allExportSelected, someExportSelected])
 
   const calendarDays = useMemo(() => buildCalendar(monthCursor), [monthCursor])
 
@@ -204,6 +232,71 @@ export default function ReportsLandingPage() {
     }
   }
 
+  const toggleExportDate = (date: string) => {
+    setSelectedExportDates((prev) => {
+      const next = new Set(prev)
+      if (next.has(date)) {
+        next.delete(date)
+      } else {
+        next.add(date)
+      }
+      return next
+    })
+    setExportError(null)
+  }
+
+  const handleSelectAllExports = () => {
+    if (monthReports.length === 0) return
+    setSelectedExportDates(new Set(monthReports.map((entry) => entry.date)))
+    setExportError(null)
+  }
+
+  const handleClearExports = () => {
+    setSelectedExportDates(new Set())
+    setExportError(null)
+  }
+
+  const handleExportPdf = async () => {
+    if (selectedExportList.length === 0) {
+      setExportError(t.exportSection.missingSelection)
+      return
+    }
+    setExportPending(true)
+    setExportError(null)
+    try {
+      const controller = new AbortController()
+      const timeoutId = window.setTimeout(() => controller.abort(), 60_000)
+      const res = await fetch('/api/reports/pdf', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
+        body: JSON.stringify({ dates: selectedExportList, locale }),
+      })
+      window.clearTimeout(timeoutId)
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { message?: string }
+        throw new Error(data.message ?? t.exportSection.exportFailed)
+      }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const filename = buildExportFilename(selectedExportList)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = filename
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.setTimeout(() => URL.revokeObjectURL(url), 30000)
+    } catch (err) {
+      const message =
+        (err as Error).name === 'AbortError' ? t.exportSection.exportFailed : (err as Error).message
+      setExportError(message)
+    } finally {
+      setExportPending(false)
+    }
+  }
+
   const alertNode = (
     <AlertDialog
       open={Boolean(alertDialog)}
@@ -229,24 +322,19 @@ export default function ReportsLandingPage() {
   }
 
   return (
-    <main className="relative mx-auto flex max-w-6xl flex-col gap-8 px-4 py-10 sm:px-6 lg:px-8 xl:max-w-[1500px] xl:px-10 2xl:max-w-[1700px] 2xl:px-12">
+    <main className="min-h-screen bg-slate-50 text-slate-900">
       {alertNode}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <nav className="flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-600">
-          <Link
-            href="/"
-            className="rounded-full border border-slate-200 bg-white/80 px-3 py-1 transition hover:bg-white"
-          >
-            {breadcrumbHome}
-          </Link>
-          <span className="text-slate-400">/</span>
-          <span className="rounded-full border border-slate-100 bg-slate-50 px-3 py-1 text-slate-800">
-            {breadcrumbReports}
-          </span>
-        </nav>
-        <LocaleSwitcher locale={locale} onChange={setLocale} variant="light" />
-      </div>
-      <section className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-sm shadow-slate-100">
+      <PageHeaderNav
+        className="z-30 py-4"
+        breadcrumbs={[{ label: breadcrumbHome, href: '/' }, { label: breadcrumbReports }]}
+        title={breadcrumbReports}
+        locale={locale}
+        onLocaleChange={setLocale}
+        localeVariant="light"
+        breadcrumbVariant="light"
+      />
+      <section className="mx-auto w-full max-w-[1700px] space-y-8 px-4 pb-10 pt-6 sm:px-6 lg:px-8 xl:px-10 2xl:px-12">
+        <section className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-sm shadow-slate-100">
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -285,9 +373,9 @@ export default function ReportsLandingPage() {
             ) : null}
           </div>
         </div>
-      </section>
+        </section>
 
-      <section className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-sm shadow-slate-100">
+        <section className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-sm shadow-slate-100">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -351,9 +439,132 @@ export default function ReportsLandingPage() {
         ) : isMonthLoading ? (
           <p className="mt-3 text-xs text-slate-500">{t.calendar.loading}</p>
         ) : null}
-      </section>
+        </section>
 
-      <section className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-sm shadow-slate-100">
+        <section className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-sm shadow-slate-100">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              {t.exportSection.badge}
+            </p>
+            <h2 className="mt-1 text-xl font-semibold text-slate-900">{t.exportSection.title}</h2>
+            <p className="mt-1 text-sm text-slate-600">{t.exportSection.description}</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              className="inline-flex items-center justify-center rounded-2xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
+              onClick={handleSelectAllExports}
+              disabled={isMonthLoading || hasMonthError || monthReports.length === 0}
+            >
+              {t.exportSection.selectAll}
+            </button>
+            <button
+              type="button"
+              className="inline-flex items-center justify-center rounded-2xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
+              onClick={handleClearExports}
+              disabled={selectedExportDates.size === 0}
+            >
+              {t.exportSection.clearSelection}
+            </button>
+            <button
+              type="button"
+              className="inline-flex items-center justify-center rounded-2xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:bg-blue-300"
+              onClick={handleExportPdf}
+              disabled={selectedExportDates.size === 0 || exportPending}
+            >
+              {exportPending ? t.exportSection.exporting : t.exportSection.exportButton}
+            </button>
+          </div>
+        </div>
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-slate-50 px-4 py-3">
+          <span className="text-sm font-semibold text-slate-700">
+            {formatCopy(t.exportSection.selectedCount, { count: selectedExportDates.size })}
+          </span>
+          <span className="text-xs text-slate-500">{t.exportSection.hint}</span>
+        </div>
+        {isMonthLoading ? (
+          <p className="mt-4 text-sm text-slate-500">{t.exportSection.loading}</p>
+        ) : hasMonthError ? (
+          <p className="mt-4 text-sm text-red-600">{t.exportSection.error}</p>
+        ) : monthReports.length === 0 ? (
+          <p className="mt-4 text-sm text-slate-500">{t.exportSection.empty}</p>
+        ) : (
+          <div className="mt-4 overflow-x-auto">
+            <table className="min-w-[640px] w-full text-left text-sm">
+              <thead>
+                <tr className="border-b border-slate-200 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  <th className="px-3 py-2">
+                    <input
+                      ref={selectAllRef}
+                      type="checkbox"
+                      className="h-4 w-4 rounded border-slate-300 text-blue-600"
+                      checked={allExportSelected}
+                      onChange={() => {
+                        if (allExportSelected) {
+                          handleClearExports()
+                        } else {
+                          handleSelectAllExports()
+                        }
+                      }}
+                      disabled={monthReports.length === 0}
+                      aria-label={t.exportSection.selectAll}
+                    />
+                  </th>
+                  <th className="px-3 py-2">{t.exportSection.dateLabel}</th>
+                  <th className="px-3 py-2">{t.exportSection.updatedLabel}</th>
+                  <th className="px-3 py-2 text-right">{t.exportSection.actionLabel}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {monthReports.map((entry) => {
+                  const isSelected = selectedExportDates.has(entry.date)
+                  return (
+                    <tr
+                      key={entry.date}
+                      className={`border-b border-slate-100 ${
+                        isSelected ? 'bg-blue-50/60' : 'bg-white'
+                      }`}
+                    >
+                      <td className="px-3 py-3">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 rounded border-slate-300 text-blue-600"
+                          checked={isSelected}
+                          onChange={() => toggleExportDate(entry.date)}
+                          aria-label={`${t.exportSection.dateLabel} ${entry.date}`}
+                        />
+                      </td>
+                      <td className="px-3 py-3 text-sm font-semibold text-slate-900">
+                        {entry.date}
+                      </td>
+                      <td className="px-3 py-3 text-xs text-slate-500">
+                        {new Intl.DateTimeFormat(dateLocale, {
+                          dateStyle: 'medium',
+                          timeStyle: 'short',
+                        }).format(new Date(entry.updatedAt))}
+                      </td>
+                      <td className="px-3 py-3 text-right">
+                        <Link
+                          href={`/reports/${entry.date}`}
+                          className="text-sm font-semibold text-blue-600 hover:text-blue-800"
+                        >
+                          {t.exportSection.view}
+                        </Link>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {exportError ? (
+          <p className="mt-3 text-xs text-amber-700">{exportError}</p>
+        ) : null}
+        </section>
+
+        <section className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-sm shadow-slate-100">
         <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
           {t.recent.badge}
         </p>
@@ -391,6 +602,7 @@ export default function ReportsLandingPage() {
             ))}
           </ul>
         )}
+        </section>
       </section>
     </main>
   )

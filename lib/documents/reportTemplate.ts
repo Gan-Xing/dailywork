@@ -18,6 +18,13 @@ const narrativeFallback: Record<Locale, string> = {
   zh: '无',
 }
 
+export interface RenderOptions {
+  /**
+   * Absolute base URL for static assets (e.g., https://dailywork-pearl.vercel.app).
+   */
+  baseUrl?: string
+}
+
 type Totals = {
   total?: string
   marche?: string
@@ -191,9 +198,15 @@ export const buildDailyReportTemplateContext = (report: DailyReport, locale: Loc
   }
 }
 
-export const renderDailyReportTemplate = (template: string, report: DailyReport, locale: Locale) => {
+export const renderDailyReportTemplate = (
+  template: string,
+  report: DailyReport,
+  locale: Locale,
+  options?: RenderOptions,
+) => {
+  const normalizedTemplate = normalizeAssets(template, options?.baseUrl)
   const context = buildDailyReportTemplateContext(report, locale)
-  return template.replace(PLACEHOLDER_REGEX, (_, rawKey: string) => {
+  return normalizedTemplate.replace(PLACEHOLDER_REGEX, (_, rawKey: string) => {
     const key = rawKey.trim()
     if (!key) return ''
     const value = resolvePath(context, key)
@@ -201,6 +214,29 @@ export const renderDailyReportTemplate = (template: string, report: DailyReport,
     if (Array.isArray(value)) return value.join(', ')
     return String(value)
   })
+}
+
+const normalizeAssets = (template: string, baseUrl?: string): string => {
+  const prefix = baseUrl ? baseUrl.replace(/\/+$/, '') : ''
+  const isAbsolute = (value: string) =>
+    /^https?:\/\//i.test(value) || value.startsWith('data:') || value.startsWith('blob:')
+  const isSpecial = (value: string) =>
+    value.startsWith('#') || value.startsWith('mailto:') || value.startsWith('tel:') || value.startsWith('javascript:')
+  const normalizePublicPath = (value: string) =>
+    value
+      .replace(/^(\.\.\/)+public\//, '/')
+      .replace(/^\.?\/?public\//, '/')
+  const toAbs = (value: string) => {
+    if (!value || isSpecial(value) || value.includes('{{')) return value
+    const normalized = normalizePublicPath(value)
+    if (isAbsolute(normalized)) return normalized
+    if (!prefix) return normalized.startsWith('/') ? normalized : `/${normalized}`
+    return `${prefix}${normalized.startsWith('/') ? normalized : `/${normalized}`}`
+  }
+
+  return template
+    .replace(/href="([^"]+\.css[^"]*)"/gi, (_match, href) => `href="${toAbs(href)}"`)
+    .replace(/src="([^"]+)"/gi, (_match, src) => `src="${toAbs(src)}"`)
 }
 
 const resolvePath = (source: unknown, path: string): unknown => {
