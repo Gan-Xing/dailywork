@@ -285,7 +285,7 @@ const boqRowToneStyles: Record<BoqItemTone, string> = {
   SECTION: 'bg-slate-100/70 text-slate-900 font-semibold',
   SUBSECTION: 'bg-slate-50/70 text-slate-700 font-medium',
   ITEM: 'text-slate-700',
-  TOTAL: 'bg-emerald-50 text-emerald-800 font-semibold',
+  TOTAL: 'bg-emerald-100/80 text-emerald-900 font-semibold',
 }
 
 const parseDecimalValue = (value?: string | null) => {

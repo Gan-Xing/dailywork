@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
-import { DocumentStatus } from '@prisma/client'
+import { DocumentStatus, DocumentType } from '@prisma/client'
 
 import { formatCopy, locales, type Locale } from '@/lib/i18n'
 import { getDocumentsCopy } from '@/lib/i18n/documents'
@@ -13,7 +13,15 @@ import type { InspectionListItem } from '@/lib/progressTypes'
 import { usePreferredLocale } from '@/lib/usePreferredLocale'
 import type { SubmissionData, SubmissionItem, Party } from '@/types/documents'
 
-type TemplateOption = { id: string; name: string; version: number; status: string; html?: string; placeholders: Array<{ key: string; path?: string }> }
+type TemplateOption = {
+  id: string
+  name: string
+  version: number
+  status: string
+  type?: DocumentType | null
+  html?: string
+  placeholders: Array<{ key: string; path?: string }>
+}
 
 type Props = {
   initialSubmission?: {
@@ -293,7 +301,7 @@ export default function SubmissionEditor({ initialSubmission, canManage = false,
         const res = await fetch('/api/documents/templates', { credentials: 'include' })
         const json = (await res.json()) as { items?: TemplateOption[]; message?: string }
         if (!res.ok) throw new Error(json.message ?? copy.submissionEditor.errors.loadTemplates)
-        const items = json.items ?? []
+        const items = (json.items ?? []).filter((item) => item.type === DocumentType.SUBMISSION || !item.type)
         setTemplates(items)
         if ((!selectedTemplateId || !items.find((t) => t.id === selectedTemplateId)) && items.length) {
           setSelectedTemplateId(items[0].id ?? null)
@@ -539,18 +547,6 @@ export default function SubmissionEditor({ initialSubmission, canManage = false,
   return (
     <>
       <div className="space-y-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-
-          <div className="flex gap-2 text-xs font-semibold">
-            <Link
-              href="/documents/submissions"
-              className="rounded-full border border-slate-200 px-4 py-2 text-slate-700 hover:border-slate-300 hover:bg-slate-100"
-            >
-              {copy.submissionEditor.back}
-            </Link>
-          </div>
-        </div>
-
         {error ? <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900">{error}</div> : null}
 
         <div className="flex flex-wrap items-center gap-3 text-sm font-semibold">
@@ -582,6 +578,14 @@ export default function SubmissionEditor({ initialSubmission, canManage = false,
               {copy.submissionEditor.baseFields.readOnly}
             </span>
           ) : null}
+          <div className="ml-auto flex gap-2 text-xs font-semibold">
+            <Link
+              href="/documents/submissions"
+              className="rounded-full border border-slate-200 px-4 py-2 text-slate-700 hover:border-slate-300 hover:bg-slate-100"
+            >
+              {copy.submissionEditor.back}
+            </Link>
+          </div>
         </div>
 
         {activeTab === 'form' ? (

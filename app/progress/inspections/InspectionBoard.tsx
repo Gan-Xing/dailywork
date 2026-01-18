@@ -1718,7 +1718,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
               {canBulkEdit ? (
                 <button
                   type="button"
-                  className="rounded-xl border border-rose-200/60 px-4 py-2 text-xs font-semibold text-rose-50 transition hover:-translate-y-0.5 hover:border-rose-200 hover:bg-rose-200/10 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="rounded-xl bg-rose-500 px-4 py-2 text-xs font-semibold text-white shadow-lg shadow-rose-500/30 transition hover:-translate-y-0.5 hover:bg-rose-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 disabled:cursor-not-allowed disabled:bg-rose-200 disabled:text-rose-100 disabled:shadow-none disabled:opacity-80"
                   onClick={openBulkDelete}
                   disabled={selectedIds.length === 0}
                 >
@@ -1728,7 +1728,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
               {canBulkEdit ? (
                 <button
                   type="button"
-                  className="rounded-xl bg-emerald-300 px-4 py-2 text-xs font-semibold text-slate-900 shadow-lg shadow-emerald-400/30 transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="rounded-xl bg-emerald-500 px-4 py-2 text-xs font-semibold text-white shadow-lg shadow-emerald-500/30 transition hover:-translate-y-0.5 hover:bg-emerald-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300 disabled:cursor-not-allowed disabled:bg-emerald-200 disabled:text-emerald-100 disabled:shadow-none disabled:opacity-80"
                   onClick={() => {
                     resetBulkEditForm()
                     setBulkEditOpen(true)

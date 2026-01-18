@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 
 import { AccessDenied } from '@/components/AccessDenied'
@@ -37,7 +37,30 @@ type BoqItemRecord = {
 type BoqCompletionRecord = {
   boqItemId: number
   bindingCount: number
+  designQuantity: number | null
   completedQuantity: number | null
+}
+
+type BoqCompletionDetailRecord = {
+  boqItemId: number
+  inputId: number
+  phaseItemId: number
+  phaseItemName: string
+  phaseItemSpec: string | null
+  intervalId: number
+  intervalStartPk: number
+  intervalEndPk: number
+  intervalSide: 'LEFT' | 'RIGHT' | 'BOTH'
+  intervalSpec: string | null
+  roadId: number
+  roadName: string
+  roadSlug: string
+  manualQuantity: number | null
+  computedQuantity: number | null
+  effectiveQuantity: number
+  completionPercent: number
+  completedQuantity: number
+  unit: string | null
 }
 
 type FetchStatus = 'idle' | 'loading' | 'success' | 'error'
@@ -85,6 +108,19 @@ const formatPercent = (value: number | null, localeId: string) => {
   return `${formatter.format(value)}%`
 }
 
+const formatPk = (value: number) => {
+  if (!Number.isFinite(value)) return '—'
+  const km = Math.floor(value / 1000)
+  const m = Math.round(value % 1000)
+  return `PK${km}+${String(m).padStart(3, '0')}`
+}
+
+const sideLabelMap: Record<BoqCompletionDetailRecord['intervalSide'], string> = {
+  LEFT: '左',
+  RIGHT: '右',
+  BOTH: '双侧',
+}
+
 const normalizeBoqCode = (value?: string | null) => (value ?? '').trim().toUpperCase()
 const isVatCode = (code: string) => code === 'TVA'
 const isTotalHtvaCode = (code: string) => code.startsWith('TOTAL HTVA')
@@ -94,7 +130,7 @@ const boqRowToneStyles: Record<BoqRowTone, string> = {
   section: 'bg-slate-100/70 text-slate-900 font-semibold',
   subsection: 'bg-slate-50/70 text-slate-700 font-medium',
   item: 'text-slate-700',
-  total: 'bg-emerald-50 text-emerald-800 font-semibold',
+  total: 'bg-emerald-100/80 text-emerald-900 font-semibold',
 }
 
 type BoqProjectMeta = {
@@ -120,6 +156,14 @@ const boqProjectMeta: Record<string, BoqProjectMeta> = {
   },
   'project-tanda-city': {
     label: { zh: '丹达市政路', fr: 'Voiries de Tanda' },
+    headerLeft: {
+      zh: '5公里道路整治工程 / 丹达市政道路 5公里',
+      fr: "TRAVAUX D'AMENAGEMENT DE 5 KM DE VOIRIES / VOIRIES DE TANDA 5 KM",
+    },
+    headerRight: {
+      zh: '路面结构：5 BB +12 GNT+18 GN 3%',
+      fr: 'Structure de chaussee : 5 BB +12 GNT+18 GN 3%',
+    },
   },
 }
 
@@ -210,6 +254,18 @@ export default function ProductionValuePage() {
   const [completionError, setCompletionError] = useState<string | null>(null)
   const [completionMap, setCompletionMap] = useState<Map<number, BoqCompletionRecord>>(
     new Map(),
+  )
+  const [completionDetails, setCompletionDetails] = useState<
+    Map<number, BoqCompletionDetailRecord[]>
+  >(new Map())
+  const [completionDetailLoading, setCompletionDetailLoading] = useState<Set<number>>(
+    new Set(),
+  )
+  const [completionDetailErrors, setCompletionDetailErrors] = useState<Map<number, string>>(
+    new Map(),
+  )
+  const [expandedCompletionItems, setExpandedCompletionItems] = useState<Set<number>>(
+    new Set(),
   )
   const boqSheetType: BoqSheetType = 'CONTRACT'
   const [boqSearch, setBoqSearch] = useState('')
@@ -509,6 +565,73 @@ export default function ProductionValuePage() {
   }, [activeTab, copy.completion.messages.loadError, productionUnauthorized, selectedProjectId])
 
   useEffect(() => {
+    if (activeTab !== 'completion') return
+    setExpandedCompletionItems(new Set())
+    setCompletionDetails(new Map())
+    setCompletionDetailLoading(new Set())
+    setCompletionDetailErrors(new Map())
+  }, [activeTab, selectedProjectId])
+
+  const loadCompletionDetails = async (boqItemId: number) => {
+    if (!selectedProjectId) return
+    setCompletionDetailLoading((prev) => {
+      const next = new Set(prev)
+      next.add(boqItemId)
+      return next
+    })
+    setCompletionDetailErrors((prev) => {
+      const next = new Map(prev)
+      next.delete(boqItemId)
+      return next
+    })
+    try {
+      const response = await fetch(
+        `/api/value/boq-completion/${boqItemId}?projectId=${selectedProjectId}`,
+        { credentials: 'include' },
+      )
+      const payload = (await response
+        .json()
+        .catch(() => ({}))) as { details?: BoqCompletionDetailRecord[]; message?: string }
+      if (!response.ok) {
+        throw new Error(payload.message ?? copy.completion.messages.loadError)
+      }
+      setCompletionDetails((prev) => {
+        const next = new Map(prev)
+        next.set(boqItemId, payload.details ?? [])
+        return next
+      })
+    } catch (error) {
+      setCompletionDetailErrors((prev) => {
+        const next = new Map(prev)
+        next.set(boqItemId, (error as Error).message ?? copy.completion.messages.loadError)
+        return next
+      })
+    } finally {
+      setCompletionDetailLoading((prev) => {
+        const next = new Set(prev)
+        next.delete(boqItemId)
+        return next
+      })
+    }
+  }
+
+  const toggleCompletionDetails = (boqItemId: number) => {
+    const isExpanded = expandedCompletionItems.has(boqItemId)
+    setExpandedCompletionItems((prev) => {
+      const next = new Set(prev)
+      if (next.has(boqItemId)) {
+        next.delete(boqItemId)
+      } else {
+        next.add(boqItemId)
+      }
+      return next
+    })
+    if (!isExpanded && !completionDetails.has(boqItemId) && !completionDetailLoading.has(boqItemId)) {
+      void loadCompletionDetails(boqItemId)
+    }
+  }
+
+  useEffect(() => {
     if (permissionDenied) return
     if (status !== 'error') return
     const message = error ?? productionError
@@ -640,6 +763,11 @@ export default function ProductionValuePage() {
       const designation = locale === 'fr' ? item.designationFr : item.designationZh
       const searchable = `${item.code} ${designation}`.toLowerCase()
       const completionRecord = completionMap.get(item.id)
+      const rawDesignQuantity = completionRecord?.designQuantity ?? null
+      const designQuantity =
+        rawDesignQuantity !== null && Number.isFinite(rawDesignQuantity)
+          ? rawDesignQuantity
+          : 0
       const rawCompletedQuantity = completionRecord?.completedQuantity ?? null
       const completedQuantity =
         rawCompletedQuantity !== null && Number.isFinite(rawCompletedQuantity)
@@ -647,12 +775,17 @@ export default function ProductionValuePage() {
           : 0
       const unitPriceValue = parseBoqNumber(item.unitPrice)
       const unitPriceMissing = unitPriceValue === null || unitPriceValue === 0
-      const quantityValue = parseBoqNumber(item.quantity)
+      const quantityValue =
+        item.tone === 'ITEM' ? designQuantity : parseBoqNumber(item.quantity)
       const totalPriceValue =
-        parseBoqNumber(item.totalPrice) ??
-        (item.tone === 'ITEM' && quantityValue !== null && unitPriceValue !== null
-          ? quantityValue * unitPriceValue
-          : null)
+        item.tone === 'ITEM'
+          ? quantityValue !== null && unitPriceValue !== null
+            ? quantityValue * unitPriceValue
+            : null
+          : parseBoqNumber(item.totalPrice) ??
+            (quantityValue !== null && unitPriceValue !== null
+              ? quantityValue * unitPriceValue
+              : null)
       const completedValue =
         item.tone === 'ITEM'
           ? unitPriceMissing
@@ -671,10 +804,12 @@ export default function ProductionValuePage() {
         id: item.id,
         code: item.code,
         designation,
+        bindingCount: completionRecord?.bindingCount ?? 0,
+        designQuantity: item.tone === 'ITEM' ? designQuantity : null,
         unit: item.unit,
         unitPrice: item.unitPrice,
-        quantity: item.quantity,
-        totalPrice: item.totalPrice,
+        quantity: item.tone === 'ITEM' ? designQuantity : item.quantity,
+        totalPrice: item.tone === 'ITEM' ? totalPriceValue : item.totalPrice,
         tone: mapBoqTone(item.tone),
         completedQuantity: item.tone === 'ITEM' ? completedQuantity : null,
         completedValue,
@@ -760,8 +895,10 @@ export default function ProductionValuePage() {
       options?: { hideCompletedQuantity?: boolean },
     ) => {
       if (!totals || totals.itemCount === 0) {
+        const fallbackTotalPrice = row.totalPriceValue ?? row.totalPrice
         return {
           ...row,
+          totalPrice: fallbackTotalPrice ?? null,
           completedQuantity: null,
           completedValue: null,
           completedPercent: null,
@@ -772,6 +909,7 @@ export default function ProductionValuePage() {
         totals.totalPrice > 0 ? (totals.completedValue / totals.totalPrice) * 100 : null
       return {
         ...row,
+        totalPrice: totals.totalPrice,
         completedQuantity: options?.hideCompletedQuantity ? null : totals.completedQuantity,
         completedValue: totals.completedValue,
         completedPercent,
@@ -952,6 +1090,7 @@ export default function ProductionValuePage() {
   const headers = copy.page.tableHeaders
   const boqHeaders = copy.boq.tableHeaders
   const completionHeaders = copy.completion.tableHeaders
+  const completionColumnCount = 9
   const tabTitle =
     activeTab === 'production'
       ? copy.page.title
@@ -1242,49 +1381,176 @@ export default function ProductionValuePage() {
                         {displayCompletionRows.map((row) => {
                           const tone = row.tone ?? 'item'
                           const isHighlighted = highlightedCompletionIndices.has(row.index)
+                          const bindingCount = row.bindingCount ?? 0
+                          const isExpandable = tone === 'item' && bindingCount > 0
+                          const isExpanded = isExpandable && expandedCompletionItems.has(row.id)
+                          const detailItems = completionDetails.get(row.id) ?? []
+                          const detailLoading = completionDetailLoading.has(row.id)
+                          const detailError = completionDetailErrors.get(row.id) ?? null
                           return (
-                            <tr
-                              key={`${row.code}-${row.index}`}
-                              className={`transition ${
-                                tone === 'item' ? 'hover:bg-slate-50' : ''
-                              } ${boqRowToneStyles[tone]} ${
-                                isHighlighted ? 'bg-amber-50/70' : ''
-                              } ${row.completionRisk ? 'bg-rose-50/80' : ''}`}
-                            >
-                              <td className="whitespace-nowrap px-3 py-3 text-xs tracking-[0.2em]">
-                                {row.code}
-                              </td>
-                              <td className="whitespace-pre-line px-3 py-3 leading-relaxed">
-                                {row.designation}
-                              </td>
-                              <td className="whitespace-nowrap px-3 py-3">
-                                {formatBoqCell(row.unit)}
-                              </td>
-                              <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums">
-                                {formatBoqCell(row.unitPrice, { numeric: true, localeId })}
-                              </td>
-                              <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums">
-                                {formatBoqCell(row.quantity, { numeric: true, localeId })}
-                              </td>
-                              <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums">
-                                {formatBoqCell(row.totalPrice, { numeric: true, localeId })}
-                              </td>
-                              <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums">
-                                {formatBoqCell(row.completedQuantity, {
-                                  numeric: true,
-                                  localeId,
-                                })}
-                              </td>
-                              <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums">
-                                {formatBoqCell(row.completedValue, {
-                                  numeric: true,
-                                  localeId,
-                                })}
-                              </td>
-                              <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums">
-                                {formatPercent(row.completedPercent, localeId)}
-                              </td>
-                            </tr>
+                            <Fragment key={`${row.code}-${row.index}`}>
+                              <tr
+                                className={`transition ${
+                                  tone === 'item' ? 'hover:bg-slate-50' : ''
+                                } ${boqRowToneStyles[tone]} ${
+                                  isHighlighted ? 'bg-amber-50/70' : ''
+                                } ${row.completionRisk ? 'bg-rose-50/80' : ''}`}
+                              >
+                                <td className="whitespace-nowrap px-3 py-3 text-xs tracking-[0.2em]">
+                                  {row.code}
+                                </td>
+                                <td className="px-3 py-3">
+                                  <div className="flex items-start gap-2">
+                                    {isExpandable ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => toggleCompletionDetails(row.id)}
+                                        className="mt-0.5 inline-flex h-5 w-5 items-center justify-center rounded border border-slate-200 text-xs text-slate-500 hover:border-slate-300 hover:bg-slate-100"
+                                        aria-label={
+                                          isExpanded
+                                            ? copy.completion.details.collapse
+                                            : copy.completion.details.expand
+                                        }
+                                      >
+                                        {isExpanded ? '▾' : '▸'}
+                                      </button>
+                                    ) : (
+                                      <span className="mt-0.5 inline-block h-5 w-5" />
+                                    )}
+                                    <span className="whitespace-pre-line leading-relaxed">
+                                      {row.designation}
+                                    </span>
+                                  </div>
+                                </td>
+                                <td className="whitespace-nowrap px-3 py-3">
+                                  {formatBoqCell(row.unit)}
+                                </td>
+                                <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums">
+                                  {formatBoqCell(row.unitPrice, { numeric: true, localeId })}
+                                </td>
+                                <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums">
+                                  {formatBoqCell(row.quantity, { numeric: true, localeId })}
+                                </td>
+                                <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums">
+                                  {formatBoqCell(row.totalPrice, { numeric: true, localeId })}
+                                </td>
+                                <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums">
+                                  {formatBoqCell(row.completedQuantity, {
+                                    numeric: true,
+                                    localeId,
+                                  })}
+                                </td>
+                                <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums">
+                                  {formatBoqCell(row.completedValue, {
+                                    numeric: true,
+                                    localeId,
+                                  })}
+                                </td>
+                                <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums">
+                                  {formatPercent(row.completedPercent, localeId)}
+                                </td>
+                              </tr>
+                              {isExpanded ? (
+                                <tr className="bg-slate-50/80">
+                                  <td colSpan={completionColumnCount} className="px-4 py-4">
+                                    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                                      <div className="flex items-center justify-between gap-3">
+                                        <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                          {copy.completion.details.title}
+                                        </div>
+                                        <div className="text-xs text-slate-500">
+                                          {detailItems.length ? `共 ${detailItems.length} 条` : ''}
+                                        </div>
+                                      </div>
+                                      {detailLoading ? (
+                                        <div className="mt-3 text-sm text-slate-500">
+                                          {copy.completion.details.loading}
+                                        </div>
+                                      ) : detailError ? (
+                                        <div className="mt-3 text-sm text-rose-600">{detailError}</div>
+                                      ) : detailItems.length === 0 ? (
+                                        <div className="mt-3 text-sm text-slate-500">
+                                          {copy.completion.details.empty}
+                                        </div>
+                                      ) : (
+                                        <div className="mt-3 overflow-x-auto">
+                                          <table className="min-w-full text-sm">
+                                            <thead className="bg-slate-50 text-xs uppercase tracking-[0.16em] text-slate-500">
+                                              <tr>
+                                                <th className="px-3 py-2 text-left">
+                                                  {copy.completion.details.headers.road}
+                                                </th>
+                                                <th className="px-3 py-2 text-left">
+                                                  {copy.completion.details.headers.interval}
+                                                </th>
+                                                <th className="px-3 py-2 text-left">
+                                                  {copy.completion.details.headers.side}
+                                                </th>
+                                                <th className="px-3 py-2 text-right">
+                                                  {copy.completion.details.headers.quantity}
+                                                </th>
+                                                <th className="px-3 py-2 text-left">
+                                                  {copy.completion.details.headers.unit}
+                                                </th>
+                                              </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-200">
+                                              {detailItems.map((detail) => {
+                                                const sideLabel =
+                                                  sideLabelMap[detail.intervalSide] ??
+                                                  detail.intervalSide
+                                                const intervalLabel = `${formatPk(detail.intervalStartPk)} - ${formatPk(detail.intervalEndPk)}`
+                                                const specLabel = detail.intervalSpec
+                                                  ? ` · ${detail.intervalSpec}`
+                                                  : ''
+                                                const manualBadge = detail.manualQuantity !== null
+                                                return (
+                                                  <tr key={detail.inputId} className="text-slate-700">
+                                                    <td className="px-3 py-2">
+                                                      <div className="font-semibold text-slate-900">
+                                                        {detail.roadName}
+                                                      </div>
+                                                      <div className="text-[11px] text-slate-500">
+                                                        {detail.roadSlug}
+                                                      </div>
+                                                    </td>
+                                                    <td className="px-3 py-2 text-slate-600">
+                                                      {intervalLabel}
+                                                      {specLabel}
+                                                    </td>
+                                                    <td className="px-3 py-2 text-slate-600">
+                                                      {sideLabel}
+                                                    </td>
+                                                    <td className="px-3 py-2 text-right tabular-nums">
+                                                      <div className="flex items-center justify-end gap-2">
+                                                        <span>
+                                                          {formatBoqCell(detail.effectiveQuantity, {
+                                                            numeric: true,
+                                                            localeId,
+                                                          })}
+                                                        </span>
+                                                        {manualBadge ? (
+                                                          <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
+                                                            {copy.completion.details.manualBadge}
+                                                          </span>
+                                                        ) : null}
+                                                      </div>
+                                                    </td>
+                                                    <td className="px-3 py-2 text-slate-600">
+                                                      {detail.unit ?? '—'}
+                                                    </td>
+                                                  </tr>
+                                                )
+                                              })}
+                                            </tbody>
+                                          </table>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </td>
+                                </tr>
+                              ) : null}
+                            </Fragment>
                           )
                         })}
                       </tbody>

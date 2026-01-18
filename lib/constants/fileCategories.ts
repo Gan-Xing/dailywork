@@ -4,6 +4,7 @@ export const FILE_CATEGORIES = [
   'inspection-acceptance',
   'attendance-sheet',
   'letter-receipt',
+  'measurement',
   'face-photo',
   'site-photo',
   'attachment',

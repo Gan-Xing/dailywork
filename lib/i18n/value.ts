@@ -96,6 +96,21 @@ export type ProductionValueCopy = {
       completedValue: string
       percent: string
     }
+    details: {
+      title: string
+      loading: string
+      empty: string
+      expand: string
+      collapse: string
+      manualBadge: string
+      headers: {
+        road: string
+        interval: string
+        side: string
+        quantity: string
+        unit: string
+      }
+    }
     messages: {
       loading: string
       projectLoading: string
@@ -203,6 +218,21 @@ export const productionValueCopy: Record<Locale, ProductionValueCopy> = {
         completedValue: '完成产值',
         percent: '完成产值占比'
       },
+      details: {
+        title: '设计量明细',
+        loading: '正在加载明细…',
+        empty: '暂无明细',
+        expand: '展开明细',
+        collapse: '收起明细',
+        manualBadge: '手动',
+        headers: {
+          road: '路段',
+          interval: '区间',
+          side: '位置',
+          quantity: '设计量',
+          unit: '单位'
+        }
+      },
       messages: {
         loading: '正在加载产值清单…',
         projectLoading: '正在加载项目列表…',
@@ -308,6 +338,21 @@ export const productionValueCopy: Record<Locale, ProductionValueCopy> = {
         completedQuantity: 'Quantité réalisée',
         completedValue: 'Montant réalisé',
         percent: 'Part réalisée'
+      },
+      details: {
+        title: 'Détails des quantités',
+        loading: 'Chargement des détails…',
+        empty: 'Aucun détail',
+        expand: 'Afficher les détails',
+        collapse: 'Masquer les détails',
+        manualBadge: 'Manuel',
+        headers: {
+          road: 'Section',
+          interval: 'Intervalle',
+          side: 'Côté',
+          quantity: 'Quantité',
+          unit: 'Unité'
+        }
       },
       messages: {
         loading: 'Chargement des valeurs réalisées…',

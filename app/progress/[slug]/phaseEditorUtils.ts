@@ -45,6 +45,7 @@ export const normalizePhaseDTO = (phase: PhaseDTO): PhaseDTO => ({
   layerIds: Array.isArray(phase.layerIds) ? [...phase.layerIds] : [],
   checkIds: Array.isArray(phase.checkIds) ? [...phase.checkIds] : [],
   intervals: phase.intervals.map((interval) => ({
+    id: (interval as { id?: number }).id,
     startPk: Number(interval.startPk) || 0,
     endPk: Number(interval.endPk) || 0,
     side: interval.side,

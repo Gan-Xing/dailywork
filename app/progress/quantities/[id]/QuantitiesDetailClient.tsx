@@ -16,6 +16,7 @@ type Props = {
   detail: RoadPhaseQuantityDetailDTO
   canEdit: boolean
   variant?: 'page' | 'modal'
+  onClose?: () => void
 }
 
 type InputField = {
@@ -79,7 +80,7 @@ const calcIntervalLength = (
   return { length, computedLength, overridden }
 }
 
-export default function QuantitiesDetailClient({ detail, canEdit, variant = 'page' }: Props) {
+export default function QuantitiesDetailClient({ detail, canEdit, variant = 'page', onClose }: Props) {
   const { locale, setLocale } = usePreferredLocale('zh', locales)
   const { addToast } = useToast()
   const [phaseItems, setPhaseItems] = useState<PhaseItemDTO[]>(detail.phaseItems)
@@ -164,6 +165,9 @@ export default function QuantitiesDetailClient({ detail, canEdit, variant = 'pag
     if (!selectedItem) return
     const draft = drafts[intervalId]
     if (!draft) return
+    if (variant === 'modal') {
+      onClose?.()
+    }
     const hasFormula = Boolean(selectedItem.formula?.expression)
     if (!hasFormula && draft.manualQuantity.trim() === '') {
       addToast('未配置公式时必须填写手动值', { tone: 'warning' })

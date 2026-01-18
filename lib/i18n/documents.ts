@@ -263,6 +263,7 @@ export type DocumentsCopy = {
       categoryLabel: string
       entityTypeLabel: string
       entityIdLabel: string
+      purposeLabel: string
       dateFromLabel: string
       dateToLabel: string
       keywordLabel: string
@@ -881,6 +882,7 @@ export const documentsCopy: Record<Locale, DocumentsCopy> = {
         categoryLabel: '分类',
         entityTypeLabel: '关联分类',
         entityIdLabel: '关联对象',
+        purposeLabel: '用途',
         dateFromLabel: '开始日期',
         dateToLabel: '结束日期',
         keywordLabel: '关键词',
@@ -941,6 +943,7 @@ export const documentsCopy: Record<Locale, DocumentsCopy> = {
         'inspection-acceptance': '报检验收材料',
         'attendance-sheet': '签到表',
         'letter-receipt': '函件签收件',
+        measurement: '计量相关',
         'face-photo': '人脸照片',
         'site-photo': '现场照片',
         attachment: '附件',
@@ -1507,6 +1510,7 @@ export const documentsCopy: Record<Locale, DocumentsCopy> = {
         categoryLabel: 'Catégorie',
         entityTypeLabel: 'Catégorie de liaison',
         entityIdLabel: 'Objet lié',
+        purposeLabel: 'Usage',
         dateFromLabel: 'Date début',
         dateToLabel: 'Date fin',
         keywordLabel: 'Mots-clés',
@@ -1567,6 +1571,7 @@ export const documentsCopy: Record<Locale, DocumentsCopy> = {
         'inspection-acceptance': "Pièces d'acceptation",
         'attendance-sheet': 'Feuille de présence',
         'letter-receipt': 'Réception de courrier',
+        measurement: 'Mesures',
         'face-photo': 'Photo visage',
         'site-photo': 'Photo de chantier',
         attachment: 'Pièce jointe',

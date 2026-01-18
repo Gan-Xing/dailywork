@@ -100,6 +100,16 @@ const parseString = (value?: string | string[]) => {
   return value
 }
 
+const normalizeEntityTypeKey = (value: string) => {
+  const list = value
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean)
+  if (!list.length) return ''
+  list.sort()
+  return list.join(',')
+}
+
 const normalizeBoqLabelText = (value: string) => value.replace(/\s+/g, ' ').trim()
 
 const resolveBoqProjectLabel = (projectName: string, projectCode: string | null, locale: string) => {
@@ -156,6 +166,16 @@ const formatLeaderLogMetaLabel = (meta: { date?: string; supervisorName?: string
   const date = meta.date?.trim() ?? ''
   const supervisor = meta.supervisorName?.trim() ?? ''
   return [date, supervisor].filter(Boolean).join(' · ')
+}
+
+const mergePurposeOptions = (base: MultiSelectOption[], extraValues: string[]) => {
+  const map = new Map(base.map((option) => [option.value, option.label]))
+  extraValues.forEach((value) => {
+    if (!map.has(value)) {
+      map.set(value, value)
+    }
+  })
+  return Array.from(map, ([value, label]) => ({ value, label }))
 }
 
 const buildBoqLinkMeta = (item: BoqItemMeta) => ({
@@ -265,6 +285,65 @@ const useLeaderLogSearch = (cacheRef: { current: Map<string, LeaderLogMeta> }) =
   return { search, setSearch, options, loading, error }
 }
 
+const useLinkPurposeOptions = ({
+  entityTypesKey,
+  enabled,
+  cacheRef,
+}: {
+  entityTypesKey: string
+  enabled: boolean
+  cacheRef: { current: Map<string, string[]> }
+}) => {
+  const [purposes, setPurposes] = useState<string[]>([])
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (!enabled) {
+      return
+    }
+
+    const key = entityTypesKey || '__all__'
+    const cached = cacheRef.current.get(key)
+    if (cached) {
+      setPurposes(cached)
+      return
+    }
+
+    const controller = new AbortController()
+    setLoading(true)
+    const query = entityTypesKey ? `?entityType=${encodeURIComponent(entityTypesKey)}` : ''
+    fetch(`/api/files/purposes${query}`, { signal: controller.signal })
+      .then((res) => {
+        if (!res.ok) throw new Error('failed')
+        return res.json()
+      })
+      .then((data: { purposes?: unknown }) => {
+        const raw = Array.isArray(data.purposes) ? data.purposes : []
+        const normalized = Array.from(
+          new Set(
+            raw
+              .map((item) => (typeof item === 'string' ? item.trim() : ''))
+              .filter(Boolean),
+          ),
+        )
+        cacheRef.current.set(key, normalized)
+        setPurposes(normalized)
+      })
+      .catch((err) => {
+        if ((err as Error).name === 'AbortError') return
+        setPurposes([])
+      })
+      .finally(() => setLoading(false))
+
+    return () => controller.abort()
+  }, [cacheRef, enabled, entityTypesKey])
+
+  const resolvedPurposes = enabled ? purposes : []
+  const resolvedLoading = enabled ? loading : false
+
+  return { purposes: resolvedPurposes, loading: resolvedLoading }
+}
+
 export function FilesPageClient({
   query,
   rows,
@@ -283,6 +362,7 @@ export function FilesPageClient({
   const [category, setCategory] = useState(() => parseString(query.category).trim())
   const [entityType, setEntityType] = useState(() => parseString(query.entityType).trim())
   const [entityId, setEntityId] = useState(() => parseString(query.entityId).trim())
+  const [purpose, setPurpose] = useState(() => parseString(query.purpose).trim())
   const [createdFrom, setCreatedFrom] = useState(() => parseString(query.createdFrom).trim())
   const [createdTo, setCreatedTo] = useState(() => parseString(query.createdTo).trim())
   const [pageInput, setPageInput] = useState(String(page))
@@ -322,6 +402,7 @@ export function FilesPageClient({
   const dragDepthRef = useRef(0)
   const boqItemCacheRef = useRef(new Map<string, BoqItemMeta>())
   const leaderLogCacheRef = useRef(new Map<string, LeaderLogMeta>())
+  const purposeCacheRef = useRef(new Map<string, string[]>())
 
   const [candidateUsers, setCandidateUsers] = useState<CandidateUser[]>([])
   const [loadingUsers, setLoadingUsers] = useState(false)
@@ -331,6 +412,24 @@ export function FilesPageClient({
   const uploadLeaderLogSearch = useLeaderLogSearch(leaderLogCacheRef)
   const editLeaderLogSearch = useLeaderLogSearch(leaderLogCacheRef)
   const filterLeaderLogSearch = useLeaderLogSearch(leaderLogCacheRef)
+  const uploadPurposeKey = useMemo(() => uploadEntityType.trim(), [uploadEntityType])
+  const editPurposeKey = useMemo(() => editEntityType.trim(), [editEntityType])
+  const filterPurposeKey = useMemo(() => normalizeEntityTypeKey(entityType), [entityType])
+  const uploadPurposeOptionsState = useLinkPurposeOptions({
+    entityTypesKey: uploadPurposeKey,
+    enabled: Boolean(uploadPurposeKey),
+    cacheRef: purposeCacheRef,
+  })
+  const editPurposeOptionsState = useLinkPurposeOptions({
+    entityTypesKey: editPurposeKey,
+    enabled: Boolean(editPurposeKey),
+    cacheRef: purposeCacheRef,
+  })
+  const filterPurposeOptionsState = useLinkPurposeOptions({
+    entityTypesKey: filterPurposeKey,
+    enabled: true,
+    cacheRef: purposeCacheRef,
+  })
 
   useEffect(() => {
     const needUsers =
@@ -374,6 +473,26 @@ export function FilesPageClient({
         label: copy.files.uploadPanel.entityTypes[key] ?? key,
       })),
     [copy],
+  )
+  const basePurposeOptions = useMemo(
+    () =>
+      Object.entries(copy.files.uploadPanel.purposes).map(([value, label]) => ({
+        value,
+        label,
+      })),
+    [copy],
+  )
+  const uploadPurposeOptions = useMemo(
+    () => mergePurposeOptions(basePurposeOptions, uploadPurposeOptionsState.purposes),
+    [basePurposeOptions, uploadPurposeOptionsState.purposes],
+  )
+  const editPurposeOptions = useMemo(
+    () => mergePurposeOptions(basePurposeOptions, editPurposeOptionsState.purposes),
+    [basePurposeOptions, editPurposeOptionsState.purposes],
+  )
+  const filterPurposeOptions = useMemo(
+    () => mergePurposeOptions(basePurposeOptions, filterPurposeOptionsState.purposes),
+    [basePurposeOptions, filterPurposeOptionsState.purposes],
   )
   const isPhotoCategory = useMemo(
     () => PHOTO_CATEGORIES.includes(uploadCategory as (typeof PHOTO_CATEGORIES)[number]),
@@ -497,6 +616,7 @@ export function FilesPageClient({
       category,
       entityType,
       entityId,
+      purpose,
       createdFrom,
       createdTo,
       page,
@@ -507,6 +627,7 @@ export function FilesPageClient({
     if (values.category) params.set('category', String(values.category))
     if (values.entityType) params.set('entityType', String(values.entityType))
     if (values.entityId) params.set('entityId', String(values.entityId))
+    if (values.purpose) params.set('purpose', String(values.purpose))
     if (values.createdFrom) params.set('createdFrom', String(values.createdFrom))
     if (values.createdTo) params.set('createdTo', String(values.createdTo))
     if (values.pageSize) params.set('pageSize', String(values.pageSize))
@@ -1269,9 +1390,9 @@ export function FilesPageClient({
                     className="h-9 rounded-lg border border-slate-200 bg-white px-2 text-sm text-slate-700 focus:border-emerald-300 focus:outline-none"
                   />
                   <datalist id="purpose-options">
-                    {Object.entries(copy.files.uploadPanel.purposes).map(([key, label]) => (
-                      <option key={key} value={key}>
-                        {label}
+                    {uploadPurposeOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
                       </option>
                     ))}
                   </datalist>
@@ -1399,6 +1520,23 @@ export function FilesPageClient({
                 className="h-9 rounded-lg border border-slate-200 bg-white px-2 text-sm text-slate-700 focus:border-emerald-300 focus:outline-none"
               />
             )}
+          </label>
+          <label className="flex flex-col gap-2 text-sm text-slate-600">
+            <span className="font-semibold text-slate-700">{copy.files.filters.purposeLabel}</span>
+            <MultiSelectFilter
+              variant="form"
+              label=""
+              options={filterPurposeOptions}
+              selected={purpose ? purpose.split(',') : []}
+              onChange={(vals) => setPurpose(vals.join(','))}
+              allLabel={copy.files.filters.allLabel}
+              selectedLabel={(count) => formatCopy(copy.files.dropdown.selected, { count })}
+              selectAllLabel={copy.files.dropdown.selectAll}
+              clearLabel={copy.files.dropdown.clear}
+              searchPlaceholder={copy.files.dropdown.search}
+              multiple={true}
+              zIndex={20}
+            />
           </label>
           <label className="flex flex-col gap-2 text-sm text-slate-600">
             <span className="font-semibold text-slate-700">{copy.files.filters.dateFromLabel}</span>
@@ -1805,9 +1943,9 @@ export function FilesPageClient({
                         className="h-9 rounded-lg border border-slate-200 bg-white px-2 text-sm text-slate-700 focus:border-emerald-300 focus:outline-none"
                       />
                       <datalist id="edit-purpose-options">
-                        {Object.entries(copy.files.uploadPanel.purposes).map(([key, label]) => (
-                          <option key={key} value={key}>
-                            {label}
+                        {editPurposeOptions.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
                           </option>
                         ))}
                       </datalist>

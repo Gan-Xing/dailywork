@@ -243,7 +243,7 @@ export function QuantitiesDetailModal({ phaseId, intervalId, open, onClose }: Pr
             )}
           </div>
 
-          <QuantitiesDetailClient detail={detail} canEdit={canEdit} variant="modal" />
+          <QuantitiesDetailClient detail={detail} canEdit={canEdit} variant="modal" onClose={onClose} />
         </div>
       ) : (
         <div className="py-10 text-center text-sm text-slate-500">无可显示的区间。</div>

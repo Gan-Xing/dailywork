@@ -1,6 +1,7 @@
-import type { BoqItemTone, BoqSheetType, Prisma } from '@prisma/client'
+import type { BoqItemTone, BoqSheetType, IntervalSide, Prisma } from '@prisma/client'
 
 import { prisma } from '@/lib/prisma'
+import { listPhaseIntervalManagementRows } from '@/lib/server/phaseItemManagement'
 
 export type BoqItemCreateInput = {
   projectId: number
@@ -179,6 +180,7 @@ export const listBoqMeasurements = async (params: {
 export type BoqCompletionRecord = {
   boqItemId: number
   bindingCount: number
+  designQuantity: number | null
   completedQuantity: number | null
 }
 
@@ -186,6 +188,32 @@ const toOptionalNumber = (value: Prisma.Decimal | number | null | undefined) => 
   if (value === null || value === undefined) return null
   const parsed = Number(value)
   return Number.isFinite(parsed) ? parsed : null
+}
+
+const buildIntervalCompletionMap = async (intervalIds: number[]) => {
+  const normalized = Array.from(
+    new Set(intervalIds.filter((id) => Number.isInteger(id) && id > 0)),
+  )
+  if (!normalized.length) return new Map<number, number>()
+  const rows = await listPhaseIntervalManagementRows()
+  const targets = new Set(normalized)
+  const map = new Map<number, number>()
+  rows.forEach((row) => {
+    if (targets.has(row.intervalId)) {
+      map.set(row.intervalId, row.completedPercent ?? 0)
+    }
+  })
+  return map
+}
+
+const resolveEffectiveQuantity = (
+  manualQuantity: Prisma.Decimal | number | null,
+  computedQuantity: Prisma.Decimal | number | null,
+) => {
+  const manual = toOptionalNumber(manualQuantity)
+  if (manual !== null) return manual
+  const computed = toOptionalNumber(computedQuantity)
+  return computed ?? 0
 }
 
 export const listBoqCompletion = async (params: {
@@ -210,7 +238,8 @@ export const listBoqCompletion = async (params: {
     return boqItems.map((item) => ({
       boqItemId: item.id,
       bindingCount: 0,
-      completedQuantity: null,
+      designQuantity: 0,
+      completedQuantity: 0,
     }))
   }
 
@@ -227,7 +256,8 @@ export const listBoqCompletion = async (params: {
     return boqItems.map((item) => ({
       boqItemId: item.id,
       bindingCount: 0,
-      completedQuantity: null,
+      designQuantity: 0,
+      completedQuantity: 0,
     }))
   }
 
@@ -251,16 +281,23 @@ export const listBoqCompletion = async (params: {
       phaseItemId: true,
       manualQuantity: true,
       computedQuantity: true,
+      intervalId: true,
     },
   })
 
-  const phaseItemTotals = new Map<number, number>()
+  const intervalCompletionMap = await buildIntervalCompletionMap(
+    inputs.map((input) => input.intervalId),
+  )
+
+  const phaseItemTotals = new Map<number, { designQuantity: number; completedQuantity: number }>()
   inputs.forEach((input) => {
-    const manual = toOptionalNumber(input.manualQuantity)
-    const computed = toOptionalNumber(input.computedQuantity)
-    const value = manual ?? computed
-    if (value === null) return
-    phaseItemTotals.set(input.phaseItemId, (phaseItemTotals.get(input.phaseItemId) ?? 0) + value)
+    const designQuantity = resolveEffectiveQuantity(input.manualQuantity, input.computedQuantity)
+    const completionPercent = intervalCompletionMap.get(input.intervalId) ?? 0
+    const completedQuantity = designQuantity * (completionPercent / 100)
+    const existing = phaseItemTotals.get(input.phaseItemId) ?? { designQuantity: 0, completedQuantity: 0 }
+    existing.designQuantity += designQuantity
+    existing.completedQuantity += completedQuantity
+    phaseItemTotals.set(input.phaseItemId, existing)
   })
 
   return boqItems.map((item) => {
@@ -271,14 +308,147 @@ export const listBoqCompletion = async (params: {
     }
 
     if (!phaseItemSet.size) {
-      return { boqItemId: item.id, bindingCount: 0, completedQuantity: null }
+      return { boqItemId: item.id, bindingCount: 0, designQuantity: 0, completedQuantity: 0 }
     }
 
-    let total = 0
+    let designQuantity = 0
+    let completedQuantity = 0
     phaseItemSet.forEach((phaseItemId) => {
-      total += phaseItemTotals.get(phaseItemId) ?? 0
+      const totals = phaseItemTotals.get(phaseItemId)
+      if (!totals) return
+      designQuantity += totals.designQuantity
+      completedQuantity += totals.completedQuantity
     })
 
-    return { boqItemId: item.id, bindingCount: phaseItemSet.size, completedQuantity: total }
+    return {
+      boqItemId: item.id,
+      bindingCount: phaseItemSet.size,
+      designQuantity,
+      completedQuantity,
+    }
+  })
+}
+
+export type BoqCompletionDetailRecord = {
+  boqItemId: number
+  inputId: number
+  phaseItemId: number
+  phaseItemName: string
+  phaseItemSpec: string | null
+  intervalId: number
+  intervalStartPk: number
+  intervalEndPk: number
+  intervalSide: IntervalSide
+  intervalSpec: string | null
+  roadId: number
+  roadName: string
+  roadSlug: string
+  manualQuantity: number | null
+  computedQuantity: number | null
+  effectiveQuantity: number
+  completionPercent: number
+  completedQuantity: number
+  unit: string | null
+}
+
+export const listBoqCompletionDetails = async (params: {
+  projectId: number
+  boqItemId: number
+}): Promise<BoqCompletionDetailRecord[]> => {
+  const { projectId, boqItemId } = params
+  const boqItem = await prisma.boqItem.findFirst({
+    where: { id: boqItemId, projectId, sheetType: 'ACTUAL', isActive: true },
+    select: { id: true, unit: true },
+  })
+  if (!boqItem) {
+    return []
+  }
+
+  const bindings = await prisma.phaseItemBoqItem.findMany({
+    where: {
+      boqItemId,
+      isActive: true,
+      phaseItem: { isActive: true },
+    },
+    select: { phaseItemId: true },
+  })
+  if (!bindings.length) return []
+
+  const phaseItemIds = bindings.map((binding) => binding.phaseItemId)
+  const inputs = await prisma.phaseItemInput.findMany({
+    where: {
+      phaseItemId: { in: phaseItemIds },
+      interval: { phase: { road: { projectId } } },
+    },
+    select: {
+      id: true,
+      phaseItemId: true,
+      manualQuantity: true,
+      computedQuantity: true,
+      interval: {
+        select: {
+          id: true,
+          startPk: true,
+          endPk: true,
+          side: true,
+          spec: true,
+          phase: {
+            select: {
+              id: true,
+              name: true,
+              road: { select: { id: true, name: true, slug: true } },
+            },
+          },
+        },
+      },
+      phaseItem: {
+        select: {
+          name: true,
+          spec: true,
+        },
+      },
+    },
+  })
+
+  const intervalCompletionMap = await buildIntervalCompletionMap(
+    inputs.map((input) => input.interval.id),
+  )
+
+  const details = inputs.map((input) => {
+    const manualQuantity = toOptionalNumber(input.manualQuantity)
+    const computedQuantity = toOptionalNumber(input.computedQuantity)
+    const effectiveQuantity = resolveEffectiveQuantity(input.manualQuantity, input.computedQuantity)
+    const completionPercent = intervalCompletionMap.get(input.interval.id) ?? 0
+    const completedQuantity = effectiveQuantity * (completionPercent / 100)
+    return {
+      boqItemId: boqItem.id,
+      inputId: input.id,
+      phaseItemId: input.phaseItemId,
+      phaseItemName: input.phaseItem.name,
+      phaseItemSpec: input.phaseItem.spec ?? null,
+      intervalId: input.interval.id,
+      intervalStartPk: input.interval.startPk,
+      intervalEndPk: input.interval.endPk,
+      intervalSide: input.interval.side,
+      intervalSpec: input.interval.spec ?? null,
+      roadId: input.interval.phase.road.id,
+      roadName: input.interval.phase.road.name,
+      roadSlug: input.interval.phase.road.slug,
+      manualQuantity,
+      computedQuantity,
+      effectiveQuantity,
+      completionPercent,
+      completedQuantity,
+      unit: boqItem.unit ?? null,
+    }
+  })
+
+  return details.sort((a, b) => {
+    if (a.roadName !== b.roadName) {
+      return a.roadName.localeCompare(b.roadName, 'zh-CN', { sensitivity: 'base' })
+    }
+    if (a.intervalStartPk !== b.intervalStartPk) return a.intervalStartPk - b.intervalStartPk
+    if (a.intervalEndPk !== b.intervalEndPk) return a.intervalEndPk - b.intervalEndPk
+    return a.intervalId - b.intervalId
   })
 }

@@ -34,6 +34,7 @@ export async function GET(request: NextRequest) {
   )
   const entityTypes = normalizeList(searchParams.get('entityType'))
   const entityIds = normalizeList(searchParams.get('entityId'))
+  const purposes = normalizeList(searchParams.get('purpose'))
   const createdFrom = searchParams.get('createdFrom')?.trim() ?? ''
   const createdTo = searchParams.get('createdTo')?.trim() ?? ''
   const page = Math.max(1, Number(searchParams.get('page') ?? 1) || 1)
@@ -46,13 +47,18 @@ export async function GET(request: NextRequest) {
   if (categories.length) {
     where.category = { in: categories }
   }
-  if (entityTypes.length || entityIds.length) {
-    where.links = {
-      some: {
-        ...(entityTypes.length ? { entityType: { in: entityTypes } } : null),
-        ...(entityIds.length ? { entityId: { in: entityIds } } : null),
-      },
-    }
+  const linkFilters: Record<string, any> = {}
+  if (entityTypes.length) {
+    linkFilters.entityType = { in: entityTypes }
+  }
+  if (entityIds.length) {
+    linkFilters.entityId = { in: entityIds }
+  }
+  if (purposes.length) {
+    linkFilters.purpose = { in: purposes }
+  }
+  if (Object.keys(linkFilters).length) {
+    where.links = { some: linkFilters }
   }
   if (createdFrom || createdTo) {
     where.createdAt = {}
@@ -68,6 +74,7 @@ export async function GET(request: NextRequest) {
       { ownerUser: { username: { contains: search, mode: 'insensitive' } } },
       { ownerUser: { name: { contains: search, mode: 'insensitive' } } },
       { links: { some: { label: { contains: search, mode: 'insensitive' } } } },
+      { links: { some: { purpose: { contains: search, mode: 'insensitive' } } } },
       { links: { some: { entityId: { contains: search, mode: 'insensitive' } } } },
       { links: { some: { entityType: { contains: search, mode: 'insensitive' } } } },
     ]

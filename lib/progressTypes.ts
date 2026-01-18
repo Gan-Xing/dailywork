@@ -228,6 +228,7 @@ export interface InspectionEntryListResponse {
 }
 
 export interface PhaseIntervalPayload {
+  id?: number
   startPk: number
   endPk: number
   side: IntervalSide

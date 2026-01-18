@@ -32,6 +32,7 @@ export type FilesQuery = {
   category?: string | string[]
   entityType?: string
   entityId?: string
+  purpose?: string
   createdFrom?: string
   createdTo?: string
   page?: string

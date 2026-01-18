@@ -256,6 +256,7 @@ export function usePhaseManagement({
     setDefinitionId(normalized.definitionId)
     setIntervals(
       normalized.intervals.map((i) => ({
+        id: i.id,
         startPk: i.startPk,
         endPk: i.endPk,
         side: i.side,
@@ -321,6 +322,7 @@ export function usePhaseManagement({
           .map((name) => allowedLayerIdByName.get(normalizeLabel(name)))
           .filter((id): id is number => Number.isInteger(id))
         return {
+          id: item.id,
           startPk,
           endPk,
           side: item.side,

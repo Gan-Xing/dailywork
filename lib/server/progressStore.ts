@@ -10,7 +10,29 @@ const TRANSACTION_TIMEOUT_MS = 15000
 const normalizeCommonList = (value?: string[] | null) =>
   Array.isArray(value) ? value.map((item) => `${item}`.trim()).filter(Boolean) : []
 
-const normalizeInterval = (interval: PhasePayload['intervals'][number], measure: PhasePayload['measure']) => {
+type NormalizedInterval = {
+  id?: number
+  startPk: number
+  endPk: number
+  side: IntervalSide
+  spec: string | null
+  layers: string[]
+  billQuantity: number | null
+}
+
+type IntervalLayerMetadata = {
+  layers: string[] | undefined
+  layerIds: number[]
+}
+
+type IntervalWithLayer = NormalizedInterval & { layerMetadata: IntervalLayerMetadata }
+
+const normalizeInterval = (
+  interval: PhasePayload['intervals'][number],
+  measure: PhasePayload['measure'],
+): NormalizedInterval => {
+  const rawId = (interval as { id?: unknown }).id
+  const intervalId = Number(rawId)
   const start = Number(interval.startPk)
   const end = Number(interval.endPk)
   const safeStart = Number.isFinite(start) ? start : 0
@@ -27,6 +49,7 @@ const normalizeInterval = (interval: PhasePayload['intervals'][number], measure:
   const layers = normalizeCommonList((interval as { layers?: string[] }).layers)
 
   return {
+    id: Number.isInteger(intervalId) && intervalId > 0 ? intervalId : undefined,
     startPk: ordered[0],
     endPk: ordered[1],
     side: normalizedSide as IntervalSide,
@@ -169,6 +192,7 @@ const mapPhaseToDTO = (
     layerIds: instanceLayers.map((l) => l.id),
     checkIds: instanceChecks.map((c) => c.id),
     intervals: phase.intervals.map((i) => ({
+      id: i.id,
       startPk: i.startPk,
       endPk: i.endPk,
       side: i.side,
@@ -261,8 +285,17 @@ export const createPhase = async (roadId: number, payload: PhasePayload) => {
     throw new Error('验收内容需在模板中维护，分项创建时不可新增验收内容')
   }
 
-  const normalizedIntervals = payload.intervals.map((i) => normalizeInterval(i, payload.measure))
-  const designLength = calcDesignLength(payload.measure, normalizedIntervals)
+  const normalizedIntervals: NormalizedInterval[] = payload.intervals.map((i) =>
+    normalizeInterval(i, payload.measure),
+  )
+  const designLength = calcDesignLength(
+    payload.measure,
+    normalizedIntervals.map((interval) => ({
+      startPk: interval.startPk,
+      endPk: interval.endPk,
+      side: interval.side,
+    })),
+  )
 
   const phase = await prisma.$transaction(
     async (tx) => {
@@ -393,8 +426,17 @@ export const updatePhase = async (roadId: number, phaseId: number, payload: Phas
     throw new Error('无效的分项 ID')
   }
 
-  const normalizedIntervals = payload.intervals.map((i) => normalizeInterval(i, payload.measure))
-  const designLength = calcDesignLength(payload.measure, normalizedIntervals)
+  const normalizedIntervals: NormalizedInterval[] = payload.intervals.map((i) =>
+    normalizeInterval(i, payload.measure),
+  )
+  const designLength = calcDesignLength(
+    payload.measure,
+    normalizedIntervals.map((interval) => ({
+      startPk: interval.startPk,
+      endPk: interval.endPk,
+      side: interval.side,
+    })),
+  )
 
   const phase = await prisma.$transaction(
     async (tx) => {
@@ -430,6 +472,11 @@ export const updatePhase = async (roadId: number, phaseId: number, payload: Phas
       const intervalLayerData = payload.intervals.map((item) =>
         resolveIntervalLayers((item as { layers?: string[] }).layers, allowedLayerMap),
       )
+      const intervalsWithLayers: IntervalWithLayer[] =
+        normalizedIntervals.map((interval, idx) => ({
+          ...interval,
+          layerMetadata: intervalLayerData[idx],
+        }))
       const intervalLayerIds = Array.from(
         new Set(intervalLayerData.flatMap((item) => item.layerIds)),
       )
@@ -460,22 +507,83 @@ export const updatePhase = async (roadId: number, phaseId: number, payload: Phas
         },
       })
 
-      await tx.phaseInterval.deleteMany({ where: { phaseId } })
-      await tx.phaseInterval.createMany({
-        data: normalizedIntervals.map((item, idx) => {
-          const layerMetadata = intervalLayerData[idx]
-          return {
-            phaseId: updated.id,
-            startPk: item.startPk,
-            endPk: item.endPk,
-            side: item.side,
-            spec: item.spec || undefined,
-            layers: layerMetadata.layers,
-            layerIds: layerMetadata.layerIds,
-            billQuantity: item.billQuantity ?? undefined,
-          }
-        }),
+      const existingIntervals = await tx.phaseInterval.findMany({
+        where: { phaseId },
+        select: { id: true, startPk: true, endPk: true, side: true, spec: true },
       })
+      const buildIntervalKey = (interval: {
+        startPk: number
+        endPk: number
+        side: IntervalSide
+        spec?: string | null
+      }) => `${interval.startPk}|${interval.endPk}|${interval.side}|${interval.spec ?? ''}`
+      const existingByKey = new Map<string, number[]>()
+      existingIntervals.forEach((interval) => {
+        const key = buildIntervalKey(interval)
+        const list = existingByKey.get(key) ?? []
+        list.push(interval.id)
+        existingByKey.set(key, list)
+      })
+      const matchedIntervals: IntervalWithLayer[] = intervalsWithLayers.map((interval) => {
+        if (interval.id) return interval
+        const key = buildIntervalKey(interval)
+        const candidates = existingByKey.get(key)
+        if (!candidates || candidates.length === 0) return interval
+        const [matchedId, ...rest] = candidates
+        if (rest.length) {
+          existingByKey.set(key, rest)
+        } else {
+          existingByKey.delete(key)
+        }
+        return { ...interval, id: matchedId }
+      })
+      const existingIds = new Set(existingIntervals.map((interval) => interval.id))
+      const toUpdate: IntervalWithLayer[] = matchedIntervals.filter(
+        (interval) => interval.id && existingIds.has(interval.id),
+      )
+      const incomingIds = new Set(toUpdate.map((interval) => interval.id as number))
+      const toCreate: IntervalWithLayer[] = matchedIntervals.filter(
+        (interval) => !interval.id || !existingIds.has(interval.id),
+      )
+      const toDeleteIds = existingIntervals
+        .filter((interval) => !incomingIds.has(interval.id))
+        .map((interval) => interval.id)
+
+      if (toDeleteIds.length) {
+        await tx.phaseInterval.deleteMany({ where: { id: { in: toDeleteIds } } })
+      }
+      if (toUpdate.length) {
+        await Promise.all(
+          toUpdate.map((interval) =>
+            tx.phaseInterval.update({
+              where: { id: interval.id as number },
+              data: {
+                startPk: interval.startPk,
+                endPk: interval.endPk,
+                side: interval.side,
+                spec: interval.spec || undefined,
+                layers: interval.layerMetadata.layers,
+                layerIds: interval.layerMetadata.layerIds,
+                billQuantity: interval.billQuantity ?? undefined,
+              },
+            }),
+          ),
+        )
+      }
+      if (toCreate.length) {
+        await tx.phaseInterval.createMany({
+          data: toCreate.map((interval) => ({
+            phaseId: updated.id,
+            startPk: interval.startPk,
+            endPk: interval.endPk,
+            side: interval.side,
+            spec: interval.spec || undefined,
+            layers: interval.layerMetadata.layers,
+            layerIds: interval.layerMetadata.layerIds,
+            billQuantity: interval.billQuantity ?? undefined,
+          })),
+        })
+      }
 
       await tx.roadPhaseLayer.deleteMany({ where: { roadPhaseId: phaseId } })
       if (requestedLayerIds.length) {

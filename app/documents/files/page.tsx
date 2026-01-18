@@ -36,6 +36,7 @@ export default async function FilesPage({ searchParams }: { searchParams: Promis
   )
   const entityTypes = parseList(query.entityType)
   const entityIds = parseList(query.entityId)
+  const purposes = parseList(query.purpose)
   const createdFrom = typeof query.createdFrom === 'string' ? query.createdFrom.trim() : ''
   const createdTo = typeof query.createdTo === 'string' ? query.createdTo.trim() : ''
   const search = typeof query.search === 'string' ? query.search.trim() : ''
@@ -49,13 +50,18 @@ export default async function FilesPage({ searchParams }: { searchParams: Promis
   if (categories.length) {
     where.category = { in: categories }
   }
-  if (entityTypes.length || entityIds.length) {
-    where.links = {
-      some: {
-        ...(entityTypes.length ? { entityType: { in: entityTypes } } : null),
-        ...(entityIds.length ? { entityId: { in: entityIds } } : null),
-      },
-    }
+  const linkFilters: Record<string, any> = {}
+  if (entityTypes.length) {
+    linkFilters.entityType = { in: entityTypes }
+  }
+  if (entityIds.length) {
+    linkFilters.entityId = { in: entityIds }
+  }
+  if (purposes.length) {
+    linkFilters.purpose = { in: purposes }
+  }
+  if (Object.keys(linkFilters).length) {
+    where.links = { some: linkFilters }
   }
   if (createdFrom || createdTo) {
     where.createdAt = {}
@@ -71,6 +77,7 @@ export default async function FilesPage({ searchParams }: { searchParams: Promis
       { ownerUser: { username: { contains: search, mode: 'insensitive' } } },
       { ownerUser: { name: { contains: search, mode: 'insensitive' } } },
       { links: { some: { label: { contains: search, mode: 'insensitive' } } } },
+      { links: { some: { purpose: { contains: search, mode: 'insensitive' } } } },
       { links: { some: { entityId: { contains: search, mode: 'insensitive' } } } },
       { links: { some: { entityType: { contains: search, mode: 'insensitive' } } } },
     ]

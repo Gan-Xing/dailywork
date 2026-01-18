@@ -18,13 +18,13 @@ const clampPercent = (value: number) => {
 const gradientStops: GradientStop[] = [
   {
     key: '0%',
-    stopColor: '#34d399',
+    stopColor: '#22c55e',
     stopOpacity: 1,
     offset: '0%',
   },
   {
     key: '50%',
-    stopColor: '#22d3ee',
+    stopColor: '#06b6d4',
     stopOpacity: 0.9,
     offset: '50%',
   },
@@ -65,8 +65,11 @@ export function PointProgressWave({ percent, size = 56, className }: PointProgre
       gradientStops={gradientStops}
       waveTextStyle={{
         fill: '#f8fafc',
+        stroke: '#0f172a',
+        strokeWidth: 1.2,
+        paintOrder: 'stroke',
         fontSize: `${Math.max(10, Math.round(size * 0.24))}px`,
-        fontWeight: 700,
+        fontWeight: 800,
       }}
       outerCircleStyle={{
         fill: 'transparent',
@@ -74,12 +77,15 @@ export function PointProgressWave({ percent, size = 56, className }: PointProgre
         strokeWidth: 2,
       }}
       circleStyle={{
-        fill: '#0ea5e910',
+        fill: '#e0f2fe',
       }}
       textStyle={{
-        fill: '#f8fafc',
+        fill: '#0f172a',
+        stroke: '#f8fafc',
+        strokeWidth: 1.2,
+        paintOrder: 'stroke',
         fontSize: `${Math.max(10, Math.round(size * 0.24))}px`,
-        fontWeight: 700,
+        fontWeight: 800,
       }}
     />
   )
