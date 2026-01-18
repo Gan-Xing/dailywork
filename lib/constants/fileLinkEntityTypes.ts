@@ -3,6 +3,7 @@ export const FILE_LINK_ENTITY_TYPES = [
   'inspection',
   'submission',
   'actual-boq-item',
+  'leader-log',
   'other',
 ] as const
 

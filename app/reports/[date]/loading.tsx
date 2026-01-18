@@ -1,10 +1,10 @@
-import { PageHeaderNav } from '@/components/PageHeaderNav'
 import { SkeletonBar, SkeletonBlock, SkeletonCircle, SkeletonText } from '@/components/Skeletons'
+import { ReportsHeader } from '../ReportsHeader'
 
 export default function Loading() {
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900">
-      <PageHeaderNav
+      <ReportsHeader
         className="z-30 py-4"
         breadcrumbs={[
           { label: <SkeletonText className="h-5 w-16" />, href: '/' },
@@ -20,7 +20,6 @@ export default function Loading() {
             <SkeletonBar className="h-9 w-24" />
           </div>
         }
-        breadcrumbVariant="light"
       />
       <section className="mx-auto flex w-full max-w-[1700px] flex-col gap-8 px-4 pb-12 pt-6 lg:px-8 xl:px-10 2xl:px-12">
         <div className="rounded-3xl border border-slate-200 bg-white/80 p-8 shadow-sm shadow-slate-100">

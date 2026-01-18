@@ -83,10 +83,13 @@ const formatWeatherCondition = (value: string, locale: Locale) => {
   return label ? label[locale] : value
 }
 
-const sumTotals = (entries: Array<Record<string, string>>, keys: Array<keyof Totals>) => {
+const sumTotals = (entries: Array<unknown>, keys: Array<keyof Totals>) => {
   const totals: Totals = {}
   keys.forEach((key) => {
-    const sum = entries.reduce((acc, entry) => acc + (Number(entry[key]) || 0), 0)
+    const sum = entries.reduce<number>((acc, entry) => {
+      const record = entry as Record<string, unknown>
+      return acc + (Number(record?.[key]) || 0)
+    }, 0)
     totals[key] = sum ? String(sum) : ''
   })
   return totals

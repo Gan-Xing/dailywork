@@ -327,6 +327,8 @@ export type DocumentsCopy = {
       invalidLink: string
       boqItemSearchHint: string
       boqItemLoadFailed: string
+      leaderLogSearchHint: string
+      leaderLogLoadFailed: string
     }
   }
   submissionEditor: {
@@ -857,6 +859,7 @@ export const documentsCopy: Record<Locale, DocumentsCopy> = {
           inspection: '报检单 (Inspection)',
           submission: '提交单 (Submission)',
           'actual-boq-item': '工程内容',
+          'leader-log': '原始日志',
           other: '其他 (Other)',
         },
         purposes: {
@@ -952,6 +955,8 @@ export const documentsCopy: Record<Locale, DocumentsCopy> = {
         invalidLink: '对象类型与对象 ID 必须同时填写',
         boqItemSearchHint: '输入关键词搜索工程内容',
         boqItemLoadFailed: '工程内容加载失败',
+        leaderLogSearchHint: '输入日期或负责人搜索原始日志',
+        leaderLogLoadFailed: '原始日志加载失败',
       },
     },
     submissionEditor: {
@@ -1480,6 +1485,7 @@ export const documentsCopy: Record<Locale, DocumentsCopy> = {
           inspection: 'Inspection',
           submission: 'Bordereau (Submission)',
           'actual-boq-item': 'BoqItem',
+          'leader-log': 'Journal brut',
           other: 'Autre',
         },
         purposes: {
@@ -1575,6 +1581,8 @@ export const documentsCopy: Record<Locale, DocumentsCopy> = {
         invalidLink: 'Type et ID doivent être renseignés ensemble',
         boqItemSearchHint: 'Saisissez un mot-clé pour rechercher',
         boqItemLoadFailed: 'Chargement des BoqItem impossible',
+        leaderLogSearchHint: 'Saisissez date ou responsable',
+        leaderLogLoadFailed: 'Chargement des journaux impossible',
       },
     },
     submissionEditor: {

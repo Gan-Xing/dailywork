@@ -6,7 +6,6 @@ import { useParams, useRouter } from 'next/navigation';
 
 import Image from 'next/image';
 
-import { PageHeaderNav } from '@/components/PageHeaderNav';
 import { EquipmentTable } from '@/components/report/EquipmentTable';
 import { MaterialsTable } from '@/components/report/MaterialsTable';
 import { PersonnelTable } from '@/components/report/PersonnelTable';
@@ -47,6 +46,7 @@ import {
 	secondaryEntities,
 	yearOptions
 } from '@/lib/i18n/reportEditor';
+import { ReportsHeader } from '../ReportsHeader';
 
 export const dynamic = 'force-dynamic';
 
@@ -640,7 +640,7 @@ export default function ReportEditorPage() {
 	if (!isReady) {
 		return (
 			<main className='min-h-screen bg-slate-50 text-slate-900'>
-				<PageHeaderNav
+				<ReportsHeader
 					className='z-30 py-4'
 					breadcrumbs={[
 						{ label: breadcrumbHome, href: '/' },
@@ -651,8 +651,6 @@ export default function ReportEditorPage() {
 					subtitle={reportDateLabel}
 					locale={locale}
 					onLocaleChange={setLocale}
-					localeVariant='light'
-					breadcrumbVariant='light'
 				/>
 				<section className='mx-auto w-full max-w-[1700px] px-4 pb-12 pt-6 sm:px-6 lg:px-8 xl:px-10 2xl:px-12'>
 					<p className='text-center text-sm text-slate-500'>加载中...</p>
@@ -664,7 +662,7 @@ export default function ReportEditorPage() {
 	if (loadError) {
 		return (
 			<main className='min-h-screen bg-slate-50 text-slate-900'>
-				<PageHeaderNav
+				<ReportsHeader
 					className='z-30 py-4'
 					breadcrumbs={[
 						{ label: breadcrumbHome, href: '/' },
@@ -675,8 +673,6 @@ export default function ReportEditorPage() {
 					subtitle={reportDateLabel}
 					locale={locale}
 					onLocaleChange={setLocale}
-					localeVariant='light'
-					breadcrumbVariant='light'
 				/>
 				<section className='mx-auto flex w-full max-w-[1700px] flex-col gap-6 px-4 pb-12 pt-6 sm:px-6 lg:px-8 xl:px-10 2xl:px-12'>
 					<div className='rounded-3xl border border-red-200 bg-red-50 p-6 text-center text-sm text-red-700'>
@@ -705,7 +701,7 @@ export default function ReportEditorPage() {
 
 	return (
 		<main className='min-h-screen bg-slate-50 text-slate-900'>
-			<PageHeaderNav
+			<ReportsHeader
 				className='z-30 py-4'
 				breadcrumbs={[
 					{ label: breadcrumbHome, href: '/' },
@@ -716,8 +712,6 @@ export default function ReportEditorPage() {
 				subtitle={reportDateLabel}
 				locale={locale}
 				onLocaleChange={setLocale}
-				localeVariant='light'
-				breadcrumbVariant='light'
 				rightSlot={
 					<div className='flex flex-wrap items-center gap-2'>
 						<button

@@ -144,7 +144,7 @@ export async function POST(request: Request) {
       if (!record?.payload) {
         throw new Error(`日报数据缺失：${dateKey}`)
       }
-      let report = normalizeReportForDate(record.payload as DailyReport, dateKey)
+      let report = normalizeReportForDate(record.payload as unknown as DailyReport, dateKey)
       report = recalcReportMaterials(report)
       const html = renderDailyReportTemplate(template.html, report, locale, { baseUrl })
       const buffer = await generatePdfBuffer(browser, html)

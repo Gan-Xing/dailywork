@@ -3,12 +3,12 @@
 import { useEffect, useState } from 'react'
 import { useParams, useSearchParams } from 'next/navigation'
 
-import { PageHeaderNav } from '@/components/PageHeaderNav'
 import { getCopy } from '@/lib/i18n'
 import { reportLandingBreadcrumbs } from '@/lib/i18n/reportsLanding'
 import { getReportPreviewCopy } from '@/lib/i18n/reportPreview'
 import { DATE_KEY_REGEX } from '@/lib/reportUtils'
 import type { DailyReport } from '@/lib/reportState'
+import { ReportsHeader } from '../../ReportsHeader'
 
 const STORAGE_PREFIX = 'report-preview-'
 
@@ -26,7 +26,7 @@ export default function ReportTemplatePreviewPage() {
   const breadcrumbDate = dateKey || '--'
 
   const header = (
-    <PageHeaderNav
+    <ReportsHeader
       className="z-30 py-4"
       breadcrumbs={[
         { label: breadcrumbsCopy.home, href: '/' },
@@ -35,7 +35,7 @@ export default function ReportTemplatePreviewPage() {
       ]}
       title={uiCopy.common.previewTitle}
       subtitle={breadcrumbDate}
-      breadcrumbVariant="light"
+      locale={localeParam}
     />
   )
 

@@ -1,6 +1,10 @@
 import type { Locale } from './index'
 
 export type ReportsLandingCopy = {
+  nav: {
+    reports: string
+    leaderLogs: string
+  }
   create: {
     badge: string
     title: string
@@ -60,6 +64,10 @@ export type ReportsLandingCopy = {
 
 export const reportsLandingCopy: Record<Locale, ReportsLandingCopy> = {
   zh: {
+    nav: {
+      reports: '日报',
+      leaderLogs: '原始日志'
+    },
     create: {
       badge: '创建日报',
       title: '选择日期，开始录入',
@@ -117,6 +125,10 @@ export const reportsLandingCopy: Record<Locale, ReportsLandingCopy> = {
     accessHint: '需要拥有 report:view 或 report:edit 权限才能创建或查看日报。'
   },
   fr: {
+    nav: {
+      reports: 'Rapports',
+      leaderLogs: 'Journal brut'
+    },
     create: {
       badge: 'Créer un rapport',
       title: 'Choisissez la date et commencez la saisie',

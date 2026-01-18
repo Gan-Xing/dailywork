@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { DATE_KEY_REGEX } from '@/lib/reportUtils'
 import { formatSupervisorLabel } from '@/lib/members/utils'
@@ -10,6 +11,7 @@ export type LeaderLogItem = {
   supervisorId: number
   supervisorName: string
   contentRaw: string
+  photoCount: number
   createdAt: string
   updatedAt: string
 }
@@ -52,6 +54,7 @@ const mapLeaderLog = (record: {
   supervisorId: record.supervisorId,
   supervisorName: record.supervisorName,
   contentRaw: record.contentRaw,
+  photoCount: 0,
   createdAt: record.createdAt.toISOString(),
   updatedAt: record.updatedAt.toISOString(),
 })
@@ -64,6 +67,43 @@ const selectLeaderLog = {
   contentRaw: true,
   createdAt: true,
   updatedAt: true,
+}
+
+const listLeaderLogPhotoCounts = async (logIds: number[]) => {
+  if (logIds.length === 0) return new Map<string, number>()
+  const links = await prisma.fileAssetLink.findMany({
+    where: {
+      entityType: 'leader-log',
+      entityId: { in: logIds.map((id) => String(id)) },
+      file: { category: 'site-photo' },
+    },
+    select: { entityId: true },
+  })
+  const counts = new Map<string, number>()
+  links.forEach((link) => {
+    counts.set(link.entityId, (counts.get(link.entityId) ?? 0) + 1)
+  })
+  return counts
+}
+
+const attachPhotoCounts = async (logs: LeaderLogItem[]) => {
+  if (!logs.length) return logs
+  const counts = await listLeaderLogPhotoCounts(logs.map((log) => log.id))
+  return logs.map((log) => ({
+    ...log,
+    photoCount: counts.get(String(log.id)) ?? 0,
+  }))
+}
+
+export const hasLeaderLogPhotos = async (logId: number) => {
+  const count = await prisma.fileAssetLink.count({
+    where: {
+      entityType: 'leader-log',
+      entityId: String(logId),
+      file: { category: 'site-photo' },
+    },
+  })
+  return count > 0
 }
 
 const fetchLeaderUser = async (supervisorId: number) => {
@@ -120,35 +160,101 @@ export const listLeaderUsers = async () => {
   }))
 }
 
-export const listLeaderLogsForDate = async (dateKey: string) => {
+export const listLeaderLogsForDate = async (dateKey: string, supervisorId?: number) => {
   if (!DATE_KEY_REGEX.test(dateKey)) {
     throw new Error('Invalid date key')
   }
-  const records = await prisma.leaderDailyLog.findMany({
-    where: { logDate: toDateTime(dateKey) },
-    orderBy: [{ supervisorName: 'asc' }],
-    select: selectLeaderLog,
-  })
-  return records.map((record) => mapLeaderLog(record))
+  const hasSupervisor = Number.isFinite(supervisorId) && (supervisorId as number) > 0
+  const records = await prisma.$queryRaw<
+    Array<{
+      id: number
+      logDate: Date
+      supervisorId: number
+      supervisorName: string
+      contentRaw: string
+      createdAt: Date
+      updatedAt: Date
+    }>
+  >`
+    SELECT
+      id,
+      "logDate",
+      "supervisorId",
+      "supervisorName",
+      "contentRaw",
+      "createdAt",
+      "updatedAt"
+    FROM "LeaderDailyLog"
+    WHERE to_char("logDate", 'YYYY-MM-DD') = ${dateKey}
+    ${hasSupervisor ? Prisma.sql`AND "supervisorId" = ${supervisorId}` : Prisma.empty}
+    ORDER BY "supervisorName" ASC
+  `
+  const logs = records.map((record) => mapLeaderLog(record))
+  return attachPhotoCounts(logs)
 }
 
-export const listLeaderLogDatesForMonth = async (monthKey: string) => {
+export const listLeaderLogDatesForMonth = async (monthKey: string, supervisorId?: number) => {
   const { start, end } = toMonthRange(monthKey)
-  const records = await prisma.leaderDailyLog.findMany({
-    where: { logDate: { gte: start, lt: end } },
-    select: { logDate: true },
-    distinct: ['logDate'],
-  })
-  return records.map((record) => formatDateKey(record.logDate))
+  const hasSupervisor = Number.isFinite(supervisorId) && (supervisorId as number) > 0
+  const records = await prisma.$queryRaw<Array<{ logDate: string }>>`
+    SELECT DISTINCT to_char(log."logDate", 'YYYY-MM-DD') AS "logDate"
+    FROM "LeaderDailyLog" log
+    WHERE log."logDate" >= ${start} AND log."logDate" < ${end}
+      AND (
+        btrim(log."contentRaw") <> ''
+        OR EXISTS (
+          SELECT 1
+          FROM "FileAssetLink" link
+          JOIN "FileAsset" file ON file."id" = link."fileId"
+          WHERE link."entityType" = 'leader-log'
+            AND link."entityId" = CAST(log."id" AS TEXT)
+            AND file."category" = 'site-photo'
+        )
+      )
+      ${hasSupervisor ? Prisma.sql`AND log."supervisorId" = ${supervisorId}` : Prisma.empty}
+  `
+  return records.map((record) => record.logDate)
 }
 
-export const listRecentLeaderLogs = async (limit = 5) => {
-  const records = await prisma.leaderDailyLog.findMany({
-    orderBy: { updatedAt: 'desc' },
-    take: limit,
-    select: selectLeaderLog,
-  })
-  return records.map((record) => mapLeaderLog(record))
+export const listRecentLeaderLogs = async (limit = 5, supervisorId?: number) => {
+  const hasSupervisor = Number.isFinite(supervisorId) && (supervisorId as number) > 0
+  const records = await prisma.$queryRaw<
+    Array<{
+      id: number
+      logDate: Date
+      supervisorId: number
+      supervisorName: string
+      contentRaw: string
+      createdAt: Date
+      updatedAt: Date
+    }>
+  >`
+    SELECT
+      log."id",
+      log."logDate",
+      log."supervisorId",
+      log."supervisorName",
+      log."contentRaw",
+      log."createdAt",
+      log."updatedAt"
+    FROM "LeaderDailyLog" log
+    WHERE (
+      btrim(log."contentRaw") <> ''
+      OR EXISTS (
+        SELECT 1
+        FROM "FileAssetLink" link
+        JOIN "FileAsset" file ON file."id" = link."fileId"
+        WHERE link."entityType" = 'leader-log'
+          AND link."entityId" = CAST(log."id" AS TEXT)
+          AND file."category" = 'site-photo'
+      )
+    )
+    ${hasSupervisor ? Prisma.sql`AND log."supervisorId" = ${supervisorId}` : Prisma.empty}
+    ORDER BY log."updatedAt" DESC
+    LIMIT ${limit}
+  `
+  const logs = records.map((record) => mapLeaderLog(record))
+  return attachPhotoCounts(logs)
 }
 
 export const getLeaderLogById = async (id: number) => {
@@ -156,7 +262,10 @@ export const getLeaderLogById = async (id: number) => {
     where: { id },
     select: selectLeaderLog,
   })
-  return record ? mapLeaderLog(record) : null
+  if (!record) return null
+  const log = mapLeaderLog(record)
+  const withCounts = await attachPhotoCounts([log])
+  return withCounts[0] ?? log
 }
 
 export const createLeaderLog = async (input: {
@@ -204,4 +313,10 @@ export const updateLeaderLog = async (input: {
     select: selectLeaderLog,
   })
   return mapLeaderLog(record)
+}
+
+export const deleteLeaderLog = async (input: { id: number }) => {
+  await prisma.leaderDailyLog.delete({
+    where: { id: input.id },
+  })
 }

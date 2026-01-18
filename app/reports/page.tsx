@@ -6,14 +6,14 @@ import { useRouter } from 'next/navigation'
 
 import { AlertDialog, type AlertTone } from '@/components/AlertDialog'
 import { AccessDenied } from '@/components/AccessDenied'
-import { PageHeaderNav } from '@/components/PageHeaderNav'
-import { formatCopy, locales, type Locale } from '@/lib/i18n'
+import { formatCopy, locales } from '@/lib/i18n'
 import {
   getReportsLandingCopy,
   reportDateLocales,
   reportLandingBreadcrumbs,
 } from '@/lib/i18n/reportsLanding'
 import { usePreferredLocale } from '@/lib/usePreferredLocale'
+import { ReportsHeader } from './ReportsHeader'
 
 export const dynamic = 'force-dynamic'
 
@@ -324,14 +324,12 @@ export default function ReportsLandingPage() {
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900">
       {alertNode}
-      <PageHeaderNav
+      <ReportsHeader
         className="z-30 py-4"
         breadcrumbs={[{ label: breadcrumbHome, href: '/' }, { label: breadcrumbReports }]}
         title={breadcrumbReports}
         locale={locale}
         onLocaleChange={setLocale}
-        localeVariant="light"
-        breadcrumbVariant="light"
       />
       <section className="mx-auto w-full max-w-[1700px] space-y-8 px-4 pb-10 pt-6 sm:px-6 lg:px-8 xl:px-10 2xl:px-12">
         <section className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-sm shadow-slate-100">
@@ -343,14 +341,14 @@ export default function ReportsLandingPage() {
             <h1 className="mt-2 text-2xl font-semibold text-slate-900">{t.create.title}</h1>
             <p className="mt-1 text-sm text-slate-600">{t.create.description}</p>
           </div>
-          <div className="flex flex-col gap-3 md:items-end">
-            <input
-              type="date"
-              className="w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm outline-none transition focus:border-blue-500 focus:ring-1 focus:ring-blue-500 md:w-auto"
-              value={selectedDate}
-              onChange={(event) => handleDateChange(event.target.value)}
-            />
-            <div className="flex flex-col gap-2 sm:flex-row">
+          <div className="flex flex-col gap-2 md:items-end">
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <input
+                type="date"
+                className="w-full min-w-[160px] rounded-2xl border border-slate-200 px-4 py-2 text-sm outline-none transition focus:border-blue-500 focus:ring-1 focus:ring-blue-500 sm:w-auto"
+                value={selectedDate}
+                onChange={(event) => handleDateChange(event.target.value)}
+              />
               <button
                 type="button"
                 className="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
@@ -367,7 +365,7 @@ export default function ReportsLandingPage() {
               </Link>
             </div>
             {selectedDate ? (
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-slate-500 md:text-right">
                 {hasReportForSelectedDate ? t.create.hintFilled : t.create.hintEmpty}
               </p>
             ) : null}

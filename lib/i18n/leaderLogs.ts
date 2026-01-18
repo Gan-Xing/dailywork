@@ -6,6 +6,13 @@ export type LeaderLogsCopy = {
     subtitle: string
     description: string
   }
+  mode: {
+    label: string
+    team: string
+    personal: string
+    leaderLabel: string
+    leaderPlaceholder: string
+  }
   stats: {
     leaders: string
     filled: string
@@ -16,6 +23,8 @@ export type LeaderLogsCopy = {
     empty: string
     pending: string
     filled: string
+    photoOnly: string
+    photoOnlyHint: string
     leaderLabel: string
     otherLeaders: string
     view: string
@@ -58,6 +67,22 @@ export type LeaderLogsCopy = {
     leaderRequired: string
     contentRequired: string
   }
+  photos: {
+    title: string
+    hint: string
+    empty: string
+    error: string
+    loading: string
+    upload: string
+    camera: string
+    album: string
+    drop: string
+    dropHint: string
+    open: string
+    openFailed: string
+    uploadFailed: string
+    uploading: string
+  }
   alerts: {
     title: string
     createDenied: string
@@ -70,9 +95,16 @@ export type LeaderLogsCopy = {
 export const leaderLogsCopy: Record<Locale, LeaderLogsCopy> = {
   zh: {
     header: {
-      title: '负责人日志',
+      title: '原始日志',
       subtitle: '施工负责人每日现场日志，可补录历史。',
       description: '日志仅一条/人/天，请在正文写明涉及班组。',
+    },
+    mode: {
+      label: '视图模式',
+      team: '全员',
+      personal: '个人',
+      leaderLabel: '负责人',
+      leaderPlaceholder: '选择负责人',
     },
     stats: {
       leaders: '负责人',
@@ -80,10 +112,12 @@ export const leaderLogsCopy: Record<Locale, LeaderLogsCopy> = {
       pending: '待填写',
     },
     list: {
-      badge: '当日负责人日志',
+      badge: '当日原始日志',
       empty: '该日期暂无日志记录。',
       pending: '待填写',
       filled: '已填写',
+      photoOnly: '仅照片',
+      photoOnlyHint: '仅上传了现场照片，暂无文字记录。',
       leaderLabel: '负责人',
       otherLeaders: '其他负责人',
       view: '查看',
@@ -111,8 +145,8 @@ export const leaderLogsCopy: Record<Locale, LeaderLogsCopy> = {
       updatedPrefix: '更新于',
     },
     form: {
-      createTitle: '新建负责人日志',
-      editTitle: '编辑负责人日志',
+      createTitle: '新建原始日志',
+      editTitle: '编辑原始日志',
       dateLabel: '日期',
       leaderLabel: '负责人',
       contentLabel: '现场日志',
@@ -126,19 +160,42 @@ export const leaderLogsCopy: Record<Locale, LeaderLogsCopy> = {
       leaderRequired: '请选择负责人',
       contentRequired: '请输入日志内容',
     },
+    photos: {
+      title: '现场照片',
+      hint: '照片默认归类为现场照片，并关联负责人 + 原始日志。',
+      empty: '暂无现场照片。',
+      error: '照片加载失败。',
+      loading: '照片加载中...',
+      upload: '上传照片',
+      camera: '拍照',
+      album: '从相册选择',
+      drop: '拖拽上传',
+      dropHint: '拖拽/点击',
+      open: '查看',
+      openFailed: '打开照片失败。',
+      uploadFailed: '上传照片失败。',
+      uploading: '上传中...',
+    },
     alerts: {
       title: '权限提醒',
       createDenied: '缺少 report:edit 权限，无法创建或修改日志。',
       viewDenied: '缺少 report:view 权限，无法查看日志。',
       close: '知道了',
     },
-    accessHint: '需要拥有 report:view 或 report:edit 权限才能查看负责人日志。',
+    accessHint: '需要拥有 report:view 或 report:edit 权限才能查看原始日志。',
   },
   fr: {
     header: {
-      title: 'Journal du responsable',
+      title: 'Journal brut',
       subtitle: 'Saisie quotidienne du responsable chantier, y compris les jours précédents.',
       description: "Une seule entrée par responsable et par jour; indiquez les équipes dans le texte.",
+    },
+    mode: {
+      label: 'Mode',
+      team: 'Équipe',
+      personal: 'Individuel',
+      leaderLabel: 'Responsable',
+      leaderPlaceholder: 'Choisir un responsable',
     },
     stats: {
       leaders: 'Responsables',
@@ -150,6 +207,8 @@ export const leaderLogsCopy: Record<Locale, LeaderLogsCopy> = {
       empty: 'Aucun journal pour cette date.',
       pending: 'À remplir',
       filled: 'Renseigné',
+      photoOnly: 'Photos uniquement',
+      photoOnlyHint: 'Photos présentes, aucun texte saisi.',
       leaderLabel: 'Responsable',
       otherLeaders: 'Autres responsables',
       view: 'Voir',
@@ -192,6 +251,22 @@ export const leaderLogsCopy: Record<Locale, LeaderLogsCopy> = {
       leaderRequired: 'Sélectionnez un responsable',
       contentRequired: 'Saisissez le journal',
     },
+    photos: {
+      title: 'Photos terrain',
+      hint: 'Catégorie: photos terrain, liées au responsable et au journal brut.',
+      empty: 'Aucune photo.',
+      error: 'Chargement des photos impossible.',
+      loading: 'Chargement des photos...',
+      upload: 'Ajouter',
+      camera: 'Prendre une photo',
+      album: 'Choisir depuis l’album',
+      drop: 'Glisser-déposer',
+      dropHint: 'Glisser / cliquer',
+      open: 'Voir',
+      openFailed: 'Ouverture de la photo impossible.',
+      uploadFailed: 'Téléversement impossible.',
+      uploading: 'Téléversement...',
+    },
     alerts: {
       title: 'Alerte de droits',
       createDenied: "Le droit report:edit est requis pour créer ou modifier un journal.",
@@ -202,9 +277,9 @@ export const leaderLogsCopy: Record<Locale, LeaderLogsCopy> = {
   },
 }
 
-export const leaderLogBreadcrumbs: Record<Locale, { home: string; logs: string }> = {
-  zh: { home: '首页', logs: '负责人日志' },
-  fr: { home: 'Accueil', logs: 'Journal du responsable' },
+export const leaderLogBreadcrumbs: Record<Locale, { home: string; reports: string; logs: string }> = {
+  zh: { home: '首页', reports: '日报管理', logs: '原始日志' },
+  fr: { home: 'Accueil', reports: 'Rapports journaliers', logs: 'Journal brut' },
 }
 
 export const leaderLogDateLocales: Record<Locale, string> = {

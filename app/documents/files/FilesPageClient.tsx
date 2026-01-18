@@ -54,6 +54,15 @@ type BoqItemMeta = {
   projectCode: string | null
 }
 
+type LeaderLogOptionRecord = {
+  id: number
+  date: string
+  supervisorId: number
+  supervisorName: string
+}
+
+type LeaderLogMeta = LeaderLogOptionRecord
+
 type EditableFileLink = {
   id?: number
   entityType: string
@@ -143,6 +152,12 @@ const formatBoqMetaLabel = (meta: {
   return [projectLabel, code, designation].filter(Boolean).join(' · ')
 }
 
+const formatLeaderLogMetaLabel = (meta: { date?: string; supervisorName?: string }) => {
+  const date = meta.date?.trim() ?? ''
+  const supervisor = meta.supervisorName?.trim() ?? ''
+  return [date, supervisor].filter(Boolean).join(' · ')
+}
+
 const buildBoqLinkMeta = (item: BoqItemMeta) => ({
   boqItemCode: item.code,
   designationZh: item.designationZh,
@@ -151,6 +166,12 @@ const buildBoqLinkMeta = (item: BoqItemMeta) => ({
   projectName: item.projectName,
   projectCode: item.projectCode,
   unit: item.unit,
+})
+
+const buildLeaderLogLinkMeta = (item: LeaderLogMeta) => ({
+  date: item.date,
+  supervisorId: item.supervisorId,
+  supervisorName: item.supervisorName,
 })
 
 const useBoqItemSearch = (locale: string, cacheRef: { current: Map<string, BoqItemMeta> }) => {
@@ -195,6 +216,51 @@ const useBoqItemSearch = (locale: string, cacheRef: { current: Map<string, BoqIt
       controller.abort()
     }
   }, [search, locale, cacheRef])
+
+  return { search, setSearch, options, loading, error }
+}
+
+const useLeaderLogSearch = (cacheRef: { current: Map<string, LeaderLogMeta> }) => {
+  const [search, setSearch] = useState('')
+  const [options, setOptions] = useState<MultiSelectOption[]>([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const term = search.trim()
+    const controller = new AbortController()
+    const handle = setTimeout(() => {
+      setLoading(true)
+      const query = term ? `?search=${encodeURIComponent(term)}` : ''
+      fetch(`/api/leader-logs/options${query}`, { signal: controller.signal })
+        .then((res) => {
+          if (!res.ok) throw new Error('failed')
+          return res.json()
+        })
+        .then((data: { items?: LeaderLogOptionRecord[] }) => {
+          const items = Array.isArray(data.items) ? data.items : []
+          items.forEach((item) => cacheRef.current.set(String(item.id), item))
+          setOptions(
+            items.map((item) => ({
+              value: String(item.id),
+              label: [item.date, item.supervisorName].filter(Boolean).join(' · '),
+            })),
+          )
+          setError(null)
+        })
+        .catch((err) => {
+          if ((err as Error).name === 'AbortError') return
+          setOptions([])
+          setError('failed')
+        })
+        .finally(() => setLoading(false))
+    }, 250)
+
+    return () => {
+      clearTimeout(handle)
+      controller.abort()
+    }
+  }, [search, cacheRef])
 
   return { search, setSearch, options, loading, error }
 }
@@ -255,12 +321,16 @@ export function FilesPageClient({
   const cameraInputRef = useRef<HTMLInputElement | null>(null)
   const dragDepthRef = useRef(0)
   const boqItemCacheRef = useRef(new Map<string, BoqItemMeta>())
+  const leaderLogCacheRef = useRef(new Map<string, LeaderLogMeta>())
 
   const [candidateUsers, setCandidateUsers] = useState<CandidateUser[]>([])
   const [loadingUsers, setLoadingUsers] = useState(false)
   const uploadBoqSearch = useBoqItemSearch(locale, boqItemCacheRef)
   const editBoqSearch = useBoqItemSearch(locale, boqItemCacheRef)
   const filterBoqSearch = useBoqItemSearch(locale, boqItemCacheRef)
+  const uploadLeaderLogSearch = useLeaderLogSearch(leaderLogCacheRef)
+  const editLeaderLogSearch = useLeaderLogSearch(leaderLogCacheRef)
+  const filterLeaderLogSearch = useLeaderLogSearch(leaderLogCacheRef)
 
   useEffect(() => {
     const needUsers =
@@ -321,6 +391,19 @@ export function FilesPageClient({
     }
   }
 
+  const buildLeaderLogLinkPayload = (entityId: string, labelOverride?: string) => {
+    const meta = leaderLogCacheRef.current.get(entityId)
+    const label =
+      labelOverride?.trim() ||
+      (meta ? [meta.date, meta.supervisorName].filter(Boolean).join(' · ') : '')
+    return {
+      entityType: 'leader-log',
+      entityId,
+      label: label || undefined,
+      meta: meta ? buildLeaderLogLinkMeta(meta) : undefined,
+    }
+  }
+
   const renderBoqItemSelect = ({
     selected,
     onChange,
@@ -341,6 +424,49 @@ export function FilesPageClient({
     const noOptionsLabel = searchState.error
       ? copy.files.messages.boqItemLoadFailed
       : copy.files.messages.boqItemSearchHint
+
+    return (
+      <MultiSelectFilter
+        variant="form"
+        label=""
+        options={searchState.options}
+        selected={selected}
+        onChange={onChange}
+        allLabel={allLabel}
+        selectedLabel={(count) => formatCopy(copy.files.dropdown.selected, { count })}
+        selectAllLabel={copy.files.dropdown.selectAll}
+        clearLabel={copy.files.dropdown.clear}
+        searchPlaceholder={copy.files.dropdown.search}
+        noOptionsLabel={noOptionsLabel}
+        multiple={multiple}
+        zIndex={zIndex}
+        disabled={disabled}
+        searchValue={searchState.search}
+        onSearchChange={searchState.setSearch}
+      />
+    )
+  }
+
+  const renderLeaderLogSelect = ({
+    selected,
+    onChange,
+    searchState,
+    multiple,
+    zIndex,
+    allLabel,
+    disabled,
+  }: {
+    selected: string[]
+    onChange: (next: string[]) => void
+    searchState: ReturnType<typeof useLeaderLogSearch>
+    multiple: boolean
+    zIndex: number
+    allLabel: string
+    disabled?: boolean
+  }) => {
+    const noOptionsLabel = searchState.error
+      ? copy.files.messages.leaderLogLoadFailed
+      : copy.files.messages.leaderLogSearchHint
 
     return (
       <MultiSelectFilter
@@ -486,6 +612,7 @@ export function FilesPageClient({
     setUploadLabel('')
     setUploadError(null)
     uploadBoqSearch.setSearch('')
+    uploadLeaderLogSearch.setSearch('')
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
     }
@@ -525,6 +652,14 @@ export function FilesPageClient({
       } else if (uploadEntityId) {
         if (uploadEntityType === 'actual-boq-item') {
           const payload = buildBoqLinkPayload(uploadEntityId.trim(), uploadLabel.trim() || undefined)
+          links = [
+            {
+              ...payload,
+              purpose: uploadPurpose.trim() || undefined,
+            },
+          ]
+        } else if (uploadEntityType === 'leader-log') {
+          const payload = buildLeaderLogLinkPayload(uploadEntityId.trim(), uploadLabel.trim() || undefined)
           links = [
             {
               ...payload,
@@ -651,6 +786,7 @@ export function FilesPageClient({
     setEditLabel('')
     setEditLinkError(null)
     editBoqSearch.setSearch('')
+    editLeaderLogSearch.setSearch('')
   }
 
   const handleAddEditLink = () => {
@@ -693,6 +829,15 @@ export function FilesPageClient({
       if (!existing.has(key)) {
         if (nextType === 'actual-boq-item') {
           const payload = buildBoqLinkPayload(entityId, nextLabel)
+          nextLinks.push({
+            entityType: payload.entityType,
+            entityId: payload.entityId,
+            purpose: nextPurpose ?? null,
+            label: payload.label ?? null,
+            meta: payload.meta ?? null,
+          })
+        } else if (nextType === 'leader-log') {
+          const payload = buildLeaderLogLinkPayload(entityId, nextLabel)
           nextLinks.push({
             entityType: payload.entityType,
             entityId: payload.entityId,
@@ -819,6 +964,11 @@ export function FilesPageClient({
     const labels = links.map((link) => {
       const directLabel = link.label?.trim()
       if (directLabel) return directLabel
+      if (link.entityType === 'leader-log') {
+        const metaRecord = link.meta as { date?: string; supervisorName?: string } | null
+        const metaLabel = metaRecord ? formatLeaderLogMetaLabel(metaRecord) : ''
+        return metaLabel || `${link.entityType}#${link.entityId}`
+      }
       const metaRecord = link.meta as
         | {
             boqItemCode?: string
@@ -1050,6 +1200,7 @@ export function FilesPageClient({
                       setUploadEntityId('')
                       setUploadUserIds([])
                       uploadBoqSearch.setSearch('')
+                      uploadLeaderLogSearch.setSearch('')
                     }}
                     allLabel={copy.files.uploadPanel.categoryPlaceholder}
                     selectedLabel={(count) => formatCopy(copy.files.dropdown.selected, { count })}
@@ -1080,6 +1231,15 @@ export function FilesPageClient({
                       disabled={loadingUsers}
                       zIndex={30}
                     />
+                  ) : uploadEntityType === 'leader-log' ? (
+                    renderLeaderLogSelect({
+                      selected: uploadEntityId ? [uploadEntityId] : [],
+                      onChange: (vals) => setUploadEntityId(vals[0] || ''),
+                      searchState: uploadLeaderLogSearch,
+                      multiple: false,
+                      zIndex: 30,
+                      allLabel: copy.files.dropdown.all,
+                    })
                   ) : uploadEntityType === 'actual-boq-item' ? (
                     renderBoqItemSelect({
                       selected: uploadEntityId ? [uploadEntityId] : [],
@@ -1178,9 +1338,10 @@ export function FilesPageClient({
               onChange={(vals) => {
                 const next = vals.join(',')
                 setEntityType(next)
-                if (next === 'user' || next === 'actual-boq-item') {
+                if (next === 'user' || next === 'actual-boq-item' || next === 'leader-log') {
                   setEntityId('')
                   filterBoqSearch.setSearch('')
+                  filterLeaderLogSearch.setSearch('')
                 }
               }}
               allLabel={copy.files.filters.allLabel}
@@ -1213,6 +1374,15 @@ export function FilesPageClient({
                 disabled={loadingUsers}
                 zIndex={20}
               />
+            ) : entityType === 'leader-log' ? (
+              renderLeaderLogSelect({
+                selected: entityId ? entityId.split(',') : [],
+                onChange: (vals) => setEntityId(vals.join(',')),
+                searchState: filterLeaderLogSearch,
+                multiple: true,
+                zIndex: 20,
+                allLabel: copy.files.filters.allLabel,
+              })
             ) : entityType === 'actual-boq-item' ? (
               renderBoqItemSelect({
                 selected: entityId ? entityId.split(',') : [],
@@ -1504,17 +1674,26 @@ export function FilesPageClient({
                       <div className="space-y-2">
                         {editLinks.map((link, index) => {
                           const typeLabel = copy.files.uploadPanel.entityTypes[link.entityType] ?? link.entityType
-                          const metaRecord = link.meta as
-                            | {
-                                boqItemCode?: string
-                                designationZh?: string
-                                designationFr?: string
-                                projectName?: string
-                                projectCode?: string | null
-                              }
-                            | null
-                          const metaLabel = metaRecord ? formatBoqMetaLabel(metaRecord, locale) : ''
-                          const displayLabel = link.label?.trim() || metaLabel || `${link.entityType}#${link.entityId}`
+                          const metaLabel =
+                            link.entityType === 'leader-log'
+                              ? (() => {
+                                  const metaRecord = link.meta as
+                                    | { date?: string; supervisorName?: string }
+                                    | null
+                                  return metaRecord ? formatLeaderLogMetaLabel(metaRecord) : ''
+                                })()
+                              : formatBoqMetaLabel(
+                                  link.meta as {
+                                    boqItemCode?: string
+                                    designationZh?: string
+                                    designationFr?: string
+                                    projectName?: string
+                                    projectCode?: string | null
+                                  },
+                                  locale,
+                                )
+                          const displayLabel =
+                            link.label?.trim() || metaLabel || `${link.entityType}#${link.entityId}`
                           return (
                             <div
                               key={link.id ?? `${link.entityType}-${link.entityId}-${index}`}
@@ -1556,6 +1735,7 @@ export function FilesPageClient({
                           setEditEntityId('')
                           setEditUserIds([])
                           editBoqSearch.setSearch('')
+                          editLeaderLogSearch.setSearch('')
                           setEditLinkError(null)
                         }}
                         allLabel={copy.files.uploadPanel.categoryPlaceholder}
@@ -1587,6 +1767,15 @@ export function FilesPageClient({
                           disabled={loadingUsers}
                           zIndex={1300}
                         />
+                      ) : editEntityType === 'leader-log' ? (
+                        renderLeaderLogSelect({
+                          selected: editEntityId ? [editEntityId] : [],
+                          onChange: (vals) => setEditEntityId(vals[0] || ''),
+                          searchState: editLeaderLogSearch,
+                          multiple: false,
+                          zIndex: 1300,
+                          allLabel: copy.files.dropdown.all,
+                        })
                       ) : editEntityType === 'actual-boq-item' ? (
                         renderBoqItemSelect({
                           selected: editEntityId ? [editEntityId] : [],

@@ -2,10 +2,9 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { Prisma } from '@prisma/client'
 
 import { getSessionUser, hasPermission } from '@/lib/server/authSession'
-import { getLeaderLogById, updateLeaderLog } from '@/lib/server/leaderLogStore'
+import { deleteLeaderLog, getLeaderLogById, hasLeaderLogPhotos, updateLeaderLog } from '@/lib/server/leaderLogStore'
 
-const isAdminUser = (user: { roles?: { name: string }[] }) =>
-  user.roles?.some((role) => role.name === 'Admin') ?? false
+const canEditAllLeaderLogs = async () => await hasPermission('leader-log:edit-all')
 
 export async function PUT(
   request: NextRequest,
@@ -35,21 +34,25 @@ export async function PUT(
 
   const contentRaw =
     typeof payload.contentRaw === 'string' ? payload.contentRaw.trim() : ''
-  if (!contentRaw) {
-    return NextResponse.json({ message: '日志内容必填' }, { status: 400 })
-  }
 
   const log = await getLeaderLogById(logId)
   if (!log) {
     return NextResponse.json({ message: '日志不存在' }, { status: 404 })
   }
 
-  const isAdmin = isAdminUser(sessionUser)
-  if (!isAdmin && log.supervisorId !== sessionUser.id) {
+  const canEditAll = await canEditAllLeaderLogs()
+  if (!canEditAll && log.supervisorId !== sessionUser.id) {
     return NextResponse.json({ message: '只能编辑自己的日志' }, { status: 403 })
   }
 
   try {
+    if (!contentRaw) {
+      const hasPhotos = await hasLeaderLogPhotos(logId)
+      if (!hasPhotos) {
+        await deleteLeaderLog({ id: logId })
+        return NextResponse.json({ deleted: true })
+      }
+    }
     const updated = await updateLeaderLog({
       id: logId,
       contentRaw,

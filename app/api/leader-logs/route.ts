@@ -12,33 +12,87 @@ import {
 const canViewLeaderLogs = async () =>
   (await hasPermission('report:view')) || (await hasPermission('report:edit'))
 
-const isAdminUser = (user: { roles?: { name: string }[] }) =>
-  user.roles?.some((role) => role.name === 'Admin') ?? false
+const canViewAllLeaderLogs = async () =>
+  (await hasPermission('leader-log:view-all')) || (await hasPermission('leader-log:edit-all'))
+
+const canEditAllLeaderLogs = async () => await hasPermission('leader-log:edit-all')
 
 export async function GET(request: Request) {
   if (!(await canViewLeaderLogs())) {
     return NextResponse.json({ message: '缺少日志查看权限' }, { status: 403 })
   }
 
+  const sessionUser = await getSessionUser()
+  if (!sessionUser) {
+    return NextResponse.json({ message: '请先登录再查看日志' }, { status: 401 })
+  }
+
   const { searchParams } = new URL(request.url)
   const date = searchParams.get('date')
   const month = searchParams.get('month')
   const limitParam = searchParams.get('limit')
+  const supervisorParam = searchParams.get('supervisorId')
+  const supervisorId = supervisorParam ? Number(supervisorParam) : NaN
+  const supervisorFilter = Number.isFinite(supervisorId) && supervisorId > 0 ? supervisorId : undefined
+  const canViewAll = await canViewAllLeaderLogs()
+  const debug = searchParams.get('debug') === '1'
 
   try {
     if (date) {
-      const logs = await listLeaderLogsForDate(date)
-      return NextResponse.json({ logs })
+      const logs = await listLeaderLogsForDate(
+        date,
+        canViewAll ? supervisorFilter : sessionUser.id,
+      )
+      return NextResponse.json(
+        debug
+          ? {
+              logs,
+              debug: {
+                canViewAll,
+                supervisorFilter,
+                sessionUserId: sessionUser.id,
+              },
+            }
+          : { logs },
+      )
     }
     if (month) {
-      const dates = await listLeaderLogDatesForMonth(month)
-      return NextResponse.json({ dates })
+      const dates = await listLeaderLogDatesForMonth(
+        month,
+        canViewAll ? supervisorFilter : sessionUser.id,
+      )
+      return NextResponse.json(
+        debug
+          ? {
+              dates,
+              debug: {
+                canViewAll,
+                supervisorFilter,
+                sessionUserId: sessionUser.id,
+              },
+            }
+          : { dates },
+      )
     }
     if (limitParam) {
       const limit = Number(limitParam)
       const effectiveLimit = Number.isFinite(limit) && limit > 0 ? limit : 5
-      const logs = await listRecentLeaderLogs(effectiveLimit)
-      return NextResponse.json({ logs })
+      const logs = await listRecentLeaderLogs(
+        effectiveLimit,
+        canViewAll ? supervisorFilter : sessionUser.id,
+      )
+      return NextResponse.json(
+        debug
+          ? {
+              logs,
+              debug: {
+                canViewAll,
+                supervisorFilter,
+                sessionUserId: sessionUser.id,
+              },
+            }
+          : { logs },
+      )
     }
   } catch (error) {
     return NextResponse.json(
@@ -79,19 +133,15 @@ export async function POST(request: Request) {
   if (!logDate) {
     return NextResponse.json({ message: '日志日期必填' }, { status: 400 })
   }
-  if (!contentRaw) {
-    return NextResponse.json({ message: '日志内容必填' }, { status: 400 })
-  }
-
-  const isAdmin = isAdminUser(sessionUser)
-  if (!isAdmin && payload.supervisorId && supervisorIdInput !== sessionUser.id) {
+  const canEditAll = await canEditAllLeaderLogs()
+  if (!canEditAll && payload.supervisorId && supervisorIdInput !== sessionUser.id) {
     return NextResponse.json({ message: '只能提交自己的日志' }, { status: 403 })
   }
-  if (isAdmin && !Number.isFinite(supervisorIdInput)) {
+  if (canEditAll && !Number.isFinite(supervisorIdInput)) {
     return NextResponse.json({ message: '负责人必填' }, { status: 400 })
   }
 
-  const supervisorId = isAdmin ? supervisorIdInput : sessionUser.id
+  const supervisorId = canEditAll ? supervisorIdInput : sessionUser.id
 
   try {
     const log = await createLeaderLog({
