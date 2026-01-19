@@ -7,6 +7,11 @@ import { useSearchParams } from 'next/navigation'
 import { AccessDenied } from '@/components/AccessDenied'
 import { PageHeaderNav } from '@/components/PageHeaderNav'
 import { useToast } from '@/components/ToastProvider'
+import {
+  buildActualBoqRows,
+  sortBoqItemsByOrder,
+  type BoqCompletionRecord,
+} from '@/lib/boq/actualBoqRows'
 import type { AggregatedPhaseProgress } from '@/lib/progressTypes'
 import { usePreferredLocale } from '@/lib/usePreferredLocale'
 import { locales, type Locale } from '@/lib/i18n'
@@ -32,13 +37,6 @@ type BoqItemRecord = {
   tone: 'SECTION' | 'SUBSECTION' | 'ITEM' | 'TOTAL'
   sortOrder: number
   isActive: boolean
-}
-
-type BoqCompletionRecord = {
-  boqItemId: number
-  bindingCount: number
-  designQuantity: number | null
-  completedQuantity: number | null
 }
 
 type BoqCompletionDetailRecord = {
@@ -730,7 +728,7 @@ export default function ProductionValuePage() {
   }, [rows, localeId, priceItemMap, phaseDefaultPrices])
 
   const boqRowData = useMemo(() => {
-    return boqItems.map((item, index) => {
+    return sortBoqItemsByOrder(boqItems).map((item, index) => {
       const designation = locale === 'fr' ? item.designationFr : item.designationZh
       const searchable = `${item.code} ${designation}`.toLowerCase()
       return {
@@ -750,78 +748,42 @@ export default function ProductionValuePage() {
 
   const completionRowData = useMemo(() => {
     if (!completionItems.length) return []
-    const sorted = [...completionItems].sort(
-      (a, b) => a.sortOrder - b.sortOrder || a.id - b.id,
-    )
-    const extractSubtotalCode = (value: string) => {
-      const normalized = normalizeBoqCode(value)
-      if (/^\d{3}$/.test(normalized)) return normalized
-      const match = normalized.match(/(\d{3})/)
-      return match?.[1] ?? null
-    }
-    const baseRows = sorted.map((item, index) => {
-      const designation = locale === 'fr' ? item.designationFr : item.designationZh
-      const searchable = `${item.code} ${designation}`.toLowerCase()
-      const completionRecord = completionMap.get(item.id)
-      const rawDesignQuantity = completionRecord?.designQuantity ?? null
-      const designQuantity =
-        rawDesignQuantity !== null && Number.isFinite(rawDesignQuantity)
-          ? rawDesignQuantity
-          : 0
-      const rawCompletedQuantity = completionRecord?.completedQuantity ?? null
-      const completedQuantity =
-        rawCompletedQuantity !== null && Number.isFinite(rawCompletedQuantity)
-          ? rawCompletedQuantity
-          : 0
-      const unitPriceValue = parseBoqNumber(item.unitPrice)
+    const baseRows = buildActualBoqRows({
+      items: completionItems,
+      completion: completionMap,
+      locale,
+    }).map((row) => {
+      const isItem = row.tone === 'ITEM'
+      const unitPriceValue = parseBoqNumber(row.unitPrice)
       const unitPriceMissing = unitPriceValue === null || unitPriceValue === 0
-      const quantityValue =
-        item.tone === 'ITEM' ? designQuantity : parseBoqNumber(item.quantity)
-      const totalPriceValue =
-        item.tone === 'ITEM'
-          ? quantityValue !== null && unitPriceValue !== null
-            ? quantityValue * unitPriceValue
-            : null
-          : parseBoqNumber(item.totalPrice) ??
-            (quantityValue !== null && unitPriceValue !== null
-              ? quantityValue * unitPriceValue
-              : null)
-      const completedValue =
-        item.tone === 'ITEM'
-          ? unitPriceMissing
-            ? 0
-            : completedQuantity * (unitPriceValue ?? 0)
-          : null
+      const rawCompletedQuantity = row.completedQuantity ?? 0
+      const completedQuantity =
+        isItem && Number.isFinite(rawCompletedQuantity) ? rawCompletedQuantity : 0
+      const completedValue = isItem
+        ? unitPriceMissing
+          ? 0
+          : completedQuantity * (unitPriceValue ?? 0)
+        : null
       const completedPercent =
-        item.tone === 'ITEM' && totalPriceValue !== null && totalPriceValue > 0
-          ? (completedValue ?? 0) / totalPriceValue * 100
+        isItem && row.totalPriceValue !== null && row.totalPriceValue > 0
+          ? (completedValue ?? 0) / row.totalPriceValue * 100
           : null
-      const completionRisk =
-        item.tone === 'ITEM' && unitPriceMissing && completedQuantity !== 0
+      const completionRisk = isItem && unitPriceMissing && completedQuantity !== 0
 
       return {
-        index,
-        id: item.id,
-        code: item.code,
-        designation,
-        bindingCount: completionRecord?.bindingCount ?? 0,
-        designQuantity: item.tone === 'ITEM' ? designQuantity : null,
-        unit: item.unit,
-        unitPrice: item.unitPrice,
-        quantity: item.tone === 'ITEM' ? designQuantity : item.quantity,
-        totalPrice: item.tone === 'ITEM' ? totalPriceValue : item.totalPrice,
-        tone: mapBoqTone(item.tone),
-        completedQuantity: item.tone === 'ITEM' ? completedQuantity : null,
+        ...row,
+        tone: mapBoqTone(row.tone),
+        completedQuantity: isItem ? completedQuantity : null,
         completedValue,
         completedPercent,
-        totalPriceValue,
         completionRisk,
-        searchable,
       }
     })
 
     const totalsBySection = new Map<number, CompletionTotals>()
     const totalsBySubsection = new Map<number, CompletionTotals>()
+    const totalsBySubsectionCode = new Map<string, CompletionTotals>()
+    const totalsByMajorCode = new Map<string, CompletionTotals>()
     const subsectionIndexBySectionAndCode = new Map<number, Map<string, number>>()
     const overallTotals: CompletionTotals = {
       completedQuantity: 0,
@@ -832,6 +794,7 @@ export default function ProductionValuePage() {
     const sectionIndexByRow: Array<number | null> = []
     let currentSectionIndex: number | null = null
     let currentSubsectionIndex: number | null = null
+    let currentSubsectionCode: string | null = null
 
     const addTotals = (target: CompletionTotals, addition: CompletionTotals) => {
       target.completedQuantity += addition.completedQuantity
@@ -855,12 +818,28 @@ export default function ProductionValuePage() {
       map.set(key, existing)
     }
 
+    const addToCodeMap = (
+      map: Map<string, CompletionTotals>,
+      key: string,
+      addition: CompletionTotals,
+    ) => {
+      const existing = map.get(key) ?? {
+        completedQuantity: 0,
+        completedValue: 0,
+        totalPrice: 0,
+        itemCount: 0,
+      }
+      addTotals(existing, addition)
+      map.set(key, existing)
+    }
+
     baseRows.forEach((row, index) => {
       if (row.tone === 'section') {
         currentSectionIndex = index
         currentSubsectionIndex = null
+        currentSubsectionCode = null
       } else if (row.tone === 'subsection') {
-        const code = extractSubtotalCode(row.code)
+        const code = row.subtotalCode
         const isMajor =
           code !== null && Number.isFinite(Number(code)) && Number(code) % 100 === 0
         if (isMajor) {
@@ -870,6 +849,11 @@ export default function ProductionValuePage() {
             subsectionIndexBySectionAndCode.set(currentSectionIndex, map)
           }
           currentSubsectionIndex = index
+        }
+      }
+      if (row.tone !== 'item') {
+        if (row.subtotalCode && /^\d{3}$/.test(row.subtotalCode)) {
+          currentSubsectionCode = row.subtotalCode
         }
       }
       sectionIndexByRow[index] = currentSectionIndex
@@ -886,6 +870,12 @@ export default function ProductionValuePage() {
       }
       if (currentSubsectionIndex !== null) {
         addToMap(totalsBySubsection, currentSubsectionIndex, addition)
+      }
+      if (currentSubsectionCode) {
+        addToCodeMap(totalsBySubsectionCode, currentSubsectionCode, addition)
+      }
+      if (row.majorCode) {
+        addToCodeMap(totalsByMajorCode, row.majorCode, addition)
       }
     })
 
@@ -924,40 +914,85 @@ export default function ProductionValuePage() {
       itemCount: totals.itemCount,
     })
 
+    const resolveTotalsForTotalRow = (
+      row: (typeof baseRows)[number],
+      index: number,
+    ): CompletionTotals | undefined => {
+      const normalizedCode = normalizeBoqCode(row.code)
+      const useOverall =
+        isVatCode(normalizedCode) || isTotalHtvaCode(normalizedCode) || isTotalWithTaxCode(normalizedCode)
+      if (useOverall) {
+        const factor = isVatCode(normalizedCode) ? 0.18 : isTotalWithTaxCode(normalizedCode) ? 1.18 : 1
+        return scaleTotals(overallTotals, factor)
+      }
+
+      const subtotalCode = row.subtotalCode
+      const majorCode = row.majorCode
+      if (majorCode && totalsByMajorCode.has(majorCode)) {
+        return totalsByMajorCode.get(majorCode)
+      }
+      if (subtotalCode && totalsBySubsectionCode.has(subtotalCode)) {
+        return totalsBySubsectionCode.get(subtotalCode)
+      }
+
+      const sectionIndex = sectionIndexByRow[index]
+      if (sectionIndex !== null) {
+        const matchingSubsectionIndex = subtotalCode
+          ? subsectionIndexBySectionAndCode.get(sectionIndex)?.get(subtotalCode) ?? null
+          : null
+        return matchingSubsectionIndex !== null
+          ? totalsBySubsection.get(matchingSubsectionIndex)
+          : totalsBySection.get(sectionIndex)
+      }
+
+      return overallTotals
+    }
+
+    const totalRowTotalsByKey = new Map<string, CompletionTotals>()
+    const totalRowTotalsByCode = new Map<string, CompletionTotals>()
+    baseRows.forEach((row, index) => {
+      if (row.tone !== 'total') return
+      const sectionIndex = sectionIndexByRow[index]
+      if (sectionIndex === null) return
+      const subtotalCode = row.subtotalCode
+      const majorCode = row.majorCode
+      if (!subtotalCode) return
+      const totals = resolveTotalsForTotalRow(row, index)
+      if (!totals) return
+      totalRowTotalsByKey.set(`${sectionIndex}:${subtotalCode}`, totals)
+      if (majorCode && !totalRowTotalsByCode.has(majorCode)) {
+        totalRowTotalsByCode.set(majorCode, totals)
+      }
+      if (!totalRowTotalsByCode.has(subtotalCode)) {
+        totalRowTotalsByCode.set(subtotalCode, totals)
+      }
+    })
+
     return baseRows.map((row, index) => {
       if (row.tone === 'subsection') {
         const normalizedCode = normalizeBoqCode(row.code)
         if (isVatCode(normalizedCode)) {
           return applyTotals(row, scaleTotals(overallTotals, 0.18), { hideCompletedQuantity: true })
         }
-        return applyTotals(row, totalsBySubsection.get(index), { hideCompletedQuantity: true })
+        const subsectionTotals = totalsBySubsection.get(index)
+        const sectionIndex = sectionIndexByRow[index]
+        const subtotalCode = row.subtotalCode
+        const majorCode = row.majorCode
+        const fallbackTotals =
+          sectionIndex !== null && subtotalCode
+            ? totalRowTotalsByKey.get(`${sectionIndex}:${subtotalCode}`)
+            : undefined
+        const codeTotals = majorCode
+          ? totalRowTotalsByCode.get(majorCode) ?? totalsByMajorCode.get(majorCode)
+          : subtotalCode
+            ? totalRowTotalsByCode.get(subtotalCode) ?? totalsBySubsectionCode.get(subtotalCode)
+            : undefined
+        const resolvedTotals =
+          subsectionTotals && subsectionTotals.itemCount > 0 ? subsectionTotals : fallbackTotals
+        return applyTotals(row, resolvedTotals ?? codeTotals, { hideCompletedQuantity: true })
       }
       if (row.tone === 'total') {
-        const normalizedCode = normalizeBoqCode(row.code)
-        const useOverall =
-          isVatCode(normalizedCode) ||
-          isTotalHtvaCode(normalizedCode) ||
-          isTotalWithTaxCode(normalizedCode)
-        const sectionIndex = sectionIndexByRow[index]
-        if (useOverall) {
-          const factor = isVatCode(normalizedCode) ? 0.18 : isTotalWithTaxCode(normalizedCode) ? 1.18 : 1
-          return applyTotals(row, scaleTotals(overallTotals, factor), { hideCompletedQuantity: true })
-        }
-
-        if (sectionIndex !== null) {
-          const subtotalCode =
-            extractSubtotalCode(row.code) ?? extractSubtotalCode(row.designation)
-          const matchingSubsectionIndex = subtotalCode
-            ? subsectionIndexBySectionAndCode.get(sectionIndex)?.get(subtotalCode) ?? null
-            : null
-          const totals =
-            matchingSubsectionIndex !== null
-              ? totalsBySubsection.get(matchingSubsectionIndex)
-              : totalsBySection.get(sectionIndex)
-          return applyTotals(row, totals, { hideCompletedQuantity: true })
-        }
-
-        return applyTotals(row, overallTotals, { hideCompletedQuantity: true })
+        return applyTotals(row, resolveTotalsForTotalRow(row, index), { hideCompletedQuantity: true })
       }
       if (row.tone === 'section') {
         return {

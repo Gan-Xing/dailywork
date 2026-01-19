@@ -6,6 +6,11 @@ import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } fro
 import { AccessDenied } from '@/components/AccessDenied'
 import { PageHeaderNav } from '@/components/PageHeaderNav'
 import { useToast } from '@/components/ToastProvider'
+import {
+  buildActualBoqRows,
+  sortBoqItemsByOrder,
+  type BoqCompletionRecord,
+} from '@/lib/boq/actualBoqRows'
 import { locales, type Locale } from '@/lib/i18n'
 import { productionValueCopy } from '@/lib/i18n/value'
 import { usePreferredLocale } from '@/lib/usePreferredLocale'
@@ -81,7 +86,7 @@ type LetterFormState = {
 const boqManageCopy: Record<Locale, any> = {
   zh: {
     title: '实际工程量清单',
-    description: '维护实际工程量清单，支持新增分项与调整数量。',
+    description: '维护实际工程量清单，数量与合价由分项绑定自动汇总。',
     breadcrumbs: {
       home: '首页',
       value: '产值计量',
@@ -126,7 +131,7 @@ const boqManageCopy: Record<Locale, any> = {
       designationFr: '法文名称',
       unit: '单位',
       unitPrice: '单价',
-      quantity: '数量',
+      quantity: '数量（自动）',
       totalPrice: '合价',
       tone: '行类型',
       sortOrder: '排序',
@@ -170,7 +175,7 @@ const boqManageCopy: Record<Locale, any> = {
   },
   fr: {
     title: 'Devis quantitatif réel',
-    description: 'Gérer le devis réel, ajouter des postes et ajuster les quantités.',
+    description: 'Gérer le devis réel avec quantités et montants calculés automatiquement.',
     breadcrumbs: {
       home: 'Accueil',
       value: 'Valeurs',
@@ -215,7 +220,7 @@ const boqManageCopy: Record<Locale, any> = {
       designationFr: 'Désignation (fr)',
       unit: 'Unité',
       unitPrice: 'Prix unitaire',
-      quantity: 'Quantité',
+      quantity: 'Quantité (auto)',
       totalPrice: 'Prix total',
       tone: 'Type',
       sortOrder: 'Ordre',
@@ -288,52 +293,17 @@ const boqRowToneStyles: Record<BoqItemTone, string> = {
   TOTAL: 'bg-emerald-100/80 text-emerald-900 font-semibold',
 }
 
-const parseDecimalValue = (value?: string | null) => {
-  if (value === undefined || value === null) return null
-  const trimmed = String(value).trim()
-  if (!trimmed || trimmed === '-') return null
-  const normalized = trimmed.replace(/,/g, '')
-  const parsed = Number(normalized)
-  if (!Number.isFinite(parsed)) return null
-  return parsed
-}
-
-const computeTotalPrice = (quantity?: string | null, unitPrice?: string | null) => {
-  const quantityValue = parseDecimalValue(quantity)
-  const unitValue = parseDecimalValue(unitPrice)
-  if (quantityValue === null || unitValue === null) return null
-  return (quantityValue * unitValue).toFixed(2)
-}
-
 const normalizeBoqCode = (value?: string | null) => (value ?? '').trim().toUpperCase()
 
 const isVatCode = (code: string) => code === 'TVA'
 const isTotalHtvaCode = (code: string) => code.startsWith('TOTAL HTVA')
 const isTotalWithTaxCode = (code: string) => code.startsWith('TOTAL TTC')
 
-const extractCodeNumber = (code: string) => {
-  const match = code.match(/(\d+)/)
-  return match ? Number(match[1]) : null
-}
-
 const isMajorSubsectionCode = (code: string) => {
   const normalized = normalizeBoqCode(code)
   if (!/^\d{3}$/.test(normalized)) return false
   const parsed = Number(normalized)
   return Number.isFinite(parsed) && parsed % 100 === 0
-}
-
-const resolveSectionKey = (code: string) => {
-  if (!code) return Number.MAX_SAFE_INTEGER
-  if (isVatCode(code) || isTotalWithTaxCode(code)) return Number.MAX_SAFE_INTEGER - 1
-  const totalMatch = code.match(/^T(\d+)$/)
-  if (totalMatch) {
-    return Number(totalMatch[1]) * 100
-  }
-  const number = extractCodeNumber(code)
-  if (number === null) return Number.MAX_SAFE_INTEGER - 2
-  if (number < 100) return 0
-  return Math.floor(number / 100) * 100
 }
 
 const hasStructuralMismatch = (actualItems: BoqItemRecord[], contractItems: BoqItemRecord[]) => {
@@ -389,6 +359,9 @@ export default function BoqManageClient() {
   const [boqItems, setBoqItems] = useState<BoqItemRecord[]>([])
   const [boqItemsStatus, setBoqItemsStatus] = useState<FetchStatus>('idle')
   const [boqItemsError, setBoqItemsError] = useState<string | null>(null)
+  const [completionMap, setCompletionMap] = useState<Map<number, BoqCompletionRecord>>(
+    new Map(),
+  )
   const [boqSearch, setBoqSearch] = useState('')
   const [boqViewMode, setBoqViewMode] = useState<'full' | 'summary'>('full')
   const [permissionDenied, setPermissionDenied] = useState(false)
@@ -402,7 +375,6 @@ export default function BoqManageClient() {
   const [formMode, setFormMode] = useState<'create' | 'edit'>('create')
   const [editingItem, setEditingItem] = useState<BoqItemRecord | null>(null)
   const [savingItem, setSavingItem] = useState(false)
-  const [updatingQuantityId, setUpdatingQuantityId] = useState<number | null>(null)
   const [formState, setFormState] = useState<BoqFormState>({
     projectId: '',
     code: '',
@@ -490,7 +462,7 @@ export default function BoqManageClient() {
     setBoqItemsError(null)
     try {
       const response = await fetch(
-        `/api/value/boq-items?projectId=${projectId}&sheetType=ACTUAL`,
+        `/api/value/boq-completion?projectId=${projectId}`,
         { credentials: 'include' },
       )
       const payload = (await response
@@ -500,14 +472,21 @@ export default function BoqManageClient() {
         if (response.status === 403) {
           addToast(payload.message ?? copy.messages.loadError, { tone: 'warning' })
           setBoqItems([])
+          setCompletionMap(new Map())
           setBoqItemsStatus('success')
           return
         }
         throw new Error(payload.message ?? copy.messages.loadError)
       }
       const items = payload.items ?? []
+      const completion = (payload as { completion?: BoqCompletionRecord[] }).completion ?? []
 
       setBoqItems(items)
+      const map = new Map<number, BoqCompletionRecord>()
+      completion.forEach((entry) => {
+        map.set(entry.boqItemId, entry)
+      })
+      setCompletionMap(map)
       setBoqItemsStatus('success')
     } catch (error) {
       setBoqItemsStatus('error')
@@ -534,13 +513,13 @@ export default function BoqManageClient() {
         }
         throw new Error(payload.message ?? copy.messages.loadError)
       }
-      setBoqItems(payload.items ?? [])
+      await loadBoqItems(projectId)
       setBoqItemsStatus('success')
     } catch (error) {
       setBoqItemsStatus('error')
       setBoqItemsError((error as Error).message)
     }
-  }, [copy.messages.loadError])
+  }, [copy.messages.loadError, loadBoqItems])
 
   useEffect(() => {
     if (!selectedProjectId) return
@@ -601,6 +580,11 @@ export default function BoqManageClient() {
   }
 
   const openEditModal = (item: BoqItemRecord) => {
+    const computed = computedRowMap.get(item.id)
+    const computedQuantity =
+      typeof computed?.quantity === 'number'
+        ? String(computed.quantity)
+        : computed?.quantity ?? ''
     setFormMode('edit')
     setEditingItem(item)
     setFormState({
@@ -610,7 +594,7 @@ export default function BoqManageClient() {
       designationFr: item.designationFr ?? '',
       unit: item.unit ?? '',
       unitPrice: item.unitPrice ?? '',
-      quantity: item.quantity ?? '',
+      quantity: computedQuantity,
       tone: item.tone ?? 'ITEM',
     })
     setShowFormModal(true)
@@ -644,7 +628,6 @@ export default function BoqManageClient() {
         designationFr: formState.designationFr.trim(),
         unit: formState.unit.trim() || null,
         unitPrice: formState.unitPrice.trim() || null,
-        quantity: formState.quantity.trim() || null,
         tone: formState.tone,
       }
 
@@ -675,54 +658,6 @@ export default function BoqManageClient() {
       addToast((error as Error).message, { tone: 'danger' })
     } finally {
       setSavingItem(false)
-    }
-  }
-
-  const handleQuantityChange = (id: number, value: string) => {
-    setBoqItems((prev) =>
-      prev.map((item) => {
-        if (item.id !== id) return item
-        const nextTotal =
-          item.tone === 'ITEM' ? computeTotalPrice(value, item.unitPrice) : item.totalPrice
-        return {
-          ...item,
-          quantity: value,
-          totalPrice: nextTotal,
-        }
-      }),
-    )
-  }
-
-  const handleQuantityBlur = async (id: number) => {
-    const target = boqItems.find((item) => item.id === id)
-    if (!target || target.tone !== 'ITEM') return
-    if (updatingQuantityId === id) return
-    setUpdatingQuantityId(id)
-    try {
-      const response = await fetch('/api/value/boq-items', {
-        method: 'PATCH',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          boqItemId: target.id,
-          quantity: target.quantity?.trim() || null,
-          totalPrice: target.totalPrice?.trim() || null,
-        }),
-      })
-      const result = (await response
-        .json()
-        .catch(() => ({}))) as { item?: BoqItemRecord; message?: string }
-      if (!response.ok) {
-        throw new Error(result.message ?? copy.messages.loadError)
-      }
-      if (result.item) {
-        const nextItem = result.item
-        setBoqItems((prev) => prev.map((item) => (item.id === nextItem.id ? nextItem : item)))
-      }
-    } catch (error) {
-      addToast((error as Error).message, { tone: 'danger' })
-    } finally {
-      setUpdatingQuantityId(null)
     }
   }
 
@@ -953,9 +888,7 @@ export default function BoqManageClient() {
   }
 
   const boqRows = useMemo(() => {
-    const sorted = [...boqItems].sort(
-      (a, b) => a.sortOrder - b.sortOrder || a.id - b.id,
-    )
+    const sorted = sortBoqItemsByOrder(boqItems)
     return sorted.map((item) => {
       const designation = locale === 'fr' ? item.designationFr : item.designationZh
       const searchable = [item.code, item.designationZh, item.designationFr]
@@ -969,6 +902,15 @@ export default function BoqManageClient() {
     })
   }, [boqItems, locale])
 
+  const computedRows = useMemo(
+    () => buildActualBoqRows({ items: boqItems, completion: completionMap, locale }),
+    [boqItems, completionMap, locale],
+  )
+  const computedRowMap = useMemo(
+    () => new Map(computedRows.map((row) => [row.id, row])),
+    [computedRows],
+  )
+
   const boqRowData = useMemo(
     () =>
       boqRows.map((row, index) => ({
@@ -978,48 +920,6 @@ export default function BoqManageClient() {
       })),
     [boqRows],
   )
-
-  const totalsBySection = useMemo(() => {
-    const map = new Map<number, number>()
-    let grandTotal = 0
-    boqRows.forEach((row) => {
-      if (row.tone !== 'ITEM') return
-      const computed = computeTotalPrice(row.quantity, row.unitPrice)
-      const value = parseDecimalValue(computed ?? row.totalPrice)
-      if (value === null) return
-      grandTotal += value
-      const sectionKey = resolveSectionKey(normalizeBoqCode(row.code))
-      map.set(sectionKey, (map.get(sectionKey) ?? 0) + value)
-    })
-    return { map, grandTotal }
-  }, [boqRows])
-
-  const resolveRowTotalPrice = (row: BoqItemRecord) => {
-    if (row.tone === 'ITEM') {
-      return computeTotalPrice(row.quantity, row.unitPrice) ?? row.totalPrice
-    }
-    if (row.tone === 'SUBSECTION') {
-      const sectionKey = resolveSectionKey(normalizeBoqCode(row.code))
-      const sectionTotal = totalsBySection.map.get(sectionKey)
-      return sectionTotal !== undefined ? sectionTotal.toFixed(2) : row.totalPrice
-    }
-    if (row.tone !== 'TOTAL') {
-      return row.totalPrice
-    }
-    const code = normalizeBoqCode(row.code)
-    if (isTotalHtvaCode(code)) {
-      return Math.round(totalsBySection.grandTotal).toString()
-    }
-    if (isVatCode(code)) {
-      return Math.round(totalsBySection.grandTotal * 0.18).toString()
-    }
-    if (isTotalWithTaxCode(code)) {
-      return Math.round(totalsBySection.grandTotal * 1.18).toString()
-    }
-    const sectionKey = resolveSectionKey(code)
-    const sectionTotal = totalsBySection.map.get(sectionKey)
-    return sectionTotal !== undefined ? sectionTotal.toFixed(2) : row.totalPrice
-  }
 
   const letterBoqOptions = useMemo(
     () => boqItems.filter((item) => item.tone === 'ITEM' && item.isActive),
@@ -1073,7 +973,7 @@ export default function BoqManageClient() {
   }, [boqRowData, boqSearch, boqViewMode])
 
   const isContractLocked = formMode === 'edit' && Boolean(editingItem?.contractItemId)
-  const isQuantityDisabled = formState.tone !== 'ITEM'
+  const isQuantityDisabled = true
   const canDragSort = sortEnabled && boqViewMode === 'full' && !boqSearch.trim()
 
   const persistSortOrder = async (orderedIds: number[]) => {
@@ -1095,8 +995,8 @@ export default function BoqManageClient() {
       if (!response.ok) {
         throw new Error(result.message ?? copy.messages.loadError)
       }
-      if (result.items) {
-        setBoqItems(result.items)
+      if (selectedProjectId) {
+        await loadBoqItems(selectedProjectId)
       }
       addToast(copy.messages.sortSaved, { tone: 'success' })
     } catch (error) {
@@ -1293,18 +1193,21 @@ export default function BoqManageClient() {
                   </tr>
 	                </thead>
 	                <tbody className="divide-y divide-slate-200/70">
-	                  {displayRows.map((row) => {
-	                    const normalizedCode = normalizeBoqCode(row.code)
-	                    const displayOnly =
-	                      row.tone === 'SECTION' ||
-	                      (row.tone === 'SUBSECTION' &&
-	                        !isMajorSubsectionCode(normalizedCode) &&
-	                        !isVatCode(normalizedCode))
-	                    return (
-	                      <tr
-	                        key={row.id}
-	                        draggable={canDragSort}
-	                        onDragStart={() => handleDragStart(row.id)}
+                  {displayRows.map((row) => {
+                    const normalizedCode = normalizeBoqCode(row.code)
+                    const displayOnly =
+                      row.tone === 'SECTION' ||
+                      (row.tone === 'SUBSECTION' &&
+                        !isMajorSubsectionCode(normalizedCode) &&
+                        !isVatCode(normalizedCode))
+                    const computed = computedRowMap.get(row.id)
+                    const displayQuantity = computed?.quantity ?? row.quantity
+                    const displayTotalPrice = computed?.totalPrice ?? row.totalPrice
+                    return (
+                      <tr
+                        key={row.id}
+                        draggable={canDragSort}
+                        onDragStart={() => handleDragStart(row.id)}
 	                        onDragOver={(event) => handleDragOver(event, row.id)}
 	                        onDrop={() => handleDrop(row.id)}
 	                        onDragEnd={() => {
@@ -1334,18 +1237,15 @@ export default function BoqManageClient() {
 	                        <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums">
 	                          {formatBoqCell(displayOnly ? null : row.unitPrice, localeId)}
 	                        </td>
-	                        <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums">
-	                          {formatBoqCell(displayOnly ? null : row.quantity, localeId)}
-	                        </td>
-	                        <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums">
-	                          {formatBoqCell(
-	                            displayOnly ? null : resolveRowTotalPrice(row),
-	                            localeId,
-	                          )}
-	                        </td>
-	                      </tr>
-	                    )
-	                  })}
+                        <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums">
+                          {formatBoqCell(displayOnly ? null : displayQuantity, localeId)}
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums">
+                          {formatBoqCell(displayOnly ? null : displayTotalPrice, localeId)}
+                        </td>
+                      </tr>
+                    )
+                  })}
 	                </tbody>
 	              </table>
 	            </div>
@@ -1456,9 +1356,6 @@ export default function BoqManageClient() {
                 <input
                   className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900"
                   value={formState.quantity}
-                  onChange={(event) =>
-                    setFormState((prev) => ({ ...prev, quantity: event.target.value }))
-                  }
                   disabled={isQuantityDisabled}
                 />
               </label>

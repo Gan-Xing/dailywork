@@ -465,7 +465,14 @@ export async function POST(request: Request) {
   }
 
   try {
-    const computedTotalPrice = tone === 'ITEM' ? computeTotalPrice(quantity, unitPrice) : totalPrice
+    const allowManualQuantity = sheetType !== 'ACTUAL'
+    const storedQuantity = allowManualQuantity ? quantity : null
+    const computedTotalPrice =
+      allowManualQuantity && tone === 'ITEM'
+        ? computeTotalPrice(storedQuantity, unitPrice)
+        : allowManualQuantity
+          ? totalPrice
+          : null
     const item = await prisma.$transaction(async (tx) => {
       const sortOrder =
         sheetType === 'ACTUAL'
@@ -480,7 +487,7 @@ export async function POST(request: Request) {
           designationFr,
           unit,
           unitPrice,
-          quantity,
+          quantity: storedQuantity,
           totalPrice: computedTotalPrice,
           tone,
           sortOrder,
@@ -570,6 +577,12 @@ export async function PATCH(request: Request) {
     return respond((error as Error).message ?? '字段格式无效', 400)
   }
 
+  const isActualSheet = existing.sheetType === 'ACTUAL'
+  if (isActualSheet) {
+    quantity = undefined
+    totalPrice = undefined
+  }
+
   const isContractBound = existing.sheetType === 'ACTUAL' && existing.contractItemId !== null
   const canEditStructure = !isContractBound
   const nextCode =
@@ -588,7 +601,11 @@ export async function PATCH(request: Request) {
   try {
     const nextQuantity = quantity === undefined ? existing.quantity : quantity
     const computedTotalPrice =
-      nextTone === 'ITEM' ? computeTotalPrice(nextQuantity, nextUnitPrice) : totalPrice
+      !isActualSheet && nextTone === 'ITEM'
+        ? computeTotalPrice(nextQuantity, nextUnitPrice)
+        : !isActualSheet
+          ? totalPrice
+          : undefined
     const shouldReorder =
       existing.sheetType === 'ACTUAL' &&
       canEditStructure &&
