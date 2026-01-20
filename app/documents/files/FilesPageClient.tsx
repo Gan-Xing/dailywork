@@ -1083,8 +1083,6 @@ export function FilesPageClient({
   const renderLinkSummary = (links: FileRow['links']) => {
     if (!links.length) return '-'
     const labels = links.map((link) => {
-      const directLabel = link.label?.trim()
-      if (directLabel) return directLabel
       if (link.entityType === 'leader-log') {
         const metaRecord = link.meta as { date?: string; supervisorName?: string } | null
         const metaLabel = metaRecord ? formatLeaderLogMetaLabel(metaRecord) : ''
@@ -1589,16 +1587,16 @@ export function FilesPageClient({
           <h2 className="text-lg font-semibold text-slate-900">{copy.files.table.title}</h2>
         </div>
         <div className="overflow-x-auto">
-          <table className="min-w-full text-sm text-slate-600">
+          <table className="min-w-full w-full text-sm text-slate-600">
             <thead className="bg-slate-50 text-xs uppercase tracking-[0.14em] text-slate-500">
               <tr>
-                <th className="px-6 py-3 text-left">{copy.files.table.columns.file}</th>
-                <th className="px-6 py-3 text-left">{copy.files.table.columns.category}</th>
-                <th className="px-6 py-3 text-left">{copy.files.table.columns.links}</th>
-                <th className="px-6 py-3 text-left">{copy.files.table.columns.owner}</th>
-                <th className="px-6 py-3 text-left">{copy.files.table.columns.createdBy}</th>
-                <th className="px-6 py-3 text-left">{copy.files.table.columns.createdAt}</th>
-                <th className="px-6 py-3 text-right">{copy.files.table.columns.actions}</th>
+                <th className="min-w-[160px] px-6 py-3 text-left">{copy.files.table.columns.file}</th>
+                <th className="min-w-[140px] px-6 py-3 text-left whitespace-nowrap">{copy.files.table.columns.category}</th>
+                <th className="min-w-[240px] px-6 py-3 text-left">{copy.files.table.columns.links}</th>
+                <th className="min-w-[60px] px-6 py-3 text-left">{copy.files.table.columns.owner}</th>
+                <th className="min-w-[120px] px-6 py-3 text-left">{copy.files.table.columns.createdBy}</th>
+                <th className="min-w-[180px] px-6 py-3 text-left whitespace-nowrap">{copy.files.table.columns.createdAt}</th>
+                <th className="min-w-[200px] px-6 py-3 text-right whitespace-nowrap">{copy.files.table.columns.actions}</th>
               </tr>
             </thead>
             <tbody>
@@ -1613,9 +1611,9 @@ export function FilesPageClient({
                   const isLocked = row.linkCount > 0 || row.signatureCount > 0
                   return (
                     <tr key={row.id} className="border-t border-slate-100">
-                      <td className="px-6 py-4">
-                        <div className="space-y-1">
-                          <div className="font-semibold text-slate-800">{row.originalName}</div>
+                      <td className="min-w-[160px] px-6 py-4">
+                        <div className="max-w-[200px] space-y-1">
+                          <div className="break-words font-semibold text-slate-800">{row.originalName}</div>
                           <div className="text-xs text-slate-400">
                             {row.mimeType || '—'} · {formatBytes(row.size)}
                           </div>
@@ -1633,16 +1631,20 @@ export function FilesPageClient({
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="min-w-[140px] px-6 py-4 whitespace-normal">
                         {categoryLabels[row.category] ?? row.category}
                       </td>
-                      <td className="px-6 py-4">
-                        <div className="max-w-[220px] truncate">{renderLinkSummary(row.links)}</div>
+                      <td className="min-w-[240px] px-6 py-4">
+                        <div className="max-w-[280px] break-words whitespace-normal">{renderLinkSummary(row.links)}</div>
                       </td>
-                      <td className="px-6 py-4">{row.ownerUser || '—'}</td>
-                      <td className="px-6 py-4">{row.createdBy || '—'}</td>
-                      <td className="px-6 py-4" suppressHydrationWarning>{new Date(row.createdAt).toLocaleString()}</td>
-                      <td className="px-6 py-4 text-right">
+                      <td className="min-w-[60px] px-6 py-4">
+                        <div className="max-w-[80px] break-words whitespace-normal">{row.ownerUser || '—'}</div>
+                      </td>
+                      <td className="min-w-[120px] px-6 py-4 break-words whitespace-normal">{row.createdBy || '—'}</td>
+                      <td className="min-w-[180px] px-6 py-4 whitespace-nowrap" suppressHydrationWarning>
+                        {new Date(row.createdAt).toLocaleString()}
+                      </td>
+                      <td className="min-w-[200px] px-6 py-4 text-right whitespace-nowrap">
                         <div className="grid grid-cols-2 justify-items-end gap-2">
                           <button
                             type="button"
