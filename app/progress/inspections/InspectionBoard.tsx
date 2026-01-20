@@ -2176,7 +2176,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
 
         {selected ? (
           <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4 py-6"
+            className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/40 px-4 py-6 sm:items-center"
             onClick={(e) => {
               if (e.target === e.currentTarget) setSelected(null)
             }}
@@ -2369,7 +2369,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
               }
             }}
           >
-            <div className="w-full max-w-5xl rounded-3xl border border-slate-200 bg-white p-6 text-sm text-slate-700 shadow-2xl shadow-emerald-400/30 backdrop-blur">
+            <div className="flex max-h-[calc(100vh-3rem)] w-full max-w-5xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white p-6 text-sm text-slate-700 shadow-2xl shadow-emerald-400/30 backdrop-blur">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="text-xs uppercase tracking-[0.2em] text-emerald-700">{copy.bulkEdit.badge}</p>
@@ -2392,157 +2392,161 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                 </button>
               </div>
 
-              <div className="mt-4 space-y-4 text-sm text-slate-600">
-                <div className="grid gap-3 md:grid-cols-2">
-                  <label className="flex flex-col gap-1">
-                    {copy.editModal.phaseLabel}
-                    <select
-                      className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:border-emerald-300 focus:outline-none"
-                      value={bulkEditForm.phaseId}
-                      onChange={(e) =>
-                        setBulkEditForm((prev) => ({
-                          ...prev,
-                          phaseId: e.target.value ? Number(e.target.value) : '',
-                        }))
-                      }
-                    >
-                      <option value="">{copy.bulkEdit.noChange}</option>
-                      {allPhaseOptions.map((phase) => (
-                        <option key={phase.id} value={phase.id}>
-                          {resolveRoadName({ slug: phase.roadSlug, name: phase.roadName }, locale)} ·{' '}
-                          {localizeProgressTerm('phase', phase.name, locale)}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="flex flex-col gap-1">
-                    {copy.editModal.sideLabel}
-                    <select
-                      className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:border-emerald-300 focus:outline-none"
-                      value={bulkEditForm.side}
-                      onChange={(e) => setBulkEditForm((prev) => ({ ...prev, side: e.target.value as IntervalSide }))}
-                    >
-                      <option value="">{copy.bulkEdit.noChange}</option>
-                      <option value="LEFT">{copy.editModal.sideLeft}</option>
-                      <option value="RIGHT">{copy.editModal.sideRight}</option>
-                      <option value="BOTH">{copy.editModal.sideBoth}</option>
-                    </select>
-                  </label>
-                </div>
+              <div className="mt-4 flex min-h-0 flex-1 flex-col text-sm text-slate-600">
+                <div className="flex-1 min-h-0 space-y-4 overflow-y-auto pr-1">
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <label className="flex flex-col gap-1">
+                      {copy.editModal.phaseLabel}
+                      <select
+                        className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:border-emerald-300 focus:outline-none"
+                        value={bulkEditForm.phaseId}
+                        onChange={(e) =>
+                          setBulkEditForm((prev) => ({
+                            ...prev,
+                            phaseId: e.target.value ? Number(e.target.value) : '',
+                          }))
+                        }
+                      >
+                        <option value="">{copy.bulkEdit.noChange}</option>
+                        {allPhaseOptions.map((phase) => (
+                          <option key={phase.id} value={phase.id}>
+                            {resolveRoadName({ slug: phase.roadSlug, name: phase.roadName }, locale)} ·{' '}
+                            {localizeProgressTerm('phase', phase.name, locale)}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="flex flex-col gap-1">
+                      {copy.editModal.sideLabel}
+                      <select
+                        className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:border-emerald-300 focus:outline-none"
+                        value={bulkEditForm.side}
+                        onChange={(e) => setBulkEditForm((prev) => ({ ...prev, side: e.target.value as IntervalSide }))}
+                      >
+                        <option value="">{copy.bulkEdit.noChange}</option>
+                        <option value="LEFT">{copy.editModal.sideLeft}</option>
+                        <option value="RIGHT">{copy.editModal.sideRight}</option>
+                        <option value="BOTH">{copy.editModal.sideBoth}</option>
+                      </select>
+                    </label>
+                  </div>
 
-                <div className="grid gap-3 md:grid-cols-2">
-                  <label className="flex flex-col gap-1">
-                    <span className="flex items-center justify-between gap-2">
-                      <span>{copy.editModal.startLabel}</span>
-                      <span className="text-[11px] text-slate-500">{copy.bulkEdit.noChange}</span>
-                    </span>
-                    <input
-                      type="number"
-                      className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:border-emerald-300 focus:outline-none"
-                      value={bulkEditForm.startPk}
-                      onChange={(e) => setBulkEditForm((prev) => ({ ...prev, startPk: e.target.value }))}
-                      placeholder={copy.bulkEdit.rangeHint}
-                    />
-                  </label>
-                  <label className="flex flex-col gap-1">
-                    {copy.editModal.endLabel}
-                    <input
-                      type="number"
-                      className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:border-emerald-300 focus:outline-none"
-                      value={bulkEditForm.endPk}
-                      onChange={(e) => setBulkEditForm((prev) => ({ ...prev, endPk: e.target.value }))}
-                      placeholder={copy.bulkEdit.rangeHint}
-                    />
-                  </label>
-                </div>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <label className="flex flex-col gap-1">
+                      <span className="flex items-center justify-between gap-2">
+                        <span>{copy.editModal.startLabel}</span>
+                        <span className="text-[11px] text-slate-500">{copy.bulkEdit.noChange}</span>
+                      </span>
+                      <input
+                        type="number"
+                        className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:border-emerald-300 focus:outline-none"
+                        value={bulkEditForm.startPk}
+                        onChange={(e) => setBulkEditForm((prev) => ({ ...prev, startPk: e.target.value }))}
+                        placeholder={copy.bulkEdit.rangeHint}
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1">
+                      {copy.editModal.endLabel}
+                      <input
+                        type="number"
+                        className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:border-emerald-300 focus:outline-none"
+                        value={bulkEditForm.endPk}
+                        onChange={(e) => setBulkEditForm((prev) => ({ ...prev, endPk: e.target.value }))}
+                        placeholder={copy.bulkEdit.rangeHint}
+                      />
+                    </label>
+                  </div>
 
-                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <label className="flex flex-col gap-1">
+                      {copy.editModal.layersLabel}
+                      <input
+                        className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-600/60 focus:border-emerald-300 focus:outline-none"
+                        value={bulkEditForm.layers}
+                        onChange={(e) => setBulkEditForm((prev) => ({ ...prev, layers: e.target.value }))}
+                        placeholder={copy.bulkEdit.tokenHint}
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1">
+                      {copy.editModal.checksLabel}
+                      <input
+                        className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-600/60 focus:border-emerald-300 focus:outline-none"
+                        value={bulkEditForm.checks}
+                        onChange={(e) => setBulkEditForm((prev) => ({ ...prev, checks: e.target.value }))}
+                        placeholder={copy.bulkEdit.tokenHint}
+                      />
+                    </label>
+                  </div>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <label className="flex flex-col gap-1">
+                      {copy.editModal.typesLabel}
+                      <input
+                        className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-600/60 focus:border-emerald-300 focus:outline-none"
+                        value={bulkEditForm.types}
+                        onChange={(e) => setBulkEditForm((prev) => ({ ...prev, types: e.target.value }))}
+                        placeholder={copy.bulkEdit.tokenHint}
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1">
+                      {copy.editModal.appointmentLabel}
+                      <input
+                        type="date"
+                        className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:border-emerald-300 focus:outline-none"
+                        value={bulkEditForm.appointmentDate}
+                        onChange={(e) => setBulkEditForm((prev) => ({ ...prev, appointmentDate: e.target.value }))}
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1">
+                      {copy.editModal.submittedAtLabel}
+                      <input
+                        type="datetime-local"
+                        className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:border-emerald-300 focus:outline-none"
+                        value={bulkEditForm.submittedAt}
+                        onChange={(e) => setBulkEditForm((prev) => ({ ...prev, submittedAt: e.target.value }))}
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1">
+                      {copy.editModal.statusLabel}
+                      <select
+                        className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:border-emerald-300 focus:outline-none"
+                        value={bulkEditForm.status}
+                        onChange={(e) =>
+                          setBulkEditForm((prev) => ({ ...prev, status: e.target.value as InspectionStatus }))
+                        }
+                      >
+                        <option value="">{copy.bulkEdit.noChange}</option>
+                        {statusOptions.map((item) => (
+                          <option key={item} value={item}>
+                            {statusCopy[item] ?? item}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="flex flex-col gap-1">
+                      {copy.editModal.submissionOrderLabel}
+                      <input
+                        type="number"
+                        className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:border-emerald-300 focus:outline-none"
+                        value={bulkEditForm.submissionOrder}
+                        onChange={(e) => setBulkEditForm((prev) => ({ ...prev, submissionOrder: e.target.value }))}
+                        placeholder={copy.editModal.submissionOrderPlaceholder}
+                      />
+                    </label>
+                  </div>
                   <label className="flex flex-col gap-1">
-                    {copy.editModal.layersLabel}
-                    <input
+                    {copy.editModal.remarkLabel}
+                    <textarea
                       className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-600/60 focus:border-emerald-300 focus:outline-none"
-                      value={bulkEditForm.layers}
-                      onChange={(e) => setBulkEditForm((prev) => ({ ...prev, layers: e.target.value }))}
-                      placeholder={copy.bulkEdit.tokenHint}
-                    />
-                  </label>
-                  <label className="flex flex-col gap-1">
-                    {copy.editModal.checksLabel}
-                    <input
-                      className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-600/60 focus:border-emerald-300 focus:outline-none"
-                      value={bulkEditForm.checks}
-                      onChange={(e) => setBulkEditForm((prev) => ({ ...prev, checks: e.target.value }))}
-                      placeholder={copy.bulkEdit.tokenHint}
+                      rows={3}
+                      value={bulkEditForm.remark}
+                      onChange={(e) => setBulkEditForm((prev) => ({ ...prev, remark: e.target.value }))}
+                      placeholder={copy.bulkEdit.remarkHint}
                     />
                   </label>
                 </div>
-                <div className="grid gap-3 md:grid-cols-2">
-                  <label className="flex flex-col gap-1">
-                    {copy.editModal.typesLabel}
-                    <input
-                      className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-600/60 focus:border-emerald-300 focus:outline-none"
-                      value={bulkEditForm.types}
-                      onChange={(e) => setBulkEditForm((prev) => ({ ...prev, types: e.target.value }))}
-                      placeholder={copy.bulkEdit.tokenHint}
-                    />
-                  </label>
-                  <label className="flex flex-col gap-1">
-                    {copy.editModal.appointmentLabel}
-                    <input
-                      type="date"
-                      className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:border-emerald-300 focus:outline-none"
-                      value={bulkEditForm.appointmentDate}
-                      onChange={(e) => setBulkEditForm((prev) => ({ ...prev, appointmentDate: e.target.value }))}
-                    />
-                  </label>
-                  <label className="flex flex-col gap-1">
-                    {copy.editModal.submittedAtLabel}
-                    <input
-                      type="datetime-local"
-                      className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:border-emerald-300 focus:outline-none"
-                      value={bulkEditForm.submittedAt}
-                      onChange={(e) => setBulkEditForm((prev) => ({ ...prev, submittedAt: e.target.value }))}
-                    />
-                  </label>
-                  <label className="flex flex-col gap-1">
-                    {copy.editModal.statusLabel}
-                    <select
-                      className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:border-emerald-300 focus:outline-none"
-                      value={bulkEditForm.status}
-                      onChange={(e) => setBulkEditForm((prev) => ({ ...prev, status: e.target.value as InspectionStatus }))}
-                    >
-                      <option value="">{copy.bulkEdit.noChange}</option>
-                      {statusOptions.map((item) => (
-                        <option key={item} value={item}>
-                          {statusCopy[item] ?? item}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="flex flex-col gap-1">
-                    {copy.editModal.submissionOrderLabel}
-                    <input
-                      type="number"
-                      className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:border-emerald-300 focus:outline-none"
-                      value={bulkEditForm.submissionOrder}
-                      onChange={(e) => setBulkEditForm((prev) => ({ ...prev, submissionOrder: e.target.value }))}
-                      placeholder={copy.editModal.submissionOrderPlaceholder}
-                    />
-                  </label>
-                </div>
-                <label className="flex flex-col gap-1">
-                  {copy.editModal.remarkLabel}
-                  <textarea
-                    className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-600/60 focus:border-emerald-300 focus:outline-none"
-                    rows={3}
-                    value={bulkEditForm.remark}
-                    onChange={(e) => setBulkEditForm((prev) => ({ ...prev, remark: e.target.value }))}
-                    placeholder={copy.bulkEdit.remarkHint}
-                  />
-                </label>
-                <p className="text-xs text-slate-500">{copy.bulkEdit.noChangeHint}</p>
-                {bulkEditError ? <p className="text-xs text-amber-700">{bulkEditError}</p> : null}
-                <div className="flex items-center justify-end gap-3">
+                <p className="mt-3 text-xs text-slate-500">{copy.bulkEdit.noChangeHint}</p>
+                {bulkEditError ? <p className="mt-2 text-xs text-amber-700">{bulkEditError}</p> : null}
+                <div className="mt-4 flex items-center justify-end gap-3 border-t border-slate-100 pt-4">
                   <button
                     type="button"
                     className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-900 transition hover:border-slate-300 hover:bg-slate-50"
