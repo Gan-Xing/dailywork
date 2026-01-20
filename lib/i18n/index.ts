@@ -10,6 +10,7 @@ export * from './reportEditor'
 export * from './reportPreview'
 export * from './leaderLogs'
 export * from './documents'
+export * from './aiChat'
 
 interface SummaryCardCopy {
   label: string

@@ -80,3 +80,10 @@
 - **禁止**在本地/任何环境直接执行 `npx prisma migrate dev`，因为项目依赖的 Supabase 数据库已集中托管，命令会尝试连接 CI/产线的 pooling 端点导致失败或数据不一致。  
 - 要应用 schema 变更，请在受控脚本中编写 SQL migration 并由运维在目标数据库上执行，或以 `prisma migrate deploy` + 预先生成的 migration 文件形式在 CI/production 中同步。  
 - 本地可以使用 `prisma db pull` 观察结构，但请不要以 `migrate dev` 形式写入远端；所有由我们提交的 schema 变动必须经过复核并在文档中记录（见本文件 Section 8/9 的规则）。
+
+## 12. AI 对话模块（可拔插）
+- 目标：提供一个可复用的 AI 对话引擎，支持意图识别、工具调用、权限校验与多轮回答。
+- 约束：默认只读查询，工具必须基于权限放行；输出不暴露思维链。
+- 位置：核心在 `lib/ai-chat/`，项目适配在 `lib/ai-chat/adapters/dailywork/`，入口为 `/ai-chat` 与 `app/api/ai-chat`。
+- Prompt：`app/ai-chat/prompt.md` 记录对话协议与工具调用格式。
+- API 目录生成：运行 `npx tsc scripts/generate-api-docs.ts --module commonjs --target es2020 --outDir .tmp --esModuleInterop --skipLibCheck`，然后 `node .tmp/generate-api-docs.js`，最后 `rm -rf .tmp`，产物写入 `lib/ai-chat/adapters/dailywork/apiCatalog.ts`。
