@@ -151,7 +151,7 @@ const buildHistorySummary = (messages: ChatMessage[], locale: Locale) => {
   return lines.slice(-6).join('\n')
 }
 
-const compressHistoryForRequest = (messages: ChatMessage[], locale: Locale) => {
+const compressHistoryForRequest = (messages: ChatMessage[], locale: Locale): ChatMessage[] => {
   const maxTail = 12
   if (messages.length <= maxTail + 4) return messages
   const tail = messages.slice(-maxTail)
@@ -159,7 +159,11 @@ const compressHistoryForRequest = (messages: ChatMessage[], locale: Locale) => {
   const summary = buildHistorySummary(head, locale)
   if (!summary) return tail
   const summaryPrefix = locale === 'fr' ? 'Résumé historique' : '历史摘要'
-  return [{ role: 'user', content: `${summaryPrefix}:\n${summary}` }, ...tail]
+  const summaryMessage: ChatMessage = {
+    role: 'user',
+    content: `${summaryPrefix}:\n${summary}`,
+  }
+  return [summaryMessage, ...tail]
 }
 
 const renderInlineMarkdown = (text: string) => {
@@ -510,9 +514,10 @@ export function ChatPanel({ locale, endpoint, labels, canDebug }: ChatPanelProps
   }, [activeSessionId])
 
   useEffect(() => {
+    const registry = requestRegistryRef.current
     return () => {
-      requestRegistryRef.current.forEach(({ controller }) => controller.abort())
-      requestRegistryRef.current.clear()
+      registry.forEach(({ controller }) => controller.abort())
+      registry.clear()
     }
   }, [])
 
@@ -1012,7 +1017,6 @@ export function ChatPanel({ locale, endpoint, labels, canDebug }: ChatPanelProps
     activeSessionId,
     buildMemoryContextForRequest,
     cancelSessionRequest,
-    canDebug,
     canSend,
     debugEnabled,
     endpoint,

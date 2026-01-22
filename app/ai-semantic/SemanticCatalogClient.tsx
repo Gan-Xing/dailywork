@@ -5,7 +5,13 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { AccessDenied } from "@/components/AccessDenied"
 import { MultiSelectFilter, type MultiSelectOption } from "@/components/MultiSelectFilter"
 import type { ApiCatalogEntry } from "@/lib/ai-chat/adapters/dailywork/apiCatalog"
-import type { ApiSemanticCatalog, ApiSemanticEntry, SemanticStatus } from "@/lib/ai-chat/semanticTypes"
+import type {
+  ApiSemanticCatalog,
+  ApiSemanticEntry,
+  ApiSemanticParamLocation,
+  ApiSemanticReturnType,
+  SemanticStatus,
+} from "@/lib/ai-chat/semanticTypes"
 import { usePreferredLocale } from "@/lib/usePreferredLocale"
 
 type SemanticCatalogClientProps = {
@@ -43,6 +49,23 @@ const METHOD_STYLES: Record<string, string> = {
   PUT: "bg-amber-100 text-amber-700",
   PATCH: "bg-violet-100 text-violet-700",
   DELETE: "bg-rose-100 text-rose-700",
+}
+
+const RETURN_TYPES: ApiSemanticReturnType[] = ["list", "detail", "summary", "action", "export"]
+const PARAM_LOCATIONS: ApiSemanticParamLocation[] = ["path", "query"]
+
+const normalizeReturnType = (value: string): ApiSemanticReturnType | undefined => {
+  const trimmed = value.trim()
+  return RETURN_TYPES.includes(trimmed as ApiSemanticReturnType)
+    ? (trimmed as ApiSemanticReturnType)
+    : undefined
+}
+
+const normalizeParamLocation = (value: string): ApiSemanticParamLocation | undefined => {
+  const trimmed = value.trim()
+  return PARAM_LOCATIONS.includes(trimmed as ApiSemanticParamLocation)
+    ? (trimmed as ApiSemanticParamLocation)
+    : undefined
 }
 
 const STATUS_STYLES: Record<StatusFilter, string> = {
@@ -310,11 +333,11 @@ export function SemanticCatalogClient({ sessionUser, canView, canEdit }: Semanti
       examples: parseList(draft.examplesText),
       inputNotes: parseList(draft.inputNotesText),
       outputNotes: parseList(draft.outputNotesText),
-      returnType: draft.returnType.trim() || undefined,
+      returnType: normalizeReturnType(draft.returnType),
       idField: draft.idField.trim() || undefined,
       detailEndpointKey: draft.detailEndpointKey.trim() || undefined,
       detailParam: draft.detailParam.trim() || undefined,
-      detailParamLocation: draft.detailParamLocation.trim() || undefined,
+      detailParamLocation: normalizeParamLocation(draft.detailParamLocation),
       evidenceFields: parseList(draft.evidenceFieldsText),
       detailKeys: parseList(draft.detailKeysText),
       status: draft.status,

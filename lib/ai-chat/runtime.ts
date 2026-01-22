@@ -785,9 +785,10 @@ const normalizePlanPayload = (payload: PlanPayload): PlanPayload | null => {
             .map((tool) => tool.trim())
             .filter((tool) => tool.length > 0)
         : []
-      const apis = Array.isArray((step as Record<string, unknown>).apis)
-        ? (step as Record<string, unknown>).apis
-            ?.filter((api) => typeof api === 'string')
+      const apisRaw = (step as { apis?: unknown }).apis
+      const apis = Array.isArray(apisRaw)
+        ? apisRaw
+            .filter((api): api is string => typeof api === 'string')
             .map((api) => api.trim())
             .filter((api) => api.length > 0)
         : []
@@ -991,7 +992,7 @@ export const runChat = async (options: ChatRunOptions): Promise<ChatRunResult> =
     }
   }
 
-  const buildModelMessages = () => {
+  const buildModelMessages = (): ChatMessage[] => {
     const maxMessages = 40
     if (conversation.length <= maxMessages) return conversation
     let index = 0
