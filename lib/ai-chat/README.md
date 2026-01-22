@@ -5,14 +5,15 @@ This folder contains a project-agnostic chat runtime with tool calling support.
 ## Core
 - `types.ts`: core interfaces (adapter, tools, messages).
 - `prompt.ts`: system prompt builder.
-- `runtime.ts`: multi-turn tool execution loop (supports optional planning + step execution).
+- `planner.ts`: planning stage that proposes data requirements and candidate APIs.
+- `runtime.ts`: multi-turn tool execution loop (planner + executor, tool scheduling safeguards).
 - `utils.ts`: JSON extraction helpers.
 
 ## How to reuse
 1. Implement a model adapter (see `adapters/deepseekAdapter.ts`).
 2. Define tool list with permission gates.
 3. Call `runChat()` with your adapter, tools, session, and messages.
-4. (Optional) Pass `onEvent` to stream plan/step/tool progress to your UI.
+4. (Optional) Pass `onEvent` to stream planner/executor plan/step/tool progress to your UI.
 
 The core files do not depend on Next.js or Prisma and can be copied to another project.
 
@@ -28,6 +29,10 @@ rm -rf .tmp
 
 ## Debugging
 - Enable the debug toggle in `/ai-chat` to reveal tool calls and parameters in the UI.
+
+## Semantic hints
+- `docs/api-semantic.json` stores API semantic hints (summary/intents/examples + returnType/detailEndpointKey/evidenceFields).
+- The planner/executor uses these hints to expand list endpoints into detail calls when evidence is missing.
 
 ## Streaming UI
 - The dailywork UI uses an SSE endpoint at `/api/ai-chat/stream` to render live plan/step progress.

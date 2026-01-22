@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server'
 
-import { getDailyworkChatAdapter, getDailyworkChatTools } from '@/lib/ai-chat/adapters/dailywork'
+import {
+  getDailyworkChatAdapter,
+  getDailyworkChatTools,
+} from '@/lib/ai-chat/adapters/dailywork'
+import { buildSemanticContext } from '@/lib/ai-chat/adapters/dailywork/semanticContext'
 import { runChat } from '@/lib/ai-chat/runtime'
 import type { ChatMessage, ChatSession } from '@/lib/ai-chat/types'
 import { getSessionUser, hasPermission } from '@/lib/server/authSession'
@@ -12,6 +16,7 @@ type ChatRequestBody = {
   input?: string
   history?: Array<{ role?: string; content?: string }>
   locale?: string
+  memoryContext?: string
 }
 
 const isValidRole = (role: string): role is ChatMessage['role'] =>
@@ -55,6 +60,9 @@ export async function POST(request: Request) {
   if (!sessionUser) {
     return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
   }
+  if (!(await hasPermission('ai-chat:view'))) {
+    return NextResponse.json({ message: '缺少 ai-chat:view 权限' }, { status: 403 })
+  }
 
   const session: ChatSession = {
     id: sessionUser.id,
@@ -66,6 +74,18 @@ export async function POST(request: Request) {
   const messages: ChatMessage[] = [...history, { role: 'user', content: input }]
   const origin = new URL(request.url).origin
   const cookie = request.headers.get('cookie') ?? ''
+  const memoryContext =
+    typeof payload.memoryContext === 'string'
+      ? payload.memoryContext.trim().slice(0, MAX_MESSAGE_LENGTH)
+      : ''
+  const semanticContext = await buildSemanticContext({
+    query: input,
+    locale: payload.locale ?? 'zh',
+    permissions: session.permissions,
+  })
+  const contextMessage = [memoryContext, semanticContext.message]
+    .filter((value) => value && value.trim())
+    .join('\n\n')
 
   try {
     const result = await runChat({
@@ -73,12 +93,15 @@ export async function POST(request: Request) {
       tools: getDailyworkChatTools(),
       session,
       locale: payload.locale ?? 'zh',
+      contextMessage: contextMessage || undefined,
+      contextCandidates: semanticContext.candidates,
       messages,
       permissionChecker: hasPermission,
       request: { origin, cookie },
       enablePlanning: true,
-      maxSteps: 6,
-      maxStepTurns: 4,
+      maxTurns: 6,
+      maxSteps: 8,
+      maxStepTurns: 6,
     })
 
     return NextResponse.json({

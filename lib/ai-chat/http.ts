@@ -9,6 +9,7 @@ export type ChatApiRequest = {
   input: string
   history?: ChatApiMessage[]
   locale?: string
+  memoryContext?: string
 }
 
 export type ChatApiResponse = {

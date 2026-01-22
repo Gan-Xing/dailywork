@@ -1,0 +1,5835 @@
+{
+  "updatedAt": "2026-01-21T15:30:25.933Z",
+  "entries": {
+    "get:/api/reports": {
+      "key": "get:/api/reports",
+      "summary": "获取日报列表（施工进度/现场情况/业主交付）",
+      "intents": [
+        "列出日报",
+        "查看施工日报列表",
+        "查看现场进度记录",
+        "查看日报摘要"
+      ],
+      "examples": [
+        "获取本月日报列表",
+        "获取最近10条日报",
+        "按月份筛选日报"
+      ],
+      "inputNotes": [
+        "需要report:view或report:edit权限",
+        "month参数为YYYY-MM字符串",
+        "limit参数限制返回数量"
+      ],
+      "outputNotes": [
+        "返回ReportSummary数组（仅存在的日报）",
+        "包含日期与摘要字段",
+        "不包含日报详情字段"
+      ],
+      "returnType": "list",
+      "idField": "date",
+      "detailEndpointKey": "get:/api/reports/:date",
+      "detailParam": "date",
+      "detailParamLocation": "path",
+      "evidenceFields": [
+        "reports"
+      ],
+      "detailKeys": [
+        "date"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:30:25.933Z",
+      "updatedBy": "AutoFix"
+    },
+    "get:/api/reports/:date": {
+      "key": "get:/api/reports/:date",
+      "summary": "获取指定日期的日报数据（现场/施工/人员/设备/材料），不存在时返回草稿",
+      "intents": [
+        "获取日报详情",
+        "查看施工日报",
+        "查看现场记录",
+        "查看日报草稿"
+      ],
+      "examples": [
+        "获取2024-01-15的日报",
+        "查询指定日期的日报详情",
+        "查看某天的施工记录"
+      ],
+      "inputNotes": [
+        "日期参数格式需符合DATE_KEY_REGEX正则表达式",
+        "需要report:view或report:edit权限",
+        "当日报不存在时仍会返回自动草稿"
+      ],
+      "outputNotes": [
+        "report字段包含施工/人员/设备/材料等现场数据",
+        "summary字段包含日期、创建时间和更新时间",
+        "exists=false表示自动草稿，非实际提交日报"
+      ],
+      "returnType": "detail",
+      "evidenceFields": [
+        "report",
+        "works",
+        "observations"
+      ],
+      "detailKeys": [
+        "date"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:30:25.933Z",
+      "updatedBy": "AutoFix",
+      "idField": "date"
+    },
+    "post:/api/ai-chat": {
+      "key": "post:/api/ai-chat",
+      "summary": "处理AI聊天请求，支持历史对话和工具调用，返回结构化响应。",
+      "intents": [
+        "AI聊天对话",
+        "多轮对话处理",
+        "工具调用集成",
+        "会话状态管理"
+      ],
+      "examples": [
+        "发送用户消息获取AI回复",
+        "携带历史记录进行连续对话",
+        "使用特定语言区域请求"
+      ],
+      "inputNotes": [
+        "需要有效的用户会话认证",
+        "input字段为必填字符串",
+        "history数组可包含最多20条消息",
+        "locale默认为'zh'"
+      ],
+      "outputNotes": [
+        "answer包含主要回复文本",
+        "toolCalls记录工具调用信息",
+        "usage显示token使用统计",
+        "plan和stepSummaries可选"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:35.506Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "evidenceFields": [
+        "answer"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "get:/api/ai-chat/semantic-catalog": {
+      "key": "get:/api/ai-chat/semantic-catalog",
+      "summary": "获取AI聊天语义目录，包含API目录和语义条目",
+      "intents": [
+        "检索语义目录",
+        "查看API语义信息",
+        "获取AI聊天配置"
+      ],
+      "examples": [
+        "获取所有语义条目",
+        "查看API目录结构",
+        "检查语义更新状态"
+      ],
+      "inputNotes": [
+        "需要permission:view权限",
+        "无查询参数",
+        "GET请求无需请求体"
+      ],
+      "outputNotes": [
+        "返回catalog和semantic两个字段",
+        "semantic包含updatedAt和entries",
+        "权限不足返回403"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:29.471Z",
+      "updatedBy": "AutoFill",
+      "returnType": "list",
+      "evidenceFields": [
+        "catalog"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "put:/api/ai-chat/semantic-catalog": {
+      "key": "put:/api/ai-chat/semantic-catalog",
+      "summary": "更新语义目录中的条目",
+      "intents": [
+        "更新API语义信息",
+        "修改语义目录条目",
+        "维护语义数据"
+      ],
+      "examples": [
+        "更新特定API的语义描述",
+        "修改语义目录中的条目属性"
+      ],
+      "inputNotes": [
+        "需要permission:update权限",
+        "请求体需包含key和entry字段",
+        "key用于标识要更新的条目"
+      ],
+      "outputNotes": [
+        "返回更新后的条目",
+        "包含操作结果"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:42.315Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "evidenceFields": [
+        "catalog"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "post:/api/ai-chat/semantic-catalog/ai": {
+      "key": "post:/api/ai-chat/semantic-catalog/ai",
+      "summary": "为API端点生成语义维护信息的AI接口",
+      "intents": [
+        "生成API语义信息",
+        "辅助AI选择接口",
+        "创建API文档草稿"
+      ],
+      "examples": [
+        "为GET /api/users生成语义信息",
+        "为POST /api/orders创建维护记录"
+      ],
+      "inputNotes": [
+        "需要permission:update权限",
+        "key参数必须提供",
+        "locale支持zh/fr"
+      ],
+      "outputNotes": [
+        "返回ApiSemanticEntry建议",
+        "包含summary/intents/examples等字段",
+        "状态默认为draft"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:35.506Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "evidenceFields": [
+        "suggestion"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "post:/api/ai-chat/stream": {
+      "key": "post:/api/ai-chat/stream",
+      "summary": "Streaming AI chat endpoint for processing user inputs with history and locale support",
+      "intents": [
+        "stream AI chat responses",
+        "process user messages with context",
+        "handle multilingual chat interactions",
+        "maintain chat session state"
+      ],
+      "examples": [
+        "Send user message with chat history",
+        "Stream AI response for French locale",
+        "Process chat input with session authentication"
+      ],
+      "inputNotes": [
+        "Requires valid JSON body with 'input' field",
+        "Optional 'history' array with role/content",
+        "Optional 'locale' parameter (defaults to 'zh')",
+        "User authentication required via session"
+      ],
+      "outputNotes": [
+        "Returns Server-Sent Events (SSE) stream",
+        "Events include status, final answer, or error",
+        "Stream format: data: {JSON event}\\n\\n",
+        "Headers set for streaming compatibility"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:35.506Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "evidenceFields": [
+        "message"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "post:/api/auth/change-password": {
+      "key": "post:/api/auth/change-password",
+      "summary": "更改当前登录用户的密码",
+      "intents": [
+        "更新用户密码",
+        "修改账户安全设置",
+        "用户身份验证"
+      ],
+      "examples": [
+        "用户登录后更改密码",
+        "忘记密码后重置"
+      ],
+      "inputNotes": [
+        "需要提供当前密码和新密码",
+        "JSON 格式请求体",
+        "用户必须已登录"
+      ],
+      "outputNotes": [
+        "成功返回 { success: true }",
+        "失败返回错误消息和状态码"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:35.506Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "evidenceFields": [
+        "success"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "post:/api/auth/login": {
+      "key": "post:/api/auth/login",
+      "summary": "用户登录端点，验证用户名和密码后返回用户信息并建立会话",
+      "intents": [
+        "用户认证",
+        "会话创建",
+        "身份验证"
+      ],
+      "examples": [
+        "{\"username\": \"user123\", \"password\": \"pass456\"}"
+      ],
+      "inputNotes": [
+        "需要JSON格式的请求体，包含username和password字段"
+      ],
+      "outputNotes": [
+        "成功时返回包含用户对象的JSON，失败时返回错误消息"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:35.506Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "evidenceFields": [
+        "user"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "post:/api/auth/logout": {
+      "key": "post:/api/auth/logout",
+      "summary": "用户登出，清除会话",
+      "intents": [
+        "用户登出",
+        "清除会话",
+        "结束认证状态"
+      ],
+      "examples": [
+        "用户点击登出按钮",
+        "应用需要清除用户会话"
+      ],
+      "inputNotes": [
+        "无需输入参数",
+        "直接调用即可"
+      ],
+      "outputNotes": [
+        "返回成功状态",
+        "会话已被清除"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:35.506Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "evidenceFields": [
+        "success"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "get:/api/auth/permissions": {
+      "key": "get:/api/auth/permissions",
+      "summary": "获取权限列表",
+      "intents": [
+        "查看所有权限",
+        "获取权限数据",
+        "权限管理"
+      ],
+      "examples": [
+        "获取所有权限信息",
+        "列出系统权限"
+      ],
+      "inputNotes": [
+        "需要权限: permission:view",
+        "无查询参数"
+      ],
+      "outputNotes": [
+        "返回权限数组，包含id、code、name、status、createdAt、updatedAt字段",
+        "status枚举值: ACTIVE, ARCHIVED"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:29.471Z",
+      "updatedBy": "AutoFill",
+      "returnType": "list",
+      "evidenceFields": [
+        "permissions"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "patch:/api/auth/permissions/:id": {
+      "key": "patch:/api/auth/permissions/:id",
+      "summary": "更新权限状态",
+      "intents": [
+        "修改权限状态",
+        "激活或归档权限",
+        "权限管理"
+      ],
+      "examples": [
+        "将权限状态改为ACTIVE",
+        "将权限状态改为ARCHIVED"
+      ],
+      "inputNotes": [
+        "需要permission:update权限",
+        "仅支持更新status字段",
+        "status必须是ACTIVE或ARCHIVED"
+      ],
+      "outputNotes": [
+        "返回更新后的权限对象",
+        "包含id、code、name、status字段",
+        "状态码400表示无效输入",
+        "状态码403表示权限不足",
+        "状态码404表示权限不存在"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:35.506Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "idField": "id",
+      "evidenceFields": [
+        "permission"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "get:/api/auth/roles": {
+      "key": "get:/api/auth/roles",
+      "summary": "获取所有角色及其权限列表",
+      "intents": [
+        "查看角色",
+        "管理权限",
+        "角色列表查询"
+      ],
+      "examples": [
+        "获取系统中所有角色",
+        "查看角色权限分配"
+      ],
+      "inputNotes": [
+        "需要角色相关权限（如role:view）",
+        "无查询参数"
+      ],
+      "outputNotes": [
+        "返回角色数组，包含权限详情",
+        "权限状态为ACTIVE或ARCHIVED"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:29.471Z",
+      "updatedBy": "AutoFill",
+      "returnType": "list",
+      "evidenceFields": [
+        "roles"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "get:/api/auth/session": {
+      "key": "get:/api/auth/session",
+      "summary": "获取当前用户的会话信息，返回用户对象或null",
+      "intents": [
+        "获取用户会话状态",
+        "检查用户是否登录",
+        "获取当前用户信息"
+      ],
+      "examples": [
+        "检查用户是否已登录",
+        "获取当前用户的会话数据"
+      ],
+      "inputNotes": [
+        "无需输入参数",
+        "自动从会话中获取用户信息"
+      ],
+      "outputNotes": [
+        "返回用户对象或null",
+        "null表示用户未登录"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:29.471Z",
+      "updatedBy": "AutoFill",
+      "returnType": "list",
+      "evidenceFields": [
+        "user"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "get:/api/auth/users": {
+      "key": "get:/api/auth/users",
+      "summary": "获取用户列表，包含详细个人信息、项目、角色和档案数据",
+      "intents": [
+        "获取所有用户信息",
+        "查看用户列表",
+        "检索用户数据",
+        "管理用户权限"
+      ],
+      "examples": [
+        "获取所有活跃用户",
+        "查看团队成员信息",
+        "检索用户角色分配"
+      ],
+      "inputNotes": [
+        "需要member:view权限",
+        "role:update或role:manage权限可查看完整角色信息",
+        "无查询参数"
+      ],
+      "outputNotes": [
+        "返回用户数组，包含基本信息和扩展档案",
+        "权限不足时角色字段可能为空数组",
+        "包含中籍和外籍用户的不同档案结构"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:29.471Z",
+      "updatedBy": "AutoFill",
+      "returnType": "list",
+      "evidenceFields": [
+        "users"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "post:/api/documents/letters": {
+      "key": "post:/api/documents/letters",
+      "summary": "创建新的函件文档",
+      "intents": [
+        "创建函件",
+        "提交函件",
+        "新增文档"
+      ],
+      "examples": [
+        "创建项目函件",
+        "提交工程函件",
+        "新增函件记录"
+      ],
+      "inputNotes": [
+        "需要项目编号和函件主题",
+        "可选字段包括发件人、收件人、日期等",
+        "需要submission:create权限"
+      ],
+      "outputNotes": [
+        "返回创建的函件对象",
+        "成功时包含letter字段",
+        "错误时返回message字段"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:35.506Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "evidenceFields": [
+        "message"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "delete:/api/documents/letters/:id": {
+      "key": "delete:/api/documents/letters/:id",
+      "summary": "删除指定ID的函件文档",
+      "intents": [
+        "删除函件",
+        "移除文档",
+        "清理函件数据"
+      ],
+      "examples": [
+        "删除ID为123的函件",
+        "移除不再需要的函件记录"
+      ],
+      "inputNotes": [
+        "需要有效的函件ID作为路径参数",
+        "用户必须具有删除权限"
+      ],
+      "outputNotes": [
+        "成功时返回{ok: true}",
+        "失败时返回错误消息"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:29.471Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "idField": "id",
+      "evidenceFields": [
+        "message"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "patch:/api/documents/letters/:id": {
+      "key": "patch:/api/documents/letters/:id",
+      "summary": "更新指定ID函件的部分字段，如主题、状态、日期等，支持可选字段更新",
+      "intents": [
+        "更新函件信息",
+        "修改函件状态",
+        "编辑函件内容",
+        "设置函件元数据"
+      ],
+      "examples": [
+        "更新函件状态为FINAL",
+        "修改函件主题和发送日期",
+        "设置函件备注和接收组织"
+      ],
+      "inputNotes": [
+        "需要submission:update权限",
+        "ID必须是正整数",
+        "支持部分字段更新",
+        "日期字段需有效格式",
+        "状态只能是DRAFT/FINAL/ARCHIVED"
+      ],
+      "outputNotes": [
+        "成功返回更新后的函件对象",
+        "失败返回错误消息",
+        "权限不足返回403",
+        "ID无效返回400"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:35.506Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "idField": "id",
+      "evidenceFields": [
+        "message"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "get:/api/documents/submissions": {
+      "key": "get:/api/documents/submissions",
+      "summary": "获取提交单文档列表",
+      "intents": [
+        "列出所有提交单文档",
+        "查看提交单文档",
+        "检索文档列表"
+      ],
+      "examples": [
+        "GET /api/documents/submissions",
+        "获取所有提交单"
+      ],
+      "inputNotes": [
+        "需要权限：submission:view 或 submission:update",
+        "无查询参数"
+      ],
+      "outputNotes": [
+        "返回文档数组，包含创建者、提交单、模板等信息",
+        "文档状态包括：SUBMISSION, LETTER, MINUTES, SUPPLY_REQUEST, DAILY_REPORT"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:29.471Z",
+      "updatedBy": "AutoFill",
+      "returnType": "list",
+      "detailEndpointKey": "get:/api/documents/submissions/:id",
+      "detailParam": "id",
+      "detailParamLocation": "path",
+      "idField": "id",
+      "evidenceFields": [
+        "items"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "post:/api/documents/submissions": {
+      "key": "post:/api/documents/submissions",
+      "summary": "创建新的提交单文档",
+      "intents": [
+        "创建文档",
+        "提交表单",
+        "新增记录"
+      ],
+      "examples": [
+        "创建草稿状态的提交单",
+        "使用模板创建文档"
+      ],
+      "inputNotes": [
+        "需要登录和submission:create权限",
+        "可选字段：title, status, data, templateId, templateVersion"
+      ],
+      "outputNotes": [
+        "返回创建的提交单对象",
+        "包含关联的createdBy, submission, template信息"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:35.506Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "evidenceFields": [
+        "items"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "get:/api/documents/submissions/:id": {
+      "key": "get:/api/documents/submissions/:id",
+      "summary": "根据ID获取提交单详情，包括提交信息、模板、项目数据和项目项列表。",
+      "intents": [
+        "获取提交单详情",
+        "查看提交单数据",
+        "检索特定提交单"
+      ],
+      "examples": [
+        "获取ID为123的提交单详情",
+        "查看提交单的项目信息和项目项"
+      ],
+      "inputNotes": [
+        "需要提交单ID作为路径参数",
+        "需要submission:view或submission:update权限"
+      ],
+      "outputNotes": [
+        "返回完整的提交单对象，包含提交信息、模板、项目数据和项目项",
+        "如果未找到提交单返回404",
+        "如果缺少权限返回403"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:29.471Z",
+      "updatedBy": "AutoFill",
+      "returnType": "detail",
+      "idField": "id",
+      "evidenceFields": [
+        "submission"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "patch:/api/documents/submissions/:id": {
+      "key": "patch:/api/documents/submissions/:id",
+      "summary": "更新指定ID的提交单文档的部分字段，需要登录且具有编辑权限。",
+      "intents": [
+        "更新提交单文档",
+        "修改文档元数据",
+        "更改文档状态",
+        "编辑文档模板"
+      ],
+      "examples": [
+        "更新提交单标题",
+        "将文档状态从DRAFT改为FINAL",
+        "修改文档关联的模板"
+      ],
+      "inputNotes": [
+        "需要JSON请求体，支持title、status、data、templateId、templateVersion字段",
+        "仅支持部分字段更新，未提供的字段保持不变",
+        "需要submission:update权限"
+      ],
+      "outputNotes": [
+        "返回更新后的完整提交单对象",
+        "包含文档状态、创建/更新信息、提交单详情等",
+        "错误时返回相应状态码和消息"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:35.506Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "idField": "id",
+      "evidenceFields": [
+        "submission"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "post:/api/documents/submissions/bulk": {
+      "key": "post:/api/documents/submissions/bulk",
+      "summary": "批量处理文档提交单，支持归档、删除或更新状态操作",
+      "intents": [
+        "批量归档文档提交单",
+        "批量删除文档提交单",
+        "批量更新文档提交单状态"
+      ],
+      "examples": [
+        "{\"action\": \"archive\", \"ids\": [1, 2, 3]}",
+        "{\"action\": \"delete\", \"ids\": [4, 5]}",
+        "{\"action\": \"status\", \"ids\": [6, 7], \"status\": \"APPROVED\"}"
+      ],
+      "inputNotes": [
+        "需要登录用户",
+        "需要submission:delete或submission:update权限",
+        "请求体必须是有效的JSON",
+        "ids必须是包含至少一个数字的数组",
+        "action必须是'archive'、'delete'或'status'之一",
+        "当action为'status'时，status字段必填"
+      ],
+      "outputNotes": [
+        "返回处理成功的文档数量",
+        "成功时返回{\"count\": number}",
+        "失败时返回错误消息和状态码"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:35.506Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "evidenceFields": [
+        "count"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "post:/api/documents/submissions/pdf": {
+      "key": "post:/api/documents/submissions/pdf",
+      "summary": "生成提交单的PDF文档，可选择性地合并关联的检查报告PDF。",
+      "intents": [
+        "生成PDF文档",
+        "导出提交单",
+        "合并检查报告"
+      ],
+      "examples": [
+        "生成一个提交单的PDF",
+        "导出包含检查报告的PDF"
+      ],
+      "inputNotes": [
+        "需要JSON请求体，包含模板ID、数据、页码文本和提交ID",
+        "需要权限：submission:view, submission:create, submission:update, signature:use"
+      ],
+      "outputNotes": [
+        "返回二进制PDF文件（application/pdf）",
+        "可能包含提交单和检查报告的合并内容"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:35.506Z",
+      "updatedBy": "AutoFill",
+      "returnType": "export",
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "post:/api/documents/submissions/render": {
+      "key": "post:/api/documents/submissions/render",
+      "summary": "渲染提交单文档为HTML",
+      "intents": [
+        "渲染文档模板",
+        "生成HTML输出",
+        "处理提交单数据"
+      ],
+      "examples": [
+        "渲染带有数据的提交单模板",
+        "生成可打印的HTML文档"
+      ],
+      "inputNotes": [
+        "需要JSON body包含templateId、data和pageNumberText",
+        "需要提交单相关权限"
+      ],
+      "outputNotes": [
+        "返回包含renderedHtml字段的JSON",
+        "HTML已根据模板和数据渲染"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:35.506Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "evidenceFields": [
+        "renderedHtml"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "get:/api/documents/templates": {
+      "key": "get:/api/documents/templates",
+      "summary": "获取文档模板列表",
+      "intents": [
+        "列出所有文档模板",
+        "查看模板信息",
+        "获取模板数据"
+      ],
+      "examples": [
+        "获取所有可用的文档模板",
+        "查看模板列表用于选择"
+      ],
+      "inputNotes": [
+        "需要模板查看或更新权限",
+        "无查询参数"
+      ],
+      "outputNotes": [
+        "返回模板数组，包含状态、ID、名称、创建信息、类型、版本、语言、HTML内容和占位符"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:29.471Z",
+      "updatedBy": "AutoFill",
+      "returnType": "list",
+      "detailEndpointKey": "get:/api/documents/templates/:id",
+      "detailParam": "id",
+      "detailParamLocation": "path",
+      "idField": "id",
+      "evidenceFields": [
+        "items"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "patch:/api/documents/templates": {
+      "key": "patch:/api/documents/templates",
+      "summary": "批量归档文档模板",
+      "intents": [
+        "归档模板",
+        "批量操作模板",
+        "更新模板状态"
+      ],
+      "examples": [
+        "归档指定ID的模板",
+        "批量处理模板归档"
+      ],
+      "inputNotes": [
+        "需要提供模板ID和action=archive",
+        "仅支持归档操作"
+      ],
+      "outputNotes": [
+        "返回操作成功状态"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:35.506Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "evidenceFields": [
+        "items"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "post:/api/documents/templates": {
+      "key": "post:/api/documents/templates",
+      "summary": "创建新的文档模板",
+      "intents": [
+        "创建模板",
+        "新增文档模板",
+        "添加模板"
+      ],
+      "examples": [
+        "创建会议纪要模板",
+        "新增提交信模板",
+        "添加日报模板"
+      ],
+      "inputNotes": [
+        "需要登录",
+        "需要template:create权限",
+        "name和html字段必填",
+        "可选字段：status, language, version, type"
+      ],
+      "outputNotes": [
+        "返回创建的模板对象",
+        "包含模板ID和其他元数据"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:35.506Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "evidenceFields": [
+        "items"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "delete:/api/documents/templates/:id": {
+      "key": "delete:/api/documents/templates/:id",
+      "summary": "删除指定ID的文档模板，实际操作为归档而非物理删除",
+      "intents": [
+        "删除模板",
+        "归档模板",
+        "移除模板"
+      ],
+      "examples": [
+        "DELETE /api/documents/templates/123",
+        "DELETE /api/documents/templates/abc-def"
+      ],
+      "inputNotes": [
+        "需要模板删除权限",
+        "ID为路径参数",
+        "无请求体"
+      ],
+      "outputNotes": [
+        "返回简单成功状态",
+        "实际执行归档操作",
+        "权限不足返回403"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:29.471Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "idField": "id",
+      "evidenceFields": [
+        "template"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "get:/api/documents/templates/:id": {
+      "key": "get:/api/documents/templates/:id",
+      "summary": "根据ID获取文档模板详情",
+      "intents": [
+        "获取模板详情",
+        "查看模板内容",
+        "读取模板数据"
+      ],
+      "examples": [
+        "获取ID为'123'的模板",
+        "查看特定模板的HTML内容",
+        "读取模板的占位符配置"
+      ],
+      "inputNotes": [
+        "需要模板查看或编辑权限",
+        "ID为必填路径参数",
+        "权限不足返回403错误"
+      ],
+      "outputNotes": [
+        "返回完整的模板对象",
+        "包含HTML、占位符等详细信息",
+        "模板不存在返回404错误"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:29.471Z",
+      "updatedBy": "AutoFill",
+      "returnType": "detail",
+      "idField": "id",
+      "evidenceFields": [
+        "template"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "patch:/api/documents/templates/:id": {
+      "key": "patch:/api/documents/templates/:id",
+      "summary": "更新指定ID的文档模板的部分字段，如名称、HTML内容、状态等。",
+      "intents": [
+        "更新模板信息",
+        "修改模板内容",
+        "更改模板状态",
+        "编辑文档模板"
+      ],
+      "examples": [
+        "更新模板名称",
+        "修改模板HTML内容",
+        "将模板状态改为PUBLISHED"
+      ],
+      "inputNotes": [
+        "需要登录",
+        "需要template:update权限",
+        "id为必填路径参数",
+        "请求体为JSON，可包含name、html、status、language、version、type等可选字段"
+      ],
+      "outputNotes": [
+        "返回更新后的完整模板对象",
+        "包含模板状态、ID、名称、创建/更新信息、类型、版本、语言、HTML和占位符"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:35.506Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "idField": "id",
+      "evidenceFields": [
+        "template"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "get:/api/files": {
+      "key": "get:/api/files",
+      "summary": "获取文件列表，支持搜索、筛选和分页。",
+      "intents": [
+        "列出文件",
+        "搜索文件",
+        "筛选文件",
+        "分页查询"
+      ],
+      "examples": [
+        "GET /api/files?search=report&category=document&page=1",
+        "GET /api/files?entityType=user&entityId=123&createdFrom=2024-01-01"
+      ],
+      "inputNotes": [
+        "需要 file:view 或 file:manage 权限",
+        "查询参数可选，包括搜索、分类、实体类型、实体ID、用途、创建时间范围、页码和页面大小"
+      ],
+      "outputNotes": [
+        "返回分页文件列表，包含文件详情、链接和计数",
+        "响应包括总记录数、页码、页面大小和总页数"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:29.471Z",
+      "updatedBy": "AutoFill",
+      "returnType": "list",
+      "detailEndpointKey": "get:/api/files/:id",
+      "detailParam": "id",
+      "detailParamLocation": "path",
+      "idField": "id",
+      "evidenceFields": [
+        "items"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "post:/api/files": {
+      "key": "post:/api/files",
+      "summary": "上传新文件到系统，支持指定文件元数据和关联链接。",
+      "intents": [
+        "上传文件",
+        "创建文件记录",
+        "关联文件到实体"
+      ],
+      "examples": [
+        "上传用户头像图片",
+        "添加文档到项目",
+        "上传合同文件并关联到客户"
+      ],
+      "inputNotes": [
+        "需要文件存储键、原始名称、MIME类型、大小和类别",
+        "可选所有者用户ID和校验和",
+        "可包含链接数组用于关联实体"
+      ],
+      "outputNotes": [
+        "返回新创建的文件对象，包含ID、元数据和关联链接",
+        "包含分页信息（如适用）"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:35.506Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "evidenceFields": [
+        "items"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "delete:/api/files/:id": {
+      "key": "delete:/api/files/:id",
+      "summary": "删除指定ID的文件，包括数据库记录和存储对象。",
+      "intents": [
+        "删除文件",
+        "清理文件资源",
+        "移除文件引用"
+      ],
+      "examples": [
+        "删除ID为123的文件",
+        "移除不再需要的文件"
+      ],
+      "inputNotes": [
+        "需要文件ID作为路径参数",
+        "可选查询参数includeUrl用于在响应中包含URL",
+        "需要file:delete或file:manage权限"
+      ],
+      "outputNotes": [
+        "成功时返回{ok: true}",
+        "如果文件不存在返回404",
+        "如果文件被引用返回409冲突"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:29.471Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "idField": "id",
+      "evidenceFields": [
+        "file"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "get:/api/files/:id": {
+      "key": "get:/api/files/:id",
+      "summary": "Retrieve a file by ID with optional signed URLs.",
+      "intents": [
+        "Get file details",
+        "Fetch file metadata",
+        "Access file information"
+      ],
+      "examples": [
+        "GET /api/files/123",
+        "GET /api/files/456?includeUrl=true"
+      ],
+      "inputNotes": [
+        "ID must be a number",
+        "includeUrl query param optional for signed URLs"
+      ],
+      "outputNotes": [
+        "Returns file object with metadata and counts",
+        "URLs are signed and expire"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:29.471Z",
+      "updatedBy": "AutoFill",
+      "returnType": "detail",
+      "idField": "id",
+      "evidenceFields": [
+        "file"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "patch:/api/files/:id": {
+      "key": "patch:/api/files/:id",
+      "summary": "更新文件元数据，如文件名和分类，并可替换关联链接。",
+      "intents": [
+        "修改文件属性",
+        "更新文件信息",
+        "替换文件链接"
+      ],
+      "examples": [
+        "PATCH /api/files/123 更新文件名为 'report.pdf'",
+        "PATCH /api/files/456 更改分类为 'invoice' 并添加链接"
+      ],
+      "inputNotes": [
+        "需要文件 ID 在路径中",
+        "可选 includeUrl 查询参数",
+        "请求体可包含 originalName、category 和 links 数组"
+      ],
+      "outputNotes": [
+        "返回更新后的文件对象",
+        "包含文件详情和可选 URL"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:35.506Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "idField": "id",
+      "evidenceFields": [
+        "file"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "get:/api/files/purposes": {
+      "key": "get:/api/files/purposes",
+      "summary": "获取文件用途列表，支持按实体类型筛选",
+      "intents": [
+        "获取文件用途",
+        "筛选文件用途",
+        "查询文件用途列表"
+      ],
+      "examples": [
+        "获取所有文件用途",
+        "获取特定实体类型的文件用途"
+      ],
+      "inputNotes": [
+        "可选查询参数：entityType（字符串，逗号分隔）"
+      ],
+      "outputNotes": [
+        "返回去重后的文件用途字符串数组"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:29.471Z",
+      "updatedBy": "AutoFill",
+      "returnType": "list",
+      "detailEndpointKey": "get:/api/files/purposes",
+      "detailParam": "entityType",
+      "detailParamLocation": "query",
+      "idField": "entityType",
+      "evidenceFields": [
+        "purposes"
+      ],
+      "detailKeys": [
+        "entityType"
+      ]
+    },
+    "post:/api/files/upload-url": {
+      "key": "post:/api/files/upload-url",
+      "summary": "获取文件上传的预签名URL",
+      "intents": [
+        "上传文件",
+        "获取上传链接",
+        "文件存储"
+      ],
+      "examples": [
+        "上传图片到服务器",
+        "获取文件上传的临时URL"
+      ],
+      "inputNotes": [
+        "需要文件信息：文件名、内容类型、大小、分类",
+        "需要文件上传或管理权限"
+      ],
+      "outputNotes": [
+        "返回预签名URL和存储键",
+        "包含上传所需的HTTP头信息"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:35.506Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "evidenceFields": [
+        "uploadUrl"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "delete:/api/finance/categories": {
+      "key": "delete:/api/finance/categories",
+      "summary": "删除或停用财务分类，需要财务管理权限，通过key标识分类",
+      "intents": [
+        "删除财务分类",
+        "停用财务分类",
+        "移除分类记录"
+      ],
+      "examples": [
+        "删除key为'expense_travel'的分类",
+        "停用特定财务分类"
+      ],
+      "inputNotes": [
+        "需要JSON body包含key字段",
+        "key为必填参数"
+      ],
+      "outputNotes": [
+        "返回被操作分类的详细信息",
+        "实际为软删除（停用）操作"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:29.471Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "evidenceFields": [
+        "categories"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "get:/api/finance/categories": {
+      "key": "get:/api/finance/categories",
+      "summary": "获取财务分类列表，按排序顺序和键名升序排列",
+      "intents": [
+        "获取财务分类",
+        "列出财务类别",
+        "查询财务分类"
+      ],
+      "examples": [
+        "获取所有财务分类",
+        "列出财务分类供选择"
+      ],
+      "inputNotes": [
+        "需要finance:view权限",
+        "无查询参数",
+        "自动确保分类存在"
+      ],
+      "outputNotes": [
+        "返回分类数组，包含多语言标签和状态字段",
+        "按sortOrder和key排序"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:29.471Z",
+      "updatedBy": "AutoFill",
+      "returnType": "list",
+      "evidenceFields": [
+        "categories"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "post:/api/finance/categories": {
+      "key": "post:/api/finance/categories",
+      "summary": "创建或更新财务分类",
+      "intents": [
+        "创建新的财务分类",
+        "更新现有财务分类",
+        "管理财务分类数据"
+      ],
+      "examples": [
+        "{\"key\": \"expense_food\", \"labelZh\": \"餐饮支出\", \"sortOrder\": 1}",
+        "{\"key\": \"income_salary\", \"labelZh\": \"工资收入\", \"parentKey\": \"income\", \"isActive\": true}"
+      ],
+      "inputNotes": [
+        "需要 finance:manage 权限",
+        "body 必须包含 key 和 labelZh 字段",
+        "parentKey 可为 null",
+        "isActive 默认为 true"
+      ],
+      "outputNotes": [
+        "返回创建的财务分类对象",
+        "包含 createdAt、updatedAt 等字段",
+        "错误时返回 400 或 403 状态码"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:35.506Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "evidenceFields": [
+        "categories"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "get:/api/finance/entries": {
+      "key": "get:/api/finance/entries",
+      "summary": "获取财务条目明细（成本/费用/支出），支持过滤与分页",
+      "intents": [
+        "查询成本明细",
+        "查看费用明细",
+        "筛选支出记录",
+        "获取财务明细"
+      ],
+      "examples": [
+        "获取本月成本明细",
+        "按原因关键词筛选成本条目",
+        "按支付状态过滤支出"
+      ],
+      "inputNotes": [
+        "dateFrom/dateTo用于设置时间范围",
+        "支持paymentStatus/categoryKey/reasonKeyword/remarkKeyword过滤",
+        "支持page/pageSize分页"
+      ],
+      "outputNotes": [
+        "返回分页结果，包含entries列表与总数",
+        "entries为FinanceEntryDTO数组"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:30:25.933Z",
+      "updatedBy": "AutoFix",
+      "returnType": "list",
+      "detailEndpointKey": "get:/api/finance/entries",
+      "detailParam": "amountMin",
+      "detailParamLocation": "query",
+      "idField": "amountMin",
+      "evidenceFields": [
+        "entries"
+      ],
+      "detailKeys": [
+        "amountMin"
+      ]
+    },
+    "post:/api/finance/entries": {
+      "key": "post:/api/finance/entries",
+      "summary": "创建新的财务条目",
+      "intents": [
+        "创建财务记录",
+        "添加财务条目",
+        "记录财务交易"
+      ],
+      "examples": [
+        "创建项目支出记录",
+        "添加收入条目",
+        "记录付款交易"
+      ],
+      "inputNotes": [
+        "需要财务编辑权限",
+        "必须包含项目ID、原因、分类、金额、单位、支付类型、支付日期和状态",
+        "支付状态必须是PENDING或PAID"
+      ],
+      "outputNotes": [
+        "返回创建的财务条目对象",
+        "成功时返回201状态码",
+        "权限不足返回403",
+        "验证失败返回400"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:35.506Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "evidenceFields": [
+        "entries"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "delete:/api/finance/entries/:id": {
+      "key": "delete:/api/finance/entries/:id",
+      "summary": "软删除指定的财务条目，需要财务编辑权限",
+      "intents": [
+        "删除财务条目",
+        "标记条目为已删除",
+        "移除财务记录"
+      ],
+      "examples": [
+        "DELETE /api/finance/entries/123",
+        "删除ID为123的财务条目"
+      ],
+      "inputNotes": [
+        "需要有效的条目ID作为路径参数",
+        "需要finance:edit权限"
+      ],
+      "outputNotes": [
+        "返回操作成功状态",
+        "条目被软删除而非物理删除"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:29.471Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "idField": "id",
+      "evidenceFields": [
+        "entry"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "put:/api/finance/entries/:id": {
+      "key": "put:/api/finance/entries/:id",
+      "summary": "更新指定ID的财务条目信息",
+      "intents": [
+        "更新财务条目",
+        "修改财务记录",
+        "编辑财务数据"
+      ],
+      "examples": [
+        "更新条目支付状态为PAID",
+        "修改条目金额和备注",
+        "编辑条目的项目和处理人"
+      ],
+      "inputNotes": [
+        "需要finance:edit权限",
+        "ID必须是有效数字",
+        "paymentStatus只能是PENDING或PAID",
+        "JSON body包含可选字段"
+      ],
+      "outputNotes": [
+        "返回更新后的完整条目对象",
+        "包含创建和更新信息",
+        "paymentStatus枚举值"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:42.315Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "idField": "id",
+      "evidenceFields": [
+        "entry"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "post:/api/finance/entries/bulk": {
+      "key": "post:/api/finance/entries/bulk",
+      "summary": "批量更新财务条目，支持部分字段更新，返回每个条目的操作结果",
+      "intents": [
+        "批量更新财务记录",
+        "修改多个财务条目",
+        "财务数据批量编辑"
+      ],
+      "examples": [
+        "更新多个条目的支付状态和金额",
+        "批量修改财务条目的分类和事由"
+      ],
+      "inputNotes": [
+        "items数组包含id和patch对象",
+        "patch只允许特定字段更新",
+        "需要finance:edit权限"
+      ],
+      "outputNotes": [
+        "results数组包含每个条目的id、ok状态和错误信息",
+        "部分成功时返回混合结果"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:35.506Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "evidenceFields": [
+        "results"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "get:/api/finance/insights": {
+      "key": "get:/api/finance/insights",
+      "summary": "获取财务成本/支出洞察汇总，支持多条件过滤与趋势分析",
+      "intents": [
+        "查询项目成本",
+        "成本汇总",
+        "成本分析",
+        "查看支出情况",
+        "查看费用占比",
+        "分析财务趋势"
+      ],
+      "examples": [
+        "查询本月成本汇总",
+        "/api/finance/insights?dateFrom=2024-01-01&dateTo=2024-01-31",
+        "/api/finance/insights?paymentStatus=PAID&categoryKey=construction-installation"
+      ],
+      "inputNotes": [
+        "dateFrom/dateTo用于设置时间范围",
+        "支持paymentStatus/categoryKey/reasonKeyword/remarkKeyword过滤",
+        "支持sort/page/pageSize分页与排序"
+      ],
+      "outputNotes": [
+        "返回totalAmount/entryCount/monthlyTrend等汇总字段",
+        "包含分类与支付方式占比统计",
+        "用于成本汇总与趋势分析"
+      ],
+      "returnType": "summary",
+      "evidenceFields": [
+        "totalAmount",
+        "entryCount",
+        "monthlyTrend"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:30:25.933Z",
+      "updatedBy": "AutoFix",
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "get:/api/finance/metadata": {
+      "key": "get:/api/finance/metadata",
+      "summary": "获取财务元数据，包括项目、单位、支付类型、分类、处理人、创建者和更新者列表",
+      "intents": [
+        "获取财务系统的基础配置数据",
+        "查询财务相关的元信息",
+        "为财务操作提供下拉选项数据"
+      ],
+      "examples": [
+        "获取所有可用的财务项目列表",
+        "查询财务分类和支付类型",
+        "获取财务处理人员信息"
+      ],
+      "inputNotes": [
+        "需要finance:view权限",
+        "无查询参数",
+        "无请求体"
+      ],
+      "outputNotes": [
+        "返回包含多个数组的元数据对象",
+        "包含projects、units、paymentTypes等字段",
+        "每个字段都是对象数组"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:29.471Z",
+      "updatedBy": "AutoFill",
+      "returnType": "list",
+      "evidenceFields": [
+        "projects"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "get:/api/finance/payment-types": {
+      "key": "get:/api/finance/payment-types",
+      "summary": "获取支付方式列表",
+      "intents": [
+        "查询支付方式",
+        "获取财务支付类型",
+        "列出可用支付方式"
+      ],
+      "examples": [
+        "获取所有支付方式",
+        "查看支付类型列表",
+        "查询财务支付选项"
+      ],
+      "inputNotes": [
+        "需要财务查看权限",
+        "无查询参数",
+        "GET请求"
+      ],
+      "outputNotes": [
+        "返回支付方式数组，按sortOrder和id排序",
+        "包含id、name、createdAt、updatedAt、isActive、sortOrder字段"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:29.471Z",
+      "updatedBy": "AutoFill",
+      "returnType": "list",
+      "evidenceFields": [
+        "paymentTypes"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "post:/api/finance/payment-types": {
+      "key": "post:/api/finance/payment-types",
+      "summary": "创建新的支付方式类型",
+      "intents": [
+        "添加支付方式",
+        "创建财务支付类型",
+        "新增支付选项"
+      ],
+      "examples": [
+        "创建名为'信用卡'的支付方式",
+        "添加排序为1的支付类型"
+      ],
+      "inputNotes": [
+        "需要提供支付方式名称",
+        "可选排序顺序和激活状态"
+      ],
+      "outputNotes": [
+        "返回创建的支付方式对象",
+        "包含ID、名称、创建时间等字段"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:35.506Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "evidenceFields": [
+        "paymentTypes"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "delete:/api/finance/payment-types/:id": {
+      "key": "delete:/api/finance/payment-types/:id",
+      "summary": "软删除指定ID的支付方式（标记为不活跃）",
+      "intents": [
+        "删除支付方式",
+        "停用支付方式",
+        "财务管理"
+      ],
+      "examples": [
+        "DELETE /api/finance/payment-types/123"
+      ],
+      "inputNotes": [
+        "需要财务管理权限",
+        "ID必须是有效数字"
+      ],
+      "outputNotes": [
+        "返回被标记为不活跃的支付方式对象"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:29.471Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "idField": "id",
+      "evidenceFields": [
+        "paymentType"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "put:/api/finance/payment-types/:id": {
+      "key": "put:/api/finance/payment-types/:id",
+      "summary": "更新指定ID的支付方式信息，包括名称、排序和激活状态",
+      "intents": [
+        "更新支付方式",
+        "修改支付类型",
+        "编辑支付配置"
+      ],
+      "examples": [
+        "更新支付方式名称",
+        "调整支付方式排序",
+        "禁用支付方式"
+      ],
+      "inputNotes": [
+        "需要finance:manage权限",
+        "ID必须是有效数字",
+        "请求体必须包含name字段"
+      ],
+      "outputNotes": [
+        "返回更新后的支付方式对象",
+        "包含完整字段如id、name、isActive等"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:42.315Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "idField": "id",
+      "evidenceFields": [
+        "paymentType"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "get:/api/finance/projects": {
+      "key": "get:/api/finance/projects",
+      "summary": "获取财务项目列表，按名称和ID排序",
+      "intents": [
+        "列出所有财务项目",
+        "查看项目信息",
+        "获取项目数据"
+      ],
+      "examples": [
+        "获取所有项目",
+        "查看项目列表",
+        "查询财务项目"
+      ],
+      "inputNotes": [
+        "需要finance:view权限",
+        "无查询参数",
+        "GET请求"
+      ],
+      "outputNotes": [
+        "返回项目数组，包含id、name、createdAt、updatedAt、isActive、code字段",
+        "按名称升序排序"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:29.471Z",
+      "updatedBy": "AutoFill",
+      "returnType": "list",
+      "evidenceFields": [
+        "projects"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "post:/api/finance/projects": {
+      "key": "post:/api/finance/projects",
+      "summary": "创建新的财务项目",
+      "intents": [
+        "创建项目",
+        "添加财务项目",
+        "新建项目记录"
+      ],
+      "examples": [
+        "创建名为'季度预算'的项目",
+        "添加一个代码为'PRJ001'的活跃项目"
+      ],
+      "inputNotes": [
+        "需要项目名称",
+        "可选代码和激活状态",
+        "需要财务管理权限"
+      ],
+      "outputNotes": [
+        "返回创建的项目对象",
+        "包含ID、名称、时间戳等字段"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:35.506Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "evidenceFields": [
+        "projects"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "delete:/api/finance/projects/:id": {
+      "key": "delete:/api/finance/projects/:id",
+      "summary": "软删除财务项目（标记为不活跃）",
+      "intents": [
+        "删除项目",
+        "停用项目",
+        "财务管理"
+      ],
+      "examples": [
+        "DELETE /api/finance/projects/123"
+      ],
+      "inputNotes": [
+        "需要项目ID作为路径参数",
+        "需要finance:manage权限"
+      ],
+      "outputNotes": [
+        "返回被标记为不活跃的项目对象",
+        "软删除而非物理删除"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:29.471Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "idField": "id",
+      "evidenceFields": [
+        "project"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "put:/api/finance/projects/:id": {
+      "key": "put:/api/finance/projects/:id",
+      "summary": "更新指定ID的财务项目信息",
+      "intents": [
+        "更新项目名称",
+        "更新项目代码",
+        "更新项目激活状态"
+      ],
+      "examples": [
+        "更新项目名称和状态",
+        "仅更新项目代码"
+      ],
+      "inputNotes": [
+        "需要finance:manage权限",
+        "ID必须是有效数字",
+        "请求体必须是有效JSON",
+        "name字段必填"
+      ],
+      "outputNotes": [
+        "返回更新后的项目对象",
+        "包含id、name、createdAt、updatedAt、isActive、code字段"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:42.315Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "idField": "id",
+      "evidenceFields": [
+        "project"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "get:/api/finance/units": {
+      "key": "get:/api/finance/units",
+      "summary": "获取财务单位列表，按排序顺序和ID升序排列",
+      "intents": [
+        "获取所有财务单位",
+        "查看财务单位列表",
+        "检索财务单位数据"
+      ],
+      "examples": [
+        "获取所有财务单位",
+        "列出财务单位",
+        "查询财务单位"
+      ],
+      "inputNotes": [
+        "需要finance:view权限",
+        "无查询参数",
+        "无请求体"
+      ],
+      "outputNotes": [
+        "返回单位数组，包含symbol、id、name、createdAt、updatedAt、isActive、sortOrder字段",
+        "symbol可为null"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:29.471Z",
+      "updatedBy": "AutoFill",
+      "returnType": "list",
+      "evidenceFields": [
+        "units"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "post:/api/finance/units": {
+      "key": "post:/api/finance/units",
+      "summary": "创建新的财务单位",
+      "intents": [
+        "创建财务单位",
+        "添加财务单位",
+        "新增财务单位"
+      ],
+      "examples": [
+        "创建名为'美元'的财务单位",
+        "添加一个符号为'¥'的财务单位"
+      ],
+      "inputNotes": [
+        "需要提供单位名称",
+        "可选提供符号、排序顺序和激活状态"
+      ],
+      "outputNotes": [
+        "返回创建的财务单位详情",
+        "包含ID、名称、符号、创建时间、更新时间、激活状态和排序顺序"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:35.506Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "evidenceFields": [
+        "units"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "delete:/api/finance/units/:id": {
+      "key": "delete:/api/finance/units/:id",
+      "summary": "软删除财务单位，通过将isActive设置为false实现",
+      "intents": [
+        "删除财务单位",
+        "禁用财务单位",
+        "标记单位为非活动状态"
+      ],
+      "examples": [
+        "删除ID为5的财务单位",
+        "禁用特定的财务单位"
+      ],
+      "inputNotes": [
+        "需要有效的单位ID作为路径参数",
+        "需要finance:manage权限"
+      ],
+      "outputNotes": [
+        "返回被软删除的单位对象",
+        "单位被标记为isActive: false而非物理删除"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:29.471Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "idField": "id",
+      "evidenceFields": [
+        "unit"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "put:/api/finance/units/:id": {
+      "key": "put:/api/finance/units/:id",
+      "summary": "更新财务单位信息",
+      "intents": [
+        "更新财务单位",
+        "修改单位属性",
+        "编辑单位数据"
+      ],
+      "examples": [
+        "更新单位名称和符号",
+        "修改单位排序顺序",
+        "激活或停用单位"
+      ],
+      "inputNotes": [
+        "需要有效的单位ID",
+        "必须提供单位名称",
+        "可选更新符号、排序顺序和激活状态"
+      ],
+      "outputNotes": [
+        "返回更新后的单位对象",
+        "包含所有单位字段"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:42.315Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "idField": "id",
+      "evidenceFields": [
+        "unit"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "get:/api/inspection-entries": {
+      "key": "get:/api/inspection-entries",
+      "summary": "获取检查条目列表，支持多种过滤、排序和分页参数。",
+      "intents": [
+        "检索检查条目",
+        "过滤检查条目",
+        "排序检查条目",
+        "分页检查条目"
+      ],
+      "examples": [
+        "获取所有检查条目",
+        "按状态过滤检查条目",
+        "按日期范围过滤检查条目",
+        "按道路过滤检查条目"
+      ],
+      "inputNotes": [
+        "所有查询参数都是可选的",
+        "支持多值参数如status、type、layerName",
+        "使用sort参数进行复杂排序",
+        "需要inspection:view权限"
+      ],
+      "outputNotes": [
+        "返回InspectionEntryDTO对象数组",
+        "响应包含分页信息（如果使用page和pageSize）",
+        "错误时返回400状态码"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:29.471Z",
+      "updatedBy": "AutoFill",
+      "returnType": "list",
+      "detailEndpointKey": "get:/api/inspection-entries/:id",
+      "detailParam": "id",
+      "detailParamLocation": "path",
+      "idField": "id",
+      "evidenceFields": [
+        "entries"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "post:/api/inspection-entries": {
+      "key": "post:/api/inspection-entries",
+      "summary": "创建新的检查条目",
+      "intents": [
+        "创建检查条目",
+        "批量添加检查数据",
+        "提交检查记录"
+      ],
+      "examples": [
+        "POST /api/inspection-entries with entries array",
+        "创建多个检查条目"
+      ],
+      "inputNotes": [
+        "需要权限 inspection:create",
+        "请求体必须包含 entries 数组",
+        "entries 不能为空"
+      ],
+      "outputNotes": [
+        "返回创建的检查条目列表",
+        "错误时返回 400 或 403 状态"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:35.506Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "evidenceFields": [
+        "entries"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "delete:/api/inspection-entries/:id": {
+      "key": "delete:/api/inspection-entries/:id",
+      "summary": "删除指定的检查条目记录",
+      "intents": [
+        "删除检查条目",
+        "移除报检记录",
+        "清理检查数据"
+      ],
+      "examples": [
+        "删除ID为123的检查条目",
+        "移除特定检查记录"
+      ],
+      "inputNotes": [
+        "需要有效的检查条目ID作为路径参数",
+        "需要用户登录和删除权限"
+      ],
+      "outputNotes": [
+        "成功删除后可能返回空响应或确认信息",
+        "失败时返回错误状态码和消息"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:29.471Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "idField": "id",
+      "evidenceFields": [
+        "entry"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "get:/api/inspection-entries/:id": {
+      "key": "get:/api/inspection-entries/:id",
+      "summary": "获取特定ID的检查条目详情，包括关联的道路、阶段、文档、提交者等信息",
+      "intents": [
+        "查看检查条目详情",
+        "获取检查记录",
+        "查询检查条目"
+      ],
+      "examples": [
+        "获取ID为123的检查条目",
+        "查看检查条目详情"
+      ],
+      "inputNotes": [
+        "需要检查条目ID作为路径参数",
+        "需要inspection:view权限"
+      ],
+      "outputNotes": [
+        "返回完整的检查条目对象",
+        "包含关联的道路、阶段、文档等详细信息"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:29.471Z",
+      "updatedBy": "AutoFill",
+      "returnType": "detail",
+      "idField": "id",
+      "evidenceFields": [
+        "entry"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "put:/api/inspection-entries/:id": {
+      "key": "put:/api/inspection-entries/:id",
+      "summary": "更新指定ID的报检记录，包括关联文档、道路、阶段、层次、验收内容等信息",
+      "intents": [
+        "更新报检记录",
+        "编辑检查条目",
+        "修改验收数据"
+      ],
+      "examples": [
+        "更新报检状态为'APPROVED'",
+        "修改报检的层次和验收类型",
+        "关联新的提交单到报检"
+      ],
+      "inputNotes": [
+        "需要提供完整的InspectionEntryPayload",
+        "documentId和submissionNumber至少提供一个用于关联文档",
+        "layerName、checkName、types必须非空"
+      ],
+      "outputNotes": [
+        "返回更新后的完整报检记录，包含关联的道路、阶段、文档、提交者等信息",
+        "如果更新失败返回错误信息"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:42.315Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "idField": "id",
+      "evidenceFields": [
+        "entry"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "post:/api/inspection-entries/bulk-delete": {
+      "key": "post:/api/inspection-entries/bulk-delete",
+      "summary": "批量删除报检条目，基于ID列表删除相关分组条目",
+      "intents": [
+        "批量删除报检",
+        "删除多个检查条目",
+        "清理检查数据"
+      ],
+      "examples": [
+        "删除指定ID的报检条目",
+        "批量移除检查记录"
+      ],
+      "inputNotes": [
+        "需要inspection:bulk-edit和inspection:create权限",
+        "请求体需包含ids数组",
+        "会删除与ids相关的分组条目"
+      ],
+      "outputNotes": [
+        "返回删除的条目数量",
+        "成功时返回{deleted: number}"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:35.506Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "evidenceFields": [
+        "deleted"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "post:/api/inspection-entries/bulk-edit": {
+      "key": "post:/api/inspection-entries/bulk-edit",
+      "summary": "批量编辑报检条目，支持按组更新多个字段",
+      "intents": [
+        "批量更新报检条目",
+        "修改多个报检记录",
+        "批量设置报检属性",
+        "更新报检状态和关联信息"
+      ],
+      "examples": [
+        "批量更新报检状态为'已完成'",
+        "为多个报检条目设置相同的提交单",
+        "批量修改报检的检查类型和层名"
+      ],
+      "inputNotes": [
+        "需要提供要更新的报检ID列表",
+        "payload字段包含要更新的属性",
+        "支持更新文档关联、状态、位置等信息",
+        "权限要求：inspection:bulk-edit和inspection:create"
+      ],
+      "outputNotes": [
+        "返回更新后的报检条目数组",
+        "包含完整的关联数据（文档、创建者、道路等）",
+        "条目按组扩展更新"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:35.506Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "evidenceFields": [
+        "items"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "get:/api/inspections": {
+      "key": "get:/api/inspections",
+      "summary": "获取检查列表，支持多种过滤、排序和分页参数",
+      "intents": [
+        "列出检查项",
+        "筛选检查",
+        "分页查询检查"
+      ],
+      "examples": [
+        "获取所有检查",
+        "按道路和状态筛选检查",
+        "分页获取待处理检查"
+      ],
+      "inputNotes": [
+        "需要inspection:view权限",
+        "查询参数均为可选",
+        "支持多状态筛选"
+      ],
+      "outputNotes": [
+        "返回分页结果",
+        "包含检查项列表和总数"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:29.471Z",
+      "updatedBy": "AutoFill",
+      "returnType": "list",
+      "detailEndpointKey": "get:/api/inspections",
+      "detailParam": "roadSlug",
+      "detailParamLocation": "query",
+      "idField": "roadSlug",
+      "evidenceFields": [
+        "items"
+      ],
+      "detailKeys": [
+        "roadSlug"
+      ]
+    },
+    "delete:/api/inspections/:id": {
+      "key": "delete:/api/inspections/:id",
+      "summary": "删除指定的报检记录",
+      "intents": [
+        "删除报检",
+        "移除检查记录",
+        "清理检查数据"
+      ],
+      "examples": [
+        "删除ID为123的报检",
+        "移除特定检查记录"
+      ],
+      "inputNotes": [
+        "需要提供有效的报检ID作为路径参数",
+        "需要inspection:create权限"
+      ],
+      "outputNotes": [
+        "返回被删除的报检详细信息",
+        "包含道路、阶段、文档等关联信息"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:29.471Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "idField": "id",
+      "evidenceFields": [
+        "inspection"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "put:/api/inspections/:id": {
+      "key": "put:/api/inspections/:id",
+      "summary": "更新指定ID的报检记录，覆盖同区间同文档的条目，需要权限。",
+      "intents": [
+        "编辑报检",
+        "更新检查状态",
+        "修改报检详情"
+      ],
+      "examples": [
+        "更新报检ID为123的状态为SCHEDULED",
+        "修改报检的起止里程和侧别"
+      ],
+      "inputNotes": [
+        "需要提供phaseId、startPk、endPk、side等必填字段",
+        "layers、checks、types不能为空",
+        "可更新documentId或submissionNumber以绑定提交单"
+      ],
+      "outputNotes": [
+        "返回更新后的报检对象，包含详细字段如roadName、phaseName等",
+        "状态枚举包括PENDING、SCHEDULED、SUBMITTED、IN_PROGRESS、APPROVED"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:42.315Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "idField": "id",
+      "evidenceFields": [
+        "inspection"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "post:/api/inspections/bulk-edit": {
+      "key": "post:/api/inspections/bulk-edit",
+      "summary": "批量编辑检查条目，更新多个检查的字段如阶段、位置、状态等",
+      "intents": [
+        "批量更新检查条目",
+        "修改多个检查的元数据",
+        "同步多个检查的字段值"
+      ],
+      "examples": [
+        "更新多个检查的阶段ID和状态",
+        "批量修改检查的起始桩号和结束桩号",
+        "为多个检查设置相同的文档ID和提交顺序"
+      ],
+      "inputNotes": [
+        "需要提供检查ID数组和要更新的字段",
+        "可更新字段包括phaseId、startPk、endPk、side、layerName、checkName、types、status、documentId、submissionOrder、remark、appointmentDate、submittedAt",
+        "documentId和submissionNumber字段会相互验证"
+      ],
+      "outputNotes": [
+        "返回更新后的检查条目数组，包含完整关联数据",
+        "每个条目包含road、phase、document、submitter、creator、updater等关联信息",
+        "更新失败时返回错误消息"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:35.506Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "evidenceFields": [
+        "items"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "post:/api/inspections/bulk-status": {
+      "key": "post:/api/inspections/bulk-status",
+      "summary": "批量更新报检条目的状态",
+      "intents": [
+        "批量修改报检状态",
+        "更新多个检查条目",
+        "批量状态变更"
+      ],
+      "examples": [
+        "{\"ids\": [1, 2, 3], \"status\": \"APPROVED\"}",
+        "{\"ids\": [4, 5], \"status\": \"REJECTED\"}"
+      ],
+      "inputNotes": [
+        "需要提供ids数组和status参数",
+        "用户需有inspection:bulk-edit和inspection:create权限",
+        "ids必须是有效的正整数数组"
+      ],
+      "outputNotes": [
+        "返回更新后的报检条目数组",
+        "包含关联的road、phase、document等详细信息",
+        "状态字段为InspectionStatus枚举值"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:35.506Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "evidenceFields": [
+        "items"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "get:/api/inspections/check-options": {
+      "key": "get:/api/inspections/check-options",
+      "summary": "获取检查定义选项列表，用于前端下拉选择或配置",
+      "intents": [
+        "获取检查定义",
+        "查询检查选项",
+        "加载检查配置"
+      ],
+      "examples": [
+        "获取所有可用的检查定义",
+        "查询检查选项用于表单选择"
+      ],
+      "inputNotes": [
+        "需要inspection:view权限",
+        "无查询参数或请求体"
+      ],
+      "outputNotes": [
+        "返回CheckDefinitionDTO数组",
+        "错误时返回400或403状态码"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:29.471Z",
+      "updatedBy": "AutoFill",
+      "returnType": "list",
+      "evidenceFields": [
+        "items"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "post:/api/inspections/pdf": {
+      "key": "post:/api/inspections/pdf",
+      "summary": "生成报检记录的PDF报告，支持预览或下载模式",
+      "intents": [
+        "导出报检PDF报告",
+        "批量生成报检文档",
+        "预览报检报告",
+        "下载报检PDF"
+      ],
+      "examples": [
+        "导出选中的报检记录为PDF",
+        "预览报检报告PDF",
+        "批量下载报检文档"
+      ],
+      "inputNotes": [
+        "需要登录且有inspection:view权限",
+        "body中需包含ids数组（最多50条）",
+        "可选locale（zh/fr）和mode（preview/download）"
+      ],
+      "outputNotes": [
+        "返回application/pdf二进制流",
+        "预览模式返回inline，下载模式返回attachment",
+        "超时或错误返回JSON错误信息"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:35.506Z",
+      "updatedBy": "AutoFill",
+      "returnType": "export",
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "post:/api/inspections/prefab": {
+      "key": "post:/api/inspections/prefab",
+      "summary": "创建预制构件报检记录，包括验收内容、类型、层等信息，并返回聚合后的检查记录和条目列表。",
+      "intents": [
+        "创建预制构件报检",
+        "提交报检预约",
+        "生成检查记录"
+      ],
+      "examples": [
+        "创建预制梁的报检记录，包含验收内容和类型",
+        "提交预制构件的报检预约，指定日期和备注"
+      ],
+      "inputNotes": [
+        "需要提供phaseKey（预制分项标识）、appointmentDate（预约日期）、checks（验收内容数组）、types（验收类型数组）",
+        "可选提供layers（层数组）和remark（备注）",
+        "所有数组字段需过滤空值"
+      ],
+      "outputNotes": [
+        "返回聚合的inspection对象和entries数组",
+        "inspection包含道路、阶段、文档、位置、状态等信息",
+        "entries为详细的检查条目列表"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:35.506Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "evidenceFields": [
+        "inspection"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "get:/api/leader-logs": {
+      "key": "get:/api/leader-logs",
+      "summary": "获取领导日志（原始日志）列表，用于查看当天现场工作内容，支持按日期/月份/数量筛选",
+      "intents": [
+        "查看原始日志",
+        "工作内容",
+        "现场工作",
+        "查看施工日志",
+        "按日期筛选日志",
+        "获取最近日志",
+        "查看日志日期列表"
+      ],
+      "examples": [
+        "前天的工作内容有哪些",
+        "/api/leader-logs?date=2026-01-19",
+        "/api/leader-logs?month=2026-01",
+        "/api/leader-logs?limit=5",
+        "/api/leader-logs?date=2026-01-19&supervisorId=123"
+      ],
+      "inputNotes": [
+        "需要登录和查看权限",
+        "查询参数可选：date（YYYY-MM-DD）、month（YYYY-MM）、limit、supervisorId、debug",
+        "date优先返回日志列表，month返回有日志的日期列表",
+        "未提供查询参数会返回400"
+      ],
+      "outputNotes": [
+        "返回logs数组或dates数组",
+        "debug模式包含调试信息",
+        "错误时返回状态码和消息"
+      ],
+      "returnType": "list",
+      "idField": "date",
+      "detailEndpointKey": "get:/api/leader-logs",
+      "detailParam": "date",
+      "detailParamLocation": "query",
+      "evidenceFields": [
+        "contentRaw",
+        "photoCount"
+      ],
+      "detailKeys": [
+        "date",
+        "id"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T11:48:43.291Z",
+      "updatedBy": "GanXing"
+    },
+    "post:/api/leader-logs": {
+      "key": "post:/api/leader-logs",
+      "summary": "创建原始日志条目",
+      "intents": [
+        "创建原始日志",
+        "提交原始日志",
+        "添加原始日志",
+        "记录施工活动"
+      ],
+      "examples": [
+        "创建2024-01-15的日志",
+        "为负责人123提交日志",
+        "添加今日领导日志"
+      ],
+      "inputNotes": [
+        "需要report:edit权限",
+        "日志日期必填",
+        "负责人ID可选，但编辑所有权限时需要",
+        "内容为原始文本"
+      ],
+      "outputNotes": [
+        "返回创建的日志对象",
+        "包含ID、日期、负责人信息等",
+        "状态码201表示成功"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:35.506Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "evidenceFields": [
+        "log"
+      ],
+      "detailKeys": [
+        "date"
+      ]
+    },
+    "put:/api/leader-logs/:id": {
+      "key": "put:/api/leader-logs/:id",
+      "summary": "更新或删除原始日志条目",
+      "intents": [
+        "更新原始日志内容",
+        "删除原始日志条目",
+        "管理原始日志"
+      ],
+      "examples": [
+        "PUT /api/leader-logs/123",
+        "PUT /api/leader-logs/456"
+      ],
+      "inputNotes": [
+        "需要身份验证和编辑权限",
+        "日志ID必须是数字",
+        "请求体可包含contentRaw字段",
+        "空contentRaw可能触发删除"
+      ],
+      "outputNotes": [
+        "成功更新返回更新后的日志对象",
+        "成功删除返回{deleted: true}",
+        "错误返回相应状态码和消息"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:42.315Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "idField": "id",
+      "evidenceFields": [
+        "deleted"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "get:/api/leader-logs/leaders": {
+      "key": "get:/api/leader-logs/leaders",
+      "summary": "获取原始日志用户列表，根据权限过滤可见原始日志成员",
+      "intents": [
+        "获取原始日志成员列表",
+        "查看原始日志成员信息",
+        "权限过滤领导"
+      ],
+      "examples": [
+        "获取所有原始日志成员列表",
+        "查看当前用户可见的原始日志成员"
+      ],
+      "inputNotes": [
+        "需要登录",
+        "需要report:view或report:edit权限"
+      ],
+      "outputNotes": [
+        "返回原始日志成员数组，包含id、username、name、frenchName、label字段",
+        "权限不足时返回403",
+        "未登录时返回401"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:29.471Z",
+      "updatedBy": "AutoFill",
+      "returnType": "list",
+      "evidenceFields": [
+        "leaders"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "get:/api/leader-logs/options": {
+      "key": "get:/api/leader-logs/options",
+      "summary": "获取领导日志选项列表，支持搜索和分页",
+      "intents": [
+        "查询成员原始日志",
+        "获取成员原始日志列表",
+        "搜索成员原始日志记录",
+        "查看成员原始日志选项"
+      ],
+      "examples": [
+        "获取最近的成员原始日志",
+        "搜索特定日期的成员原始日志",
+        "按主管姓名筛选日志"
+      ],
+      "inputNotes": [
+        "需要登录和查看权限",
+        "支持按日期或主管姓名搜索",
+        "limit参数限制返回数量"
+      ],
+      "outputNotes": [
+        "返回日志项数组，包含id、日期、主管信息",
+        "日期格式为YYYY-MM-DD"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:29.471Z",
+      "updatedBy": "AutoFill",
+      "returnType": "list",
+      "detailEndpointKey": "get:/api/leader-logs/options",
+      "detailParam": "search",
+      "detailParamLocation": "query",
+      "idField": "search",
+      "evidenceFields": [
+        "items"
+      ],
+      "detailKeys": [
+        "search"
+      ]
+    },
+    "get:/api/members": {
+      "key": "get:/api/members",
+      "summary": "获取成员列表，返回完整成员档案；筛选需在本地完成。",
+      "intents": [
+        "list members",
+        "retrieve member data",
+        "view member profiles",
+        "fetch team members",
+        "get user list",
+        "access member directory",
+        "成员",
+        "人员",
+        "员工",
+        "成员列表",
+        "人员列表",
+        "成员管理",
+        "人员管理",
+        "成员统计",
+        "人员统计",
+        "国籍统计",
+        "成员国籍",
+        "人员国籍",
+        "在职人员",
+        "离职人员"
+      ],
+      "examples": [
+        "GET /api/members",
+        "筛选国籍：GET /api/members 后按 nationality 过滤",
+        "筛选状态/项目/角色：GET /api/members 后按字段过滤",
+        "统计科特迪瓦国籍成员人数"
+      ],
+      "inputNotes": [
+        "Requires 'member:view' permission",
+        "接口不支持 query 过滤，需获取全量后在本地筛选。",
+        "可筛选字段: name/username/gender/nationality/phones/joinDate/position/employmentStatus/roles/tags/project/team/chineseSupervisor/contractNumber/contractType/contractStartDate/contractEndDate/salaryCategory/baseSalary/netMonthly/maritalStatus/childrenCount/cnpsNumber/cnpsDeclarationCode/provenance/frenchName/idNumber/passportNumber/educationAndMajor/certifications/domesticMobile/emergencyContactName/emergencyContactPhone/redBookValidYears/cumulativeAbroadYears/birthplace/residenceInChina/medicalHistory/healthStatus/createdAt/updatedAt",
+        "Permissions affect role visibility: 'role:update' or 'role:manage' required to see roles"
+      ],
+      "outputNotes": [
+        "Returns array of member objects with nested profiles",
+        "Chinese and expat profiles included based on nationality",
+        "Roles may be empty array if user lacks role permissions",
+        "EmploymentStatus enum: ACTIVE, TERMINATED, ON_LEAVE",
+        "用于统计时可直接基于列表汇总回答，无需详情端点"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-22T08:31:53.439Z",
+      "updatedBy": "manual",
+      "returnType": "list",
+      "evidenceFields": [
+        "members"
+      ]
+    },
+    "post:/api/members": {
+      "key": "post:/api/members",
+      "summary": "创建新成员账户，支持中籍和外籍员工的不同资料字段",
+      "intents": [
+        "创建成员",
+        "新增员工",
+        "注册用户账户"
+      ],
+      "examples": [
+        "创建中籍员工",
+        "添加外籍成员",
+        "注册新用户"
+      ],
+      "inputNotes": [
+        "需要用户名和密码",
+        "国籍决定资料字段",
+        "支持批量电话号码输入"
+      ],
+      "outputNotes": [
+        "返回成员列表",
+        "包含详细资料信息",
+        "权限控制角色可见性"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:35.506Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "evidenceFields": [
+        "members"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "delete:/api/members/:id": {
+      "key": "delete:/api/members/:id",
+      "summary": "删除指定ID的成员",
+      "intents": [
+        "删除成员",
+        "移除用户",
+        "删除用户账户"
+      ],
+      "examples": [
+        "删除ID为123的成员",
+        "移除离职员工"
+      ],
+      "inputNotes": [
+        "需要成员ID作为路径参数",
+        "需要删除权限"
+      ],
+      "outputNotes": [
+        "返回被删除的成员完整信息",
+        "成功删除后返回200状态码"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:29.471Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "idField": "id",
+      "evidenceFields": [
+        "member"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "put:/api/members/:id": {
+      "key": "put:/api/members/:id",
+      "summary": "更新成员信息，包括个人资料、项目分配、角色、合同和薪资等详细信息",
+      "intents": [
+        "更新成员信息",
+        "修改成员资料",
+        "编辑成员档案",
+        "更新成员项目",
+        "修改成员角色",
+        "更新合同信息"
+      ],
+      "examples": [
+        "更新成员姓名和职位",
+        "修改成员电话号码",
+        "分配成员到新项目",
+        "更新成员薪资信息",
+        "修改成员合同类型",
+        "更新紧急联系人信息"
+      ],
+      "inputNotes": [
+        "需要成员更新权限",
+        "可更新个人资料、项目、角色等",
+        "支持批量更新多个字段",
+        "可跳过变更历史记录",
+        "需要验证输入格式",
+        "支持中英文资料更新"
+      ],
+      "outputNotes": [
+        "返回完整的成员对象",
+        "包含更新后的所有字段",
+        "包含项目、角色等关联信息",
+        "包含中英文档案信息",
+        "包含合同和薪资详情",
+        "包含时间戳信息"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:42.315Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "idField": "id",
+      "evidenceFields": [
+        "member"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "get:/api/members/:id/compensation": {
+      "key": "get:/api/members/:id/compensation",
+      "summary": "获取指定成员的薪酬历史记录，包括合同变更、薪资调整和薪资发放信息",
+      "intents": [
+        "查询成员薪酬历史",
+        "获取薪酬变更记录",
+        "查看薪资发放详情"
+      ],
+      "examples": [
+        "获取ID为123的成员薪酬历史",
+        "查询成员合同变更记录",
+        "查看薪资调整历史"
+      ],
+      "inputNotes": [
+        "需要成员ID作为路径参数",
+        "需要成员更新权限（member:update/edit/manage）"
+      ],
+      "outputNotes": [
+        "返回三个数组：contractChanges（合同变更）、payrollChanges（薪资调整）、payrollPayouts（薪资发放）",
+        "数据按日期降序排列",
+        "金额字段为字符串格式"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:29.471Z",
+      "updatedBy": "AutoFill",
+      "returnType": "detail",
+      "idField": "id",
+      "evidenceFields": [
+        "contractChanges",
+        "payrollChanges"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "post:/api/members/:id/contract-changes": {
+      "key": "post:/api/members/:id/contract-changes",
+      "summary": "为指定外籍成员创建合同变更记录，更新团队、职位、合同详情、薪资等信息",
+      "intents": [
+        "更新成员合同信息",
+        "记录合同变更历史",
+        "修改外籍员工薪资",
+        "调整团队成员分配"
+      ],
+      "examples": [
+        "更新外籍员工薪资",
+        "修改合同类型为CDD",
+        "调整团队成员到新班组",
+        "记录合同变更原因"
+      ],
+      "inputNotes": [
+        "仅适用于外籍成员",
+        "需要成员更新权限",
+        "至少提供一个变更字段",
+        "团队变更需绑定中方负责人"
+      ],
+      "outputNotes": [
+        "返回合同变更记录",
+        "包含外籍档案信息",
+        "更新入职日期和职位",
+        "合同类型为CTJ或CDD"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:35.506Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "idField": "id",
+      "evidenceFields": [
+        "contractChange"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "delete:/api/members/:id/contract-changes/:changeId": {
+      "key": "delete:/api/members/:id/contract-changes/:changeId",
+      "summary": "删除指定成员的特定合同变更记录",
+      "intents": [
+        "删除合同变更记录",
+        "撤销合同变更",
+        "移除成员合同历史"
+      ],
+      "examples": [
+        "删除成员ID为123的合同变更ID为456的记录"
+      ],
+      "inputNotes": [
+        "需要成员ID和变更记录ID作为路径参数",
+        "可能需要权限验证"
+      ],
+      "outputNotes": [
+        "返回删除后的成员合同状态",
+        "包含合同变更和外籍档案信息"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:29.471Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "idField": "id",
+      "evidenceFields": [
+        "contractChange"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "put:/api/members/:id/contract-changes/:changeId": {
+      "key": "put:/api/members/:id/contract-changes/:changeId",
+      "summary": "更新指定成员的特定合同变更记录，包括团队、职位、合同详情、薪资和日期等信息，并同步相关数据。",
+      "intents": [
+        "更新合同变更记录",
+        "修改成员合同信息",
+        "同步团队和主管数据",
+        "验证合同类型和薪资单位"
+      ],
+      "examples": [
+        "更新成员ID为123的合同变更ID为456的团队和薪资",
+        "修改合同变更的起始日期和原因",
+        "调整合同类型为CDD并设置月薪"
+      ],
+      "inputNotes": [
+        "body字段可选，缺失时使用原记录值",
+        "团队变更会触发中方负责人更新",
+        "合同类型CDD不能与薪资单位HOUR组合"
+      ],
+      "outputNotes": [
+        "返回更新后的合同变更对象和关联的外籍档案",
+        "包含同步的入职日期和职位信息",
+        "错误时返回400或403状态码"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:42.315Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "idField": "id",
+      "evidenceFields": [
+        "contractChange"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "post:/api/members/:id/payroll-changes": {
+      "key": "post:/api/members/:id/payroll-changes",
+      "summary": "为指定成员创建工资变更记录，更新外籍员工薪资信息",
+      "intents": [
+        "创建工资变更记录",
+        "更新外籍员工薪资",
+        "记录薪资调整",
+        "管理员工薪酬"
+      ],
+      "examples": [
+        "为成员ID 123创建工资变更，设置baseSalaryAmount为5000",
+        "更新成员ID 456的薪资类别和团队信息"
+      ],
+      "inputNotes": [
+        "仅适用于外籍员工（非中方成员）",
+        "需要至少一个薪资相关字段",
+        "changeDate可选，默认为当前日期",
+        "team字段变更时会自动关联中方负责人"
+      ],
+      "outputNotes": [
+        "返回创建的工资变更记录详情",
+        "包含变更前后的薪资信息",
+        "自动更新用户的外籍档案"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:42.315Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "idField": "id",
+      "evidenceFields": [
+        "payrollChange"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "delete:/api/members/:id/payroll-changes/:changeId": {
+      "key": "delete:/api/members/:id/payroll-changes/:changeId",
+      "summary": "删除指定成员的特定工资变更记录",
+      "intents": [
+        "删除工资变更记录",
+        "移除薪资调整",
+        "撤销工资变更"
+      ],
+      "examples": [
+        "删除成员ID为123的工资变更记录ID为456",
+        "移除某成员的特定薪资调整"
+      ],
+      "inputNotes": [
+        "需要成员ID和变更记录ID作为路径参数",
+        "需要成员更新权限"
+      ],
+      "outputNotes": [
+        "返回操作成功状态",
+        "删除后记录不可恢复"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:29.471Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "idField": "id",
+      "evidenceFields": [
+        "payrollChange"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "put:/api/members/:id/payroll-changes/:changeId": {
+      "key": "put:/api/members/:id/payroll-changes/:changeId",
+      "summary": "更新指定成员的特定工资变更记录，并同步更新外籍扩展字段",
+      "intents": [
+        "更新工资变更记录",
+        "修改成员薪资信息",
+        "同步外籍员工薪资数据"
+      ],
+      "examples": [
+        "更新成员ID为123的工资变更记录ID为456的薪资类别和团队信息",
+        "修改工资变更记录的基本工资和生效日期"
+      ],
+      "inputNotes": [
+        "body字段可选，仅需提供要更新的字段",
+        "team字段更新时会自动解析中方负责人",
+        "changeDate应为ISO格式字符串",
+        "金额字段应为字符串格式的十进制数"
+      ],
+      "outputNotes": [
+        "返回更新后的完整工资变更记录",
+        "包含关联的中方负责人信息",
+        "所有时间字段为ISO格式字符串",
+        "金额字段为字符串格式"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:42.315Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "idField": "id",
+      "evidenceFields": [
+        "payrollChange"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "post:/api/members/:id/payroll-payouts": {
+      "key": "post:/api/members/:id/payroll-payouts",
+      "summary": "为指定成员创建工资发放记录，适用于外籍成员，需要相关权限",
+      "intents": [
+        "创建工资发放记录",
+        "为成员添加薪资支付",
+        "记录外籍员工工资支付"
+      ],
+      "examples": [
+        "为成员ID 123创建工资发放记录",
+        "记录外籍员工的薪资支付"
+      ],
+      "inputNotes": [
+        "需要成员ID作为路径参数",
+        "body中runId、amount为必填字段",
+        "仅适用于外籍成员（非中方）",
+        "需要member:update/edit/manage权限"
+      ],
+      "outputNotes": [
+        "返回创建的工资发放记录详情",
+        "包含中文字段如chineseSupervisorName",
+        "日期字段为ISO字符串格式"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:42.315Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "idField": "id",
+      "evidenceFields": [
+        "payrollPayout"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "delete:/api/members/:id/payroll-payouts/:payoutId": {
+      "key": "delete:/api/members/:id/payroll-payouts/:payoutId",
+      "summary": "删除指定成员的工资发放记录",
+      "intents": [
+        "删除工资发放记录",
+        "移除薪资支付",
+        "撤销工资发放"
+      ],
+      "examples": [
+        "删除成员ID为123的工资发放记录ID为456",
+        "移除指定成员的薪资支付记录"
+      ],
+      "inputNotes": [
+        "需要成员更新权限",
+        "路径参数id为成员ID，payoutId为工资发放记录ID"
+      ],
+      "outputNotes": [
+        "成功返回{ok: true}",
+        "失败返回错误信息"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:29.471Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "idField": "id",
+      "evidenceFields": [
+        "payrollPayout"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "put:/api/members/:id/payroll-payouts/:payoutId": {
+      "key": "put:/api/members/:id/payroll-payouts/:payoutId",
+      "summary": "更新指定成员的工资发放记录",
+      "intents": [
+        "更新工资发放记录",
+        "修改工资发放信息",
+        "编辑工资发放详情"
+      ],
+      "examples": [
+        "更新发放批次ID",
+        "修改发放金额",
+        "调整发放班组"
+      ],
+      "inputNotes": [
+        "需要成员更新权限",
+        "可选字段可部分更新",
+        "团队字段需绑定中方负责人"
+      ],
+      "outputNotes": [
+        "返回更新后的完整工资发放记录",
+        "包含时间戳和关联信息"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:42.315Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "idField": "id",
+      "evidenceFields": [
+        "payrollPayout"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "get:/api/members/:id/signatures": {
+      "key": "get:/api/members/:id/signatures",
+      "summary": "获取指定成员的签名列表",
+      "intents": [
+        "获取成员签名",
+        "查看签名记录",
+        "列出签名文件"
+      ],
+      "examples": [
+        "获取ID为123的成员的所有签名",
+        "查看成员签名历史"
+      ],
+      "inputNotes": [
+        "需要成员ID作为路径参数",
+        "需要签名查看权限"
+      ],
+      "outputNotes": [
+        "返回签名数组，包含文件信息和创建者",
+        "文件URL为预签名URL，有TTL限制"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:29.471Z",
+      "updatedBy": "AutoFill",
+      "returnType": "detail",
+      "idField": "id",
+      "evidenceFields": [
+        "signatures"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "post:/api/members/:id/signatures": {
+      "key": "post:/api/members/:id/signatures",
+      "summary": "为指定成员上传签名文件，处理图像并激活为新版本。",
+      "intents": [
+        "上传签名",
+        "更新成员签名",
+        "处理图像资产"
+      ],
+      "examples": [
+        "上传PNG签名文件",
+        "为成员ID 123添加新签名"
+      ],
+      "inputNotes": [
+        "需要成员ID作为路径参数",
+        "请求体需包含storageKey、originalName、mimeType、size",
+        "文件路径必须匹配members/{id}/signatures/",
+        "支持特定MIME类型和大小限制"
+      ],
+      "outputNotes": [
+        "返回签名列表，包括文件详情和创建者信息",
+        "新签名被激活，旧签名设为非活动",
+        "包含预览URL和文件URL"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:42.315Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "idField": "id",
+      "evidenceFields": [
+        "signatures"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "delete:/api/members/:id/signatures/:signatureId": {
+      "key": "delete:/api/members/:id/signatures/:signatureId",
+      "summary": "删除指定成员的特定签名文件",
+      "intents": [
+        "删除签名",
+        "移除用户签名",
+        "清理签名文件"
+      ],
+      "examples": [
+        "删除成员ID为123的签名ID为456的签名",
+        "移除用户的特定签名版本"
+      ],
+      "inputNotes": [
+        "需要签名删除权限",
+        "路径参数id为成员ID，signatureId为签名ID"
+      ],
+      "outputNotes": [
+        "成功返回{ok: true}",
+        "删除后如果被删签名是活跃签名，会自动激活最新版本"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:29.471Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "idField": "id",
+      "evidenceFields": [
+        "signature"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "patch:/api/members/:id/signatures/:signatureId": {
+      "key": "patch:/api/members/:id/signatures/:signatureId",
+      "summary": "激活指定成员的特定签名版本，使其成为当前活动签名",
+      "intents": [
+        "激活签名",
+        "切换活动签名",
+        "更新签名状态"
+      ],
+      "examples": [
+        "激活用户ID为123的签名ID为456的签名",
+        "将签名设置为活动状态"
+      ],
+      "inputNotes": [
+        "需要签名上传权限",
+        "路径参数：成员ID和签名ID",
+        "无请求体字段"
+      ],
+      "outputNotes": [
+        "返回更新后的签名详情，包含文件信息和创建者",
+        "签名激活后，该用户的其他签名会自动设为非活动"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:35.506Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "idField": "id",
+      "evidenceFields": [
+        "signature"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "post:/api/members/:id/signatures/upload-url": {
+      "key": "post:/api/members/:id/signatures/upload-url",
+      "summary": "为指定成员生成签名文件上传的预签名URL",
+      "intents": [
+        "获取上传URL",
+        "签名文件上传",
+        "成员签名管理"
+      ],
+      "examples": [
+        "POST /api/members/123/signatures/upload-url",
+        "为ID为123的成员生成签名上传URL"
+      ],
+      "inputNotes": [
+        "需要签名上传权限",
+        "请求体需包含filename、contentType、size字段",
+        "contentType需在允许的MIME类型中",
+        "size不能超过最大限制"
+      ],
+      "outputNotes": [
+        "返回预签名上传URL和存储密钥",
+        "包含上传所需的HTTP头信息",
+        "URL有效期600秒"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:42.315Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "idField": "id",
+      "evidenceFields": [
+        "uploadUrl"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "post:/api/members/bulk": {
+      "key": "post:/api/members/bulk",
+      "summary": "批量更新成员信息，支持外籍和中国籍员工资料、项目分配等字段的批量修改",
+      "intents": [
+        "批量更新多个成员信息",
+        "修改外籍员工合同和薪资数据",
+        "更新中国籍员工档案",
+        "分配或更改成员项目",
+        "批量处理成员数据变更"
+      ],
+      "examples": [
+        "批量更新10个成员的团队和薪资信息",
+        "修改多个外籍员工的合同结束日期",
+        "更新中国籍员工的紧急联系人信息",
+        "将一组成员分配到新项目"
+      ],
+      "inputNotes": [
+        "需要member:update/edit/manage权限",
+        "请求体必须包含items数组",
+        "每个item需有id和patch字段",
+        "不能修改name/username/password/birthDate等字段",
+        "外籍员工contractNumber不可批量编辑"
+      ],
+      "outputNotes": [
+        "返回results数组，每个元素包含id、ok状态和可能的error",
+        "部分成功时返回混合结果",
+        "错误时返回400或403状态码"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:42.315Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "evidenceFields": [
+        "results"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "post:/api/members/contract-audit": {
+      "key": "post:/api/members/contract-audit",
+      "summary": "上传合同审核表格文件，进行成员合同数据审计，生成审计报告文件",
+      "intents": [
+        "合同审计",
+        "批量验证",
+        "文件处理",
+        "数据匹配",
+        "生成报告"
+      ],
+      "examples": [
+        "上传包含班组、合同编号、姓名、出生日期的Excel文件进行合同审计"
+      ],
+      "inputNotes": [
+        "需要上传Excel文件",
+        "文件必须包含班组、合同编号、姓名、出生日期表头",
+        "支持.xlsx格式"
+      ],
+      "outputNotes": [
+        "返回生成的审计报告文件路径",
+        "包含详细的审计统计摘要",
+        "报告保存为文本文件"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:42.315Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "evidenceFields": [
+        "path"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "post:/api/members/contract-changes/import": {
+      "key": "post:/api/members/contract-changes/import",
+      "summary": "批量导入成员合同变更数据，支持错误处理和权限验证",
+      "intents": [
+        "批量导入合同变更",
+        "更新成员合同信息",
+        "处理导入错误"
+      ],
+      "examples": [
+        "导入合同变更CSV数据",
+        "批量更新成员薪资和合同"
+      ],
+      "inputNotes": [
+        "需要成员更新权限",
+        "支持忽略错误选项",
+        "数据格式需符合ImportItem类型"
+      ],
+      "outputNotes": [
+        "返回导入成功数量和错误列表",
+        "错误包含行号和错误代码"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:42.315Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "evidenceFields": [
+        "imported"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "post:/api/members/import": {
+      "key": "post:/api/members/import",
+      "summary": "批量导入成员数据，支持外籍和中国籍员工信息，包括个人资料、合同、薪资等，可处理错误和权限检查。",
+      "intents": [
+        "批量创建成员",
+        "导入员工信息",
+        "处理成员数据",
+        "支持批量操作",
+        "验证输入数据",
+        "管理权限控制"
+      ],
+      "examples": [
+        "导入CSV格式的成员列表",
+        "批量添加新员工",
+        "更新现有成员信息",
+        "处理导入错误",
+        "跳过历史记录",
+        "忽略错误继续导入"
+      ],
+      "inputNotes": [
+        "需要成员数组作为输入",
+        "可选跳过历史记录和忽略错误",
+        "支持多种字段如用户名、密码、姓名、合同等",
+        "数据验证包括必填字段和格式检查",
+        "权限要求：member:create 或 member:manage"
+      ],
+      "outputNotes": [
+        "返回导入成功数量和错误列表",
+        "错误包括行号和错误代码",
+        "可能返回403权限错误或400数据错误",
+        "支持批量事务处理"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:42.315Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "evidenceFields": [
+        "imported"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "get:/api/payroll-runs": {
+      "key": "get:/api/payroll-runs",
+      "summary": "获取工资发放运行记录，支持按年月或成员ID筛选",
+      "intents": [
+        "查询工资发放记录",
+        "获取工资运行数据",
+        "查看工资发放详情",
+        "筛选工资发放信息"
+      ],
+      "examples": [
+        "GET /api/payroll-runs?year=2024&month=3",
+        "GET /api/payroll-runs?months=2024-01,2024-02",
+        "GET /api/payroll-runs?memberIds=1,2,3"
+      ],
+      "inputNotes": [
+        "year和month参数需同时提供或都不提供",
+        "months参数格式为YYYY-MM，多个用逗号分隔",
+        "memberIds参数格式为数字，多个用逗号分隔"
+      ],
+      "outputNotes": [
+        "返回包含工资运行、发放详情和合同快照的完整数据",
+        "管理员权限可确保工资运行存在，普通用户仅能查看已有记录"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:29.471Z",
+      "updatedBy": "AutoFill",
+      "returnType": "list",
+      "detailEndpointKey": "get:/api/payroll-runs/:runId",
+      "detailParam": "runId",
+      "detailParamLocation": "path",
+      "idField": "runId",
+      "evidenceFields": [
+        "months"
+      ],
+      "detailKeys": [
+        "runId"
+      ]
+    },
+    "get:/api/payroll-runs/:runId": {
+      "key": "get:/api/payroll-runs/:runId",
+      "summary": "获取指定工资发放批次的详细信息",
+      "intents": [
+        "查询工资发放批次",
+        "查看工资发放详情",
+        "获取工资发放数据"
+      ],
+      "examples": [
+        "获取ID为123的工资发放批次信息",
+        "查询2024年5月第1次工资发放详情"
+      ],
+      "inputNotes": [
+        "需要有效的runId路径参数",
+        "需要工资发放查看权限"
+      ],
+      "outputNotes": [
+        "返回完整的工资发放批次对象",
+        "包含发放日期、考勤截止日期等字段"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:29.471Z",
+      "updatedBy": "AutoFill",
+      "returnType": "detail",
+      "idField": "runId",
+      "evidenceFields": [
+        "run"
+      ],
+      "detailKeys": [
+        "runId"
+      ]
+    },
+    "put:/api/payroll-runs/:runId": {
+      "key": "put:/api/payroll-runs/:runId",
+      "summary": "更新工资发放批次信息",
+      "intents": [
+        "更新工资发放批次",
+        "修改发放日期",
+        "修改考勤截止日期",
+        "添加或更新备注",
+        "批量更新用户工资发放日期"
+      ],
+      "examples": [
+        "更新发放批次123的发放日期",
+        "修改批次456的考勤截止日期",
+        "为批次789添加备注"
+      ],
+      "inputNotes": [
+        "需要工资发放管理权限",
+        "至少提供一个可更新字段",
+        "payoutDate和attendanceCutoffDate应为日期字符串",
+        "note可为字符串或null"
+      ],
+      "outputNotes": [
+        "返回更新后的完整发放批次对象",
+        "如果更新了payoutDate，会同步更新关联的用户工资发放记录"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:42.315Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "idField": "runId",
+      "evidenceFields": [
+        "run"
+      ],
+      "detailKeys": [
+        "runId"
+      ]
+    },
+    "post:/api/payroll-runs/:runId/attendance-zip": {
+      "key": "post:/api/payroll-runs/:runId/attendance-zip",
+      "summary": "为指定工资发放批次生成考勤报告的ZIP压缩包",
+      "intents": [
+        "导出考勤报告",
+        "批量生成PDF",
+        "下载考勤数据",
+        "生成工资相关文档"
+      ],
+      "examples": [
+        "导出ID为123的工资批次的考勤报告",
+        "下载所有员工的月度考勤PDF"
+      ],
+      "inputNotes": [
+        "需要工资发放批次的runId作为路径参数",
+        "可选的locale参数控制语言（zh/fr）"
+      ],
+      "outputNotes": [
+        "返回application/zip格式的二进制文件",
+        "包含多个PDF文件，按团队分组"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:42.315Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "idField": "runId",
+      "detailKeys": [
+        "runId"
+      ]
+    },
+    "delete:/api/payroll-runs/:runId/payouts": {
+      "key": "delete:/api/payroll-runs/:runId/payouts",
+      "summary": "删除指定工资发放批次中的所有发放记录",
+      "intents": [
+        "删除工资发放记录",
+        "清空发放批次数据",
+        "移除工资发放明细"
+      ],
+      "examples": [
+        "删除批次123的所有发放记录",
+        "清空特定批次的工资数据"
+      ],
+      "inputNotes": [
+        "需要工资发放管理权限",
+        "runId为路径参数，指定批次ID"
+      ],
+      "outputNotes": [
+        "返回删除的记录数量",
+        "成功时ok为true"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:29.471Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "idField": "runId",
+      "evidenceFields": [
+        "ok"
+      ],
+      "detailKeys": [
+        "runId"
+      ]
+    },
+    "post:/api/payroll-runs/:runId/payouts": {
+      "key": "post:/api/payroll-runs/:runId/payouts",
+      "summary": "为指定工资发放批次批量创建或更新外籍员工发放明细",
+      "intents": [
+        "批量处理工资发放明细",
+        "更新外籍员工发放记录",
+        "管理工资发放批次"
+      ],
+      "examples": [
+        "为批次123添加多个外籍员工发放记录",
+        "更新批次456中特定员工的发放金额和团队信息"
+      ],
+      "inputNotes": [
+        "需要工资发放管理权限",
+        "items数组中的userId必须有效且为外籍员工",
+        "amount为空时会删除该用户的发放记录"
+      ],
+      "outputNotes": [
+        "返回更新和删除的记录数量",
+        "成功时ok为true"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:42.315Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "idField": "runId",
+      "evidenceFields": [
+        "ok"
+      ],
+      "detailKeys": [
+        "runId"
+      ]
+    },
+    "post:/api/payroll-runs/:runId/salary-pdf": {
+      "key": "post:/api/payroll-runs/:runId/salary-pdf",
+      "summary": "为指定工资发放批次生成PDF格式的工资单报告",
+      "intents": [
+        "生成工资单PDF",
+        "导出工资数据",
+        "创建工资报告"
+      ],
+      "examples": [
+        "POST /api/payroll-runs/123/salary-pdf",
+        "POST /api/payroll-runs/456/salary-pdf"
+      ],
+      "inputNotes": [
+        "runId为工资发放批次ID",
+        "可选locale参数控制语言（zh/fr）",
+        "可选unitName参数设置单位名称"
+      ],
+      "outputNotes": [
+        "返回application/pdf格式的二进制文件",
+        "包含工资单的PDF报告"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:42.315Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "idField": "runId",
+      "detailKeys": [
+        "runId"
+      ]
+    },
+    "get:/api/progress/:slug/phases": {
+      "key": "get:/api/progress/:slug/phases",
+      "summary": "获取指定路段的所有进度阶段及相关定义数据",
+      "intents": [
+        "获取路段进度阶段",
+        "查询阶段定义和选项",
+        "查看路段详细信息"
+      ],
+      "examples": [
+        "获取路段'section-a'的所有阶段",
+        "查询路段进度配置选项",
+        "查看路段'section-b'的进度数据"
+      ],
+      "inputNotes": [
+        "需要路段slug参数",
+        "需要progress:view权限"
+      ],
+      "outputNotes": [
+        "返回路段信息、阶段列表、定义和选项",
+        "包含路段详细属性如起终点桩号"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:29.471Z",
+      "updatedBy": "AutoFill",
+      "returnType": "detail",
+      "idField": "slug",
+      "evidenceFields": [
+        "road",
+        "phases"
+      ],
+      "detailKeys": [
+        "slug"
+      ]
+    },
+    "post:/api/progress/:slug/phases": {
+      "key": "post:/api/progress/:slug/phases",
+      "summary": "为指定路段创建新的进度阶段，包括阶段定义、图层选项和检查选项",
+      "intents": [
+        "创建进度阶段",
+        "添加施工阶段",
+        "管理路段进度"
+      ],
+      "examples": [
+        "创建桥梁施工阶段",
+        "添加路面铺设阶段"
+      ],
+      "inputNotes": [
+        "需要进度编辑权限",
+        "路段slug为路径参数",
+        "JSON body包含阶段配置"
+      ],
+      "outputNotes": [
+        "返回新创建的阶段对象",
+        "包含路段信息和相关定义"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:42.315Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "idField": "slug",
+      "evidenceFields": [
+        "road"
+      ],
+      "detailKeys": [
+        "slug"
+      ]
+    },
+    "delete:/api/progress/:slug/phases/:id": {
+      "key": "delete:/api/progress/:slug/phases/:id",
+      "summary": "删除指定路段进度中的特定分项",
+      "intents": [
+        "删除进度分项",
+        "移除阶段",
+        "清理进度数据"
+      ],
+      "examples": [
+        "删除路段A的进度分项123",
+        "移除特定进度阶段"
+      ],
+      "inputNotes": [
+        "需要路段slug和分项ID作为路径参数",
+        "需要progress:edit权限"
+      ],
+      "outputNotes": [
+        "返回被删除的分项ID",
+        "成功时返回200状态码"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:29.471Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "idField": "slug",
+      "evidenceFields": [
+        "phase"
+      ],
+      "detailKeys": [
+        "slug"
+      ]
+    },
+    "put:/api/progress/:slug/phases/:id": {
+      "key": "put:/api/progress/:slug/phases/:id",
+      "summary": "更新指定路段进度中的特定分项（阶段）信息",
+      "intents": [
+        "更新进度分项",
+        "修改阶段数据",
+        "编辑进度阶段"
+      ],
+      "examples": [
+        "更新路段A的进度分项123的名称和区间",
+        "修改阶段测量方式和关联图层"
+      ],
+      "inputNotes": [
+        "需要progress:edit权限",
+        "slug为路段标识符",
+        "id为分项ID",
+        "body包含name、measure、intervals等字段",
+        "intervals数组包含区间详细信息"
+      ],
+      "outputNotes": [
+        "返回更新后的PhaseDTO对象",
+        "包含完整的阶段信息",
+        "可能包含错误响应"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:42.315Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "idField": "slug",
+      "evidenceFields": [
+        "phase"
+      ],
+      "detailKeys": [
+        "slug"
+      ]
+    },
+    "post:/api/progress/quantities/boq-binding": {
+      "key": "post:/api/progress/quantities/boq-binding",
+      "summary": "绑定或解绑分项与工程量清单条目",
+      "intents": [
+        "设置分项与工程量清单的关联",
+        "更新进度分项的清单绑定",
+        "管理分项与BOQ的映射关系"
+      ],
+      "examples": [
+        "将分项123绑定到BOQ条目456",
+        "解绑分项789的清单关联"
+      ],
+      "inputNotes": [
+        "需要进度编辑权限",
+        "phaseItemId必须是正整数",
+        "projectId必须是正整数",
+        "boqItemId可为null或正整数"
+      ],
+      "outputNotes": [
+        "成功时返回操作结果",
+        "失败时返回错误消息"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:42.315Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "evidenceFields": [
+        "message"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "get:/api/progress/quantities/bound-items": {
+      "key": "get:/api/progress/quantities/bound-items",
+      "summary": "获取指定区间绑定的阶段项目数量明细",
+      "intents": [
+        "查询进度",
+        "获取绑定项目",
+        "查看区间明细"
+      ],
+      "examples": [
+        "获取区间ID为5的绑定项目列表",
+        "查询进度绑定明细"
+      ],
+      "inputNotes": [
+        "需要progress:view权限",
+        "intervalId必须为正整数"
+      ],
+      "outputNotes": [
+        "成功时返回items数组",
+        "错误时返回message字段"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:29.471Z",
+      "updatedBy": "AutoFill",
+      "returnType": "list",
+      "detailEndpointKey": "get:/api/progress/quantities/bound-items",
+      "detailParam": "intervalId",
+      "detailParamLocation": "query",
+      "idField": "intervalId",
+      "evidenceFields": [
+        "message"
+      ],
+      "detailKeys": [
+        "intervalId"
+      ]
+    },
+    "post:/api/progress/quantities/bound-items/batch": {
+      "key": "post:/api/progress/quantities/bound-items/batch",
+      "summary": "批量获取区间绑定的阶段项目明细",
+      "intents": [
+        "批量查询区间绑定的项目",
+        "获取进度相关的绑定项",
+        "批量加载区间明细"
+      ],
+      "examples": [
+        "传入区间ID列表获取绑定项目",
+        "批量查询多个区间的绑定项"
+      ],
+      "inputNotes": [
+        "需要progress:view权限",
+        "请求体应包含intervalIds数组",
+        "intervalIds应为正整数数组",
+        "最多支持500个区间"
+      ],
+      "outputNotes": [
+        "返回itemsByInterval对象",
+        "键为区间ID字符串",
+        "值为绑定项目数组",
+        "权限不足返回403",
+        "参数错误返回400"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:42.315Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "evidenceFields": [
+        "message"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "get:/api/progress/quantities/detail": {
+      "key": "get:/api/progress/quantities/detail",
+      "summary": "获取道路分项工程量详情，包括区间、输入项、分项信息、道路信息、分项条目和BOQ绑定项，以及编辑权限状态。",
+      "intents": [
+        "查看工程量详情",
+        "获取分项进度数据",
+        "检查编辑权限"
+      ],
+      "examples": [
+        "获取特定分项和区间的工程量详情",
+        "查看道路分项的进度输入项"
+      ],
+      "inputNotes": [
+        "需要有效的phaseId和intervalId查询参数",
+        "phaseId和intervalId必须为正整数"
+      ],
+      "outputNotes": [
+        "返回过滤后的详情数据，仅包含指定intervalId的区间和输入项",
+        "包含canEdit字段指示用户是否有编辑权限"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:29.471Z",
+      "updatedBy": "AutoFill",
+      "returnType": "list",
+      "detailEndpointKey": "get:/api/progress/quantities/detail",
+      "detailParam": "phaseId",
+      "detailParamLocation": "query",
+      "idField": "phaseId",
+      "evidenceFields": [
+        "detail"
+      ],
+      "detailKeys": [
+        "phaseId"
+      ]
+    },
+    "post:/api/progress/quantities/formula": {
+      "key": "post:/api/progress/quantities/formula",
+      "summary": "创建或更新进度分项的公式",
+      "intents": [
+        "更新公式",
+        "设置进度计算规则",
+        "配置分项公式"
+      ],
+      "examples": [
+        "为分项ID 123设置公式",
+        "更新进度分项的表达式"
+      ],
+      "inputNotes": [
+        "需要progress:edit权限",
+        "phaseItemId必须是正整数",
+        "expression应为字符串"
+      ],
+      "outputNotes": [
+        "成功时返回操作结果",
+        "失败时返回错误消息"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:42.315Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "evidenceFields": [
+        "message"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "delete:/api/progress/quantities/input": {
+      "key": "delete:/api/progress/quantities/input",
+      "summary": "删除进度数量输入记录",
+      "intents": [
+        "删除计量输入",
+        "移除进度数据",
+        "解绑输入记录"
+      ],
+      "examples": [
+        "删除指定inputId的输入记录",
+        "解绑进度数量输入"
+      ],
+      "inputNotes": [
+        "需要progress:edit权限",
+        "通过query参数inputId指定要删除的记录"
+      ],
+      "outputNotes": [
+        "成功返回{ok: true}",
+        "失败返回错误消息"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:29.471Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "evidenceFields": [
+        "message"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "post:/api/progress/quantities/input": {
+      "key": "post:/api/progress/quantities/input",
+      "summary": "创建或更新进度计量输入记录，支持手动数量和公式值",
+      "intents": [
+        "创建计量输入",
+        "更新计量输入",
+        "提交进度数据",
+        "记录分项数量"
+      ],
+      "examples": [
+        "提交分项ID为123、区间ID为456的计量输入",
+        "更新分项计量值并设置手动数量"
+      ],
+      "inputNotes": [
+        "需要progress:edit权限",
+        "phaseItemId和intervalId必须为正整数",
+        "manualQuantity可为空或数字",
+        "values需符合公式格式"
+      ],
+      "outputNotes": [
+        "成功时返回操作结果对象",
+        "错误时返回message字段描述错误"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:42.315Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "evidenceFields": [
+        "message"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "get:/api/progress/summary": {
+      "key": "get:/api/progress/summary",
+      "summary": "获取分项工程进度汇总数据",
+      "intents": [
+        "查看产值进度汇总",
+        "获取分项工程进度统计"
+      ],
+      "examples": [
+        "获取所有分项工程的进度汇总",
+        "查看产值进度统计"
+      ],
+      "inputNotes": [
+        "需要value:view权限",
+        "无查询参数"
+      ],
+      "outputNotes": [
+        "返回分项工程进度汇总数组",
+        "包含phases字段"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:35.506Z",
+      "updatedBy": "AutoFill",
+      "returnType": "summary",
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "delete:/api/progress/workflows": {
+      "key": "delete:/api/progress/workflows",
+      "summary": "删除工作流模板",
+      "intents": [
+        "删除工作流模板",
+        "移除工作流配置",
+        "清理工作流数据"
+      ],
+      "examples": [
+        "删除指定phaseDefinitionId的工作流模板",
+        "移除不再需要的工作流配置"
+      ],
+      "inputNotes": [
+        "需要road:manage权限",
+        "请求体需包含phaseDefinitionId字段"
+      ],
+      "outputNotes": [
+        "成功时返回{ok: true}",
+        "失败时返回错误信息"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:29.471Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "evidenceFields": [
+        "workflows"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "get:/api/progress/workflows": {
+      "key": "get:/api/progress/workflows",
+      "summary": "获取工作流模板列表",
+      "intents": [
+        "列出所有工作流模板",
+        "检索工作流配置",
+        "查看可用工作流"
+      ],
+      "examples": [
+        "获取所有工作流模板",
+        "查询工作流列表"
+      ],
+      "inputNotes": [
+        "需要道路管理权限",
+        "无查询参数"
+      ],
+      "outputNotes": [
+        "返回WorkflowBinding数组",
+        "包含默认工作流"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:35.506Z",
+      "updatedBy": "AutoFill",
+      "returnType": "list",
+      "evidenceFields": [
+        "workflows"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "post:/api/progress/workflows": {
+      "key": "post:/api/progress/workflows",
+      "summary": "管理道路工作流模板，支持创建、更新和删除操作",
+      "intents": [
+        "创建工作流模板",
+        "更新工作流模板",
+        "删除工作流模板"
+      ],
+      "examples": [
+        "创建新工作流模板",
+        "更新现有工作流模板",
+        "删除指定工作流模板"
+      ],
+      "inputNotes": [
+        "需要道路管理权限",
+        "JSON请求体包含action字段",
+        "创建时需提供name、measure等字段",
+        "更新时需提供phaseDefinitionId和workflow"
+      ],
+      "outputNotes": [
+        "返回操作结果或错误信息",
+        "创建成功返回201状态码",
+        "包含工作流模板数据"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:42.315Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "evidenceFields": [
+        "workflows"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "get:/api/projects": {
+      "key": "get:/api/projects",
+      "summary": "获取项目列表，需要成员相关权限，按名称和ID排序返回",
+      "intents": [
+        "列出所有项目",
+        "查看项目信息",
+        "获取项目数据"
+      ],
+      "examples": [
+        "获取活跃项目列表",
+        "查询项目名称和代码"
+      ],
+      "inputNotes": [
+        "无需输入参数",
+        "需要成员权限（如view、update等）"
+      ],
+      "outputNotes": [
+        "返回项目数组，包含id、name、isActive、code字段",
+        "code字段可能为null"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:35.506Z",
+      "updatedBy": "AutoFill",
+      "returnType": "list",
+      "evidenceFields": [
+        "projects"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "put:/api/reports/:date": {
+      "key": "put:/api/reports/:date",
+      "summary": "更新指定日期的日报报告",
+      "intents": [
+        "更新优化后的提交版本日报",
+        "编辑提交版本的报告",
+        "保存提交版本的报告数据",
+        "修改提交版本的日报内容"
+      ],
+      "examples": [
+        "更新2024-01-15的日报",
+        "修改日报中的天气数据",
+        "保存日报编辑结果"
+      ],
+      "inputNotes": [
+        "需要report:edit权限",
+        "请求体必须包含report字段",
+        "日期参数需符合DATE_KEY_REGEX格式"
+      ],
+      "outputNotes": [
+        "返回更新后的报告和摘要",
+        "包含createdAt和updatedAt时间戳",
+        "报告结构包含metadata、weather、equipment等字段"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:42.315Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "idField": "date",
+      "evidenceFields": [
+        "report"
+      ],
+      "detailKeys": [
+        "date"
+      ]
+    },
+    "post:/api/reports/pdf": {
+      "key": "post:/api/reports/pdf",
+      "summary": "生成并导出日报PDF文件，支持单日或多日合并导出",
+      "intents": [
+        "导出日报为PDF格式",
+        "批量生成日报PDF",
+        "下载日报文档"
+      ],
+      "examples": [
+        "导出2024-01-15的日报PDF",
+        "批量导出最近7天的日报PDF"
+      ],
+      "inputNotes": [
+        "需要report:view或report:edit权限",
+        "dates参数为日期数组（YYYY-MM-DD格式）",
+        "locale参数可选（zh/fr）"
+      ],
+      "outputNotes": [
+        "返回application/pdf二进制流",
+        "单日导出文件名包含日期",
+        "多日导出文件名包含日期范围"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:42.315Z",
+      "updatedBy": "AutoFill",
+      "returnType": "export",
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "post:/api/reports/template-preview": {
+      "key": "post:/api/reports/template-preview",
+      "summary": "预览日报模板渲染的HTML结果",
+      "intents": [
+        "预览日报模板",
+        "生成HTML预览",
+        "测试模板渲染"
+      ],
+      "examples": [
+        "预览指定日期的日报模板",
+        "使用自定义报告数据预览模板"
+      ],
+      "inputNotes": [
+        "需要report:view或report:edit权限",
+        "可传入date、locale和report参数",
+        "date格式需符合正则表达式"
+      ],
+      "outputNotes": [
+        "返回包含HTML和templateId的JSON",
+        "HTML是渲染后的日报内容"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:42.315Z",
+      "updatedBy": "AutoFill",
+      "returnType": "export",
+      "evidenceFields": [
+        "html"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "get:/api/roadmap": {
+      "key": "get:/api/roadmap",
+      "summary": "获取开发路线想法列表，需要登录和查看权限，按优先级、重要性和创建时间排序",
+      "intents": [
+        "获取路线想法",
+        "查看开发计划",
+        "列出待办事项"
+      ],
+      "examples": [
+        "获取所有路线想法",
+        "查看开发路线列表",
+        "获取排序后的路线项目"
+      ],
+      "inputNotes": [
+        "需要用户登录",
+        "需要roadmap:view权限",
+        "无查询参数"
+      ],
+      "outputNotes": [
+        "返回items数组，包含路线想法详情",
+        "每个想法有状态、标题、优先级等字段",
+        "状态枚举为PENDING或DONE"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:35.506Z",
+      "updatedBy": "AutoFill",
+      "returnType": "list",
+      "evidenceFields": [
+        "items"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "post:/api/roadmap": {
+      "key": "post:/api/roadmap",
+      "summary": "创建新的路线图想法条目",
+      "intents": [
+        "创建路线图想法",
+        "添加开发计划",
+        "提交功能建议"
+      ],
+      "examples": [
+        "{\"title\":\"新增用户反馈模块\",\"priority\":4,\"importance\":5,\"difficulty\":3}",
+        "{\"title\":\"优化登录流程\",\"details\":\"简化两步验证步骤\",\"priority\":2,\"importance\":4,\"difficulty\":2}"
+      ],
+      "inputNotes": [
+        "需要用户登录和roadmap:create权限",
+        "title为必填字段",
+        "priority/importance/difficulty需为1-5的整数，默认为3"
+      ],
+      "outputNotes": [
+        "成功时返回201状态码和新创建的item对象",
+        "包含自动生成的id、时间戳和状态字段"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:42.315Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "evidenceFields": [
+        "items"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "delete:/api/roadmap/:id": {
+      "key": "delete:/api/roadmap/:id",
+      "summary": "删除指定ID的路线记录，仅允许删除状态为PENDING的记录",
+      "intents": [
+        "删除路线",
+        "移除开发计划",
+        "清理待办事项"
+      ],
+      "examples": [
+        "删除ID为123的路线",
+        "移除待开发的路线项"
+      ],
+      "inputNotes": [
+        "需要路线ID作为路径参数",
+        "用户需有roadmap:delete权限",
+        "仅能删除状态为PENDING的记录"
+      ],
+      "outputNotes": [
+        "返回被删除的路线对象",
+        "包含完整路线信息如标题、状态、优先级等"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:29.471Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "idField": "id",
+      "evidenceFields": [
+        "item"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "patch:/api/roadmap/:id": {
+      "key": "patch:/api/roadmap/:id",
+      "summary": "更新路线图项目的部分字段，如状态、标题、详情、优先级、重要度、难度等",
+      "intents": [
+        "更新路线图项目状态",
+        "修改路线图项目详情",
+        "调整路线图项目优先级",
+        "编辑路线图项目标题",
+        "更新路线图项目评分",
+        "标记路线图项目为完成"
+      ],
+      "examples": [
+        "将ID为123的路线图状态更新为DONE",
+        "修改路线图标题为'新功能开发'",
+        "更新路线图优先级为3",
+        "设置路线图重要度为5",
+        "修改路线图详情描述",
+        "调整路线图难度评分"
+      ],
+      "inputNotes": [
+        "需要用户登录且具有roadmap:update权限",
+        "ID必须是整数",
+        "状态只能是PENDING或DONE",
+        "优先级、重要度、难度必须是1-5的整数",
+        "标题不能为空",
+        "至少提供一个可更新字段"
+      ],
+      "outputNotes": [
+        "返回更新后的完整路线图项目对象",
+        "状态为DONE时会自动设置completedAt",
+        "更新时会记录updatedById",
+        "包含所有字段如id、title、status、priority等"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:35.506Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "idField": "id",
+      "evidenceFields": [
+        "item"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "get:/api/roads": {
+      "key": "get:/api/roads",
+      "summary": "获取所有路段信息列表",
+      "intents": [
+        "查询路段数据",
+        "获取路段列表",
+        "查看路段信息"
+      ],
+      "examples": [
+        "获取所有路段",
+        "列出所有路段",
+        "查询路段列表"
+      ],
+      "inputNotes": [
+        "需要road:view或road:manage权限",
+        "无查询参数"
+      ],
+      "outputNotes": [
+        "返回RoadSectionDTO数组",
+        "包含所有路段信息"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:35.506Z",
+      "updatedBy": "AutoFill",
+      "returnType": "list",
+      "evidenceFields": [
+        "roads"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "post:/api/roads": {
+      "key": "post:/api/roads",
+      "summary": "创建新的路段记录",
+      "intents": [
+        "创建路段",
+        "添加道路段",
+        "新增道路信息"
+      ],
+      "examples": [
+        "创建名为'G101'的路段",
+        "添加起点为'K10+000'、终点为'K20+000'的路段"
+      ],
+      "inputNotes": [
+        "需要road:manage权限",
+        "必填字段：slug、name、startPk、endPk",
+        "projectId可为空或正整数"
+      ],
+      "outputNotes": [
+        "返回创建的路段对象",
+        "slug重复时返回错误"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:42.315Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "evidenceFields": [
+        "roads"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "delete:/api/roads/:id": {
+      "key": "delete:/api/roads/:id",
+      "summary": "删除指定ID的路段",
+      "intents": [
+        "删除路段",
+        "移除道路数据",
+        "清理路段记录"
+      ],
+      "examples": [
+        "删除ID为123的路段",
+        "移除特定路段"
+      ],
+      "inputNotes": [
+        "需要路段管理权限",
+        "ID必须是正整数",
+        "ID通过路径参数传递"
+      ],
+      "outputNotes": [
+        "成功时返回{success: true}",
+        "失败时返回错误信息",
+        "可能返回404（路段不存在）"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:29.471Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "idField": "id",
+      "evidenceFields": [
+        "road"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "put:/api/roads/:id": {
+      "key": "put:/api/roads/:id",
+      "summary": "更新指定ID的路段信息，需要管理权限，验证必填字段和唯一性约束",
+      "intents": [
+        "更新路段数据",
+        "修改道路信息",
+        "编辑路段属性"
+      ],
+      "examples": [
+        "更新路段名称和位置",
+        "修改路段路由标识",
+        "调整路段项目关联"
+      ],
+      "inputNotes": [
+        "需要road:manage权限",
+        "ID必须是正整数",
+        "slug、name、startPk、endPk为必填字段",
+        "projectId可为null或正整数"
+      ],
+      "outputNotes": [
+        "返回更新后的路段对象",
+        "可能返回400错误（无效ID、缺少字段、唯一性冲突）",
+        "可能返回403错误（权限不足）",
+        "可能返回404错误（路段不存在）"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:42.315Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "idField": "id",
+      "evidenceFields": [
+        "road"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "get:/api/roles": {
+      "key": "get:/api/roles",
+      "summary": "获取所有角色列表，包含角色详情和权限信息",
+      "intents": [
+        "查看角色列表",
+        "获取角色信息",
+        "浏览系统角色"
+      ],
+      "examples": [
+        "获取所有角色",
+        "查看可用角色",
+        "列出角色及其权限"
+      ],
+      "inputNotes": [
+        "需要角色查看权限",
+        "无查询参数",
+        "GET请求无需请求体"
+      ],
+      "outputNotes": [
+        "返回角色数组，包含ID、名称、权限、创建和更新时间",
+        "权限状态为ACTIVE或ARCHIVED"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:35.506Z",
+      "updatedBy": "AutoFill",
+      "returnType": "list",
+      "evidenceFields": [
+        "roles"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "post:/api/roles": {
+      "key": "post:/api/roles",
+      "summary": "创建新角色并关联权限",
+      "intents": [
+        "创建角色",
+        "分配权限给角色",
+        "管理角色权限"
+      ],
+      "examples": [
+        "创建管理员角色并分配权限",
+        "添加新用户角色"
+      ],
+      "inputNotes": [
+        "需要角色名称",
+        "可选的权限ID列表",
+        "权限必须为ACTIVE状态"
+      ],
+      "outputNotes": [
+        "返回创建的角色详情",
+        "包含关联的权限信息"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:42.315Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "evidenceFields": [
+        "roles"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "delete:/api/roles/:id": {
+      "key": "delete:/api/roles/:id",
+      "summary": "删除指定ID的角色，包括其关联的权限和用户角色关系",
+      "intents": [
+        "删除角色",
+        "移除角色",
+        "清理角色数据"
+      ],
+      "examples": [
+        "删除ID为5的角色",
+        "移除管理员角色"
+      ],
+      "inputNotes": [
+        "需要角色删除或管理权限",
+        "ID必须是正整数",
+        "删除前会清理关联的权限和用户关系"
+      ],
+      "outputNotes": [
+        "成功返回{success: true}",
+        "失败返回错误信息",
+        "删除是永久性的"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:29.471Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "idField": "id",
+      "evidenceFields": [
+        "role"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "put:/api/roles/:id": {
+      "key": "put:/api/roles/:id",
+      "summary": "更新指定ID的角色信息，包括名称和权限绑定",
+      "intents": [
+        "更新角色信息",
+        "修改角色权限",
+        "编辑角色名称"
+      ],
+      "examples": [
+        "更新角色名称",
+        "为角色添加新权限",
+        "修改角色的权限列表"
+      ],
+      "inputNotes": [
+        "需要角色更新或管理权限",
+        "角色名称必填",
+        "权限ID必须是有效的ACTIVE权限",
+        "ID必须是正整数"
+      ],
+      "outputNotes": [
+        "返回更新后的完整角色对象",
+        "包含权限详细信息",
+        "包含时间戳"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:42.315Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "idField": "id",
+      "evidenceFields": [
+        "role"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "get:/api/submissions": {
+      "key": "get:/api/submissions",
+      "summary": "获取所有提交记录列表",
+      "intents": [
+        "查看报检记录",
+        "列出所有提交"
+      ],
+      "examples": [
+        "获取所有报检记录",
+        "查看所有提交"
+      ],
+      "inputNotes": [
+        "需要inspection:view权限",
+        "无查询参数"
+      ],
+      "outputNotes": [
+        "返回items数组，包含id、code、submissionNumber字段"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:35.506Z",
+      "updatedBy": "AutoFill",
+      "returnType": "list",
+      "evidenceFields": [
+        "items"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "post:/api/submissions": {
+      "key": "post:/api/submissions",
+      "summary": "创建新的报检提交，需要登录和创建权限",
+      "intents": [
+        "创建报检记录",
+        "提交报检数据",
+        "新增检查项"
+      ],
+      "examples": [
+        "创建代码为ABC123的报检",
+        "提交带备注的报检文件"
+      ],
+      "inputNotes": [
+        "需要JSON body包含code、remark、files字段",
+        "需要inspection:create权限"
+      ],
+      "outputNotes": [
+        "返回创建的submission对象",
+        "错误时返回400状态码"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:42.315Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "evidenceFields": [
+        "items"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "get:/api/team-supervisors": {
+      "key": "get:/api/team-supervisors",
+      "summary": "获取所有班组与中方负责人的关联列表",
+      "intents": [
+        "查询班组负责人关系",
+        "获取团队监督信息",
+        "查看班组配置"
+      ],
+      "examples": [
+        "GET /api/team-supervisors",
+        "获取所有班组负责人列表"
+      ],
+      "inputNotes": [
+        "需要成员查看权限",
+        "支持按权限过滤访问"
+      ],
+      "outputNotes": [
+        "返回班组负责人数组",
+        "包含项目信息",
+        "按teamKey升序排序"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:35.506Z",
+      "updatedBy": "AutoFill",
+      "returnType": "list",
+      "evidenceFields": [
+        "teamSupervisors"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "post:/api/team-supervisors": {
+      "key": "post:/api/team-supervisors",
+      "summary": "创建新的班组与中方负责人关联",
+      "intents": [
+        "创建班组负责人",
+        "关联班组与中方负责人",
+        "新增班组管理关系"
+      ],
+      "examples": [
+        "{\"team\":\"班组A\",\"teamZh\":\"班组A中文\",\"supervisorId\":123}",
+        "{\"team\":\"班组B\",\"supervisorId\":456}"
+      ],
+      "inputNotes": [
+        "team必填，supervisorId必填",
+        "supervisorId必须对应中国籍成员",
+        "teamZh可选，为空时存储为null",
+        "projectId可选，为空时存储为null"
+      ],
+      "outputNotes": [
+        "返回创建的班组负责人对象",
+        "包含关联的项目信息（如存在）",
+        "supervisorLabel为格式化后的负责人标签"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:42.315Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "evidenceFields": [
+        "teamSupervisors"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "delete:/api/team-supervisors/:id": {
+      "key": "delete:/api/team-supervisors/:id",
+      "summary": "删除指定的班组负责人绑定记录",
+      "intents": [
+        "删除班组负责人绑定",
+        "移除团队监督关系",
+        "清理团队管理数据"
+      ],
+      "examples": [
+        "删除ID为123的班组负责人绑定",
+        "移除特定团队监督关系"
+      ],
+      "inputNotes": [
+        "需要有效的班组绑定ID作为路径参数",
+        "需要成员创建或管理权限"
+      ],
+      "outputNotes": [
+        "成功时返回{ok: true}",
+        "失败时返回错误信息及状态码"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:29.471Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "idField": "id",
+      "evidenceFields": [
+        "teamSupervisor"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "put:/api/team-supervisors/:id": {
+      "key": "put:/api/team-supervisors/:id",
+      "summary": "更新指定ID的班组负责人绑定信息，包括班组名称、中文名称、负责人和项目关联",
+      "intents": [
+        "更新班组负责人信息",
+        "修改班组绑定",
+        "编辑团队监督关系",
+        "变更中方负责人"
+      ],
+      "examples": [
+        "更新班组A的负责人为张三",
+        "修改班组B的中文名称",
+        "为班组C关联项目X"
+      ],
+      "inputNotes": [
+        "需要成员新增或管理权限",
+        "中方负责人必须为中国籍成员",
+        "班组名称不能重复",
+        "项目ID可为空或有效值"
+      ],
+      "outputNotes": [
+        "返回更新后的完整班组负责人对象",
+        "包含项目详细信息",
+        "失败时返回具体错误信息"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:42.315Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "idField": "id",
+      "evidenceFields": [
+        "teamSupervisor"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "post:/api/translate": {
+      "key": "post:/api/translate",
+      "summary": "将中文土木工程日报内容翻译成法文，合并为单段紧凑格式",
+      "intents": [
+        "翻译文本",
+        "处理土木工程报告",
+        "中文到法文转换",
+        "格式化输出"
+      ],
+      "examples": [
+        "翻译日报内容",
+        "将中文报告转为法文",
+        "处理RAS缩写"
+      ],
+      "inputNotes": [
+        "需要content和section字段",
+        "支持特定语言方向（如zh→fr）",
+        "内容会被扁平化处理"
+      ],
+      "outputNotes": [
+        "返回翻译文本和token使用情况",
+        "RAS缩写直接返回",
+        "错误时返回相应状态码"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:42.315Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "evidenceFields": [
+        "translation"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "get:/api/value/boq-completion": {
+      "key": "get:/api/value/boq-completion",
+      "summary": "获取指定项目的产值清单和完成记录",
+      "intents": [
+        "查询项目产值数据",
+        "获取BOQ完成情况",
+        "查看实际产值清单"
+      ],
+      "examples": [
+        "获取项目123的产值完成情况",
+        "查询项目产值清单和进度"
+      ],
+      "inputNotes": [
+        "需要项目ID作为查询参数",
+        "需要value:view权限"
+      ],
+      "outputNotes": [
+        "返回产值项目和完成记录数组",
+        "包含中法文描述和价格信息"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:35.506Z",
+      "updatedBy": "AutoFill",
+      "returnType": "list",
+      "detailEndpointKey": "get:/api/value/boq-completion/:boqItemId",
+      "detailParam": "boqItemId",
+      "detailParamLocation": "path",
+      "idField": "boqItemId",
+      "evidenceFields": [
+        "items"
+      ],
+      "detailKeys": [
+        "boqItemId"
+      ]
+    },
+    "get:/api/value/boq-completion/:boqItemId": {
+      "key": "get:/api/value/boq-completion/:boqItemId",
+      "summary": "获取指定工程量清单条目的产值完成明细",
+      "intents": [
+        "查询产值完成情况",
+        "获取工程量清单完成明细",
+        "查看项目产值数据"
+      ],
+      "examples": [
+        "获取项目123中工程量清单条目456的完成明细"
+      ],
+      "inputNotes": [
+        "需要value:view权限",
+        "boqItemId必须是正整数",
+        "projectId查询参数必须是正整数"
+      ],
+      "outputNotes": [
+        "成功时返回details字段包含明细数据",
+        "错误时返回message字段描述错误"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:35.506Z",
+      "updatedBy": "AutoFill",
+      "returnType": "detail",
+      "idField": "boqItemId",
+      "evidenceFields": [
+        "message"
+      ],
+      "detailKeys": [
+        "boqItemId"
+      ]
+    },
+    "delete:/api/value/boq-items": {
+      "key": "delete:/api/value/boq-items",
+      "summary": "删除BOQ（工程量清单）项目，支持按范围、项目ID等条件筛选删除",
+      "intents": [
+        "删除BOQ项目",
+        "批量删除工程量清单",
+        "移除BOQ条目"
+      ],
+      "examples": [
+        "删除所有BOQ项目",
+        "删除特定项目的BOQ项目",
+        "删除包含非活动项目的BOQ项目"
+      ],
+      "inputNotes": [
+        "支持通过查询参数scope、projectId等筛选要删除的项目",
+        "需要value:delete权限",
+        "sheetType和tone参数类型为Error，可能无效"
+      ],
+      "outputNotes": [
+        "返回操作结果消息",
+        "成功时返回{message: string}"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:29.471Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "evidenceFields": [
+        "message"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "get:/api/value/boq-items": {
+      "key": "get:/api/value/boq-items",
+      "summary": "获取BOQ（工程量清单）项目列表，支持按范围、项目ID等筛选，返回JSON格式的消息。",
+      "intents": [
+        "检索BOQ项目",
+        "筛选BOQ数据",
+        "查看工程量清单"
+      ],
+      "examples": [
+        "获取所有BOQ项目",
+        "按项目ID筛选BOQ项目",
+        "包括非活跃项目"
+      ],
+      "inputNotes": [
+        "scope参数可选，用于指定范围",
+        "includeInactive参数可选，布尔值，默认为false",
+        "projectId参数可选，数字类型"
+      ],
+      "outputNotes": [
+        "返回JSON对象，包含message字段",
+        "message为字符串，描述操作结果或错误"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:35.506Z",
+      "updatedBy": "AutoFill",
+      "returnType": "list",
+      "detailEndpointKey": "get:/api/value/boq-items",
+      "detailParam": "scope",
+      "detailParamLocation": "query",
+      "idField": "scope",
+      "evidenceFields": [
+        "message"
+      ],
+      "detailKeys": [
+        "scope"
+      ]
+    },
+    "patch:/api/value/boq-items": {
+      "key": "patch:/api/value/boq-items",
+      "summary": "批量更新或删除BOQ（工程量清单）项目，支持筛选和批量操作",
+      "intents": [
+        "批量更新BOQ项目",
+        "批量删除BOQ项目",
+        "筛选BOQ项目进行批量操作",
+        "管理BOQ项目状态"
+      ],
+      "examples": [
+        "批量更新多个BOQ项目的数量",
+        "根据项目ID筛选并删除BOQ项目",
+        "更新特定范围的BOQ项目状态"
+      ],
+      "inputNotes": [
+        "使用查询参数筛选要操作的BOQ项目",
+        "支持按范围、项目ID、清单类型等筛选",
+        "批量操作可能影响多个项目"
+      ],
+      "outputNotes": [
+        "返回操作结果消息",
+        "操作成功或失败的状态信息"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:35.506Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "evidenceFields": [
+        "message"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "post:/api/value/boq-items": {
+      "key": "post:/api/value/boq-items",
+      "summary": "处理BOQ（工程量清单）项目的创建、更新、删除和列表操作，支持查询参数筛选和权限验证。",
+      "intents": [
+        "创建BOQ项目",
+        "更新BOQ项目",
+        "删除BOQ项目",
+        "列出BOQ项目",
+        "筛选BOQ项目"
+      ],
+      "examples": [
+        "添加新的BOQ项目",
+        "更新现有BOQ项目",
+        "删除BOQ项目",
+        "获取所有BOQ项目列表",
+        "按项目ID筛选BOQ项目"
+      ],
+      "inputNotes": [
+        "需要权限：value:view, value:create, value:update, value:delete",
+        "查询参数可选，如scope、includeLetters、projectId等",
+        "body字段为空，操作可能通过查询参数或内部逻辑处理"
+      ],
+      "outputNotes": [
+        "返回JSON对象，包含message字段",
+        "状态码指示操作结果，如200成功、400错误"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:42.315Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "evidenceFields": [
+        "message"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "post:/api/value/boq-items/reorder": {
+      "key": "post:/api/value/boq-items/reorder",
+      "summary": "重新排序指定项目的实际BOQ项目，更新排序顺序",
+      "intents": [
+        "重新排序BOQ项目",
+        "更新项目排序顺序",
+        "批量更新排序值"
+      ],
+      "examples": [
+        "{\"projectId\": 123}",
+        "{\"projectId\": 456}"
+      ],
+      "inputNotes": [
+        "需要项目编号projectId",
+        "请求体必须是JSON对象",
+        "需要value:update权限"
+      ],
+      "outputNotes": [
+        "返回排序后的项目列表",
+        "成功时返回items数组",
+        "失败时返回错误消息"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:42.315Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "evidenceFields": [
+        "message"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "get:/api/value/boq-items/search": {
+      "key": "get:/api/value/boq-items/search",
+      "summary": "搜索产值BOQ项目，支持按代码、名称或项目信息过滤，返回项目列表",
+      "intents": [
+        "搜索BOQ项目",
+        "获取产值项目列表",
+        "按条件过滤项目"
+      ],
+      "examples": [
+        "搜索包含'混凝土'的项目",
+        "获取前10个BOQ项目"
+      ],
+      "inputNotes": [
+        "需要value:view权限",
+        "search参数支持模糊搜索",
+        "limit参数限制返回数量"
+      ],
+      "outputNotes": [
+        "返回项目数组，包含项目详情和关联项目信息",
+        "默认按项目名称和代码排序"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:35.506Z",
+      "updatedBy": "AutoFill",
+      "returnType": "list",
+      "detailEndpointKey": "get:/api/value/boq-items/search",
+      "detailParam": "search",
+      "detailParamLocation": "query",
+      "idField": "search",
+      "evidenceFields": [
+        "items"
+      ],
+      "detailKeys": [
+        "search"
+      ]
+    },
+    "post:/api/value/boq-items/seed": {
+      "key": "post:/api/value/boq-items/seed",
+      "summary": "为指定项目生成或获取实际BOQ项目列表",
+      "intents": [
+        "生成实际BOQ项目",
+        "获取实际BOQ项目列表",
+        "复制合同BOQ到实际BOQ"
+      ],
+      "examples": [
+        "为项目123生成实际BOQ项目",
+        "获取项目456的实际BOQ项目列表"
+      ],
+      "inputNotes": [
+        "需要项目ID作为请求体参数",
+        "需要value:create权限"
+      ],
+      "outputNotes": [
+        "返回包含created标志和items数组的对象",
+        "items包含BOQ项目的详细信息"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:42.315Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "evidenceFields": [
+        "created"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "post:/api/value/boq-items/sort": {
+      "key": "post:/api/value/boq-items/sort",
+      "summary": "更新BOQ项目的排序顺序",
+      "intents": [
+        "排序BOQ项目",
+        "重新排列项目清单",
+        "更新项目顺序"
+      ],
+      "examples": [
+        "{\"projectId\": 123, \"orderedIds\": [45, 67, 89]}",
+        "{\"projectId\": 456, \"orderedIds\": [12, 34, 56, 78]}"
+      ],
+      "inputNotes": [
+        "需要value:update权限",
+        "projectId必须是正整数",
+        "orderedIds必须是有效ID数组"
+      ],
+      "outputNotes": [
+        "成功时返回更新后的项目列表",
+        "失败时返回错误消息"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:42.315Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "evidenceFields": [
+        "message"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "get:/api/value/boq-letters": {
+      "key": "get:/api/value/boq-letters",
+      "summary": "获取或创建与BOQ条目或项目相关的函件列表",
+      "intents": [
+        "查询函件列表",
+        "创建新函件",
+        "管理产值相关函件"
+      ],
+      "examples": [
+        "获取项目123的函件",
+        "创建BOQ条目456的函件",
+        "查看所有函件附件数量"
+      ],
+      "inputNotes": [
+        "GET需提供boqItemId或projectId查询参数",
+        "POST需提供subject等必填字段",
+        "支持DRAFT/FINAL/ARCHIVED状态"
+      ],
+      "outputNotes": [
+        "返回函件列表含attachmentCount",
+        "错误时返回message字段",
+        "权限不足返回403"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:35.506Z",
+      "updatedBy": "AutoFill",
+      "returnType": "list",
+      "detailEndpointKey": "get:/api/value/boq-letters",
+      "detailParam": "boqItemId",
+      "detailParamLocation": "query",
+      "idField": "boqItemId",
+      "evidenceFields": [
+        "message"
+      ],
+      "detailKeys": [
+        "boqItemId"
+      ]
+    },
+    "post:/api/value/boq-letters": {
+      "key": "post:/api/value/boq-letters",
+      "summary": "创建或查询与项目或工程量清单相关的函件",
+      "intents": [
+        "创建新函件",
+        "查询函件列表",
+        "管理函件附件"
+      ],
+      "examples": [
+        "创建项目函件",
+        "查询工程量清单函件",
+        "获取函件附件数量"
+      ],
+      "inputNotes": [
+        "需要项目ID或工程量清单ID",
+        "函件主题必填",
+        "支持可选字段如发件人、收件人、日期"
+      ],
+      "outputNotes": [
+        "返回函件对象或列表",
+        "包含附件数量信息",
+        "错误时返回消息字段"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:42.315Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "evidenceFields": [
+        "message"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "delete:/api/value/boq-letters/:id": {
+      "key": "delete:/api/value/boq-letters/:id",
+      "summary": "归档函件（软删除），将函件状态设置为ARCHIVED",
+      "intents": [
+        "归档函件",
+        "软删除函件",
+        "标记函件为已归档"
+      ],
+      "examples": [
+        "DELETE /api/value/boq-letters/123",
+        "归档ID为123的函件"
+      ],
+      "inputNotes": [
+        "需要路径参数id（正整数）",
+        "需要value:update权限",
+        "需要用户登录"
+      ],
+      "outputNotes": [
+        "返回更新后的函件对象",
+        "成功时状态码200",
+        "失败时返回错误消息"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:29.471Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "idField": "id",
+      "evidenceFields": [
+        "message"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "patch:/api/value/boq-letters/:id": {
+      "key": "patch:/api/value/boq-letters/:id",
+      "summary": "更新函件信息或归档函件",
+      "intents": [
+        "更新函件字段",
+        "归档函件"
+      ],
+      "examples": [
+        "更新函件主题和状态",
+        "归档函件"
+      ],
+      "inputNotes": [
+        "需要value:update权限",
+        "需要登录",
+        "id必须是正整数",
+        "请求体为JSON对象",
+        "可更新subject、senderOrg、recipientOrg、issuedAt、receivedAt、remark、boqItemId、status字段"
+      ],
+      "outputNotes": [
+        "成功返回更新后的函件对象",
+        "失败返回错误消息"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:35.506Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "idField": "id",
+      "evidenceFields": [
+        "message"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "get:/api/value/boq-projects": {
+      "key": "get:/api/value/boq-projects",
+      "summary": "获取BOQ项目列表，需要产值查看权限",
+      "intents": [
+        "获取项目列表",
+        "查看产值数据",
+        "检索BOQ项目"
+      ],
+      "examples": [
+        "获取所有BOQ项目",
+        "查看可用的产值项目"
+      ],
+      "inputNotes": [
+        "需要权限: value:view",
+        "无查询参数或请求体"
+      ],
+      "outputNotes": [
+        "成功时返回项目数组",
+        "失败时返回错误消息"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:35.506Z",
+      "updatedBy": "AutoFill",
+      "returnType": "list",
+      "evidenceFields": [
+        "message"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "get:/api/value/phase-item-bindings": {
+      "key": "get:/api/value/phase-item-bindings",
+      "summary": "获取分项与工程量清单条目的绑定关系",
+      "intents": [
+        "查询绑定关系",
+        "获取分项与清单关联",
+        "查看产值绑定"
+      ],
+      "examples": [
+        "获取所有项目的绑定",
+        "查询特定项目的绑定"
+      ],
+      "inputNotes": [
+        "需要value:view权限",
+        "scope参数可选：'all'或留空",
+        "projectId为数字，与scope互斥"
+      ],
+      "outputNotes": [
+        "返回绑定列表，每个绑定包含phaseItemId和boqItemId",
+        "错误时返回message字段"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:35.506Z",
+      "updatedBy": "AutoFill",
+      "returnType": "list",
+      "detailEndpointKey": "get:/api/value/phase-item-bindings",
+      "detailParam": "scope",
+      "detailParamLocation": "query",
+      "idField": "scope",
+      "evidenceFields": [
+        "message"
+      ],
+      "detailKeys": [
+        "scope"
+      ]
+    },
+    "post:/api/value/phase-item-bindings": {
+      "key": "post:/api/value/phase-item-bindings",
+      "summary": "创建或更新分项与工程量清单条目的绑定关系",
+      "intents": [
+        "绑定分项到工程量清单",
+        "更新分项与清单的关联",
+        "管理分项与BOQ的映射"
+      ],
+      "examples": [
+        "绑定单个分项到特定清单条目",
+        "批量绑定分项到多个清单条目"
+      ],
+      "inputNotes": [
+        "需要value:update权限",
+        "支持单个绑定或批量绑定",
+        "phaseItemId必须为正整数"
+      ],
+      "outputNotes": [
+        "返回绑定结果或错误消息",
+        "成功时返回boqItemIds或boqItem"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:42.315Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "evidenceFields": [
+        "message"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "get:/api/value/phase-items/:id": {
+      "key": "get:/api/value/phase-items/:id",
+      "summary": "获取特定产值分项项目的详细信息，包括项目数据、计算公式和关联的工程量清单项ID",
+      "intents": [
+        "检索产值分项项目",
+        "获取项目详情",
+        "查看项目关联数据"
+      ],
+      "examples": [
+        "获取ID为123的产值分项项目",
+        "查询特定分项项目的详细信息"
+      ],
+      "inputNotes": [
+        "需要有效的项目ID作为路径参数",
+        "需要value:view权限"
+      ],
+      "outputNotes": [
+        "返回项目详情、计算公式和关联的工程量清单项ID",
+        "可能返回null值字段"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:35.506Z",
+      "updatedBy": "AutoFill",
+      "returnType": "detail",
+      "idField": "id",
+      "evidenceFields": [
+        "item"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "post:/api/value/phase-items/:id/boq-bindings": {
+      "key": "post:/api/value/phase-items/:id/boq-bindings",
+      "summary": "为产值分项绑定清单条目",
+      "intents": [
+        "绑定清单条目到产值分项",
+        "更新分项的清单关联",
+        "设置分项的清单绑定"
+      ],
+      "examples": [
+        "绑定清单条目ID数组到分项",
+        "为分项设置清单条目列表"
+      ],
+      "inputNotes": [
+        "需要产值更新权限",
+        "请求体必须是包含boqItemIds数组的对象",
+        "boqItemIds应为正整数数组"
+      ],
+      "outputNotes": [
+        "成功时返回绑定的boqItemIds数组",
+        "失败时返回错误消息"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:42.315Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "idField": "id",
+      "evidenceFields": [
+        "message"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "post:/api/value/phase-items/:id/formula": {
+      "key": "post:/api/value/phase-items/:id/formula",
+      "summary": "为产值分项创建或更新计算公式",
+      "intents": [
+        "创建公式",
+        "更新公式",
+        "设置计算字段"
+      ],
+      "examples": [
+        "POST /api/value/phase-items/123/formula",
+        "设置分项123的计算公式"
+      ],
+      "inputNotes": [
+        "需要value:update权限",
+        "id必须是正整数",
+        "请求体需包含expression、unitString、fields字段",
+        "fields中的key必须唯一"
+      ],
+      "outputNotes": [
+        "成功时返回formula对象",
+        "失败时返回错误消息"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:42.315Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "idField": "id",
+      "evidenceFields": [
+        "message"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "delete:/api/value/prices": {
+      "key": "delete:/api/value/prices",
+      "summary": "删除价格项",
+      "intents": [
+        "删除价格项",
+        "移除价格项",
+        "停用价格项"
+      ],
+      "examples": [
+        "删除特定价格项",
+        "移除价格项"
+      ],
+      "inputNotes": [
+        "需要权限: value:delete",
+        "可能需要价格项ID"
+      ],
+      "outputNotes": [
+        "返回操作结果消息"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:29.471Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "evidenceFields": [
+        "message"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "get:/api/value/prices": {
+      "key": "get:/api/value/prices",
+      "summary": "获取产值分项价格列表，包含规格选项",
+      "intents": [
+        "查看价格列表",
+        "获取分项定价",
+        "查询产值价格"
+      ],
+      "examples": [
+        "获取所有分项价格",
+        "查看价格配置"
+      ],
+      "inputNotes": [
+        "需要value:view权限",
+        "无查询参数"
+      ],
+      "outputNotes": [
+        "返回价格列表，每个项包含specOptions",
+        "错误时返回message字段"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:35.506Z",
+      "updatedBy": "AutoFill",
+      "returnType": "list",
+      "evidenceFields": [
+        "message"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "patch:/api/value/prices": {
+      "key": "patch:/api/value/prices",
+      "summary": "更新产值价格项的部分字段，如名称、规格、单价或激活状态。",
+      "intents": [
+        "更新价格项",
+        "修改产值定价",
+        "调整价格项属性"
+      ],
+      "examples": [
+        "更新价格项名称和单价",
+        "停用某个价格项",
+        "修改价格项规格"
+      ],
+      "inputNotes": [
+        "需要 priceItemId 标识要更新的项",
+        "字段可选，只更新提供的字段",
+        "单价必须为非负数字"
+      ],
+      "outputNotes": [
+        "返回成功消息",
+        "错误时返回描述性消息"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:35.506Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "evidenceFields": [
+        "message"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    },
+    "post:/api/value/prices": {
+      "key": "post:/api/value/prices",
+      "summary": "创建新的产值价格项，包括分项定义、名称、计量方式、规格、单位、描述和单价。",
+      "intents": [
+        "创建价格项",
+        "新增产值条目",
+        "添加分项定价"
+      ],
+      "examples": [
+        "{\"phaseDefinitionId\": 1, \"name\": \"混凝土浇筑\", \"measure\": \"LINEAR\", \"unitPrice\": 100.5}"
+      ],
+      "inputNotes": [
+        "需要产值新增权限",
+        "phaseDefinitionId 必须为正整数",
+        "name 不能为空",
+        "measure 必须是 LINEAR 或 POINT",
+        "unitPrice 必须是非负数字"
+      ],
+      "outputNotes": [
+        "返回创建的项对象",
+        "错误时返回消息字符串"
+      ],
+      "status": "verified",
+      "updatedAt": "2026-01-21T15:14:42.315Z",
+      "updatedBy": "AutoFill",
+      "returnType": "action",
+      "evidenceFields": [
+        "message"
+      ],
+      "detailKeys": [
+        "id"
+      ]
+    }
+  }
+}

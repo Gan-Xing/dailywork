@@ -74,6 +74,151 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "source": "app/api/ai-chat/route.ts"
   },
   {
+    "key": "get:/api/ai-chat/semantic-catalog",
+    "method": "GET",
+    "path": "/api/ai-chat/semantic-catalog",
+    "description": "GET /api/ai-chat/semantic-catalog",
+    "permissions": [
+      "permission:view",
+      "permission:update"
+    ],
+    "mode": "read",
+    "pathParams": [],
+    "queryParams": [],
+    "bodyFields": [],
+    "responseSchema": {
+      "type": "{ catalog: ApiCatalogEntry[]; semantic: ApiSemanticCatalog; }",
+      "fields": [
+        {
+          "name": "catalog",
+          "type": "ApiCatalogEntry[]"
+        },
+        {
+          "name": "semantic",
+          "type": "ApiSemanticCatalog",
+          "fields": [
+            {
+              "name": "updatedAt",
+              "type": "string"
+            },
+            {
+              "name": "entries",
+              "type": "Record<string, ApiSemanticEntry>"
+            }
+          ]
+        }
+      ]
+    },
+    "source": "app/api/ai-chat/semantic-catalog/route.ts"
+  },
+  {
+    "key": "put:/api/ai-chat/semantic-catalog",
+    "method": "PUT",
+    "path": "/api/ai-chat/semantic-catalog",
+    "description": "PUT /api/ai-chat/semantic-catalog",
+    "permissions": [
+      "permission:view",
+      "permission:update"
+    ],
+    "mode": "write",
+    "pathParams": [],
+    "queryParams": [],
+    "bodyFields": [],
+    "responseSchema": {
+      "type": "{ catalog: ApiCatalogEntry[]; semantic: ApiSemanticCatalog; }",
+      "fields": [
+        {
+          "name": "catalog",
+          "type": "ApiCatalogEntry[]"
+        },
+        {
+          "name": "semantic",
+          "type": "ApiSemanticCatalog",
+          "fields": [
+            {
+              "name": "updatedAt",
+              "type": "string"
+            },
+            {
+              "name": "entries",
+              "type": "Record<string, ApiSemanticEntry>"
+            }
+          ]
+        }
+      ]
+    },
+    "source": "app/api/ai-chat/semantic-catalog/route.ts"
+  },
+  {
+    "key": "post:/api/ai-chat/semantic-catalog/ai",
+    "method": "POST",
+    "path": "/api/ai-chat/semantic-catalog/ai",
+    "description": "POST /api/ai-chat/semantic-catalog/ai",
+    "permissions": [
+      "permission:update"
+    ],
+    "mode": "write",
+    "pathParams": [],
+    "queryParams": [],
+    "bodyFields": [],
+    "responseSchema": {
+      "type": "{ suggestion: ApiSemanticEntry; }",
+      "fields": [
+        {
+          "name": "suggestion",
+          "type": "ApiSemanticEntry",
+          "fields": [
+            {
+              "name": "key",
+              "type": "string"
+            },
+            {
+              "name": "summary",
+              "type": "string | undefined",
+              "optional": true
+            },
+            {
+              "name": "intents",
+              "type": "string[] | undefined",
+              "optional": true
+            },
+            {
+              "name": "examples",
+              "type": "string[] | undefined",
+              "optional": true
+            },
+            {
+              "name": "inputNotes",
+              "type": "string[] | undefined",
+              "optional": true
+            },
+            {
+              "name": "outputNotes",
+              "type": "string[] | undefined",
+              "optional": true
+            },
+            {
+              "name": "status",
+              "type": "SemanticStatus | undefined",
+              "optional": true
+            },
+            {
+              "name": "updatedAt",
+              "type": "string | undefined",
+              "optional": true
+            },
+            {
+              "name": "updatedBy",
+              "type": "string | undefined",
+              "optional": true
+            }
+          ]
+        }
+      ]
+    },
+    "source": "app/api/ai-chat/semantic-catalog/ai/route.ts"
+  },
+  {
     "key": "post:/api/ai-chat/stream",
     "method": "POST",
     "path": "/api/ai-chat/stream",

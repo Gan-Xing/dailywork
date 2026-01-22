@@ -1,5 +1,7 @@
 import { buildSystemPrompt } from './prompt'
-import { extractJsonObject, normalizeWhitespace, safeJsonParse } from './utils'
+import { runPlanner } from './planner'
+import { readSemanticCatalog } from './semanticStore'
+import { clampMessageLength, extractJsonObject, normalizeWhitespace, safeJsonParse } from './utils'
 import type {
   ChatMessage,
   ChatRunOptions,
@@ -10,6 +12,7 @@ import type {
   ChatToolContext,
   ChatToolResult,
   ModelResponsePayload,
+  PlannerPayload,
   PermissionChecker,
   PlanPayload,
   PlanStep,
@@ -17,9 +20,12 @@ import type {
   ToolCallPayload,
 } from './types'
 
-const DEFAULT_MAX_TURNS = 4
-const DEFAULT_MAX_STEPS = 6
-const DEFAULT_MAX_STEP_TURNS = 4
+const DEFAULT_MAX_TURNS = 6
+const DEFAULT_MAX_STEPS = 8
+const DEFAULT_MAX_STEP_TURNS = 6
+const SUMMARY_MAX_ITEMS = 6
+const SUMMARY_TAIL_MESSAGES = 14
+const SUMMARY_MAX_CHARS = 1200
 
 const fallbackAnswer = (locale: string) =>
   locale === 'fr'
@@ -66,7 +72,8 @@ const parseModelPayload = (content: string): ModelResponsePayload | null => {
 
 const formatToolResultMessage = (tool: ChatTool, result: ChatToolResult) => {
   if (tool.formatResult) return tool.formatResult(result)
-  return `TOOL_RESULT ${tool.name}: ${JSON.stringify(result)}`
+  const summarized = summarizeToolResult(result)
+  return `TOOL_RESULT ${tool.name}: ${JSON.stringify(summarized)}`
 }
 
 const buildToolContext = (options: ChatRunOptions): ChatToolContext => ({
@@ -75,6 +82,50 @@ const buildToolContext = (options: ChatRunOptions): ChatToolContext => ({
   request: options.request,
   permissionChecker: options.permissionChecker,
 })
+
+const buildToolLabelMap = async () => {
+  const catalog = await readSemanticCatalog()
+  const map = new Map<string, string>()
+  Object.values(catalog.entries ?? {}).forEach((entry) => {
+    if (!entry?.key) return
+    if (entry.summary) {
+      map.set(entry.key, entry.summary)
+      return
+    }
+    if (entry.intents && entry.intents.length > 0) {
+      map.set(entry.key, entry.intents[0])
+    }
+  })
+  return map
+}
+
+const resolveToolLabel = (
+  tool: string,
+  args: Record<string, unknown>,
+  locale: string,
+  apiLabels: Map<string, string>,
+) => {
+  if (tool === 'call_api') {
+    const key = typeof args.key === 'string' ? args.key.trim() : ''
+    if (key) {
+      const label = apiLabels.get(key)
+      if (label) return label
+    }
+    return locale === 'fr' ? 'Requête de données' : '查询系统数据'
+  }
+  const toolLabels: Record<string, { zh: string; fr: string }> = {
+    get_system_time: { zh: '获取系统时间', fr: "Heure système" },
+    list_api_catalog: { zh: '加载 API 目录', fr: 'Catalogue API' },
+    list_road_sections: { zh: '查询路段列表', fr: 'Sections routières' },
+    list_active_members: { zh: '查询在职人员', fr: 'Membres actifs' },
+    count_members_by_project: { zh: '统计项目人员', fr: 'Effectifs par projet' },
+    list_boq_projects: { zh: '查询清单项目', fr: 'Projets BOQ' },
+    list_reports: { zh: '查询日报列表', fr: 'Rapports journaliers' },
+  }
+  const fallback = toolLabels[tool]
+  if (fallback) return locale === 'fr' ? fallback.fr : fallback.zh
+  return tool
+}
 
 const appendMessage = (messages: ChatMessage[], message: ChatMessage) => {
   messages.push(message)
@@ -87,6 +138,215 @@ const normalizeToolCallArguments = (payload: ToolCallPayload) =>
   typeof payload.arguments === 'object' && payload.arguments !== null
     ? (payload.arguments as Record<string, unknown>)
     : {}
+
+const isInternalUserMessage = (content: string) => {
+  if (!content) return false
+  if (content.startsWith('TOOL_RESULT ')) return true
+  if (content.startsWith('工具摘要:') || content.startsWith('Résumé outils:')) return true
+  if (content.startsWith('历史摘要') || content.startsWith('Résumé historique')) return true
+  if (content.includes('如需工具请用 tool_call') || content.includes('请按 final JSON')) return true
+  if (content.includes('执行第 ') || content.includes('Exécute l\'étape')) return true
+  if (content.includes('必须覆盖的 API') || content.includes('Endpoints requis')) return true
+  if (content.includes('本次可用 API') || content.includes('Endpoints autorisés')) return true
+  if (content.includes('成本/费用类问题必须调用')) return true
+  return false
+}
+
+const extractFinalAnswer = (content: string) => {
+  const candidate = extractJsonObject(content)
+  if (!candidate) return null
+  const payload = safeJsonParse<{ type?: string; answer?: string }>(candidate)
+  if (payload?.type !== 'final') return null
+  const answer = typeof payload.answer === 'string' ? payload.answer.trim() : ''
+  return answer || null
+}
+
+const stripAnswerMeta = (answer: string) => {
+  const lines = answer.split('\n')
+  const filtered = lines.filter((line) => {
+    const trimmed = line.trim()
+    if (!trimmed) return true
+    if (/^来源[:：]/.test(trimmed)) return false
+    if (/^Sources?:/i.test(trimmed)) return false
+    if (/^工具提示[:：]?/.test(trimmed)) return false
+    if (/^Tool hints?:/i.test(trimmed)) return false
+    return true
+  })
+  return filtered.join('\n').replace(/\n{3,}/g, '\n\n').trim()
+}
+
+const buildHistorySummary = (history: ChatMessage[], locale: string) => {
+  let lastQuestion = ''
+  const items: string[] = []
+  history.forEach((message) => {
+    if (message.role === 'user') {
+      if (!isInternalUserMessage(message.content)) {
+        lastQuestion = message.content.trim()
+      }
+      return
+    }
+    if (message.role !== 'assistant') return
+    const answer = extractFinalAnswer(message.content)
+    if (!answer || !lastQuestion) return
+    const cleanedAnswer = stripAnswerMeta(answer)
+    if (!cleanedAnswer) return
+    const questionText = clampMessageLength(lastQuestion, 120)
+    const answerText = clampMessageLength(cleanedAnswer, 200)
+    if (locale === 'fr') {
+      items.push(`Q: ${questionText} | R: ${answerText}`)
+    } else {
+      items.push(`问：${questionText} | 答：${answerText}`)
+    }
+    lastQuestion = ''
+  })
+  if (!items.length) return ''
+  const summaryItems = items.slice(-SUMMARY_MAX_ITEMS)
+  const prefix = locale === 'fr' ? 'Résumé historique' : '历史摘要'
+  const summary = summaryItems.map((item) => `- ${item}`).join('\n')
+  const merged = `${prefix}:\n${summary}`
+  return clampMessageLength(merged, SUMMARY_MAX_CHARS)
+}
+
+const MAX_TOOL_RESULT_CHARS = 4000
+const MAX_SUMMARY_ROWS = 1000
+const MAX_VALUE_BUCKETS = 20
+const MAX_SAMPLE_ROWS = 3
+const MAX_SAMPLE_KEYS = 8
+
+const formatPreviewValue = (value: unknown) => {
+  if (value === null || value === undefined) return value
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+    return value
+  }
+  if (Array.isArray(value)) return `[${value.length}]`
+  if (typeof value === 'object') return '{...}'
+  return String(value)
+}
+
+const buildArrayValueCounts = (rows: unknown[]) => {
+  const counts = new Map<string, Map<string, number>>()
+  const overflowKeys = new Set<string>()
+  rows.forEach((row) => {
+    if (!row || typeof row !== 'object' || Array.isArray(row)) return
+    Object.entries(row as Record<string, unknown>).forEach(([key, value]) => {
+      if (overflowKeys.has(key)) return
+      if (value === null || value === undefined) return
+      if (typeof value !== 'string' && typeof value !== 'number' && typeof value !== 'boolean') {
+        return
+      }
+      const map = counts.get(key) ?? new Map<string, number>()
+      const label = String(value)
+      map.set(label, (map.get(label) ?? 0) + 1)
+      if (map.size > MAX_VALUE_BUCKETS) {
+        overflowKeys.add(key)
+        counts.delete(key)
+        return
+      }
+      counts.set(key, map)
+    })
+  })
+  const output: Record<string, Record<string, number>> = {}
+  counts.forEach((map, key) => {
+    if (map.size <= 1) return
+    output[key] = Object.fromEntries(map.entries())
+  })
+  return output
+}
+
+const buildArraySample = (rows: unknown[]) =>
+  rows.slice(0, MAX_SAMPLE_ROWS).map((row) => {
+    if (!row || typeof row !== 'object' || Array.isArray(row)) return row
+    const record = row as Record<string, unknown>
+    const preview: Record<string, unknown> = {}
+    Object.keys(record)
+      .slice(0, MAX_SAMPLE_KEYS)
+      .forEach((key) => {
+        preview[key] = formatPreviewValue(record[key])
+      })
+    return preview
+  })
+
+const summarizeToolResult = (result: ChatToolResult): ChatToolResult => {
+  if (!result.data) return result
+  try {
+    const serialized = JSON.stringify(result.data)
+    if (serialized.length <= MAX_TOOL_RESULT_CHARS) return result
+    const data = result.data
+    let summary: Record<string, unknown> = {}
+    if (Array.isArray(data)) {
+      const rows = data.slice(0, MAX_SUMMARY_ROWS)
+      summary = {
+        kind: 'array',
+        length: data.length,
+        sample: buildArraySample(rows),
+        valueCounts: buildArrayValueCounts(rows),
+      }
+    } else if (data && typeof data === 'object') {
+      const keys = Object.keys(data as Record<string, unknown>)
+      const preview = keys.slice(0, MAX_SAMPLE_KEYS).reduce<Record<string, unknown>>((acc, key) => {
+        acc[key] = formatPreviewValue((data as Record<string, unknown>)[key])
+        return acc
+      }, {})
+      const arraySummaries: Record<string, unknown> = {}
+      keys.slice(0, 6).forEach((key) => {
+        const value = (data as Record<string, unknown>)[key]
+        if (!Array.isArray(value)) return
+        const rows = value.slice(0, MAX_SUMMARY_ROWS)
+        arraySummaries[key] = {
+          length: value.length,
+          sample: buildArraySample(rows),
+          valueCounts: buildArrayValueCounts(rows),
+        }
+      })
+      summary = {
+        kind: 'object',
+        keys: keys.slice(0, 12),
+        preview,
+        ...(Object.keys(arraySummaries).length > 0 ? { arraySummaries } : {}),
+      }
+    } else {
+      summary = { kind: typeof data, value: data }
+    }
+    return {
+      ...result,
+      data: {
+        summary,
+        truncated: true,
+      },
+    }
+  } catch {
+    return result
+  }
+}
+
+const TOOL_TIMEOUT_MS = 15000
+const TOOL_MAX_RETRIES = 1
+
+const stableStringify = (value: unknown): string => {
+  if (!value || typeof value !== 'object') return JSON.stringify(value)
+  if (Array.isArray(value)) return `[${value.map((item) => stableStringify(item)).join(',')}]`
+  const record = value as Record<string, unknown>
+  const keys = Object.keys(record).sort()
+  const entries = keys.map((key) => `${JSON.stringify(key)}:${stableStringify(record[key])}`)
+  return `{${entries.join(',')}}`
+}
+
+const buildToolCacheKey = (tool: string, args: Record<string, unknown>) =>
+  `${tool}:${stableStringify(args)}`
+
+const withTimeout = async <T>(promise: Promise<T>, timeoutMs: number) => {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => {
+      reject(new Error('tool_timeout'))
+    }, timeoutMs)
+  })
+  try {
+    return await Promise.race([promise, timeoutPromise])
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId)
+  }
+}
 
 const extractLastUserMessage = (messages: ChatMessage[]) => {
   for (let i = messages.length - 1; i >= 0; i -= 1) {
@@ -131,6 +391,267 @@ const isFinanceQuestion = (content: string) => {
   return keywords.some((keyword) => text.includes(keyword))
 }
 
+const isWorkContentQuestion = (content: string) => {
+  const text = content.toLowerCase()
+  const keywords = [
+    '工作内容',
+    '主要工作',
+    '做了什么',
+    '做哪些工作',
+    '做什么工作',
+    '现场工作',
+    '施工内容',
+    '施工情况',
+    '现场情况',
+    '原始日志',
+    '领导日志',
+    'journal de chantier',
+    'travaux',
+    'chantier',
+  ]
+  if (keywords.some((keyword) => text.includes(keyword))) return true
+  return /工作/.test(content) && /(什么|哪些|主要|情况)/.test(content)
+}
+
+const isCapabilityQuestion = (content: string) => {
+  const text = content.toLowerCase()
+  const keywords = [
+    '能做什么',
+    '能做哪些',
+    '可以做什么',
+    '可以做哪些',
+    '有哪些功能',
+    '功能有哪些',
+    '支持什么',
+    '能帮我什么',
+    '你能做什么',
+    '你能做哪些',
+    '你可以做什么',
+    '你可以做哪些',
+    'what can you do',
+    'what can i ask',
+    'what can you help',
+    'capability',
+    'capabilities',
+  ]
+  return keywords.some((keyword) => text.includes(keyword))
+}
+
+const shouldUseMultipleSources = (
+  content: string,
+  candidates: Array<{ key: string }>,
+) => {
+  if (candidates.length < 2) return false
+  const text = content.toLowerCase()
+  const hints = [
+    '汇总',
+    '统计',
+    '对比',
+    '分别',
+    '同时',
+    '以及',
+    '并且',
+    '全部',
+    '所有',
+    '总览',
+    '明细',
+    '详情',
+    '列表',
+    'compare',
+    'summary',
+    'breakdown',
+    'detail',
+    'list',
+    'and',
+  ]
+  return hints.some((hint) => text.includes(hint))
+}
+
+const deriveEvidenceFields = (
+  question: string,
+  plannerFields: string[] | undefined,
+  candidateMeta: Map<string, { evidenceFields?: string[] }>,
+  requiredKeys: string[],
+) => {
+  const provided = (plannerFields ?? []).map((field) => field.trim()).filter(Boolean)
+  if (provided.length > 0) return provided
+  const fromCandidates = requiredKeys
+    .map((key) => candidateMeta.get(key)?.evidenceFields ?? [])
+    .flat()
+    .map((field) => field.trim())
+    .filter(Boolean)
+  if (fromCandidates.length > 0) return Array.from(new Set(fromCandidates))
+  const text = question.toLowerCase()
+  const detailHints = ['内容', '详情', '明细', '主要', 'summary', 'detail', 'breakdown', 'list']
+  if (!detailHints.some((hint) => text.includes(hint))) return []
+  return ['content', 'description', 'detail', 'items', 'logs', 'entries', 'summary']
+}
+
+const normalizeFieldName = (value: string) => value.toLowerCase()
+
+const isValuePresent = (value: unknown) => {
+  if (value === null || value === undefined) return false
+  if (typeof value === 'string') return value.trim().length > 0
+  if (typeof value === 'number') return Number.isFinite(value)
+  if (typeof value === 'boolean') return true
+  if (Array.isArray(value)) return value.length > 0
+  if (typeof value === 'object') return Object.keys(value as Record<string, unknown>).length > 0
+  return false
+}
+
+const collectEvidenceMatches = (
+  value: unknown,
+  fields: string[],
+  found: Set<string>,
+  depth = 0,
+) => {
+  if (depth > 4) return
+  if (!value) return
+  if (Array.isArray(value)) {
+    value.forEach((item) => collectEvidenceMatches(item, fields, found, depth + 1))
+    return
+  }
+  if (typeof value !== 'object') return
+  const record = value as Record<string, unknown>
+  Object.entries(record).forEach(([key, fieldValue]) => {
+    const normalizedKey = normalizeFieldName(key)
+    fields.forEach((field) => {
+      const normalizedField = normalizeFieldName(field)
+      if (
+        normalizedKey === normalizedField ||
+        normalizedKey.includes(normalizedField)
+      ) {
+        if (isValuePresent(fieldValue)) {
+          found.add(field)
+        }
+      }
+    })
+    collectEvidenceMatches(fieldValue, fields, found, depth + 1)
+  })
+}
+
+const evaluateEvidence = (toolCalls: ChatToolCallRecord[], fields: string[]) => {
+  if (!fields.length) {
+    return { missing: [], found: [] }
+  }
+  const found = new Set<string>()
+  toolCalls.forEach((call) => {
+    collectEvidenceMatches(call.result?.data, fields, found)
+  })
+  const missing = fields.filter((field) => !found.has(field))
+  return { missing, found: Array.from(found) }
+}
+
+const extractIdentifiers = (value: unknown, detailKeys: string[], results: Map<string, Set<string>>) => {
+  const maxDepth = 4
+  const walk = (node: unknown, depth: number) => {
+    if (depth > maxDepth || node === null || node === undefined) return
+    if (Array.isArray(node)) {
+      node.forEach((item) => walk(item, depth + 1))
+      return
+    }
+    if (typeof node !== 'object') return
+    const record = node as Record<string, unknown>
+    Object.entries(record).forEach(([key, fieldValue]) => {
+      const normalizedKey = normalizeFieldName(key)
+      detailKeys.forEach((detailKey) => {
+        const normalizedDetail = normalizeFieldName(detailKey)
+        if (normalizedKey === normalizedDetail || normalizedKey.includes(normalizedDetail)) {
+          if (typeof fieldValue === 'string' || typeof fieldValue === 'number') {
+            const bucket = results.get(detailKey) ?? new Set<string>()
+            bucket.add(String(fieldValue))
+            results.set(detailKey, bucket)
+          } else if (Array.isArray(fieldValue)) {
+            const bucket = results.get(detailKey) ?? new Set<string>()
+            fieldValue.forEach((item) => {
+              if (typeof item === 'string' || typeof item === 'number') {
+                bucket.add(String(item))
+              }
+            })
+            results.set(detailKey, bucket)
+          }
+        }
+      })
+      walk(fieldValue, depth + 1)
+    })
+  }
+  walk(value, 0)
+}
+
+const collectIdentifierHints = (toolCalls: ChatToolCallRecord[], detailKeys: string[]) => {
+  if (!detailKeys.length) return {}
+  const results = new Map<string, Set<string>>()
+  toolCalls.forEach((call) => {
+    extractIdentifiers(call.result?.data, detailKeys, results)
+  })
+  const output: Record<string, string[]> = {}
+  results.forEach((set, key) => {
+    output[key] = Array.from(set).slice(0, 6)
+  })
+  return output
+}
+
+const collectIdentifiersFromData = (data: unknown, detailKeys: string[]) => {
+  if (!detailKeys.length) return {}
+  const results = new Map<string, Set<string>>()
+  extractIdentifiers(data, detailKeys, results)
+  const output: Record<string, string[]> = {}
+  results.forEach((set, key) => {
+    output[key] = Array.from(set).slice(0, 6)
+  })
+  return output
+}
+
+const buildAutoDetailCalls = (input: {
+  toolCalls: ChatToolCallRecord[]
+  candidateMeta: Map<string, {
+    detailEndpointKey?: string
+    detailParam?: string
+    detailParamLocation?: 'path' | 'query'
+    idField?: string
+    detailKeys?: string[]
+  }>
+  fallbackDetailKeys: string[]
+  maxCalls: number
+  cache: Set<string>
+}): ToolCallPayload[] => {
+  const calls: ToolCallPayload[] = []
+  for (const call of input.toolCalls) {
+    if (calls.length >= input.maxCalls) break
+    if (call.tool !== 'call_api') continue
+    const key = typeof call.arguments?.key === 'string' ? call.arguments.key : ''
+    if (!key) continue
+    const meta = input.candidateMeta.get(key)
+    if (!meta?.detailEndpointKey) continue
+    const detailKey = meta.detailEndpointKey
+    const detailParam = meta.detailParam || meta.idField || 'id'
+    const location = meta.detailParamLocation ?? 'query'
+    const detailKeys = Array.from(
+      new Set(
+        (meta.detailKeys ?? []).concat(meta.idField ? [meta.idField] : [], input.fallbackDetailKeys),
+      ),
+    ).filter(Boolean)
+    const identifiers = collectIdentifiersFromData(call.result?.data, detailKeys)
+    const primaryValues =
+      identifiers[detailParam] ??
+      identifiers[meta.idField ?? ''] ??
+      Object.values(identifiers)[0] ??
+      []
+    for (const value of primaryValues) {
+      if (calls.length >= input.maxCalls) break
+      const args =
+        location === 'path'
+          ? { key: detailKey, params: { [detailParam]: value } }
+          : { key: detailKey, query: { [detailParam]: value } }
+      const cacheKey = buildToolCacheKey('call_api', args)
+      if (input.cache.has(cacheKey)) continue
+      input.cache.add(cacheKey)
+      calls.push({ type: 'tool_call', tool: 'call_api', arguments: args })
+    }
+  }
+  return calls
+}
+
 const hasFinanceInsightsCall = (toolCalls: ChatToolCallRecord[]) =>
   toolCalls.some((call) => {
     if (call.tool !== 'call_api') return false
@@ -140,6 +661,78 @@ const hasFinanceInsightsCall = (toolCalls: ChatToolCallRecord[]) =>
 
 const hasSystemTimeCall = (toolCalls: ChatToolCallRecord[]) =>
   toolCalls.some((call) => call.tool === 'get_system_time' && call.result?.ok)
+
+const hasLeaderLogsCall = (toolCalls: ChatToolCallRecord[]) =>
+  toolCalls.some((call) => {
+    if (call.tool !== 'call_api') return false
+    const key = typeof call.arguments?.key === 'string' ? call.arguments.key : ''
+    return key === 'get:/api/leader-logs'
+  })
+
+const extractLeaderLogsData = (toolCalls: ChatToolCallRecord[]) => {
+  const dates: string[] = []
+  const logs: Array<{
+    date?: string
+    contentRaw?: string
+    photoCount?: number
+    supervisorId?: number
+    supervisorName?: string
+  }> = []
+  toolCalls.forEach((call) => {
+    if (call.tool !== 'call_api') return
+    const key = typeof call.arguments?.key === 'string' ? call.arguments.key : ''
+    if (key !== 'get:/api/leader-logs') return
+    const data = call.result?.data
+    if (!isRecord(data)) return
+    if (Array.isArray(data.dates)) {
+      data.dates.forEach((date) => {
+        if (typeof date === 'string') dates.push(date)
+      })
+    }
+    if (Array.isArray(data.logs)) {
+      data.logs.forEach((item) => {
+        if (!isRecord(item)) return
+        logs.push({
+          date: typeof item.date === 'string' ? item.date : undefined,
+          contentRaw: typeof item.contentRaw === 'string' ? item.contentRaw : undefined,
+          photoCount: typeof item.photoCount === 'number' ? item.photoCount : undefined,
+          supervisorId: typeof item.supervisorId === 'number' ? item.supervisorId : undefined,
+          supervisorName:
+            typeof item.supervisorName === 'string' ? item.supervisorName : undefined,
+        })
+      })
+    }
+  })
+  return {
+    dates: Array.from(new Set(dates)),
+    logs,
+    hasContent: logs.some((log) => (log.contentRaw ?? '').trim().length > 0 || (log.photoCount ?? 0) > 0),
+  }
+}
+
+const collectCallApiKeys = (toolCalls: ChatToolCallRecord[]) => {
+  const keys = new Set<string>()
+  toolCalls.forEach((call) => {
+    if (call.tool !== 'call_api') return
+    const key = typeof call.arguments?.key === 'string' ? call.arguments.key : ''
+    if (key) keys.add(key)
+  })
+  return keys
+}
+
+const extractReportCallStatus = (toolCalls: ChatToolCallRecord[]) => {
+  const lastCall = [...toolCalls].reverse().find((call) => {
+    if (call.tool !== 'call_api') return false
+    const key = typeof call.arguments?.key === 'string' ? call.arguments.key : ''
+    return key === 'get:/api/reports/:date'
+  })
+  if (!lastCall) return null
+  const data = lastCall.result?.data
+  const exists = isRecord(data) && typeof data.exists === 'boolean' ? data.exists : null
+  const params = isRecord(lastCall.arguments?.params) ? lastCall.arguments?.params : null
+  const date = params && typeof params.date === 'string' ? params.date : null
+  return { exists, date }
+}
 
 const financeInsightsQueryMissingRange = (toolCalls: ChatToolCallRecord[]) => {
   const lastCall = [...toolCalls].reverse().find((call) => {
@@ -192,10 +785,16 @@ const normalizePlanPayload = (payload: PlanPayload): PlanPayload | null => {
             .map((tool) => tool.trim())
             .filter((tool) => tool.length > 0)
         : []
+      const apis = Array.isArray((step as Record<string, unknown>).apis)
+        ? (step as Record<string, unknown>).apis
+            ?.filter((api) => typeof api === 'string')
+            .map((api) => api.trim())
+            .filter((api) => api.length > 0)
+        : []
       if (tools.length) {
-        return { id, title, tools }
+        return apis.length ? { id, title, tools, apis } : { id, title, tools }
       }
-      return { id, title }
+      return apis.length ? { id, title, apis } : { id, title }
     })
     .filter((step): step is PlanStep => Boolean(step))
 
@@ -209,16 +808,22 @@ const buildStepInstruction = (step: PlanStep, index: number, total: number, loca
       ? `Outils suggérés: ${step.tools.join(', ')}.`
       : `可用工具：${step.tools.join('、')}。`
     : ''
+  const apiHint = step.apis?.length
+    ? locale === 'fr'
+      ? `Endpoints suggérés: ${step.apis.join(', ')}.`
+      : `候选API：${step.apis.join('、')}。`
+    : ''
+  const combinedHint = [toolHint, apiHint].filter(Boolean).join(' ')
 
   if (locale === 'fr') {
     return normalizeWhitespace(
-      `Exécute l'étape ${index + 1}/${total}: ${step.title}. ${toolHint} ` +
+      `Exécute l'étape ${index + 1}/${total}: ${step.title}. ${combinedHint} ` +
         'Si un outil est nécessaire, réponds avec tool_call. Quand l\'étape est terminée, réponds avec step_done.',
     )
   }
 
   return normalizeWhitespace(
-    `执行第 ${index + 1}/${total} 步：${step.title}。${toolHint} ` +
+    `执行第 ${index + 1}/${total} 步：${step.title}。${combinedHint} ` +
       '如需工具请用 tool_call JSON，完成后返回 step_done JSON。',
   )
 }
@@ -245,20 +850,31 @@ export const runChat = async (options: ChatRunOptions): Promise<ChatRunResult> =
   const financeSubject = extractFinanceSubject(lastUserQuestion)
   const monthHint = extractMonthYearHint(lastUserQuestion)
   const sessionPermissions = options.session?.permissions ?? []
-  const allowedTools = await resolveAllowedTools(
+  const contextCandidates = options.contextCandidates ?? []
+  const candidateMeta = new Map(
+    contextCandidates.map((item) => [item.key, item]),
+  )
+  const detailEndpointKeys = new Set(
+    contextCandidates
+      .map((item) => item.detailEndpointKey)
+      .filter((value): value is string => Boolean(value)),
+  )
+  const primaryCandidates = contextCandidates.filter(
+    (item) => item.key && !detailEndpointKeys.has(item.key),
+  )
+  const candidateKeys = Array.from(
+    new Set(
+      (primaryCandidates.length > 0 ? primaryCandidates : contextCandidates)
+        .map((item) => item.key)
+        .filter((value): value is string => Boolean(value)),
+    ),
+  )
+  let plannerPlan: PlannerPayload | undefined
+  const allowedToolsBase = await resolveAllowedTools(
     options.tools,
     sessionPermissions,
     options.permissionChecker,
   )
-  const toolMap = new Map(allowedTools.map((tool) => [tool.name, tool]))
-  const systemPrompt = buildSystemPrompt({ tools: allowedTools, locale, enablePlanning })
-  const conversation: ChatMessage[] = [{ role: 'system', content: systemPrompt }, ...options.messages]
-  const toolCalls: ChatToolCallRecord[] = []
-  const stepSummaries: string[] = []
-  let plan: PlanPayload | undefined
-  let lastUsage: ChatRunResult['usage']
-  let financeGuardApplied = false
-
   const emitEvent = (event: ChatStreamEvent) => {
     if (!options.onEvent) return
     try {
@@ -268,9 +884,164 @@ export const runChat = async (options: ChatRunOptions): Promise<ChatRunResult> =
     }
   }
 
+  const apiLabelMap = await buildToolLabelMap()
+
+  emitEvent({
+    type: 'status',
+    message: locale === 'fr' ? 'Génération du plan…' : '正在生成计划…',
+  })
+
+  plannerPlan = await runPlanner({
+    adapter: options.adapter,
+    locale,
+    question: lastUserQuestion,
+    candidates: candidateKeys,
+    contextMessage: options.contextMessage ?? undefined,
+    maxSteps: Math.min(maxSteps, 6),
+  })
+
+  if (plannerPlan) {
+    emitEvent({ type: 'plan', plan: plannerPlan })
+  }
+
+  const plannedCandidates = plannerPlan?.candidateApis?.length
+    ? plannerPlan.candidateApis
+    : candidateKeys
+  const uniqueCandidates = Array.from(new Set(plannedCandidates.filter(Boolean)))
+  const candidateForHeuristic = primaryCandidates.length > 0 ? primaryCandidates : contextCandidates
+  const heuristicMinCalls = shouldUseMultipleSources(lastUserQuestion, candidateForHeuristic) ? 2 : 1
+  const minApiCallsBase = plannerPlan?.minApiCalls ?? heuristicMinCalls
+  const requiredApiKeysRaw = plannerPlan?.requiredApis?.length
+    ? plannerPlan.requiredApis
+    : uniqueCandidates.slice(0, minApiCallsBase)
+  const requiredApiKeys = requiredApiKeysRaw.filter((key) => uniqueCandidates.includes(key))
+  const minApiCalls = Math.max(minApiCallsBase, requiredApiKeys.length || 1)
+  const evidenceFields = deriveEvidenceFields(
+    lastUserQuestion,
+    plannerPlan?.evidenceFields,
+    candidateMeta,
+    requiredApiKeys,
+  )
+  const detailKeys = (plannerPlan?.detailKeys ?? [])
+    .filter(Boolean)
+    .concat(
+      requiredApiKeys
+        .map((key) => candidateMeta.get(key)?.detailKeys ?? [])
+        .flat(),
+    )
+  const uniqueDetailKeys = Array.from(new Set(detailKeys))
+  const allowedTools = allowedToolsBase
+
+  const toolMap = new Map(allowedTools.map((tool) => [tool.name, tool]))
+  const systemPrompt = buildSystemPrompt({ tools: allowedTools, locale, enablePlanning })
+  const conversation: ChatMessage[] = [{ role: 'system', content: systemPrompt }]
+  if (options.contextMessage) {
+    conversation.push({ role: 'system', content: options.contextMessage })
+  }
+  if (uniqueCandidates.length > 0) {
+    const candidateMessage =
+      locale === 'fr'
+        ? `Endpoints suggérés pour cette demande: ${uniqueCandidates.join(', ')}.`
+        : `本次候选 API key：${uniqueCandidates.join('、')}。`
+    conversation.push({ role: 'system', content: candidateMessage })
+  }
+  if (requiredApiKeys.length > 0) {
+    const requiredMessage =
+      locale === 'fr'
+        ? `Endpoints requis: ${requiredApiKeys.join(', ')}. Minimum d'appels API: ${minApiCalls}.`
+        : `必须覆盖的 API：${requiredApiKeys.join('、')}。最少调用 ${minApiCalls} 个 API。`
+    conversation.push({ role: 'system', content: requiredMessage })
+  }
+  conversation.push(...options.messages)
+
+  const baseSystemMessages = conversation.filter((message) => message.role === 'system')
+  const userQuestionMessage: ChatMessage = { role: 'user', content: lastUserQuestion }
+
+  const buildToolSummaryForModel = (records: ChatToolCallRecord[]) => {
+    if (records.length === 0) return ''
+    const summary = records.map((call) => {
+      const args = call.arguments ?? {}
+      const normalized = summarizeToolResult(call.result ?? { ok: false, content: '' })
+      return {
+        tool: call.tool,
+        key: typeof args.key === 'string' ? args.key : undefined,
+        params: args.params,
+        query: args.query,
+        ok: call.result?.ok ?? false,
+        content: call.result?.content,
+        data: normalized.data,
+      }
+    })
+    const prefix = locale === 'fr' ? 'Résumé outils:' : '工具摘要:'
+    return `${prefix} ${JSON.stringify(summary)}`
+  }
+
+  const resetConversationForReplan = (note?: string) => {
+    conversation.length = 0
+    conversation.push(...baseSystemMessages)
+    if (userQuestionMessage.content) {
+      conversation.push(userQuestionMessage)
+    }
+    const toolSummary = buildToolSummaryForModel(toolCalls)
+    if (toolSummary) {
+      conversation.push({ role: 'user', content: toolSummary })
+    }
+    if (note) {
+      conversation.push({ role: 'user', content: note })
+    }
+  }
+
+  const buildModelMessages = () => {
+    const maxMessages = 40
+    if (conversation.length <= maxMessages) return conversation
+    let index = 0
+    while (index < conversation.length && conversation[index].role === 'system') {
+      index += 1
+    }
+    const systemMessages = conversation.slice(0, index)
+    const history = conversation.slice(index)
+    const remaining = Math.max(maxMessages - systemMessages.length, 0)
+    if (history.length <= remaining) {
+      return [...systemMessages, ...history]
+    }
+    const tailCount = Math.min(SUMMARY_TAIL_MESSAGES, remaining)
+    const tail = history.slice(-tailCount)
+    const head = history.slice(0, Math.max(history.length - tailCount, 0))
+    const summary = buildHistorySummary(head, locale)
+    if (summary) {
+      return [...systemMessages, { role: 'system', content: summary }, ...tail]
+    }
+    return [...systemMessages, ...tail]
+  }
+  const toolCalls: ChatToolCallRecord[] = []
+  const toolResultCache = new Map<string, ChatToolResult>()
+  const autoDetailCache = new Set<string>()
+  const stepSummaries: string[] = []
+  let plan: PlanPayload | undefined
+  let lastUsage: ChatRunResult['usage']
+  let financeGuardApplied = false
+
+  if (plannerPlan) {
+    const normalizedPlannerPlan = normalizePlanPayload(plannerPlan)
+    if (normalizedPlannerPlan) {
+      plan = normalizedPlannerPlan
+      appendMessage(conversation, { role: 'assistant', content: JSON.stringify(normalizedPlannerPlan) })
+    }
+  }
+
   const finalizeAnswer = (answer: string): ChatRunResult => {
+    const usedApiKeys = Array.from(collectCallApiKeys(toolCalls))
+    const hasSources =
+      /来源|sources?:/i.test(answer)
+    const sourceLine =
+      usedApiKeys.length > 0 && !hasSources
+        ? locale === 'fr'
+          ? `\n\nSources: ${usedApiKeys.join(', ')}`
+          : `\n\n来源: ${usedApiKeys.join('、')}`
+        : ''
+    const finalAnswer = `${answer}${sourceLine}`.trim()
     const result: ChatRunResult = {
-      answer,
+      answer: finalAnswer,
       toolCalls,
       plan,
       stepSummaries,
@@ -278,7 +1049,7 @@ export const runChat = async (options: ChatRunOptions): Promise<ChatRunResult> =
     }
     emitEvent({
       type: 'final',
-      answer,
+      answer: finalAnswer,
       plan,
       stepSummaries,
       toolCalls,
@@ -289,7 +1060,8 @@ export const runChat = async (options: ChatRunOptions): Promise<ChatRunResult> =
   const executeToolCall = async (payload: ToolCallPayload) => {
     const tool = toolMap.get(payload.tool)
     const args = normalizeToolCallArguments(payload)
-    emitEvent({ type: 'tool_call', tool: payload.tool, arguments: args })
+    const toolLabel = resolveToolLabel(payload.tool, args, locale, apiLabelMap)
+    emitEvent({ type: 'tool_call', tool: payload.tool, arguments: args, label: toolLabel })
     appendMessage(conversation, { role: 'assistant', content: JSON.stringify(payload) })
 
     if (!tool) {
@@ -299,7 +1071,7 @@ export const runChat = async (options: ChatRunOptions): Promise<ChatRunResult> =
         error: 'tool_not_allowed',
       }
       toolCalls.push({ tool: payload.tool, arguments: args, result })
-      emitEvent({ type: 'tool_result', tool: payload.tool, result })
+      emitEvent({ type: 'tool_result', tool: payload.tool, result, label: toolLabel })
       appendMessage(conversation, {
         role: 'user',
         content: `TOOL_RESULT ${payload.tool}: ${JSON.stringify(result)}`,
@@ -307,9 +1079,29 @@ export const runChat = async (options: ChatRunOptions): Promise<ChatRunResult> =
       return
     }
 
+    const cacheKey = buildToolCacheKey(tool.name, args)
+    const cachedResult = toolResultCache.get(cacheKey)
+    if (cachedResult) {
+      toolCalls.push({ tool: tool.name, arguments: args, result: cachedResult })
+      emitEvent({ type: 'tool_result', tool: tool.name, result: cachedResult, label: toolLabel })
+      appendMessage(conversation, { role: 'user', content: formatToolResultMessage(tool, cachedResult) })
+      return
+    }
+
     let result: ChatToolResult
     try {
-      result = await tool.handler(args, buildToolContext(options))
+      let attempt = 0
+      while (true) {
+        try {
+          result = await withTimeout(tool.handler(args, buildToolContext(options)), TOOL_TIMEOUT_MS)
+          break
+        } catch (error) {
+          if (attempt >= TOOL_MAX_RETRIES) {
+            throw error
+          }
+          attempt += 1
+        }
+      }
     } catch (error) {
       result = {
         ok: false,
@@ -317,8 +1109,9 @@ export const runChat = async (options: ChatRunOptions): Promise<ChatRunResult> =
         error: error instanceof Error ? error.message : String(error),
       }
     }
+    toolResultCache.set(cacheKey, result)
     toolCalls.push({ tool: tool.name, arguments: args, result })
-    emitEvent({ type: 'tool_result', tool: tool.name, result })
+    emitEvent({ type: 'tool_result', tool: tool.name, result, label: toolLabel })
     appendMessage(conversation, { role: 'user', content: formatToolResultMessage(tool, result) })
   }
 
@@ -349,6 +1142,7 @@ export const runChat = async (options: ChatRunOptions): Promise<ChatRunResult> =
 
   const buildReplanMessage = () => {
     const hints: string[] = []
+    const capabilityQuestion = isCapabilityQuestion(lastUserQuestion)
     if (needsFinanceInsights && financeSubject && !hasFinanceSubjectFilter(financeSubject, toolCalls)) {
       hints.push(
         locale === 'fr'
@@ -381,6 +1175,79 @@ export const runChat = async (options: ChatRunOptions): Promise<ChatRunResult> =
           locale === 'fr'
             ? `Aucun résultat trouvé pour \"${financeSubject}\". Essaie get:/api/finance/categories pour trouver le categoryKey, puis relance insights avec categoryKey.`
             : `未找到“${financeSubject}”相关结果，可先调用 get:/api/finance/categories 找到 categoryKey，再用 categoryKey 重新查询。`,
+        )
+      }
+    }
+    let evidence: { missing: string[]; found: string[] } | null = null
+    if (evidenceFields.length > 0) {
+      evidence = evaluateEvidence(toolCalls, evidenceFields)
+      if (evidence.missing.length > 0) {
+        if (!capabilityQuestion || toolCalls.length === 0) {
+          const idHints = collectIdentifierHints(
+            toolCalls,
+            uniqueDetailKeys.length ? uniqueDetailKeys : ['date', 'id'],
+          )
+          const idHintText = Object.keys(idHints).length
+            ? locale === 'fr'
+              ? `Identifiants trouvés: ${Object.entries(idHints)
+                  .map(([key, values]) => `${key}=${values.join(', ')}`)
+                  .join(' ; ')}.`
+              : `已发现标识符：${Object.entries(idHints)
+                  .map(([key, values]) => `${key}=${values.join('、')}`)
+                  .join('；')}。`
+            : ''
+          hints.push(
+            locale === 'fr'
+              ? `Preuves manquantes (${evidence.missing.join(', ')}). Utilise les identifiants disponibles pour récupérer les détails via un endpoint adapté. ${idHintText}`
+              : `证据字段缺失（${evidence.missing.join('、')}），请使用可用标识符调用合适的详情端点获取内容。${idHintText}`,
+          )
+        }
+      }
+    }
+    if (!capabilityQuestion && (requiredApiKeys.length > 0 || minApiCalls > 1)) {
+      const usedKeys = collectCallApiKeys(toolCalls)
+      const missingRequired =
+        requiredApiKeys.length > 0
+          ? requiredApiKeys.filter((key) => !usedKeys.has(key))
+          : []
+      const evidenceOk = !evidence || evidence.missing.length === 0
+      if (missingRequired.length > 0) {
+        hints.push(
+          locale === 'fr'
+            ? `Endpoints requis manquants: ${missingRequired.join(', ')}.`
+            : `缺少必需 API：${missingRequired.join('、')}。`,
+        )
+      }
+      const shouldEnforceMinCalls =
+        minApiCalls > usedKeys.size &&
+        !(evidenceOk && missingRequired.length === 0 && usedKeys.size >= 1)
+      if (shouldEnforceMinCalls) {
+        const needed = minApiCalls - usedKeys.size
+        hints.push(
+          locale === 'fr'
+            ? `Appelle encore ${needed} endpoint(s) pertinent(s) et synthétise.`
+            : `请补充调用 ${needed} 个相关端点并综合结果。`,
+        )
+      }
+    }
+    if (isWorkContentQuestion(lastUserQuestion) && !hasLeaderLogsCall(toolCalls)) {
+      const reportStatus = extractReportCallStatus(toolCalls)
+      if (reportStatus?.exists === false) {
+        const dateHint = reportStatus.date
+          ? locale === 'fr'
+            ? `Utilise la même date (${reportStatus.date}).`
+            : `使用同一日期（${reportStatus.date}）。`
+          : ''
+        hints.push(
+          locale === 'fr'
+            ? `Le rapport renvoyé est un brouillon automatique (exists=false). Appelle get:/api/leader-logs pour récupérer les journaux bruts. ${dateHint}`
+            : `日报返回exists=false为自动草稿，请改用 get:/api/leader-logs 查询原始日志。${dateHint}`,
+        )
+      } else if (!reportStatus) {
+        hints.push(
+          locale === 'fr'
+            ? 'Pour les questions sur le contenu des travaux, utilise get:/api/leader-logs pour les journaux bruts.'
+            : '工作内容类问题优先使用 get:/api/leader-logs 查询原始日志。',
         )
       }
     }
@@ -420,7 +1287,7 @@ export const runChat = async (options: ChatRunOptions): Promise<ChatRunResult> =
     | { type: 'replan'; message: string }
     | { type: 'result'; result: ChatRunResult }
 
-  const handleFinalPayload = (payload: { answer?: string }): FinalHandling => {
+  const handleFinalPayload = async (payload: { answer?: string }): Promise<FinalHandling> => {
     if (maybeEnforceFinanceGuard()) {
       return { type: 'continue' }
     }
@@ -435,6 +1302,22 @@ export const runChat = async (options: ChatRunOptions): Promise<ChatRunResult> =
       return { type: 'continue' }
     }
     const replanMessage = buildReplanMessage()
+    const evidence = evidenceFields.length > 0 ? evaluateEvidence(toolCalls, evidenceFields) : null
+    if (replanMessage && evidence && evidence.missing.length > 0) {
+      const autoCalls = buildAutoDetailCalls({
+        toolCalls,
+        candidateMeta,
+        fallbackDetailKeys: uniqueDetailKeys.length ? uniqueDetailKeys : ['date', 'id'],
+        maxCalls: 5,
+        cache: autoDetailCache,
+      })
+      if (autoCalls.length > 0) {
+        for (const call of autoCalls) {
+          await executeToolCall(call)
+        }
+        return { type: 'continue' }
+      }
+    }
     if (replanMessage) {
       return { type: 'replan', message: replanMessage }
     }
@@ -455,7 +1338,7 @@ export const runChat = async (options: ChatRunOptions): Promise<ChatRunResult> =
     if (!plan) {
       for (let turn = 0; turn < maxTurns; turn += 1) {
         const response = await options.adapter.generate({
-          messages: conversation,
+          messages: buildModelMessages(),
           responseFormat: 'json_object',
         })
         lastUsage = response.usage
@@ -465,7 +1348,7 @@ export const runChat = async (options: ChatRunOptions): Promise<ChatRunResult> =
         }
 
         if (payload.type === 'final') {
-          const outcome = handleFinalPayload(payload)
+          const outcome = await handleFinalPayload(payload)
           if (outcome.type === 'continue') {
             continue
           }
@@ -497,7 +1380,7 @@ export const runChat = async (options: ChatRunOptions): Promise<ChatRunResult> =
         replanCount += 1
         plan = undefined
         stepSummaries.length = 0
-        appendMessage(conversation, { role: 'user', content: replanMessage })
+        resetConversationForReplan(replanMessage)
         emitEvent({
           type: 'status',
           message: locale === 'fr' ? 'Réévaluation du plan…' : '正在重新规划…',
@@ -526,7 +1409,7 @@ export const runChat = async (options: ChatRunOptions): Promise<ChatRunResult> =
 
       for (let stepTurn = 0; stepTurn < maxStepTurns; stepTurn += 1) {
         const response = await options.adapter.generate({
-          messages: conversation,
+          messages: buildModelMessages(),
           responseFormat: 'json_object',
         })
         lastUsage = response.usage
@@ -555,7 +1438,7 @@ export const runChat = async (options: ChatRunOptions): Promise<ChatRunResult> =
         }
 
         if (payload.type === 'final') {
-          const outcome = handleFinalPayload(payload)
+          const outcome = await handleFinalPayload(payload)
           if (outcome.type === 'continue') {
             continue
           }
@@ -593,7 +1476,7 @@ export const runChat = async (options: ChatRunOptions): Promise<ChatRunResult> =
       replanCount += 1
       plan = undefined
       stepSummaries.length = 0
-      appendMessage(conversation, { role: 'user', content: replanMessage })
+      resetConversationForReplan(replanMessage)
       emitEvent({
         type: 'status',
         message: locale === 'fr' ? 'Réévaluation du plan…' : '正在重新规划…',
@@ -618,7 +1501,7 @@ export const runChat = async (options: ChatRunOptions): Promise<ChatRunResult> =
 
     for (let turn = 0; turn < maxTurns; turn += 1) {
       const response = await options.adapter.generate({
-        messages: conversation,
+        messages: buildModelMessages(),
         responseFormat: 'json_object',
       })
       lastUsage = response.usage
@@ -628,7 +1511,7 @@ export const runChat = async (options: ChatRunOptions): Promise<ChatRunResult> =
       }
 
       if (payload.type === 'final') {
-        const outcome = handleFinalPayload(payload)
+        const outcome = await handleFinalPayload(payload)
         if (outcome.type === 'continue') {
           continue
         }
@@ -661,7 +1544,7 @@ export const runChat = async (options: ChatRunOptions): Promise<ChatRunResult> =
       replanCount += 1
       plan = undefined
       stepSummaries.length = 0
-      appendMessage(conversation, { role: 'user', content: replanMessage })
+      resetConversationForReplan(replanMessage)
       emitEvent({
         type: 'status',
         message: locale === 'fr' ? 'Réévaluation du plan…' : '正在重新规划…',

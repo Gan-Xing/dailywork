@@ -53,12 +53,22 @@ export type PlanStep = {
   id: string
   title: string
   tools?: string[]
+  apis?: string[]
 }
 
 export type PlanPayload = {
   type: 'plan'
   goal: string
   steps: PlanStep[]
+}
+
+export type PlannerPayload = PlanPayload & {
+  dataRequirements?: string[]
+  candidateApis?: string[]
+  requiredApis?: string[]
+  minApiCalls?: number
+  evidenceFields?: string[]
+  detailKeys?: string[]
 }
 
 export type StepDonePayload = {
@@ -114,8 +124,8 @@ export type ChatStreamEvent =
   | { type: 'status'; message: string }
   | { type: 'plan'; plan: PlanPayload }
   | { type: 'step'; step: PlanStep; index: number; total: number }
-  | { type: 'tool_call'; tool: string; arguments: Record<string, unknown> }
-  | { type: 'tool_result'; tool: string; result: ChatToolResult }
+  | { type: 'tool_call'; tool: string; arguments: Record<string, unknown>; label?: string }
+  | { type: 'tool_result'; tool: string; result: ChatToolResult; label?: string }
   | { type: 'step_done'; summary?: string }
   | {
       type: 'final'
@@ -131,6 +141,18 @@ export type ChatRunOptions = {
   tools: ChatTool[]
   session: ChatSession | null
   locale?: ChatLocale
+  contextMessage?: string
+  contextCandidates?: Array<{
+    key: string
+    score?: number
+    returnType?: string
+    idField?: string
+    detailEndpointKey?: string
+    detailParam?: string
+    detailParamLocation?: 'path' | 'query'
+    evidenceFields?: string[]
+    detailKeys?: string[]
+  }>
   messages: ChatMessage[]
   maxTurns?: number
   maxSteps?: number
