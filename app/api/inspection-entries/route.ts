@@ -31,6 +31,18 @@ export async function GET(request: Request) {
     .map((value) => Number(value))
     .filter((value) => Number.isFinite(value))
   const checkParams = searchParams.getAll('checkName').filter(Boolean)
+  const submittedByParams = searchParams
+    .getAll('submittedById')
+    .map((value) => Number(value))
+    .filter((value) => Number.isFinite(value))
+  const createdByParams = searchParams
+    .getAll('createdById')
+    .map((value) => Number(value))
+    .filter((value) => Number.isFinite(value))
+  const updatedByParams = searchParams
+    .getAll('updatedById')
+    .map((value) => Number(value))
+    .filter((value) => Number.isFinite(value))
   const idsParams = searchParams
     .getAll('ids')
     .map((val) => val.split(','))
@@ -89,6 +101,9 @@ export async function GET(request: Request) {
         ? Number(submissionNumberValue)
         : undefined,
     submissionNumbers: submissionNumberParams.length ? submissionNumberParams : undefined,
+    submittedByIds: submittedByParams.length ? submittedByParams : undefined,
+    createdByIds: createdByParams.length ? createdByParams : undefined,
+    updatedByIds: updatedByParams.length ? updatedByParams : undefined,
     phaseId: searchParams.get('phaseId') ? Number(searchParams.get('phaseId')) : undefined,
     phaseDefinitionId: searchParams.get('phaseDefinitionId')
       ? Number(searchParams.get('phaseDefinitionId'))
@@ -102,6 +117,14 @@ export async function GET(request: Request) {
     checkName: searchParams.get('checkName') ?? undefined,
     checkNames: checkParams.length ? checkParams : undefined,
     keyword: searchParams.get('keyword') ?? undefined,
+    appointmentDateFrom: searchParams.get('appointmentDateFrom') ?? undefined,
+    appointmentDateTo: searchParams.get('appointmentDateTo') ?? undefined,
+    submittedFrom: searchParams.get('submittedFrom') ?? undefined,
+    submittedTo: searchParams.get('submittedTo') ?? undefined,
+    createdFrom: searchParams.get('createdFrom') ?? undefined,
+    createdTo: searchParams.get('createdTo') ?? undefined,
+    updatedFrom: searchParams.get('updatedFrom') ?? undefined,
+    updatedTo: searchParams.get('updatedTo') ?? undefined,
     startDate: searchParams.get('startDate') ?? undefined,
     endDate: searchParams.get('endDate') ?? undefined,
     startPkFrom: searchParams.get('startPkFrom') ? Number(searchParams.get('startPkFrom')) : undefined,

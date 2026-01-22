@@ -19,7 +19,9 @@ import {
 } from '@/lib/i18n/progressDictionary'
 import { locales } from '@/lib/i18n'
 import { usePreferredLocale } from '@/lib/usePreferredLocale'
+import { MemberFilterDrawer } from '@/components/members/MemberFilterDrawer'
 import { ProgressHeader } from '../ProgressHeader'
+import { InspectionFiltersPanel } from './InspectionFiltersPanel'
 
 interface Props {
   roads: RoadSectionWithPhasesDTO[]
@@ -35,6 +37,12 @@ type PhaseOption = RoadSectionWithPhasesDTO['phases'][number] & {
 type PhaseDefinitionOption = {
   id: number
   name: string
+}
+
+type UserOption = {
+  id: number
+  username: string
+  name: string | null
 }
 
 type SortField =
@@ -112,6 +120,14 @@ const statusPriority: Record<InspectionStatus, number> = {
   APPROVED: 5,
 }
 
+const STATUS_OPTIONS: InspectionStatus[] = [
+  'PENDING',
+  'SCHEDULED',
+  'SUBMITTED',
+  'IN_PROGRESS',
+  'APPROVED',
+]
+
 const buildQuery = (params: Record<string, string | number | undefined | (string | number)[]>) => {
   const search = new URLSearchParams()
   Object.entries(params).forEach(([key, value]) => {
@@ -144,6 +160,11 @@ const splitTokens = (value: string) =>
     .split(/[,，\n]/)
     .map((item) => item.trim())
     .filter(Boolean)
+
+const splitNumberTokens = (value: string) =>
+  splitTokens(value)
+    .map((item) => Number(item))
+    .filter((item) => Number.isFinite(item))
 
 const mapEntryToListItem = (entry: InspectionEntryDTO): InspectionListItem => {
   const status = entry.status ?? 'PENDING'
@@ -239,17 +260,19 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
   const [types, setTypes] = useState<string[]>([])
   const [checkFilters, setCheckFilters] = useState<string[]>([])
   const [keyword, setKeyword] = useState('')
+  const [submissionNumbersInput, setSubmissionNumbersInput] = useState('')
+  const [submittedByIds, setSubmittedByIds] = useState<string[]>([])
+  const [createdByIds, setCreatedByIds] = useState<string[]>([])
+  const [updatedByIds, setUpdatedByIds] = useState<string[]>([])
+  const [appointmentDateFrom, setAppointmentDateFrom] = useState('')
+  const [appointmentDateTo, setAppointmentDateTo] = useState('')
+  const [filtersOpen, setFiltersOpen] = useState(false)
   const [checkOptions, setCheckOptions] = useState<string[]>([])
   const [checkOptionsError, setCheckOptionsError] = useState<string | null>(null)
   const [checkOptionsLoading, setCheckOptionsLoading] = useState(false)
-  const [typeOpen, setTypeOpen] = useState(false)
-  const [checkOpen, setCheckOpen] = useState(false)
-  const [statusOpen, setStatusOpen] = useState(false)
-  const [layerOpen, setLayerOpen] = useState(false)
-  const [roadOpen, setRoadOpen] = useState(false)
-  const [phaseOpen, setPhaseOpen] = useState(false)
-  const [startDate, setStartDate] = useState('')
-  const [endDate, setEndDate] = useState('')
+  const [userOptions, setUserOptions] = useState<UserOption[]>([])
+  const [userOptionsError, setUserOptionsError] = useState<string | null>(null)
+  const [userOptionsLoading, setUserOptionsLoading] = useState(false)
   const [startPkFrom, setStartPkFrom] = useState('')
   const [startPkTo, setStartPkTo] = useState('')
   const [sortStack, setSortStack] = useState<Array<{ field: SortField; order: SortOrder }>>([
@@ -314,12 +337,6 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
   const [visibleColumns, setVisibleColumns] = useState<ColumnKey[]>(() => defaultVisibleColumns)
   const [showColumnSelector, setShowColumnSelector] = useState(false)
   const columnSelectorRef = useRef<HTMLDivElement | null>(null)
-  const typeSelectorRef = useRef<HTMLDivElement | null>(null)
-  const statusSelectorRef = useRef<HTMLDivElement | null>(null)
-  const layerSelectorRef = useRef<HTMLDivElement | null>(null)
-  const roadSelectorRef = useRef<HTMLDivElement | null>(null)
-  const phaseSelectorRef = useRef<HTMLDivElement | null>(null)
-  const checkSelectorRef = useRef<HTMLDivElement | null>(null)
 
   const persistVisibleColumns = (next: ColumnKey[]) => {
     if (typeof window !== 'undefined') {
@@ -377,6 +394,24 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
     )
   }, [locale, roads])
 
+  const roadFilterOptions = useMemo(
+    () =>
+      roads.map((road) => ({
+        value: road.slug,
+        label: resolveRoadName(road, locale),
+      })),
+    [locale, roads],
+  )
+
+  const phaseFilterOptions = useMemo(
+    () =>
+      phaseDefinitions.map((definition) => ({
+        value: String(definition.id),
+        label: formatPhaseDefinitionLabel(definition),
+      })),
+    [formatPhaseDefinitionLabel, phaseDefinitions],
+  )
+
   useEffect(() => {
     let stopped = false
     const loadCheckOptions = async () => {
@@ -410,6 +445,35 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
     }
   }, [copy.errors.loadFailed])
 
+  useEffect(() => {
+    let stopped = false
+    const loadUserOptions = async () => {
+      setUserOptionsLoading(true)
+      setUserOptionsError(null)
+      try {
+        const res = await fetch('/api/inspection-entries/user-options')
+        const data = (await res.json().catch(() => ({}))) as { items?: UserOption[]; message?: string }
+        if (!res.ok || !data.items) {
+          throw new Error(data.message ?? copy.errors.loadFailed)
+        }
+        if (stopped) return
+        setUserOptions(data.items)
+      } catch (err) {
+        if (!stopped) {
+          setUserOptionsError((err as Error).message)
+        }
+      } finally {
+        if (!stopped) {
+          setUserOptionsLoading(false)
+        }
+      }
+    }
+    loadUserOptions()
+    return () => {
+      stopped = true
+    }
+  }, [copy.errors.loadFailed])
+
   const layerOptions = useMemo(() => {
     const set = new Set<string>()
     roads.forEach((road) => {
@@ -426,6 +490,15 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
     })
     return Array.from(set)
   }, [items, roads])
+
+  const layerFilterOptions = useMemo(
+    () =>
+      layerOptions.map((option) => ({
+        value: option,
+        label: localizeProgressTerm('layer', option, locale),
+      })),
+    [layerOptions, locale],
+  )
 
   const editingPhases = useMemo(() => {
     if (!editing) return []
@@ -448,6 +521,57 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
   const allSelected = pageIds.length > 0 && pageIds.every((id) => selectedIds.includes(id))
   const columnCount = visibleColumns.length + 1
   const isVisible = (key: ColumnKey) => visibleColumns.includes(key)
+  const phaseDefinitionValues = useMemo(
+    () => phaseDefinitionIds.map((id) => String(id)),
+    [phaseDefinitionIds],
+  )
+  const checkOptionsEmptyLabel = useMemo(
+    () => (checkOptionsLoading ? copy.filters.loading : checkOptionsError ?? copy.filters.noOptions),
+    [checkOptionsError, checkOptionsLoading, copy.filters.loading, copy.filters.noOptions],
+  )
+  const userOptionsEmptyLabel = useMemo(
+    () => (userOptionsLoading ? copy.filters.loading : userOptionsError ?? copy.filters.noOptions),
+    [copy.filters.loading, copy.filters.noOptions, userOptionsError, userOptionsLoading],
+  )
+  const submissionNumbers = useMemo(
+    () => splitNumberTokens(submissionNumbersInput),
+    [submissionNumbersInput],
+  )
+  const activeFilterCount = useMemo(() => {
+    let count = 0
+    if (roadSlugs.length) count += 1
+    if (phaseDefinitionIds.length) count += 1
+    if (side) count += 1
+    if (layerFilters.length) count += 1
+    if (checkFilters.length) count += 1
+    if (types.length) count += 1
+    if (status.length) count += 1
+    if (submissionNumbers.length) count += 1
+    if (submittedByIds.length) count += 1
+    if (createdByIds.length) count += 1
+    if (updatedByIds.length) count += 1
+    if (keyword.trim()) count += 1
+    if (appointmentDateFrom || appointmentDateTo) count += 1
+    if (startPkFrom || startPkTo) count += 1
+    return count
+  }, [
+    appointmentDateFrom,
+    appointmentDateTo,
+    checkFilters.length,
+    createdByIds.length,
+    keyword,
+    layerFilters.length,
+    phaseDefinitionIds.length,
+    roadSlugs.length,
+    side,
+    startPkFrom,
+    startPkTo,
+    status.length,
+    submissionNumbers.length,
+    submittedByIds.length,
+    types.length,
+    updatedByIds.length,
+  ])
 
   const fetchData = async () => {
     setLoading(true)
@@ -461,9 +585,13 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
         layerName: layerFilterValues.length ? layerFilterValues : undefined,
         type: types.length ? types : undefined,
         checkName: checkFilters.length ? checkFilters : undefined,
+        submissionNumber: submissionNumbers.length ? submissionNumbers : undefined,
+        submittedById: submittedByIdValues.length ? submittedByIdValues : undefined,
+        createdById: createdByIdValues.length ? createdByIdValues : undefined,
+        updatedById: updatedByIdValues.length ? updatedByIdValues : undefined,
         keyword: keyword ? `remark:${keyword}` : undefined,
-        startDate: startDate || undefined,
-        endDate: endDate || undefined,
+        appointmentDateFrom: appointmentDateFrom || undefined,
+        appointmentDateTo: appointmentDateTo || undefined,
         startPkFrom: startPkFrom || undefined,
         startPkTo: startPkTo || undefined,
         sort: sortStack.map((spec) => `${spec.field}:${spec.order}`),
@@ -506,9 +634,13 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
     layerFilterValues,
     types,
     checkFilters,
+    submissionNumbersInput,
+    submittedByIds,
+    createdByIds,
+    updatedByIds,
     keyword,
-    startDate,
-    endDate,
+    appointmentDateFrom,
+    appointmentDateTo,
     startPkFrom,
     startPkTo,
     sortStack,
@@ -540,32 +672,81 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
     setPdfError(null)
   }, [selectedIds])
 
-  const statusOptions: InspectionStatus[] = ['PENDING', 'SCHEDULED', 'SUBMITTED', 'IN_PROGRESS', 'APPROVED']
-  const toggleValue = <T,>(list: T[], value: T) =>
-    list.includes(value) ? list.filter((item) => item !== value) : [...list, value]
+  const sideFilterOptions = useMemo(
+    () => [
+      { value: 'LEFT', label: copy.filters.sideLeft },
+      { value: 'RIGHT', label: copy.filters.sideRight },
+      { value: 'BOTH', label: copy.filters.sideBoth },
+    ],
+    [copy.filters.sideBoth, copy.filters.sideLeft, copy.filters.sideRight],
+  )
+  const typeFilterOptions = useMemo(
+    () =>
+      inspectionTypeOptions.map((option) => ({
+        value: option,
+        label: formatTypeLabel(option),
+      })),
+    [formatTypeLabel, inspectionTypeOptions],
+  )
+  const checkFilterOptions = useMemo(
+    () =>
+      checkOptions.map((option) => ({
+        value: option,
+        label: localizeProgressTerm('check', option, locale),
+      })),
+    [checkOptions, locale],
+  )
+  const statusFilterOptions = useMemo(
+    () =>
+      STATUS_OPTIONS.map((option) => ({
+        value: option,
+        label: statusCopy[option] ?? option,
+      })),
+    [statusCopy],
+  )
+  const userFilterOptions = useMemo(
+    () =>
+      userOptions.map((user) => ({
+        value: String(user.id),
+        label: user.name ? `${user.name} · ${user.username}` : user.username,
+      })),
+    [userOptions],
+  )
+  const submittedByIdValues = useMemo(
+    () => submittedByIds.map((value) => Number(value)).filter((value) => Number.isFinite(value)),
+    [submittedByIds],
+  )
+  const createdByIdValues = useMemo(
+    () => createdByIds.map((value) => Number(value)).filter((value) => Number.isFinite(value)),
+    [createdByIds],
+  )
+  const updatedByIdValues = useMemo(
+    () => updatedByIds.map((value) => Number(value)).filter((value) => Number.isFinite(value)),
+    [updatedByIds],
+  )
+  const filterControlProps = useMemo(
+    () => ({
+      allLabel: copy.typePicker.all,
+      selectedLabel: (count: number) => formatProgressCopy(copy.typePicker.selected, { count }),
+      selectAllLabel: copy.typePicker.selectAll,
+      clearLabel: copy.typePicker.clear,
+      noOptionsLabel: copy.filters.noOptions,
+      searchPlaceholder: copy.filters.searchPlaceholder,
+    }),
+    [
+      copy.filters.noOptions,
+      copy.filters.searchPlaceholder,
+      copy.typePicker.all,
+      copy.typePicker.clear,
+      copy.typePicker.selectAll,
+      copy.typePicker.selected,
+    ],
+  )
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (columnSelectorRef.current && !columnSelectorRef.current.contains(event.target as Node)) {
         setShowColumnSelector(false)
-      }
-      if (typeSelectorRef.current && !typeSelectorRef.current.contains(event.target as Node)) {
-        setTypeOpen(false)
-      }
-      if (statusSelectorRef.current && !statusSelectorRef.current.contains(event.target as Node)) {
-        setStatusOpen(false)
-      }
-      if (layerSelectorRef.current && !layerSelectorRef.current.contains(event.target as Node)) {
-        setLayerOpen(false)
-      }
-      if (roadSelectorRef.current && !roadSelectorRef.current.contains(event.target as Node)) {
-        setRoadOpen(false)
-      }
-      if (phaseSelectorRef.current && !phaseSelectorRef.current.contains(event.target as Node)) {
-        setPhaseOpen(false)
-      }
-      if (checkSelectorRef.current && !checkSelectorRef.current.contains(event.target as Node)) {
-        setCheckOpen(false)
       }
     }
     document.addEventListener('mousedown', handleClickOutside)
@@ -595,11 +776,6 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
       console.error('Failed to load visible columns', error)
     }
   }, [columnOptions])
-
-  const toggleStatus = (value: InspectionStatus) => {
-    setPage(1)
-    setStatus((prev) => (prev.includes(value) ? prev.filter((item) => item !== value) : [...prev, value]))
-  }
 
   const toggleColumnVisibility = (key: ColumnKey) => {
     const next = visibleColumns.includes(key)
@@ -656,9 +832,13 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
     setLayerFilters([])
     setTypes([])
     setCheckFilters([])
+    setSubmissionNumbersInput('')
+    setSubmittedByIds([])
+    setCreatedByIds([])
+    setUpdatedByIds([])
     setKeyword('')
-    setStartDate('')
-    setEndDate('')
+    setAppointmentDateFrom('')
+    setAppointmentDateTo('')
     setStartPkFrom('')
     setStartPkTo('')
     setSortStack([{ field: 'updatedAt', order: 'desc' }])
@@ -1024,9 +1204,13 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
               layerName: layerFilterValues.length ? layerFilterValues : undefined,
               type: types.length ? types : undefined,
               checkName: checkFilters.length ? checkFilters : undefined,
+              submissionNumber: submissionNumbers.length ? submissionNumbers : undefined,
+              submittedById: submittedByIdValues.length ? submittedByIdValues : undefined,
+              createdById: createdByIdValues.length ? createdByIdValues : undefined,
+              updatedById: updatedByIdValues.length ? updatedByIdValues : undefined,
               keyword: keyword ? `remark:${keyword}` : undefined,
-              startDate: startDate || undefined,
-              endDate: endDate || undefined,
+              appointmentDateFrom: appointmentDateFrom || undefined,
+              appointmentDateTo: appointmentDateTo || undefined,
               startPkFrom: startPkFrom || undefined,
               startPkTo: startPkTo || undefined,
               sort: sortStack.map((spec) => `${spec.field}:${spec.order}`),
@@ -1140,523 +1324,164 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
             {formatProgressCopy(copy.errorHint, { message: error })}
           </p>
         ) : null}
-        <section className="mt-6 space-y-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-xl shadow-slate-900/30 backdrop-blur">
-          <div className="grid gap-3 md:grid-cols-4">
-            <label className="flex flex-col gap-1 text-xs text-slate-600">
-              {copy.filters.road}
-              <div className="relative" ref={roadSelectorRef}>
-                <button
-                  type="button"
-                  onClick={() => setRoadOpen((prev) => !prev)}
-                  className="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-left text-sm text-slate-900 shadow-inner shadow-slate-900/30 focus:border-emerald-300 focus:outline-none"
-                >
-                  <span className="truncate">
-                    {roadSlugs.length === 0
-                      ? copy.filters.all
-                      : formatProgressCopy(copy.typePicker.selected, { count: roadSlugs.length })}
-                  </span>
-                  <span className="text-xs text-slate-600">⌕</span>
-                </button>
-                {roadOpen ? (
-                  <div className="absolute z-10 mt-2 w-full rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-700 shadow-lg shadow-slate-900/40 backdrop-blur">
-                    <div className="flex items-center justify-between border-b border-slate-200 pb-2 text-[11px] text-slate-600">
-                      <span>
-                        {formatProgressCopy(copy.typePicker.summary, {
-                          count: roadSlugs.length ? roadSlugs.length : copy.typePicker.all,
-                        })}
-                      </span>
-                      <div className="flex gap-2">
-                        <button
-                          className="text-emerald-300 hover:underline"
-                          onClick={() => {
-                            setRoadSlugs(roads.map((road) => road.slug))
-                            setPage(1)
-                          }}
-                        >
-                          {copy.typePicker.selectAll}
-                        </button>
-                        <button
-                          className="text-slate-500 hover:underline"
-                          onClick={() => {
-                            setRoadSlugs([])
-                            setPage(1)
-                          }}
-                        >
-                          {copy.typePicker.clear}
-                        </button>
-                      </div>
-                    </div>
-                    <div className="mt-2 max-h-48 space-y-1 overflow-y-auto">
-                      {roads.map((road) => (
-                        <label
-                          key={road.id}
-                          className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 hover:bg-white"
-                        >
-                          <input
-                            type="checkbox"
-                            className="h-4 w-4 rounded border-slate-300 bg-white accent-emerald-300"
-                            checked={roadSlugs.includes(road.slug)}
-                            onChange={() => {
-                              setRoadSlugs((prev) => toggleValue(prev, road.slug))
-                              setPage(1)
-                            }}
-                          />
-                          <span className="truncate">{resolveRoadName(road, locale)}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
-              </div>
-            </label>
-            <label className="flex flex-col gap-1 text-xs text-slate-600">
-              {copy.filters.phase}
-              <div className="relative" ref={phaseSelectorRef}>
-                <button
-                  type="button"
-                  onClick={() => setPhaseOpen((prev) => !prev)}
-                  className="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-left text-sm text-slate-900 shadow-inner shadow-slate-900/30 focus:border-emerald-300 focus:outline-none"
-                >
-                  <span className="truncate">
-                    {phaseDefinitionIds.length === 0
-                      ? copy.filters.all
-                      : formatProgressCopy(copy.typePicker.selected, { count: phaseDefinitionIds.length })}
-                  </span>
-                  <span className="text-xs text-slate-600">⌕</span>
-                </button>
-                {phaseOpen ? (
-                  <div className="absolute z-10 mt-2 w-full rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-700 shadow-lg shadow-slate-900/40 backdrop-blur">
-                    <div className="flex items-center justify-between border-b border-slate-200 pb-2 text-[11px] text-slate-600">
-                      <span>
-                        {formatProgressCopy(copy.typePicker.summary, {
-                          count: phaseDefinitionIds.length ? phaseDefinitionIds.length : copy.typePicker.all,
-                        })}
-                      </span>
-                      <div className="flex gap-2">
-                        <button
-                          className="text-emerald-300 hover:underline"
-                          onClick={() => {
-                            setPhaseDefinitionIds(phaseDefinitions.map((definition) => definition.id))
-                            setPage(1)
-                          }}
-                        >
-                          {copy.typePicker.selectAll}
-                        </button>
-                        <button
-                          className="text-slate-500 hover:underline"
-                          onClick={() => {
-                            setPhaseDefinitionIds([])
-                            setPage(1)
-                          }}
-                        >
-                          {copy.typePicker.clear}
-                        </button>
-                      </div>
-                    </div>
-                    <div className="mt-2 max-h-48 space-y-1 overflow-y-auto">
-                      {phaseDefinitions.map((definition) => (
-                        <label
-                          key={definition.id}
-                          className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 hover:bg-white"
-                        >
-                          <input
-                            type="checkbox"
-                            className="h-4 w-4 rounded border-slate-300 bg-white accent-emerald-300"
-                            checked={phaseDefinitionIds.includes(definition.id)}
-                            onChange={() => {
-                              setPhaseDefinitionIds((prev) => toggleValue(prev, definition.id))
-                              setPage(1)
-                            }}
-                          />
-                          <span className="truncate">{formatPhaseDefinitionLabel(definition)}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
-              </div>
-            </label>
-          <label className="flex flex-col gap-1 text-xs text-slate-600">
-            {copy.filters.side}
-            <select
-              className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:border-emerald-300 focus:outline-none"
-              value={side}
-              onChange={(e) => {
-                setSide(e.target.value)
-                setPage(1)
-              }}
-            >
-              <option value="">{copy.filters.all}</option>
-              <option value="LEFT">{copy.filters.sideLeft}</option>
-              <option value="RIGHT">{copy.filters.sideRight}</option>
-              <option value="BOTH">{copy.filters.sideBoth}</option>
-            </select>
-          </label>
-          <label className="flex flex-col gap-1 text-xs text-slate-600">
-            {copy.columns.layers}
-            <div className="relative" ref={layerSelectorRef}>
+        <section className="mt-6 rounded-3xl border border-slate-200 bg-white p-5 shadow-xl shadow-slate-900/30 backdrop-blur">
+          <div className="flex flex-wrap items-center gap-3 text-sm text-slate-600">
+            <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
-                onClick={() => setLayerOpen((prev) => !prev)}
-                className="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-left text-sm text-slate-900 shadow-inner shadow-slate-900/30 focus:border-emerald-300 focus:outline-none"
+                className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-900 transition hover:border-slate-300 hover:bg-slate-50"
+                onClick={() => setFiltersOpen(true)}
               >
-                <span className="truncate">
-                  {layerFilters.length === 0
-                    ? copy.filters.all
-                    : formatProgressCopy(copy.typePicker.selected, { count: layerFilters.length })}
-                </span>
-                <span className="text-xs text-slate-600">⌕</span>
+                {copy.filters.open}
+                <span className="text-xs text-slate-500">⌕</span>
               </button>
-              {layerOpen ? (
-                <div className="absolute z-10 mt-2 w-full rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-700 shadow-lg shadow-slate-900/40 backdrop-blur">
-                  <div className="flex items-center justify-between border-b border-slate-200 pb-2 text-[11px] text-slate-600">
-                    <span>
-                      {formatProgressCopy(copy.typePicker.summary, {
-                        count: layerFilters.length ? layerFilters.length : copy.typePicker.all,
-                      })}
-                    </span>
-                    <div className="flex gap-2">
-                      <button
-                        className="text-emerald-300 hover:underline"
-                        onClick={() => {
-                          setLayerFilters(layerOptions)
-                          setPage(1)
-                        }}
-                      >
-                        {copy.typePicker.selectAll}
-                      </button>
-                      <button
-                        className="text-slate-500 hover:underline"
-                        onClick={() => {
-                          setLayerFilters([])
-                          setPage(1)
-                        }}
-                      >
-                        {copy.typePicker.clear}
-                      </button>
-                    </div>
-                  </div>
-                  <div className="mt-2 max-h-48 space-y-1 overflow-y-auto">
-                    {layerOptions.map((option) => (
-                      <label
-                        key={option}
-                        className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 hover:bg-white"
-                      >
-                        <input
-                          type="checkbox"
-                          className="h-4 w-4 rounded border-slate-300 bg-white accent-emerald-300"
-                          checked={layerFilters.includes(option)}
-                          onChange={() => {
-                            setLayerFilters((prev) => toggleValue(prev, option))
-                            setPage(1)
-                          }}
-                        />
-                        <span className="truncate">{localizeProgressTerm('layer', option, locale)}</span>
-                      </label>
-                    ))}
-                    {layerOptions.length === 0 ? (
-                      <p className="px-2 py-1 text-[11px] text-slate-600">{copy.filters.loading}</p>
-                    ) : null}
-                  </div>
-                </div>
-              ) : null}
-            </div>
-          </label>
-          <label className="flex flex-col gap-1 text-xs text-slate-600">
-            {copy.filters.type}
-            <div className="relative" ref={typeSelectorRef}>
               <button
                 type="button"
-                onClick={() => setTypeOpen((prev) => !prev)}
-                className="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-left text-sm text-slate-900 shadow-inner shadow-slate-900/30 focus:border-emerald-300 focus:outline-none"
+                className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-900 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
+                onClick={resetFilters}
+                disabled={activeFilterCount === 0}
               >
-                <span className="truncate">
-                  {types.length === 0
-                    ? copy.typePicker.placeholder
-                    : formatProgressCopy(copy.typePicker.selected, { count: types.length })}
-                </span>
-                <span className="text-xs text-slate-600">⌕</span>
+                {copy.filters.clear}
               </button>
-              {typeOpen ? (
-                <div className="absolute z-10 mt-2 w-full rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-700 shadow-lg shadow-slate-900/40 backdrop-blur">
-                  <div className="flex items-center justify-between border-b border-slate-200 pb-2 text-[11px] text-slate-600">
-                    <span>
-                      {formatProgressCopy(copy.typePicker.summary, {
-                        count: types.length ? types.length : copy.typePicker.all,
-                      })}
-                    </span>
-                    <div className="flex gap-2">
-                      <button
-                        className="text-emerald-300 hover:underline"
-                        onClick={() => {
-                          setTypes(inspectionTypeOptions)
-                          setPage(1)
-                        }}
-                      >
-                        {copy.typePicker.selectAll}
-                      </button>
-                      <button
-                        className="text-slate-500 hover:underline"
-                        onClick={() => {
-                          setTypes([])
-                          setPage(1)
-                        }}
-                      >
-                        {copy.typePicker.clear}
-                      </button>
-                    </div>
-                  </div>
-                  <div className="mt-2 max-h-48 space-y-1 overflow-y-auto">
-                    {inspectionTypeOptions.map((option) => (
-                      <label
-                        key={option}
-                        className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 hover:bg-white"
-                      >
-                        <input
-                          type="checkbox"
-                          className="h-4 w-4 rounded border-slate-300 bg-white accent-emerald-300"
-                          checked={types.includes(option)}
-                          onChange={() => {
-                            setTypes((prev) => toggleValue(prev, option))
-                            setPage(1)
-                          }}
-                        />
-                        <span className="truncate">{formatTypeLabel(option)}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
+              <span className="text-xs text-slate-500">
+                {activeFilterCount > 0
+                  ? formatProgressCopy(copy.filters.selectedCount, { count: activeFilterCount })
+                  : copy.filters.noneSelected}
+              </span>
             </div>
-          </label>
-          <label className="flex flex-col gap-1 text-xs text-slate-600">
-            {copy.filters.check}
-            <div className="relative" ref={checkSelectorRef}>
+            <div className="ml-auto flex flex-wrap items-center gap-2">
+              <label className="sr-only" htmlFor="inspection-keyword">
+                {copy.filters.keyword}
+              </label>
+              <input
+                id="inspection-keyword"
+                type="search"
+                className="h-9 w-56 rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs text-slate-900 placeholder:text-slate-500 focus:border-emerald-300 focus:outline-none"
+                value={keyword}
+                onChange={(e) => {
+                  setKeyword(e.target.value)
+                  setPage(1)
+                }}
+                placeholder={copy.filters.keywordPlaceholder}
+              />
               <button
                 type="button"
-                onClick={() => setCheckOpen((prev) => !prev)}
-                className="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-left text-sm text-slate-900 shadow-inner shadow-slate-900/30 focus:border-emerald-300 focus:outline-none"
+                className="h-9 rounded-xl bg-emerald-300 px-4 text-xs font-semibold text-slate-900 shadow-lg shadow-emerald-400/30 transition hover:-translate-y-0.5"
+                onClick={() => {
+                  setPage(1)
+                  fetchData()
+                }}
               >
-                <span className="truncate">
-                  {checkFilters.length === 0
-                    ? copy.filters.all
-                    : formatProgressCopy(copy.typePicker.selected, { count: checkFilters.length })}
-                </span>
-                <span className="text-xs text-slate-600">⌕</span>
+                {copy.filters.search}
               </button>
-              {checkOpen ? (
-                <div className="absolute z-10 mt-2 w-full rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-700 shadow-lg shadow-slate-900/40 backdrop-blur">
-                  <div className="flex items-center justify-between border-b border-slate-200 pb-2 text-[11px] text-slate-600">
-                    <span>
-                      {formatProgressCopy(copy.typePicker.summary, {
-                        count: checkFilters.length ? checkFilters.length : copy.typePicker.all,
-                      })}
-                    </span>
-                    <div className="flex gap-2">
-                      <button
-                        className="text-emerald-300 hover:underline"
-                        onClick={() => {
-                          setCheckFilters(checkOptions)
-                          setPage(1)
-                        }}
-                      >
-                        {copy.typePicker.selectAll}
-                      </button>
-                      <button
-                        className="text-slate-500 hover:underline"
-                        onClick={() => {
-                          setCheckFilters([])
-                          setPage(1)
-                        }}
-                      >
-                        {copy.typePicker.clear}
-                      </button>
-                    </div>
-                  </div>
-                  <div className="mt-2 max-h-48 space-y-1 overflow-y-auto">
-                    {checkOptions.map((option) => (
-                      <label
-                        key={option}
-                        className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 hover:bg-white"
-                      >
-                        <input
-                          type="checkbox"
-                          className="h-4 w-4 rounded border-slate-300 bg-white accent-emerald-300"
-                          checked={checkFilters.includes(option)}
-                          onChange={() => {
-                            setCheckFilters((prev) => toggleValue(prev, option))
-                            setPage(1)
-                          }}
-                        />
-                        <span className="truncate">{localizeProgressTerm('check', option, locale)}</span>
-                      </label>
-                    ))}
-                    {checkOptionsLoading ? (
-                      <span className="px-2 text-[11px] text-slate-600">{copy.filters.loading}</span>
-                    ) : null}
-                    {checkOptionsError ? (
-                      <span className="px-2 text-[11px] text-amber-700">{checkOptionsError}</span>
-                    ) : null}
-                  </div>
-                </div>
-              ) : null}
-            </div>
-          </label>
-          <label className="flex flex-col gap-1 text-xs text-slate-600">
-            {copy.filters.status}
-            <div className="relative" ref={statusSelectorRef}>
-              <button
-                type="button"
-                onClick={() => setStatusOpen((prev) => !prev)}
-                className="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-left text-sm text-slate-900 shadow-inner shadow-slate-900/30 focus:border-emerald-300 focus:outline-none"
-              >
-                <span className="truncate">
-                  {status.length === 0
-                    ? copy.filters.all
-                    : formatProgressCopy(copy.typePicker.selected, { count: status.length })}
-                </span>
-                <span className="text-xs text-slate-600">⌕</span>
-              </button>
-              {statusOpen ? (
-                <div className="absolute z-10 mt-2 w-full rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-700 shadow-lg shadow-slate-900/40 backdrop-blur">
-                  <div className="flex items-center justify-between border-b border-slate-200 pb-2 text-[11px] text-slate-600">
-                    <span>
-                      {formatProgressCopy(copy.typePicker.summary, {
-                        count: status.length ? status.length : copy.typePicker.all,
-                      })}
-                    </span>
-                    <div className="flex gap-2">
-                      <button
-                        className="text-emerald-300 hover:underline"
-                        onClick={() => {
-                          setStatus(statusOptions)
-                          setPage(1)
-                        }}
-                      >
-                        {copy.typePicker.selectAll}
-                      </button>
-                      <button
-                        className="text-slate-500 hover:underline"
-                        onClick={() => {
-                          setStatus([])
-                          setPage(1)
-                        }}
-                      >
-                        {copy.typePicker.clear}
-                      </button>
-                    </div>
-                  </div>
-                  <div className="mt-2 max-h-48 space-y-1 overflow-y-auto">
-                    {statusOptions.map((option) => (
-                      <label
-                        key={option}
-                        className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 hover:bg-white"
-                      >
-                        <input
-                          type="checkbox"
-                          className="h-4 w-4 rounded border-slate-300 bg-white accent-emerald-300"
-                          checked={status.includes(option)}
-                          onChange={() => {
-                            setStatus((prev) => toggleValue(prev, option))
-                            setPage(1)
-                          }}
-                        />
-                        <span className="truncate">{statusCopy[option]}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
-            </div>
-          </label>
-            <label className="flex flex-col gap-1 text-xs text-slate-600">
-              {copy.filters.startDate}
-              <input
-                type="date"
-                className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:border-emerald-300 focus:outline-none"
-                value={startDate}
-                onChange={(e) => {
-                  setStartDate(e.target.value)
-                  setPage(1)
-                }}
-              />
-            </label>
-            <label className="flex flex-col gap-1 text-xs text-slate-600">
-              {copy.filters.endDate}
-              <input
-                type="date"
-                className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:border-emerald-300 focus:outline-none"
-                value={endDate}
-                onChange={(e) => {
-                  setEndDate(e.target.value)
-                  setPage(1)
-                }}
-              />
-            </label>
-            <label className="flex flex-col gap-1 text-xs text-slate-600">
-              {copy.filters.startPkFrom ?? '起点桩号 >=（米）'}
-              <input
-                type="number"
-                inputMode="decimal"
-                className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:border-emerald-300 focus:outline-none"
-                value={startPkFrom}
-                onChange={(e) => {
-                  setStartPkFrom(e.target.value)
-                  setPage(1)
-                }}
-                placeholder="例：480"
-              />
-            </label>
-            <label className="flex flex-col gap-1 text-xs text-slate-600">
-              {copy.filters.startPkTo ?? '终点桩号 <=（米）'}
-              <input
-                type="number"
-                inputMode="decimal"
-                className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:border-emerald-300 focus:outline-none"
-                value={startPkTo}
-                onChange={(e) => {
-                  setStartPkTo(e.target.value)
-                  setPage(1)
-                }}
-                placeholder="例：1500"
-              />
-            </label>
-            <div className="flex flex-col gap-1 text-xs text-slate-600 md:col-span-2">
-              {copy.filters.keyword}
-              <div className="flex flex-col gap-2 md:flex-row md:items-end md:gap-3">
-                <input
-                  className="h-10 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-600/60 focus:border-emerald-300 focus:outline-none"
-                  value={keyword}
-                  onChange={(e) => {
-                    setKeyword(e.target.value)
-                    setPage(1)
-                  }}
-                  placeholder={copy.filters.keywordPlaceholder}
-                />
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    className="h-10 rounded-xl border border-slate-200 px-4 text-xs font-semibold text-slate-900 transition hover:border-slate-300 hover:bg-slate-50"
-                    onClick={resetFilters}
-                  >
-                    {copy.filters.reset}
-                  </button>
-                  <button
-                    type="button"
-                    className="h-10 rounded-xl bg-emerald-300 px-4 text-xs font-semibold text-slate-900 shadow-lg shadow-emerald-400/30 transition hover:-translate-y-0.5"
-                    onClick={() => {
-                      setPage(1)
-                      fetchData()
-                    }}
-                  >
-                    {copy.filters.search}
-                  </button>
-                  {loading ? <span className="text-xs text-slate-600">{copy.filters.loading}</span> : null}
-                </div>
-              </div>
+              {loading ? <span className="text-xs text-slate-600">{copy.filters.loading}</span> : null}
             </div>
           </div>
         </section>
+
+        <MemberFilterDrawer
+          open={filtersOpen}
+          onClose={() => setFiltersOpen(false)}
+          onClearAll={resetFilters}
+          title={copy.filters.title}
+          clearLabel={copy.filters.clear}
+          closeLabel={copy.filters.close}
+          clearHint={
+            activeFilterCount > 0
+              ? formatProgressCopy(copy.filters.selectedCount, { count: activeFilterCount })
+              : copy.filters.noneSelected
+          }
+        >
+          <InspectionFiltersPanel
+            copy={copy}
+            filterControlProps={filterControlProps}
+            roadOptions={roadFilterOptions}
+            phaseOptions={phaseFilterOptions}
+            sideOptions={sideFilterOptions}
+            layerOptions={layerFilterOptions}
+            checkOptions={checkFilterOptions}
+            checkOptionsEmptyLabel={checkOptionsEmptyLabel}
+            typeOptions={typeFilterOptions}
+            statusOptions={statusFilterOptions}
+            userOptions={userFilterOptions}
+            userOptionsEmptyLabel={userOptionsEmptyLabel}
+            roadSlugs={roadSlugs}
+            onRoadSlugsChange={(value) => {
+              setRoadSlugs(value)
+              setPage(1)
+            }}
+            phaseDefinitionIds={phaseDefinitionValues}
+            onPhaseDefinitionChange={(value) => {
+              setPhaseDefinitionIds(value.map((entry) => Number(entry)).filter((entry) => Number.isFinite(entry)))
+              setPage(1)
+            }}
+            side={side}
+            onSideChange={(value) => {
+              setSide(value)
+              setPage(1)
+            }}
+            layerFilters={layerFilters}
+            onLayerFiltersChange={(value) => {
+              setLayerFilters(value)
+              setPage(1)
+            }}
+            checkFilters={checkFilters}
+            onCheckFiltersChange={(value) => {
+              setCheckFilters(value)
+              setPage(1)
+            }}
+            typeFilters={types}
+            onTypeFiltersChange={(value) => {
+              setTypes(value)
+              setPage(1)
+            }}
+            statusFilters={status}
+            onStatusFiltersChange={(value) => {
+              setStatus(value as InspectionStatus[])
+              setPage(1)
+            }}
+            startPkFrom={startPkFrom}
+            onStartPkFromChange={(value) => {
+              setStartPkFrom(value)
+              setPage(1)
+            }}
+            startPkTo={startPkTo}
+            onStartPkToChange={(value) => {
+              setStartPkTo(value)
+              setPage(1)
+            }}
+            appointmentDateFrom={appointmentDateFrom}
+            appointmentDateTo={appointmentDateTo}
+            onAppointmentDateFromChange={(value) => {
+              setAppointmentDateFrom(value)
+              setPage(1)
+            }}
+            onAppointmentDateToChange={(value) => {
+              setAppointmentDateTo(value)
+              setPage(1)
+            }}
+            submissionNumbersInput={submissionNumbersInput}
+            onSubmissionNumbersInputChange={(value) => {
+              setSubmissionNumbersInput(value)
+              setPage(1)
+            }}
+            submittedByIds={submittedByIds}
+            onSubmittedByIdsChange={(value) => {
+              setSubmittedByIds(value)
+              setPage(1)
+            }}
+            createdByIds={createdByIds}
+            onCreatedByIdsChange={(value) => {
+              setCreatedByIds(value)
+              setPage(1)
+            }}
+            updatedByIds={updatedByIds}
+            onUpdatedByIdsChange={(value) => {
+              setUpdatedByIds(value)
+              setPage(1)
+            }}
+          />
+        </MemberFilterDrawer>
 
         <section className="mt-6 rounded-3xl border border-slate-200 bg-white shadow-xl shadow-slate-900/30">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-5 py-3 text-sm text-slate-600">
@@ -2515,7 +2340,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                         }
                       >
                         <option value="">{copy.bulkEdit.noChange}</option>
-                        {statusOptions.map((item) => (
+                        {STATUS_OPTIONS.map((item) => (
                           <option key={item} value={item}>
                             {statusCopy[item] ?? item}
                           </option>
@@ -2726,7 +2551,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                       onChange={(e) => setEditForm((prev) => ({ ...prev, status: e.target.value as InspectionStatus }))}
                     >
                       <option value="">{copy.editModal.statusPlaceholder}</option>
-                      {statusOptions.map((item) => (
+                      {STATUS_OPTIONS.map((item) => (
                         <option key={item} value={item}>
                           {statusCopy[item] ?? item}
                         </option>

@@ -353,6 +353,12 @@ type InspectionBoardCopy = {
   prefabRoadName: string
   errorHint: string
   filters: {
+    title: string
+    open: string
+    close: string
+    clear: string
+    selectedCount: string
+    noneSelected: string
     road: string
     all: string
     phase: string
@@ -367,14 +373,34 @@ type InspectionBoardCopy = {
     status: string
     startPkFrom: string
     startPkTo: string
-    startDate: string
-    endDate: string
+    appointmentDateFrom: string
+    appointmentDateTo: string
+    submittedFrom: string
+    submittedTo: string
+    createdFrom: string
+    createdTo: string
+    updatedFrom: string
+    updatedTo: string
+    submissionNumber: string
+    submissionNumberPlaceholder: string
+    submittedBy: string
+    createdBy: string
+    updatedBy: string
     keyword: string
     keywordPlaceholder: string
+    searchPlaceholder: string
+    noOptions: string
     reset: string
     search: string
     addPrefab: string
     loading: string
+    groups: {
+      location: string
+      content: string
+      status: string
+      submission: string
+      people: string
+    }
   }
   typePicker: {
     placeholder: string
@@ -911,6 +937,12 @@ const progressCopy: Record<Locale, ProgressCopy> = {
       prefabRoadName: '预制',
       errorHint: '加载提示：{message}',
       filters: {
+        title: '筛选条件',
+        open: '展开筛选',
+        close: '关闭筛选',
+        clear: '清空筛选',
+        selectedCount: '已筛选 {count} 项',
+        noneSelected: '未设置筛选',
         road: '道路',
         all: '全部',
         phase: '分项',
@@ -925,14 +957,34 @@ const progressCopy: Record<Locale, ProgressCopy> = {
         status: '状态',
         startPkFrom: '起点桩号 >=（米）',
         startPkTo: '终点桩号 <=（米）',
-        startDate: '开始日期',
-        endDate: '结束日期',
+        appointmentDateFrom: '预约日期（起）',
+        appointmentDateTo: '预约日期（止）',
+        submittedFrom: '提交时间（起）',
+        submittedTo: '提交时间（止）',
+        createdFrom: '创建时间（起）',
+        createdTo: '创建时间（止）',
+        updatedFrom: '更新时间（起）',
+        updatedTo: '更新时间（止）',
+        submissionNumber: '提交单编号',
+        submissionNumberPlaceholder: '支持逗号/换行分隔',
+        submittedBy: '提交人',
+        createdBy: '创建人',
+        updatedBy: '更新人',
         keyword: '备注关键字',
         keywordPlaceholder: '仅按备注模糊过滤',
+        searchPlaceholder: '搜索筛选选项',
+        noOptions: '暂无选项',
         reset: '重置筛选',
         search: '立即查询',
         addPrefab: '新增预制报检',
         loading: '加载中...',
+        groups: {
+          location: '位置与区间',
+          content: '验收内容',
+          status: '状态与时间',
+          submission: '提交单',
+          people: '人员',
+        },
       },
       typePicker: {
         placeholder: '全部类型',
@@ -1495,6 +1547,12 @@ const progressCopy: Record<Locale, ProgressCopy> = {
       prefabRoadName: 'Préfab',
       errorHint: 'Alerte chargement : {message}',
       filters: {
+        title: 'Filtres',
+        open: 'Afficher les filtres',
+        close: 'Fermer les filtres',
+        clear: 'Effacer les filtres',
+        selectedCount: 'Filtres actifs : {count}',
+        noneSelected: 'Aucun filtre',
         road: 'Route',
         all: 'Tout',
         phase: 'Phase',
@@ -1509,14 +1567,34 @@ const progressCopy: Record<Locale, ProgressCopy> = {
         status: 'Statut',
         startPkFrom: 'PK début ≥ (m)',
         startPkTo: 'PK fin ≤ (m)',
-        startDate: 'Début',
-        endDate: 'Fin',
+        appointmentDateFrom: 'RDV (début)',
+        appointmentDateTo: 'RDV (fin)',
+        submittedFrom: 'Soumis (début)',
+        submittedTo: 'Soumis (fin)',
+        createdFrom: 'Créé (début)',
+        createdTo: 'Créé (fin)',
+        updatedFrom: 'Mis à jour (début)',
+        updatedTo: 'Mis à jour (fin)',
+        submissionNumber: 'N° de soumission',
+        submissionNumberPlaceholder: 'Séparez par virgules / retours ligne',
+        submittedBy: 'Soumis par',
+        createdBy: 'Créé par',
+        updatedBy: 'Mis à jour par',
         keyword: 'Mot-clé (remarque)',
         keywordPlaceholder: 'Filtrer seulement la remarque',
+        searchPlaceholder: 'Rechercher une option',
+        noOptions: 'Aucune option',
         reset: 'Réinitialiser',
         search: 'Rechercher',
         addPrefab: 'Ajouter contrôle préfab',
         loading: 'Chargement...',
+        groups: {
+          location: 'Localisation',
+          content: 'Contenu',
+          status: 'Statut & dates',
+          submission: 'Soumission',
+          people: 'Personnes',
+        },
       },
       typePicker: {
         placeholder: 'Tous les types',

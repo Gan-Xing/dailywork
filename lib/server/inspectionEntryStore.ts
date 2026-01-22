@@ -509,6 +509,15 @@ export const listInspectionEntries = async (filter: InspectionEntryFilter): Prom
   } else if (filter.checkName) {
     where.checkName = { contains: filter.checkName, mode: 'insensitive' }
   }
+  if (filter.submittedByIds && filter.submittedByIds.length) {
+    where.submittedBy = { in: filter.submittedByIds }
+  }
+  if (filter.createdByIds && filter.createdByIds.length) {
+    where.createdBy = { in: filter.createdByIds }
+  }
+  if (filter.updatedByIds && filter.updatedByIds.length) {
+    where.updatedBy = { in: filter.updatedByIds }
+  }
   if (Number.isFinite(filter.startPkFrom)) {
     where.startPk = { gte: filter.startPkFrom as number }
   }
@@ -533,10 +542,30 @@ export const listInspectionEntries = async (filter: InspectionEntryFilter): Prom
       ]
     }
   }
-  if (filter.startDate || filter.endDate) {
+  if (filter.appointmentDateFrom || filter.appointmentDateTo) {
+    where.appointmentDate = {
+      gte: filter.appointmentDateFrom ? new Date(filter.appointmentDateFrom) : undefined,
+      lte: filter.appointmentDateTo ? new Date(filter.appointmentDateTo) : undefined,
+    }
+  }
+  if (filter.submittedFrom || filter.submittedTo) {
+    where.submittedAt = {
+      gte: filter.submittedFrom ? new Date(filter.submittedFrom) : undefined,
+      lte: filter.submittedTo ? new Date(filter.submittedTo) : undefined,
+    }
+  }
+  const createdFrom = filter.createdFrom ?? filter.startDate
+  const createdTo = filter.createdTo ?? filter.endDate
+  if (createdFrom || createdTo) {
     where.createdAt = {
-      gte: filter.startDate ? new Date(filter.startDate) : undefined,
-      lte: filter.endDate ? new Date(filter.endDate) : undefined,
+      gte: createdFrom ? new Date(createdFrom) : undefined,
+      lte: createdTo ? new Date(createdTo) : undefined,
+    }
+  }
+  if (filter.updatedFrom || filter.updatedTo) {
+    where.updatedAt = {
+      gte: filter.updatedFrom ? new Date(filter.updatedFrom) : undefined,
+      lte: filter.updatedTo ? new Date(filter.updatedTo) : undefined,
     }
   }
   if (filter.documentIds && filter.documentIds.length) {
@@ -577,6 +606,46 @@ export const listInspectionEntries = async (filter: InspectionEntryFilter): Prom
     page,
     pageSize,
   }
+}
+
+export const listInspectionEntryUserOptions = async (): Promise<
+  Array<{ id: number; username: string; name: string | null }>
+> => {
+  const [submittedRows, createdRows, updatedRows] = await prisma.$transaction([
+    prisma.inspectionEntry.findMany({
+      where: { submittedBy: { not: null } },
+      select: { submittedBy: true },
+      distinct: ['submittedBy'],
+    }),
+    prisma.inspectionEntry.findMany({
+      where: { createdBy: { not: null } },
+      select: { createdBy: true },
+      distinct: ['createdBy'],
+    }),
+    prisma.inspectionEntry.findMany({
+      where: { updatedBy: { not: null } },
+      select: { updatedBy: true },
+      distinct: ['updatedBy'],
+    }),
+  ])
+  const idSet = new Set<number>()
+  submittedRows.forEach((row) => {
+    if (Number.isFinite(row.submittedBy as number)) idSet.add(row.submittedBy as number)
+  })
+  createdRows.forEach((row) => {
+    if (Number.isFinite(row.createdBy as number)) idSet.add(row.createdBy as number)
+  })
+  updatedRows.forEach((row) => {
+    if (Number.isFinite(row.updatedBy as number)) idSet.add(row.updatedBy as number)
+  })
+
+  if (idSet.size === 0) return []
+
+  const users = await prisma.user.findMany({
+    where: { id: { in: Array.from(idSet) } },
+    select: { id: true, username: true, name: true },
+  })
+  return users.sort((a, b) => a.username.localeCompare(b.username))
 }
 
 export const createInspectionEntries = async (
@@ -877,6 +946,9 @@ export const aggregateEntriesAsListItems = async (
     ...(filter.types?.length ? { types: { hasSome: filter.types } } : {}),
     ...(filter.checkId ? { checkId: filter.checkId } : {}),
     ...(filter.checkName ? { checkName: { contains: filter.checkName, mode: 'insensitive' as const } } : {}),
+    ...(filter.submittedByIds?.length ? { submittedBy: { in: filter.submittedByIds } } : {}),
+    ...(filter.createdByIds?.length ? { createdBy: { in: filter.createdByIds } } : {}),
+    ...(filter.updatedByIds?.length ? { updatedBy: { in: filter.updatedByIds } } : {}),
     ...(filter.keyword
       ? {
           OR: [
@@ -888,11 +960,43 @@ export const aggregateEntriesAsListItems = async (
           ],
         }
       : {}),
-    ...(filter.startDate || filter.endDate
+    ...(filter.appointmentDateFrom || filter.appointmentDateTo
+      ? {
+          appointmentDate: {
+            gte: filter.appointmentDateFrom ? new Date(filter.appointmentDateFrom) : undefined,
+            lte: filter.appointmentDateTo ? new Date(filter.appointmentDateTo) : undefined,
+          },
+        }
+      : {}),
+    ...(filter.submittedFrom || filter.submittedTo
+      ? {
+          submittedAt: {
+            gte: filter.submittedFrom ? new Date(filter.submittedFrom) : undefined,
+            lte: filter.submittedTo ? new Date(filter.submittedTo) : undefined,
+          },
+        }
+      : {}),
+    ...(filter.createdFrom || filter.createdTo || filter.startDate || filter.endDate
       ? {
           createdAt: {
-            gte: filter.startDate ? new Date(filter.startDate) : undefined,
-            lte: filter.endDate ? new Date(filter.endDate) : undefined,
+            gte: filter.createdFrom
+              ? new Date(filter.createdFrom)
+              : filter.startDate
+                ? new Date(filter.startDate)
+                : undefined,
+            lte: filter.createdTo
+              ? new Date(filter.createdTo)
+              : filter.endDate
+                ? new Date(filter.endDate)
+                : undefined,
+          },
+        }
+      : {}),
+    ...(filter.updatedFrom || filter.updatedTo
+      ? {
+          updatedAt: {
+            gte: filter.updatedFrom ? new Date(filter.updatedFrom) : undefined,
+            lte: filter.updatedTo ? new Date(filter.updatedTo) : undefined,
           },
         }
       : {}),

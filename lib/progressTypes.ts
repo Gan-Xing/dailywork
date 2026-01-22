@@ -163,6 +163,9 @@ export interface InspectionEntryFilter {
   documentIds?: number[]
   submissionNumber?: number
   submissionNumbers?: number[]
+  submittedByIds?: number[]
+  createdByIds?: number[]
+  updatedByIds?: number[]
   phaseId?: number
   phaseDefinitionId?: number
   phaseDefinitionIds?: number[]
@@ -174,6 +177,14 @@ export interface InspectionEntryFilter {
   checkName?: string
   checkNames?: string[]
   keyword?: string
+  appointmentDateFrom?: string
+  appointmentDateTo?: string
+  submittedFrom?: string
+  submittedTo?: string
+  createdFrom?: string
+  createdTo?: string
+  updatedFrom?: string
+  updatedTo?: string
   startDate?: string
   endDate?: string
   startPkFrom?: number
