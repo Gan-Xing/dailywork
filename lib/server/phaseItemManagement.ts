@@ -43,6 +43,19 @@ const normalizeInputSchema = (value: unknown | null | undefined) => {
   return value as Prisma.InputJsonValue
 }
 
+const hasInputFields = (schema: unknown) => {
+  if (!schema || typeof schema !== 'object' || Array.isArray(schema)) {
+    return false
+  }
+  const fields = (schema as { fields?: unknown }).fields
+  if (!Array.isArray(fields)) return false
+  return fields.some((field) => {
+    if (!field || typeof field !== 'object') return false
+    const key = (field as { key?: unknown }).key
+    return typeof key === 'string' && Boolean(key.trim())
+  })
+}
+
 const formatBoqItem = (item: {
   id: number
   code: string
@@ -781,6 +794,94 @@ export const upsertPhaseItemInput = async (payload: {
       computedError,
     },
   }
+}
+
+export const batchUpsertPhaseItemInputsForInterval = async (payload: {
+  phaseId: number
+  intervalId: number
+}) => {
+  if (!Number.isInteger(payload.phaseId) || payload.phaseId <= 0) {
+    throw new Error('分项无效')
+  }
+  if (!Number.isInteger(payload.intervalId) || payload.intervalId <= 0) {
+    throw new Error('区间无效')
+  }
+
+  const interval = await prisma.phaseInterval.findUnique({
+    where: { id: payload.intervalId },
+    include: {
+      phase: { select: { id: true, phaseDefinitionId: true } },
+    },
+  })
+  if (!interval) {
+    throw new Error('区间不存在')
+  }
+  if (interval.phaseId !== payload.phaseId) {
+    throw new Error('区间不属于当前分项')
+  }
+
+  const phaseItems = await prisma.phaseItem.findMany({
+    where: { phaseDefinitionId: interval.phase.phaseDefinitionId, isActive: true },
+    include: { formula: true },
+    orderBy: { name: 'asc' },
+  })
+
+  if (!phaseItems.length) {
+    return { inputs: [], skipped: [], failed: [] }
+  }
+
+  const existingInputs = await prisma.phaseItemInput.findMany({
+    where: {
+      intervalId: payload.intervalId,
+      phaseItemId: { in: phaseItems.map((item) => item.id) },
+    },
+  })
+  const existingMap = new Map(existingInputs.map((input) => [input.phaseItemId, input]))
+
+  const inputs: PhaseItemInputDTO[] = []
+  const skipped: { phaseItemId: number; reason: string }[] = []
+  const failed: { phaseItemId: number; error: string }[] = []
+
+  for (const item of phaseItems) {
+    const expression = item.formula?.expression ?? ''
+    if (!expression) {
+      skipped.push({ phaseItemId: item.id, reason: '无公式' })
+      continue
+    }
+
+    const requiresInput = hasInputFields(item.formula?.inputSchema ?? null)
+    const existing = existingMap.get(item.id)
+    if (requiresInput && !existing) {
+      skipped.push({ phaseItemId: item.id, reason: '缺少输入字段' })
+      continue
+    }
+
+    const values = existing ? normalizeInputValues(existing.values) : {}
+    const manualQuantity = existing ? toOptionalNumber(existing.manualQuantity) : null
+
+    const variables = buildFormulaVariables({
+      startPk: interval.startPk,
+      endPk: interval.endPk,
+      side: interval.side,
+      billQuantity: interval.billQuantity ?? null,
+      values,
+    })
+    const result = evaluateFormulaExpression(expression, variables)
+    if (result.error) {
+      failed.push({ phaseItemId: item.id, error: result.error })
+      continue
+    }
+
+    const saved = await upsertPhaseItemInput({
+      phaseItemId: item.id,
+      intervalId: payload.intervalId,
+      values,
+      manualQuantity,
+    })
+    inputs.push(saved.input)
+  }
+
+  return { inputs, skipped, failed }
 }
 
 export const upsertPhaseItemFormula = async (payload: {

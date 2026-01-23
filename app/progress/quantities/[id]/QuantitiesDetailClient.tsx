@@ -31,6 +31,13 @@ type IntervalDraft = {
   manualQuantity: string
 }
 
+type BatchSaveResponse = {
+  inputs?: PhaseItemInputDTO[]
+  skipped?: { phaseItemId: number; reason: string }[]
+  failed?: { phaseItemId: number; error: string }[]
+  message?: string
+}
+
 const parseInputSchema = (schema: unknown): InputField[] => {
   if (!schema || typeof schema !== 'object' || Array.isArray(schema)) {
     return []
@@ -90,6 +97,7 @@ export default function QuantitiesDetailClient({ detail, canEdit, variant = 'pag
   )
   const [drafts, setDrafts] = useState<Record<number, IntervalDraft>>({})
   const [savingIntervals, setSavingIntervals] = useState<number[]>([])
+  const [savingAllIntervals, setSavingAllIntervals] = useState<number[]>([])
 
   const selectedItem = useMemo(
     () => phaseItems.find((item) => item.id === selectedPhaseItemId) ?? null,
@@ -137,7 +145,6 @@ export default function QuantitiesDetailClient({ detail, canEdit, variant = 'pag
     setDrafts(nextDrafts)
   }, [detail.intervals, inputFields, inputMap, selectedItem])
 
-
   const handleFieldChange = (intervalId: number, key: string, value: string) => {
     setDrafts((prev) => ({
       ...prev,
@@ -159,6 +166,22 @@ export default function QuantitiesDetailClient({ detail, canEdit, variant = 'pag
         manualQuantity: value,
       },
     }))
+  }
+
+  const upsertInputs = (nextInputs: PhaseItemInputDTO[]) => {
+    if (!nextInputs.length) return
+    setInputs((prev) => {
+      const next = [...prev]
+      nextInputs.forEach((input) => {
+        const index = next.findIndex((item) => item.id === input.id)
+        if (index >= 0) {
+          next[index] = input
+        } else {
+          next.push(input)
+        }
+      })
+      return next
+    })
   }
 
   const saveInterval = async (intervalId: number) => {
@@ -195,22 +218,57 @@ export default function QuantitiesDetailClient({ detail, canEdit, variant = 'pag
         throw new Error(result.message ?? '保存失败')
       }
       if (result.input) {
-        const nextInput = result.input
-        setInputs((prev) => {
-          const existingIndex = prev.findIndex((item) => item.id === nextInput.id)
-          if (existingIndex >= 0) {
-            const next = [...prev]
-            next[existingIndex] = nextInput
-            return next
-          }
-          return [...prev, nextInput]
-        })
+        upsertInputs([result.input])
       }
       addToast('已保存区间计量', { tone: 'success' })
     } catch (error) {
       addToast((error as Error).message ?? '保存失败', { tone: 'danger' })
     } finally {
       setSavingIntervals((prev) => prev.filter((item) => item !== intervalId))
+    }
+  }
+
+  const saveIntervalAllPhaseItems = async (intervalId: number) => {
+    if (!canEdit) return
+    if (variant === 'modal') {
+      onClose?.()
+    }
+    if (savingAllIntervals.includes(intervalId)) return
+    setSavingAllIntervals((prev) => (prev.includes(intervalId) ? prev : [...prev, intervalId]))
+
+    try {
+      const response = await fetch('/api/progress/quantities/input/batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          phaseId: detail.phase.id,
+          intervalId,
+        }),
+      })
+      const result = (await response.json().catch(() => ({}))) as BatchSaveResponse
+      if (!response.ok) {
+        throw new Error(result.message ?? '批量保存失败')
+      }
+      const savedInputs = Array.isArray(result.inputs) ? result.inputs : []
+      const skippedCount = Array.isArray(result.skipped) ? result.skipped.length : 0
+      const failedCount = Array.isArray(result.failed) ? result.failed.length : 0
+      const savedCount = savedInputs.length
+      if (savedCount) {
+        upsertInputs(savedInputs)
+      }
+      if (savedCount || skippedCount || failedCount) {
+        const summary = `已保存${savedCount}条${
+          skippedCount ? `，跳过${skippedCount}条` : ''
+        }${failedCount ? `，失败${failedCount}条` : ''}`
+        addToast(summary, { tone: failedCount || !savedCount ? 'warning' : 'success' })
+      } else {
+        addToast('没有可保存的分项', { tone: 'warning' })
+      }
+    } catch (error) {
+      addToast((error as Error).message ?? '批量保存失败', { tone: 'danger' })
+    } finally {
+      setSavingAllIntervals((prev) => prev.filter((item) => item !== intervalId))
     }
   }
 
@@ -279,6 +337,9 @@ export default function QuantitiesDetailClient({ detail, canEdit, variant = 'pag
                 interval.billQuantity,
               )
               const hasFormula = Boolean(selectedItem?.formula?.expression)
+              const isSavingInterval = savingIntervals.includes(interval.id)
+              const isSavingAll = savingAllIntervals.includes(interval.id)
+              const isSaving = isSavingInterval || isSavingAll
               return (
                 <div
                   key={interval.id}
@@ -353,14 +414,24 @@ export default function QuantitiesDetailClient({ detail, canEdit, variant = 'pag
                       />
                     </label>
                     <div className="flex items-end">
-                      <button
-                        type="button"
-                        onClick={() => saveInterval(interval.id)}
-                        disabled={!canEdit || savingIntervals.includes(interval.id)}
-                        className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-semibold text-emerald-700 transition hover:border-emerald-300 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        {savingIntervals.includes(interval.id) ? '保存中...' : '保存区间'}
-                      </button>
+                      <div className="flex flex-wrap items-center justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => saveInterval(interval.id)}
+                          disabled={!canEdit || isSaving}
+                          className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-semibold text-emerald-700 transition hover:border-emerald-300 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {isSavingInterval ? '保存中...' : '保存区间'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => saveIntervalAllPhaseItems(interval.id)}
+                          disabled={!canEdit || isSaving}
+                          className="inline-flex items-center rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {isSavingAll ? '保存中...' : '保存全部分项'}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
