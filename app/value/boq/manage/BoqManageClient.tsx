@@ -89,7 +89,7 @@ const boqManageCopy: Record<Locale, any> = {
     description: '维护实际工程量清单，数量与合价由分项绑定自动汇总。',
     breadcrumbs: {
       home: '首页',
-      value: '产值计量',
+      value: '产值界面',
       boq: '工程量清单',
     },
     actions: {
@@ -178,7 +178,7 @@ const boqManageCopy: Record<Locale, any> = {
     description: 'Gérer le devis réel avec quantités et montants calculés automatiquement.',
     breadcrumbs: {
       home: 'Accueil',
-      value: 'Valeurs',
+      value: 'Valeurs réalisées',
       boq: 'Devis quantitatif',
     },
     actions: {
@@ -349,7 +349,7 @@ export default function BoqManageClient() {
   const { addToast } = useToast()
   const copy = boqManageCopy[locale]
   const tabCopy = productionValueCopy[locale]
-  const unauthorizedMessage = tabCopy.page.messages.unauthorized
+  const unauthorizedMessage = tabCopy.messages.unauthorized
   const localeId = formatLocaleId(locale)
 
   const [boqProjects, setBoqProjects] = useState<BoqProject[]>([])
@@ -1054,8 +1054,7 @@ export default function BoqManageClient() {
   }
 
   const tabs = [
-    { key: 'production', label: tabCopy.tabs.production, href: '/value' },
-    { key: 'completion', label: tabCopy.tabs.completion, href: '/value?tab=completion' },
+    { key: 'completion', label: tabCopy.tabs.completion, href: '/value' },
     { key: 'boq', label: tabCopy.tabs.boq, href: '/value?tab=boq' },
     { key: 'manage', label: tabCopy.tabs.manage, href: '/value/prices' },
   ].map((tab) => ({

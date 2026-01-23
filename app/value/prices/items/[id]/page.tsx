@@ -477,8 +477,7 @@ export default function PhaseItemDetailPage() {
   }
 
   const tabs = [
-    { key: 'production', label: tabCopy.tabs.production, href: '/value' },
-    { key: 'completion', label: tabCopy.tabs.completion, href: '/value?tab=completion' },
+    { key: 'completion', label: tabCopy.tabs.completion, href: '/value' },
     { key: 'boq', label: tabCopy.tabs.boq, href: '/value?tab=boq' },
     { key: 'manage', label: tabCopy.tabs.manage, href: '/value/prices' },
   ].map((tab) => ({

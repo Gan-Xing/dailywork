@@ -13,34 +13,13 @@ export type ProductionValueCopy = {
     cta: string
   }
   tabs: {
-    production: string
     completion: string
     boq: string
     manage: string
   }
-  page: {
-    title: string
-    description: string
-    managePricesCta: string
-    unitLabel: string
-    tableHeaders: {
-      phase: string
-      spec: string
-      designAmount: string
-      unitPrice: string
-      designValue: string
-      completedAmount: string
-      completedValue: string
-      percent: string
-    }
-    messages: {
-      loading: string
-      empty: string
-      unauthorized: string
-      error: string
-      priceLoading: string
-      priceLoadError: string
-    }
+  messages: {
+    unauthorized: string
+    projectLoadError: string
   }
   boq: {
     title: string
@@ -125,44 +104,22 @@ export const productionValueCopy: Record<Locale, ProductionValueCopy> = {
   zh: {
     breadcrumbs: {
       home: '首页',
-      value: '产值计量'
+      value: '产值界面'
     },
     card: {
-      badge: '产值计量',
-      title: '产值计量',
-      description:
-        '汇总各分项的设计/完成量与单价，梳理产值进度。权限足够即可查看最新数据。',
-      cta: '查看产值详情'
+      badge: '产值界面',
+      title: '产值界面',
+      description: '基于实际工程量清单汇总已完成产值与占比。',
+      cta: '查看产值界面'
     },
     tabs: {
-      production: '产值计量',
       completion: '产值界面',
       boq: '工程量清单',
       manage: '分项管理'
     },
-    page: {
-      title: '产值计量',
-      description: '',
-      managePricesCta: '分项管理',
-      unitLabel: '',
-      tableHeaders: {
-        phase: '分项工程',
-        spec: '规格',
-        designAmount: '设计量',
-        unitPrice: '对应价格',
-        designValue: '设计量总金额',
-        completedAmount: '目前已完成工程量',
-        completedValue: '已完成产值',
-        percent: '完成百分比'
-      },
-      messages: {
-        loading: '正在加载产值数据…',
-        empty: '暂无产值数据',
-        unauthorized: '需“产值查看”权限才能查看产值计量',
-        error: '产值数据加载失败，请稍后重试',
-        priceLoading: '正在加载价格配置…',
-        priceLoadError: '价格配置加载失败，请稍后重试'
-      }
+    messages: {
+      unauthorized: '需“产值查看”权限才能查看产值界面',
+      projectLoadError: '项目列表加载失败，请稍后重试'
     },
     boq: {
       title: '工程量清单',
@@ -245,44 +202,22 @@ export const productionValueCopy: Record<Locale, ProductionValueCopy> = {
   fr: {
     breadcrumbs: {
       home: 'Accueil',
-      value: 'Valeurs'
+      value: 'Valeurs réalisées'
     },
     card: {
-      badge: 'Production',
-      title: 'Calcul des valeurs',
-      description:
-        'Regroupe les quantités prévues, réalisées et les prix unitaires par sous-ouvrage pour alimenter la comptabilité.',
-      cta: 'Voir les valeurs'
+      badge: 'Valeurs réalisées',
+      title: 'Valeurs réalisées',
+      description: 'Tableau des quantités réalisées basé sur le devis réel.',
+      cta: 'Voir les valeurs réalisées'
     },
     tabs: {
-      production: 'Valeurs',
       completion: 'Valeurs réalisées',
       boq: 'Devis quantitatif',
       manage: 'Postes'
     },
-    page: {
-      title: 'Calcul des valeurs',
-      description: 'Suivi des quantités, prix unitaires et montants validés pour chaque sous-ouvrage.',
-      managePricesCta: 'Gérer les prix unitaires',
-      unitLabel: 'Franc CFA (XOF)',
-      tableHeaders: {
-        phase: 'Sous-ouvrage',
-        spec: 'Spécification',
-        designAmount: 'Quantité prévue',
-        unitPrice: 'Prix unitaire',
-        designValue: 'Montant prévu',
-        completedAmount: 'Quantité réalisée',
-        completedValue: 'Montant réalisé',
-        percent: 'Taux d’achèvement'
-      },
-      messages: {
-        loading: 'Chargement des valeurs…',
-        empty: 'Aucune donnée de valeur disponible',
-        unauthorized: 'Permission « value:view » requise pour consulter les valeurs',
-        error: 'Impossible de charger les valeurs, réessayez plus tard',
-        priceLoading: 'Chargement des prix unitaires…',
-        priceLoadError: 'Impossible de charger les prix unitaires, réessayez plus tard'
-      }
+    messages: {
+      unauthorized: 'Permission « value:view » requise pour consulter les valeurs réalisées',
+      projectLoadError: 'Impossible de charger les projets, réessayez plus tard.'
     },
     boq: {
       title: 'Devis quantitatif',
@@ -465,13 +400,13 @@ export const priceManagerCopy: Record<Locale, PriceManagerCopy> = {
   zh: {
     breadcrumbs: {
       home: '首页',
-      value: '产值计量',
+      value: '产值界面',
       prices: '分项管理'
     },
     title: '分项管理',
     description: '',
     note: '',
-    backCta: '返回产值表',
+    backCta: '返回产值界面',
     tableHeaders: {
       name: '分项名称',
       spec: '规格',
@@ -549,13 +484,13 @@ export const priceManagerCopy: Record<Locale, PriceManagerCopy> = {
   fr: {
     breadcrumbs: {
       home: 'Accueil',
-      value: 'Valeurs',
+      value: 'Valeurs réalisées',
       prices: 'Gestion des postes'
     },
     title: 'Gestion des postes',
     description: '',
     note: '',
-    backCta: 'Retour aux valeurs',
+    backCta: 'Retour aux valeurs réalisées',
     tableHeaders: {
       name: 'Nom',
       spec: 'Spécification',

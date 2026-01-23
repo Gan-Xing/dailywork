@@ -94,7 +94,7 @@ export const homeCopy: Record<Locale, HomeCopy> = {
       progress: '进度',
       suffix: '。',
       description:
-        '把一线更新、项目里程碑放在同一块操作面板，保持团队节奏一致。当前开放 6 个核心入口（日报系统内嵌原始日志导航，成员管理、产值计量与财务记账等保持在一起），后续模块可随时接入。',
+        '把一线更新、项目里程碑放在同一块操作面板，保持团队节奏一致。当前开放 6 个核心入口（日报系统内嵌原始日志导航，成员管理、产值界面与财务记账等保持在一起），后续模块可随时接入。',
       primaryCta: '立即填写日报',
       secondaryCta: '查看项目进度'
     },
@@ -143,19 +143,19 @@ export const homeCopy: Record<Locale, HomeCopy> = {
         cta: '进入财务'
       },
       {
-        title: '产值计量',
+        title: '产值界面',
         href: '/value',
         tone: 'from-indigo-300/80 via-purple-300/80 to-fuchsia-300/80',
-        description: '按分项统计设计/完成量与单价，实时跟踪产值进度与完成率。',
+        description: '基于实际工程量清单汇总已完成产值与占比，实时跟踪产值进度。',
         tags: ['单价/产值', '完成率', '工程汇总'],
-        cta: '查看产值详情'
+        cta: '查看产值界面'
       }
     ],
     stats: {
       entriesLabel: '当前入口',
       entriesValue: '6',
       recentLabel: '最近更新',
-      recentValue: '日报系统已整合原始日志入口；成员管理、产值计量上线，日报/进度/财务持续维护',
+      recentValue: '日报系统已整合原始日志入口；成员管理、产值界面上线，日报/进度/财务持续维护',
       upcomingTitle: '即将推出',
       upcomingBody: '支持更多入口：质量巡检、物资追踪、风险复盘。'
     },
@@ -285,13 +285,13 @@ export const homeCopy: Record<Locale, HomeCopy> = {
         cta: 'Ouvrir la compta'
       },
       {
-        title: 'Calcul des valeurs',
+        title: 'Valeurs réalisées',
         href: '/value',
         tone: 'from-indigo-300/80 via-purple-300/80 to-fuchsia-300/80',
         description:
-          'Regroupe quantités prévues/réalisées et prix unitaires par sous-ouvrage pour suivre la valeur validée.',
-        tags: ['Prix unitaires', 'Valeurs réalisées', 'Progression'],
-        cta: 'Voir les valeurs'
+          'Tableau des quantités réalisées basé sur le devis réel pour suivre les montants validés.',
+        tags: ['Devis réel', 'Valeurs réalisées', 'Progression'],
+        cta: 'Voir les valeurs réalisées'
       }
     ],
     stats: {
@@ -299,7 +299,7 @@ export const homeCopy: Record<Locale, HomeCopy> = {
       entriesValue: '6',
       recentLabel: 'Mise à jour',
       recentValue:
-        'Journal brut intégré aux rapports ; modules membres/valeurs en ligne, rapports/progrès/finance maintenus',
+        'Journal brut intégré aux rapports ; modules membres/valeurs réalisées en ligne, rapports/progrès/finance maintenus',
       upcomingTitle: 'Prochainement',
       upcomingBody: 'Inspection qualité, flux matériaux, revues de risques.'
     },
