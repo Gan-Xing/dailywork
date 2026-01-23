@@ -9,6 +9,7 @@ export * from './reportsLanding'
 export * from './reportEditor'
 export * from './reportPreview'
 export * from './leaderLogs'
+export * from './logExtractor'
 export * from './documents'
 export * from './aiChat'
 

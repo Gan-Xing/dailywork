@@ -41,7 +41,11 @@ export function ReportsHeader({
       if (pathname === '/reports' || pathname === '/reports/') {
         return true
       }
-      return pathname?.startsWith('/reports/') && !pathname?.startsWith('/reports/leader-logs')
+      return (
+        pathname?.startsWith('/reports/') &&
+        !pathname?.startsWith('/reports/leader-logs') &&
+        !pathname?.startsWith('/reports/log-extractor')
+      )
     }
     return pathname === href || pathname?.startsWith(`${href}/`)
   }
@@ -49,6 +53,7 @@ export function ReportsHeader({
   const tabs = [
     { key: 'reports', label: navCopy.reports, href: '/reports' },
     { key: 'leader-logs', label: navCopy.leaderLogs, href: '/reports/leader-logs' },
+    { key: 'log-extractor', label: navCopy.logExtractor, href: '/reports/log-extractor' },
   ].map((item) => ({
     ...item,
     active: isActive(item.href),

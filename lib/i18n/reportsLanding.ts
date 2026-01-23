@@ -4,6 +4,7 @@ export type ReportsLandingCopy = {
   nav: {
     reports: string
     leaderLogs: string
+    logExtractor: string
   }
   create: {
     badge: string
@@ -66,7 +67,8 @@ export const reportsLandingCopy: Record<Locale, ReportsLandingCopy> = {
   zh: {
     nav: {
       reports: '日报',
-      leaderLogs: '原始日志'
+      leaderLogs: '原始日志',
+      logExtractor: '日志抽取'
     },
     create: {
       badge: '创建日报',
@@ -127,7 +129,8 @@ export const reportsLandingCopy: Record<Locale, ReportsLandingCopy> = {
   fr: {
     nav: {
       reports: 'Rapports',
-      leaderLogs: 'Journal brut'
+      leaderLogs: 'Journal brut',
+      logExtractor: 'Extraction'
     },
     create: {
       badge: 'Créer un rapport',
