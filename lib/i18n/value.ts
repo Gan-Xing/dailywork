@@ -16,6 +16,7 @@ export type ProductionValueCopy = {
     completion: string
     boq: string
     manage: string
+    measurement: string
   }
   messages: {
     unauthorized: string
@@ -98,6 +99,54 @@ export type ProductionValueCopy = {
       noMatches: string
     }
   }
+  measurement: {
+    title: string
+    description: string
+    periodLabel: string
+    advanceLabel: string
+    netHtvaLabel: string
+    projectLabel: string
+    projectPlaceholder: string
+    columnSelector: {
+      label: string
+      selectedTemplate: string
+      noneSelected: string
+      selectAll: string
+      restore: string
+      clear: string
+      baseGroup: string
+      periodGroup: string
+    }
+    actions: {
+      searchLabel: string
+      searchPlaceholder: string
+      addPeriod: string
+      save: string
+      saving: string
+    }
+    tableHeaders: {
+      code: string
+      designation: string
+      unit: string
+      unitPrice: string
+      quantity: string
+      totalPrice: string
+      totalMeasuredQuantity: string
+      totalMeasuredValue: string
+      periodQuantity: string
+      periodAmount: string
+    }
+    messages: {
+      loading: string
+      projectLoading: string
+      loadError: string
+      empty: string
+      noMatches: string
+      saved: string
+      saveError: string
+      requiredQuantity: string
+    }
+  }
 }
 
 export const productionValueCopy: Record<Locale, ProductionValueCopy> = {
@@ -115,7 +164,8 @@ export const productionValueCopy: Record<Locale, ProductionValueCopy> = {
     tabs: {
       completion: '产值界面',
       boq: '工程量清单',
-      manage: '分项管理'
+      manage: '分项管理',
+      measurement: '计量'
     },
     messages: {
       unauthorized: '需“产值查看”权限才能查看产值界面',
@@ -197,6 +247,54 @@ export const productionValueCopy: Record<Locale, ProductionValueCopy> = {
         empty: '该项目暂无实际工程量清单记录',
         noMatches: '未找到匹配的产值记录'
       }
+    },
+    measurement: {
+      title: '计量页面',
+      description: '基于实际工程量清单录入分期计量工程量与金额。',
+      periodLabel: '第{value}期',
+      advanceLabel: '预付款',
+      netHtvaLabel: '不含税实收',
+      projectLabel: '项目',
+      projectPlaceholder: '选择项目',
+      columnSelector: {
+        label: '显示列',
+        selectedTemplate: '已选 {count} 列',
+        noneSelected: '未选择列',
+        selectAll: '全选',
+        restore: '恢复默认',
+        clear: '清空',
+        baseGroup: '基础列',
+        periodGroup: '期次列'
+      },
+      actions: {
+        searchLabel: '检索',
+        searchPlaceholder: '输入编号或名称…',
+        addPeriod: '新增期次',
+        save: '保存计量',
+        saving: '保存中…'
+      },
+      tableHeaders: {
+        code: '编号',
+        designation: '工程内容',
+        unit: '单位',
+        unitPrice: '单价（F CFA）',
+        quantity: '数量',
+        totalPrice: '合价（F CFA）',
+        totalMeasuredQuantity: '总计量工程量',
+        totalMeasuredValue: '总计量产值',
+        periodQuantity: '计量工程量',
+        periodAmount: '计量金额'
+      },
+      messages: {
+        loading: '正在加载计量数据…',
+        projectLoading: '正在加载项目列表…',
+        loadError: '计量数据加载失败，请稍后重试',
+        empty: '该项目暂无实际工程量清单记录',
+        noMatches: '未找到匹配的计量记录',
+        saved: '计量已保存',
+        saveError: '计量保存失败，请检查输入',
+        requiredQuantity: '请填写计量工程量'
+      }
     }
   },
   fr: {
@@ -213,7 +311,8 @@ export const productionValueCopy: Record<Locale, ProductionValueCopy> = {
     tabs: {
       completion: 'Valeurs réalisées',
       boq: 'Devis quantitatif',
-      manage: 'Postes'
+      manage: 'Postes',
+      measurement: 'Métrés'
     },
     messages: {
       unauthorized: 'Permission « value:view » requise pour consulter les valeurs réalisées',
@@ -295,6 +394,54 @@ export const productionValueCopy: Record<Locale, ProductionValueCopy> = {
         loadError: 'Impossible de charger les valeurs réalisées',
         empty: 'Aucune ligne de devis réel pour ce projet',
         noMatches: 'Aucune ligne correspondante'
+      }
+    },
+    measurement: {
+      title: 'Métrés',
+      description: 'Saisie des quantités et montants par période sur le devis réel.',
+      periodLabel: 'Période {value}',
+      advanceLabel: 'Avance',
+      netHtvaLabel: 'Net HTVA',
+      projectLabel: 'Projet',
+      projectPlaceholder: 'Sélectionner un projet',
+      columnSelector: {
+        label: 'Colonnes',
+        selectedTemplate: '{count} colonnes',
+        noneSelected: 'Aucune colonne',
+        selectAll: 'Tout sélectionner',
+        restore: 'Par défaut',
+        clear: 'Tout effacer',
+        baseGroup: 'Colonnes de base',
+        periodGroup: 'Colonnes par période'
+      },
+      actions: {
+        searchLabel: 'Recherche',
+        searchPlaceholder: 'Rechercher par code ou désignation…',
+        addPeriod: 'Ajouter une période',
+        save: 'Enregistrer',
+        saving: 'Enregistrement…'
+      },
+      tableHeaders: {
+        code: 'N° Prix',
+        designation: 'Désignation',
+        unit: 'Unité',
+        unitPrice: 'Prix unitaire (F CFA)',
+        quantity: 'Quantité',
+        totalPrice: 'Prix total (F CFA)',
+        totalMeasuredQuantity: 'Qté cumulée',
+        totalMeasuredValue: 'Montant cumulé',
+        periodQuantity: 'Qté mesurée',
+        periodAmount: 'Montant'
+      },
+      messages: {
+        loading: 'Chargement des métrés…',
+        projectLoading: 'Chargement des projets…',
+        loadError: 'Impossible de charger les métrés',
+        empty: 'Aucun devis réel pour ce projet',
+        noMatches: 'Aucune ligne correspondante',
+        saved: 'Métrés enregistrés',
+        saveError: 'Échec de l’enregistrement',
+        requiredQuantity: 'Veuillez saisir la quantité'
       }
     }
   }

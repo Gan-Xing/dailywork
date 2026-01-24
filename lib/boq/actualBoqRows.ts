@@ -50,6 +50,21 @@ const normalizeBoqCode = (value?: string | null) => (value ?? '').trim().toUpper
 const isVatCode = (code: string) => code === 'TVA'
 const isTotalHtvaCode = (code: string) => code.startsWith('TOTAL HTVA')
 const isTotalWithTaxCode = (code: string) => code.startsWith('TOTAL TTC')
+const isMajorSubsectionCode = (value?: string | null) => {
+  if (!value) return false
+  const normalized = normalizeBoqCode(value)
+  if (!/^\d{3}$/.test(normalized)) return false
+  const numeric = Number(normalized)
+  return Number.isFinite(numeric) && numeric % 100 === 0
+}
+const isSubtotalLabel = (value?: string | null) => {
+  if (!value) return false
+  const trimmed = value.trim()
+  if (!trimmed) return false
+  if (trimmed.includes('小计')) return true
+  const upper = trimmed.toUpperCase()
+  return upper.includes('SOUS-TOTAL') || upper.includes('SOUS TOTAL') || upper.startsWith('TOTAL')
+}
 
 const parseBoqNumber = (value?: string | number | null) => {
   if (value === undefined || value === null) return null
@@ -282,6 +297,19 @@ export const buildActualBoqRows = ({
       const normalizedCode = normalizeBoqCode(row.code)
       if (isVatCode(normalizedCode)) {
         return applyTotals(row, scaleTotals(overallTotals, 0.18))
+      }
+      const isMajorSubsection =
+        isMajorSubsectionCode(normalizedCode) || isMajorSubsectionCode(row.subtotalCode)
+      const isSummarySubsection =
+        isTotalHtvaCode(normalizedCode) || isTotalWithTaxCode(normalizedCode)
+      const isSubtotalRow =
+        /^T\d+/i.test(normalizedCode) || isSubtotalLabel(row.designation ?? null)
+      if (!isMajorSubsection && !isSummarySubsection && !isSubtotalRow) {
+        return {
+          ...row,
+          totalPrice: null,
+          totalPriceValue: null,
+        }
       }
       const subsectionTotals = totalsBySubsection.get(index)
       const sectionIndex = sectionIndexByRow[index]

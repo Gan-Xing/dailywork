@@ -160,6 +160,7 @@ export default function PhaseDefinitionDetailPage() {
   const tabs = [
     { key: 'completion', label: tabCopy.tabs.completion, href: '/value' },
     { key: 'boq', label: tabCopy.tabs.boq, href: '/value?tab=boq' },
+    { key: 'measurement', label: tabCopy.tabs.measurement, href: '/value?tab=measurement' },
     { key: 'manage', label: tabCopy.tabs.manage, href: '/value/prices' },
   ].map((tab) => ({
     ...tab,
