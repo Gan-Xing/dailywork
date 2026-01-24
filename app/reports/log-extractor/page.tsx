@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Libre_Bodoni, Public_Sans } from 'next/font/google'
 
 import { AccessDenied } from '@/components/AccessDenied'
@@ -10,6 +10,11 @@ import {
   logExtractorBreadcrumbs,
   logExtractorDateLocales,
 } from '@/lib/i18n/logExtractor'
+import {
+  DEFAULT_LOG_EXTRACTION_PROMPT,
+  createEmptyLogExtractionOutput,
+  type LogExtractionOutput,
+} from '@/lib/logExtraction'
 import { usePreferredLocale } from '@/lib/usePreferredLocale'
 
 import { ReportsHeader } from '../ReportsHeader'
@@ -30,38 +35,15 @@ type SessionUser = {
   permissions: string[]
 }
 
-type ExtractedOutput = {
-  observations: {
-    security: string
-    environment: string
-    general: string
-    special: string
-  }
-  works: {
-    preparation: string
-    earthwork: string
-    pavement: string
-    drainage: string
-    safety: string
-    geotech: string
-    otherWork: string
-  }
-  controls: {
-    beTopo: string
-    quarry: string
-    subcontract: string
-    other: string
-  }
-  survey: string
-  quarry: string
-  subcontract: string
-  other: string
-}
-
-type ExtractedOutputPatch = Omit<Partial<ExtractedOutput>, 'observations' | 'works' | 'controls'> & {
-  observations?: Partial<ExtractedOutput['observations']>
-  works?: Partial<ExtractedOutput['works']>
-  controls?: Partial<ExtractedOutput['controls']>
+type LeaderLogItem = {
+  id: number
+  date: string
+  supervisorId: number
+  supervisorName: string
+  contentRaw: string
+  photoCount: number
+  createdAt: string
+  updatedAt: string
 }
 
 const formatDateInput = (date: Date) => date.toISOString().split('T')[0]
@@ -76,173 +58,42 @@ const formatDateLabel = (value: string, locale: string) => {
   }).format(date)
 }
 
-const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+const formatDateTime = (value: string, locale: string) => {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return new Intl.DateTimeFormat(locale, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date)
+}
 
-const buildEmptyOutput = (): ExtractedOutput => ({
-  observations: {
-    security: 'RAS',
-    environment: '',
-    general: '',
-    special: '',
-  },
-  works: {
-    preparation: '',
-    earthwork: '',
-    pavement: '',
-    drainage: '',
-    safety: '',
-    geotech: '',
-    otherWork: '',
-  },
-  controls: {
-    beTopo: '',
-    quarry: '',
-    subcontract: '',
-    other: '',
-  },
-  survey: '',
-  quarry: '',
-  subcontract: '',
-  other: '',
-})
-
-const mergeOutput = (base: ExtractedOutput, patch: ExtractedOutputPatch): ExtractedOutput => ({
-  ...base,
-  ...patch,
-  observations: {
-    ...base.observations,
-    ...patch.observations,
-  },
-  works: {
-    ...base.works,
-    ...patch.works,
-  },
-  controls: {
-    ...base.controls,
-    ...patch.controls,
-  },
-})
-
-const fieldMatchers: Array<{ path: string; labels: string[] }> = [
-  { path: 'observations.security', labels: ['安保', '安全', '巡查', '门禁', '巡逻'] },
-  { path: 'observations.environment', labels: ['环境', '扬尘', '噪音', '水土保持'] },
-  { path: 'observations.general', labels: ['总体观察', '现场观察', '总体'] },
-  { path: 'observations.special', labels: ['特殊事件', '事故', '封路', '来访'] },
-  { path: 'works.preparation', labels: ['前期准备'] },
-  { path: 'works.earthwork', labels: ['土方工程', '土方'] },
-  { path: 'works.pavement', labels: ['路面工程', '路面'] },
-  { path: 'works.drainage', labels: ['排水与涵洞', '排水', '涵洞'] },
-  { path: 'works.safety', labels: ['安保与交安', '交安'] },
-  { path: 'works.geotech', labels: ['岩土/试验', '岩土', '试验'] },
-  { path: 'controls.beTopo', labels: ['BE/Topo'] },
-  { path: 'controls.other', labels: ['Observations / Divers'] },
-  { path: 'survey', labels: ['技术/测量', '测量', '放样', '复测'] },
-  { path: 'subcontract', labels: ['分包工程'] },
-  { path: 'other', labels: ['其他事项'] },
-]
-
-const parseStructuredLines = (raw: string): ExtractedOutputPatch => {
-  const result: Record<string, string[]> = {}
-  const lines = raw
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean)
-
-  for (const line of lines) {
-    for (const matcher of fieldMatchers) {
-      for (const label of matcher.labels) {
-        const regex = new RegExp(`^${escapeRegex(label)}\\s*[:：]\\s*(.+)$`, 'i')
-        const match = line.match(regex)
-        if (!match) continue
-        if (!result[matcher.path]) result[matcher.path] = []
-        result[matcher.path].push(match[1].trim())
-      }
-    }
-  }
-
-  const patch: ExtractedOutputPatch = {}
-  const observationsPatch: Partial<ExtractedOutput['observations']> = {}
-  const worksPatch: Partial<ExtractedOutput['works']> = {}
-  const controlsPatch: Partial<ExtractedOutput['controls']> = {}
-  const topLevelPatch: Partial<Pick<ExtractedOutput, 'survey' | 'quarry' | 'subcontract' | 'other'>> = {}
-
-  Object.entries(result).forEach(([path, values]) => {
-    const merged = values.filter(Boolean).join('；')
-    if (!merged) return
-    if (path.startsWith('observations.')) {
-      const key = path.replace('observations.', '') as keyof ExtractedOutput['observations']
-      observationsPatch[key] = merged
-      return
-    }
-    if (path.startsWith('works.')) {
-      const key = path.replace('works.', '') as keyof ExtractedOutput['works']
-      worksPatch[key] = merged
-      return
-    }
-    if (path.startsWith('controls.')) {
-      const key = path.replace('controls.', '') as keyof ExtractedOutput['controls']
-      controlsPatch[key] = merged
-      return
-    }
-    switch (path) {
-      case 'survey':
-      case 'quarry':
-      case 'subcontract':
-      case 'other':
-        topLevelPatch[path] = merged
-        break
-      default:
-        break
-    }
+const hasOutputContent = (output: LogExtractionOutput) => {
+  const values = [
+    output.observations.security,
+    output.observations.environment,
+    output.observations.general,
+    output.observations.special,
+    output.works.preparation,
+    output.works.earthwork,
+    output.works.pavement,
+    output.works.drainage,
+    output.works.safety,
+    output.works.geotech,
+    output.works.otherWork,
+    output.controls.beTopo,
+    output.controls.quarry,
+    output.controls.subcontract,
+    output.controls.other,
+  ]
+  return values.some((value) => {
+    const trimmed = value.trim()
+    if (!trimmed) return false
+    if (trimmed.toUpperCase() === 'RAS') return false
+    return true
   })
-
-  if (Object.keys(observationsPatch).length) patch.observations = observationsPatch
-  if (Object.keys(worksPatch).length) patch.works = worksPatch
-  if (Object.keys(controlsPatch).length) patch.controls = controlsPatch
-  Object.assign(patch, topLevelPatch)
-
-  return patch
-}
-
-const filterNoise = (raw: string, noiseWords: string[]) => {
-  if (!noiseWords.length) return raw
-  const normalizedWords = noiseWords.map((word) => word.trim()).filter(Boolean)
-  if (!normalizedWords.length) return raw
-  return raw
-    .split(/\r?\n/)
-    .filter((line) => !normalizedWords.some((word) => line.includes(word)))
-    .join('\n')
-}
-
-const renderOutputText = (output: ExtractedOutput) => {
-  const security = output.observations.security.trim() || 'RAS'
-  return [
-    '安全与环境观察',
-    `- 安保：${security}`,
-    `- 环境：${output.observations.environment}`,
-    `- 总体观察：${output.observations.general}`,
-    `- 特殊事件：${output.observations.special}`,
-    '',
-    '施工内容',
-    `- 前期准备：${output.works.preparation}`,
-    `- 土方工程：${output.works.earthwork}`,
-    `- 路面工程：${output.works.pavement}`,
-    `- 排水与涵洞：${output.works.drainage}`,
-    `- 安保与交安：${output.works.safety}`,
-    `- 岩土/试验：${output.works.geotech}`,
-    `- 其他：${output.works.otherWork}`,
-    '',
-    'Contrôles',
-    `- BE/Topo：${output.controls.beTopo}`,
-    `- 采石场：${output.controls.quarry}`,
-    `- 分包：${output.controls.subcontract}`,
-    `- Observations / Divers：${output.controls.other}`,
-    '',
-    `技术/测量：${output.survey}`,
-    `采石场：${output.quarry}`,
-    `分包工程：${output.subcontract}`,
-    `其他事项：${output.other}`,
-  ].join('\n')
 }
 
 export default function LogExtractorPage() {
@@ -256,18 +107,31 @@ export default function LogExtractorPage() {
   const [authLoaded, setAuthLoaded] = useState(false)
 
   const [selectedDate, setSelectedDate] = useState(() => formatDateInput(new Date()))
-  const [dateMode, setDateMode] = useState<'preset' | 'custom'>('preset')
-  const [customDate, setCustomDate] = useState(selectedDate)
 
-  const [rawLogs, setRawLogs] = useState('')
-  const [leaderPattern, setLeaderPattern] = useState('')
-  const [noiseInput, setNoiseInput] = useState('')
-  const [noiseWords, setNoiseWords] = useState<string[]>([])
+  const [logs, setLogs] = useState<LeaderLogItem[]>([])
+  const [logsLoading, setLogsLoading] = useState(false)
+  const [logsError, setLogsError] = useState<string | null>(null)
+  const [selectedLogIds, setSelectedLogIds] = useState<Set<number>>(new Set())
+  const [expandedLogs, setExpandedLogs] = useState<Set<number>>(new Set())
+  const [searchTerm, setSearchTerm] = useState('')
 
-  const [output, setOutput] = useState<ExtractedOutput>(() => buildEmptyOutput())
-  const [statusMessage, setStatusMessage] = useState<string | null>(null)
+  const [promptText, setPromptText] = useState(DEFAULT_LOG_EXTRACTION_PROMPT)
+  const [promptLoaded, setPromptLoaded] = useState(false)
+  const [promptSaving, setPromptSaving] = useState(false)
+  const [promptSavedAt, setPromptSavedAt] = useState<string | null>(null)
+  const [promptError, setPromptError] = useState<string | null>(null)
+  const lastSavedRef = useRef('')
+
+  const [output, setOutput] = useState<LogExtractionOutput>(() => createEmptyLogExtractionOutput())
+  const [previewOutput, setPreviewOutput] = useState<LogExtractionOutput | null>(null)
+  const [extracting, setExtracting] = useState(false)
+  const [previewing, setPreviewing] = useState(false)
+  const [applying, setApplying] = useState(false)
+  const [actionError, setActionError] = useState<string | null>(null)
+  const [actionSuccess, setActionSuccess] = useState<string | null>(null)
 
   const canView = session?.permissions.some((perm) => perm === 'report:view' || perm === 'report:edit') ?? false
+  const canEdit = session?.permissions.includes('report:edit') ?? false
 
   useEffect(() => {
     const loadSession = async () => {
@@ -284,133 +148,246 @@ export default function LogExtractorPage() {
     void loadSession()
   }, [])
 
-  useEffect(() => {
-    if (!statusMessage) return
-    const timer = setTimeout(() => setStatusMessage(null), 2200)
-    return () => clearTimeout(timer)
-  }, [statusMessage])
-
-  const presetDates = useMemo(() => {
-    const today = new Date()
-    const items = Array.from({ length: 21 }, (_, index) => {
-      const date = new Date(today)
-      date.setDate(today.getDate() - index)
-      const value = formatDateInput(date)
-      return {
-        value,
-        label: formatDateLabel(value, dateLocale),
-      }
-    })
-
-    if (!items.find((item) => item.value === selectedDate)) {
-      items.unshift({
-        value: selectedDate,
-        label: formatDateLabel(selectedDate, dateLocale),
-      })
-    }
-
-    return items
-  }, [dateLocale, selectedDate])
-
-  const detectedDates = useMemo(() => {
-    const isoMatches = rawLogs.match(/\b\d{4}-\d{2}-\d{2}\b/g) ?? []
-    const slashMatches = rawLogs.match(/\b\d{2}\/\d{2}\/\d{4}\b/g) ?? []
-    return Array.from(new Set([...isoMatches, ...slashMatches]))
-  }, [rawLogs])
-
-  const otherDates = useMemo(
-    () => detectedDates.filter((value) => value !== selectedDate),
-    [detectedDates, selectedDate],
-  )
-
-  const promptText = useMemo(() => {
-    const noiseLine = noiseWords.length ? `噪声过滤词：${noiseWords.join('、')}` : '噪声过滤词：无'
-    const leaderLine = leaderPattern.trim() ? `负责人习惯：${leaderPattern.trim()}` : ''
-    return [
-      `请从原始日志中抽取信息，填入日期 ${selectedDate} 的日报。`,
-      '抽取信息只能填写到对应日期的日报，其他日期一律忽略。',
-      '字段仅限以下范围，禁止新增字段或输出无关内容：',
-      '安全与环境观察：安保、环境、总体观察、特殊事件。',
-      '施工内容：前期准备、土方工程、路面工程、排水与涵洞、安保与交安、岩土/试验、其他。',
-      'Contrôles：BE/Topo、采石场、分包、Observations / Divers。',
-      '技术/测量、采石场、分包工程、其他事项。',
-      '规则：',
-      '1) 安保缺失必须填 “RAS”，其余字段缺失保持空白。',
-      '2) 施工内容空白表示无作业，不要强行填充。',
-      '3) 输出仅中文，不需要法语。',
-      leaderLine,
-      noiseLine,
-      '',
-      '输出模板如下（保持字段顺序与名称）：',
-      '安全与环境观察',
-      '- 安保：',
-      '- 环境：',
-      '- 总体观察：',
-      '- 特殊事件：',
-      '',
-      '施工内容',
-      '- 前期准备：',
-      '- 土方工程：',
-      '- 路面工程：',
-      '- 排水与涵洞：',
-      '- 安保与交安：',
-      '- 岩土/试验：',
-      '- 其他：',
-      '',
-      'Contrôles',
-      '- BE/Topo：',
-      '- 采石场：',
-      '- 分包：',
-      '- Observations / Divers：',
-      '',
-      '技术/测量：',
-      '采石场：',
-      '分包工程：',
-      '其他事项：',
-      '',
-      '原始日志：',
-      rawLogs.trim() ? rawLogs.trim() : '（无）',
-    ]
-      .filter(Boolean)
-      .join('\n')
-  }, [leaderPattern, noiseWords, rawLogs, selectedDate])
-
-  const outputText = useMemo(() => renderOutputText(output), [output])
-
-  const handleExtract = () => {
-    const filteredRaw = filterNoise(rawLogs, noiseWords)
-    const parsed = parseStructuredLines(filteredRaw)
-    const emptyOutput = buildEmptyOutput()
-    setOutput(mergeOutput(emptyOutput, parsed))
-  }
-
-  const handleClear = () => {
-    setRawLogs('')
-    setLeaderPattern('')
-    setNoiseWords([])
-    setNoiseInput('')
-    setOutput(buildEmptyOutput())
-    setStatusMessage(null)
-  }
-
-  const handleCopy = async (value: string, message: string) => {
+  const fetchPrompt = useCallback(async () => {
     try {
-      await navigator.clipboard.writeText(value)
-      setStatusMessage(message)
-    } catch {
-      setStatusMessage('复制失败')
+      const res = await fetch('/api/log-extractor/config', { cache: 'no-store' })
+      if (!res.ok) {
+        throw new Error('加载抽取规则失败')
+      }
+      const data = (await res.json()) as { promptText?: string; updatedAt?: string | null }
+      const nextPrompt = data.promptText?.trim() || DEFAULT_LOG_EXTRACTION_PROMPT
+      setPromptText(nextPrompt)
+      lastSavedRef.current = nextPrompt
+      setPromptSavedAt(data.updatedAt ?? null)
+      setPromptError(null)
+    } catch (error) {
+      setPromptError((error as Error).message)
+      setPromptText(DEFAULT_LOG_EXTRACTION_PROMPT)
+    } finally {
+      setPromptLoaded(true)
     }
-  }
+  }, [])
 
-  const addNoiseWord = () => {
-    const trimmed = noiseInput.trim()
-    if (!trimmed) return
-    if (noiseWords.includes(trimmed)) {
-      setNoiseInput('')
+  useEffect(() => {
+    if (!authLoaded || !canView) return
+    void fetchPrompt()
+  }, [authLoaded, canView, fetchPrompt])
+
+  useEffect(() => {
+    if (!promptLoaded || !canEdit) return
+    if (promptText.trim() === lastSavedRef.current.trim()) return
+
+    const handler = setTimeout(async () => {
+      setPromptSaving(true)
+      setPromptError(null)
+      try {
+        const res = await fetch('/api/log-extractor/config', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ promptText }),
+        })
+        if (!res.ok) {
+          const data = (await res.json()) as { message?: string }
+          throw new Error(data.message ?? '保存失败')
+        }
+        const data = (await res.json()) as { updatedAt?: string | null; promptText?: string }
+        lastSavedRef.current = data.promptText ?? promptText
+        setPromptSavedAt(data.updatedAt ?? null)
+      } catch (error) {
+        setPromptError((error as Error).message)
+      } finally {
+        setPromptSaving(false)
+      }
+    }, 800)
+
+    return () => clearTimeout(handler)
+  }, [promptLoaded, promptText, canEdit])
+
+  const fetchLogs = useCallback(async () => {
+    if (!selectedDate) return
+    setLogsLoading(true)
+    setLogsError(null)
+    setActionError(null)
+    try {
+      const res = await fetch(`/api/leader-logs?date=${selectedDate}`, { cache: 'no-store' })
+      if (!res.ok) {
+        const data = (await res.json()) as { message?: string }
+        throw new Error(data.message ?? '加载日志失败')
+      }
+      const data = (await res.json()) as { logs?: LeaderLogItem[] }
+      const items = data.logs ?? []
+      setLogs(items)
+      setSelectedLogIds(new Set(items.map((item) => item.id)))
+      setExpandedLogs(new Set())
+      setOutput(createEmptyLogExtractionOutput())
+      setPreviewOutput(null)
+      setActionSuccess(null)
+    } catch (error) {
+      setLogsError((error as Error).message)
+      setLogs([])
+      setSelectedLogIds(new Set())
+    } finally {
+      setLogsLoading(false)
+    }
+  }, [selectedDate])
+
+  useEffect(() => {
+    if (!authLoaded || !canView) return
+    void fetchLogs()
+  }, [authLoaded, canView, fetchLogs])
+
+  useEffect(() => {
+    setPreviewOutput(null)
+  }, [output])
+
+  const filteredLogs = useMemo(() => {
+    const term = searchTerm.trim()
+    if (!term) return logs
+    return logs.filter((log) =>
+      `${log.supervisorName} ${log.contentRaw}`.toLowerCase().includes(term.toLowerCase()),
+    )
+  }, [logs, searchTerm])
+
+  const selectedCount = selectedLogIds.size
+  const allSelected = logs.length > 0 && selectedLogIds.size === logs.length
+  const outputReady = hasOutputContent(output)
+
+  const toggleSelectAll = () => {
+    if (allSelected) {
+      setSelectedLogIds(new Set())
       return
     }
-    setNoiseWords((prev) => [...prev, trimmed])
-    setNoiseInput('')
+    setSelectedLogIds(new Set(logs.map((log) => log.id)))
+  }
+
+  const toggleLogSelection = (id: number) => {
+    setSelectedLogIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
+      return next
+    })
+  }
+
+  const toggleExpand = (id: number) => {
+    setExpandedLogs((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
+      return next
+    })
+  }
+
+  const handleExtract = async () => {
+    if (!selectedLogIds.size) {
+      setActionError(t.actions.selectLogWarning)
+      return
+    }
+    setExtracting(true)
+    setActionError(null)
+    setActionSuccess(null)
+    setPreviewOutput(null)
+    try {
+      const res = await fetch('/api/log-extractor/extract', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          date: selectedDate,
+          logIds: Array.from(selectedLogIds),
+          promptText,
+        }),
+      })
+      if (!res.ok) {
+        const data = (await res.json()) as { message?: string }
+        throw new Error(data.message ?? t.actions.extractFailed)
+      }
+      const data = (await res.json()) as { output?: LogExtractionOutput }
+      setOutput(data.output ?? createEmptyLogExtractionOutput())
+      setActionSuccess(t.actions.extractSuccess)
+    } catch (error) {
+      setActionError((error as Error).message)
+    } finally {
+      setExtracting(false)
+    }
+  }
+
+  const handlePreview = async () => {
+    if (!canEdit) {
+      setActionError(t.actions.permissionDenied)
+      return
+    }
+    if (!outputReady) {
+      setActionError(t.actions.previewWarning)
+      return
+    }
+    setPreviewing(true)
+    setActionError(null)
+    setActionSuccess(null)
+    try {
+      const res = await fetch('/api/log-extractor/apply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          date: selectedDate,
+          output,
+          dryRun: true,
+        }),
+      })
+      if (!res.ok) {
+        const data = (await res.json()) as { message?: string }
+        throw new Error(data.message ?? t.actions.previewFailed)
+      }
+      const data = (await res.json()) as { mergedOutput?: LogExtractionOutput }
+      setPreviewOutput(data.mergedOutput ?? null)
+      setActionSuccess(t.actions.previewSuccess)
+    } catch (error) {
+      setActionError((error as Error).message)
+    } finally {
+      setPreviewing(false)
+    }
+  }
+
+  const handleApply = async () => {
+    if (!canEdit) {
+      setActionError(t.actions.permissionDenied)
+      return
+    }
+    if (!previewOutput) {
+      setActionError(t.actions.applyWarning)
+      return
+    }
+    setApplying(true)
+    setActionError(null)
+    setActionSuccess(null)
+    try {
+      const res = await fetch('/api/log-extractor/apply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          date: selectedDate,
+          output,
+        }),
+      })
+      if (!res.ok) {
+        const data = (await res.json()) as { message?: string }
+        throw new Error(data.message ?? t.actions.applyFailed)
+      }
+      setActionSuccess(t.actions.applySuccess)
+    } catch (error) {
+      setActionError((error as Error).message)
+    } finally {
+      setApplying(false)
+    }
   }
 
   if (authLoaded && !canView) {
@@ -418,7 +395,7 @@ export default function LogExtractorPage() {
       <AccessDenied
         locale={locale}
         permissions={['report:view', 'report:edit']}
-        hint="需要拥有 report:view 或 report:edit 权限才能抽取日志。"
+        hint={t.accessHint}
       />
     )
   }
@@ -471,20 +448,22 @@ export default function LogExtractorPage() {
           </div>
         </div>
 
-        <div className="grid gap-6 xl:grid-cols-[1.08fr,1fr]">
+        <div className="grid gap-6 xl:grid-cols-[1.05fr,1.2fr]">
           <div className="flex flex-col gap-6">
-            <div className="rounded-3xl border border-slate-200/70 bg-white/90 p-6 shadow-xl shadow-slate-200/40 backdrop-blur">
+            <section className="rounded-3xl border border-slate-200/70 bg-white/90 p-6 shadow-xl shadow-slate-200/40 backdrop-blur">
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
-                    {t.panels.inputs.title}
+                    {t.panels.logs.title}
                   </p>
                   <h2 className={`text-lg font-semibold text-slate-900 ${headingFont.className}`}>
-                    {t.panels.inputs.description}
+                    {t.panels.logs.description}
                   </h2>
                 </div>
                 <div className="flex flex-wrap gap-2 text-xs font-semibold text-slate-600">
-                  <span className="rounded-full border border-slate-200 bg-white px-3 py-1">{t.form.lockLabel}</span>
+                  <span className="rounded-full border border-slate-200 bg-white px-3 py-1">
+                    {t.logs.selectedLabel} {selectedCount}
+                  </span>
                   <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-amber-700">
                     {formatDateLabel(selectedDate, dateLocale)}
                   </span>
@@ -493,196 +472,175 @@ export default function LogExtractorPage() {
 
               <div className="mt-5 grid gap-4">
                 <label className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-                  {t.form.dateLabel}
+                  {t.logs.dateLabel}
                 </label>
-                <div className="grid gap-3 md:grid-cols-[1fr,1fr]">
-                  <div className="flex flex-col gap-2">
-                    <span className="text-[11px] text-slate-500">{t.form.presetLabel}</span>
-                    <select
-                      value={dateMode === 'custom' ? 'custom' : selectedDate}
-                      onChange={(event) => {
-                        const value = event.target.value
-                        if (value === 'custom') {
-                          setDateMode('custom')
-                          return
-                        }
-                        setDateMode('preset')
-                        setSelectedDate(value)
-                        setCustomDate(value)
-                      }}
-                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm transition focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
-                    >
-                      {presetDates.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                      <option value="custom">{t.form.customLabel}</option>
-                    </select>
-                  </div>
-                  {dateMode === 'custom' ? (
-                    <div className="flex flex-col gap-2">
-                      <span className="text-[11px] text-slate-500">{t.form.customLabel}</span>
-                      <input
-                        type="date"
-                        value={customDate}
-                        onChange={(event) => {
-                          setCustomDate(event.target.value)
-                          setSelectedDate(event.target.value)
-                        }}
-                        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm transition focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
-                      />
-                    </div>
-                  ) : null}
-                </div>
-                <p className="text-xs text-slate-500">{t.form.dateHint}</p>
+                <input
+                  type="date"
+                  value={selectedDate}
+                  onChange={(event) => setSelectedDate(event.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm transition focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+                />
 
-                <div className="grid gap-4 md:grid-cols-[1fr,1fr]">
-                  <div className="flex flex-col gap-2">
-                    <label className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-                      {t.form.leaderLabel}
-                    </label>
-                    <textarea
-                      value={leaderPattern}
-                      onChange={(event) => setLeaderPattern(event.target.value)}
-                      rows={3}
-                      placeholder={t.form.leaderPlaceholder}
-                      className="min-h-[90px] rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm transition focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
-                    />
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <button
+                    type="button"
+                    onClick={toggleSelectAll}
+                    className="rounded-full border border-slate-200 bg-white px-4 py-1.5 text-xs font-semibold text-slate-600 transition hover:border-slate-300 hover:text-slate-900"
+                  >
+                    {allSelected ? t.logs.clearSelection : t.logs.selectAll}
+                  </button>
+                  <div className="flex items-center gap-2 text-xs text-slate-500">
+                    <span>{t.logs.totalLabel}</span>
+                    <span className="font-semibold text-slate-700">{logs.length}</span>
                   </div>
-                  <div className="flex flex-col gap-2">
-                    <label className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-                      {t.form.noiseLabel}
-                    </label>
-                    <div className="flex gap-2">
-                      <input
-                        value={noiseInput}
-                        onChange={(event) => setNoiseInput(event.target.value)}
-                        onKeyDown={(event) => {
-                          if (event.key === 'Enter') {
-                            event.preventDefault()
-                            addNoiseWord()
-                          }
-                        }}
-                        placeholder={t.form.noisePlaceholder}
-                        className="flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm transition focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
-                      />
-                      <button
-                        type="button"
-                        onClick={addNoiseWord}
-                        className="rounded-xl border border-slate-200 bg-slate-900 px-3 py-2 text-xs font-semibold text-white transition hover:bg-slate-800"
-                      >
-                        {t.form.noiseAdd}
-                      </button>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {noiseWords.map((word) => (
-                        <button
-                          type="button"
-                          key={word}
-                          onClick={() => setNoiseWords((prev) => prev.filter((item) => item !== word))}
-                          className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold text-slate-600 transition hover:border-slate-300 hover:text-slate-900"
+                </div>
+
+                <input
+                  type="search"
+                  value={searchTerm}
+                  onChange={(event) => setSearchTerm(event.target.value)}
+                  placeholder={t.logs.searchPlaceholder}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm transition focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+                />
+
+                {logsLoading ? (
+                  <p className="text-sm text-slate-500">{t.logs.loading}</p>
+                ) : logsError ? (
+                  <p className="text-sm text-rose-500">{logsError}</p>
+                ) : filteredLogs.length === 0 ? (
+                  <p className="text-sm text-slate-500">{t.logs.empty}</p>
+                ) : (
+                  <div className="grid max-h-[520px] gap-3 overflow-y-auto pr-2">
+                    {filteredLogs.map((log) => {
+                      const selected = selectedLogIds.has(log.id)
+                      const expanded = expandedLogs.has(log.id)
+                      const content = log.contentRaw?.trim() || ''
+                      const hasContent = Boolean(content)
+                      return (
+                        <div
+                          key={log.id}
+                          className={`rounded-2xl border p-4 transition ${
+                            selected
+                              ? 'border-sky-200 bg-sky-50/70 shadow-sm'
+                              : 'border-slate-200 bg-white'
+                          }`}
                         >
-                          {word}
-                        </button>
-                      ))}
-                      {noiseWords.length === 0 ? (
-                        <span className="text-[11px] text-slate-400">{t.hints.noiseEmpty}</span>
-                      ) : null}
-                    </div>
+                          <div className="flex items-start justify-between gap-3">
+                            <label className="flex items-center gap-3">
+                              <input
+                                type="checkbox"
+                                checked={selected}
+                                onChange={() => toggleLogSelection(log.id)}
+                                className="mt-1 h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-200"
+                              />
+                              <div>
+                                <p className="text-sm font-semibold text-slate-900">
+                                  {log.supervisorName}
+                                </p>
+                                <p className="text-xs text-slate-500">
+                                  {formatDateTime(log.updatedAt, dateLocale)} · {t.logs.photoLabel} {log.photoCount}
+                                </p>
+                              </div>
+                            </label>
+                            <button
+                              type="button"
+                              onClick={() => toggleExpand(log.id)}
+                              className="text-xs font-semibold text-slate-500 transition hover:text-slate-900"
+                            >
+                              {expanded ? t.logs.collapse : t.logs.expand}
+                            </button>
+                          </div>
+                          <div className="mt-3 text-sm text-slate-700">
+                            {hasContent ? (
+                              <p className={`${expanded ? 'whitespace-pre-wrap' : 'line-clamp-3'}`}>{content}</p>
+                            ) : (
+                              <p className="text-xs text-slate-400">{t.logs.noContent}</p>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
                   </div>
-                </div>
-
-                <div className="flex flex-col gap-2">
-                  <label className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-                    {t.form.rawLabel}
-                  </label>
-                  <textarea
-                    value={rawLogs}
-                    onChange={(event) => setRawLogs(event.target.value)}
-                    rows={10}
-                    placeholder={t.form.rawPlaceholder}
-                    className="min-h-[220px] rounded-3xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm transition focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
-                  />
-                  <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500">
-                    <span>{t.form.rawHint}</span>
-                    {rawLogs.trim() ? (
-                      <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px]">
-                        {t.form.lockHint}
-                      </span>
-                    ) : null}
-                  </div>
-                  {rawLogs.trim() && otherDates.length > 0 ? (
-                    <p className="text-xs text-amber-600">
-                      {t.warnings.dateMismatch.replace('{dates}', otherDates.join('，'))}
-                    </p>
-                  ) : null}
-                  {rawLogs.trim() && detectedDates.length === 0 ? (
-                    <p className="text-xs text-slate-400">{t.warnings.dateNone}</p>
-                  ) : null}
-                </div>
-
-                <div className="flex flex-wrap gap-3">
-                  <button
-                    type="button"
-                    onClick={handleExtract}
-                    className="rounded-full bg-slate-900 px-5 py-2 text-sm font-semibold text-white shadow-md shadow-slate-900/20 transition hover:-translate-y-0.5 hover:bg-slate-800"
-                  >
-                    {t.actions.extract}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleClear}
-                    className="rounded-full border border-slate-200 bg-white px-5 py-2 text-sm font-semibold text-slate-700 transition hover:-translate-y-0.5 hover:border-slate-300"
-                  >
-                    {t.actions.clear}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleCopy(promptText, t.status.promptCopied)}
-                    className="rounded-full border border-slate-200 bg-slate-50 px-5 py-2 text-sm font-semibold text-slate-700 transition hover:-translate-y-0.5 hover:border-slate-300"
-                  >
-                    {t.actions.copyPrompt}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleCopy(outputText, t.status.outputCopied)}
-                    className="rounded-full border border-amber-200 bg-amber-50 px-5 py-2 text-sm font-semibold text-amber-700 transition hover:-translate-y-0.5 hover:border-amber-300"
-                  >
-                    {t.actions.copyOutput}
-                  </button>
-                  {statusMessage ? (
-                    <span className="flex items-center text-xs text-slate-500">{statusMessage}</span>
-                  ) : null}
-                </div>
+                )}
               </div>
-            </div>
-
-            <div className="rounded-3xl border border-slate-200/70 bg-white/90 p-6 shadow-xl shadow-slate-200/40 backdrop-blur">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
-                {t.panels.prompt.title}
-              </p>
-              <p className="mt-1 text-xs text-slate-500">{t.panels.prompt.description}</p>
-              <textarea
-                readOnly
-                value={promptText}
-                rows={14}
-                className="mt-4 w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 shadow-sm"
-              />
-            </div>
+            </section>
           </div>
 
           <div className="flex flex-col gap-6">
-            <div className="rounded-3xl border border-slate-200/70 bg-white/90 p-6 shadow-xl shadow-slate-200/40 backdrop-blur">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
-                {t.panels.output.title}
-              </p>
-              <p className="mt-1 text-xs text-slate-500">{t.panels.output.description}</p>
+            <section className="rounded-3xl border border-slate-200/70 bg-white/90 p-6 shadow-xl shadow-slate-200/40 backdrop-blur">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+                    {t.panels.prompt.title}
+                  </p>
+                  <h2 className={`text-lg font-semibold text-slate-900 ${headingFont.className}`}>
+                    {t.panels.prompt.description}
+                  </h2>
+                </div>
+                <div className="text-xs text-slate-500">
+                  {promptSaving ? t.prompt.saving : t.prompt.saved}
+                  {promptSavedAt ? ` · ${formatDateTime(promptSavedAt, dateLocale)}` : ''}
+                </div>
+              </div>
+              <textarea
+                value={promptText}
+                onChange={(event) => setPromptText(event.target.value)}
+                rows={6}
+                placeholder={t.prompt.placeholder}
+                disabled={!canEdit}
+                className="mt-4 w-full rounded-3xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm transition focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100 disabled:cursor-not-allowed disabled:bg-slate-100"
+              />
+              {promptError ? (
+                <p className="mt-2 text-xs text-rose-500">{promptError}</p>
+              ) : (
+                <p className="mt-2 text-xs text-slate-500">{canEdit ? t.prompt.hint : t.prompt.readonlyHint}</p>
+              )}
+            </section>
+
+            <section className="rounded-3xl border border-slate-200/70 bg-white/90 p-6 shadow-xl shadow-slate-200/40 backdrop-blur">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+                    {t.panels.output.title}
+                  </p>
+                  <h2 className={`text-lg font-semibold text-slate-900 ${headingFont.className}`}>
+                    {t.panels.output.description}
+                  </h2>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={handleExtract}
+                    disabled={extracting || !selectedLogIds.size}
+                    className="rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-slate-900/20 transition hover:-translate-y-0.5 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-70"
+                  >
+                    {extracting ? t.actions.extracting : t.actions.extract}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handlePreview}
+                    disabled={previewing || !canEdit || !outputReady}
+                    className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 transition hover:-translate-y-0.5 hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-70"
+                  >
+                    {previewing ? t.actions.previewing : t.actions.preview}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleApply}
+                    disabled={applying || !previewOutput || !canEdit}
+                    className="rounded-full border border-amber-200 bg-amber-50 px-4 py-2 text-xs font-semibold text-amber-700 transition hover:-translate-y-0.5 hover:border-amber-300 disabled:cursor-not-allowed disabled:opacity-70"
+                  >
+                    {applying ? t.actions.applying : t.actions.apply}
+                  </button>
+                </div>
+              </div>
+
+              {actionError ? <p className="mt-3 text-xs text-rose-500">{actionError}</p> : null}
+              {actionSuccess ? <p className="mt-3 text-xs text-emerald-600">{actionSuccess}</p> : null}
 
               <div className="mt-5 grid gap-6">
                 <section className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
                   <p className="text-sm font-semibold text-slate-800">{t.output.observations}</p>
-                  <p className="text-[11px] text-slate-400">{t.hints.securityRequired}</p>
                   <div className="mt-3 grid gap-3">
                     <FieldTextarea
                       label={t.output.security}
@@ -729,7 +687,6 @@ export default function LogExtractorPage() {
 
                 <section className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
                   <p className="text-sm font-semibold text-slate-800">{t.output.works}</p>
-                  <p className="text-[11px] text-slate-400">{t.hints.emptyAllowed}</p>
                   <div className="mt-3 grid gap-3">
                     <FieldTextarea
                       label={t.output.preparation}
@@ -818,7 +775,7 @@ export default function LogExtractorPage() {
                       }
                     />
                     <FieldTextarea
-                      label={t.output.quarryControl}
+                      label={t.output.quarry}
                       value={output.controls.quarry}
                       onChange={(value) =>
                         setOutput((prev) => ({
@@ -828,7 +785,7 @@ export default function LogExtractorPage() {
                       }
                     />
                     <FieldTextarea
-                      label={t.output.subcontractControl}
+                      label={t.output.subcontract}
                       value={output.controls.subcontract}
                       onChange={(value) =>
                         setOutput((prev) => ({
@@ -838,7 +795,7 @@ export default function LogExtractorPage() {
                       }
                     />
                     <FieldTextarea
-                      label={t.output.controlOther}
+                      label={t.output.other}
                       value={output.controls.other}
                       onChange={(value) =>
                         setOutput((prev) => ({
@@ -849,48 +806,46 @@ export default function LogExtractorPage() {
                     />
                   </div>
                 </section>
-
-                <section className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
-                  <p className="text-sm font-semibold text-slate-800">{t.panels.extra.title}</p>
-                  <p className="text-[11px] text-slate-400">{t.panels.extra.description}</p>
-                  <div className="mt-3 grid gap-3">
-                    <FieldTextarea
-                      label={t.output.survey}
-                      value={output.survey}
-                      onChange={(value) => setOutput((prev) => ({ ...prev, survey: value }))}
-                    />
-                    <FieldTextarea
-                      label={t.output.quarry}
-                      value={output.quarry}
-                      onChange={(value) => setOutput((prev) => ({ ...prev, quarry: value }))}
-                    />
-                    <FieldTextarea
-                      label={t.output.subcontract}
-                      value={output.subcontract}
-                      onChange={(value) => setOutput((prev) => ({ ...prev, subcontract: value }))}
-                    />
-                    <FieldTextarea
-                      label={t.output.other}
-                      value={output.other}
-                      onChange={(value) => setOutput((prev) => ({ ...prev, other: value }))}
-                    />
-                  </div>
-                </section>
               </div>
-            </div>
+            </section>
 
-            <div className="rounded-3xl border border-slate-200/70 bg-white/90 p-6 shadow-xl shadow-slate-200/40 backdrop-blur">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
-                {t.panels.combined.title}
-              </p>
-              <p className="mt-1 text-xs text-slate-500">{t.panels.combined.description}</p>
-              <textarea
-                readOnly
-                value={outputText}
-                rows={12}
-                className="mt-4 w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 shadow-sm"
-              />
-            </div>
+            {previewOutput ? (
+              <section className="rounded-3xl border border-amber-200/70 bg-amber-50/70 p-6 shadow-xl shadow-amber-200/30 backdrop-blur">
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-600">
+                      {t.panels.preview.title}
+                    </p>
+                    <h2 className={`text-lg font-semibold text-slate-900 ${headingFont.className}`}>
+                      {t.panels.preview.description}
+                    </h2>
+                  </div>
+                </div>
+                <div className="mt-4 grid gap-4">
+                  <PreviewBlock title={t.output.observations}>
+                    <PreviewItem label={t.output.security} value={previewOutput.observations.security} />
+                    <PreviewItem label={t.output.environment} value={previewOutput.observations.environment} />
+                    <PreviewItem label={t.output.general} value={previewOutput.observations.general} />
+                    <PreviewItem label={t.output.special} value={previewOutput.observations.special} />
+                  </PreviewBlock>
+                  <PreviewBlock title={t.output.works}>
+                    <PreviewItem label={t.output.preparation} value={previewOutput.works.preparation} />
+                    <PreviewItem label={t.output.earthwork} value={previewOutput.works.earthwork} />
+                    <PreviewItem label={t.output.pavement} value={previewOutput.works.pavement} />
+                    <PreviewItem label={t.output.drainage} value={previewOutput.works.drainage} />
+                    <PreviewItem label={t.output.safety} value={previewOutput.works.safety} />
+                    <PreviewItem label={t.output.geotech} value={previewOutput.works.geotech} />
+                    <PreviewItem label={t.output.otherWork} value={previewOutput.works.otherWork} />
+                  </PreviewBlock>
+                  <PreviewBlock title={t.output.controls}>
+                    <PreviewItem label={t.output.beTopo} value={previewOutput.controls.beTopo} />
+                    <PreviewItem label={t.output.quarry} value={previewOutput.controls.quarry} />
+                    <PreviewItem label={t.output.subcontract} value={previewOutput.controls.subcontract} />
+                    <PreviewItem label={t.output.other} value={previewOutput.controls.other} />
+                  </PreviewBlock>
+                </div>
+              </section>
+            ) : null}
           </div>
         </div>
       </section>
@@ -915,5 +870,33 @@ function FieldTextarea({ label, value, onChange }: FieldTextareaProps) {
         className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm font-normal text-slate-700 shadow-sm transition focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
       />
     </label>
+  )
+}
+
+type PreviewBlockProps = {
+  title: string
+  children: ReactNode
+}
+
+function PreviewBlock({ title, children }: PreviewBlockProps) {
+  return (
+    <div className="rounded-2xl border border-amber-200/80 bg-white/70 px-4 py-3">
+      <p className="text-sm font-semibold text-slate-800">{title}</p>
+      <div className="mt-3 grid gap-2 text-xs text-slate-700">{children}</div>
+    </div>
+  )
+}
+
+type PreviewItemProps = {
+  label: string
+  value: string
+}
+
+function PreviewItem({ label, value }: PreviewItemProps) {
+  return (
+    <div className="grid gap-1">
+      <span className="text-[11px] font-semibold text-slate-500">{label}</span>
+      <span className="text-sm text-slate-800">{value || '—'}</span>
+    </div>
   )
 }

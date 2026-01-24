@@ -347,15 +347,15 @@
     11. `isActive`：布尔，软删除开关，默认 `true`。
     12. `createdAt` / `updatedAt`：时间戳。
 
-## 工程量计量（月度明细，BoqMeasurement）
+## 工程量计量（期次明细，BoqMeasurement）
 
-- **用途**：记录每月完成工程量，用于生成实际工程量清单、计量单与月产值统计。
+- **用途**：记录每期完成工程量，用于生成实际工程量清单、计量单与产值统计。
 - **字段**
      1. `id`：唯一标识。
      2. `projectId`：关联 `Project`（必填）。
      3. `boqItemId`：关联 `BoqItem`（必填）。
-     4. `period`：月份标识（日期类型，按月存储）。
-     5. `quantity`：本月完成量（decimal）。
+     4. `period`：期次标识（日期类型，按期次顺序编码存储）。
+     5. `quantity`：本期完成量（decimal）。
      6. `unitPrice?`：可选月度单价（用于临时调整/变更价）。
      7. `amount?`：本月产值金额（可选，允许前端或报表计算后回写）。
      8. `note?`：备注。
@@ -667,3 +667,12 @@
      - `Document.status` 作为函件状态来源（`DRAFT`/`FINAL`/`ARCHIVED`）。
      - 附件通过 `FileAssetLink` 绑定至 `Document`（`entityType=document`，`entityId=Document.id`），签收件使用 `letter-receipt` 分类。
      - 函件正文写入 `Document.data.content`，收/发件人姓名可写入 `Document.data.senderName` / `Document.data.recipientName`。
+
+## 日志抽取配置（LogExtractionConfig）
+
+- **用途**：保存“日志抽取”模块的当前提示词（无历史版本）。
+- **字段**
+     1. `key`：配置键，默认 `daily-report-extractor`，仅一条记录。
+     2. `promptText`：当前生效的抽取提示词，中文为主。
+     3. `updatedById`：最近更新用户 ID，可空。
+     4. `createdAt` / `updatedAt`：创建与更新时间戳。
