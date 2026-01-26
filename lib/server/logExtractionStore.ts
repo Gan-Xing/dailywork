@@ -12,6 +12,15 @@ export type LogExtractionConfigRecord = {
   updatedAt: Date
 }
 
+export type LeaderLogPromptRecord = {
+  id: number
+  supervisorId: number
+  promptText: string
+  updatedById: number | null
+  createdAt: Date
+  updatedAt: Date
+}
+
 export const getLogExtractionConfig = async () => {
   return prisma.logExtractionConfig.findUnique({
     where: { key: LOG_EXTRACTION_CONFIG_KEY },
@@ -35,6 +44,37 @@ export const upsertLogExtractionConfig = async (promptText: string, userId?: num
     update: {
       promptText: trimmed,
       updatedById: userId ?? null,
+    },
+  })
+}
+
+export const listLeaderLogPrompts = async (supervisorIds?: number[]) => {
+  const where =
+    supervisorIds && supervisorIds.length
+      ? { supervisorId: { in: supervisorIds } }
+      : undefined
+  return prisma.leaderLogPrompt.findMany({
+    where,
+    orderBy: { supervisorId: 'asc' },
+  })
+}
+
+export const upsertLeaderLogPrompt = async (input: {
+  supervisorId: number
+  promptText: string
+  userId?: number | null
+}) => {
+  const trimmed = input.promptText.trim()
+  return prisma.leaderLogPrompt.upsert({
+    where: { supervisorId: input.supervisorId },
+    create: {
+      supervisorId: input.supervisorId,
+      promptText: trimmed,
+      updatedById: input.userId ?? null,
+    },
+    update: {
+      promptText: trimmed,
+      updatedById: input.userId ?? null,
     },
   })
 }

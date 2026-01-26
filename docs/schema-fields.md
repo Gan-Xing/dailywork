@@ -676,3 +676,14 @@
      2. `promptText`：当前生效的抽取提示词，中文为主。
      3. `updatedById`：最近更新用户 ID，可空。
      4. `createdAt` / `updatedAt`：创建与更新时间戳。
+
+## 负责人提示词（LeaderLogPrompt）
+
+- **用途**：为每位“施工负责人”维护一条专属提示词，用于日志抽取时叠加个人日报风格说明。
+- **字段**
+     1. `supervisorId`：负责人用户 ID，唯一。
+     2. `promptText`：负责人专属提示词（文本，可为空字符串）。
+     3. `updatedById`：最近更新用户 ID，可空。
+     4. `createdAt` / `updatedAt`：创建与更新时间戳。
+- **约束**
+     1. `supervisorId` 唯一，确保每位负责人仅一条提示词。

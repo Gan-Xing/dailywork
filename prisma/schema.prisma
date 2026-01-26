@@ -199,6 +199,19 @@ model LogExtractionConfig {
   updatedAt   DateTime @updatedAt
 }
 
+model LeaderLogPrompt {
+  id           Int      @id @default(autoincrement())
+  supervisorId Int      @unique
+  promptText   String
+  updatedById  Int?
+  supervisor   User     @relation("LeaderLogPromptSupervisor", fields: [supervisorId], references: [id], onDelete: Cascade)
+  updatedBy    User?    @relation("LeaderLogPromptUpdater", fields: [updatedById], references: [id], onDelete: SetNull)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([updatedById])
+}
+
 model RoadSection {
   id        Int      @id @default(autoincrement())
   projectId Int?
@@ -540,6 +553,8 @@ model User {
   supervisedLeaderDailyLogs LeaderDailyLog[] @relation("LeaderDailyLogSupervisor")
   createdLeaderDailyLogs LeaderDailyLog[] @relation("LeaderDailyLogCreator")
   updatedLeaderDailyLogs LeaderDailyLog[] @relation("LeaderDailyLogUpdater")
+  leaderLogPrompt LeaderLogPrompt? @relation("LeaderLogPromptSupervisor")
+  leaderLogPromptsUpdated LeaderLogPrompt[] @relation("LeaderLogPromptUpdater")
   logExtractionConfigsUpdated LogExtractionConfig[] @relation("LogExtractionConfigUpdater")
   contractChangeSupervisees UserContractChange[] @relation("ContractChangeSupervisor")
   payrollChangeSupervisees UserPayrollChange[] @relation("PayrollChangeSupervisor")

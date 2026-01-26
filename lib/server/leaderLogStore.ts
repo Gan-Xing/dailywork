@@ -257,6 +257,60 @@ export const listRecentLeaderLogs = async (limit = 5, supervisorId?: number) => 
   return attachPhotoCounts(logs)
 }
 
+export const listRecentLeaderLogsByDays = async (
+  days: number,
+  supervisorId?: number,
+  limit?: number,
+) => {
+  const safeDays = Number.isFinite(days) && days > 0 ? Math.floor(days) : 7
+  const safeLimit = Number.isFinite(limit) && (limit as number) > 0 ? Math.floor(limit as number) : null
+  const now = new Date()
+  const since = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
+  since.setUTCDate(since.getUTCDate() - (safeDays - 1))
+  const until = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1))
+
+  const hasSupervisor = Number.isFinite(supervisorId) && (supervisorId as number) > 0
+  const records = await prisma.$queryRaw<
+    Array<{
+      id: number
+      logDate: Date
+      supervisorId: number
+      supervisorName: string
+      contentRaw: string
+      createdAt: Date
+      updatedAt: Date
+    }>
+  >`
+    SELECT
+      log."id",
+      log."logDate",
+      log."supervisorId",
+      log."supervisorName",
+      log."contentRaw",
+      log."createdAt",
+      log."updatedAt"
+    FROM "LeaderDailyLog" log
+    WHERE log."logDate" >= ${since}
+      AND log."logDate" < ${until}
+      AND (
+        btrim(log."contentRaw") <> ''
+        OR EXISTS (
+          SELECT 1
+          FROM "FileAssetLink" link
+          JOIN "FileAsset" file ON file."id" = link."fileId"
+          WHERE link."entityType" = 'leader-log'
+            AND link."entityId" = CAST(log."id" AS TEXT)
+            AND file."category" = 'site-photo'
+        )
+      )
+    ${hasSupervisor ? Prisma.sql`AND log."supervisorId" = ${supervisorId}` : Prisma.empty}
+    ORDER BY log."logDate" DESC, log."updatedAt" DESC
+    ${safeLimit ? Prisma.sql`LIMIT ${safeLimit}` : Prisma.empty}
+  `
+  const logs = records.map((record) => mapLeaderLog(record))
+  return attachPhotoCounts(logs)
+}
+
 export const getLeaderLogById = async (id: number) => {
   const record = await prisma.leaderDailyLog.findUnique({
     where: { id },

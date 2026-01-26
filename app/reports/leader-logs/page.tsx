@@ -274,7 +274,7 @@ export default function LeaderLogsPage() {
     setRecentLoading(true)
     setRecentError(null)
     try {
-      const params = new URLSearchParams({ limit: '5' })
+      const params = new URLSearchParams({ days: '7', limit: '7' })
       if (leaderId) {
         params.set('supervisorId', String(leaderId))
       }

@@ -7,6 +7,7 @@ import {
   listLeaderLogDatesForMonth,
   listLeaderLogsForDate,
   listRecentLeaderLogs,
+  listRecentLeaderLogsByDays,
 } from '@/lib/server/leaderLogStore'
 
 const canViewLeaderLogs = async () =>
@@ -31,6 +32,7 @@ export async function GET(request: Request) {
   const date = searchParams.get('date')
   const month = searchParams.get('month')
   const limitParam = searchParams.get('limit')
+  const daysParam = searchParams.get('days')
   const supervisorParam = searchParams.get('supervisorId')
   const supervisorId = supervisorParam ? Number(supervisorParam) : NaN
   const supervisorFilter = Number.isFinite(supervisorId) && supervisorId > 0 ? supervisorId : undefined
@@ -72,6 +74,30 @@ export async function GET(request: Request) {
               },
             }
           : { dates },
+      )
+    }
+    if (daysParam) {
+      const days = Number(daysParam)
+      const limit = limitParam ? Number(limitParam) : NaN
+      const effectiveLimit = Number.isFinite(limit) && limit > 0 ? limit : undefined
+      const logs = await listRecentLeaderLogsByDays(
+        days,
+        canViewAll ? supervisorFilter : sessionUser.id,
+        effectiveLimit,
+      )
+      return NextResponse.json(
+        debug
+          ? {
+            logs,
+            debug: {
+              canViewAll,
+              supervisorFilter,
+              sessionUserId: sessionUser.id,
+              limit: effectiveLimit ?? null,
+              days,
+            },
+          }
+          : { logs },
       )
     }
     if (limitParam) {

@@ -4,7 +4,7 @@ import { callDeepseek, DeepseekConfigError, DeepseekRequestError } from '@/lib/a
 import { prisma } from '@/lib/prisma'
 import { DATE_KEY_REGEX } from '@/lib/reportUtils'
 import { getSessionUser, hasPermission } from '@/lib/server/authSession'
-import { getEffectiveLogExtractionPrompt } from '@/lib/server/logExtractionStore'
+import { getEffectiveLogExtractionPrompt, listLeaderLogPrompts } from '@/lib/server/logExtractionStore'
 import {
   normalizeLogExtractionOutput,
   parseLogExtractionOutputFromText,
@@ -82,6 +82,7 @@ export async function POST(request: Request) {
     },
     select: {
       id: true,
+      supervisorId: true,
       supervisorName: true,
       contentRaw: true,
       updatedAt: true,
@@ -97,6 +98,33 @@ export async function POST(request: Request) {
     ? payload.promptText.trim()
     : await getEffectiveLogExtractionPrompt()
 
+  const leaderPromptRecords = await listLeaderLogPrompts(
+    Array.from(new Set(logs.map((log) => log.supervisorId))),
+  )
+  const leaderPromptMap = new Map<number, string>(
+    leaderPromptRecords.map((record) => [record.supervisorId, record.promptText.trim()]),
+  )
+
+  const uniqueLeaders = Array.from(
+    logs.reduce<Map<number, string>>((acc, log) => {
+      if (!acc.has(log.supervisorId)) {
+        acc.set(log.supervisorId, log.supervisorName)
+      }
+      return acc
+    }, new Map()),
+  ).map(([id, name]) => ({ id, name }))
+
+  const promptByLeader = uniqueLeaders
+    .map((leader) => {
+      const customPrompt = leaderPromptMap.get(leader.id)
+      const parts = [promptText]
+      if (customPrompt) {
+        parts.push(`负责人风格要求：${customPrompt}`)
+      }
+      return `【${leader.name}】\n${parts.join('\n')}`
+    })
+    .join('\n\n')
+
   const logContent = logs
     .map((log) => {
       const updated = log.updatedAt.toISOString().replace('T', ' ').slice(0, 16)
@@ -107,8 +135,8 @@ export async function POST(request: Request) {
 
   const userMessage = [
     `所选日期：${dateKey}`,
-    '请严格遵守以下用户提示词：',
-    promptText,
+    '请严格遵守以下用户提示词（按负责人拼接通用提示词与个人风格）：',
+    promptByLeader,
     '',
     '原始日志如下：',
     logContent,

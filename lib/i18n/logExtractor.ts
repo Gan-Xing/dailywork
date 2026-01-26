@@ -48,6 +48,10 @@ export type LogExtractorCopy = {
     readonlyHint: string
     saving: string
     saved: string
+    leaderTitle: string
+    leaderHint: string
+    leaderPlaceholder: string
+    leaderEmpty: string
   }
   actions: {
     extract: string
@@ -143,6 +147,10 @@ export const logExtractorCopy: Record<Locale, LogExtractorCopy> = {
       readonlyHint: '缺少编辑权限，当前为只读模式。',
       saving: '保存中…',
       saved: '已保存',
+      leaderTitle: '负责人提示词',
+      leaderHint: '仅作为该负责人的日报风格补充说明，会叠加到通用提示词。',
+      leaderPlaceholder: '例如：简洁风格、突出设备与产值、用分号分隔…',
+      leaderEmpty: '暂无负责人可编辑提示词。',
     },
     actions: {
       extract: 'AI 抽取',
@@ -236,6 +244,10 @@ export const logExtractorCopy: Record<Locale, LogExtractorCopy> = {
       readonlyHint: 'Lecture seule (pas de droit d’édition).',
       saving: 'Sauvegarde…',
       saved: 'Sauvegardé',
+      leaderTitle: 'Prompt par responsable',
+      leaderHint: 'Ajout du style propre au responsable, combiné au prompt global.',
+      leaderPlaceholder: 'Ex.: style concis, focus sur matériel et production…',
+      leaderEmpty: 'Aucun responsable disponible.',
     },
     actions: {
       extract: 'Extraire',
