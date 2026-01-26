@@ -21,7 +21,10 @@ const dictionaries: Record<DictionaryKind, Record<string, Entry>> = {
     [normalize('过道涵')]: { zh: '过道涵', fr: 'Dalot traversée' },
     [normalize('底基层')]: { zh: '底基层', fr: 'Fondation' },
     [normalize('基层')]: { zh: '基层', fr: 'Couche de base' },
+    // French aliases (so French UI values can be canonicalized back to zh)
+    [normalize('Couche de base')]: { zh: '基层', fr: 'Couche de base' },
     [normalize('GNT基层')]: { zh: 'GNT基层', fr: 'Couche de base en GNT (Grave Non Traitée)' },
+    [normalize('Couche de base en GNT (Grave Non Traitée)')]: { zh: 'GNT基层', fr: 'Couche de base en GNT (Grave Non Traitée)' },
     [normalize('垫层')]: { zh: '垫层', fr: 'Couche de forme' },
     [normalize('Béton de propreté')]: { zh: '垫层', fr: 'Béton de propreté' },
     [normalize('路基垫层')]: { zh: '路基垫层', fr: 'Couche de Forme' },
@@ -48,7 +51,10 @@ const dictionaries: Record<DictionaryKind, Record<string, Entry>> = {
     [normalize('过道涵')]: { zh: '过道涵', fr: 'Dalot traversée' },
     [normalize('底基层')]: { zh: '底基层', fr: 'Fondation' },
     [normalize('基层')]: { zh: '基层', fr: 'Couche de base' },
+    // French aliases (so French UI values can be canonicalized back to zh)
+    [normalize('Couche de base')]: { zh: '基层', fr: 'Couche de base' },
     [normalize('GNT基层')]: { zh: 'GNT基层', fr: 'Couche de base en GNT (Grave Non Traitée)' },
+    [normalize('Couche de base en GNT (Grave Non Traitée)')]: { zh: 'GNT基层', fr: 'Couche de base en GNT (Grave Non Traitée)' },
     [normalize('垫层')]: { zh: '垫层', fr: 'Couche de forme' },
     [normalize('路基垫层')]: { zh: '路基垫层', fr: 'Couche de Forme' },
     [normalize('埋墙粉刷')]: { zh: '埋墙粉刷', fr: 'Badigeonnage' },
@@ -110,8 +116,11 @@ const dictionaries: Record<DictionaryKind, Record<string, Entry>> = {
     [normalize('埋墙粉刷')]: { zh: '埋墙粉刷', fr: 'Badigeonnage' },
     [normalize('CBR')]: { zh: 'CBR', fr: 'CBR' },
     [normalize('现场干密度')]: { zh: '现场干密度', fr: 'Densité sèche in situ' },
+    [normalize('Densité sèche in situ')]: { zh: '现场干密度', fr: 'Densité sèche in situ' },
     [normalize('颗粒级配')]: { zh: '颗粒级配', fr: 'Granulométrie' },
+    [normalize('Granulométrie')]: { zh: '颗粒级配', fr: 'Granulométrie' },
     [normalize('砂当量')]: { zh: '砂当量', fr: 'Équivalent de sable' },
+    [normalize('Équivalent de sable')]: { zh: '砂当量', fr: 'Équivalent de sable' },
   },
   type: {
     [normalize('现场验收')]: { zh: '现场验收', fr: 'GENIE CIVIL' },
