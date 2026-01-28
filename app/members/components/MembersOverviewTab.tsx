@@ -425,29 +425,20 @@ const parseNumber = (value?: string | null) => {
 const formatMonthValue = (year: number, month: number) =>
   `${year}-${String(month).padStart(2, '0')}`
 
-const getLastMonthKey = () => {
-  const date = new Date()
-  const utc = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1))
-  utc.setUTCMonth(utc.getUTCMonth() - 1)
-  return {
-    year: utc.getUTCFullYear(),
-    month: utc.getUTCMonth() + 1,
-  }
-}
-
-const getLastMonthValue = () => {
-  const { year, month } = getLastMonthKey()
-  return formatMonthValue(year, month)
-}
-
-const buildRecentMonthOptions = (count: number) => {
+const buildMonthOptionsInDynamicRange = (startYear: number, startMonth: number) => {
   const options: MultiSelectOption[] = []
-  const { year, month } = getLastMonthKey()
-  const cursor = new Date(Date.UTC(year, month - 1, 1))
-  for (let i = 0; i < count; i += 1) {
+  const now = new Date()
+  const currentYear = now.getUTCFullYear()
+  const currentMonth = now.getUTCMonth() + 1 // UTC months are 0-indexed
+
+  let cursor = new Date(Date.UTC(startYear, startMonth - 1, 1)) // Month is 0-indexed
+  while (
+    cursor.getUTCFullYear() < currentYear ||
+    (cursor.getUTCFullYear() === currentYear && cursor.getUTCMonth() + 1 <= currentMonth)
+  ) {
     const value = formatMonthValue(cursor.getUTCFullYear(), cursor.getUTCMonth() + 1)
     options.push({ value, label: value })
-    cursor.setUTCMonth(cursor.getUTCMonth() - 1)
+    cursor.setUTCMonth(cursor.getUTCMonth() + 1) // Increment by one month
   }
   return options
 }
@@ -3034,11 +3025,11 @@ export function MembersOverviewTab({
     key: string
     direction: 'asc' | 'desc'
   }>({ key: 'total', direction: 'desc' })
-  const defaultPayrollMonth = useMemo(() => getLastMonthValue(), [])
+  const defaultPayrollMonth = useMemo(() => { const now = new Date(); return formatMonthValue(now.getUTCFullYear(), now.getUTCMonth() + 1); }, []);
   const [payrollMonthFilters, setPayrollMonthFilters] = useState<string[]>(() => [
     defaultPayrollMonth,
   ])
-  const payrollMonthOptions = useMemo(() => buildRecentMonthOptions(12), [])
+  const payrollMonthOptions = useMemo(() => buildMonthOptionsInDynamicRange(2024, 1).reverse(), [])
   const activePayrollMonths = useMemo(() => {
     const months = payrollMonthFilters.length > 0 ? payrollMonthFilters : [defaultPayrollMonth]
     return Array.from(new Set(months)).sort()

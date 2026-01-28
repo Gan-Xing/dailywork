@@ -124,16 +124,42 @@ export default function SubmissionEditor({ initialSubmission, canManage = false,
     return check ? [check] : []
   }
 
+  const normalizeInspectionToken = (value: string) =>
+    value.replace(/[\u200B-\u200D\uFEFF]/g, '').trim()
+
+  const splitInspectionTokens = (values: string[]) => {
+    const result: string[] = []
+    const seen = new Set<string>()
+    values.forEach((value) => {
+      const cleaned = normalizeInspectionToken(value)
+      if (!cleaned) return
+      const slashParts = cleaned.split(/\s+\/\s+/)
+      slashParts.forEach((part) => {
+        part
+          .split(/[、，,\n]/)
+          .map((item) => normalizeInspectionToken(item))
+          .filter(Boolean)
+          .forEach((token) => {
+            const key = token.toLowerCase()
+            if (seen.has(key)) return
+            seen.add(key)
+            result.push(token)
+          })
+      })
+    })
+    return result
+  }
+
   const buildInspectionDescription = (inspection: InspectionListItem) => {
     const locale: Locale = 'fr' // 对齐 PDF 默认法语导出
     const sideLabelMap: Record<string, string> = { LEFT: 'Gauche', RIGHT: 'Droite', BOTH: 'Deux côtés' }
     const sideLabel = sideLabelMap[inspection.side] ?? inspection.side
     const rangeText = `${formatPk(inspection.startPk)} → ${formatPk(inspection.endPk)}`
     const roadText = resolveRoadName({ slug: inspection.roadSlug, name: inspection.roadName }, locale)
-    const phaseText = localizeProgressTerm('phase', inspection.phaseName, locale)
+    const phaseText = localizeProgressTerm('phase', normalizeInspectionToken(inspection.phaseName), locale)
     const localisation = `${roadText} · ${phaseText} · ${sideLabel} · ${rangeText}`
-    const rawLayers = getRawLayers(inspection)
-    const rawChecks = getRawChecks(inspection)
+    const rawLayers = splitInspectionTokens(getRawLayers(inspection))
+    const rawChecks = splitInspectionTokens(getRawChecks(inspection))
     const layers = localizeProgressList('layer', rawLayers, locale, { phaseName: inspection.phaseName })
     const checks = localizeProgressList('check', rawChecks, locale, { phaseName: inspection.phaseName })
     const nature = [...layers, ...checks].filter(Boolean).join(' / ')
