@@ -176,6 +176,9 @@ const mapEntryToListItem = (entry: InspectionEntryDTO): InspectionListItem => {
     roadId: entry.roadId,
     roadName: entry.roadName ?? rawRoad?.name ?? '',
     roadSlug: entry.roadSlug ?? rawRoad?.slug ?? '',
+    locationRoadId: entry.locationRoadId ?? null,
+    locationRoadName: entry.locationRoadName ?? null,
+    locationRoadSlug: entry.locationRoadSlug ?? null,
     phaseId: entry.phaseId,
     phaseName: entry.phaseName ?? rawPhase?.name ?? '',
     documentId: entry.documentId ?? null,
@@ -232,6 +235,13 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
   )
   const formatTypeLabel = useCallback((value: string) => localizeProgressTerm('type', value, locale), [locale])
   const formatRoadName = useCallback((slug?: string, name?: string) => resolveRoadName({ slug, name }, locale), [locale])
+  const resolveDisplayRoad = useCallback(
+    (item: Pick<InspectionListItem, 'roadSlug' | 'roadName' | 'locationRoadSlug' | 'locationRoadName'>) => ({
+      slug: item.locationRoadSlug ?? item.roadSlug,
+      name: item.locationRoadName ?? item.roadName,
+    }),
+    [],
+  )
   const normalizeLayerLabels = useCallback(
     (values: string[], phaseName?: string) =>
       localizeProgressList('layer', canonicalizeProgressList('layer', values), locale, {
@@ -1245,8 +1255,10 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
           switch (col.key) {
             case 'sequence':
               return index + 1
-            case 'road':
-              return isPrefab ? prefabRoadLabel : formatRoadName(item.roadSlug, item.roadName)
+            case 'road': {
+              const displayRoad = resolveDisplayRoad(item)
+              return isPrefab ? prefabRoadLabel : formatRoadName(displayRoad.slug, displayRoad.name)
+            }
             case 'phase':
               return item.phaseName ? localizeProgressTerm('phase', item.phaseName, locale) : '—'
             case 'side':
@@ -1765,9 +1777,10 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                     const displayIndex = (page - 1) * pageSize + index + 1
                     const isPrefab = isPrefabItem(item)
                     const isRowSelected = selectedIds.includes(item.id)
+                    const displayRoad = resolveDisplayRoad(item)
                     const roadText = isPrefab
                       ? prefabRoadLabel
-                      : formatRoadName(item.roadSlug, item.roadName)
+                      : formatRoadName(displayRoad.slug, displayRoad.name)
                     const sideText = isPrefab ? '—' : sideCopy[item.side] ?? item.side
     const rangeText = isPrefab ? '—' : `${formatPK(item.startPk)} → ${formatPK(item.endPk)}`
                     const layersText = normalizeLayerLabels(
@@ -2010,7 +2023,8 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
               const isPrefab = isPrefabItem(selected)
               const sideText = isPrefab ? '—' : sideCopy[selected.side] ?? selected.side
               const rangeText = isPrefab ? '—' : `${formatPK(selected.startPk)} → ${formatPK(selected.endPk)}`
-              const roadText = isPrefab ? prefabRoadLabel : formatRoadName(selected.roadSlug, selected.roadName)
+              const displayRoad = resolveDisplayRoad(selected)
+              const roadText = isPrefab ? prefabRoadLabel : formatRoadName(displayRoad.slug, displayRoad.name)
               const joiner = locale === 'fr' ? ', ' : ' / '
               const layerText = normalizeLayerLabels(selected.layers, selected.phaseName).join(joiner)
               const checksText = normalizeCheckLabels(selected.checks).join(joiner)
@@ -2405,7 +2419,8 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
           >
             {(() => {
               const isPrefab = isPrefabItem(editing)
-              const roadText = isPrefab ? prefabRoadLabel : formatRoadName(editing.roadSlug, editing.roadName)
+              const displayRoad = resolveDisplayRoad(editing)
+              const roadText = isPrefab ? prefabRoadLabel : formatRoadName(displayRoad.slug, displayRoad.name)
               const rangeText = isPrefab ? '—' : `${formatPK(editing.startPk)} → ${formatPK(editing.endPk)}`
               return (
             <div className="w-full max-w-4xl rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl shadow-emerald-500/20 backdrop-blur">
@@ -2621,7 +2636,10 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                   <p className="text-sm text-slate-600">
                     {isPrefabItem(deleteTarget)
                       ? prefabRoadLabel
-                      : formatRoadName(deleteTarget.roadSlug, deleteTarget.roadName)}{' '}
+                      : (() => {
+                          const displayRoad = resolveDisplayRoad(deleteTarget)
+                          return formatRoadName(displayRoad.slug, displayRoad.name)
+                        })()}{' '}
                     · {formatPK(deleteTarget.startPk)} → {formatPK(deleteTarget.endPk)}
                   </p>
                 </div>

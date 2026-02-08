@@ -21,6 +21,7 @@ import { localizeProgressTerm } from '@/lib/i18n/progressDictionary'
 import { locales } from '@/lib/i18n'
 import { usePreferredLocale } from '@/lib/usePreferredLocale'
 import type { IntervalSide, PhaseMeasure } from '@/lib/progressTypes'
+import { LEVEL_CROSSING_ROAD_SLUG } from '@/lib/roadConstants'
 
 const PhaseFormModal = dynamic<PhaseFormModalProps>(
   () => import('./PhaseFormModal').then((mod) => mod.PhaseFormModal),
@@ -42,6 +43,7 @@ export function PhaseEditor({
   initialPhases,
   phaseDefinitions,
   workflows,
+  locationRoadOptions = [],
   canManage,
   canInspect,
   canViewInspection,
@@ -77,6 +79,7 @@ export function PhaseEditor({
     const end = Number(road.endPk)
     return Number.isFinite(end) ? end : roadStart
   }, [road.endPk, roadStart])
+  const isLevelCrossing = road.slug === LEVEL_CROSSING_ROAD_SLUG
 
   const resetInspectionFormRef = useRef<() => void>(() => {})
   const clearSelectedSegmentRef = useRef<() => void>(() => {})
@@ -86,6 +89,8 @@ export function PhaseEditor({
     initialPhases,
     phaseDefinitions,
     workflows,
+    locationRoadOptions,
+    isLevelCrossing,
     canManage,
     locale,
     t,
@@ -224,9 +229,12 @@ export function PhaseEditor({
           name={phaseState.name}
           definitionId={phaseState.definitionId}
           editingId={phaseState.editingId}
+          locale={locale}
           definitions={phaseState.definitions}
           pointHasSides={phaseState.pointHasSides}
           intervals={phaseState.intervals}
+          isLevelCrossing={isLevelCrossing}
+          locationRoadOptions={locationRoadOptions}
           sideOptions={sideOptions}
           defaultLayers={phaseState.defaultLayers}
           layerOptions={phaseState.layerOptions}
@@ -408,6 +416,7 @@ export function PhaseEditor({
                                               end: seg.end,
                                               spec: seg.spec ?? null,
                                               billQuantity: seg.billQuantity ?? null,
+                                              locationRoadId: seg.locationRoadId ?? null,
                                               pointHasSides: phase.pointHasSides,
                                             })
                                           }}

@@ -7,8 +7,9 @@ import type { WorkflowBinding } from '@/lib/progressWorkflow'
 import { getProgressCopy } from '@/lib/i18n/progress'
 import { getSessionUser } from '@/lib/server/authSession'
 import { listPhaseDefinitions, listPhases } from '@/lib/server/progressStore'
-import { getRoadBySlug } from '@/lib/server/roadStore'
+import { getRoadBySlug, listRoadSections } from '@/lib/server/roadStore'
 import { getWorkflowByPhaseDefinitionId } from '@/lib/server/workflowStore'
+import { LEVEL_CROSSING_ROAD_SLUG } from '@/lib/roadConstants'
 
 export const dynamic = 'force-dynamic'
 
@@ -36,7 +37,15 @@ export default async function RoadDetailPage({ params }: { params: Promise<{ slu
     return <ProgressNotFound />
   }
 
-  const [phases, phaseDefinitions] = await Promise.all([listPhases(road.id), listPhaseDefinitions()])
+  const [phases, phaseDefinitions, allRoads] = await Promise.all([
+    listPhases(road.id),
+    listPhaseDefinitions(),
+    road.slug === LEVEL_CROSSING_ROAD_SLUG ? listRoadSections() : Promise.resolve([]),
+  ])
+  const locationRoadOptions =
+    road.slug === LEVEL_CROSSING_ROAD_SLUG
+      ? allRoads.filter((item) => item.slug !== LEVEL_CROSSING_ROAD_SLUG)
+      : []
   const workflows = (
     await Promise.all(
       phaseDefinitions.map((definition) => getWorkflowByPhaseDefinitionId(definition.id)),
@@ -53,6 +62,7 @@ export default async function RoadDetailPage({ params }: { params: Promise<{ slu
           initialPhases={phases}
           phaseDefinitions={phaseDefinitions as PhaseDefinitionDTO[]}
           workflows={workflows}
+          locationRoadOptions={locationRoadOptions}
           canManage={canManage}
           canInspect={canInspect}
           canViewInspection={canViewInspection}

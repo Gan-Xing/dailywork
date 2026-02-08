@@ -14,6 +14,7 @@ export interface PhaseEditorProps {
   initialPhases: PhaseDTO[]
   phaseDefinitions: PhaseDefinitionDTO[]
   workflows: WorkflowBinding[]
+  locationRoadOptions?: RoadSectionDTO[]
   canManage: boolean
   canInspect: boolean
   canViewInspection: boolean
@@ -26,6 +27,7 @@ export type InspectionSlice = {
   side: IntervalSide
   startPk: number
   endPk: number
+  locationRoadId?: number | null
   status: InspectionStatus
   updatedAt: number
 }
@@ -40,6 +42,7 @@ export type LatestPointInspection = {
   side: IntervalSide
   startPk: number
   endPk: number
+  locationRoadId?: number | null
   status: InspectionStatus
   updatedAt: number
 }
@@ -50,6 +53,7 @@ export interface Segment {
   status: Status
   spec?: string | null
   billQuantity?: number | null
+  locationRoadId?: number | null
   workflow?: WorkflowBinding
   workflowLayers?: WorkflowLayerTemplate[]
   workflowTypeOptions?: string[]
@@ -82,6 +86,7 @@ export interface PointView {
     side: IntervalSide
     spec?: string | null
     billQuantity?: number | null
+    locationRoadId?: number | null
     layers?: string[]
   }[]
 }
@@ -98,6 +103,7 @@ export interface SelectedSegment {
   end: number
   spec?: string | null
   billQuantity?: number | null
+  locationRoadId?: number | null
   workflow?: WorkflowBinding
   workflowLayers?: WorkflowLayerTemplate[]
   workflowTypeOptions?: string[]
@@ -135,6 +141,7 @@ export type InspectionSubmitBatch = {
 
 export type InspectionEntrySubmitPayload = {
   roadId: number
+  locationRoadId?: number | null
   phaseId: number
   side: IntervalSide
   startPk: number

@@ -20,6 +20,8 @@ type UsePhaseManagementParams = {
   initialPhases: PhaseDTO[]
   phaseDefinitions: PhaseDefinitionDTO[]
   workflows: WorkflowBinding[]
+  locationRoadOptions: PhaseEditorProps['locationRoadOptions']
+  isLevelCrossing: boolean
   canManage: boolean
   locale: Locale
   t: ReturnType<typeof import('@/lib/i18n/progress').getProgressCopy>['phase']
@@ -79,6 +81,8 @@ export function usePhaseManagement({
   initialPhases,
   phaseDefinitions,
   workflows,
+  locationRoadOptions = [],
+  isLevelCrossing,
   canManage,
   locale,
   t,
@@ -95,8 +99,17 @@ export function usePhaseManagement({
   const [name, setName] = useState(() => phaseDefinitions[0]?.name ?? '')
   const [measure, setMeasure] = useState<PhaseMeasure>(() => phaseDefinitions[0]?.measure ?? 'LINEAR')
   const [pointHasSides, setPointHasSides] = useState(() => Boolean(phaseDefinitions[0]?.pointHasSides))
+  const defaultLocationRoadId = isLevelCrossing ? null : road.id
   const [intervals, setIntervals] = useState<PhaseIntervalPayload[]>([
-    { startPk: roadStart, endPk: roadEnd, side: 'BOTH', spec: '', layers: [], billQuantity: null },
+    {
+      startPk: roadStart,
+      endPk: roadEnd,
+      side: 'BOTH',
+      spec: '',
+      layers: [],
+      billQuantity: null,
+      locationRoadId: defaultLocationRoadId,
+    },
   ])
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
@@ -131,6 +144,10 @@ export function usePhaseManagement({
     })
     return map
   }, [phases, workflowMap])
+  const allowedLocationRoadIds = useMemo(
+    () => new Set((locationRoadOptions ?? []).map((road) => road.id)),
+    [locationRoadOptions],
+  )
 
   const currentPhaseForForm = useMemo(
     () => (editingId ? phases.find((item) => item.id === editingId) ?? null : null),
@@ -167,8 +184,16 @@ export function usePhaseManagement({
   }, [currentPhaseForForm?.resolvedLayers, definitionId, definitions, workflowLayersForForm])
 
   const defaultInterval = useMemo<PhaseIntervalPayload>(
-    () => ({ startPk: roadStart, endPk: roadEnd, side: 'BOTH', spec: '', layers: defaultLayers, billQuantity: null }),
-    [defaultLayers, roadEnd, roadStart],
+    () => ({
+      startPk: roadStart,
+      endPk: roadEnd,
+      side: 'BOTH',
+      spec: '',
+      layers: defaultLayers,
+      billQuantity: null,
+      locationRoadId: defaultLocationRoadId,
+    }),
+    [defaultLayers, defaultLocationRoadId, roadEnd, roadStart],
   )
 
   const designLength = useMemo(() => computeDesign(measure, intervals), [measure, intervals])
@@ -263,6 +288,7 @@ export function usePhaseManagement({
         spec: i.spec ?? '',
         layers: Array.isArray(i.layers) ? i.layers : [],
         billQuantity: i.billQuantity ?? null,
+        locationRoadId: i.locationRoadId ?? defaultLocationRoadId,
       })),
     )
     setPointHasSides(Boolean(normalized.pointHasSides))
@@ -287,6 +313,16 @@ export function usePhaseManagement({
       if (intervalInvalid) {
         setError(t.errors.invalidRange)
         return
+      }
+      if (isLevelCrossing) {
+        const missingLocation = intervals.some((item) => {
+          const id = Number(item.locationRoadId)
+          return !Number.isFinite(id) || !allowedLocationRoadIds.has(id)
+        })
+        if (missingLocation) {
+          setError(t.errors.locationRoadMissing ?? t.errors.invalidRange)
+          return
+        }
       }
       if (!definitionId) {
         setError(t.errors.definitionMissing)
@@ -321,11 +357,15 @@ export function usePhaseManagement({
         const layerIds = layers
           .map((name) => allowedLayerIdByName.get(normalizeLabel(name)))
           .filter((id): id is number => Number.isInteger(id))
+        const locationRoadId = isLevelCrossing
+          ? (Number.isFinite(Number(item.locationRoadId)) ? Number(item.locationRoadId) : null)
+          : road.id
         return {
           id: item.id,
           startPk,
           endPk,
           side: item.side,
+          locationRoadId,
           spec: spec || undefined,
           layers,
           layerIds,

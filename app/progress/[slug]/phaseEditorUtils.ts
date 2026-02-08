@@ -49,6 +49,7 @@ export const normalizePhaseDTO = (phase: PhaseDTO): PhaseDTO => ({
     startPk: Number(interval.startPk) || 0,
     endPk: Number(interval.endPk) || 0,
     side: interval.side,
+    locationRoadId: interval.locationRoadId ?? null,
     spec: interval.spec ?? null,
     layers: Array.isArray((interval as { layers?: string[] }).layers)
       ? ((interval as { layers?: string[] }).layers ?? []).filter(Boolean)
@@ -88,6 +89,7 @@ export type CheckStatusKeyInput = {
   layerName?: string | null
   checkId?: string | null | number
   checkName?: string | null
+  locationRoadId?: number | null
   startPk: number
   endPk: number
 }
@@ -98,6 +100,7 @@ export const buildCheckStatusBaseKey = (input: CheckStatusKeyInput) => {
     normalizeEntityKey(input.phaseId, input.phaseName),
     normalizeEntityKey(input.layerId, input.layerName),
     normalizeEntityKey(input.checkId, input.checkName),
+    `loc:${input.locationRoadId ?? 'default'}`,
     `${start}-${end}`,
   ].join('|')
 }
@@ -136,6 +139,7 @@ export const normalizeInterval = (interval: PhaseIntervalPayload, measure: Phase
     startPk: orderedStart,
     endPk: orderedEnd,
     side: interval.side,
+    locationRoadId: interval.locationRoadId ?? null,
     spec: typeof interval.spec === 'string' && interval.spec.trim() ? interval.spec.trim() : null,
     layers: Array.isArray((interval as { layers?: string[] }).layers)
       ? ((interval as { layers?: string[] }).layers ?? []).filter(Boolean)
@@ -192,9 +196,18 @@ export const isWorkflowSatisfied = (status?: InspectionStatus) =>
   (statusPriority[status ?? 'PENDING'] ?? 0) >= (statusPriority.SCHEDULED ?? 0)
 
 export const snapshotMatches =
-  (phaseId: number, targetSide: IntervalSide, targetStart: number, targetEnd: number) =>
+  (
+    phaseId: number,
+    targetSide: IntervalSide,
+    targetStart: number,
+    targetEnd: number,
+    targetLocationRoadId?: number | null,
+  ) =>
   (snapshot: LatestPointInspection) => {
     if (snapshot.phaseId !== phaseId) return false
+    if (targetLocationRoadId !== undefined && targetLocationRoadId !== null) {
+      if ((snapshot.locationRoadId ?? null) !== targetLocationRoadId) return false
+    }
     const [snapshotStart, snapshotEnd] = normalizeRange(snapshot.startPk, snapshot.endPk)
     const [targetStartOrdered, targetEndOrdered] = normalizeRange(targetStart, targetEnd)
     if (snapshotEnd < targetStartOrdered || snapshotStart > targetEndOrdered) return false
@@ -239,7 +252,12 @@ export const applyInspectionStatuses = (segments: Segment[], inspections: Inspec
     if (!design) continue
     let status = design.status
     if (design.status !== 'nonDesign') {
-      const overlaps = inspections.filter((insp) => Math.max(start, insp.startPk) < Math.min(end, insp.endPk))
+      const overlaps = inspections.filter((insp) => {
+        if (design.locationRoadId !== null && design.locationRoadId !== undefined) {
+          if ((insp.locationRoadId ?? null) !== design.locationRoadId) return false
+        }
+        return Math.max(start, insp.startPk) < Math.min(end, insp.endPk)
+      })
       if (overlaps.length) {
         const best = overlaps.reduce<InspectionSlice | null>((prev, current) => {
           if (!prev) return current
@@ -290,6 +308,7 @@ export const buildLinearView = (
       status: 'pending' as Status,
       spec: interval.spec,
       billQuantity: interval.billQuantity,
+      locationRoadId: interval.locationRoadId ?? null,
       pointHasSides: Boolean(phase.pointHasSides),
     }
     if (interval.side === 'LEFT') left.push(baseSegment)

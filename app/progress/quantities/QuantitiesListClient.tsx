@@ -43,6 +43,9 @@ type ColumnKey =
 
 type DisplayRow = PhaseIntervalManagementRow & {
   displayLabel: string
+  displayRoadId: number
+  displayRoadName: string
+  displayRoadSlug: string
   projectKey: string
   projectLabel: string
   updatedDate: string
@@ -165,11 +168,17 @@ export default function QuantitiesListClient({ rows, canEdit }: Props) {
             ? `${row.projectName}（${row.projectCode}）`
             : row.projectName
           : '未绑定项目'
+        const displayRoadId = row.locationRoadId ?? row.roadId
+        const displayRoadName = row.locationRoadName ?? row.roadName
+        const displayRoadSlug = row.locationRoadSlug ?? row.roadSlug
         const completedPercent = Math.min(100, Math.max(0, row.completedPercent ?? 0))
         const bindingStatus = row.hasBoundItems ? 'BOUND' : 'UNBOUND'
         return {
           ...row,
           displayLabel: displayLabels[row.measure] ?? row.measure,
+          displayRoadId,
+          displayRoadName,
+          displayRoadSlug,
           projectKey,
           projectLabel,
           updatedDate: formatUpdatedDate(row.updatedAt),
@@ -196,8 +205,8 @@ export default function QuantitiesListClient({ rows, canEdit }: Props) {
     () =>
       buildOptions(
         rowsWithMeta.map((row) => ({
-          value: String(row.roadId),
-          label: `${row.roadName}（${row.roadSlug}）`,
+          value: String(row.displayRoadId),
+          label: `${row.displayRoadName}（${row.displayRoadSlug}）`,
         })),
       ).sort((a, b) => compareText(a.label, b.label)),
     [rowsWithMeta],
@@ -298,7 +307,7 @@ export default function QuantitiesListClient({ rows, canEdit }: Props) {
       if (selectedProjects.length && !selectedProjects.includes(row.projectKey)) {
         return false
       }
-      if (selectedRoads.length && !selectedRoads.includes(String(row.roadId))) {
+      if (selectedRoads.length && !selectedRoads.includes(String(row.displayRoadId))) {
         return false
       }
       if (selectedPhases.length && !selectedPhases.includes(row.phaseName)) {
@@ -349,9 +358,9 @@ export default function QuantitiesListClient({ rows, canEdit }: Props) {
         case 'project':
           result = compareText(a.projectLabel, b.projectLabel)
           break
-        case 'road':
-          result = compareText(a.roadName, b.roadName)
-          break
+      case 'road':
+        result = compareText(a.displayRoadName, b.displayRoadName)
+        break
         case 'phase':
           result = compareText(a.phaseName, b.phaseName)
           break
@@ -858,8 +867,8 @@ export default function QuantitiesListClient({ rows, canEdit }: Props) {
                             ) : null}
                             {isVisible('road') ? (
                               <td className="px-4 py-3">
-                                <div className="font-semibold text-slate-900">{row.roadName}</div>
-                                <div className="text-xs text-slate-500">{row.roadSlug}</div>
+                              <div className="font-semibold text-slate-900">{row.displayRoadName}</div>
+                              <div className="text-xs text-slate-500">{row.displayRoadSlug}</div>
                               </td>
                             ) : null}
                           {isVisible('phase') ? (

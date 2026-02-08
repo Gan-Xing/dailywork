@@ -530,6 +530,7 @@ export function useInspectionFlow({
         layerName: snapshot.layerName ?? snapshot.layerId ?? null,
         checkId: snapshot.checkId ?? null,
         checkName: snapshot.checkName ?? snapshot.checkId ?? null,
+        locationRoadId: snapshot.locationRoadId ?? null,
         startPk: targetStart,
         endPk: targetEnd,
       }
@@ -826,6 +827,7 @@ export function useInspectionFlow({
             layerName?: string | null
             checkId?: string | number | null
             checkName?: string | null
+            locationRoadId?: number | null
             updatedAt: string
           }>
         }
@@ -841,6 +843,7 @@ export function useInspectionFlow({
             layerName: snapshot.layerName,
             checkId: snapshot.checkId,
             checkName: snapshot.checkName,
+            locationRoadId: snapshot.locationRoadId ?? null,
             side: snapshot.side,
             startPk: snapshot.startPk,
             endPk: snapshot.endPk,
@@ -868,7 +871,7 @@ export function useInspectionFlow({
             restrictToTopLayer && (!normalizedLayerName || !topLayerNames.has(normalizedLayerName))
 
           if (!skipSlice) {
-            const sliceKey = `${snapshot.phaseId}:${snapshot.side}:${snapshot.startPk}:${snapshot.endPk}`
+            const sliceKey = `${snapshot.phaseId}:${snapshot.locationRoadId ?? 'null'}:${snapshot.side}:${snapshot.startPk}:${snapshot.endPk}`
             const prevSlice = sliceMap.get(sliceKey)
             const prevPriority = statusPriority[prevSlice?.status ?? 'PENDING'] ?? 0
             if (
@@ -881,6 +884,7 @@ export function useInspectionFlow({
                 side: snapshot.side,
                 startPk: snapshot.startPk,
                 endPk: snapshot.endPk,
+                locationRoadId: snapshot.locationRoadId ?? null,
                 status: snapshot.status ?? 'PENDING',
                 updatedAt: ts,
               })
@@ -906,6 +910,7 @@ export function useInspectionFlow({
             side,
             startPk: orderedStart,
             endPk: orderedEnd,
+            locationRoadId: item.locationRoadId ?? null,
             status: item.status ?? 'PENDING',
             updatedAt: ts,
           }
@@ -990,9 +995,9 @@ export function useInspectionFlow({
       return { left: false, right: false, both: false, lockedSide: null as IntervalSide | null }
     }
     const [rangeStart, rangeEnd] = intervalRange
-    const matchLeft = snapshotMatches(selectedSegment.phaseId, 'LEFT', rangeStart, rangeEnd)
-    const matchRight = snapshotMatches(selectedSegment.phaseId, 'RIGHT', rangeStart, rangeEnd)
-    const matchBoth = snapshotMatches(selectedSegment.phaseId, 'BOTH', rangeStart, rangeEnd)
+    const matchLeft = snapshotMatches(selectedSegment.phaseId, 'LEFT', rangeStart, rangeEnd, selectedSegment.locationRoadId ?? null)
+    const matchRight = snapshotMatches(selectedSegment.phaseId, 'RIGHT', rangeStart, rangeEnd, selectedSegment.locationRoadId ?? null)
+    const matchBoth = snapshotMatches(selectedSegment.phaseId, 'BOTH', rangeStart, rangeEnd, selectedSegment.locationRoadId ?? null)
     let left = false
     let right = false
     let both = false
@@ -1072,6 +1077,7 @@ export function useInspectionFlow({
       startPk: number,
       endPk: number,
       allowedLayers: string[] = [],
+      locationRoadId?: number | null,
     ) => {
       const workflowLayers = workflowLayersByPhaseId.get(phaseId)
       const phaseNameFallback = phases.find((item) => item.id === phaseId)?.name ?? ''
@@ -1106,6 +1112,7 @@ export function useInspectionFlow({
               layerName: layer.name,
               checkId: check.id,
               checkName: check.name,
+              locationRoadId: locationRoadId ?? null,
               side: candidateSide,
               startPk: targetStart,
               endPk: targetEnd,
@@ -1117,6 +1124,7 @@ export function useInspectionFlow({
               layerName: layer.name,
               checkId: null,
               checkName: check.name,
+              locationRoadId: locationRoadId ?? null,
               side: candidateSide,
               startPk: targetStart,
               endPk: targetEnd,
@@ -1154,6 +1162,7 @@ export function useInspectionFlow({
           layerName: layer.name,
           checkId: check.id,
           checkName: check.name,
+          locationRoadId: selectedSegment.locationRoadId ?? null,
           startPk: rangeStart,
           endPk: rangeEnd,
         })
@@ -1186,6 +1195,7 @@ export function useInspectionFlow({
           layerName: layer.name,
           checkId: check.id,
           checkName: check.name,
+          locationRoadId: selectedSegment.locationRoadId ?? null,
           startPk: rangeStart,
           endPk: rangeEnd,
         })
@@ -1382,6 +1392,7 @@ export function useInspectionFlow({
       return uniqueLayers.flatMap((layerName) =>
         uniqueChecks.map<InspectionEntrySubmitPayload>((checkName) => ({
           roadId: road.id,
+          locationRoadId: selectedSegment.locationRoadId ?? road.id,
           phaseId: payload.phaseId,
           side: payload.side,
           startPk: normalizedStart,

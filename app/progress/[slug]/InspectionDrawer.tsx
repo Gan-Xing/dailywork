@@ -159,6 +159,7 @@ export function InspectionDrawer({
       layerName: layer.name,
       checkId: check.id,
       checkName: check.name,
+      locationRoadId: selectedSegment.locationRoadId ?? null,
       side,
       startPk: targetStart,
       endPk: targetEnd,
@@ -176,6 +177,7 @@ export function InspectionDrawer({
       layerName: layer.name,
       checkId: null,
       checkName: check.name,
+      locationRoadId: selectedSegment.locationRoadId ?? null,
       side,
       startPk: targetStart,
       endPk: targetEnd,
@@ -192,6 +194,7 @@ export function InspectionDrawer({
       layerName: layer.name,
       checkId: check.id,
       checkName: check.name,
+      locationRoadId: selectedSegment.locationRoadId ?? null,
       startPk: targetStart,
       endPk: targetEnd,
     })
@@ -207,6 +210,7 @@ export function InspectionDrawer({
       layerName: layer.name,
       checkId: null,
       checkName: check.name,
+      locationRoadId: selectedSegment.locationRoadId ?? null,
       startPk: targetStart,
       endPk: targetEnd,
     })

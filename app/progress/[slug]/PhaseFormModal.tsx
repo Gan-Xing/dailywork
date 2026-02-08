@@ -2,7 +2,8 @@
 
 import type { RefObject } from 'react'
 
-import type { IntervalSide, PhaseDefinitionDTO, PhaseIntervalPayload, PhaseMeasure } from '@/lib/progressTypes'
+import type { IntervalSide, PhaseDefinitionDTO, PhaseIntervalPayload, PhaseMeasure, RoadSectionDTO } from '@/lib/progressTypes'
+import type { Locale } from '@/lib/i18n'
 import type { getProgressCopy } from '@/lib/i18n/progress'
 import { formatProgressCopy } from '@/lib/i18n/progress'
 
@@ -12,6 +13,7 @@ export interface PhaseFormModalProps {
   open: boolean
   canManage: boolean
   t: PhaseCopy
+  locale: Locale
   designLength: number
   roadLength: number
   measure: PhaseMeasure
@@ -21,6 +23,8 @@ export interface PhaseFormModalProps {
   definitions: PhaseDefinitionDTO[]
   pointHasSides: boolean
   intervals: PhaseIntervalPayload[]
+  isLevelCrossing: boolean
+  locationRoadOptions: RoadSectionDTO[]
   sideOptions: { value: IntervalSide; label: string }[]
   defaultLayers: string[]
   layerOptions: string[]
@@ -44,6 +48,7 @@ export function PhaseFormModal({
   open,
   canManage,
   t,
+  locale,
   designLength,
   roadLength,
   measure,
@@ -53,6 +58,8 @@ export function PhaseFormModal({
   definitions,
   pointHasSides,
   intervals,
+  isLevelCrossing,
+  locationRoadOptions,
   sideOptions,
   defaultLayers,
   layerOptions,
@@ -207,7 +214,9 @@ export function PhaseFormModal({
                 {intervals.map((item, index) => (
                   <div
                     key={index}
-                    className="grid grid-cols-1 gap-3 rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-700 md:grid-cols-6 md:items-center"
+                    className={`grid grid-cols-1 gap-3 rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-700 md:items-center ${
+                      isLevelCrossing ? 'md:grid-cols-7' : 'md:grid-cols-6'
+                    }`}
                   >
                     <label className="flex flex-col items-center gap-1 text-center">
                       {t.form.intervalStart}
@@ -257,6 +266,28 @@ export function PhaseFormModal({
                         placeholder={t.form.intervalSpec}
                       />
                     </label>
+                    {isLevelCrossing ? (
+                      <label className="flex flex-col items-center gap-1 text-center">
+                        {t.form.intervalLocationRoad}
+                        <select
+                          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-emerald-300 focus:outline-none"
+                          value={item.locationRoadId ?? ''}
+                          onChange={(e) =>
+                            onIntervalChange(index, {
+                              locationRoadId: e.target.value === '' ? null : Number(e.target.value),
+                            })
+                          }
+                          required={isLevelCrossing}
+                        >
+                          <option value="">{t.form.intervalLocationRoadPlaceholder}</option>
+                          {locationRoadOptions.map((road) => (
+                            <option key={road.id} value={road.id}>
+                              {(road.labels?.[locale] ?? road.name) + (road.slug ? ` (${road.slug})` : '')}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    ) : null}
                     <div className="md:col-span-2 flex flex-col gap-3 md:flex-row md:items-center md:gap-3">
                       <label className="flex w-full flex-col items-center gap-1 text-center md:mb-0">
                         {t.form.intervalBillQuantity}

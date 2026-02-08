@@ -71,6 +71,7 @@ interface PointLaneProps {
     startPk: number,
     endPk: number,
     allowedLayers?: string[],
+    locationRoadId?: number | null,
   ) => {
     percent: number
     completedLayers: number
@@ -128,6 +129,7 @@ export function PointLane({
       end: item.endPk,
       spec: item.spec ?? null,
       billQuantity: item.billQuantity ?? null,
+      locationRoadId: item.locationRoadId ?? null,
       pointHasSides: phase.pointHasSides,
     })
   }
@@ -167,6 +169,7 @@ export function PointLane({
                   item.startPk,
                   item.endPk,
                   item.layers && item.layers.length ? item.layers : phase.resolvedLayers,
+                  item.locationRoadId ?? null,
                 )
                 return (
                   <button
