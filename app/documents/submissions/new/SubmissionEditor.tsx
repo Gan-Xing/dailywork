@@ -155,7 +155,11 @@ export default function SubmissionEditor({ initialSubmission, canManage = false,
     const sideLabelMap: Record<string, string> = { LEFT: 'Gauche', RIGHT: 'Droite', BOTH: 'Deux côtés' }
     const sideLabel = sideLabelMap[inspection.side] ?? inspection.side
     const rangeText = `${formatPk(inspection.startPk)} → ${formatPk(inspection.endPk)}`
-    const roadText = resolveRoadName({ slug: inspection.roadSlug, name: inspection.roadName }, locale)
+    const displayRoad = {
+      slug: inspection.locationRoadSlug ?? inspection.roadSlug,
+      name: inspection.locationRoadName ?? inspection.roadName,
+    }
+    const roadText = resolveRoadName(displayRoad, locale)
     const phaseText = localizeProgressTerm('phase', normalizeInspectionToken(inspection.phaseName), locale)
     const localisation = `${roadText} · ${phaseText} · ${sideLabel} · ${rangeText}`
     const rawLayers = splitInspectionTokens(getRawLayers(inspection))
@@ -417,8 +421,10 @@ export default function SubmissionEditor({ initialSubmission, canManage = false,
       selectedInspections.forEach((inspection) => {
         const rawLayers = getRawLayers(inspection)
         const layerKey = rawLayers.length ? rawLayers[0].trim().toLowerCase() : ''
+        const locationKey = inspection.locationRoadId ?? inspection.roadId
         const key = [
-          inspection.roadSlug ?? inspection.roadName,
+          inspection.roadId,
+          locationKey,
           inspection.phaseId,
           inspection.side,
           inspection.startPk,

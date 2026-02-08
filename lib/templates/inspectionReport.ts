@@ -468,9 +468,16 @@ const buildPage = (
       : { LEFT: '左侧', RIGHT: '右侧', BOTH: '双侧' }
 
   const isPrefab = inspection.roadSlug === 'prefab'
+  const displayRoad =
+    inspection.locationRoadSlug || inspection.locationRoadName
+      ? {
+          slug: inspection.locationRoadSlug ?? inspection.roadSlug,
+          name: inspection.locationRoadName ?? inspection.roadName,
+        }
+      : { slug: inspection.roadSlug, name: inspection.roadName }
   const roadText = isPrefab
     ? (locale === 'fr' ? 'Préfabriqué' : '预制')
-    : resolveRoadName({ slug: inspection.roadSlug, name: inspection.roadName }, locale)
+    : resolveRoadName(displayRoad, locale)
 
   const phaseText = localizeProgressTerm('phase', inspection.phaseName, locale)
   const sideText = isPrefab ? '' : sideCopy[inspection.side] ?? inspection.side

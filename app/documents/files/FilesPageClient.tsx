@@ -117,8 +117,13 @@ const resolveBoqProjectLabel = (projectName: string, projectCode: string | null,
   const code = projectCode ?? ''
   const isBondoukou = code === 'project-bondoukou-city' || rawProjectName.includes('邦杜库')
   const isTanda = code === 'project-tanda-city' || rawProjectName.includes('丹达')
+  const isAgnibilekrou =
+    code === 'project-anibilekrou-city' ||
+    rawProjectName.includes('阿尼比莱克鲁') ||
+    rawProjectName.toLowerCase().includes('agnibil')
   if (isBondoukou) return locale === 'fr' ? 'Voiries de Bondoukou' : '邦杜库市政'
   if (isTanda) return locale === 'fr' ? 'Voiries de Tanda' : '丹达市政'
+  if (isAgnibilekrou) return locale === 'fr' ? "Voiries d'Agnibilékrou" : '阿尼比莱克鲁市政'
   if (rawProjectName) return rawProjectName
   return locale === 'fr' ? 'Projet sans nom' : '未命名项目'
 }
@@ -148,13 +153,20 @@ const formatBoqItemLabel = (item: BoqItemMeta, locale: string) => {
   return [projectLabel, code, designation].filter(Boolean).join(' · ')
 }
 
-const formatBoqMetaLabel = (meta: {
-  boqItemCode?: string
-  designationZh?: string
-  designationFr?: string
-  projectName?: string
-  projectCode?: string | null
-}, locale: string) => {
+const formatBoqMetaLabel = (
+  meta:
+    | {
+        boqItemCode?: string
+        designationZh?: string
+        designationFr?: string
+        projectName?: string
+        projectCode?: string | null
+      }
+    | null
+    | undefined,
+  locale: string,
+) => {
+  if (!meta) return ''
   const projectLabel = resolveBoqProjectLabel(meta.projectName ?? '', meta.projectCode ?? null, locale)
   const designation = resolveBoqDesignation(meta.designationZh ?? '', meta.designationFr ?? '', locale)
   const code = normalizeBoqLabelText(meta.boqItemCode ?? '')
@@ -162,7 +174,8 @@ const formatBoqMetaLabel = (meta: {
   return [projectLabel, code, designation].filter(Boolean).join(' · ')
 }
 
-const formatLeaderLogMetaLabel = (meta: { date?: string; supervisorName?: string }) => {
+const formatLeaderLogMetaLabel = (meta: { date?: string; supervisorName?: string } | null | undefined) => {
+  if (!meta) return ''
   const date = meta.date?.trim() ?? ''
   const supervisor = meta.supervisorName?.trim() ?? ''
   return [date, supervisor].filter(Boolean).join(' · ')

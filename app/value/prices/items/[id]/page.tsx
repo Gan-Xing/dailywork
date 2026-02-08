@@ -245,8 +245,13 @@ export default function PhaseItemDetailPage() {
     const projectCode = entry.projectCode ?? ''
     const isBondoukou = projectCode === 'project-bondoukou-city' || rawProjectName.includes('邦杜库')
     const isTanda = projectCode === 'project-tanda-city' || rawProjectName.includes('丹达')
+    const isAgnibilekrou =
+      projectCode === 'project-anibilekrou-city' ||
+      rawProjectName.includes('阿尼比莱克鲁') ||
+      rawProjectName.toLowerCase().includes('agnibil')
     if (isBondoukou) return isFrenchLocale ? 'Voiries de Bondoukou' : '邦杜库市政'
     if (isTanda) return isFrenchLocale ? 'Voiries de Tanda' : '丹达市政'
+    if (isAgnibilekrou) return isFrenchLocale ? "Voiries d'Agnibilékrou" : '阿尼比莱克鲁市政'
     if (rawProjectName) return rawProjectName
     return isFrenchLocale ? 'Projet sans nom' : '未命名项目'
   }, [isFrenchLocale])
