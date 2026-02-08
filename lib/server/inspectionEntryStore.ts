@@ -11,6 +11,7 @@ import { canonicalizeProgressList } from '@/lib/i18n/progressDictionary'
 import { clampTypesForCheck, mergeTypesForCheck } from './inspectionTypeRules'
 import { prisma } from '@/lib/prisma'
 import { getWorkflowByPhaseDefinitionId } from './workflowStore'
+import { LEVEL_CROSSING_ROAD_SLUG } from '@/lib/roadConstants'
 
 const normalizeSide = (side: string | undefined) =>
   side === 'LEFT' || side === 'RIGHT' || side === 'BOTH' ? side : 'BOTH'
@@ -71,43 +72,56 @@ const mapEntry = (
     include: {
       document: { include: { submission: true } }
       road: true
+      locationRoad: true
       phase: true
       submitter: true
       creator: true
       updater: true
     }
   }>,
-): InspectionEntryDTO => ({
-  id: row.id,
-  documentId: row.documentId ?? null,
-  documentCode: row.document?.code ?? null,
-  submissionId: row.documentId ?? null,
-  submissionCode: row.document?.code ?? null,
-  submissionNumber: row.document?.submission?.submissionNumber ?? null,
-  roadId: row.roadId,
-  roadName: row.road.name,
-  roadSlug: row.road.slug,
-  phaseId: row.phaseId,
-  phaseName: row.phase.name,
-  side: row.side,
-  startPk: row.startPk,
-  endPk: row.endPk,
-  layerId: row.layerId ?? null,
-  layerName: row.layerName,
-  checkId: row.checkId ?? null,
-  checkName: row.checkName,
-  types: row.types,
-  status: row.status,
-  appointmentDate: row.appointmentDate?.toISOString(),
-  remark: row.remark ?? undefined,
-  submissionOrder: row.submissionOrder ?? undefined,
-  submittedAt: row.submittedAt.toISOString(),
-  submittedBy: row.submitter ? { id: row.submitter.id, username: row.submitter.username } : null,
-  createdBy: row.creator ? { id: row.creator.id, username: row.creator.username } : null,
-  createdAt: row.createdAt.toISOString(),
-  updatedAt: row.updatedAt.toISOString(),
-  updatedBy: row.updater ? { id: row.updater.id, username: row.updater.username } : null,
-})
+): InspectionEntryDTO => {
+  const fallbackLocationRoadId =
+    row.road.slug === LEVEL_CROSSING_ROAD_SLUG ? null : row.roadId
+  const effectiveLocationRoadId =
+    row.locationRoadId ?? fallbackLocationRoadId
+  const resolvedLocationRoad =
+    row.locationRoad ?? (effectiveLocationRoadId && effectiveLocationRoadId === row.roadId ? row.road : null)
+
+  return {
+    id: row.id,
+    documentId: row.documentId ?? null,
+    documentCode: row.document?.code ?? null,
+    submissionId: row.documentId ?? null,
+    submissionCode: row.document?.code ?? null,
+    submissionNumber: row.document?.submission?.submissionNumber ?? null,
+    roadId: row.roadId,
+    roadName: row.road.name,
+    roadSlug: row.road.slug,
+    locationRoadId: effectiveLocationRoadId ?? null,
+    locationRoadName: resolvedLocationRoad?.name ?? null,
+    locationRoadSlug: resolvedLocationRoad?.slug ?? null,
+    phaseId: row.phaseId,
+    phaseName: row.phase.name,
+    side: row.side,
+    startPk: row.startPk,
+    endPk: row.endPk,
+    layerId: row.layerId ?? null,
+    layerName: row.layerName,
+    checkId: row.checkId ?? null,
+    checkName: row.checkName,
+    types: row.types,
+    status: row.status,
+    appointmentDate: row.appointmentDate?.toISOString(),
+    remark: row.remark ?? undefined,
+    submissionOrder: row.submissionOrder ?? undefined,
+    submittedAt: row.submittedAt.toISOString(),
+    submittedBy: row.submitter ? { id: row.submitter.id, username: row.submitter.username } : null,
+    createdBy: row.creator ? { id: row.creator.id, username: row.creator.username } : null,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+    updatedBy: row.updater ? { id: row.updater.id, username: row.updater.username } : null,
+  }
+}
 
 type InspectionEntryCreateData = Omit<Prisma.InspectionEntryUncheckedCreateInput, 'types'> & {
   types: string[]
@@ -185,6 +199,8 @@ export const isWorkflowValidationError = (error: unknown): error is WorkflowVali
 
 const assertWorkflowSubmissionRules = async (params: {
   phase: { id: number; phaseDefinitionId: number; name?: string }
+  roadId: number
+  locationRoadId?: number | null
   side: IntervalSide
   startPk: number
   endPk: number
@@ -235,12 +251,20 @@ const assertWorkflowSubmissionRules = async (params: {
     throw new WorkflowValidationError('报检内容不在模板中', invalidChecks)
   }
   const targetRange = normalizeRange(params.startPk, params.endPk)
+  const locationRoadFilter = (() => {
+    if (!params.locationRoadId) return null
+    if (params.locationRoadId === params.roadId) {
+      return { OR: [{ locationRoadId: params.locationRoadId }, { locationRoadId: null }] }
+    }
+    return { locationRoadId: params.locationRoadId }
+  })()
   const satisfiedEntries = await prisma.inspectionEntry.findMany({
     where: {
       phaseId: params.phase.id,
       status: { in: [InspectionStatus.SCHEDULED, InspectionStatus.SUBMITTED, InspectionStatus.IN_PROGRESS, InspectionStatus.APPROVED] },
       startPk: { lte: targetRange.endPk },
       endPk: { gte: targetRange.startPk },
+      ...(locationRoadFilter ? { AND: [locationRoadFilter] } : {}),
     },
   })
   // 打印模板与本次报检内容，便于直接定位前置校验
@@ -473,13 +497,20 @@ export const listInspectionEntries = async (filter: InspectionEntryFilter): Prom
 
   const where: Prisma.InspectionEntryWhereInput = {}
   const and: Prisma.InspectionEntryWhereInput[] = []
+  if (filter.roadSlugs && filter.roadSlugs.length) {
+    and.push({
+      OR: [
+        { road: { slug: { in: filter.roadSlugs } } },
+        { locationRoad: { slug: { in: filter.roadSlugs } } },
+      ],
+    })
+  } else if (filter.roadSlug) {
+    and.push({
+      OR: [{ road: { slug: filter.roadSlug } }, { locationRoad: { slug: filter.roadSlug } }],
+    })
+  }
   if (filter.ids && filter.ids.length) {
     where.id = { in: filter.ids }
-  }
-  if (filter.roadSlugs && filter.roadSlugs.length) {
-    where.road = { slug: { in: filter.roadSlugs } }
-  } else if (filter.roadSlug) {
-    where.road = { slug: filter.roadSlug }
   }
   if (filter.phaseId) {
     where.phaseId = filter.phaseId
@@ -539,6 +570,7 @@ export const listInspectionEntries = async (filter: InspectionEntryFilter): Prom
         { checkName: { contains: normalizedKeyword, mode: 'insensitive' } },
         { phase: { name: { contains: normalizedKeyword, mode: 'insensitive' } } },
         { road: { name: { contains: normalizedKeyword, mode: 'insensitive' } } },
+        { locationRoad: { name: { contains: normalizedKeyword, mode: 'insensitive' } } },
       ]
     }
   }
@@ -588,6 +620,7 @@ export const listInspectionEntries = async (filter: InspectionEntryFilter): Prom
       where,
       include: {
         road: true,
+        locationRoad: true,
         phase: true,
         document: { include: { submission: true } },
         submitter: true,
@@ -709,6 +742,17 @@ export const createInspectionEntries = async (
     throw new Error('路段不存在或已删除')
   }
   const roadMap = new Map(roads.map((road) => [road.id, road]))
+  const locationRoadIds = Array.from(
+    new Set(
+      entries
+        .map((item) => parseOptionalNumber((item as any).locationRoadId))
+        .filter((id): id is number => typeof id === 'number' && Number.isInteger(id) && id > 0),
+    ),
+  )
+  const locationRoads = locationRoadIds.length
+    ? await prisma.roadSection.findMany({ where: { id: { in: locationRoadIds } } })
+    : []
+  const locationRoadMap = new Map(locationRoads.map((road) => [road.id, road]))
 
   const phaseIds = Array.from(new Set(entries.map((item) => item.phaseId)))
   const phases = await prisma.roadPhase.findMany({
@@ -730,6 +774,8 @@ export const createInspectionEntries = async (
     string,
     {
       phase: (typeof phases)[number]
+      roadId: number
+      locationRoadId: number | null
       side: IntervalSide
       startPk: number
       endPk: number
@@ -761,14 +807,30 @@ export const createInspectionEntries = async (
     if (!road) {
       throw new Error('路段不存在或已删除')
     }
+    const isLevelCrossing = road.slug === LEVEL_CROSSING_ROAD_SLUG
+    const locationRoadInput = parseOptionalNumber((normalized as any).locationRoadId)
+    const locationRoadId = isLevelCrossing ? locationRoadInput : road.id
+    if (isLevelCrossing) {
+      if (!locationRoadId) {
+        throw new Error('平交路口报检必须选择所属主路段')
+      }
+      if (locationRoadId === road.id) {
+        throw new Error('所属主路段不能选择平交路口自身')
+      }
+      if (!locationRoadMap.has(locationRoadId)) {
+        throw new Error('所属主路段不存在或已删除')
+      }
+    }
 
     if (phase.roadId !== normalized.roadId) {
       throw new Error('分项与路段不匹配，请刷新后重试')
     }
 
-    const groupKey = `${phase.id}:${side}:${range.startPk}:${range.endPk}`
+    const groupKey = `${phase.id}:${side}:${range.startPk}:${range.endPk}:${locationRoadId ?? 'null'}`
     const group = workflowGroups.get(groupKey) ?? {
       phase,
+      roadId: road.id,
+      locationRoadId: locationRoadId ?? null,
       side: side as IntervalSide,
       startPk: range.startPk,
       endPk: range.endPk,
@@ -783,6 +845,7 @@ export const createInspectionEntries = async (
       data: {
         documentId: bindingProvided ? documentId ?? null : undefined,
         roadId: normalized.roadId,
+        locationRoadId: locationRoadId ?? undefined,
         phaseId: normalized.phaseId,
         side: side as IntervalSide,
         startPk: range.startPk,
@@ -810,6 +873,8 @@ export const createInspectionEntries = async (
     const availableLayers = resolvedLayersByPhaseId.get(group.phase.id)
     await assertWorkflowSubmissionRules({
       phase: { id: group.phase.id, phaseDefinitionId: group.phase.phaseDefinitionId },
+      roadId: group.roadId,
+      locationRoadId: group.locationRoadId,
       side: group.side,
       startPk: group.startPk,
       endPk: group.endPk,
@@ -824,6 +889,7 @@ export const createInspectionEntries = async (
   const keyFor = (data: InspectionEntryCreateData) =>
     [
       data.roadId,
+      data.locationRoadId ?? data.roadId,
       data.phaseId,
       data.side,
       data.startPk,
@@ -864,6 +930,16 @@ export const createInspectionEntries = async (
   const results: InspectionEntryDTO[] = []
   for (const [key, data] of Array.from(uniqueByKey.entries())) {
     const bindingProvided = bindingMap.get(key) ?? false
+    const locationRoadWhere = (() => {
+      const locationRoadId = data.locationRoadId ?? null
+      if (locationRoadId === null) {
+        return { locationRoadId: null }
+      }
+      if (locationRoadId === data.roadId) {
+        return { OR: [{ locationRoadId }, { locationRoadId: null }] }
+      }
+      return { locationRoadId }
+    })()
     const existing = await prisma.inspectionEntry.findFirst({
       where: {
         roadId: data.roadId,
@@ -873,10 +949,12 @@ export const createInspectionEntries = async (
         endPk: data.endPk,
         layerName: data.layerName,
         checkName: data.checkName,
+        AND: [locationRoadWhere],
       },
       orderBy: { id: 'asc' },
       include: {
         road: true,
+        locationRoad: true,
         phase: true,
         document: { include: { submission: true } },
         submitter: true,
@@ -890,6 +968,7 @@ export const createInspectionEntries = async (
       const updateData: Prisma.InspectionEntryUncheckedUpdateInput = {
         types: mergedTypes,
         updatedBy: data.updatedBy,
+        locationRoadId: data.locationRoadId ?? undefined,
       }
       if (bindingProvided) {
         updateData.documentId = data.documentId ?? null
@@ -903,6 +982,7 @@ export const createInspectionEntries = async (
         data: updateData,
         include: {
           road: true,
+          locationRoad: true,
           phase: true,
           document: { include: { submission: true } },
           submitter: true,
@@ -916,6 +996,7 @@ export const createInspectionEntries = async (
         data: data as Prisma.InspectionEntryUncheckedCreateInput,
         include: {
           road: true,
+          locationRoad: true,
           phase: true,
           document: { include: { submission: true } },
           submitter: true,
@@ -938,7 +1019,6 @@ export const aggregateEntriesAsListItems = async (
   const skip = (page - 1) * pageSize
   const where: Prisma.InspectionEntryWhereInput = {
     ...(filter.ids?.length ? { id: { in: filter.ids } } : {}),
-    ...(filter.roadSlug ? { road: { slug: filter.roadSlug } } : {}),
     ...(filter.phaseId ? { phaseId: filter.phaseId } : {}),
     ...(filter.phaseDefinitionId ? { phase: { phaseDefinitionId: filter.phaseDefinitionId } } : {}),
     ...(filter.status?.length ? { status: { in: filter.status as InspectionStatus[] } } : {}),
@@ -957,6 +1037,7 @@ export const aggregateEntriesAsListItems = async (
             { checkName: { contains: filter.keyword, mode: 'insensitive' } },
             { phase: { name: { contains: filter.keyword, mode: 'insensitive' } } },
             { road: { name: { contains: filter.keyword, mode: 'insensitive' } } },
+            { locationRoad: { name: { contains: filter.keyword, mode: 'insensitive' } } },
           ],
         }
       : {}),
@@ -1022,6 +1103,7 @@ export const aggregateEntriesAsListItems = async (
       where,
       include: {
         road: true,
+        locationRoad: true,
         phase: true,
         document: { include: { submission: true } },
         submitter: true,
@@ -1041,19 +1123,27 @@ export const aggregateEntriesAsListItems = async (
       : entry.layerName
         ? `name:${normalizeLabel(entry.layerName)}`
         : 'layer:unknown'
-    const baseKey = `${entry.roadId}:${entry.phaseId}:${entry.side}:${entry.startPk}:${entry.endPk}:${entry.documentId ?? ''}`
+    const effectiveLocationRoadId =
+      entry.locationRoadId ?? (entry.road.slug === LEVEL_CROSSING_ROAD_SLUG ? null : entry.roadId)
+    const baseKey = `${entry.roadId}:${effectiveLocationRoadId ?? 'null'}:${entry.phaseId}:${entry.side}:${entry.startPk}:${entry.endPk}:${entry.documentId ?? ''}`
     const key = filter.groupByLayer ? `${baseKey}:${layerKey}` : baseKey
     const priority = statusPriority[entry.status]
     const existing = grouped.get(key)
     const layerToken = entry.layerName
     const checkToken = entry.checkName
     const updatedAt = entry.updatedAt.getTime()
+    const resolvedLocationRoad =
+      entry.locationRoad ??
+      (effectiveLocationRoadId && effectiveLocationRoadId === entry.roadId ? entry.road : null)
     if (!existing) {
       grouped.set(key, {
         id: entry.id,
         roadId: entry.roadId,
         roadName: entry.road.name,
         roadSlug: entry.road.slug,
+        locationRoadId: effectiveLocationRoadId ?? null,
+        locationRoadName: resolvedLocationRoad?.name ?? null,
+        locationRoadSlug: resolvedLocationRoad?.slug ?? null,
         phaseId: entry.phaseId,
         phaseName: entry.phase.name,
         documentId: entry.documentId,
@@ -1096,6 +1186,9 @@ export const aggregateEntriesAsListItems = async (
         submissionId: existing.submissionId ?? entry.documentId,
         submissionCode: existing.submissionCode ?? entry.document?.code ?? null,
         submissionNumber: existing.submissionNumber ?? entry.document?.submission?.submissionNumber ?? null,
+        locationRoadId: existing.locationRoadId ?? effectiveLocationRoadId ?? null,
+        locationRoadName: existing.locationRoadName ?? resolvedLocationRoad?.name ?? null,
+        locationRoadSlug: existing.locationRoadSlug ?? resolvedLocationRoad?.slug ?? null,
         layers: filter.groupByLayer
           ? existing.layers && existing.layers.length
             ? existing.layers

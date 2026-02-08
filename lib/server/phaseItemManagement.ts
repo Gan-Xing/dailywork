@@ -94,11 +94,11 @@ const calcLinearQuantity = (startPk: number, endPk: number, side: IntervalSide) 
   return base * factor
 }
 
-const buildPointStructureKey = (startPk: number, endPk: number, side: IntervalSide) => {
+const buildPointStructureKey = (startPk: number, endPk: number, side: IntervalSide, locationRoadId?: number | null) => {
   const [start, end] = normalizeRange(startPk, endPk)
   const startKey = Math.round(start * 1000)
   const endKey = Math.round(end * 1000)
-  return `${startKey}-${endKey}-${side ?? 'BOTH'}`
+  return `${startKey}-${endKey}-${side ?? 'BOTH'}-${locationRoadId ?? 'default'}`
 }
 
 const resolvePhaseLayers = (phase: {
@@ -196,7 +196,7 @@ const calcLinearIntervalPercent = (
 }
 
 const calcPointIntervalPercent = (params: {
-  interval: { startPk: number; endPk: number; side: IntervalSide; layers?: string[] | null; layerIds?: number[] | null }
+  interval: { startPk: number; endPk: number; side: IntervalSide; layers?: string[] | null; layerIds?: number[] | null; locationRoadId?: number | null }
   fallbackLayers: string[]
   layerNameById: Map<number, string>
   workflowChecksByLayer: Map<string, Set<string>>
@@ -222,7 +222,7 @@ const calcPointIntervalPercent = (params: {
       ? (['BOTH', 'LEFT', 'RIGHT'] as IntervalSide[])
       : ([interval.side, 'BOTH'] as IntervalSide[])
   candidateSides.forEach((side) => {
-    const key = buildPointStructureKey(interval.startPk, interval.endPk, side)
+    const key = buildPointStructureKey(interval.startPk, interval.endPk, side, interval.locationRoadId ?? null)
     const entries = entriesByStructure.get(key) ?? []
     entries.forEach((entry) => {
       if (!allowedLayerKeys.has(entry.layerKey)) return
@@ -251,6 +251,7 @@ export const listPhaseIntervalManagementRows = async (): Promise<PhaseIntervalMa
         },
         intervals: {
           orderBy: [{ startPk: 'asc' }, { endPk: 'asc' }, { side: 'asc' }],
+          include: { locationRoad: { select: { id: true, name: true, slug: true } } },
         },
         layerLinks: { include: { layerDefinition: { select: { id: true, name: true } } } },
         phaseDefinition: {
@@ -279,7 +280,7 @@ export const listPhaseIntervalManagementRows = async (): Promise<PhaseIntervalMa
 
   const phaseProgressMap = new Map<
     number,
-    { inspections: { startPk: number; endPk: number; side: IntervalSide }[] }
+    { inspections: { startPk: number; endPk: number; side: IntervalSide; locationRoadId?: number | null }[] }
   >()
   progressRoads.forEach((road) => {
     road.phases.forEach((phase) => {
@@ -288,6 +289,7 @@ export const listPhaseIntervalManagementRows = async (): Promise<PhaseIntervalMa
           startPk: inspection.startPk,
           endPk: inspection.endPk,
           side: ensureIntervalSide(inspection.side),
+          locationRoadId: inspection.locationRoadId ?? road.id,
         })),
       })
     })
@@ -307,13 +309,14 @@ export const listPhaseIntervalManagementRows = async (): Promise<PhaseIntervalMa
           side: true,
           layerName: true,
           checkName: true,
+          locationRoadId: true,
         },
       })
     : []
 
   const entriesByPhase = new Map<
     number,
-    Array<{ startPk: number; endPk: number; side: IntervalSide; layerName: string; checkName: string }>
+    Array<{ startPk: number; endPk: number; side: IntervalSide; layerName: string; checkName: string; locationRoadId?: number | null }>
   >()
   pointEntries.forEach((entry) => {
     const list = entriesByPhase.get(entry.phaseId) ?? []
@@ -323,6 +326,7 @@ export const listPhaseIntervalManagementRows = async (): Promise<PhaseIntervalMa
       side: ensureIntervalSide(entry.side),
       layerName: entry.layerName,
       checkName: entry.checkName,
+      locationRoadId: entry.locationRoadId ?? null,
     })
     entriesByPhase.set(entry.phaseId, list)
   })
@@ -355,7 +359,7 @@ export const listPhaseIntervalManagementRows = async (): Promise<PhaseIntervalMa
     const entries = entriesByPhase.get(phase.id) ?? []
     const entriesByStructure = new Map<string, Array<{ layerKey: string; checkKey: string }>>()
     entries.forEach((entry) => {
-      const key = buildPointStructureKey(entry.startPk, entry.endPk, entry.side)
+      const key = buildPointStructureKey(entry.startPk, entry.endPk, entry.side, entry.locationRoadId ?? null)
       const layerKey = normalizeLabel(canonicalizeSingle('layer', entry.layerName))
       const checkKey = normalizeLabel(canonicalizeSingle('check', entry.checkName))
       if (!key || !layerKey || !checkKey) return
@@ -366,6 +370,13 @@ export const listPhaseIntervalManagementRows = async (): Promise<PhaseIntervalMa
     const inspections = phaseProgressMap.get(phase.id)?.inspections ?? []
 
     phase.intervals.forEach((interval) => {
+      const intervalLocationRoadId = interval.locationRoadId ?? phase.road.id
+      const intervalInspections = inspections.filter(
+        (inspection) => (inspection.locationRoadId ?? phase.road.id) === intervalLocationRoadId,
+      )
+      const resolvedLocationRoad =
+        interval.locationRoad ??
+        (intervalLocationRoadId === phase.road.id ? phase.road : null)
       const rawQuantity =
         phase.measure === 'POINT'
           ? 1
@@ -387,13 +398,13 @@ export const listPhaseIntervalManagementRows = async (): Promise<PhaseIntervalMa
       const completedPercent =
         phase.measure === 'POINT'
           ? calcPointIntervalPercent({
-              interval,
+              interval: { ...interval, locationRoadId: intervalLocationRoadId },
               fallbackLayers,
               layerNameById,
               workflowChecksByLayer,
               entriesByStructure,
             })
-          : calcLinearIntervalPercent(interval, inspections)
+          : calcLinearIntervalPercent(interval, intervalInspections)
 
       rows.push({
         intervalId: interval.id,
@@ -404,6 +415,9 @@ export const listPhaseIntervalManagementRows = async (): Promise<PhaseIntervalMa
         roadId: phase.road.id,
         roadName: phase.road.name,
         roadSlug: phase.road.slug,
+        locationRoadId: intervalLocationRoadId,
+        locationRoadName: resolvedLocationRoad?.name ?? null,
+        locationRoadSlug: resolvedLocationRoad?.slug ?? null,
         projectId: phase.road.projectId ?? null,
         projectName: phase.road.project?.name ?? null,
         projectCode: phase.road.project?.code ?? null,

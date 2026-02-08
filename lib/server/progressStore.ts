@@ -15,6 +15,7 @@ type NormalizedInterval = {
   startPk: number
   endPk: number
   side: IntervalSide
+  locationRoadId: number | null
   spec: string | null
   layers: string[]
   billQuantity: number | null
@@ -30,6 +31,7 @@ type IntervalWithLayer = NormalizedInterval & { layerMetadata: IntervalLayerMeta
 const normalizeInterval = (
   interval: PhasePayload['intervals'][number],
   measure: PhasePayload['measure'],
+  defaultLocationRoadId: number,
 ): NormalizedInterval => {
   const rawId = (interval as { id?: unknown }).id
   const intervalId = Number(rawId)
@@ -42,17 +44,25 @@ const normalizeInterval = (
   const billValue = (interval as { billQuantity?: unknown }).billQuantity
   const rawBillQuantity =
     billValue === null || billValue === undefined ? null : Number(billValue)
+  const rawLocationRoadId = (interval as { locationRoadId?: unknown }).locationRoadId
+  const parsedLocationRoadId = Number(rawLocationRoadId)
 
   const side = interval.side ?? 'BOTH'
   const normalizedSide =
     side === 'LEFT' || side === 'RIGHT' || side === 'BOTH' ? side : 'BOTH'
   const layers = normalizeCommonList((interval as { layers?: string[] }).layers)
 
+  const locationRoadId =
+    Number.isInteger(parsedLocationRoadId) && parsedLocationRoadId > 0
+      ? parsedLocationRoadId
+      : defaultLocationRoadId
+
   return {
     id: Number.isInteger(intervalId) && intervalId > 0 ? intervalId : undefined,
     startPk: ordered[0],
     endPk: ordered[1],
     side: normalizedSide as IntervalSide,
+    locationRoadId,
     spec: spec || null,
     layers,
     billQuantity:
@@ -196,6 +206,7 @@ const mapPhaseToDTO = (
       startPk: i.startPk,
       endPk: i.endPk,
       side: i.side,
+      locationRoadId: i.locationRoadId ?? phase.roadId,
       spec: i.spec,
       layers: (i as { layers?: string[] }).layers ?? [],
       layerIds: i.layerIds ?? [],
@@ -286,7 +297,7 @@ export const createPhase = async (roadId: number, payload: PhasePayload) => {
   }
 
   const normalizedIntervals: NormalizedInterval[] = payload.intervals.map((i) =>
-    normalizeInterval(i, payload.measure),
+    normalizeInterval(i, payload.measure, roadId),
   )
   const designLength = calcDesignLength(
     payload.measure,
@@ -356,14 +367,15 @@ export const createPhase = async (roadId: number, payload: PhasePayload) => {
           intervals: {
             create: normalizedIntervals.map((item, idx) => {
               const layerMetadata = intervalLayerData[idx]
-              return {
-                startPk: item.startPk,
-                endPk: item.endPk,
-                side: item.side,
-                spec: item.spec || undefined,
-                layers: layerMetadata.layers,
-                layerIds: layerMetadata.layerIds,
-                billQuantity: item.billQuantity ?? undefined,
+      return {
+        startPk: item.startPk,
+        endPk: item.endPk,
+        side: item.side,
+        locationRoadId: item.locationRoadId ?? undefined,
+        spec: item.spec || undefined,
+        layers: layerMetadata.layers,
+        layerIds: layerMetadata.layerIds,
+        billQuantity: item.billQuantity ?? undefined,
               }
             }),
           },
@@ -427,7 +439,7 @@ export const updatePhase = async (roadId: number, phaseId: number, payload: Phas
   }
 
   const normalizedIntervals: NormalizedInterval[] = payload.intervals.map((i) =>
-    normalizeInterval(i, payload.measure),
+    normalizeInterval(i, payload.measure, roadId),
   )
   const designLength = calcDesignLength(
     payload.measure,
@@ -509,14 +521,16 @@ export const updatePhase = async (roadId: number, phaseId: number, payload: Phas
 
       const existingIntervals = await tx.phaseInterval.findMany({
         where: { phaseId },
-        select: { id: true, startPk: true, endPk: true, side: true, spec: true },
+        select: { id: true, startPk: true, endPk: true, side: true, spec: true, locationRoadId: true },
       })
       const buildIntervalKey = (interval: {
         startPk: number
         endPk: number
         side: IntervalSide
         spec?: string | null
-      }) => `${interval.startPk}|${interval.endPk}|${interval.side}|${interval.spec ?? ''}`
+        locationRoadId?: number | null
+      }) =>
+        `${interval.startPk}|${interval.endPk}|${interval.side}|${interval.spec ?? ''}|${interval.locationRoadId ?? 'null'}`
       const existingByKey = new Map<string, number[]>()
       existingIntervals.forEach((interval) => {
         const key = buildIntervalKey(interval)
@@ -561,6 +575,7 @@ export const updatePhase = async (roadId: number, phaseId: number, payload: Phas
                 startPk: interval.startPk,
                 endPk: interval.endPk,
                 side: interval.side,
+                locationRoadId: interval.locationRoadId ?? undefined,
                 spec: interval.spec || undefined,
                 layers: interval.layerMetadata.layers,
                 layerIds: interval.layerMetadata.layerIds,
@@ -577,6 +592,7 @@ export const updatePhase = async (roadId: number, phaseId: number, payload: Phas
             startPk: interval.startPk,
             endPk: interval.endPk,
             side: interval.side,
+            locationRoadId: interval.locationRoadId ?? undefined,
             spec: interval.spec || undefined,
             layers: interval.layerMetadata.layers,
             layerIds: interval.layerMetadata.layerIds,

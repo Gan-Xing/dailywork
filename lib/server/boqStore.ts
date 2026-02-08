@@ -392,6 +392,8 @@ export const listBoqCompletionDetails = async (params: {
           endPk: true,
           side: true,
           spec: true,
+          locationRoadId: true,
+          locationRoad: { select: { id: true, name: true, slug: true } },
           phase: {
             select: {
               id: true,
@@ -420,6 +422,11 @@ export const listBoqCompletionDetails = async (params: {
     const effectiveQuantity = resolveEffectiveQuantity(input.manualQuantity, input.computedQuantity)
     const completionPercent = intervalCompletionMap.get(input.interval.id) ?? 0
     const completedQuantity = effectiveQuantity * (completionPercent / 100)
+    const resolvedLocationRoad =
+      input.interval.locationRoad ??
+      (input.interval.locationRoadId && input.interval.locationRoadId === input.interval.phase.road.id
+        ? input.interval.phase.road
+        : null)
     return {
       boqItemId: boqItem.id,
       inputId: input.id,
@@ -432,8 +439,8 @@ export const listBoqCompletionDetails = async (params: {
       intervalSide: input.interval.side,
       intervalSpec: input.interval.spec ?? null,
       roadId: input.interval.phase.road.id,
-      roadName: input.interval.phase.road.name,
-      roadSlug: input.interval.phase.road.slug,
+      roadName: resolvedLocationRoad?.name ?? input.interval.phase.road.name,
+      roadSlug: resolvedLocationRoad?.slug ?? input.interval.phase.road.slug,
       manualQuantity,
       computedQuantity,
       effectiveQuantity,

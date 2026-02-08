@@ -127,11 +127,11 @@ const calcCompletedLinearLength = (
   }, 0)
 }
 
-const buildPointStructureKey = (startPk: number, endPk: number, side: string) => {
+const buildPointStructureKey = (startPk: number, endPk: number, side: string, locationRoadId?: number | null) => {
   const [start, end] = normalizeSegment(startPk, endPk)
   const startKey = Math.round(start * 1000)
   const endKey = Math.round(end * 1000)
-  return `${startKey}-${endKey}-${side ?? 'BOTH'}`
+  return `${startKey}-${endKey}-${side ?? 'BOTH'}-${locationRoadId ?? 'default'}`
 }
 
 const resolvePhaseLayers = (phase: {
@@ -171,24 +171,25 @@ const resolveIntervalLayers = (
 }
 
 const buildIntervalLayerMap = (
-  intervals: { startPk: number; endPk: number; side: string; layers?: string[] | null; layerIds?: number[] | null }[],
+  intervals: { startPk: number; endPk: number; side: string; locationRoadId?: number | null; layers?: string[] | null; layerIds?: number[] | null }[],
   fallbackLayers: string[],
   layerNameById: Map<number, string>,
 ) => {
   const map = new Map<
     string,
-    { startPk: number; endPk: number; side: IntervalSide; layers: string[] }
+    { startPk: number; endPk: number; side: IntervalSide; layers: string[]; locationRoadId?: number | null }
   >()
   intervals.forEach((interval) => {
     const [start, end] = normalizeSegment(interval.startPk, interval.endPk)
     const side = (interval.side ?? 'BOTH') as IntervalSide
-    const key = buildPointStructureKey(start, end, side)
+    const key = buildPointStructureKey(start, end, side, interval.locationRoadId ?? null)
     if (!key) return
     const layers = resolveIntervalLayers(interval, fallbackLayers, layerNameById)
     map.set(key, {
       startPk: start,
       endPk: end,
       side,
+      locationRoadId: interval.locationRoadId ?? null,
       layers: layers.map((layer) => normalizeLabel(canonicalizeSingle('layer', layer))).filter(Boolean),
     })
   })
@@ -265,11 +266,11 @@ const ensureIntervalSide = (value?: string | null): IntervalSide =>
   value === 'LEFT' || value === 'RIGHT' || value === 'BOTH' ? value : 'BOTH'
 
 const buildInspectionRangesFromEntries = (
-  entries: { startPk: number; endPk: number; side: string }[],
+  entries: { startPk: number; endPk: number; side: string; locationRoadId?: number | null }[],
 ) => {
   const map = new Map<string, { startPk: number; endPk: number; side: IntervalSide }>()
   entries.forEach((entry) => {
-    const key = buildPointStructureKey(entry.startPk, entry.endPk, entry.side)
+    const key = buildPointStructureKey(entry.startPk, entry.endPk, entry.side, entry.locationRoadId ?? null)
     if (!key || map.has(key)) return
     const [start, end] = normalizeSegment(entry.startPk, entry.endPk)
     map.set(key, { startPk: start, endPk: end, side: ensureIntervalSide(entry.side) })
@@ -291,8 +292,11 @@ const isSubbasePhase = (phase: {
 }
 
 const calcCompletedPointStructures = (
-  entries: { startPk: number; endPk: number; side: string; layerName: string; checkName: string }[],
-  intervalLayers: Map<string, { startPk: number; endPk: number; side: IntervalSide; layers: string[] }>,
+  entries: { startPk: number; endPk: number; side: string; layerName: string; checkName: string; locationRoadId?: number | null }[],
+  intervalLayers: Map<
+    string,
+    { startPk: number; endPk: number; side: IntervalSide; layers: string[]; locationRoadId?: number | null }
+  >,
   workflow?: WorkflowBinding | null,
 ) => {
   if (!intervalLayers.size || !workflow?.layers?.length) return 0
@@ -302,7 +306,7 @@ const calcCompletedPointStructures = (
 
   const entriesByStructure = new Map<string, Array<{ layerKey: string; checkKey: string }>>()
   entries.forEach((entry) => {
-    const key = buildPointStructureKey(entry.startPk, entry.endPk, entry.side)
+    const key = buildPointStructureKey(entry.startPk, entry.endPk, entry.side, entry.locationRoadId ?? null)
     if (!key) return
     const layerKey = normalizeLabel(canonicalizeSingle('layer', entry.layerName))
     const checkKey = normalizeLabel(canonicalizeSingle('check', entry.checkName))
@@ -331,7 +335,7 @@ const calcCompletedPointStructures = (
         ? (['BOTH', 'LEFT', 'RIGHT'] as string[])
         : ([interval.side, 'BOTH'] as string[])
     candidateSides.forEach((candidateSide) => {
-      const key = buildPointStructureKey(interval.startPk, interval.endPk, candidateSide)
+      const key = buildPointStructureKey(interval.startPk, interval.endPk, candidateSide, interval.locationRoadId ?? null)
       if (!key) return
       const structureEntries = entriesByStructure.get(key) ?? []
       structureEntries.forEach((entry) => {
@@ -371,7 +375,7 @@ export const listRoadSectionsWithProgress = async (): Promise<RoadSectionProgres
           inspections: {
             where: { status: { in: ['SCHEDULED', 'SUBMITTED', 'IN_PROGRESS', 'APPROVED'] } },
             orderBy: { updatedAt: 'desc' },
-            select: { startPk: true, endPk: true, side: true, layers: true, updatedAt: true, status: true },
+            select: { startPk: true, endPk: true, side: true, layers: true, updatedAt: true, status: true, locationRoadId: true },
           },
           entries: {
             where: { status: 'APPROVED' },
@@ -381,6 +385,7 @@ export const listRoadSectionsWithProgress = async (): Promise<RoadSectionProgres
               side: true,
               layerName: true,
               checkName: true,
+              locationRoadId: true,
             },
           },
           intervals: {
@@ -391,6 +396,7 @@ export const listRoadSectionsWithProgress = async (): Promise<RoadSectionProgres
               spec: true,
               layers: true,
               layerIds: true,
+              locationRoadId: true,
             },
           },
           layerLinks: {
@@ -473,7 +479,7 @@ export const listRoadSectionsWithProgress = async (): Promise<RoadSectionProgres
       const intervalLayerMap =
         phase.measure === 'POINT' || phase.measure === 'LINEAR'
           ? buildIntervalLayerMap(phase.intervals ?? [], resolvedLayers, layerNameById)
-          : new Map<string, { startPk: number; endPk: number; side: IntervalSide; layers: string[] }>()
+          : new Map<string, { startPk: number; endPk: number; side: IntervalSide; layers: string[]; locationRoadId?: number | null }>()
       const stageByLayer = phase.measure === 'LINEAR' ? buildWorkflowStageByLayer(workflow) : new Map()
       const terminalLayerMap =
         phase.measure === 'LINEAR'
@@ -487,11 +493,11 @@ export const listRoadSectionsWithProgress = async (): Promise<RoadSectionProgres
       const filteredLinearEntries =
         phase.measure === 'LINEAR' && !isEarthworkPhase(phase)
           ? approvedEntries.filter((entry) => {
-              const key = buildPointStructureKey(entry.startPk, entry.endPk, entry.side)
+              const key = buildPointStructureKey(entry.startPk, entry.endPk, entry.side, entry.locationRoadId ?? null)
               const candidateKey = key ?? ''
               const bothKey =
                 entry.side !== 'BOTH'
-                  ? buildPointStructureKey(entry.startPk, entry.endPk, 'BOTH')
+                  ? buildPointStructureKey(entry.startPk, entry.endPk, 'BOTH', entry.locationRoadId ?? null)
                   : null
               const terminalLayers =
                 terminalLayerMap.get(candidateKey) ??
@@ -517,6 +523,7 @@ export const listRoadSectionsWithProgress = async (): Promise<RoadSectionProgres
         startPk: interval.startPk,
         endPk: interval.endPk,
         side: interval.side,
+        locationRoadId: interval.locationRoadId ?? road.id,
         spec: interval.spec ?? null,
         layers: (interval as { layers?: string[] }).layers ?? [],
         layerIds: (interval as { layerIds?: number[] }).layerIds ?? [],
@@ -530,6 +537,7 @@ export const listRoadSectionsWithProgress = async (): Promise<RoadSectionProgres
                 startPk: inspection.startPk,
                 endPk: inspection.endPk,
                 side: ensureIntervalSide(inspection.side),
+                locationRoadId: inspection.locationRoadId ?? road.id,
               }))
       return {
         phaseId: phase.id,

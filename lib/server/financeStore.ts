@@ -208,6 +208,7 @@ export const ensureFinanceDefaults = async () => {
         { name: '铁布高速项目', code: 'project-tieb-highway' },
         { name: '阿比让办事处', code: 'project-abidjan-office' },
         { name: '丹达市政路项目', code: 'project-tanda-city' },
+        { name: '阿尼比莱克鲁市政路项目', code: 'project-anibilekrou-city' },
       ],
       skipDuplicates: true,
     }),
