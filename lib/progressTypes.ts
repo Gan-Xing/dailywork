@@ -28,7 +28,7 @@ export interface RoadPhaseProgressDTO {
   completedLength: number
   completedPercent: number
   intervals: PhaseIntervalProgress[]
-  inspections: { startPk: number; endPk: number; side: IntervalSide }[]
+  inspections: { startPk: number; endPk: number; side: IntervalSide; locationRoadId?: number | null }[]
   updatedAt: string
 }
 
@@ -75,6 +75,9 @@ export interface InspectionListItem {
   roadId: number
   roadName: string
   roadSlug: string
+  locationRoadId?: number | null
+  locationRoadName?: string | null
+  locationRoadSlug?: string | null
   phaseId: number
   phaseName: string
   documentId?: number | null
@@ -123,6 +126,7 @@ export interface InspectionEntryPayload {
   submissionNumber?: number | null
   documentId?: number | null
   roadId: number
+  locationRoadId?: number | null
   phaseId: number
   side: IntervalSide
   startPk: number
@@ -147,6 +151,8 @@ export interface InspectionEntryDTO extends InspectionEntryPayload {
   documentCode?: string | null
   roadName: string
   roadSlug: string
+  locationRoadName?: string | null
+  locationRoadSlug?: string | null
   phaseName: string
   submittedBy?: { id: number; username: string } | null
   createdBy?: { id: number; username: string } | null
@@ -243,6 +249,7 @@ export interface PhaseIntervalPayload {
   startPk: number
   endPk: number
   side: IntervalSide
+  locationRoadId?: number | null
   spec?: string | null
   layers?: string[]
   layerIds?: number[]
@@ -253,6 +260,7 @@ export interface PhaseIntervalProgress {
   startPk: number
   endPk: number
   side: IntervalSide
+  locationRoadId?: number | null
   spec: string | null
   layers?: string[]
   layerIds: number[]
@@ -321,6 +329,7 @@ export interface InspectionPayload {
   layers: string[]
   checks: string[]
   types: string[]
+  locationRoadId?: number | null
   status?: InspectionStatus
   submissionId?: number | null
   submissionNumber?: number | null
@@ -339,6 +348,7 @@ export interface InspectionBulkPayload {
   layers?: string[]
   checks?: string[]
   types?: string[]
+  locationRoadId?: number | null
   status?: InspectionStatus
   submissionId?: number | null
   submissionNumber?: number | null

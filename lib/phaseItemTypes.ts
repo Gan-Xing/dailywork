@@ -9,6 +9,9 @@ export type PhaseIntervalManagementRow = {
   roadId: number
   roadName: string
   roadSlug: string
+  locationRoadId?: number | null
+  locationRoadName?: string | null
+  locationRoadSlug?: string | null
   projectId: number | null
   projectName: string | null
   projectCode: string | null

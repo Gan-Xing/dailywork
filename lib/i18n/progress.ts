@@ -212,6 +212,8 @@ type PhaseCopy = {
     intervalEnd: string
     intervalSide: string
     intervalSpec: string
+    intervalLocationRoad: string
+    intervalLocationRoadPlaceholder: string
     intervalBillQuantity: string
     sideBoth: string
     sideLeft: string
@@ -279,6 +281,7 @@ type PhaseCopy = {
   }
   errors: {
     invalidRange: string
+    locationRoadMissing: string
     definitionMissing: string
     saveFailed: string
     deleteFailed: string
@@ -705,6 +708,8 @@ const progressCopy: Record<Locale, ProgressCopy> = {
         intervalEnd: '终点',
         intervalSide: '侧别',
         intervalSpec: '规格',
+        intervalLocationRoad: '所属主路段',
+        intervalLocationRoadPlaceholder: '选择主路段',
         intervalBillQuantity: '计量工程量',
         sideBoth: '双侧',
         sideLeft: '左侧',
@@ -776,6 +781,7 @@ const progressCopy: Record<Locale, ProgressCopy> = {
       },
       errors: {
         invalidRange: '请填写有效的起点/终点',
+        locationRoadMissing: '请选择所属主路段',
         saveFailed: '保存失败',
         deleteFailed: '删除失败',
       submitRangeInvalid: '请输入有效的起点和终点',
@@ -1311,6 +1317,8 @@ const progressCopy: Record<Locale, ProgressCopy> = {
         intervalEnd: 'Fin',
         intervalSide: 'Côté',
         intervalSpec: 'Spécification',
+        intervalLocationRoad: 'Tronçon principal',
+        intervalLocationRoadPlaceholder: 'Sélectionner le tronçon',
         intervalBillQuantity: 'Quantité métrée',
         sideBoth: 'Deux côtés',
         sideLeft: 'Gauche',
@@ -1383,6 +1391,7 @@ const progressCopy: Record<Locale, ProgressCopy> = {
       },
       errors: {
         invalidRange: 'Renseignez un début/fin valides',
+        locationRoadMissing: 'Sélectionnez le tronçon principal',
         saveFailed: "Échec de l'enregistrement",
         deleteFailed: 'Échec de la suppression',
         submitRangeInvalid: 'Début/fin invalides',
