@@ -2,7 +2,8 @@ import { NextResponse, type NextRequest } from 'next/server'
 
 import { hasPermission } from '@/lib/server/authSession'
 import { deletePhase, updatePhase } from '@/lib/server/progressStore'
-import { getRoadBySlug } from '@/lib/server/roadStore'
+import { getRoadBySlug, listRoadSections } from '@/lib/server/roadStore'
+import { LEVEL_CROSSING_ROAD_SLUG } from '@/lib/roadConstants'
 
 export async function PUT(
   request: NextRequest,
@@ -22,6 +23,7 @@ export async function PUT(
   if (!road) {
     return NextResponse.json({ message: '路段不存在' }, { status: 404 })
   }
+  const isLevelCrossing = road.slug === LEVEL_CROSSING_ROAD_SLUG
 
   let payload: {
     phaseDefinitionId?: number
@@ -33,6 +35,7 @@ export async function PUT(
       endPk?: number
       side?: string
       spec?: string
+      locationRoadId?: number
       billQuantity?: number
       layers?: string[]
     }[]
@@ -49,6 +52,12 @@ export async function PUT(
 
   if (!payload.name || !payload.measure || !payload.intervals) {
     return NextResponse.json({ message: '缺少必填字段：名称/显示方式/区间' }, { status: 400 })
+  }
+
+  let locationRoadMap: Map<number, { id: number; slug: string }> | null = null
+  if (isLevelCrossing) {
+    const roads = await listRoadSections()
+    locationRoadMap = new Map(roads.map((item) => [item.id, { id: item.id, slug: item.slug }]))
   }
 
   try {
@@ -70,6 +79,23 @@ export async function PUT(
               ? i.side
               : 'BOTH',
           spec: typeof i.spec === 'string' ? i.spec : undefined,
+          locationRoadId: (() => {
+            const parsed = Number(i.locationRoadId)
+            const locationRoadId = Number.isFinite(parsed) && parsed > 0 ? parsed : null
+            if (!isLevelCrossing) {
+              return road.id
+            }
+            if (!locationRoadId) {
+              throw new Error('平交路口区间必须选择所属主路段')
+            }
+            if (locationRoadId === road.id) {
+              throw new Error('所属主路段不能选择平交路口自身')
+            }
+            if (locationRoadMap && !locationRoadMap.has(locationRoadId)) {
+              throw new Error('所属主路段不存在')
+            }
+            return locationRoadId
+          })(),
           layers: Array.isArray(i.layers) ? i.layers.filter(Boolean) : undefined,
           billQuantity:
             i.billQuantity === null || i.billQuantity === undefined || !Number.isFinite(Number(i.billQuantity))

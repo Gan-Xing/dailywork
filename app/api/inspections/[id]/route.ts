@@ -4,6 +4,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 import type { InspectionPayload } from '@/lib/progressTypes'
 import { getSessionUser, hasPermission } from '@/lib/server/authSession'
 import { canonicalizeProgressList } from '@/lib/i18n/progressDictionary'
+import { LEVEL_CROSSING_ROAD_SLUG } from '@/lib/roadConstants'
 import { prisma } from '@/lib/prisma'
 
 const parseOptionalNumber = (value: unknown) => {
@@ -100,6 +101,29 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
     const resolvedDocumentId = bindingProvided ? targetDocumentId ?? null : existing.documentId
 
+    const hasLocationRoadField = Object.prototype.hasOwnProperty.call(payload as any, 'locationRoadId')
+    const parsedLocationRoadId = hasLocationRoadField
+      ? parseOptionalNumber((payload as any).locationRoadId)
+      : undefined
+    const isLevelCrossing = existing.road.slug === LEVEL_CROSSING_ROAD_SLUG
+    const effectiveLocationRoadId = isLevelCrossing
+      ? (parsedLocationRoadId ?? existing.locationRoadId ?? null)
+      : existing.roadId
+    if (isLevelCrossing) {
+      if (!effectiveLocationRoadId) {
+        return NextResponse.json({ message: '平交路口必须指定所属主路段' }, { status: 400 })
+      }
+      if (effectiveLocationRoadId === existing.roadId) {
+        return NextResponse.json({ message: '平交路口所属主路段不能与平交路口本身相同' }, { status: 400 })
+      }
+    }
+    const locationRoadWhere =
+      effectiveLocationRoadId === null || effectiveLocationRoadId === undefined
+        ? { locationRoadId: null }
+        : !isLevelCrossing && effectiveLocationRoadId === existing.roadId
+          ? { OR: [{ locationRoadId: effectiveLocationRoadId }, { locationRoadId: null }] }
+          : { locationRoadId: effectiveLocationRoadId }
+
     await prisma.inspectionEntry.deleteMany({
       where: {
         documentId: existing.documentId,
@@ -108,6 +132,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         side: existing.side,
         startPk: existing.startPk,
         endPk: existing.endPk,
+        AND: [locationRoadWhere],
       },
     })
 
@@ -118,6 +143,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
             data: {
               documentId: resolvedDocumentId ?? undefined,
               roadId: existing.roadId,
+              locationRoadId: effectiveLocationRoadId ?? undefined,
               phaseId: payload.phaseId,
               side: payload.side as any,
               startPk: Number(payload.startPk),
@@ -154,6 +180,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       roadId: first.roadId,
       roadName: first.road.name,
       roadSlug: first.road.slug,
+      locationRoadId: first.locationRoadId ?? null,
       phaseId: first.phaseId,
       phaseName: first.phase.name,
       documentId: first.documentId,

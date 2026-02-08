@@ -23,6 +23,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     where: { id },
     include: {
       road: true,
+      locationRoad: true,
       phase: true,
       document: { include: { submission: true } },
       submitter: true,
@@ -108,6 +109,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
           ? parsedSubmissionNumber
           : undefined
         : Number(payload.submissionOrder)
+  const hasLocationRoadField = Object.prototype.hasOwnProperty.call(payload as any, 'locationRoadId')
+  const locationRoadId = hasLocationRoadField ? parseOptionalNumber(payload.locationRoadId) : undefined
 
   try {
     const updated = await prisma.inspectionEntry.update({
@@ -115,6 +118,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       data: {
         documentId: documentId === undefined ? undefined : documentId,
         roadId: payload.roadId,
+        locationRoadId: locationRoadId === undefined ? undefined : locationRoadId,
         phaseId: payload.phaseId,
         side: payload.side,
         startPk: Number(payload.startPk),
@@ -133,6 +137,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       },
       include: {
         road: true,
+        locationRoad: true,
         phase: true,
         document: { include: { submission: true } },
         submitter: true,
