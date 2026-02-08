@@ -1,0 +1,11 @@
+{
+  "levelCrossingSlug": "level-crossing",
+  "targets": [
+    {
+      "locationRoadSlug": "tanda-voie1",
+      "ranges": [
+        { "startPk": 100, "endPk": 110, "side": "BOTH" }
+      ]
+    }
+  ]
+}
