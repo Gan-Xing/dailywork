@@ -224,7 +224,10 @@ model RoadSection {
   project   Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
   phases    RoadPhase[]
   inspections InspectionRequest[]
-  inspectionEntries InspectionEntry[]
+  locationInspectionRequests InspectionRequest[] @relation("InspectionRequestLocationRoad")
+  inspectionEntries InspectionEntry[] @relation("InspectionEntryRoad")
+  locationInspectionEntries InspectionEntry[] @relation("InspectionEntryLocationRoad")
+  locationPhaseIntervals PhaseInterval[] @relation("PhaseIntervalLocationRoad")
 
   @@index([projectId])
 }
@@ -315,6 +318,8 @@ model PhaseInterval {
   id        Int           @id @default(autoincrement())
   phaseId   Int
   phase     RoadPhase     @relation(fields: [phaseId], references: [id], onDelete: Cascade)
+  locationRoadId Int?
+  locationRoad   RoadSection? @relation("PhaseIntervalLocationRoad", fields: [locationRoadId], references: [id], onDelete: SetNull)
   startPk   Float
   endPk     Float
   side      IntervalSide
@@ -325,12 +330,16 @@ model PhaseInterval {
   phaseItemInputs PhaseItemInput[]
   createdAt DateTime      @default(now())
   updatedAt DateTime      @updatedAt
+
+  @@index([locationRoadId])
 }
 
 model InspectionRequest {
   id         Int              @id @default(autoincrement())
   roadId     Int
   road       RoadSection      @relation(fields: [roadId], references: [id], onDelete: Cascade)
+  locationRoadId Int?
+  locationRoad RoadSection?   @relation("InspectionRequestLocationRoad", fields: [locationRoadId], references: [id], onDelete: SetNull)
   phaseId    Int
   phase      RoadPhase        @relation(fields: [phaseId], references: [id], onDelete: Cascade)
   side       IntervalSide
@@ -354,6 +363,7 @@ model InspectionRequest {
   updatedAt       DateTime     @updatedAt
 
   @@index([phaseId, status, updatedAt])
+  @@index([locationRoadId])
 }
 
 model Document {
@@ -412,7 +422,9 @@ model InspectionEntry {
   documentId   Int?
   document     Document?        @relation(fields: [documentId], references: [id], onDelete: Cascade)
   roadId       Int
-  road         RoadSection      @relation(fields: [roadId], references: [id], onDelete: Cascade)
+  road         RoadSection      @relation("InspectionEntryRoad", fields: [roadId], references: [id], onDelete: Cascade)
+  locationRoadId Int?
+  locationRoad RoadSection?     @relation("InspectionEntryLocationRoad", fields: [locationRoadId], references: [id], onDelete: SetNull)
   phaseId      Int
   phase        RoadPhase        @relation(fields: [phaseId], references: [id], onDelete: Cascade)
   side         IntervalSide
@@ -438,6 +450,7 @@ model InspectionEntry {
   updatedAt    DateTime         @updatedAt
 
   @@index([roadId, phaseId, side, startPk, endPk, status])
+  @@index([locationRoadId])
   @@index([documentId])
 }
 
