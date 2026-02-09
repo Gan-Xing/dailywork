@@ -94,7 +94,7 @@ export const homeCopy: Record<Locale, HomeCopy> = {
       progress: '进度',
       suffix: '。',
       description:
-        '把一线更新、项目里程碑放在同一块操作面板，保持团队节奏一致。当前开放 6 个核心入口（日报系统内嵌原始日志导航，成员管理、产值界面与财务记账等保持在一起），后续模块可随时接入。',
+        '把一线更新、项目里程碑放在同一块操作面板，保持团队节奏一致。当前开放 7 个核心入口（日报系统内嵌原始日志导航，成员管理、机物管理、产值界面与财务记账等保持在一起），后续模块可随时接入。',
       primaryCta: '立即填写日报',
       secondaryCta: '查看项目进度'
     },
@@ -135,6 +135,14 @@ export const homeCopy: Record<Locale, HomeCopy> = {
         cta: '进入成员管理'
       },
       {
+        title: '机物管理',
+        href: '/resources',
+        tone: 'from-slate-300/80 via-sky-200/70 to-emerald-200/70',
+        description: '统一入口管理机械台账与物资台账，支持 Excel 导入与台账沉淀。',
+        tags: ['机械台账', '物资台账', 'Excel 导入'],
+        cta: '进入机物管理'
+      },
+      {
         title: '财务记账',
         href: '/finance',
         tone: 'from-emerald-300/80 via-teal-300/80 to-blue-400/70',
@@ -153,7 +161,7 @@ export const homeCopy: Record<Locale, HomeCopy> = {
     ],
     stats: {
       entriesLabel: '当前入口',
-      entriesValue: '6',
+      entriesValue: '7',
       recentLabel: '最近更新',
       recentValue: '日报系统已整合原始日志入口；成员管理、产值界面上线，日报/进度/财务持续维护',
       upcomingTitle: '即将推出',
@@ -233,7 +241,7 @@ export const homeCopy: Record<Locale, HomeCopy> = {
       progress: "suivi d'avancement",
       suffix: '.',
       description:
-        "Regroupez les mises à jour terrain et les jalons projet sur le même tableau de bord. Six accès clés sont actifs (journal brut intégré aux rapports, membres/valeurs/comptabilité inclus), les suivants se brancheront facilement.",
+        "Regroupez les mises à jour terrain et les jalons projet sur le même tableau de bord. Sept accès clés sont actifs (journal brut intégré aux rapports, membres, engins/matériaux, valeurs et comptabilité inclus), les suivants se brancheront facilement.",
       primaryCta: 'Remplir un rapport',
       secondaryCta: "Voir l'avancement"
     },
@@ -276,6 +284,14 @@ export const homeCopy: Record<Locale, HomeCopy> = {
         cta: 'Ouvrir membres'
       },
       {
+        title: 'Gestion engins & matériaux',
+        href: '/resources',
+        tone: 'from-slate-300/80 via-sky-200/70 to-emerald-200/70',
+        description: 'Un accès unique pour gérer machines et matériaux, avec import Excel.',
+        tags: ['Machines', 'Matériaux', 'Import Excel'],
+        cta: 'Ouvrir engins & matériaux'
+      },
+      {
         title: 'Comptabilité',
         href: '/finance',
         tone: 'from-emerald-300/80 via-teal-300/80 to-blue-400/70',
@@ -296,7 +312,7 @@ export const homeCopy: Record<Locale, HomeCopy> = {
     ],
     stats: {
       entriesLabel: 'Entrées actives',
-      entriesValue: '6',
+      entriesValue: '7',
       recentLabel: 'Mise à jour',
       recentValue:
         'Journal brut intégré aux rapports ; modules membres/valeurs réalisées en ligne, rapports/progrès/finance maintenus',
