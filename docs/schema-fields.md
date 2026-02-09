@@ -453,6 +453,99 @@
 - **PaymentType（支付方式）**：`id`、`name`、`isActive`、`sortOrder`、`createdAt`、`updatedAt`；默认包含“现金”“现金支票”“转账支票”“办事处代付”“无票据支出”。
 - **FinanceCategory（分类树）**：存储自定义/扩展后的财务分类节点，字段含 `key`（唯一）、`parentKey`、`label.zh`、`label.en?`、`label.fr?`、`code?`、`isActive`、`sortOrder`、`createdAt`、`updatedAt`。
 
+## 机物管理（Resources）
+
+### MachineAsset（机械台账）
+
+- **用途**：承接财务 Excel 的机械资产台账，支持导入、筛选与导出；资产编号 `assetNumber` 全局唯一且稳定，用于导入时的 upsert（新增/更新同一资产）。
+- **财务字段（Excel 同步）**
+  1. `assetCategoryName`：资产类别名称（可空）。
+  2. `assetNumber`：资产编号（必填，唯一）。
+  3. `manufacturer`：生产厂家（可空）。
+  4. `assetName`：资产名称（可空）。
+  5. `assetStatusName`：资产状态名称（可空）。
+  6. `specModel`：规格型号（可空）。
+  7. `registrationDate`：登记日期（date，可空）。
+  8. `originalValue`：资产原值（decimal，可空）。
+  9. `usedMonths`：使用月份（int，可空）。
+  10. `currentValue`：资产现值（decimal，系统计算优先）：`originalValue * remainingMonths / usedMonths`（缺少必要字段时回退到导入值）。
+  11. `depreciatedMonths`：已提月份（int，系统计算优先）：`当前月份 - 登记月份`，且不超过 `usedMonths`（缺少登记日期时回退到导入值）。
+  12. `remainingMonths`：剩余月份（int，系统计算优先）：`max(usedMonths - depreciatedMonths, 0)`（缺少登记日期/使用月份时回退到导入值）。
+- **运营字段（系统维护，可选导入）**
+  - `usageStatus?`：使用状态（如在用/停用/维修等，字符串，可空）。
+  - `alias?`：别名（字符串，可空）。
+  - `plateNumber?`：车牌（字符串，可空）。
+  - `photoLinks`：照片链接数组（string[]）。
+  - `meta?`：JSON 扩展字段（用于临时字段兜底，不建议长期依赖做筛选统计）。
+- **审计字段**
+  - `createdById?` / `updatedById?`：操作用户（可空）。
+  - `createdAt` / `updatedAt`：时间戳。
+- **导入约定**
+  1. Excel 导入必需包含“财务基础字段（9 列）”：资产类别名称/资产编号/生产厂家/资产名称/资产状态名称/规格型号/登记日期/资产原值/使用月份。
+  2. `currentValue`（资产现值）/`depreciatedMonths`（已提月份）/`remainingMonths`（剩余月份）可选导入：系统会优先按“当前年月 + 登记日期 + 使用月份”进行自动计算并随月份更新；当缺少必要字段无法计算时，会回退使用导入值。
+  3. 月份口径按 `DW_LEDGER_TIMEZONE`（默认 `Africa/Abidjan`，科特迪瓦时间）；如需伦敦夏令时口径可设置为 `Europe/London`。
+  4. 运营字段列可选（使用状态/别名/车牌/照片链接）。当 Excel 中包含运营字段列且单元格有值时会同步；缺列或空值不会触发覆盖（在 `ignoreBlanks` 开启时）。
+  5. 支持 `ignoreBlanks`：开启后，Excel 空值不会覆盖数据库中已有值（避免财务表缺值导致冲空）；关闭后空值会覆盖为 `null`（数组字段会清空为 `[]`）。
+
+### MachineDailyLog（机械日志：每日记录）
+
+- **用途**：按“机械 × 日期”记录每天的运行/绑定/油耗/折旧等信息。机械可能每天归属不同项目/队伍/负责人，因此这些字段必须落在每日表里以形成历史轨迹。
+- **唯一约束**：`@@unique([machineId, logDate])`，同一台机械同一天只允许 1 条记录。
+- **核心字段（可空）**
+  1. `logDate`：日期（按日口径，建议存 `YYYY-MM-DDT00:00:00.000Z` 的 UTC midnight）。
+  2. `machineId`：关联 `MachineAsset.id`。
+  3. `team` / `teamKey`：队伍/班组快照与标准化键（用于筛选/分组）。
+  4. `chineseSupervisorId` / `chineseSupervisorName`：中方负责人绑定与快照名（选队伍后可根据 `TeamSupervisor` 自动带出）。
+  5. `projectId`：当天所属项目（可随天变化，必须落库）。
+  6. `operatorId` / `operatorName`：当天绑定的具体成员（可选，来自成员管理）。
+  7. `workContent`：当天工作内容（可选文本）。
+  8. `fuelRemainingEnd`：当日结束时剩余油量（收盘值，单位建议 L）。
+  9. `dailyDepreciation`：每日折旧数额快照（可空；若后续要统一算法，可在保存时生成默认值但允许手工覆盖）。
+- **油耗口径（计算值，不落库）**
+  - `dailyFuelConsumed = 上一日剩余 + 当日加油 − 当日剩余`
+  - 其中“上一日剩余”取上一天 `MachineDailyLog.fuelRemainingEnd`；“当日加油”取当天 `MachineFuelEvent.amount` 求和；“当日剩余”取当天 `fuelRemainingEnd`。
+- **审计字段**
+  - `createdById?` / `updatedById?`、`createdAt` / `updatedAt`。
+
+### MachineFuelEvent（机械日志：加油流水）
+
+- **用途**：支持“一天多次加油”，每次加油必须记录来源（油罐/加油车）与加油量。
+- **字段**
+  1. `dailyLogId`：关联 `MachineDailyLog.id`（同一天同一机械的加油记录归集到该日记录下）。
+  2. `fuelSourceId`：关联 `FuelSource.id`（加油来源）。
+  3. `amount`：当次加油量（decimal）。
+  4. `note?`：备注（可空，如单据号/异常说明）。
+  5. `createdAt`：时间戳（用于追溯，不要求精确到加油时刻时可只用创建时间）。
+
+### FuelSource（加油来源：油罐/加油车）
+
+- **用途**：统一管理加油来源，支持固定油罐 + 多辆加油车。
+- **字段**
+  1. `type`：枚举 `TANK` / `TRUCK`。
+  2. `code`：全局唯一，用于稳定引用与幂等 upsert（示例：`TANK_1`、`TANK_2`、`TRUCK:{machineId}`）。
+  3. `name`：显示名称（油罐名/加油车名）。
+  4. `machineId?`：当 `type=TRUCK` 时绑定 `MachineAsset.id`（允许多辆加油车来自机械台账）。
+  5. `isActive`：是否启用（停用后不再出现在下拉中，但历史流水仍保留）。
+
+### FuelSourceDailyLog（加油来源：每日库存/日结）
+
+- **用途**：记录油罐/加油车的日结剩余量，结合机械加油流水汇总出库，便于掌握柴油库存与计划补给。
+- **唯一约束**：`@@unique([fuelSourceId, logDate])`。
+- **字段**
+  1. `logDate`：日期（按日口径）。
+  2. `fuelSourceId`：关联 `FuelSource.id`。
+  3. `received?`：当日入库/补给（可空，默认按 0 处理）。
+  4. `remainingEnd?`：当日结束剩余（收盘值，可空）。
+- **可对账计算（不落库）**
+  - `dispensedToday = sum(MachineFuelEvent.amount by fuelSourceId, date)`
+  - `expectedEnd = prevRemainingEnd + received - dispensedToday`
+  - `delta = remainingEnd - expectedEnd`（用于快速发现漏记/误记）。
+
+### 物资台账（规划）
+
+- **目标**：先覆盖大宗材料（柴油、汽油、水泥、钢筋、沥青、润滑油），后续补齐小类（标号/类型/包装）与出入库流水。
+- **说明**：物资库存建议以“出入库流水”聚合计算，避免单字段库存导致后期对账困难。
+
 ## 权限与账户模型
 
 - **Permission**：`code`（唯一标识，如 `road:manage`、`report:edit`）、`name`、`status`（`ACTIVE`/`ARCHIVED`，默认 `ACTIVE`）、`createdAt`、`updatedAt`；当前权限编码覆盖：
@@ -465,6 +558,8 @@
   - 财务：`finance:view`、`finance:edit`、`finance:manage`
   - 工资发放：`payroll:view`、`payroll:manage`
   - 产值计量：`value:view`、`value:create`、`value:update`、`value:delete`
+  - 机物管理：`machine:view`、`machine:create`、`machine:update`、`machine:delete`；`material:view`、`material:create`、`material:update`、`material:delete`
+  - 机械日志与油料来源：`machine-log:view`、`machine-log:create`、`machine-log:update`、`machine-log:delete`；`fuel-source:view`、`fuel-source:create`、`fuel-source:update`、`fuel-source:delete`
   - 开发路线：`roadmap:view`、`roadmap:create`、`roadmap:update`、`roadmap:delete`
   - AI 对话：`ai-chat:view`、`ai-chat:debug`
 - **备注**：`status=ARCHIVED` 表示归档权限，不再参与鉴权，也不允许继续绑定角色。
