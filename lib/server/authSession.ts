@@ -71,13 +71,38 @@ export const getSessionUser = async (): Promise<SessionUser | null> => {
   const jar = await cookies()
   const token = jar.get(SESSION_COOKIE)?.value
   if (!token) return null
-  return decode(token)
+  const user = decode(token)
+  if (!user) return null
+
+  // Best-effort: Admin should always have all ACTIVE permissions.
+  if (user.roles.some((role) => role.name === 'Admin')) {
+    try {
+      const permissions = await prisma.permission.findMany({
+        where: { status: 'ACTIVE' },
+        select: { code: true },
+      })
+      user.permissions = permissions.map((perm) => perm.code)
+    } catch (error) {
+      console.error('Failed to expand Admin permissions', error)
+    }
+  }
+
+  return user
 }
 
 export const hasPermission = async (permission: string) => {
   noStore()
   const user = await getSessionUser()
   if (!user) return false
+  if (user.roles.some((role) => role.name === 'Admin')) {
+    if (user.permissions.includes(permission)) return true
+    // Fallback for older sessions or when Admin permission expansion fails.
+    const record = await prisma.permission.findUnique({
+      where: { code: permission },
+      select: { status: true },
+    })
+    return record?.status === 'ACTIVE'
+  }
   if (!user.permissions.includes(permission)) return false
   const record = await prisma.permission.findUnique({
     where: { code: permission },
