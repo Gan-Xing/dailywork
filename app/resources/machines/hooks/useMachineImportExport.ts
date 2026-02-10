@@ -1,12 +1,14 @@
 import { useCallback, useMemo, useState } from 'react'
 
 import type { ResourcesCopy } from '@/lib/i18n/resources'
+import { getMachineEquipmentTypeLabel, isMachineEquipmentTypeKey } from '@/lib/resources/machines/equipmentTypes'
 import {
   MACHINE_REQUIRED_IMPORT_HEADERS,
   MACHINE_TEMPLATE_HEADERS,
   type MachineColumnKey,
   machineColumnOrder,
 } from '@/lib/resources/machines/constants'
+import { usePreferredLocale } from '@/lib/usePreferredLocale'
 import type { MachineAsset, MachineImportRow } from '@/types/machines'
 
 type ImportHeaderKey =
@@ -16,6 +18,7 @@ type ImportHeaderKey =
   | 'assetName'
   | 'assetStatusName'
   | 'specModel'
+  | 'equipmentTypeKey'
   | 'registrationDate'
   | 'originalValue'
   | 'usedMonths'
@@ -46,7 +49,8 @@ export function useMachineImportExport({
   t,
   canCreateMachines,
   canUpdateMachines,
-  machines,
+  exportMachines,
+  allMachines,
   visibleColumns,
   loadData,
   setActionError,
@@ -55,7 +59,8 @@ export function useMachineImportExport({
   t: ResourcesCopy
   canCreateMachines: boolean
   canUpdateMachines: boolean
-  machines: MachineAsset[]
+  exportMachines: MachineAsset[]
+  allMachines: MachineAsset[]
   visibleColumns: MachineColumnKey[]
   loadData: () => Promise<void>
   setActionError: (value: string | null) => void
@@ -64,6 +69,7 @@ export function useMachineImportExport({
   const [importing, setImporting] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [templateDownloading, setTemplateDownloading] = useState(false)
+  const { locale } = usePreferredLocale()
 
   const importHeaderMap = useMemo(() => {
     const map = new Map<string, ImportHeaderKey>()
@@ -78,6 +84,7 @@ export function useMachineImportExport({
     add('资产名称', 'assetName')
     add('资产状态名称', 'assetStatusName')
     add('规格型号', 'specModel')
+    add('设备类型', 'equipmentTypeKey')
     add('登记日期', 'registrationDate')
     add('资产原值', 'originalValue')
     add('使用月份', 'usedMonths')
@@ -287,17 +294,21 @@ export function useMachineImportExport({
     ],
   )
 
-  const handleExport = useCallback(async () => {
-    setExporting(true)
-    setActionError(null)
-    setActionNotice(null)
-    try {
+  const exportToWorkbook = useCallback(
+    async (machines: MachineAsset[], { filenamePrefix }: { filenamePrefix: string }) => {
       const XLSX = await import('xlsx')
-      const columns = machineColumnOrder.filter((key) => key !== 'actions' && visibleColumns.includes(key))
+      const columns = machineColumnOrder.filter(
+        (key) => key !== 'actions' && visibleColumns.includes(key),
+      )
       const header = columns.map((key) => t.machines.columns[key])
       const rows = machines.map((machine) =>
         columns.map((key) => {
           switch (key) {
+            case 'equipmentTypeKey': {
+              const raw = (machine.equipmentTypeKey ?? '').trim()
+              if (!raw) return ''
+              return isMachineEquipmentTypeKey(raw) ? getMachineEquipmentTypeLabel(locale, raw) : raw
+            }
             case 'registrationDate':
               return machine.registrationDate ? formatDateInput(machine.registrationDate) : ''
             case 'originalValue':
@@ -315,7 +326,7 @@ export function useMachineImportExport({
             case 'updatedAt':
               return machine.updatedAt ? formatDateInput(machine.updatedAt) : ''
             case 'photoLinks':
-              return machine.photoLinks?.join(',') ?? ''
+              return String(machine.photoCount ?? 0)
             default:
               return (machine as Record<string, unknown>)[key] ?? ''
           }
@@ -325,14 +336,37 @@ export function useMachineImportExport({
       const worksheet = XLSX.utils.aoa_to_sheet([header, ...rows])
       const workbook = XLSX.utils.book_new()
       XLSX.utils.book_append_sheet(workbook, worksheet, 'machines')
-      const filename = `machines-export-${new Date().toISOString().slice(0, 10)}.xlsx`
+      const filename = `${filenamePrefix}-${new Date().toISOString().slice(0, 10)}.xlsx`
       XLSX.writeFile(workbook, filename, { bookType: 'xlsx' })
+    },
+    [locale, t, visibleColumns],
+  )
+
+  const handleExport = useCallback(async () => {
+    setExporting(true)
+    setActionError(null)
+    setActionNotice(null)
+    try {
+      await exportToWorkbook(exportMachines, { filenamePrefix: 'machines-export' })
     } catch (error) {
       setActionError(error instanceof Error ? error.message : t.common.loadFailed)
     } finally {
       setExporting(false)
     }
-  }, [machines, setActionError, setActionNotice, t, visibleColumns])
+  }, [exportMachines, exportToWorkbook, setActionError, setActionNotice, t.common.loadFailed])
+
+  const handleExportAll = useCallback(async () => {
+    setExporting(true)
+    setActionError(null)
+    setActionNotice(null)
+    try {
+      await exportToWorkbook(allMachines, { filenamePrefix: 'machines-export-all' })
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : t.common.loadFailed)
+    } finally {
+      setExporting(false)
+    }
+  }, [allMachines, exportToWorkbook, setActionError, setActionNotice, t.common.loadFailed])
 
   const handleDownloadTemplate = useCallback(async () => {
     setTemplateDownloading(true)
@@ -357,6 +391,8 @@ export function useMachineImportExport({
     exporting,
     templateDownloading,
     handleImportFileChange,
+    handleExportFiltered: handleExport,
+    handleExportAll,
     handleExport,
     handleDownloadTemplate,
   }

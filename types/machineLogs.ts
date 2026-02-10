@@ -96,6 +96,65 @@ export type MachineLogsPageData = {
   }
 }
 
+export type MachineLogGroupBy = 'none' | 'category' | 'supervisor' | 'team' | 'equipmentType'
+
+export type MachineLogEffectiveBinding = {
+  sourceDate: string | null
+  isFromToday: boolean
+  team: string | null
+  teamKey: string | null
+  chineseSupervisorId: number | null
+  chineseSupervisorName: string | null
+  projectId: number | null
+  operatorId: number | null
+  operatorName: string | null
+}
+
+export type MachineLogGroupSummary = {
+  groupBy: MachineLogGroupBy
+  groupKey: string
+  groupLabel: string
+  machineCount: number
+  filledCount: number
+  missingCount: number
+  fuelAddedTotal: number
+  fuelConsumedTotal: number | null
+  dailyDepreciationTotal: number
+  issues: {
+    negativeFuelConsumedCount: number
+    missingFuelRemainingEndCount: number
+  }
+}
+
+export type MachineLogsSummaryPageData = {
+  date: string
+  locale: 'fr' | 'zh'
+  groupBy: MachineLogGroupBy
+  mine: boolean
+  projectId: number | null
+  groups: MachineLogGroupSummary[]
+  options: {
+    projects: ProjectOption[]
+  }
+}
+
+export type MachineLogsGroupPageData = {
+  date: string
+  locale: 'fr' | 'zh'
+  groupBy: MachineLogGroupBy
+  groupKey: string
+  groupLabel: string
+  mine: boolean
+  projectId: number | null
+  summary: MachineLogGroupSummary
+  machines: MachineAsset[]
+  logs: MachineDailyLog[]
+  prevFuelByMachineId: Record<string, number | null>
+  effectiveByMachineId: Record<string, MachineLogEffectiveBinding>
+  fuelSources: FuelSource[]
+  options: MachineLogsPageData['options']
+}
+
 export type FuelSourceDailyRow = {
   fuelSource: FuelSource
   received: number | null

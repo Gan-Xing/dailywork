@@ -5,10 +5,13 @@ import { useEffect, useMemo, useState } from 'react'
 import { ActionButton } from '@/components/ActionButton'
 import { SingleSelect, type SingleSelectOption } from '@/components/SingleSelect'
 import type { ResourcesCopy } from '@/lib/i18n/resources'
+import { computeMachineDailyDepreciation } from '@/lib/resources/machines/depreciation'
+import { resolveMachineEquipmentTypeKey } from '@/lib/resources/machines/equipmentTypes'
 import type { MachineAsset } from '@/types/machines'
 import type {
   FuelSource,
   MachineDailyLog,
+  MachineLogEffectiveBinding,
   TeamSupervisorOption,
   UserOption,
   ProjectOption,
@@ -81,6 +84,7 @@ export function MachineLogCard({
   date,
   machine,
   log,
+  suggested,
   prevFuelRemainingEnd,
   fuelSources,
   teamSupervisors,
@@ -94,6 +98,7 @@ export function MachineLogCard({
   date: string
   machine: MachineAsset
   log: MachineDailyLog | null
+  suggested?: MachineLogEffectiveBinding | null
   prevFuelRemainingEnd: number | null
   fuelSources: FuelSource[]
   teamSupervisors: TeamSupervisorOption[]
@@ -110,11 +115,15 @@ export function MachineLogCard({
     operatorId: number | null
     workContent: string | null
     fuelRemainingEnd: number | null
-    dailyDepreciation: number | null
     fuelEvents: Array<{ fuelSourceId: number; amount: number; note?: string | null }>
   }) => Promise<MachineDailyLog>
 }) {
   const { primary, secondary } = formatMachineTitle(machine)
+
+  const shouldTrackFuel = useMemo(() => {
+    const resolved = resolveMachineEquipmentTypeKey(machine)
+    return resolved.key !== 'survey' && resolved.key !== 'lab'
+  }, [machine])
 
   const teamOptions: SingleSelectOption[] = useMemo(() => {
     const entries = teamSupervisors.map((binding) => ({
@@ -142,13 +151,22 @@ export function MachineLogCard({
     [fuelSources, t.common.clear],
   )
 
-  const [teamKey, setTeamKey] = useState(log?.teamKey ?? '')
-  const [team, setTeam] = useState(log?.team ?? '')
-  const [supervisorId, setSupervisorId] = useState(log?.chineseSupervisorId ? String(log.chineseSupervisorId) : '')
-  const [projectId, setProjectId] = useState(log?.projectId ? String(log.projectId) : '')
-  const [operatorId, setOperatorId] = useState(log?.operatorId ? String(log.operatorId) : '')
+  const [teamKey, setTeamKey] = useState(log?.teamKey ?? suggested?.teamKey ?? '')
+  const [team, setTeam] = useState(log?.team ?? suggested?.team ?? '')
+  const [supervisorId, setSupervisorId] = useState(
+    log?.chineseSupervisorId
+      ? String(log.chineseSupervisorId)
+      : suggested?.chineseSupervisorId
+        ? String(suggested.chineseSupervisorId)
+        : '',
+  )
+  const [projectId, setProjectId] = useState(
+    log?.projectId ? String(log.projectId) : suggested?.projectId ? String(suggested.projectId) : '',
+  )
+  const [operatorId, setOperatorId] = useState(
+    log?.operatorId ? String(log.operatorId) : suggested?.operatorId ? String(suggested.operatorId) : '',
+  )
   const [fuelRemainingEnd, setFuelRemainingEnd] = useState(toInputString(log?.fuelRemainingEnd ?? null))
-  const [dailyDepreciation, setDailyDepreciation] = useState(toInputString(log?.dailyDepreciation ?? null))
   const [workContent, setWorkContent] = useState(log?.workContent ?? '')
   const [fuelEvents, setFuelEvents] = useState<FuelEventDraft[]>(() => mapFuelDrafts(log))
 
@@ -158,19 +176,31 @@ export function MachineLogCard({
 
   const logSnapshot = useMemo(
     () => ({
-      teamKey: log?.teamKey ?? '',
-      team: log?.team ?? '',
-      supervisorId: log?.chineseSupervisorId ? String(log.chineseSupervisorId) : '',
-      projectId: log?.projectId ? String(log.projectId) : '',
-      operatorId: log?.operatorId ? String(log.operatorId) : '',
+      teamKey: log?.teamKey ?? suggested?.teamKey ?? '',
+      team: log?.team ?? suggested?.team ?? '',
+      supervisorId: log?.chineseSupervisorId
+        ? String(log.chineseSupervisorId)
+        : suggested?.chineseSupervisorId
+          ? String(suggested.chineseSupervisorId)
+          : '',
+      projectId: log?.projectId
+        ? String(log.projectId)
+        : suggested?.projectId
+          ? String(suggested.projectId)
+          : '',
+      operatorId: log?.operatorId
+        ? String(log.operatorId)
+        : suggested?.operatorId
+          ? String(suggested.operatorId)
+          : '',
       fuelRemainingEnd: toInputString(log?.fuelRemainingEnd ?? null),
-      dailyDepreciation: toInputString(log?.dailyDepreciation ?? null),
       workContent: log?.workContent ?? '',
       fuelEvents: mapFuelDrafts(log),
       updatedAt: log?.updatedAt ?? '',
       id: log?.id ?? null,
+      suggestedSourceDate: suggested?.sourceDate ?? null,
     }),
-    [log],
+    [log, suggested],
   )
 
   useEffect(() => {
@@ -180,7 +210,6 @@ export function MachineLogCard({
     setProjectId(logSnapshot.projectId)
     setOperatorId(logSnapshot.operatorId)
     setFuelRemainingEnd(logSnapshot.fuelRemainingEnd)
-    setDailyDepreciation(logSnapshot.dailyDepreciation)
     setWorkContent(logSnapshot.workContent)
     setFuelEvents(logSnapshot.fuelEvents)
     setError(null)
@@ -188,7 +217,19 @@ export function MachineLogCard({
   }, [logSnapshot])
 
   const resolvedFuelRemainingEnd = useMemo(() => parseNumberInput(fuelRemainingEnd), [fuelRemainingEnd])
-  const resolvedDailyDepreciation = useMemo(() => parseNumberInput(dailyDepreciation), [dailyDepreciation])
+  const resolvedDailyDepreciation = useMemo(() => {
+    return computeMachineDailyDepreciation({
+      dateKey: date,
+      registrationDate: machine.registrationDate ?? null,
+      originalValue: machine.originalValue ?? null,
+      usedMonths: machine.usedMonths ?? null,
+    })
+  }, [date, machine.originalValue, machine.registrationDate, machine.usedMonths])
+
+  const resolvedDailyDepreciationText = useMemo(() => {
+    if (resolvedDailyDepreciation == null) return '—'
+    return String(resolvedDailyDepreciation)
+  }, [resolvedDailyDepreciation])
 
   const fuelAddedTotal = useMemo(() => {
     const amounts = fuelEvents
@@ -262,7 +303,6 @@ export function MachineLogCard({
         operatorId: operatorId ? Number(operatorId) : null,
         workContent: workContent.trim() ? workContent.trim() : null,
         fuelRemainingEnd: resolvedFuelRemainingEnd,
-        dailyDepreciation: resolvedDailyDepreciation,
         fuelEvents: nextEvents,
       }
 
@@ -286,6 +326,11 @@ export function MachineLogCard({
               {machine.assetCategoryName ?? t.machineLogs.labels.groupBy.none}
               {machine.plateNumber ? ` · ${machine.plateNumber}` : ''}
             </p>
+            {!log && suggested?.sourceDate ? (
+              <p className="mt-2 text-xs text-amber-700">
+                {t.machineLogs.hints.prefilledFrom(suggested.sourceDate)}
+              </p>
+            ) : null}
           </div>
 
           <div className="flex items-center gap-2">
@@ -330,50 +375,58 @@ export function MachineLogCard({
           />
         </div>
 
-        <div className="grid gap-4 md:grid-cols-3">
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-            <p className="text-xs font-semibold text-slate-500">{t.machineLogs.labels.prevFuelRemainingEnd}</p>
-            <p className="mt-1 text-sm font-semibold text-slate-800">
-              {prevFuelRemainingEnd == null ? '—' : prevFuelRemainingEnd}
-            </p>
+        {shouldTrackFuel ? (
+          <div className="grid gap-4 md:grid-cols-3">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+              <p className="text-xs font-semibold text-slate-500">{t.machineLogs.labels.prevFuelRemainingEnd}</p>
+              <p className="mt-1 text-sm font-semibold text-slate-800">
+                {prevFuelRemainingEnd == null ? '—' : prevFuelRemainingEnd}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+              <p className="text-xs font-semibold text-slate-500">{t.machineLogs.labels.fuelAddedTotal}</p>
+              <p className="mt-1 text-sm font-semibold text-slate-800">{fuelAddedTotal || 0}</p>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+              <p className="text-xs font-semibold text-slate-500">{t.machineLogs.labels.dailyFuelConsumed}</p>
+              <p className="mt-1 text-sm font-semibold text-slate-800">
+                {dailyFuelConsumed == null ? '—' : Math.round(dailyFuelConsumed * 100) / 100}
+              </p>
+            </div>
           </div>
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-            <p className="text-xs font-semibold text-slate-500">{t.machineLogs.labels.fuelAddedTotal}</p>
-            <p className="mt-1 text-sm font-semibold text-slate-800">{fuelAddedTotal || 0}</p>
+        ) : (
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600">
+            {t.machineLogs.hints.fuelNotRequired}
           </div>
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-            <p className="text-xs font-semibold text-slate-500">{t.machineLogs.labels.dailyFuelConsumed}</p>
-            <p className="mt-1 text-sm font-semibold text-slate-800">
-              {dailyFuelConsumed == null ? '—' : Math.round(dailyFuelConsumed * 100) / 100}
-            </p>
-          </div>
-        </div>
+        )}
 
         <div className="grid gap-4 md:grid-cols-2">
-          <label className="flex flex-col gap-1 text-xs text-slate-600">
-            <span className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-              {t.machineLogs.labels.fuelRemainingEnd}
-            </span>
-            <input
-              value={fuelRemainingEnd}
-              onChange={(event) => setFuelRemainingEnd(event.target.value)}
-              inputMode="decimal"
-              disabled={readOnly}
-              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-900 shadow-sm focus:border-sky-400 focus:outline-none"
-              placeholder={t.machineLogs.hints.emptyOptional}
-            />
-          </label>
+          {shouldTrackFuel ? (
+            <label className="flex flex-col gap-1 text-xs text-slate-600">
+              <span className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                {t.machineLogs.labels.fuelRemainingEnd}
+              </span>
+              <input
+                value={fuelRemainingEnd}
+                onChange={(event) => setFuelRemainingEnd(event.target.value)}
+                inputMode="decimal"
+                disabled={readOnly}
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-900 shadow-sm focus:border-sky-400 focus:outline-none"
+                placeholder={t.machineLogs.hints.emptyOptional}
+              />
+            </label>
+          ) : null}
           <label className="flex flex-col gap-1 text-xs text-slate-600">
             <span className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
               {t.machineLogs.labels.dailyDepreciation}
             </span>
+            <span className="text-[11px] leading-4 text-slate-400">{t.machineLogs.hints.dailyDepreciationFormula}</span>
             <input
-              value={dailyDepreciation}
-              onChange={(event) => setDailyDepreciation(event.target.value)}
+              value={resolvedDailyDepreciationText}
               inputMode="decimal"
-              disabled={readOnly}
+              disabled
               className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-900 shadow-sm focus:border-sky-400 focus:outline-none"
-              placeholder={t.machineLogs.hints.emptyOptional}
+              placeholder="—"
             />
           </label>
         </div>
@@ -391,102 +444,104 @@ export function MachineLogCard({
           />
         </label>
 
-        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="text-sm font-semibold text-slate-900">{t.machineLogs.labels.fuelEvents}</p>
-              <p className="mt-1 text-xs text-slate-500">{t.machineLogs.hints.consumptionFormula}</p>
-            </div>
-            <ActionButton onClick={onAddFuelEvent} disabled={readOnly}>
-              {t.machineLogs.actions.addFuelEvent}
-            </ActionButton>
-          </div>
-
-          <div className="mt-4 space-y-3">
-            {fuelEvents.map((event, idx) => (
-              <div
-                key={`${idx}-${event.fuelSourceId}`}
-                className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-3 md:grid-cols-12"
-              >
-                <div className="md:col-span-5">
-                  <SingleSelect
-                    label={t.machineLogs.labels.fuelSource}
-                    value={event.fuelSourceId}
-                    options={fuelSourceOptions}
-                    placeholder={t.machineLogs.hints.emptyOptional}
-                    onChange={(value) => {
-                      setFuelEvents((prev) => {
-                        const next = [...prev]
-                        next[idx] = { ...next[idx], fuelSourceId: value }
-                        return next
-                      })
-                    }}
-                    disabled={readOnly}
-                  />
-                </div>
-                <div className="md:col-span-3">
-                  <label className="flex flex-col gap-1 text-xs text-slate-600">
-                    <span className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-                      {t.machineLogs.labels.fuelAmount}
-                    </span>
-                    <input
-                      value={event.amount}
-                      onChange={(e) => {
-                        const value = e.target.value
-                        setFuelEvents((prev) => {
-                          const next = [...prev]
-                          next[idx] = { ...next[idx], amount: value }
-                          return next
-                        })
-                      }}
-                      inputMode="decimal"
-                      disabled={readOnly}
-                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-900 shadow-sm focus:border-sky-400 focus:outline-none"
-                      placeholder={t.machineLogs.hints.emptyOptional}
-                    />
-                  </label>
-                </div>
-                <div className="md:col-span-3">
-                  <label className="flex flex-col gap-1 text-xs text-slate-600">
-                    <span className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-                      {t.machineLogs.labels.fuelNote}
-                    </span>
-                    <input
-                      value={event.note}
-                      onChange={(e) => {
-                        const value = e.target.value
-                        setFuelEvents((prev) => {
-                          const next = [...prev]
-                          next[idx] = { ...next[idx], note: value }
-                          return next
-                        })
-                      }}
-                      disabled={readOnly}
-                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-900 shadow-sm focus:border-sky-400 focus:outline-none"
-                      placeholder={t.machineLogs.hints.emptyOptional}
-                    />
-                  </label>
-                </div>
-                <div className="md:col-span-1 flex items-end">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setFuelEvents((prev) => prev.filter((_, i) => i !== idx))
-                    }}
-                    disabled={readOnly}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-200"
-                  >
-                    {t.machineLogs.actions.removeFuelEvent}
-                  </button>
-                </div>
+        {shouldTrackFuel ? (
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-slate-900">{t.machineLogs.labels.fuelEvents}</p>
+                <p className="mt-1 text-xs text-slate-500">{t.machineLogs.hints.consumptionFormula}</p>
               </div>
-            ))}
+              <ActionButton onClick={onAddFuelEvent} disabled={readOnly} className="shrink-0 whitespace-nowrap">
+                {t.machineLogs.actions.addFuelEvent}
+              </ActionButton>
+            </div>
 
-            {fuelEvents.length === 0 ? (
-              <p className="text-xs text-slate-500">{t.machineLogs.hints.emptyOptional}</p>
-            ) : null}
+            <div className="mt-4 space-y-3">
+              {fuelEvents.map((event, idx) => (
+                <div
+                  key={`${idx}-${event.fuelSourceId}`}
+                  className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-3 md:grid-cols-12"
+                >
+                  <div className="md:col-span-5">
+                    <SingleSelect
+                      label={t.machineLogs.labels.fuelSource}
+                      value={event.fuelSourceId}
+                      options={fuelSourceOptions}
+                      placeholder={t.machineLogs.hints.emptyOptional}
+                      onChange={(value) => {
+                        setFuelEvents((prev) => {
+                          const next = [...prev]
+                          next[idx] = { ...next[idx], fuelSourceId: value }
+                          return next
+                        })
+                      }}
+                      disabled={readOnly}
+                    />
+                  </div>
+                  <div className="md:col-span-3">
+                    <label className="flex flex-col gap-1 text-xs text-slate-600">
+                      <span className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                        {t.machineLogs.labels.fuelAmount}
+                      </span>
+                      <input
+                        value={event.amount}
+                        onChange={(e) => {
+                          const value = e.target.value
+                          setFuelEvents((prev) => {
+                            const next = [...prev]
+                            next[idx] = { ...next[idx], amount: value }
+                            return next
+                          })
+                        }}
+                        inputMode="decimal"
+                        disabled={readOnly}
+                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-900 shadow-sm focus:border-sky-400 focus:outline-none"
+                        placeholder={t.machineLogs.hints.emptyOptional}
+                      />
+                    </label>
+                  </div>
+                  <div className="md:col-span-3">
+                    <label className="flex flex-col gap-1 text-xs text-slate-600">
+                      <span className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                        {t.machineLogs.labels.fuelNote}
+                      </span>
+                      <input
+                        value={event.note}
+                        onChange={(e) => {
+                          const value = e.target.value
+                          setFuelEvents((prev) => {
+                            const next = [...prev]
+                            next[idx] = { ...next[idx], note: value }
+                            return next
+                          })
+                        }}
+                        disabled={readOnly}
+                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-900 shadow-sm focus:border-sky-400 focus:outline-none"
+                        placeholder={t.machineLogs.hints.emptyOptional}
+                      />
+                    </label>
+                  </div>
+                  <div className="md:col-span-1 flex items-end">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFuelEvents((prev) => prev.filter((_, i) => i !== idx))
+                      }}
+                      disabled={readOnly}
+                      className="w-full rounded-2xl border border-slate-200 bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-200"
+                    >
+                      {t.machineLogs.actions.removeFuelEvent}
+                    </button>
+                  </div>
+                </div>
+              ))}
+
+              {fuelEvents.length === 0 ? (
+                <p className="text-xs text-slate-500">{t.machineLogs.hints.emptyOptional}</p>
+              ) : null}
+            </div>
           </div>
-        </div>
+        ) : null}
 
         {error ? (
           <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">

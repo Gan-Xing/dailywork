@@ -69,23 +69,77 @@ export type ResourcesCopy = {
     actions: {
       import: string
       export: string
+      exportFiltered: string
+      exportAll: string
       downloadTemplate: string
       filters: string
       columns: string
+      clearSort: string
       clearFilters: string
       search: string
       refresh: string
       view: string
+      edit: string
+      create: string
+      bulkEdit: string
+      saveChanges: string
+      creating: string
+      save: string
+      saving: string
+      cancel: string
+    }
+    columnSelector: {
+      restore: string
+      selectGroup: string
+      clearGroup: string
+    }
+    columnGroups: Record<'base' | 'finance' | 'operations' | 'system', string>
+    stats: {
+      count: string
+      photoCoverage: string
+      originalValueTotal: string
+      currentValueTotal: string
     }
     notices: {
       importSuccess: (created: number, updated: number) => string
+      bulkSaveEmpty: string
+      bulkSaveSuccess: (count: number) => string
+      bulkSavePartial: (success: number, failed: number) => string
     }
     errors: {
       needMachineCreateOrUpdate: string
+      createFailed: string
+      saveFailed: string
       importInvalidFile: string
       importNoData: string
       importMissingHeaders: string
       importFailed: string
+    }
+    hints: {
+      optional: string
+      required: string
+      cleared: string
+      assetNumberLocked: string
+      createAfterPhotos: string
+    }
+    financeSection: {
+      title: string
+      hint: string
+      computedHint: string
+      manage: string
+      readOnly: string
+    }
+    photos: {
+      title: string
+      empty: string
+      readOnly: string
+      count: (count: number) => string
+      upload: string
+      uploading: string
+      uploadFailed: string
+      delete: string
+      deleting: string
+      deleteFailed: string
     }
     filters: {
       title: string
@@ -101,6 +155,7 @@ export type ResourcesCopy = {
       | 'assetName'
       | 'assetStatusName'
       | 'specModel'
+      | 'equipmentTypeKey'
       | 'registrationDate'
       | 'originalValue'
       | 'usedMonths'
@@ -123,6 +178,8 @@ export type ResourcesCopy = {
     actions: {
       save: string
       saving: string
+      enterGroup: string
+      backToGroups: string
       addFuelEvent: string
       removeFuelEvent: string
       addFuelTruck: string
@@ -137,6 +194,7 @@ export type ResourcesCopy = {
       groupBy: {
         none: string
         category: string
+        equipmentType: string
         supervisor: string
         team: string
       }
@@ -151,6 +209,9 @@ export type ResourcesCopy = {
       prevFuelRemainingEnd: string
       fuelAddedTotal: string
       dailyFuelConsumed: string
+      filledLogs: string
+      missingLogs: string
+      issues: string
       fuelEvents: string
       fuelSource: string
       fuelAmount: string
@@ -164,6 +225,9 @@ export type ResourcesCopy = {
     hints: {
       emptyOptional: string
       consumptionFormula: string
+      dailyDepreciationFormula: string
+      fuelNotRequired: string
+      prefilledFrom: (date: string) => string
     }
     errors: {
       needMachineLogView: string
@@ -256,13 +320,41 @@ export const getResourcesCopy = (locale: Locale): ResourcesCopy => {
         actions: {
           import: 'Importer Excel',
           export: 'Exporter Excel',
+          exportFiltered: 'Exporter (filtré)',
+          exportAll: 'Exporter (tout)',
           downloadTemplate: 'Télécharger le modèle',
           filters: 'Filtres',
           columns: 'Colonnes',
+          clearSort: 'Effacer tri',
           clearFilters: 'Réinitialiser',
           search: 'Rechercher',
           refresh: 'Rafraîchir',
           view: 'Voir',
+          edit: 'Éditer',
+          create: 'Nouvelle machine',
+          bulkEdit: 'Édition en lot',
+          saveChanges: 'Enregistrer modifications',
+          creating: 'Création…',
+          save: 'Enregistrer',
+          saving: 'Enregistrement…',
+          cancel: 'Annuler',
+        },
+        columnSelector: {
+          restore: 'Défaut',
+          selectGroup: 'Tout le groupe',
+          clearGroup: 'Vider le groupe',
+        },
+        columnGroups: {
+          base: 'Base',
+          finance: 'Finance',
+          operations: 'Exploitation',
+          system: 'Système',
+        },
+        stats: {
+          count: 'Machines',
+          photoCoverage: 'Couverture photo',
+          originalValueTotal: 'Valeur initiale (total)',
+          currentValueTotal: 'Valeur actuelle (total)',
         },
         notices: {
           importSuccess: (created, updated) =>
@@ -270,13 +362,46 @@ export const getResourcesCopy = (locale: Locale): ResourcesCopy => {
               created,
               updated,
             }),
+          bulkSaveEmpty: "Aucune modification à enregistrer sur la page.",
+          bulkSaveSuccess: (count) =>
+            formatCopy('Enregistré: {count} machine(s) mise(s) à jour.', { count }),
+          bulkSavePartial: (success, failed) =>
+            formatCopy('Partiel: {success} ok, {failed} échec(s).', { success, failed }),
         },
         errors: {
-          needMachineCreateOrUpdate: "Droit requis: machine:create ou machine:update.",
+          needMachineCreateOrUpdate: "Droit requis: machine:create, machine:update ou machine:manage.",
+          createFailed: 'Échec de la création.',
+          saveFailed: "Échec de l'enregistrement.",
           importInvalidFile: 'Fichier non reconnu, veuillez fournir un CSV ou Excel.',
           importNoData: 'Aucune donnée dans le fichier.',
           importMissingHeaders: 'En-têtes requis manquants.',
           importFailed: "Échec de l'import.",
+        },
+        hints: {
+          optional: 'Optionnel',
+          required: 'Requis',
+          cleared: 'Effacé',
+          assetNumberLocked: "Le N° d'actif est globalement unique et ne doit pas être modifié.",
+          createAfterPhotos: "Après la création, vous pourrez ajouter des photos dans la fenêtre d'édition.",
+        },
+        financeSection: {
+          title: 'Champs finance',
+          hint: 'Champs issus du registre financier (import Excel).',
+          computedHint: 'Calcul automatique mensuel: valeur actuelle = valeur initiale * mois restants / mois utilisés.',
+          manage: 'Mode gestion: champs finance modifiables.',
+          readOnly: 'Lecture seule: droits machine:update.',
+        },
+        photos: {
+          title: 'Photos',
+          empty: 'Aucune photo',
+          readOnly: 'Lecture seule',
+          count: (count) => formatCopy('{count} photo(s)', { count }),
+          upload: 'Téléverser',
+          uploading: 'Téléversement…',
+          uploadFailed: 'Échec du téléversement',
+          delete: 'Supprimer',
+          deleting: 'Suppression…',
+          deleteFailed: 'Échec de la suppression',
         },
         filters: {
           title: 'Filtres',
@@ -292,6 +417,7 @@ export const getResourcesCopy = (locale: Locale): ResourcesCopy => {
           assetName: 'Nom',
           assetStatusName: 'Statut (finance)',
           specModel: 'Modèle',
+          equipmentTypeKey: "Type d'engin",
           registrationDate: "Date d'enregistrement",
           originalValue: 'Valeur initiale',
           usedMonths: 'Mois utilisés',
@@ -313,6 +439,8 @@ export const getResourcesCopy = (locale: Locale): ResourcesCopy => {
         actions: {
           save: 'Enregistrer',
           saving: 'Enregistrement…',
+          enterGroup: 'Ouvrir',
+          backToGroups: 'Retour aux groupes',
           addFuelEvent: 'Ajouter ravitaillement',
           removeFuelEvent: 'Supprimer',
           addFuelTruck: 'Ajouter camion',
@@ -327,6 +455,7 @@ export const getResourcesCopy = (locale: Locale): ResourcesCopy => {
           groupBy: {
             none: 'Aucun',
             category: 'Catégorie',
+            equipmentType: "Type d'engin",
             supervisor: 'Responsable',
             team: 'Équipe',
           },
@@ -341,6 +470,9 @@ export const getResourcesCopy = (locale: Locale): ResourcesCopy => {
           prevFuelRemainingEnd: 'Reste (J-1)',
           fuelAddedTotal: 'Ajout du jour',
           dailyFuelConsumed: 'Consommation',
+          filledLogs: 'Saisis',
+          missingLogs: 'Non saisis',
+          issues: 'Anomalies',
           fuelEvents: 'Ravitaillements',
           fuelSource: 'Source',
           fuelAmount: 'Quantité',
@@ -354,6 +486,9 @@ export const getResourcesCopy = (locale: Locale): ResourcesCopy => {
         hints: {
           emptyOptional: 'Optionnel',
           consumptionFormula: 'Formule: J-1 + Ajout - Reste',
+          dailyDepreciationFormula: 'Calcul auto: amortissement du mois / jours du mois',
+          fuelNotRequired: 'Aucun ravitaillement requis pour ce type.',
+          prefilledFrom: (date) => formatCopy('Pré-rempli depuis {date} (non enregistré).', { date }),
         },
         errors: {
           needMachineLogView: "Autorisation requise: machine-log:view.",
@@ -445,13 +580,41 @@ export const getResourcesCopy = (locale: Locale): ResourcesCopy => {
       actions: {
         import: '导入 Excel',
         export: '导出 Excel',
+        exportFiltered: '导出筛选结果',
+        exportAll: '导出全部',
         downloadTemplate: '下载模板',
         filters: '筛选',
         columns: '列',
+        clearSort: '清空排序',
         clearFilters: '重置筛选',
         search: '搜索',
         refresh: '刷新',
         view: '查看',
+        edit: '编辑',
+        create: '新增设备',
+        bulkEdit: '批量编辑',
+        saveChanges: '保存更改',
+        creating: '新增中…',
+        save: '保存',
+        saving: '保存中…',
+        cancel: '取消',
+      },
+      columnSelector: {
+        restore: '默认',
+        selectGroup: '选择该组',
+        clearGroup: '清空该组',
+      },
+      columnGroups: {
+        base: '基础信息',
+        finance: '财务折旧',
+        operations: '运营字段',
+        system: '系统字段',
+      },
+      stats: {
+        count: '设备数量',
+        photoCoverage: '照片覆盖',
+        originalValueTotal: '资产原值合计',
+        currentValueTotal: '资产现值合计',
       },
       notices: {
         importSuccess: (created, updated) =>
@@ -459,13 +622,45 @@ export const getResourcesCopy = (locale: Locale): ResourcesCopy => {
             created,
             updated,
           }),
+        bulkSaveEmpty: '当前页没有可保存的更改。',
+        bulkSaveSuccess: (count) => formatCopy('批量保存完成：成功更新 {count} 条。', { count }),
+        bulkSavePartial: (success, failed) =>
+          formatCopy('批量保存部分成功：成功 {success} 条，失败 {failed} 条。', { success, failed }),
       },
       errors: {
-        needMachineCreateOrUpdate: '需要权限：machine:create 或 machine:update。',
+        needMachineCreateOrUpdate: '需要权限：machine:create 或 machine:update 或 machine:manage。',
+        createFailed: '新增失败。',
+        saveFailed: '保存失败。',
         importInvalidFile: '无法识别文件，请上传 CSV 或 Excel 文件。',
         importNoData: '文件内无数据。',
         importMissingHeaders: '缺少必填表头（请使用模板）。',
         importFailed: '导入失败。',
+      },
+      hints: {
+        optional: '可选',
+        required: '必填',
+        cleared: '已清空',
+        assetNumberLocked: '资产编号全局唯一且稳定，禁止修改。',
+        createAfterPhotos: '创建完成后可在“编辑”里上传照片。',
+      },
+      financeSection: {
+        title: '财务字段',
+        hint: '来自财务台账（Excel 导入）。',
+        computedHint: '系统每月自动计算：资产现值 = 资产原值 * 剩余月份 / 使用月份。',
+        manage: '管理模式：可编辑财务字段。',
+        readOnly: '无管理权限：财务字段只读。',
+      },
+      photos: {
+        title: '机械照片',
+        empty: '暂无照片',
+        readOnly: '只读',
+        count: (count) => formatCopy('共 {count} 张', { count }),
+        upload: '上传照片',
+        uploading: '上传中…',
+        uploadFailed: '上传失败',
+        delete: '删除',
+        deleting: '删除中…',
+        deleteFailed: '删除失败',
       },
       filters: {
         title: '筛选',
@@ -481,6 +676,7 @@ export const getResourcesCopy = (locale: Locale): ResourcesCopy => {
         assetName: '资产名称',
         assetStatusName: '资产状态名称',
         specModel: '规格型号',
+        equipmentTypeKey: '设备类型',
         registrationDate: '登记日期',
         originalValue: '资产原值',
         usedMonths: '使用月份',
@@ -490,7 +686,7 @@ export const getResourcesCopy = (locale: Locale): ResourcesCopy => {
         usageStatus: '使用状态',
         alias: '别名',
         plateNumber: '车牌',
-        photoLinks: '照片链接',
+        photoLinks: '照片',
         createdAt: '创建时间',
         updatedAt: '更新时间',
         actions: '操作',
@@ -502,6 +698,8 @@ export const getResourcesCopy = (locale: Locale): ResourcesCopy => {
       actions: {
         save: '保存',
         saving: '保存中…',
+        enterGroup: '进入',
+        backToGroups: '返回分组',
         addFuelEvent: '新增加油记录',
         removeFuelEvent: '删除',
         addFuelTruck: '添加加油车',
@@ -516,6 +714,7 @@ export const getResourcesCopy = (locale: Locale): ResourcesCopy => {
         groupBy: {
           none: '不分组',
           category: '按资产类别',
+          equipmentType: '按设备类型',
           supervisor: '按中方负责人',
           team: '按队伍',
         },
@@ -530,6 +729,9 @@ export const getResourcesCopy = (locale: Locale): ResourcesCopy => {
         prevFuelRemainingEnd: '上一日剩余',
         fuelAddedTotal: '当日加油量',
         dailyFuelConsumed: '当日油耗',
+        filledLogs: '已填日志',
+        missingLogs: '未填日志',
+        issues: '异常',
         fuelEvents: '加油流水',
         fuelSource: '加油来源',
         fuelAmount: '加油量',
@@ -543,6 +745,9 @@ export const getResourcesCopy = (locale: Locale): ResourcesCopy => {
       hints: {
         emptyOptional: '可空，不填不影响保存。',
         consumptionFormula: '油耗公式：上一日剩余 + 当日加油 - 当日剩余',
+        dailyDepreciationFormula: '自动计算：当月折旧金额 / 当月天数',
+        fuelNotRequired: '该设备类型默认不记录加油/油耗。',
+        prefilledFrom: (date) => formatCopy('已沿用 {date} 的归属信息（未保存）。', { date }),
       },
       errors: {
         needMachineLogView: '需要权限：machine-log:view。',

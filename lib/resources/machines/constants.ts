@@ -5,6 +5,7 @@ export type MachineColumnKey =
   | 'assetName'
   | 'assetStatusName'
   | 'specModel'
+  | 'equipmentTypeKey'
   | 'registrationDate'
   | 'originalValue'
   | 'usedMonths'
@@ -35,6 +36,7 @@ export const machineColumnOrder: MachineColumnKey[] = [
   'assetName',
   'assetStatusName',
   'specModel',
+  'equipmentTypeKey',
   'registrationDate',
   'originalValue',
   'usedMonths',
@@ -56,6 +58,7 @@ export const defaultVisibleMachineColumns: MachineColumnKey[] = [
   'assetCategoryName',
   'assetStatusName',
   'specModel',
+  'equipmentTypeKey',
   'registrationDate',
   'originalValue',
   'currentValue',
@@ -68,7 +71,47 @@ export const defaultMachineSort: { field: MachineSortField; order: MachineSortOr
   order: 'asc',
 }
 
+export const defaultMachineSortStack: Array<{ field: MachineSortField; order: MachineSortOrder }> = [
+  defaultMachineSort,
+]
+
 export const MACHINE_PAGE_SIZE_OPTIONS = [10, 20, 50, 100] as const
+
+export const machineColumnGroups = [
+  {
+    key: 'base',
+    columns: [
+      'assetNumber',
+      'assetName',
+      'assetCategoryName',
+      'manufacturer',
+      'assetStatusName',
+      'specModel',
+      'equipmentTypeKey',
+      'registrationDate',
+    ],
+  },
+  {
+    key: 'finance',
+    columns: [
+      'originalValue',
+      'usedMonths',
+      'currentValue',
+      'depreciatedMonths',
+      'remainingMonths',
+    ],
+  },
+  {
+    key: 'operations',
+    columns: ['usageStatus', 'alias', 'plateNumber', 'photoLinks'],
+  },
+  {
+    key: 'system',
+    columns: ['createdAt', 'updatedAt'],
+  },
+] as const
+
+export type MachineColumnGroupKey = (typeof machineColumnGroups)[number]['key']
 
 export const MACHINE_REQUIRED_IMPORT_HEADERS = [
   '资产类别名称',
@@ -83,6 +126,7 @@ export const MACHINE_REQUIRED_IMPORT_HEADERS = [
 ] as const
 
 export const MACHINE_OPTIONAL_IMPORT_HEADERS = [
+  '设备类型',
   '资产现值',
   '已提月份',
   '剩余月份',

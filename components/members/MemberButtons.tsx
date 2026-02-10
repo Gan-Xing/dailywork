@@ -2,6 +2,8 @@
 
 import type { ReactNode } from 'react'
 
+import { ActionButton as BaseActionButton } from '@/components/ActionButton'
+
 export function TabButton({
   children,
   active,
@@ -36,13 +38,8 @@ export function ActionButton({
   disabled?: boolean
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-800 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-60"
-    >
+    <BaseActionButton onClick={onClick} disabled={disabled}>
       {children}
-    </button>
+    </BaseActionButton>
   )
 }

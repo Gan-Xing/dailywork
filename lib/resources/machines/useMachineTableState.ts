@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useReducer, useState } from 'react'
+import { useCallback, useEffect, useReducer, useState } from 'react'
 
 import {
   MACHINE_FILTER_STORAGE_KEY,
@@ -6,11 +6,28 @@ import {
   type MachineSortOrder,
 } from './constants'
 
+type SortSpec = { field: MachineSortField; order: MachineSortOrder }
+
 export type MachineFiltersState = {
   assetCategoryNameFilters: string[]
-  assetStatusNameFilters: string[]
+  assetNumberFilters: string[]
   manufacturerFilters: string[]
+  assetNameFilters: string[]
+  assetStatusNameFilters: string[]
+  specModelFilters: string[]
+  equipmentTypeKeyFilters: string[]
   registrationMonthFilters: string[]
+  originalValueFilters: string[]
+  usedMonthsFilters: string[]
+  currentValueFilters: string[]
+  depreciatedMonthsFilters: string[]
+  remainingMonthsFilters: string[]
+  usageStatusFilters: string[]
+  aliasFilters: string[]
+  plateNumberFilters: string[]
+  photoLinksCountFilters: string[]
+  createdMonthFilters: string[]
+  updatedMonthFilters: string[]
 }
 
 type FilterAction =
@@ -20,9 +37,24 @@ type FilterAction =
 
 const initialFiltersState: MachineFiltersState = {
   assetCategoryNameFilters: [],
-  assetStatusNameFilters: [],
+  assetNumberFilters: [],
   manufacturerFilters: [],
+  assetNameFilters: [],
+  assetStatusNameFilters: [],
+  specModelFilters: [],
+  equipmentTypeKeyFilters: [],
   registrationMonthFilters: [],
+  originalValueFilters: [],
+  usedMonthsFilters: [],
+  currentValueFilters: [],
+  depreciatedMonthsFilters: [],
+  remainingMonthsFilters: [],
+  usageStatusFilters: [],
+  aliasFilters: [],
+  plateNumberFilters: [],
+  photoLinksCountFilters: [],
+  createdMonthFilters: [],
+  updatedMonthFilters: [],
 }
 
 const filterKeys = Object.keys(initialFiltersState) as Array<keyof MachineFiltersState>
@@ -55,7 +87,7 @@ const filterReducer = (state: MachineFiltersState, action: FilterAction): Machin
 
 type Options = {
   defaultPageSize?: number
-  defaultSort?: { field: MachineSortField; order: MachineSortOrder }
+  defaultSortStack?: SortSpec[]
 }
 
 export function useMachineTableState(options: Options = {}) {
@@ -67,9 +99,7 @@ export function useMachineTableState(options: Options = {}) {
   const [page, setPage] = useState(1)
   const [pageInput, setPageInput] = useState('1')
   const [pageSize, setPageSize] = useState(options.defaultPageSize ?? 20)
-  const [sort, setSort] = useState<{ field: MachineSortField; order: MachineSortOrder }>(
-    options.defaultSort ?? { field: 'assetNumber', order: 'asc' },
-  )
+  const [sortStack, setSortStack] = useState<SortSpec[]>(options.defaultSortStack ?? [])
 
   const setFilter = useCallback((key: keyof MachineFiltersState, value: string[]) => {
     dispatch({ type: 'set', key, value })
@@ -107,20 +137,9 @@ export function useMachineTableState(options: Options = {}) {
     }
   }, [filters, filtersHydrated])
 
-  const filterActions = useMemo(
-    () => ({
-      setAssetCategoryNameFilters: (value: string[]) => setFilter('assetCategoryNameFilters', value),
-      setAssetStatusNameFilters: (value: string[]) => setFilter('assetStatusNameFilters', value),
-      setManufacturerFilters: (value: string[]) => setFilter('manufacturerFilters', value),
-      setRegistrationMonthFilters: (value: string[]) =>
-        setFilter('registrationMonthFilters', value),
-    }),
-    [setFilter],
-  )
-
   return {
     filters,
-    filterActions,
+    setFilter,
     filtersOpen,
     setFiltersOpen,
     page,
@@ -129,8 +148,8 @@ export function useMachineTableState(options: Options = {}) {
     setPageInput,
     pageSize,
     setPageSize,
-    sort,
-    setSort,
+    sortStack,
+    setSortStack,
     resetFilters,
     filtersHydrated,
     filtersLoadedFromStorage,

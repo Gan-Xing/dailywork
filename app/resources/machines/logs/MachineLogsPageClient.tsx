@@ -1,58 +1,96 @@
 'use client'
 
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useMemo, useState } from 'react'
 
 import { AccessDenied } from '@/components/AccessDenied'
 import { ActionButton } from '@/components/ActionButton'
 import { SingleSelect } from '@/components/SingleSelect'
+import type { Locale } from '@/lib/i18n'
 import { usePreferredLocale } from '@/lib/usePreferredLocale'
 import { getResourcesCopy } from '@/lib/i18n/resources'
-import type { MachineDailyLog } from '@/types/machineLogs'
+import type { MachineLogGroupBy } from '@/types/machineLogs'
 
 import { ResourcesHeader } from '../../ResourcesHeader'
 import { useResourcesSession } from '../../hooks/useResourcesSession'
-import { MachineLogCard } from './components/MachineLogCard'
+import { useMachinesData } from '../hooks/useMachinesData'
+import { MachineLogGroupCard } from './components/MachineLogGroupCard'
 import { useFuelSourceDailyData, getFuelSourceLabel } from './hooks/useFuelSourceDailyData'
-import { useMachineLogsData } from './hooks/useMachineLogsData'
+import { useMachineLogsSummaryData } from './hooks/useMachineLogsSummaryData'
 
 const defaultDateKey = () => new Date().toISOString().slice(0, 10)
 
-type GroupBy = 'none' | 'category' | 'supervisor' | 'team'
+const isGroupBy = (value: string): value is MachineLogGroupBy => {
+  return ['none', 'category', 'supervisor', 'team', 'equipmentType'].includes(value)
+}
 
-const groupLabel = (groupBy: GroupBy, t: ReturnType<typeof getResourcesCopy>) => {
+const groupLabel = (groupBy: MachineLogGroupBy, t: ReturnType<typeof getResourcesCopy>) => {
   const labels = t.machineLogs.labels.groupBy
   if (groupBy === 'category') return labels.category
   if (groupBy === 'supervisor') return labels.supervisor
   if (groupBy === 'team') return labels.team
+  if (groupBy === 'equipmentType') return labels.equipmentType
   return labels.none
 }
 
 export function MachineLogsPageClient() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+
   const { locale, setLocale } = usePreferredLocale()
   const t = getResourcesCopy(locale)
   const {
     authLoaded,
     session,
+    canViewMachines,
     canViewMachineLogs,
-    canCreateMachineLogs,
-    canUpdateMachineLogs,
     canViewFuelSources,
     canUpdateFuelSources,
   } = useResourcesSession()
 
-  const [date, setDate] = useState(defaultDateKey)
-  const [groupBy, setGroupBy] = useState<GroupBy>('supervisor')
+  const [date, setDate] = useState(() => searchParams?.get('date')?.trim() || defaultDateKey())
+  const [groupBy, setGroupBy] = useState<MachineLogGroupBy>(() => {
+    const raw = searchParams?.get('groupBy')?.trim() || ''
+    return isGroupBy(raw) ? raw : 'supervisor'
+  })
+  const [projectId, setProjectId] = useState(() => searchParams?.get('projectId')?.trim() || '')
+
+  const showMineDefault = Boolean(session?.id)
+  const [mineOnly, setMineOnly] = useState(() => searchParams?.get('mine') === '1')
+  const resolvedMineOnly = Boolean(showMineDefault && mineOnly)
+
+  const syncQuery = useCallback(
+    (next: { date?: string; groupBy?: MachineLogGroupBy; projectId?: string; mine?: boolean } = {}) => {
+      const params = new URLSearchParams(searchParams?.toString() ?? '')
+      if (next.date) params.set('date', next.date)
+      if (next.groupBy) params.set('groupBy', next.groupBy)
+      if (next.projectId !== undefined) {
+        const safe = next.projectId.trim()
+        if (safe) params.set('projectId', safe)
+        else params.delete('projectId')
+      }
+      if (typeof next.mine === 'boolean') {
+        if (next.mine) params.set('mine', '1')
+        else params.delete('mine')
+      }
+      router.replace(`?${params.toString()}`)
+    },
+    [router, searchParams],
+  )
 
   const {
-    data,
-    setData,
-    loading,
-    error,
-    loadData,
-  } = useMachineLogsData({
+    data: summary,
+    loading: summaryLoading,
+    error: summaryError,
+    loadData: loadSummary,
+  } = useMachineLogsSummaryData({
     authLoaded,
     canViewMachineLogs,
     date,
+    groupBy,
+    projectId,
+    mineOnly: resolvedMineOnly,
+    locale: locale as Locale,
     loadErrorMessage: t.machineLogs.errors.loadFailed,
   })
 
@@ -64,127 +102,39 @@ export function MachineLogsPageClient() {
     date,
     loadErrorMessage: t.machineLogs.errors.loadFailed,
   })
-  const loadFuelSourceDaily = fuelSourceDaily.loadData
 
-  const saveLog = useCallback(
-    async (payload: any) => {
-      const res = await fetch('/api/resources/machines/logs', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(payload),
-      })
-      const json = (await res.json().catch(() => null)) as { error?: string; log?: MachineDailyLog } | null
-      if (!res.ok) {
-        throw new Error(json?.error || t.machineLogs.errors.saveFailed)
-      }
-      const saved = json?.log
-      if (!saved) {
-        throw new Error(t.machineLogs.errors.saveFailed)
-      }
-
-      setData((prev) => {
-        if (!prev) return prev
-        const nextLogs = prev.logs.filter((item) => item.machineId !== saved.machineId)
-        nextLogs.push(saved)
-        nextLogs.sort((a, b) => a.machineId - b.machineId)
-        return { ...prev, logs: nextLogs }
-      })
-
-      return saved
-    },
-    [setData, t.machineLogs.errors.saveFailed],
-  )
-
-  const logsByMachineId = useMemo(() => {
-    const map = new Map<number, MachineDailyLog>()
-    data?.logs.forEach((log) => map.set(log.machineId, log))
-    return map
-  }, [data?.logs])
-
-  const supervisorIdByMachineId = useMemo(() => {
-    const map = new Map<number, number>()
-    logsByMachineId.forEach((log, machineId) => {
-      const id = log.chineseSupervisorId
-      if (id) map.set(machineId, id)
-    })
-    return map
-  }, [logsByMachineId])
-
-  const groupKeys = useMemo(() => {
-    const machines = data?.machines ?? []
-    const groups = new Map<string, number[]>()
-
-    const put = (key: string, machineId: number) => {
-      const list = groups.get(key) ?? []
-      list.push(machineId)
-      groups.set(key, list)
-    }
-
-    machines.forEach((machine) => {
-      const log = logsByMachineId.get(machine.id) ?? null
-
-      let key = ''
-      if (groupBy === 'category') {
-        key = (machine.assetCategoryName ?? '').trim() || '未分类'
-      } else if (groupBy === 'team') {
-        key = (log?.team ?? '').trim() || '未填队伍'
-      } else if (groupBy === 'supervisor') {
-        key = (log?.chineseSupervisorName ?? '').trim() || '未填负责人'
-      } else {
-        key = '全部'
-      }
-
-      put(key, machine.id)
-    })
-
-    const entries = Array.from(groups.entries())
-    entries.sort((a, b) => a[0].localeCompare(b[0], undefined, { numeric: true, sensitivity: 'base' }))
-    return entries
-  }, [data?.machines, groupBy, logsByMachineId])
+  const machinesData = useMachinesData({
+    authLoaded,
+    canViewMachines: canUpdateFuelSources && canViewMachines,
+    loadErrorMessage: t.common.loadFailed,
+  })
 
   const groupByOptions = useMemo(
     () => [
-      { value: 'none', label: t.machineLogs.labels.groupBy.none },
-      { value: 'category', label: t.machineLogs.labels.groupBy.category },
       { value: 'supervisor', label: t.machineLogs.labels.groupBy.supervisor },
       { value: 'team', label: t.machineLogs.labels.groupBy.team },
+      { value: 'category', label: t.machineLogs.labels.groupBy.category },
+      { value: 'equipmentType', label: t.machineLogs.labels.groupBy.equipmentType },
+      { value: 'none', label: t.machineLogs.labels.groupBy.none },
     ],
     [t.machineLogs.labels.groupBy],
   )
 
-  const showMineDefault = Boolean(session?.id)
-  const [showMine, setShowMine] = useState(false)
-
-  const filteredGroupKeys = useMemo(() => {
-    if (!showMineDefault || !showMine || !session?.id) return groupKeys
-    const mineId = session.id
-
-    const machines = data?.machines ?? []
-    const mineMachineIds = new Set<number>()
-    machines.forEach((machine) => {
-      const supervisorId = supervisorIdByMachineId.get(machine.id)
-      if (supervisorId === mineId) {
-        mineMachineIds.add(machine.id)
-      }
-    })
-
-    const next: Array<[string, number[]]> = []
-    groupKeys.forEach(([key, ids]) => {
-      const filtered = ids.filter((id) => mineMachineIds.has(id))
-      if (filtered.length > 0) next.push([key, filtered])
-    })
-    return next
-  }, [data?.machines, groupKeys, session?.id, showMine, showMineDefault, supervisorIdByMachineId])
-
-  const canEditLogs = canCreateMachineLogs || canUpdateMachineLogs
+  const projectOptions = useMemo(() => {
+    const projects = summary?.options.projects ?? []
+    const opts = projects.map((project) => ({
+      value: String(project.id),
+      label: project.code ? `${project.name} (${project.code})` : project.name,
+    }))
+    return [{ value: '', label: t.common.all }, ...opts]
+  }, [summary?.options.projects, t.common.all])
 
   const [truckMachineId, setTruckMachineId] = useState('')
   const [truckActionError, setTruckActionError] = useState<string | null>(null)
   const [truckSaving, setTruckSaving] = useState(false)
 
   const machineOptions = useMemo(() => {
-    const machines = data?.machines ?? []
+    const machines = machinesData.machines ?? []
     const opts = machines.map((machine) => {
       const title = (machine.alias ?? '').trim() || (machine.assetName ?? '').trim() || machine.assetNumber
       const plate = (machine.plateNumber ?? '').trim()
@@ -192,7 +142,7 @@ export function MachineLogsPageClient() {
       return { value: String(machine.id), label: `${title}${suffix}` }
     })
     return [{ value: '', label: t.common.noOptions }, ...opts]
-  }, [data?.machines, t.common.noOptions])
+  }, [machinesData.machines, t.common.noOptions])
 
   const updateTruck = useCallback(
     async ({ machineId, isActive }: { machineId: number; isActive: boolean }) => {
@@ -209,15 +159,14 @@ export function MachineLogsPageClient() {
         })
         const json = (await res.json().catch(() => null)) as { error?: string } | null
         if (!res.ok) throw new Error(json?.error || t.machineLogs.errors.saveFailed)
-        await loadFuelSourceDaily()
-        await loadData()
+        await fuelSourceDaily.loadData()
       } catch (err) {
         setTruckActionError(err instanceof Error ? err.message : t.machineLogs.errors.saveFailed)
       } finally {
         setTruckSaving(false)
       }
     },
-    [loadFuelSourceDaily, loadData, t.machineLogs.errors.saveFailed],
+    [fuelSourceDaily, t.machineLogs.errors.saveFailed],
   )
 
   const addTruck = useCallback(async () => {
@@ -263,7 +212,11 @@ export function MachineLogsPageClient() {
                   <input
                     type="date"
                     value={date}
-                    onChange={(event) => setDate(event.target.value)}
+                    onChange={(event) => {
+                      const next = event.target.value
+                      setDate(next)
+                      syncQuery({ date: next })
+                    }}
                     className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm text-slate-900 shadow-sm focus:border-sky-400 focus:outline-none"
                   />
                 </label>
@@ -274,19 +227,44 @@ export function MachineLogsPageClient() {
                     value={groupBy}
                     options={groupByOptions}
                     placeholder={groupLabel(groupBy, t)}
-                    onChange={(value) => setGroupBy(value as GroupBy)}
+                    onChange={(value) => {
+                      const next = value as MachineLogGroupBy
+                      setGroupBy(next)
+                      syncQuery({ groupBy: next })
+                    }}
+                  />
+                </div>
+
+                <div className="w-72">
+                  <SingleSelect
+                    label={t.machineLogs.labels.project}
+                    value={projectId}
+                    options={projectOptions}
+                    placeholder={t.common.all}
+                    onChange={(value) => {
+                      setProjectId(value)
+                      syncQuery({ projectId: value })
+                    }}
                   />
                 </div>
 
                 {showMineDefault ? (
-                  <ActionButton onClick={() => setShowMine((prev) => !prev)}>
-                    {showMine ? t.machineLogs.actions.hideMine : t.machineLogs.actions.showMine}
+                  <ActionButton
+                    onClick={() =>
+                      setMineOnly((prev) => {
+                        const next = !prev
+                        syncQuery({ mine: next })
+                        return next
+                      })
+                    }
+                  >
+                    {resolvedMineOnly ? t.machineLogs.actions.hideMine : t.machineLogs.actions.showMine}
                   </ActionButton>
                 ) : null}
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
-                <ActionButton onClick={() => void loadData()} disabled={loading}>
+                <ActionButton onClick={() => void loadSummary()} disabled={summaryLoading}>
                   {t.machineLogs.actions.refresh}
                 </ActionButton>
                 <ActionButton onClick={() => void fuelSourceDaily.loadData()} disabled={fuelSourceDaily.loading}>
@@ -295,13 +273,13 @@ export function MachineLogsPageClient() {
               </div>
             </div>
 
-            {error ? (
+            {summaryError ? (
               <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
-                {error}
+                {summaryError}
               </div>
             ) : null}
 
-            {loading ? (
+            {summaryLoading ? (
               <p className="mt-4 text-sm text-slate-600">{t.common.loading}</p>
             ) : null}
           </div>
@@ -315,7 +293,7 @@ export function MachineLogsPageClient() {
                     <p className="mt-1 text-xs text-slate-500">{t.machineLogs.hints.consumptionFormula}</p>
                   </div>
 
-                  {canUpdateFuelSources ? (
+                  {canUpdateFuelSources && canViewMachines ? (
                     <div className="flex flex-wrap items-end gap-2">
                       <div className="w-72">
                         <SingleSelect
@@ -446,55 +424,23 @@ export function MachineLogsPageClient() {
             </div>
           ) : null}
 
-          {data ? (
-            <div className="grid gap-6">
-              {filteredGroupKeys.map(([key, ids]) => (
-                <section key={key} className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h2 className="text-lg font-semibold text-slate-900">{key}</h2>
-                    <p className="text-xs text-slate-500">{ids.length} 台</p>
-                  </div>
-
-                  <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
-                    {ids.map((machineId) => {
-                      const machine = data.machines.find((item) => item.id === machineId)
-                      if (!machine) return null
-                      const log = logsByMachineId.get(machineId) ?? null
-                      const prevFuel = data.prevFuelByMachineId[String(machineId)] ?? null
-
-                      return (
-                        <MachineLogCard
-                          key={machineId}
-                          t={t}
-                          date={data.date}
-                          machine={machine}
-                          log={log}
-                          prevFuelRemainingEnd={prevFuel}
-                          fuelSources={data.fuelSources}
-                          teamSupervisors={data.options.teamSupervisors}
-                          supervisors={data.options.supervisors}
-                          operators={data.options.operators}
-                          projects={data.options.projects}
-                          readOnly={!canEditLogs}
-                          onSave={saveLog}
-                        />
-                      )
-                    })}
-                  </div>
-                </section>
+          {summary ? (
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+              {summary.groups.map((group) => (
+                <MachineLogGroupCard
+                  key={`${group.groupBy}:${group.groupKey}`}
+                  t={t}
+                  summary={group}
+                  date={summary.date}
+                  projectId={projectId}
+                  mineOnly={resolvedMineOnly}
+                />
               ))}
-            </div>
-          ) : null}
-
-          {!loading && !data ? (
-            <div className="rounded-3xl border border-slate-200 bg-white p-8 shadow-xl shadow-slate-900/5">
-              <p className="text-sm text-slate-600">{t.common.empty}</p>
-            </div>
-          ) : null}
-
-          {!canEditLogs ? (
-            <div className="rounded-3xl border border-amber-200 bg-amber-50 p-6 text-sm text-amber-900">
-              {t.machineLogs.errors.needMachineLogCreateOrUpdate}
+              {summary.groups.length === 0 ? (
+                <div className="rounded-3xl border border-slate-200 bg-white p-8 shadow-xl shadow-slate-900/5">
+                  <p className="text-sm text-slate-600">{t.common.empty}</p>
+                </div>
+              ) : null}
             </div>
           ) : null}
         </div>

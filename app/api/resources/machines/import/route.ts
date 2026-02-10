@@ -5,9 +5,12 @@ import { upsertMachineAssets } from '@/lib/server/machineStore'
 import type { MachineImportRow } from '@/types/machines'
 
 export async function POST(request: Request) {
-  const canCreate = await hasPermission('machine:create')
-  const canUpdate = await hasPermission('machine:update')
-  if (!canCreate && !canUpdate) {
+  const [canCreate, canUpdate, canManage] = await Promise.all([
+    hasPermission('machine:create'),
+    hasPermission('machine:update'),
+    hasPermission('machine:manage'),
+  ])
+  if (!canCreate && !canUpdate && !canManage) {
     return NextResponse.json({ error: '缺少机械新增/更新权限' }, { status: 403 })
   }
 

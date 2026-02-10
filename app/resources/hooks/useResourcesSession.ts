@@ -28,6 +28,7 @@ export function useResourcesSession() {
   const canCreateMachines = has('machine:create')
   const canUpdateMachines = has('machine:update')
   const canDeleteMachines = has('machine:delete')
+  const canManageMachines = has('machine:manage')
 
   const canViewMachineLogs = has('machine-log:view')
   const canCreateMachineLogs = has('machine-log:create')
@@ -57,6 +58,7 @@ export function useResourcesSession() {
     canCreateMachines,
     canUpdateMachines,
     canDeleteMachines,
+    canManageMachines,
     canViewMachineLogs,
     canCreateMachineLogs,
     canUpdateMachineLogs,
