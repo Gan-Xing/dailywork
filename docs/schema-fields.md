@@ -472,6 +472,7 @@
   11. `depreciatedMonths`：已提月份（int，系统计算优先）：`当前月份 - 登记月份`，且不超过 `usedMonths`（缺少登记日期时回退到导入值）。
   12. `remainingMonths`：剩余月份（int，系统计算优先）：`max(usedMonths - depreciatedMonths, 0)`（缺少登记日期/使用月份时回退到导入值）。
 - **运营字段（系统维护，可选导入）**
+  - `equipmentTypeKey?`：设备类型键（受控枚举，用于机械日志按“设备类型”分组与统计；建议在台账中维护，避免依赖名称猜测）。
   - `usageStatus?`：使用状态（如在用/停用/维修等，字符串，可空）。
   - `alias?`：别名（字符串，可空）。
   - `plateNumber?`：车牌（字符串，可空）。
@@ -500,7 +501,7 @@
   6. `operatorId` / `operatorName`：当天绑定的具体成员（可选，来自成员管理）。
   7. `workContent`：当天工作内容（可选文本）。
   8. `fuelRemainingEnd`：当日结束时剩余油量（收盘值，单位建议 L）。
-  9. `dailyDepreciation`：每日折旧数额快照（可空；若后续要统一算法，可在保存时生成默认值但允许手工覆盖）。
+  9. `dailyDepreciation`：每日折旧数额（系统自动计算，只读）：`当月折旧金额 / 当月天数`；其中 `当月折旧金额 = originalValue / usedMonths`（直线法）。当缺少 `originalValue` 或 `usedMonths` 时返回 `null`；若存在 `registrationDate`，则不在折旧期（早于登记月份或超过 `usedMonths`）时为 `0`。
 - **油耗口径（计算值，不落库）**
   - `dailyFuelConsumed = 上一日剩余 + 当日加油 − 当日剩余`
   - 其中“上一日剩余”取上一天 `MachineDailyLog.fuelRemainingEnd`；“当日加油”取当天 `MachineFuelEvent.amount` 求和；“当日剩余”取当天 `fuelRemainingEnd`。
@@ -558,7 +559,7 @@
   - 财务：`finance:view`、`finance:edit`、`finance:manage`
   - 工资发放：`payroll:view`、`payroll:manage`
   - 产值计量：`value:view`、`value:create`、`value:update`、`value:delete`
-  - 机物管理：`machine:view`、`machine:create`、`machine:update`、`machine:delete`；`material:view`、`material:create`、`material:update`、`material:delete`
+  - 机物管理：`machine:view`、`machine:create`、`machine:update`、`machine:delete`、`machine:manage`；`material:view`、`material:create`、`material:update`、`material:delete`
   - 机械日志与油料来源：`machine-log:view`、`machine-log:create`、`machine-log:update`、`machine-log:delete`；`fuel-source:view`、`fuel-source:create`、`fuel-source:update`、`fuel-source:delete`
   - 开发路线：`roadmap:view`、`roadmap:create`、`roadmap:update`、`roadmap:delete`
   - AI 对话：`ai-chat:view`、`ai-chat:debug`
@@ -626,7 +627,7 @@
 
 ### FileAsset（非结构化文件）
 - `id`：自增整型。
-- `category`：文件分类（初始枚举：`signature`、`inspection-receipt`、`inspection-acceptance`、`attendance-sheet`、`letter-receipt`、`face-photo`、`site-photo`、`attachment`、`other`）。
+- `category`：文件分类（初始枚举：`signature`、`inspection-receipt`、`inspection-acceptance`、`attendance-sheet`、`letter-receipt`、`face-photo`、`site-photo`、`machine-photo`、`attachment`、`other`）。
 - `storageKey`：存储桶对象键（唯一）。
 - `bucket`：存储桶名称。
 - `originalName`：原始文件名。

@@ -618,6 +618,7 @@ model MachineAsset {
   assetName         String?
   assetStatusName   String?
   specModel         String?
+  equipmentTypeKey  String?
   registrationDate  DateTime?
   originalValue     Decimal?          @db.Decimal(18, 2)
   usedMonths        Int?
@@ -641,6 +642,7 @@ model MachineAsset {
   @@index([assetCategoryName])
   @@index([assetStatusName])
   @@index([manufacturer])
+  @@index([equipmentTypeKey])
   @@index([registrationDate])
 }
 
