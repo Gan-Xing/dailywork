@@ -28,6 +28,8 @@ type RoadmapItem = {
 	completedAt: string | null;
 };
 
+const MODULE_CLICK_STORAGE_KEY_PREFIX = 'dailywork.home.module-last-open.v1';
+
 export default function HomePageClient() {
 	const { locale, setLocale } = usePreferredLocale('zh', locales);
 	const t = getHomeCopy(locale);
@@ -51,7 +53,13 @@ export default function HomePageClient() {
 	const [roadmapLoading, setRoadmapLoading] = useState(false);
 	const [roadmapError, setRoadmapError] = useState<string | null>(null);
 	const [roadmapIndex, setRoadmapIndex] = useState(0);
+	const [moduleLastOpened, setModuleLastOpened] = useState<Record<string, number>>({});
 	const searchParams = useSearchParams();
+
+	const moduleStorageKey = useMemo(
+		() => `${MODULE_CLICK_STORAGE_KEY_PREFIX}:${session?.username ?? 'guest'}`,
+		[session?.username]
+	);
 
 	const can = useCallback(
 		(required: string[]) => {
@@ -114,6 +122,16 @@ export default function HomePageClient() {
 			(a, b) => b.priority - a.priority || b.importance - a.importance || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
 		);
 	}, [roadmapPending]);
+	const moduleHrefList = useMemo(() => t.modules.map((module) => module.href), [t.modules]);
+	const sortedModules = useMemo(() => {
+		const defaultOrder = new Map(t.modules.map((module, index) => [module.href, index]));
+		return [...t.modules].sort((a, b) => {
+			const aTime = moduleLastOpened[a.href] ?? 0;
+			const bTime = moduleLastOpened[b.href] ?? 0;
+			if (aTime !== bTime) return bTime - aTime;
+			return (defaultOrder.get(a.href) ?? 0) - (defaultOrder.get(b.href) ?? 0);
+		});
+	}, [moduleLastOpened, t.modules]);
 
 	useEffect(() => {
 		const list = roadmapPreview.length ? roadmapPreview : roadmapPending;
@@ -148,6 +166,40 @@ export default function HomePageClient() {
 			setLoginOpen(true);
 		}
 	}, [searchParams]);
+
+	useEffect(() => {
+		if (typeof window === 'undefined') return;
+		try {
+			const raw = window.localStorage.getItem(moduleStorageKey);
+			if (!raw) {
+				setModuleLastOpened({});
+				return;
+			}
+			const parsed = JSON.parse(raw) as Record<string, unknown> | null;
+			if (!parsed || typeof parsed !== 'object') {
+				setModuleLastOpened({});
+				return;
+			}
+			const next: Record<string, number> = {};
+			Object.entries(parsed).forEach(([href, value]) => {
+				const timestamp = Number(value);
+				if (!href || !Number.isFinite(timestamp) || timestamp <= 0) return;
+				next[href] = timestamp;
+			});
+			setModuleLastOpened(next);
+		} catch {
+			setModuleLastOpened({});
+		}
+	}, [moduleStorageKey]);
+
+	const resolveTrackedModuleHref = useCallback(
+		(href: string) => {
+			if (moduleHrefList.includes(href)) return href;
+			const matched = moduleHrefList.find((item) => item.startsWith(href) || href.startsWith(item));
+			return matched ?? href;
+		},
+		[moduleHrefList]
+	);
 
 	useEffect(() => {
 		const loadRoadmap = async () => {
@@ -236,13 +288,31 @@ export default function HomePageClient() {
 		}
 	};
 
+	const recordModuleVisit = (href: string) => {
+		if (typeof window === 'undefined') return;
+		const trackedHref = resolveTrackedModuleHref(href);
+		const timestamp = Date.now();
+		setModuleLastOpened((prev) => {
+			const next = { ...prev, [trackedHref]: timestamp };
+			try {
+				window.localStorage.setItem(moduleStorageKey, JSON.stringify(next));
+			} catch {
+				// ignore storage quota errors
+			}
+			return next;
+		});
+	};
+
 	const handleModuleClick = (
 		event: React.MouseEvent,
 		href: string,
 		requiredPermissions: string[]
 	) => {
 		const allowed = can(requiredPermissions);
-		if (allowed) return;
+		if (allowed) {
+			recordModuleVisit(href);
+			return;
+		}
 		event.preventDefault();
 		if (!session) {
 			setLoginOpen(true);
@@ -428,13 +498,13 @@ export default function HomePageClient() {
 				</header>
 
 				<section className='mt-12 grid gap-6 md:grid-cols-2 xl:grid-cols-3 xl:gap-8'>
-					{t.modules.map((module) => {
+					{sortedModules.map((module) => {
 						const required = modulePermissions[module.href] ?? [];
 						const allowed = can(required);
 						const locked = !allowed;
 						return (
 							<Link
-								key={module.title}
+								key={module.href}
 								href={module.href}
 								onClick={(event) => handleModuleClick(event, module.href, required)}
 								aria-disabled={locked}
