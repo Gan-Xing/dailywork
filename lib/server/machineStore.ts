@@ -373,7 +373,7 @@ export async function upsertMachineAssets(
 
   for (const batch of batches) {
     const operations = batch.map((item) => {
-      const createData: Prisma.MachineAssetUncheckedCreateInput = {
+      const createData: Prisma.MachineAssetCreateInput = {
         assetNumber: item.assetNumber,
         assetCategoryName: item.assetCategoryName,
         manufacturer: item.manufacturer,
@@ -391,16 +391,16 @@ export async function upsertMachineAssets(
         alias: item.alias ?? null,
         plateNumber: item.plateNumber ?? null,
         photoLinks: item.photoLinks ?? [],
-        updatedById: updatedById ?? null,
-        createdById: updatedById ?? null,
+        createdBy: updatedById == null ? undefined : { connect: { id: updatedById } },
+        updatedBy: updatedById == null ? undefined : { connect: { id: updatedById } },
       }
 
-      const updateData: Prisma.MachineAssetUncheckedUpdateInput = {
-        updatedById: updatedById ?? null,
+      const updateData: Prisma.MachineAssetUpdateInput = {
+        updatedBy: updatedById == null ? { disconnect: true } : { connect: { id: updatedById } },
       }
-      const assign = <K extends keyof Prisma.MachineAssetUncheckedUpdateInput>(
+      const assign = <K extends keyof Prisma.MachineAssetUpdateInput>(
         key: K,
-        value: Prisma.MachineAssetUncheckedUpdateInput[K],
+        value: Prisma.MachineAssetUpdateInput[K],
       ) => {
         if (value === undefined) return
         if (!ignoreBlanks || value !== null) {
@@ -499,7 +499,7 @@ export async function createMachineAsset(
     throw new Error('资产编号不能为空')
   }
 
-  const data: Prisma.MachineAssetUncheckedCreateInput = {
+  const data: Prisma.MachineAssetCreateInput = {
     assetNumber,
     assetCategoryName: normalizeString(payload.assetCategoryName),
     manufacturer: normalizeString(payload.manufacturer),
@@ -517,8 +517,8 @@ export async function createMachineAsset(
     alias: normalizeString(payload.alias),
     plateNumber: normalizeString(payload.plateNumber),
     photoLinks: [],
-    createdById: createdById ?? null,
-    updatedById: createdById ?? null,
+    createdBy: createdById == null ? undefined : { connect: { id: createdById } },
+    updatedBy: createdById == null ? undefined : { connect: { id: createdById } },
   }
 
   try {
@@ -581,13 +581,13 @@ export async function updateMachineAsset(
     throw new Error('资产现值/已提月份/剩余月份为系统计算字段，禁止手工修改')
   }
 
-  const data: Prisma.MachineAssetUncheckedUpdateInput = {
-    updatedById: updatedById ?? null,
+  const data: Prisma.MachineAssetUpdateInput = {
+    updatedBy: updatedById == null ? { disconnect: true } : { connect: { id: updatedById } },
   }
 
-  const assign = <K extends keyof Prisma.MachineAssetUncheckedUpdateInput>(
+  const assign = <K extends keyof Prisma.MachineAssetUpdateInput>(
     key: K,
-    value: Prisma.MachineAssetUncheckedUpdateInput[K],
+    value: Prisma.MachineAssetUpdateInput[K],
   ) => {
     if (value === undefined) return
     data[key] = value
