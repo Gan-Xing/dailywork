@@ -210,9 +210,9 @@ export default function SubmissionEditor({ initialSubmission, canManage = false,
           .map((item) => {
             const token = normalizeInspectionToken(item)
             if (!token) return token
-            const layerToken = localizeProgressTerm('layer', token, 'fr', { phaseName: phasePart })
-            if (layerToken !== token) return layerToken
-            return localizeProgressTerm('check', token, 'fr', { phaseName: phasePart })
+            const checkToken = localizeProgressTerm('check', token, 'fr', { phaseName: phasePart })
+            if (checkToken !== token) return checkToken
+            return localizeProgressTerm('layer', token, 'fr', { phaseName: phasePart })
           })
           .filter(Boolean)
           .join(' / ')

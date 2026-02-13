@@ -493,10 +493,10 @@ const localizePhaseToken = (token: string, locale: Locale) => {
 const localizeNatureToken = (token: string, locale: Locale, phaseName: string) => {
   const normalized = normalizeInspectionToken(token)
   if (!normalized) return ''
-  const layer = localizeProgressTerm('layer', normalized, locale, { phaseName })
-  if (layer !== normalized) return layer
   const check = localizeProgressTerm('check', normalized, locale, { phaseName })
   if (check !== normalized) return check
+  const layer = localizeProgressTerm('layer', normalized, locale, { phaseName })
+  if (layer !== normalized) return layer
   const phase = localizeProgressTerm('phase', normalized, locale)
   if (phase !== normalized) return phase
   return normalized
