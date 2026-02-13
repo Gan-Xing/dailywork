@@ -33,6 +33,7 @@ export type MachineDailyLog = {
   id: number
   machineId: number
   logDate: string
+  usageStatus: string | null
   team: string | null
   teamKey: string | null
   chineseSupervisorId: number | null

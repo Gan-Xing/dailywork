@@ -27,6 +27,7 @@ export function MachineEditModal({
   t,
   machine,
   open,
+  usageStatusOptions,
   canEditOperational,
   canManage,
   onClose,
@@ -35,6 +36,7 @@ export function MachineEditModal({
   t: ResourcesCopy
   machine: MachineAsset | null
   open: boolean
+  usageStatusOptions: Array<{ value: string; label: string }>
   canEditOperational: boolean
   canManage: boolean
   onClose: () => void
@@ -149,6 +151,24 @@ export function MachineEditModal({
     return [{ value: '', label: t.common.clear }, ...opts]
   }, [locale, t.common.clear])
 
+  const resolvedUsageStatusOptions = useMemo(() => {
+    const emptyLabel = locale === 'fr' ? 'Non renseigné' : '未填写'
+    const map = new Map<string, string>()
+    usageStatusOptions.forEach((option) => {
+      const key = option.value.trim()
+      if (!key) return
+      if (!map.has(key)) map.set(key, option.label)
+    })
+    const current = usageStatus.trim()
+    if (current && !map.has(current)) {
+      map.set(current, current)
+    }
+    return [
+      { value: '', label: emptyLabel },
+      ...Array.from(map.entries()).map(([value, label]) => ({ value, label })),
+    ]
+  }, [locale, usageStatus, usageStatusOptions])
+
   if (!machine) return null
 
   return (
@@ -168,13 +188,16 @@ export function MachineEditModal({
           </div>
 
           <div>
-            <div className={labelClass}>{t.machines.columns.usageStatus}</div>
-            <input
-              className={inputClass}
+            <SingleSelect
+              label={t.machines.columns.usageStatus}
               value={usageStatus}
-              onChange={(e) => setUsageStatus(e.target.value)}
-              disabled={!canEditOperational && !canManage}
+              options={resolvedUsageStatusOptions}
               placeholder={t.machines.hints.optional}
+              searchPlaceholder={locale === 'fr' ? 'Rechercher un statut…' : '搜索使用状态…'}
+              emptyLabel={locale === 'fr' ? 'Aucun statut' : '暂无状态'}
+              onChange={setUsageStatus}
+              disabled={!canEditOperational && !canManage}
+              className="mt-[2px]"
             />
           </div>
 

@@ -4,9 +4,15 @@ import { useEffect, useMemo, useState } from 'react'
 
 import { ActionButton } from '@/components/ActionButton'
 import { SingleSelect, type SingleSelectOption } from '@/components/SingleSelect'
+import type { Locale } from '@/lib/i18n'
 import type { ResourcesCopy } from '@/lib/i18n/resources'
 import { computeMachineDailyDepreciation } from '@/lib/resources/machines/depreciation'
 import { resolveMachineEquipmentTypeKey } from '@/lib/resources/machines/equipmentTypes'
+import {
+  buildMachineUsageStatusSelectOptions,
+  getMachineUsageStatusLabel,
+  normalizeMachineUsageStatus,
+} from '@/lib/resources/machines/usageStatus'
 import type { MachineAsset } from '@/types/machines'
 import type {
   FuelSource,
@@ -80,6 +86,7 @@ const mapFuelDrafts = (log: MachineDailyLog | null): FuelEventDraft[] => {
 }
 
 export function MachineLogCard({
+  locale,
   t,
   date,
   machine,
@@ -94,6 +101,7 @@ export function MachineLogCard({
   readOnly = false,
   onSave,
 }: {
+  locale: Locale
   t: ResourcesCopy
   date: string
   machine: MachineAsset
@@ -109,6 +117,7 @@ export function MachineLogCard({
   onSave: (payload: {
     date: string
     machineId: number
+    usageStatus: string | null
     team: string | null
     chineseSupervisorId: number | null
     projectId: number | null
@@ -153,6 +162,7 @@ export function MachineLogCard({
 
   const [teamKey, setTeamKey] = useState(log?.teamKey ?? suggested?.teamKey ?? '')
   const [team, setTeam] = useState(log?.team ?? suggested?.team ?? '')
+  const [usageStatus, setUsageStatus] = useState(log?.usageStatus ?? machine.usageStatus ?? '')
   const [supervisorId, setSupervisorId] = useState(
     log?.chineseSupervisorId
       ? String(log.chineseSupervisorId)
@@ -178,6 +188,7 @@ export function MachineLogCard({
     () => ({
       teamKey: log?.teamKey ?? suggested?.teamKey ?? '',
       team: log?.team ?? suggested?.team ?? '',
+      usageStatus: log?.usageStatus ?? machine.usageStatus ?? '',
       supervisorId: log?.chineseSupervisorId
         ? String(log.chineseSupervisorId)
         : suggested?.chineseSupervisorId
@@ -200,12 +211,13 @@ export function MachineLogCard({
       id: log?.id ?? null,
       suggestedSourceDate: suggested?.sourceDate ?? null,
     }),
-    [log, suggested],
+    [log, machine.usageStatus, suggested],
   )
 
   useEffect(() => {
     setTeamKey(logSnapshot.teamKey)
     setTeam(logSnapshot.team)
+    setUsageStatus(logSnapshot.usageStatus)
     setSupervisorId(logSnapshot.supervisorId)
     setProjectId(logSnapshot.projectId)
     setOperatorId(logSnapshot.operatorId)
@@ -228,8 +240,24 @@ export function MachineLogCard({
 
   const resolvedDailyDepreciationText = useMemo(() => {
     if (resolvedDailyDepreciation == null) return '—'
-    return String(resolvedDailyDepreciation)
+    return resolvedDailyDepreciation.toLocaleString(undefined, { maximumFractionDigits: 2 })
   }, [resolvedDailyDepreciation])
+
+  const usageStatusOptions = useMemo(() => {
+    const baseOptions = buildMachineUsageStatusSelectOptions({ locale })
+    const map = new Map(baseOptions.map((option) => [option.value, option.label]))
+    const current = normalizeMachineUsageStatus(usageStatus)
+    if (current && !map.has(current)) {
+      map.set(current, getMachineUsageStatusLabel(locale, current) || current)
+    }
+    return Array.from(map.entries()).map(([value, label]) => ({ value, label }))
+  }, [locale, usageStatus])
+
+  const usageStatusDisplay = useMemo(() => {
+    const current = normalizeMachineUsageStatus(usageStatus)
+    if (!current) return '—'
+    return getMachineUsageStatusLabel(locale, current) || current
+  }, [locale, usageStatus])
 
   const fuelAddedTotal = useMemo(() => {
     const amounts = fuelEvents
@@ -297,6 +325,7 @@ export function MachineLogCard({
       const payload = {
         date,
         machineId: machine.id,
+        usageStatus: normalizeMachineUsageStatus(usageStatus),
         team: team.trim() ? team.trim() : null,
         chineseSupervisorId: supervisorId ? Number(supervisorId) : null,
         projectId: projectId ? Number(projectId) : null,
@@ -326,6 +355,9 @@ export function MachineLogCard({
               {machine.assetCategoryName ?? t.machineLogs.labels.groupBy.none}
               {machine.plateNumber ? ` · ${machine.plateNumber}` : ''}
             </p>
+            <p className="mt-2 text-xs text-slate-600">
+              {t.machines.columns.usageStatus}: <span className="font-semibold text-slate-800">{usageStatusDisplay}</span>
+            </p>
             {!log && suggested?.sourceDate ? (
               <p className="mt-2 text-xs text-amber-700">
                 {t.machineLogs.hints.prefilledFrom(suggested.sourceDate)}
@@ -341,6 +373,16 @@ export function MachineLogCard({
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
+          <SingleSelect
+            label={t.machines.columns.usageStatus}
+            value={usageStatus}
+            options={usageStatusOptions}
+            placeholder={t.machineLogs.hints.emptyOptional}
+            searchPlaceholder={locale === 'fr' ? 'Rechercher un statut…' : '搜索使用状态…'}
+            emptyLabel={locale === 'fr' ? 'Aucun statut' : '暂无状态'}
+            onChange={setUsageStatus}
+            disabled={readOnly}
+          />
           <SingleSelect
             label={t.machineLogs.labels.team}
             value={teamKey}
@@ -416,19 +458,10 @@ export function MachineLogCard({
               />
             </label>
           ) : null}
-          <label className="flex flex-col gap-1 text-xs text-slate-600">
-            <span className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-              {t.machineLogs.labels.dailyDepreciation}
-            </span>
-            <span className="text-[11px] leading-4 text-slate-400">{t.machineLogs.hints.dailyDepreciationFormula}</span>
-            <input
-              value={resolvedDailyDepreciationText}
-              inputMode="decimal"
-              disabled
-              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-900 shadow-sm focus:border-sky-400 focus:outline-none"
-              placeholder="—"
-            />
-          </label>
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+            <p className="text-xs font-semibold text-slate-500">{t.machineLogs.labels.dailyDepreciation}</p>
+            <p className="mt-1 text-sm font-semibold text-slate-800">{resolvedDailyDepreciationText}</p>
+          </div>
         </div>
 
         <label className="flex flex-col gap-1 text-xs text-slate-600">

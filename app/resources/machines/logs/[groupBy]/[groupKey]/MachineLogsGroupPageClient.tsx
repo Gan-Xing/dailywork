@@ -281,6 +281,7 @@ export function MachineLogsGroupPageClient() {
                 return (
                   <MachineLogCard
                     key={machine.id}
+                    locale={locale}
                     t={t}
                     date={data.date}
                     machine={machine}

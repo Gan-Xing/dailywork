@@ -75,7 +75,7 @@ export const defaultMachineSortStack: Array<{ field: MachineSortField; order: Ma
   defaultMachineSort,
 ]
 
-export const MACHINE_PAGE_SIZE_OPTIONS = [10, 20, 50, 100] as const
+export const MACHINE_PAGE_SIZE_OPTIONS = [10, 20, 50, 100, 250] as const
 
 export const machineColumnGroups = [
   {

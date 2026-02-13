@@ -9,6 +9,7 @@ import {
   resolveMachineEquipmentTypeKey,
 } from '@/lib/resources/machines/equipmentTypes'
 import { computeMachineDailyDepreciation } from '@/lib/resources/machines/depreciation'
+import { normalizeMachineUsageStatus } from '@/lib/resources/machines/usageStatus'
 import { resolveTeamDefaults } from '@/lib/server/teamSupervisors'
 import { listMachineAssets } from '@/lib/server/machineStore'
 import type {
@@ -272,6 +273,17 @@ const mapFuelEvent = (event: {
   createdAt: event.createdAt.toISOString(),
 })
 
+const asRecord = (value: unknown): Record<string, unknown> | null => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+  return value as Record<string, unknown>
+}
+
+const extractUsageStatusFromMeta = (meta: Prisma.JsonValue | null) => {
+  const record = asRecord(meta)
+  if (!record) return null
+  return normalizeMachineUsageStatus(record.usageStatus)
+}
+
 const mapDailyLog = (log: {
   id: number
   machineId: number
@@ -301,6 +313,7 @@ const mapDailyLog = (log: {
   id: log.id,
   machineId: log.machineId,
   logDate: formatDateKey(log.logDate),
+  usageStatus: extractUsageStatusFromMeta(log.meta),
   team: log.team,
   teamKey: log.teamKey,
   chineseSupervisorId: log.chineseSupervisorId,
@@ -970,6 +983,7 @@ export async function getMachineLogsGroupPageData({
 export type MachineDailyLogSaveInput = {
   date: string
   machineId: number
+  usageStatus?: string | null
   team?: string | null
   chineseSupervisorId?: number | null
   projectId?: number | null
@@ -992,6 +1006,9 @@ export async function saveMachineDailyLog(
   }
 
   const start = parseDateKey(input.date)
+  const hasUsageStatusInput = Object.prototype.hasOwnProperty.call(input, 'usageStatus')
+  const hasMetaInput = Object.prototype.hasOwnProperty.call(input, 'meta')
+  const usageStatus = normalizeMachineUsageStatus(input.usageStatus)
 
   const machineSnapshot = await prisma.machineAsset.findUnique({
     where: { id: machineId },
@@ -1071,6 +1088,28 @@ export async function saveMachineDailyLog(
   const workContent = typeof input.workContent === 'string' ? input.workContent.trim() : null
 
   const fuelEvents = Array.isArray(input.fuelEvents) ? input.fuelEvents : []
+  const existingMeta = hasUsageStatusInput
+    ? await prisma.machineDailyLog.findUnique({
+        where: { machineId_logDate: { machineId, logDate: start } },
+        select: { meta: true },
+      })
+    : null
+
+  const metaToWrite = (() => {
+    if (!hasUsageStatusInput) {
+      return hasMetaInput ? ((input.meta as Prisma.InputJsonValue) ?? undefined) : undefined
+    }
+
+    const source = hasMetaInput ? input.meta : existingMeta?.meta ?? null
+    const sourceRecord = asRecord(source)
+    const next: Record<string, unknown> = sourceRecord ? { ...sourceRecord } : {}
+    if (usageStatus) {
+      next.usageStatus = usageStatus
+    } else {
+      delete next.usageStatus
+    }
+    return next as Prisma.InputJsonValue
+  })()
 
   const supervisorSnapshot = safeSupervisorId
     ? await prisma.user.findUnique({
@@ -1181,7 +1220,7 @@ export async function saveMachineDailyLog(
         fuelRemainingEnd:
           fuelRemainingEnd == null ? null : new Prisma.Decimal(toMoney(fuelRemainingEnd) ?? 0),
         dailyDepreciation: dailyDepreciationDecimal,
-        meta: (input.meta as Prisma.InputJsonValue) ?? undefined,
+        meta: metaToWrite,
         createdById: updatedById ?? null,
         updatedById: updatedById ?? null,
       },
@@ -1197,7 +1236,7 @@ export async function saveMachineDailyLog(
         fuelRemainingEnd:
           fuelRemainingEnd == null ? null : new Prisma.Decimal(toMoney(fuelRemainingEnd) ?? 0),
         dailyDepreciation: dailyDepreciationDecimal,
-        meta: (input.meta as Prisma.InputJsonValue) ?? undefined,
+        meta: metaToWrite,
         updatedById: updatedById ?? null,
       },
       select: { id: true },
@@ -1215,6 +1254,20 @@ export async function saveMachineDailyLog(
         })),
       })
     }
+
+    const latestLog = await tx.machineDailyLog.findFirst({
+      where: { machineId },
+      orderBy: [{ logDate: 'desc' }, { id: 'desc' }],
+      select: { meta: true },
+    })
+    const latestUsageStatus = extractUsageStatusFromMeta(latestLog?.meta ?? null)
+    await tx.machineAsset.update({
+      where: { id: machineId },
+      data: {
+        usageStatus: latestUsageStatus,
+        updatedBy: updatedById == null ? { disconnect: true } : { connect: { id: updatedById } },
+      },
+    })
 
     const record = await tx.machineDailyLog.findUnique({
       where: { id: daily.id },

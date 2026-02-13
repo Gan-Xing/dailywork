@@ -20,6 +20,7 @@ import {
   type MachineSortOrder,
 } from '@/lib/resources/machines/constants'
 import { getMachineEquipmentTypeLabel, isMachineEquipmentTypeKey } from '@/lib/resources/machines/equipmentTypes'
+import { buildMachineUsageStatusSelectOptions } from '@/lib/resources/machines/usageStatus'
 import { useMachineTableState } from '@/lib/resources/machines/useMachineTableState'
 import type { MachineAsset, MachineBulkPatch } from '@/types/machines'
 
@@ -479,6 +480,10 @@ export function MachinesPageClient() {
   const usageStatusOptions = useMemo(
     () => buildOptions(machines.map((m) => m.usageStatus), emptyLabel),
     [machines, emptyLabel],
+  )
+  const usageStatusSelectOptions = useMemo(
+    () => buildMachineUsageStatusSelectOptions({ locale }),
+    [locale],
   )
   const aliasOptions = useMemo(
     () => buildOptions(machines.map((m) => m.alias), emptyLabel),
@@ -1069,6 +1074,7 @@ export function MachinesPageClient() {
         t={t}
         machine={editingMachine}
         open={Boolean(editingMachine)}
+        usageStatusOptions={usageStatusSelectOptions}
         canEditOperational={canUpdateMachines || canManageMachines}
         canManage={canManageMachines}
         onClose={() => setEditingMachine(null)}
