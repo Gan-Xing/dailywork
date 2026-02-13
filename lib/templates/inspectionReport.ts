@@ -1,6 +1,6 @@
 import type { Locale } from '@/lib/i18n'
 import { resolveRoadName } from '@/lib/i18n/roadDictionary'
-import { localizeProgressList, localizeProgressTerm } from '@/lib/i18n/progressDictionary'
+import { localizeProgressTerm } from '@/lib/i18n/progressDictionary'
 import type { InspectionListItem } from '@/lib/progressTypes'
 
 type RenderOptions = {
@@ -457,6 +457,65 @@ const formatDate = (value?: string | null, locale: Locale = 'fr') => {
   })
 }
 
+const normalizeInspectionToken = (value: string) => {
+  return value.replace(/\u3000/g, ' ').replace(/\s+/g, ' ').trim()
+}
+
+const splitInspectionTokens = (values: string[]) => {
+  const result: string[] = []
+  const seen = new Set<string>()
+  values.forEach((value) => {
+    const cleaned = normalizeInspectionToken(value)
+    if (!cleaned) return
+    const slashParts = cleaned.split(/\s+\/\s+/)
+    slashParts.forEach((part) => {
+      part
+        .split(/[、，,\n]/)
+        .map((item) => normalizeInspectionToken(item))
+        .filter(Boolean)
+        .forEach((token) => {
+          const key = token.toLowerCase()
+          if (seen.has(key)) return
+          seen.add(key)
+          result.push(token)
+        })
+    })
+  })
+  return result
+}
+
+const localizePhaseToken = (token: string, locale: Locale) => {
+  const normalized = normalizeInspectionToken(token)
+  if (!normalized) return ''
+  return localizeProgressTerm('phase', normalized, locale)
+}
+
+const localizeNatureToken = (token: string, locale: Locale, phaseName: string) => {
+  const normalized = normalizeInspectionToken(token)
+  if (!normalized) return ''
+  const layer = localizeProgressTerm('layer', normalized, locale, { phaseName })
+  if (layer !== normalized) return layer
+  const check = localizeProgressTerm('check', normalized, locale, { phaseName })
+  if (check !== normalized) return check
+  const phase = localizeProgressTerm('phase', normalized, locale)
+  if (phase !== normalized) return phase
+  return normalized
+}
+
+const dedupeTokens = (values: string[]) => {
+  const result: string[] = []
+  const seen = new Set<string>()
+  values.forEach((value) => {
+    const token = normalizeInspectionToken(value)
+    if (!token) return
+    const key = token.toLowerCase()
+    if (seen.has(key)) return
+    seen.add(key)
+    result.push(token)
+  })
+  return result
+}
+
 const buildPage = (
   inspection: InspectionListItem,
   locale: Locale,
@@ -479,20 +538,19 @@ const buildPage = (
     ? (locale === 'fr' ? 'Préfabriqué' : '预制')
     : resolveRoadName(displayRoad, locale)
 
-  const phaseText = localizeProgressTerm('phase', inspection.phaseName, locale)
+  const phaseTokens = splitInspectionTokens([inspection.phaseName])
+  const phaseText = localizePhaseToken(phaseTokens[0] ?? inspection.phaseName, locale)
   const sideText = isPrefab ? '' : sideCopy[inspection.side] ?? inspection.side
   const rangeText = isPrefab ? '' : `${formatPK(inspection.startPk)} → ${formatPK(inspection.endPk)}`
   const localisation = isPrefab
     ? `${roadText} · ${phaseText}`
     : `${roadText} · ${phaseText} · ${sideText} · ${rangeText}`
 
-  const layersText = localizeProgressList('layer', inspection.layers, locale, {
-    phaseName: inspection.phaseName,
-  }).join(' / ')
-  const checksText = localizeProgressList('check', inspection.checks, locale, {
-    phaseName: inspection.phaseName,
-  }).join(' / ')
-  const natureTravaux = [layersText, checksText].filter(Boolean).join(' / ')
+  const rawLayers = splitInspectionTokens(inspection.layers ?? [])
+  const rawChecks = splitInspectionTokens(inspection.checks ?? [])
+  const localizedLayers = rawLayers.map((token) => localizeNatureToken(token, locale, inspection.phaseName))
+  const localizedChecks = rawChecks.map((token) => localizeNatureToken(token, locale, inspection.phaseName))
+  const natureTravaux = dedupeTokens([...localizedLayers, ...localizedChecks]).join(' / ')
 
   const numero = ''
   const dateSubmitted = formatDate(inspection.submittedAt, locale)

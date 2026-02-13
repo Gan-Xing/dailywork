@@ -6,6 +6,7 @@ import type { IntervalSide, PhaseDefinitionDTO, PhaseIntervalPayload, PhaseMeasu
 import type { Locale } from '@/lib/i18n'
 import type { getProgressCopy } from '@/lib/i18n/progress'
 import { formatProgressCopy } from '@/lib/i18n/progress'
+import { resolveRoadName } from '@/lib/i18n/roadDictionary'
 
 type PhaseCopy = ReturnType<typeof getProgressCopy>['phase']
 
@@ -282,7 +283,7 @@ export function PhaseFormModal({
                           <option value="">{t.form.intervalLocationRoadPlaceholder}</option>
                           {locationRoadOptions.map((road) => (
                             <option key={road.id} value={road.id}>
-                              {(road.labels?.[locale] ?? road.name) + (road.slug ? ` (${road.slug})` : '')}
+                              {resolveRoadName(road, locale) + (road.slug ? ` (${road.slug})` : '')}
                             </option>
                           ))}
                         </select>

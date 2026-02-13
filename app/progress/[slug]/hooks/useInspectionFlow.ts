@@ -1252,7 +1252,7 @@ export function useInspectionFlow({
     const submissionNumber =
       submissionNumberText === '' ? undefined : Number(submissionNumberText)
     if (submissionNumberText && !Number.isFinite(submissionNumber)) {
-      raiseSubmitError('提交单编号需为数字')
+      raiseSubmitError(t.errors.submitSubmissionNumberInvalid)
       return
     }
     const targetSide = enforcedSide ?? selectedSide

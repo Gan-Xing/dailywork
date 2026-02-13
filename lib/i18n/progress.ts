@@ -290,6 +290,7 @@ type PhaseCopy = {
     submitCheckMissing: string
     submitTypeMissing: string
     submitAppointmentMissing: string
+    submitSubmissionNumberInvalid: string
     submitFailed: string
   }
   success: {
@@ -308,6 +309,8 @@ type PhaseCopy = {
     endPlaceholder: string
     appointmentLabel: string
     appointmentPlaceholder: string
+    submissionNumberLabel: string
+    submissionNumberPlaceholder: string
     layersLabel: string
     layersEmpty: string
     checksLabel: string
@@ -789,6 +792,7 @@ const progressCopy: Record<Locale, ProgressCopy> = {
       submitCheckMissing: '请选择至少一个验收内容',
       submitTypeMissing: '请选择至少一个验收类型',
       submitAppointmentMissing: '请选择预约日期',
+      submitSubmissionNumberInvalid: '提交单编号需为数字（可留空）',
       submitFailed: '提交失败',
       definitionMissing: '请选择分项模板',
     },
@@ -808,6 +812,8 @@ const progressCopy: Record<Locale, ProgressCopy> = {
         endPlaceholder: '输入终点 PK',
         appointmentLabel: '预约报检日期',
         appointmentPlaceholder: '选择日期',
+        submissionNumberLabel: '提交单编号（可选）',
+        submissionNumberPlaceholder: '填入提交单编号，不填则不绑定',
         layersLabel: '层次（多选）',
         layersEmpty: '暂无层次，请先在分项维护中添加。',
         checksLabel: '验收内容（多选，可临时添加）',
@@ -1399,6 +1405,7 @@ const progressCopy: Record<Locale, ProgressCopy> = {
         submitCheckMissing: 'Sélectionnez au moins un contrôle',
         submitTypeMissing: 'Sélectionnez au moins un type',
         submitAppointmentMissing: 'Choisissez une date de rendez-vous',
+        submitSubmissionNumberInvalid: 'Le numéro de soumission doit être numérique (optionnel)',
         submitFailed: "Échec de l'envoi",
         definitionMissing: 'Choisissez un modèle de phase',
       },
@@ -1418,6 +1425,8 @@ const progressCopy: Record<Locale, ProgressCopy> = {
         endPlaceholder: 'Saisir PK fin',
         appointmentLabel: 'Date de rendez-vous',
         appointmentPlaceholder: 'Choisir une date',
+        submissionNumberLabel: 'Numéro de soumission (optionnel)',
+        submissionNumberPlaceholder: 'Saisir un numéro, vide = non lié',
         layersLabel: 'Couches (multi)',
         layersEmpty: 'Aucune couche, ajoutez-les dans la phase.',
         checksLabel: 'Contrôles (multi, ajout libre)',

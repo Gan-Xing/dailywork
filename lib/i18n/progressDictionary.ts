@@ -5,7 +5,16 @@ type LocalizeOptions = { phaseName?: string }
 
 type Entry = { zh: string; fr: string }
 
-const normalize = (value: string) => value.trim().toLowerCase()
+const normalize = (value: string) =>
+  value
+    .normalize('NFKC')
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase()
+
+const compactNormalize = (value: string) =>
+  normalize(value).replace(/[\s()（）[\]{}.,;:·•\-_/\\→]+/g, '')
 
 const dictionaries: Record<DictionaryKind, Record<string, Entry>> = {
   phase: {
@@ -31,6 +40,10 @@ const dictionaries: Record<DictionaryKind, Record<string, Entry>> = {
     [normalize('Beton Proprete')]: { zh: '垫层', fr: 'Béton de propreté' },
     [normalize('Béton de propreté')]: { zh: '垫层', fr: 'Béton de propreté' },
     [normalize('土方')]: { zh: '土方', fr: 'Terrassement' },
+    [normalize('清表')]: { zh: '清表', fr: 'Décapage' },
+    [normalize('Décapage')]: { zh: '清表', fr: 'Décapage' },
+    [normalize('清灌')]: { zh: '清灌', fr: 'Débroussaillage' },
+    [normalize('Débroussaillage')]: { zh: '清灌', fr: 'Débroussaillage' },
     [normalize('基坑')]: { zh: '基坑', fr: 'Fouille' },
     [normalize('底板')]: { zh: '底板', fr: 'Radier' },
     [normalize('墙身')]: { zh: '墙身', fr: 'Voile' },
@@ -59,6 +72,10 @@ const dictionaries: Record<DictionaryKind, Record<string, Entry>> = {
     [normalize('路基垫层')]: { zh: '路基垫层', fr: 'Couche de Forme' },
     [normalize('埋墙粉刷')]: { zh: '埋墙粉刷', fr: 'Badigeonnage' },
     [normalize('土方')]: { zh: '土方', fr: 'Terrassement' },
+    [normalize('清表')]: { zh: '清表', fr: 'Décapage' },
+    [normalize('Décapage')]: { zh: '清表', fr: 'Décapage' },
+    [normalize('清灌')]: { zh: '清灌', fr: 'Débroussaillage' },
+    [normalize('Débroussaillage')]: { zh: '清灌', fr: 'Débroussaillage' },
     [normalize('基坑')]: { zh: '基坑', fr: 'Fouille' },
     [normalize('底板')]: { zh: '底板', fr: 'Radier' },
     [normalize('墙身')]: { zh: '墙身', fr: 'Voile' },
@@ -123,6 +140,16 @@ const dictionaries: Record<DictionaryKind, Record<string, Entry>> = {
     [normalize('Granulométrie')]: { zh: '颗粒级配', fr: 'Granulométrie' },
     [normalize('砂当量')]: { zh: '砂当量', fr: 'Équivalent de sable' },
     [normalize('Équivalent de sable')]: { zh: '砂当量', fr: 'Équivalent de sable' },
+    [normalize('清表面积验收')]: { zh: '清表面积验收', fr: 'Réception de la surface de décapage' },
+    [normalize('Réception de la surface de décapage')]: {
+      zh: '清表面积验收',
+      fr: 'Réception de la surface de décapage',
+    },
+    [normalize('清灌面积验收')]: { zh: '清灌面积验收', fr: 'Réception de la surface de débroussaillage' },
+    [normalize('Réception de la surface de débroussaillage')]: {
+      zh: '清灌面积验收',
+      fr: 'Réception de la surface de débroussaillage',
+    },
   },
   type: {
     [normalize('现场验收')]: { zh: '现场验收', fr: 'GENIE CIVIL' },
@@ -136,6 +163,47 @@ const dictionaries: Record<DictionaryKind, Record<string, Entry>> = {
     [normalize('Autre')]: { zh: '其他', fr: 'Autre' },
   },
 }
+
+const createUniqueEntries = (kind: DictionaryKind): Entry[] => {
+  const seen = new Set<string>()
+  const result: Entry[] = []
+  Object.values(dictionaries[kind]).forEach((entry) => {
+    const key = `${entry.zh}__${entry.fr}`
+    if (seen.has(key)) return
+    seen.add(key)
+    result.push(entry)
+  })
+  return result.sort((a, b) => Math.max(b.zh.length, b.fr.length) - Math.max(a.zh.length, a.fr.length))
+}
+
+const uniqueEntriesByKind: Record<DictionaryKind, Entry[]> = {
+  phase: createUniqueEntries('phase'),
+  layer: createUniqueEntries('layer'),
+  check: createUniqueEntries('check'),
+  type: createUniqueEntries('type'),
+}
+
+const compactDictionaryByKind: Record<DictionaryKind, Record<string, Entry>> = {
+  phase: {},
+  layer: {},
+  check: {},
+  type: {},
+}
+
+const dictionaryKinds: DictionaryKind[] = ['phase', 'layer', 'check', 'type']
+
+dictionaryKinds.forEach((kind) => {
+  uniqueEntriesByKind[kind].forEach((entry) => {
+    const zhCompact = compactNormalize(entry.zh)
+    const frCompact = compactNormalize(entry.fr)
+    if (zhCompact && !compactDictionaryByKind[kind][zhCompact]) {
+      compactDictionaryByKind[kind][zhCompact] = entry
+    }
+    if (frCompact && !compactDictionaryByKind[kind][frCompact]) {
+      compactDictionaryByKind[kind][frCompact] = entry
+    }
+  })
+})
 
 const workflowTextDictionary: Record<string, Entry> = {
   [normalize('涵洞分项的层次/验收内容/验收类型绑定，按照基坑→垫层→底板/截水墙→墙身/八字墙/顶板/帽石的顺序设置依赖，避免越级报检。')]:
@@ -181,16 +249,50 @@ const isCulvertPhase = (phaseName?: string) => {
   return key === normalize('涵洞') || key === normalize('过道涵') || key === normalize('dalot')
 }
 
+const lookupEntry = (kind: DictionaryKind, value: string) => {
+  const key = normalize(value)
+  const direct = dictionaries[kind][key]
+  if (direct) return direct
+  const compactKey = compactNormalize(value)
+  if (!compactKey) return undefined
+  return compactDictionaryByKind[kind][compactKey]
+}
+
+const localizeEmbeddedValue = (kind: DictionaryKind, value: string, locale: Locale) => {
+  let result = value
+  let changed = false
+  uniqueEntriesByKind[kind].forEach((entry) => {
+    const target = locale === 'fr' ? entry.fr : entry.zh
+    const sourceCandidates = [entry.zh, entry.fr]
+    sourceCandidates.forEach((source) => {
+      if (!source || source === target) return
+      if (!result.includes(source)) return
+      result = result.split(source).join(target)
+      changed = true
+    })
+  })
+  return changed ? result : value
+}
+
 const localizeValue = (kind: DictionaryKind, value: string, locale: Locale, options?: LocalizeOptions): string => {
+  if (!value) return value
   const key = normalize(value)
   // Contextual layer translation: culvert/overpass bedding vs roadbed
-  if (kind === 'layer' && key === normalize('垫层') && isCulvertPhase(options?.phaseName)) {
+  if (
+    kind === 'layer' &&
+    (key === normalize('垫层') || compactNormalize(value) === compactNormalize('垫层')) &&
+    isCulvertPhase(options?.phaseName)
+  ) {
     return locale === 'fr' ? 'Béton de propreté' : '垫层'
   }
-  const entry = dictionaries[kind][key]
-  if (!entry) return value
-  if (locale === 'fr') return entry.fr
-  return entry.zh
+  const entry = lookupEntry(kind, value)
+  if (entry) {
+    if (locale === 'fr') return entry.fr
+    return entry.zh
+  }
+  const embedded = localizeEmbeddedValue(kind, value, locale)
+  if (embedded !== value) return embedded
+  return value
 }
 
 export const localizeProgressTerm = (kind: DictionaryKind, value: string, locale: Locale, options?: LocalizeOptions) =>
@@ -204,8 +306,7 @@ export const localizeProgressList = (
 ) => values.map((item) => localizeValue(kind, item, locale, options))
 
 const canonicalizeValue = (kind: DictionaryKind, value: string) => {
-  const key = normalize(value)
-  const entry = dictionaries[kind][key]
+  const entry = lookupEntry(kind, value)
   return entry ? entry.zh : value.trim()
 }
 

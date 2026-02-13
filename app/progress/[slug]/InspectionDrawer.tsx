@@ -372,13 +372,13 @@ export function InspectionDrawer({
                   />
                 </label>
                 <label className="flex flex-col gap-1 text-xs text-slate-600">
-                  <span className="font-semibold">提交单编号（可选）</span>
+                  <span className="font-semibold">{t.inspection.submissionNumberLabel}</span>
                   <input
                     type="number"
                     className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 shadow-inner shadow-slate-900/40 focus:border-emerald-300 focus:outline-none"
                     value={submissionNumberInput}
                     onChange={(e) => setSubmissionNumberInput(e.target.value)}
-                    placeholder="填入提交单编号，不填则不绑定"
+                    placeholder={t.inspection.submissionNumberPlaceholder}
                   />
                 </label>
               </div>

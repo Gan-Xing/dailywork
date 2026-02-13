@@ -23,6 +23,16 @@ const roadNameEntries: RoadDictionaryEntry[] = [
     fr: 'Tanda 1',
   },
   {
+    slug: 'agnibilekrou-voie1',
+    zh: '阿尼比莱克鲁1号路',
+    fr: 'Agnibilékrou 1',
+  },
+  {
+    slug: 'agnibilekrou-voie2a',
+    zh: '阿尼比莱克鲁2A路',
+    fr: 'Agnibilékrou 2A',
+  },
+  {
     slug: 'tanda-voie2',
     zh: '丹达2号路',
     fr: 'Tanda 2',
@@ -76,20 +86,62 @@ roadNameEntries.forEach((entry) => {
 
 const normalize = (value?: string) => (value ? value.trim() : '')
 
+const deriveRoadLabels = (name?: string): LocalizedString | null => {
+  const normalizedName = normalize(name)
+  if (!normalizedName) return null
+
+  const agnibilekrouMatch = normalizedName.match(/^阿尼比莱克鲁(.+)路$/)
+  if (agnibilekrouMatch) {
+    const suffix = agnibilekrouMatch[1].trim().replace(/号$/, '')
+    if (suffix) {
+      return {
+        zh: normalizedName,
+        fr: `Agnibilékrou ${suffix}`,
+      }
+    }
+  }
+
+  return null
+}
+
 export const resolveRoadLabels = (input: {
   slug?: string
   name?: string
   labels?: LocalizedString
 }): LocalizedString => {
+  const slugLabel = input.slug ? labelsBySlug[input.slug] : undefined
   if (input.labels) {
-    return input.labels
+    const providedZh = normalize(input.labels.zh)
+    const providedFr = normalize(input.labels.fr)
+    if (slugLabel) {
+      return {
+        zh: providedZh || slugLabel.zh,
+        fr: providedFr && providedFr !== providedZh ? providedFr : slugLabel.fr,
+      }
+    }
+    if (providedZh || providedFr) {
+      const normalizedName = normalize(input.name)
+      const candidateZh = providedZh || normalizedName || providedFr
+      const candidateFr = providedFr && providedFr !== providedZh ? providedFr : ''
+      if (candidateFr) {
+        return {
+          zh: candidateZh || candidateFr,
+          fr: candidateFr,
+        }
+      }
+      if (candidateZh) {
+        return { zh: candidateZh, fr: candidateZh }
+      }
+    }
   }
 
-  const slugLabel = input.slug ? labelsBySlug[input.slug] : undefined
   if (slugLabel) return slugLabel
 
   const nameLabel = input.name ? labelsByZh[normalize(input.name)] : undefined
   if (nameLabel) return nameLabel
+
+  const derivedLabel = deriveRoadLabels(input.name)
+  if (derivedLabel) return derivedLabel
 
   const fallback = normalize(input.name) || normalize(input.slug)
   return { fr: fallback, zh: fallback }

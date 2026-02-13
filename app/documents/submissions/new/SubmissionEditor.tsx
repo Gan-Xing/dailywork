@@ -172,6 +172,55 @@ export default function SubmissionEditor({ initialSubmission, canManage = false,
     return descriptionParts.join('\n')
   }
 
+  const normalizeLegacyInspectionDesignation = (designation?: string | null) => {
+    const raw = (designation ?? '').trim()
+    if (!raw || !raw.includes(' · ') || !raw.includes('PK')) return designation ?? ''
+
+    const lines = raw.split('\n')
+    const headParts = lines[0]?.split(' · ').map((part) => part.trim()) ?? []
+    if (headParts.length < 4) return designation ?? ''
+
+    const [roadPart, phasePart, sidePart, ...rangeParts] = headParts
+    const rangePart = rangeParts.join(' · ').trim()
+    if (!rangePart || !/^PK\d+\+\d{3}\s*→\s*PK\d+\+\d{3}$/i.test(rangePart)) return designation ?? ''
+
+    const normalizedPhase = localizeProgressTerm('phase', normalizeInspectionToken(phasePart), 'fr')
+    const normalizedRoad = resolveRoadName({ name: roadPart }, 'fr')
+    const sideMap: Record<string, string> = {
+      LEFT: 'Gauche',
+      RIGHT: 'Droite',
+      BOTH: 'Deux côtés',
+      Gauche: 'Gauche',
+      Droite: 'Droite',
+      'Deux côtés': 'Deux côtés',
+      左侧: 'Gauche',
+      右侧: 'Droite',
+      双侧: 'Deux côtés',
+    }
+    const normalizedSide = sideMap[sidePart] ?? sidePart
+
+    const normalizedHead = [normalizedRoad, normalizedPhase, normalizedSide, rangePart].join(' · ')
+
+    const normalizedBody = lines
+      .slice(1)
+      .map((line) => {
+        if (!line.trim()) return line
+        return line
+          .split(/\s+\/\s+/)
+          .map((item) => {
+            const token = normalizeInspectionToken(item)
+            if (!token) return token
+            const layerToken = localizeProgressTerm('layer', token, 'fr', { phaseName: phasePart })
+            if (layerToken !== token) return layerToken
+            return localizeProgressTerm('check', token, 'fr', { phaseName: phasePart })
+          })
+          .filter(Boolean)
+          .join(' / ')
+      })
+
+    return [normalizedHead, ...normalizedBody].join('\n')
+  }
+
   const parseErrorMessage = useCallback(async (res: Response) => {
     try {
       const json = (await res.json()) as { message?: string }
@@ -402,7 +451,12 @@ export default function SubmissionEditor({ initialSubmission, canManage = false,
     setError(null)
     try {
       const baseItems =
-        data.items && data.items.length === 1 && isEmptyItem(data.items[0]) ? [] : data.items || []
+        data.items && data.items.length === 1 && isEmptyItem(data.items[0])
+          ? []
+          : (data.items || []).map((item) => ({
+              ...item,
+              designation: normalizeLegacyInspectionDesignation(item.designation),
+            }))
 
       const selectedInspections = inspectionOptions.filter((item) => selectedInspectionIds.includes(item.id))
       const existingDesignations = new Set(
