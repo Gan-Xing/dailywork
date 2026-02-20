@@ -77,6 +77,8 @@ export const buildExpatProfileForm = (profile?: ExpatProfile | null): ExpatProfi
   cnpsNumber: profile?.cnpsNumber ?? '',
   cnpsDeclarationCode: profile?.cnpsDeclarationCode ?? '',
   provenance: profile?.provenance ?? '',
+  bankAccountNumber: profile?.bankAccountNumber ?? '',
+  bankName: profile?.bankName ?? '',
   emergencyContactName: profile?.emergencyContactName ?? '',
   emergencyContactPhone: profile?.emergencyContactPhone ?? '',
 })

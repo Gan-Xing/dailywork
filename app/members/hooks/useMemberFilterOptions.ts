@@ -99,6 +99,15 @@ export function useMemberFilterOptions({
     return Array.from(set).sort(optionCollator.compare)
   }, [membersData, optionCollator])
 
+  const bankNameOptions = useMemo(() => {
+    const set = new Set<string>()
+    membersData.forEach((member) => {
+      const value = normalizeText(member.expatProfile?.bankName)
+      if (value) set.add(value)
+    })
+    return Array.from(set).sort(optionCollator.compare)
+  }, [membersData, optionCollator])
+
   const nameFilterOptions = useMemo(() => {
     const names = membersData.map((member) => normalizeText(member.name)).filter(Boolean)
     const unique = Array.from(new Set(names)).sort(optionCollator.compare)
@@ -715,6 +724,7 @@ export function useMemberFilterOptions({
     salaryCategoryOptions,
     maritalStatusOptions,
     provenanceOptions,
+    bankNameOptions,
     teamOptions,
     nameFilterOptions,
     usernameFilterOptions,

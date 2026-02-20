@@ -204,6 +204,8 @@ export const memberCopy: Record<
       | 'cnpsNumber'
       | 'cnpsDeclarationCode'
       | 'provenance'
+      | 'bankAccountNumber'
+      | 'bankName'
       | 'frenchName'
       | 'idNumber'
       | 'passportNumber'
@@ -309,6 +311,9 @@ export const memberCopy: Record<
       importDuplicateContractNumber: string
       importContractNumberExists: string
       importMissingTeamSupervisor: string
+      importMissingBankAccountNumber: string
+      importMissingBankName: string
+      importInvalidBankAccountNumber: string
       importContractChangeMissingFields: string
       importRoleNotFound: (role: string) => string
       importFailed: string
@@ -347,6 +352,8 @@ export const memberCopy: Record<
         | 'cnpsNumber'
         | 'cnpsDeclarationCode'
         | 'provenance'
+        | 'bankAccountNumber'
+        | 'bankName'
         | 'emergencyContact'
         | 'frenchName'
         | 'idNumber'
@@ -504,6 +511,8 @@ export const memberCopy: Record<
       cnpsNumber: string
       cnpsDeclarationCode: string
       provenance: string
+      bankAccountNumber: string
+      bankName: string
       emergencyContact: string
       frenchName: string
       idNumber: string
@@ -868,6 +877,8 @@ export const memberCopy: Record<
       cnpsNumber: 'CNPS 编号',
       cnpsDeclarationCode: 'CNPS 申报码',
       provenance: '籍贯/属地',
+      bankAccountNumber: '银行账户号码',
+      bankName: '银行名称',
       frenchName: '法语名',
       idNumber: '身份证号',
       passportNumber: '护照号',
@@ -971,6 +982,9 @@ export const memberCopy: Record<
       importDuplicateContractNumber: '合同编号重复（同一文件内）',
       importContractNumberExists: '合同编号已存在',
       importMissingTeamSupervisor: '班组未绑定中方负责人',
+      importMissingBankAccountNumber: '缺少银行账户号码',
+      importMissingBankName: '缺少银行名称',
+      importInvalidBankAccountNumber: '银行账户号码仅支持英文字母、数字和空格',
       importContractChangeMissingFields: '缺少合同变更字段',
       importRoleNotFound: (role: string) => `角色不存在：${role}`,
       importFailed: '导入失败，请稍后重试。',
@@ -1009,6 +1023,9 @@ export const memberCopy: Record<
         cnpsNumber: '可选；CNPS 号码，支持斜杠分段，自动保留后段数字。',
         cnpsDeclarationCode: '可选；CNPS 申报码，仅数字，OK 忽略。',
         provenance: '可选；籍贯/属地。',
+        bankAccountNumber:
+          '可选；银行账户号码，仅支持英文字母、数字和空格；与银行名称需同时填写。',
+        bankName: '可选；银行名称；与银行账户号码需同时填写。',
         emergencyContact: '可选；紧急联系人+电话；示例：0170239598 OUMAR FRERE。',
         frenchName: '可选；法语名或法语拼写。',
         idNumber: '可选；身份证号码。',
@@ -1167,6 +1184,8 @@ export const memberCopy: Record<
       cnpsNumber: 'CNPS 编号',
       cnpsDeclarationCode: 'CNPS 申报码',
       provenance: '籍贯/属地',
+      bankAccountNumber: '银行账户号码',
+      bankName: '银行名称',
       emergencyContact: '紧急联系人（合并）',
       frenchName: '法语名',
       idNumber: '身份证号',
@@ -1542,6 +1561,8 @@ export const memberCopy: Record<
       cnpsNumber: 'N° CNPS',
       cnpsDeclarationCode: 'Code CNPS',
       provenance: 'Provenance',
+      bankAccountNumber: 'N° de compte bancaire',
+      bankName: 'Nom de la banque',
       frenchName: 'Nom français',
       idNumber: 'N° identité',
       passportNumber: 'N° passeport',
@@ -1645,6 +1666,10 @@ export const memberCopy: Record<
       importDuplicateContractNumber: "N° contrat en double dans le fichier",
       importContractNumberExists: "N° contrat déjà utilisé",
       importMissingTeamSupervisor: "Équipe sans responsable chinois",
+      importMissingBankAccountNumber: 'Numéro de compte bancaire manquant',
+      importMissingBankName: 'Nom de banque manquant',
+      importInvalidBankAccountNumber:
+        'Le numéro de compte bancaire accepte uniquement lettres, chiffres et espaces',
       importContractChangeMissingFields: 'Champs de changement de contrat manquants',
       importRoleNotFound: (role: string) => `Rôle introuvable : ${role}`,
       importFailed: "Échec de l'import, réessayez.",
@@ -1684,6 +1709,10 @@ export const memberCopy: Record<
         cnpsNumber: 'Optionnel ; numéro CNPS, segments avec "/", on conserve le dernier.',
         cnpsDeclarationCode: 'Optionnel ; code CNPS, chiffres uniquement, "OK" ignoré.',
         provenance: 'Optionnel ; provenance.',
+        bankAccountNumber:
+          'Optionnel ; numéro de compte bancaire, lettres/chiffres/espaces uniquement ; à renseigner avec le nom de banque.',
+        bankName:
+          'Optionnel ; nom de banque ; à renseigner avec le numéro de compte bancaire.',
         emergencyContact: 'Optionnel ; contact + téléphone ; ex. 0170239598 OUMAR FRERE.',
         frenchName: 'Optionnel ; nom en français.',
         idNumber: "Optionnel ; numéro d'identité.",
@@ -1844,6 +1873,8 @@ export const memberCopy: Record<
       cnpsNumber: 'N° CNPS',
       cnpsDeclarationCode: 'Code CNPS',
       provenance: 'Provenance',
+      bankAccountNumber: 'N° de compte bancaire',
+      bankName: 'Nom de la banque',
       emergencyContact: "Contact d'urgence (combiné)",
       frenchName: 'Nom français',
       idNumber: "N° d'identité",

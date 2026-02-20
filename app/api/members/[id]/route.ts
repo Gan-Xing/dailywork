@@ -14,6 +14,7 @@ import {
   normalizeExpatProfile,
   parseBirthDateInput,
   parseChineseIdBirthDate,
+  validateExpatBankFields,
 } from '@/lib/server/memberProfiles'
 import { prisma } from '@/lib/prisma'
 
@@ -75,6 +76,19 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   const shouldRecordHistory = !canBypassHistory
   const chineseProfileData = normalizeChineseProfile(chineseProfile)
   const expatProfileData = normalizeExpatProfile(expatProfile)
+  const bankValidationIssue = validateExpatBankFields(expatProfileData)
+  if (bankValidationIssue) {
+    if (bankValidationIssue === 'bank_account_number_required') {
+      return NextResponse.json({ error: '银行账户号码为必填' }, { status: 400 })
+    }
+    if (bankValidationIssue === 'bank_name_required') {
+      return NextResponse.json({ error: '银行名称为必填' }, { status: 400 })
+    }
+    return NextResponse.json(
+      { error: '银行账户号码仅支持英文字母、数字和空格' },
+      { status: 400 },
+    )
+  }
   const shouldUpsertExpatProfile = !isChinese || hasExpatProfileData(expatProfileData)
   const hasProjectField = Object.prototype.hasOwnProperty.call(body ?? {}, 'projectId')
   const parsedProjectId = hasProjectField
@@ -105,6 +119,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
           baseSalaryUnit: true,
           netMonthlyAmount: true,
           netMonthlyUnit: true,
+          bankAccountNumber: true,
+          bankName: true,
         },
       },
       projectAssignments: {

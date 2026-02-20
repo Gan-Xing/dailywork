@@ -79,6 +79,7 @@ export function MemberEditClient({
     salaryCategoryOptions,
     maritalStatusOptions,
     provenanceOptions,
+    bankNameOptions,
   } = useMemberEditData({
     locale,
     canAssignRole,
@@ -288,6 +289,7 @@ export function MemberEditClient({
               salaryCategoryOptions={salaryCategoryOptions}
               maritalStatusOptions={maritalStatusOptions}
               provenanceOptions={provenanceOptions}
+              bankNameOptions={bankNameOptions}
             />
 
             <SignatureSection

@@ -30,6 +30,7 @@
   - 薪资：`salaryCategory`（CATEGORIE 工资等级）、`baseSalaryAmount` + `baseSalaryUnit`（SALAIRE DE BASE 金额与单位）、`netMonthlyAmount` + `netMonthlyUnit`（NET MENSUEL 实发工资与单位，仅月）。
   - 个人情况：`maritalStatus`（婚姻状态）、`childrenCount`（子女数量）。
   - CNPS：`cnpsNumber`（NUMERO CNPS）、`cnpsDeclarationCode`（CODE DE DECLARATION CNPS）。
+  - 银行信息：`bankAccountNumber`（NUMERO DE COMPTE BANCAIRE，允许英文字母/数字/空格）与 `bankName`（NOM DE LA BANQUE），两者需成对填写。
   - 其他：`provenance`（PROVENANCE 属地/来源）、`emergencyContactName` + `emergencyContactPhone`（EN CAS D'URGENCES 紧急联系人与电话）。
 - `Role` / `Permission`
   - 沿用现有 RBAC：用户-角色多对多，角色-权限多对多；权限以资源-动作编码存储（示例 `member:view`、`member:create`、`member:update`，兼容旧 `member:edit`/`member:manage`）。

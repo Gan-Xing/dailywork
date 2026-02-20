@@ -435,6 +435,7 @@ export function MembersPageClient() {
     salaryCategoryOptions,
     maritalStatusOptions,
     provenanceOptions,
+    bankNameOptions,
     teamOptions,
     nameFilterOptions,
     usernameFilterOptions,
@@ -937,6 +938,8 @@ export function MembersPageClient() {
       cnpsNumber: formState.expatProfile.cnpsNumber.trim() || null,
       cnpsDeclarationCode: formState.expatProfile.cnpsDeclarationCode.trim() || null,
       provenance: formState.expatProfile.provenance.trim() || null,
+      bankAccountNumber: formState.expatProfile.bankAccountNumber.trim() || null,
+      bankName: formState.expatProfile.bankName.trim() || null,
       emergencyContactName: formState.expatProfile.emergencyContactName.trim() || null,
       emergencyContactPhone: formState.expatProfile.emergencyContactPhone.trim() || null,
     }
@@ -1763,6 +1766,7 @@ export function MembersPageClient() {
           salaryCategoryOptions={salaryCategoryOptions}
           maritalStatusOptions={maritalStatusOptions}
           provenanceOptions={provenanceOptions}
+          bankNameOptions={bankNameOptions}
           teamOptions={teamOptions}
           teamSupervisorMap={teamSupervisorMap}
           projectOptions={projectOptions}

@@ -10,6 +10,7 @@ import {
   normalizeChineseProfile,
   normalizeExpatProfile,
   parseChineseIdBirthDate,
+  validateExpatBankFields,
 } from '@/lib/server/memberProfiles'
 import { applyProjectAssignment } from '@/lib/server/memberProjects'
 import { prisma } from '@/lib/prisma'
@@ -178,6 +179,8 @@ export async function POST(request: NextRequest) {
               cnpsNumber: true,
               cnpsDeclarationCode: true,
               provenance: true,
+              bankAccountNumber: true,
+              bankName: true,
               emergencyContactName: true,
               emergencyContactPhone: true,
             },
@@ -356,6 +359,9 @@ export async function POST(request: NextRequest) {
         if (expatHas('cnpsDeclarationCode'))
           expatUpdates.cnpsDeclarationCode = normalizedExpat.cnpsDeclarationCode
         if (expatHas('provenance')) expatUpdates.provenance = normalizedExpat.provenance
+        if (expatHas('bankAccountNumber'))
+          expatUpdates.bankAccountNumber = normalizedExpat.bankAccountNumber
+        if (expatHas('bankName')) expatUpdates.bankName = normalizedExpat.bankName
         if (expatHas('emergencyContactName'))
           expatUpdates.emergencyContactName = normalizedExpat.emergencyContactName
         if (expatHas('emergencyContactPhone'))
@@ -432,6 +438,30 @@ export async function POST(request: NextRequest) {
           results.push({ id: userId, ok: false, error: 'CDD base salary must be monthly' })
           continue
         }
+        if (expatHas('bankAccountNumber') || expatHas('bankName')) {
+          const bankValidationIssue = validateExpatBankFields({
+            bankAccountNumber: expatHas('bankAccountNumber')
+              ? normalizedExpat.bankAccountNumber
+              : existingExpat?.bankAccountNumber ?? null,
+            bankName: expatHas('bankName')
+              ? normalizedExpat.bankName
+              : existingExpat?.bankName ?? null,
+          })
+          if (bankValidationIssue) {
+            if (bankValidationIssue === 'bank_account_number_required') {
+              results.push({ id: userId, ok: false, error: '银行账户号码为必填' })
+            } else if (bankValidationIssue === 'bank_name_required') {
+              results.push({ id: userId, ok: false, error: '银行名称为必填' })
+            } else {
+              results.push({
+                id: userId,
+                ok: false,
+                error: '银行账户号码仅支持英文字母、数字和空格',
+              })
+            }
+            continue
+          }
+        }
 
         expatCreateData = {
           team: normalizedExpat.team,
@@ -451,6 +481,8 @@ export async function POST(request: NextRequest) {
           cnpsNumber: normalizedExpat.cnpsNumber,
           cnpsDeclarationCode: normalizedExpat.cnpsDeclarationCode,
           provenance: normalizedExpat.provenance,
+          bankAccountNumber: normalizedExpat.bankAccountNumber,
+          bankName: normalizedExpat.bankName,
           emergencyContactName: normalizedExpat.emergencyContactName,
           emergencyContactPhone: normalizedExpat.emergencyContactPhone,
         }

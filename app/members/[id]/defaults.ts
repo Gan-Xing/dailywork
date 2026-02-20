@@ -35,6 +35,8 @@ export const emptyExpatProfile: ExpatProfileForm = {
   cnpsNumber: '',
   cnpsDeclarationCode: '',
   provenance: '',
+  bankAccountNumber: '',
+  bankName: '',
   emergencyContactName: '',
   emergencyContactPhone: '',
 }

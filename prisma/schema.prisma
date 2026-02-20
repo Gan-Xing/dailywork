@@ -854,6 +854,8 @@ model UserExpatProfile {
   cnpsNumber            String?
   cnpsDeclarationCode   String?
   provenance            String?
+  bankAccountNumber     String?
+  bankName              String?
   emergencyContactName  String?
   emergencyContactPhone String?
   createdAt             DateTime      @default(now())

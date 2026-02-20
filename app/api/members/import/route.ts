@@ -10,6 +10,7 @@ import {
   normalizeChineseProfile,
   parseBirthDateInput,
   parseChineseIdBirthDate,
+  validateExpatBankFields,
 } from '@/lib/server/memberProfiles'
 import { normalizeTagsInput, normalizeTeamKey, normalizeText } from '@/lib/members/utils'
 import { buildTeamSupervisorMap } from '@/lib/server/teamSupervisors'
@@ -58,6 +59,8 @@ type ImportMemberInput = {
   cnpsNumber?: string | null
   cnpsDeclarationCode?: string | null
   provenance?: string | null
+  bankAccountNumber?: string | null
+  bankName?: string | null
   emergencyContact?: string | null
   frenchName?: string | null
   idNumber?: string | null
@@ -96,6 +99,9 @@ type ImportErrorCode =
   | 'invalid_project'
   | 'invalid_chinese_supervisor'
   | 'missing_team_supervisor'
+  | 'missing_bank_account_number'
+  | 'missing_bank_name'
+  | 'invalid_bank_account_number'
   | 'duplicate_contract_number'
   | 'contract_number_exists'
   | 'role_not_found'
@@ -234,6 +240,8 @@ export async function POST(request: Request) {
       cnpsNumber: member.cnpsNumber,
       cnpsDeclarationCode: member.cnpsDeclarationCode,
       provenance: member.provenance,
+      bankAccountNumber: member.bankAccountNumber,
+      bankName: member.bankName,
       emergencyContact: member.emergencyContact,
       emergencyContactName: member.emergencyContactName,
       emergencyContactPhone: member.emergencyContactPhone,
@@ -557,6 +565,22 @@ export async function POST(request: Request) {
   prepared.forEach((member) => {
     if (invalidRows.has(member.row)) return
     const match = matchByRow.get(member.row)
+    const bankValidationIssue = validateExpatBankFields(member.expatProfile)
+    if (bankValidationIssue) {
+      if (bankValidationIssue === 'bank_account_number_required') {
+        errors.push({ row: member.row, code: 'missing_bank_account_number' })
+      } else if (bankValidationIssue === 'bank_name_required') {
+        errors.push({ row: member.row, code: 'missing_bank_name' })
+      } else {
+        errors.push({
+          row: member.row,
+          code: 'invalid_bank_account_number',
+          value: member.expatProfile.bankAccountNumber ?? '',
+        })
+      }
+      invalidRows.add(member.row)
+      return
+    }
     if (match && !canBypassHistory) return
     if (
       member.hasContractTypeInput &&
@@ -734,6 +758,12 @@ export async function POST(request: Request) {
             ...(member.expatProfile.provenance
               ? { provenance: member.expatProfile.provenance }
               : {}),
+            ...(member.expatProfile.bankAccountNumber
+              ? { bankAccountNumber: member.expatProfile.bankAccountNumber }
+              : {}),
+            ...(member.expatProfile.bankName
+              ? { bankName: member.expatProfile.bankName }
+              : {}),
             ...(member.expatProfile.emergencyContactName
               ? { emergencyContactName: member.expatProfile.emergencyContactName }
               : {}),
@@ -888,6 +918,12 @@ export async function POST(request: Request) {
                 : {}),
               ...(member.expatProfile.provenance
                 ? { provenance: member.expatProfile.provenance }
+                : {}),
+              ...(member.expatProfile.bankAccountNumber
+                ? { bankAccountNumber: member.expatProfile.bankAccountNumber }
+                : {}),
+              ...(member.expatProfile.bankName
+                ? { bankName: member.expatProfile.bankName }
                 : {}),
               ...(member.expatProfile.emergencyContactName
                 ? { emergencyContactName: member.expatProfile.emergencyContactName }

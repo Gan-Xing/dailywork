@@ -19,6 +19,7 @@ type ExpatProfileFieldsProps = {
   salaryCategoryOptions: string[]
   maritalStatusOptions: string[]
   provenanceOptions: string[]
+  bankNameOptions: string[]
 }
 
 export function ExpatProfileFields({
@@ -31,6 +32,7 @@ export function ExpatProfileFields({
   salaryCategoryOptions,
   maritalStatusOptions,
   provenanceOptions,
+  bankNameOptions,
 }: ExpatProfileFieldsProps) {
   useEffect(() => {
     const teamKey = normalizeTeamKey(formState.expatProfile.team)
@@ -372,6 +374,38 @@ export function ExpatProfileFields({
         />
         <datalist id="provenance-options">
           {provenanceOptions.map((value) => (
+            <option key={value} value={value} />
+          ))}
+        </datalist>
+      </label>
+      <label className="space-y-1 text-sm text-slate-700">
+        <span className="block font-semibold">{t.form.bankAccountNumber}</span>
+        <input
+          value={formState.expatProfile.bankAccountNumber}
+          onChange={(event) =>
+            setFormState((prev) => ({
+              ...prev,
+              expatProfile: { ...prev.expatProfile, bankAccountNumber: event.target.value },
+            }))
+          }
+          className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+        />
+      </label>
+      <label className="space-y-1 text-sm text-slate-700">
+        <span className="block font-semibold">{t.form.bankName}</span>
+        <input
+          list="bank-name-options"
+          value={formState.expatProfile.bankName}
+          onChange={(event) =>
+            setFormState((prev) => ({
+              ...prev,
+              expatProfile: { ...prev.expatProfile, bankName: event.target.value },
+            }))
+          }
+          className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+        />
+        <datalist id="bank-name-options">
+          {bankNameOptions.map((value) => (
             <option key={value} value={value} />
           ))}
         </datalist>

@@ -108,6 +108,8 @@ export function useMemberImportExport({
       add(copy.form.cnpsNumber, 'cnpsNumber')
       add(copy.form.cnpsDeclarationCode, 'cnpsDeclarationCode')
       add(copy.form.provenance, 'provenance')
+      add(copy.form.bankAccountNumber, 'bankAccountNumber')
+      add(copy.form.bankName, 'bankName')
       add(copy.form.emergencyContact, 'emergencyContact')
       add(copy.form.frenchName, 'frenchName')
       add(copy.form.idNumber, 'idNumber')
@@ -249,6 +251,15 @@ export function useMemberImportExport({
         case 'missing_team_supervisor':
           message = t.errors.importMissingTeamSupervisor
           break
+        case 'missing_bank_account_number':
+          message = t.errors.importMissingBankAccountNumber
+          break
+        case 'missing_bank_name':
+          message = t.errors.importMissingBankName
+          break
+        case 'invalid_bank_account_number':
+          message = t.errors.importInvalidBankAccountNumber
+          break
         default:
           message = t.errors.importFailed
       }
@@ -330,6 +341,8 @@ export function useMemberImportExport({
           cnpsNumber?: string | null
           cnpsDeclarationCode?: string | null
           provenance?: string | null
+          bankAccountNumber?: string | null
+          bankName?: string | null
           emergencyContact?: string | null
           frenchName?: string | null
           idNumber?: string | null
@@ -438,6 +451,8 @@ export function useMemberImportExport({
             cnpsNumber?: string | null
             cnpsDeclarationCode?: string | null
             provenance?: string | null
+            bankAccountNumber?: string | null
+            bankName?: string | null
             emergencyContact?: string | null
             frenchName?: string | null
             idNumber?: string | null
@@ -600,9 +615,15 @@ export function useMemberImportExport({
               case 'cnpsDeclarationCode':
                 record.cnpsDeclarationCode = String(rawValue ?? '').trim()
                 break
-            case 'provenance':
-              record.provenance = String(rawValue ?? '').trim()
-              break
+              case 'provenance':
+                record.provenance = String(rawValue ?? '').trim()
+                break
+              case 'bankAccountNumber':
+                record.bankAccountNumber = String(rawValue ?? '').trim()
+                break
+              case 'bankName':
+                record.bankName = String(rawValue ?? '').trim()
+                break
               case 'emergencyContact':
                 record.emergencyContact = String(rawValue ?? '').trim()
                 break
@@ -888,6 +909,10 @@ export function useMemberImportExport({
               return formatProfileText(expatProfile?.cnpsDeclarationCode)
             case 'provenance':
               return formatProfileText(expatProfile?.provenance)
+            case 'bankAccountNumber':
+              return formatProfileText(expatProfile?.bankAccountNumber)
+            case 'bankName':
+              return formatProfileText(expatProfile?.bankName)
             case 'frenchName':
               return formatProfileText(chineseProfile?.frenchName)
             case 'idNumber':

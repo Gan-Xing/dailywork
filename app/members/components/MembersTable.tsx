@@ -482,6 +482,22 @@ export function MembersTable({
               {t.table.provenance} {sortIndicator('provenance')}
             </th>
           ) : null}
+          {isVisible('bankAccountNumber') ? (
+            <th
+              className="px-3 py-3 whitespace-nowrap cursor-pointer select-none"
+              onClick={() => handleSort('bankAccountNumber')}
+            >
+              {t.table.bankAccountNumber} {sortIndicator('bankAccountNumber')}
+            </th>
+          ) : null}
+          {isVisible('bankName') ? (
+            <th
+              className="px-3 py-3 whitespace-nowrap cursor-pointer select-none"
+              onClick={() => handleSort('bankName')}
+            >
+              {t.table.bankName} {sortIndicator('bankName')}
+            </th>
+          ) : null}
           {isVisible('frenchName') ? (
             <th
               className="px-3 py-3 whitespace-nowrap cursor-pointer select-none"
@@ -1049,6 +1065,30 @@ export function MembersTable({
                         disabled: member.nationality === 'china',
                       })
                     : formatProfileText(expatProfile?.provenance)}
+                </td>
+              ) : null}
+              {isVisible('bankAccountNumber') ? (
+                <td className="whitespace-nowrap px-4 py-3 text-slate-700 align-middle">
+                  {isEditable('bankAccountNumber')
+                    ? renderBulkInput({
+                        memberId: member.id,
+                        path: 'expatProfile.bankAccountNumber',
+                        currentValue: expatProfile?.bankAccountNumber ?? '',
+                        disabled: member.nationality === 'china',
+                      })
+                    : formatProfileText(expatProfile?.bankAccountNumber)}
+                </td>
+              ) : null}
+              {isVisible('bankName') ? (
+                <td className="whitespace-nowrap px-4 py-3 text-slate-700 align-middle">
+                  {isEditable('bankName')
+                    ? renderBulkInput({
+                        memberId: member.id,
+                        path: 'expatProfile.bankName',
+                        currentValue: expatProfile?.bankName ?? '',
+                        disabled: member.nationality === 'china',
+                      })
+                    : formatProfileText(expatProfile?.bankName)}
                 </td>
               ) : null}
               {isVisible('frenchName') ? (

@@ -45,6 +45,8 @@ const formatExpatProfile = (profile: {
   cnpsNumber: string | null
   cnpsDeclarationCode: string | null
   provenance: string | null
+  bankAccountNumber: string | null
+  bankName: string | null
   emergencyContactName: string | null
   emergencyContactPhone: string | null
 } | null) => {
@@ -67,6 +69,8 @@ const formatExpatProfile = (profile: {
     cnpsNumber: profile.cnpsNumber,
     cnpsDeclarationCode: profile.cnpsDeclarationCode,
     provenance: profile.provenance,
+    bankAccountNumber: profile.bankAccountNumber,
+    bankName: profile.bankName,
     emergencyContactName: profile.emergencyContactName,
     emergencyContactPhone: profile.emergencyContactPhone,
   }
@@ -267,6 +271,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         cnpsNumber: true,
         cnpsDeclarationCode: true,
         provenance: true,
+        bankAccountNumber: true,
+        bankName: true,
         emergencyContactName: true,
         emergencyContactPhone: true,
       },

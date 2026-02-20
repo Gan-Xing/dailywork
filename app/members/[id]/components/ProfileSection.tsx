@@ -24,6 +24,7 @@ type ProfileSectionProps = {
   salaryCategoryOptions: string[]
   maritalStatusOptions: string[]
   provenanceOptions: string[]
+  bankNameOptions: string[]
 }
 
 export function ProfileSection({
@@ -40,6 +41,7 @@ export function ProfileSection({
   salaryCategoryOptions,
   maritalStatusOptions,
   provenanceOptions,
+  bankNameOptions,
 }: ProfileSectionProps) {
   if (isChineseForm && !canViewChineseProfile) {
     return null
@@ -77,6 +79,7 @@ export function ProfileSection({
             salaryCategoryOptions={salaryCategoryOptions}
             maritalStatusOptions={maritalStatusOptions}
             provenanceOptions={provenanceOptions}
+            bankNameOptions={bankNameOptions}
           />
         )
       ) : null}

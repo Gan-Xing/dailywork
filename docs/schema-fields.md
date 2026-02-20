@@ -175,6 +175,8 @@
 - `cnpsNumber`（NUMERO CNPS）：CNPS 编号，字符串，可空。
 - `cnpsDeclarationCode`（CODE DE DECLARATION CNPS）：申报码，字符串，可空。
 - `provenance`（PROVENANCE）：属地/来源，字符串，可空。
+- `bankAccountNumber`（NUMERO DE COMPTE BANCAIRE）：银行账户号码，字符串，可空；允许英文字母、数字和空格。
+- `bankName`（NOM DE LA BANQUE）：银行名称，字符串，可空。
 - `emergencyContactName` + `emergencyContactPhone`（EN CAS D'URGENCES）：紧急联系人姓名与电话，字符串，可空。
 
 ### TeamSupervisor（班组负责人绑定）
@@ -623,6 +625,8 @@
 - `cnpsNumber?`：CNPS 编号。
 - `cnpsDeclarationCode?`：CNPS 申报码。
 - `provenance?`：属地/来源。
+- `bankAccountNumber?`：银行账户号码（允许英文字母、数字和空格）。
+- `bankName?`：银行名称。
 - `emergencyContactName?` / `emergencyContactPhone?`：紧急联系人及电话。
 
 ### FileAsset（非结构化文件）

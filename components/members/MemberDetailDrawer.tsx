@@ -321,6 +321,16 @@ export function MemberDetailDrawer({
                           emptyLabel={t.labels.empty}
                         />
                         <DetailItem label={t.table.provenance} value={member.expatProfile?.provenance ?? ''} emptyLabel={t.labels.empty} />
+                        <DetailItem
+                          label={t.table.bankAccountNumber}
+                          value={member.expatProfile?.bankAccountNumber ?? ''}
+                          emptyLabel={t.labels.empty}
+                        />
+                        <DetailItem
+                          label={t.table.bankName}
+                          value={member.expatProfile?.bankName ?? ''}
+                          emptyLabel={t.labels.empty}
+                        />
                         <DetailItem label={t.table.cnpsNumber} value={member.expatProfile?.cnpsNumber ?? ''} emptyLabel={t.labels.empty} />
                         <DetailItem
                           label={t.table.cnpsDeclarationCode}

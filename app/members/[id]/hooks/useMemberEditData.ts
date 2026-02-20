@@ -65,6 +65,15 @@ export function useMemberEditData({
     return Array.from(set).sort(optionCollator.compare)
   }, [memberOptions, optionCollator])
 
+  const bankNameOptions = useMemo(() => {
+    const set = new Set<string>()
+    memberOptions.forEach((memberOption) => {
+      const value = normalizeText(memberOption.expatProfile?.bankName ?? null)
+      if (value) set.add(value)
+    })
+    return Array.from(set).sort(optionCollator.compare)
+  }, [memberOptions, optionCollator])
+
 
   useEffect(() => {
     if (!canAssignRole) return
@@ -104,5 +113,6 @@ export function useMemberEditData({
     salaryCategoryOptions,
     maritalStatusOptions,
     provenanceOptions,
+    bankNameOptions,
   }
 }

@@ -35,9 +35,13 @@ export type NormalizedExpatProfile = {
   cnpsNumber: string | null
   cnpsDeclarationCode: string | null
   provenance: string | null
+  bankAccountNumber: string | null
+  bankName: string | null
   emergencyContactName: string | null
   emergencyContactPhone: string | null
 }
+
+const BANK_ACCOUNT_PATTERN = /^[A-Za-z0-9 ]+$/
 
 const normalizeString = (value: unknown) => {
   if (typeof value !== 'string') return null
@@ -325,9 +329,31 @@ export const normalizeExpatProfile = (raw: unknown): NormalizedExpatProfile => {
     cnpsNumber: parseCnpsNumber(source.cnpsNumber),
     cnpsDeclarationCode: parseCnpsDeclarationCode(source.cnpsDeclarationCode),
     provenance: normalizeString(source.provenance),
+    bankAccountNumber: normalizeString(source.bankAccountNumber),
+    bankName: normalizeString(source.bankName),
     emergencyContactName,
     emergencyContactPhone,
   }
+}
+
+export type ExpatBankValidationIssue =
+  | 'bank_account_number_required'
+  | 'bank_name_required'
+  | 'bank_account_number_invalid'
+
+export const validateExpatBankFields = (
+  profile: Pick<NormalizedExpatProfile, 'bankAccountNumber' | 'bankName'>,
+): ExpatBankValidationIssue | null => {
+  if (profile.bankAccountNumber && !BANK_ACCOUNT_PATTERN.test(profile.bankAccountNumber)) {
+    return 'bank_account_number_invalid'
+  }
+  if (profile.bankAccountNumber && !profile.bankName) {
+    return 'bank_name_required'
+  }
+  if (profile.bankName && !profile.bankAccountNumber) {
+    return 'bank_account_number_required'
+  }
+  return null
 }
 
 export const hasExpatProfileData = (profile: NormalizedExpatProfile) => {
@@ -349,6 +375,8 @@ export const hasExpatProfileData = (profile: NormalizedExpatProfile) => {
     Boolean(profile.cnpsNumber) ||
     Boolean(profile.cnpsDeclarationCode) ||
     Boolean(profile.provenance) ||
+    Boolean(profile.bankAccountNumber) ||
+    Boolean(profile.bankName) ||
     Boolean(profile.emergencyContactName) ||
     Boolean(profile.emergencyContactPhone)
   )

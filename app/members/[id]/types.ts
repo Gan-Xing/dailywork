@@ -41,6 +41,8 @@ export type ExpatProfile = {
   cnpsNumber: string | null
   cnpsDeclarationCode: string | null
   provenance: string | null
+  bankAccountNumber: string | null
+  bankName: string | null
   emergencyContactName: string | null
   emergencyContactPhone: string | null
 }
@@ -89,6 +91,7 @@ export type MemberOption = {
     salaryCategory?: string | null
     maritalStatus?: string | null
     provenance?: string | null
+    bankName?: string | null
   } | null
 }
 
@@ -127,6 +130,8 @@ export type ExpatProfileForm = {
   cnpsNumber: string
   cnpsDeclarationCode: string
   provenance: string
+  bankAccountNumber: string
+  bankName: string
   emergencyContactName: string
   emergencyContactPhone: string
 }

@@ -224,6 +224,8 @@ export function useFilteredMembers({
       addSearchValue(values, expatProfile?.cnpsNumber)
       addSearchValue(values, expatProfile?.cnpsDeclarationCode)
       addSearchValue(values, expatProfile?.provenance)
+      addSearchValue(values, expatProfile?.bankAccountNumber)
+      addSearchValue(values, expatProfile?.bankName)
       addSearchValue(values, emergencyContactName)
       addSearchValue(values, emergencyContactPhone)
       addSearchValue(values, chineseProfile?.frenchName)
@@ -580,6 +582,20 @@ export function useFilteredMembers({
             result = compareNullable(
               getTextValue(leftExpatProfile?.provenance),
               getTextValue(rightExpatProfile?.provenance),
+              (a, b) => collator.compare(a, b),
+            )
+            break
+          case 'bankAccountNumber':
+            result = compareNullable(
+              getTextValue(leftExpatProfile?.bankAccountNumber),
+              getTextValue(rightExpatProfile?.bankAccountNumber),
+              (a, b) => collator.compare(a, b),
+            )
+            break
+          case 'bankName':
+            result = compareNullable(
+              getTextValue(leftExpatProfile?.bankName),
+              getTextValue(rightExpatProfile?.bankName),
               (a, b) => collator.compare(a, b),
             )
             break

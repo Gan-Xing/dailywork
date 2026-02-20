@@ -30,6 +30,8 @@ export type ColumnKey =
   | 'cnpsNumber'
   | 'cnpsDeclarationCode'
   | 'provenance'
+  | 'bankAccountNumber'
+  | 'bankName'
   | 'frenchName'
   | 'idNumber'
   | 'passportNumber'
@@ -82,6 +84,8 @@ export type TemplateColumnKey =
   | 'cnpsNumber'
   | 'cnpsDeclarationCode'
   | 'provenance'
+  | 'bankAccountNumber'
+  | 'bankName'
   | 'emergencyContact'
   | 'frenchName'
   | 'idNumber'
@@ -120,6 +124,9 @@ export type ImportErrorCode =
   | 'invalid_project'
   | 'invalid_chinese_supervisor'
   | 'missing_team_supervisor'
+  | 'missing_bank_account_number'
+  | 'missing_bank_name'
+  | 'invalid_bank_account_number'
   | 'duplicate_contract_number'
   | 'contract_number_exists'
   | 'role_not_found'
@@ -173,6 +180,8 @@ export const memberColumnOrder: ColumnKey[] = [
   'cnpsNumber',
   'cnpsDeclarationCode',
   'provenance',
+  'bankAccountNumber',
+  'bankName',
   'frenchName',
   'idNumber',
   'passportNumber',
@@ -226,6 +235,8 @@ export const memberTemplateColumns: TemplateColumnKey[] = [
   'cnpsNumber',
   'cnpsDeclarationCode',
   'provenance',
+  'bankAccountNumber',
+  'bankName',
   'emergencyContact',
   'frenchName',
   'idNumber',

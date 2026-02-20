@@ -14,6 +14,7 @@ import {
   normalizeChineseProfile,
   parseBirthDateInput,
   parseChineseIdBirthDate,
+  validateExpatBankFields,
 } from '@/lib/server/memberProfiles'
 import { prisma } from '@/lib/prisma'
 
@@ -81,6 +82,19 @@ export async function POST(request: Request) {
   const chineseProfileData = normalizeChineseProfile(chineseProfile)
   const shouldCreateChineseProfile = isChinese && hasChineseProfileData(chineseProfileData)
   const expatProfileData = normalizeExpatProfile(expatProfile)
+  const bankValidationIssue = validateExpatBankFields(expatProfileData)
+  if (bankValidationIssue) {
+    if (bankValidationIssue === 'bank_account_number_required') {
+      return NextResponse.json({ error: '银行账户号码为必填' }, { status: 400 })
+    }
+    if (bankValidationIssue === 'bank_name_required') {
+      return NextResponse.json({ error: '银行名称为必填' }, { status: 400 })
+    }
+    return NextResponse.json(
+      { error: '银行账户号码仅支持英文字母、数字和空格' },
+      { status: 400 },
+    )
+  }
   const parsedProjectId =
     projectId === null || projectId === '' || projectId === undefined ? null : Number(projectId)
   if (parsedProjectId !== null && !Number.isFinite(parsedProjectId)) {

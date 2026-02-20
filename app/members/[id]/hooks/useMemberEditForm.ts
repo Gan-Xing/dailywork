@@ -138,6 +138,8 @@ export function useMemberEditForm({ member, canAssignRole, t }: UseMemberEditFor
       cnpsNumber: formState.expatProfile.cnpsNumber.trim() || null,
       cnpsDeclarationCode: formState.expatProfile.cnpsDeclarationCode.trim() || null,
       provenance: formState.expatProfile.provenance.trim() || null,
+      bankAccountNumber: formState.expatProfile.bankAccountNumber.trim() || null,
+      bankName: formState.expatProfile.bankName.trim() || null,
       emergencyContactName: formState.expatProfile.emergencyContactName.trim() || null,
       emergencyContactPhone: formState.expatProfile.emergencyContactPhone.trim() || null,
     }
