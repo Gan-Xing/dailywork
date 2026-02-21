@@ -138,6 +138,7 @@ export function PayrollPayoutsTab({
   const [bulkInputs, setBulkInputs] = useState<Record<number, string>>({})
   const [exportingRunId, setExportingRunId] = useState<number | null>(null)
   const [exportingAttendanceRunId, setExportingAttendanceRunId] = useState<number | null>(null)
+  const [exportingBankTransferRunId, setExportingBankTransferRunId] = useState<number | null>(null)
   const [nameFilters, setNameFilters] = useState<string[]>([])
   const [teamFilters, setTeamFilters] = useState<string[]>([])
   const [supervisorFilters, setSupervisorFilters] = useState<string[]>([])
@@ -565,7 +566,7 @@ export function PayrollPayoutsTab({
     const getContractNumber = (member: Member) =>
       normalizeText(
         primaryContractsByMemberId[member.id]?.contractNumber ??
-          member.expatProfile?.contractNumber,
+        member.expatProfile?.contractNumber,
       )
 
     const getContractType = (member: Member) =>
@@ -1114,6 +1115,162 @@ export function PayrollPayoutsTab({
     }
   }
 
+  const exportBankTransfer = async (run: PayrollRun) => {
+    if (exportingBankTransferRunId) return
+    setExportingBankTransferRunId(run.id)
+    setError(null)
+    try {
+      const eligibleMembers = sortedMembers.filter((m) => {
+        const amount = payoutMap.get(run.id)?.get(m.id)?.amount
+        return toAmountNumber(amount) !== null
+      })
+      if (eligibleMembers.length === 0) return
+
+      const ExcelJS = (await import('exceljs')).default
+      const { saveAs } = await import('file-saver')
+
+      const workbook = new ExcelJS.Workbook()
+      const worksheet = workbook.addWorksheet(t.payroll.title)
+
+      worksheet.mergeCells('A1:G1')
+      const titleCell = worksheet.getCell('A1')
+      titleCell.value = "REMISE D'ORDRES DE VIREMENTS"
+      titleCell.font = { size: 14, bold: true }
+      titleCell.alignment = { horizontal: 'center', vertical: 'middle' }
+
+      worksheet.mergeCells('A2:G2')
+      const subtitleCell = worksheet.getCell('A2')
+      subtitleCell.value = "(FICHIER A TRANSFERER A LA SGCI SUR SUPPORT MAGNETIQUE)"
+      subtitleCell.font = { size: 9 }
+      subtitleCell.alignment = { horizontal: 'center', vertical: 'middle' }
+
+      worksheet.getCell('A4').value = "Donneur d'ordre"
+      worksheet.getCell('C4').value = "CRBC"
+      worksheet.getCell('C4').font = { bold: true }
+
+      worksheet.getCell('A5').value = "Raison sociale"
+      worksheet.getCell('C5').value = "CHINA ROAD AND BRIDGE CORPORATION COTE D'IVOIRE"
+      worksheet.getCell('C5').font = { bold: true }
+
+      worksheet.getCell('A6').value = "N° Emetteur (Code APB)"
+      worksheet.getCell('C6').value = "00000"
+      worksheet.getCell('C6').font = { bold: true }
+
+      worksheet.getCell('A7').value = "Compte à Débiter"
+      worksheet.getCell('C7').value = "CI0080111101118195874586"
+      worksheet.getCell('C7').font = { bold: true }
+
+      worksheet.getCell('A9').value = "Liste des bénéficiaires"
+      worksheet.getCell('A9').font = { bold: true }
+
+      const headers = ["Code", "Nom / Raison sociale", "Banque", "Agence", "N° de Compte", "Clé Rib", "Montant CFA"]
+      const headerRow = worksheet.addRow(headers)
+      headerRow.eachCell((cell) => {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFC00000' } }
+        cell.font = { color: { argb: 'FFFFFFFF' }, bold: true }
+        cell.alignment = { horizontal: 'center', vertical: 'middle' }
+        cell.border = {
+          top: { style: 'thin' }, left: { style: 'thin' },
+          bottom: { style: 'thin' }, right: { style: 'thin' }
+        }
+      })
+
+      let totalAmount = 0
+      eligibleMembers.forEach((member) => {
+        const amountStr = payoutMap.get(run.id)?.get(member.id)?.amount
+        const amount = toAmountNumber(amountStr) ?? 0
+
+        if (amount > 0) {
+          totalAmount += amount
+          const name = normalizeText(member.name) || normalizeText(member.username) || ''
+          const accountNum = normalizeText(member.expatProfile?.bankAccountNumber) || ''
+
+          let banque = ''
+          let agence = ''
+          let numCompte = ''
+          let cleRib = ''
+
+          if (accountNum.length >= 24) {
+            banque = accountNum.substring(0, 5)
+            agence = accountNum.substring(5, 10)
+            numCompte = ` ${accountNum.substring(10, 22)}`
+            cleRib = accountNum.substring(22, 24)
+          } else {
+            numCompte = ` ${accountNum}`
+          }
+
+          const rowIndex = worksheet.rowCount + 1
+          const listIndex = rowIndex - 9 // Header is on row 9, so data starts at row 10, index 1
+          const row = worksheet.addRow([listIndex, name, banque, agence, numCompte, cleRib, amount])
+          row.eachCell((cell, colNumber) => {
+            cell.border = {
+              top: { style: 'thin' }, left: { style: 'thin' },
+              bottom: { style: 'thin' }, right: { style: 'thin' }
+            }
+            if (colNumber === 7) {
+              cell.numFmt = '#,##0'
+            } else if (colNumber >= 3 && colNumber <= 6) {
+              cell.alignment = { horizontal: 'center', vertical: 'middle' }
+            }
+          })
+        }
+      })
+
+      // Add blank yellow row before total
+      const blankRow = worksheet.addRow([])
+      blankRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+        if (colNumber <= 7) {
+          cell.border = {
+            top: { style: 'thin' }, left: { style: 'thin' },
+            bottom: { style: 'thin' }, right: { style: 'thin' }
+          }
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } }
+        }
+      })
+
+      const footerRow = worksheet.addRow([])
+      worksheet.mergeCells(`A${footerRow.number}:F${footerRow.number}`)
+      const footerLabel = worksheet.getCell(`A${footerRow.number}`)
+      footerLabel.value = "Montant total de la Remise"
+      footerLabel.font = { bold: true }
+
+      const footerTotal = worksheet.getCell(`G${footerRow.number}`)
+      footerTotal.value = totalAmount
+      footerTotal.numFmt = '#,##0'
+      footerTotal.font = { bold: true }
+
+      footerRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+        if (colNumber <= 7) {
+          cell.border = {
+            top: { style: 'thin' }, left: { style: 'thin' },
+            bottom: { style: 'thin' }, right: { style: 'thin' }
+          }
+        }
+      })
+
+
+      worksheet.columns = [
+        { width: 8 },
+        { width: 35 },
+        { width: 10 },
+        { width: 10 },
+        { width: 20 },
+        { width: 10 },
+        { width: 15 },
+      ]
+
+      const buffer = await workbook.xlsx.writeBuffer()
+      const filename = `Virement_${selectedMonth}_Run${run.sequence}.xlsx`
+      saveAs(new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), filename)
+
+    } catch (err) {
+      const message = err instanceof Error ? err.message : t.payroll.errors.exportFailed
+      setError(message)
+    } finally {
+      setExportingBankTransferRunId(null)
+    }
+  }
+
   const sumRun = (runId: number | undefined, members: Member[]) => {
     if (!runId) return 0
     return members.reduce((total, member) => {
@@ -1245,11 +1402,10 @@ export function PayrollPayoutsTab({
               key={mode}
               type="button"
               onClick={() => setViewMode(mode)}
-              className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
-                viewMode === mode
-                  ? 'bg-white text-slate-900 shadow-sm'
-                  : 'text-slate-500 hover:text-slate-700'
-              }`}
+              className={`rounded-full px-3 py-1 text-xs font-semibold transition ${viewMode === mode
+                ? 'bg-white text-slate-900 shadow-sm'
+                : 'text-slate-500 hover:text-slate-700'
+                }`}
             >
               {t.payroll.viewModes[mode]}
             </button>
@@ -1280,7 +1436,8 @@ export function PayrollPayoutsTab({
           const isBulkOpen = bulkOpen[run.id]
           const isExporting = exportingRunId === run.id
           const isAttendanceExporting = exportingAttendanceRunId === run.id
-          const isExportBusy = exportingRunId !== null || exportingAttendanceRunId !== null
+          const isBankTransferExporting = exportingBankTransferRunId === run.id
+          const isExportBusy = exportingRunId !== null || exportingAttendanceRunId !== null || exportingBankTransferRunId !== null
           const hasPayouts = (payoutMap.get(run.id)?.size ?? 0) > 0
           return (
             <div key={run.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
@@ -1385,8 +1542,16 @@ export function PayrollPayoutsTab({
                 <button
                   type="button"
                   disabled={!hasPayouts || isExportBusy}
-                  onClick={() => exportSalaryPdf(run)}
+                  onClick={() => exportBankTransfer(run)}
                   className="rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700 disabled:opacity-60"
+                >
+                  {isBankTransferExporting ? t.payroll.actions.exportingBankTransfer : t.payroll.actions.exportBankTransfer}
+                </button>
+                <button
+                  type="button"
+                  disabled={!hasPayouts || isExportBusy}
+                  onClick={() => exportSalaryPdf(run)}
+                  className="rounded-full bg-slate-100 border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700 disabled:opacity-60"
                 >
                   {isExporting ? t.payroll.actions.exportingPdf : t.payroll.actions.exportPdf}
                 </button>
@@ -1611,88 +1776,88 @@ export function PayrollPayoutsTab({
             ) : null}
             {!membersLoading && !loading
               ? sortedMembers.map((member, index) => {
-                  const eligibility = eligibilityById.get(member.id)
-                  const runOneEligible = Boolean(runOne && eligibility?.run1Editable)
-                  const runTwoEligible = Boolean(runTwo && eligibility?.run2Editable)
-                  const runOneValue = runOne ? getDraftAmount(runOne.id, member.id) : ''
-                  const runTwoValue = runTwo ? getDraftAmount(runTwo.id, member.id) : ''
-                  const runOneMissing =
-                    viewMode === 'entry' && runOneEligible && !normalizeText(runOneValue)
-                  const runTwoMissing =
-                    viewMode === 'entry' && runTwoEligible && !normalizeText(runTwoValue)
-                  const contractSnapshot = getPrimaryContractSnapshot(member)
-                  const runOneReportValue =
-                    runOne ? payoutMap.get(runOne.id)?.get(member.id)?.amount ?? '' : ''
-                  const runTwoReportValue =
-                    runTwo ? payoutMap.get(runTwo.id)?.get(member.id)?.amount ?? '' : ''
-                  const runOneNumber = toAmountNumber(runOneReportValue)
-                  const runTwoNumber = toAmountNumber(runTwoReportValue)
-                  const hasRowTotal = runOneNumber !== null || runTwoNumber !== null
-                  const rowTotal = (runOneNumber ?? 0) + (runTwoNumber ?? 0)
-                  return (
-                    <tr key={member.id} className="border-b border-slate-100 last:border-0">
-                      <td className="px-4 py-3 text-center text-xs text-slate-500">
-                        {index + 1}
-                      </td>
-                      <td className="px-4 py-3">{getSupervisorLabel(member, runTwo?.id ?? runOne?.id)}</td>
-                      <td className="px-4 py-3">{getTeamLabel(member, runTwo?.id ?? runOne?.id)}</td>
+                const eligibility = eligibilityById.get(member.id)
+                const runOneEligible = Boolean(runOne && eligibility?.run1Editable)
+                const runTwoEligible = Boolean(runTwo && eligibility?.run2Editable)
+                const runOneValue = runOne ? getDraftAmount(runOne.id, member.id) : ''
+                const runTwoValue = runTwo ? getDraftAmount(runTwo.id, member.id) : ''
+                const runOneMissing =
+                  viewMode === 'entry' && runOneEligible && !normalizeText(runOneValue)
+                const runTwoMissing =
+                  viewMode === 'entry' && runTwoEligible && !normalizeText(runTwoValue)
+                const contractSnapshot = getPrimaryContractSnapshot(member)
+                const runOneReportValue =
+                  runOne ? payoutMap.get(runOne.id)?.get(member.id)?.amount ?? '' : ''
+                const runTwoReportValue =
+                  runTwo ? payoutMap.get(runTwo.id)?.get(member.id)?.amount ?? '' : ''
+                const runOneNumber = toAmountNumber(runOneReportValue)
+                const runTwoNumber = toAmountNumber(runTwoReportValue)
+                const hasRowTotal = runOneNumber !== null || runTwoNumber !== null
+                const rowTotal = (runOneNumber ?? 0) + (runTwoNumber ?? 0)
+                return (
+                  <tr key={member.id} className="border-b border-slate-100 last:border-0">
+                    <td className="px-4 py-3 text-center text-xs text-slate-500">
+                      {index + 1}
+                    </td>
+                    <td className="px-4 py-3">{getSupervisorLabel(member, runTwo?.id ?? runOne?.id)}</td>
+                    <td className="px-4 py-3">{getTeamLabel(member, runTwo?.id ?? runOne?.id)}</td>
+                    <td className="px-4 py-3">
+                      {normalizeText(member.name) || normalizeText(member.username) || t.labels.empty}
+                    </td>
+                    <td className="px-4 py-3">
+                      {normalizeText(contractSnapshot.contractNumber) || t.labels.empty}
+                    </td>
+                    <td className="px-4 py-3">{contractSnapshot.contractType ?? t.labels.empty}</td>
+                    <td className={`px-4 py-3 ${runOneMissing ? 'bg-rose-50' : ''}`}>
+                      {viewMode === 'entry' ? (
+                        <input
+                          type="number"
+                          inputMode="decimal"
+                          value={runOneValue}
+                          disabled={!runOne || !canManagePayroll || !runOneEligible}
+                          onChange={(event) =>
+                            runOne && updateDraft(runOne.id, member.id, event.target.value)
+                          }
+                          placeholder={
+                            runOneEligible ? t.compensation.fields.amount : t.payroll.table.runEmpty
+                          }
+                          className={`w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100 disabled:bg-slate-100 disabled:text-slate-400 ${runOneMissing ? 'bg-rose-50 border-rose-200' : ''}`}
+                        />
+                      ) : (
+                        <span className="text-sm">
+                          {runOneReportValue || t.labels.empty}
+                        </span>
+                      )}
+                    </td>
+                    <td className={`px-4 py-3 ${runTwoMissing ? 'bg-rose-50' : ''}`}>
+                      {viewMode === 'entry' ? (
+                        <input
+                          type="number"
+                          inputMode="decimal"
+                          value={runTwoValue}
+                          disabled={!runTwo || !canManagePayroll || !runTwoEligible}
+                          onChange={(event) =>
+                            runTwo && updateDraft(runTwo.id, member.id, event.target.value)
+                          }
+                          placeholder={
+                            runTwoEligible ? t.compensation.fields.amount : t.payroll.table.runEmpty
+                          }
+                          className={`w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100 disabled:bg-slate-100 disabled:text-slate-400 ${runTwoMissing ? 'bg-rose-50 border-rose-200' : ''}`}
+                        />
+                      ) : (
+                        <span className="text-sm">
+                          {runTwoReportValue || t.labels.empty}
+                        </span>
+                      )}
+                    </td>
+                    {viewMode === 'report' ? (
                       <td className="px-4 py-3">
-                        {normalizeText(member.name) || normalizeText(member.username) || t.labels.empty}
+                        {hasRowTotal ? numberFormatter.format(rowTotal) : t.labels.empty}
                       </td>
-                      <td className="px-4 py-3">
-                        {normalizeText(contractSnapshot.contractNumber) || t.labels.empty}
-                      </td>
-                      <td className="px-4 py-3">{contractSnapshot.contractType ?? t.labels.empty}</td>
-                      <td className={`px-4 py-3 ${runOneMissing ? 'bg-rose-50' : ''}`}>
-                        {viewMode === 'entry' ? (
-                          <input
-                            type="number"
-                            inputMode="decimal"
-                            value={runOneValue}
-                            disabled={!runOne || !canManagePayroll || !runOneEligible}
-                            onChange={(event) =>
-                              runOne && updateDraft(runOne.id, member.id, event.target.value)
-                            }
-                            placeholder={
-                              runOneEligible ? t.compensation.fields.amount : t.payroll.table.runEmpty
-                            }
-                            className={`w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100 disabled:bg-slate-100 disabled:text-slate-400 ${runOneMissing ? 'bg-rose-50 border-rose-200' : ''}`}
-                          />
-                        ) : (
-                          <span className="text-sm">
-                            {runOneReportValue || t.labels.empty}
-                          </span>
-                        )}
-                      </td>
-                      <td className={`px-4 py-3 ${runTwoMissing ? 'bg-rose-50' : ''}`}>
-                        {viewMode === 'entry' ? (
-                          <input
-                            type="number"
-                            inputMode="decimal"
-                            value={runTwoValue}
-                            disabled={!runTwo || !canManagePayroll || !runTwoEligible}
-                            onChange={(event) =>
-                              runTwo && updateDraft(runTwo.id, member.id, event.target.value)
-                            }
-                            placeholder={
-                              runTwoEligible ? t.compensation.fields.amount : t.payroll.table.runEmpty
-                            }
-                            className={`w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100 disabled:bg-slate-100 disabled:text-slate-400 ${runTwoMissing ? 'bg-rose-50 border-rose-200' : ''}`}
-                          />
-                        ) : (
-                          <span className="text-sm">
-                            {runTwoReportValue || t.labels.empty}
-                          </span>
-                        )}
-                      </td>
-                      {viewMode === 'report' ? (
-                        <td className="px-4 py-3">
-                          {hasRowTotal ? numberFormatter.format(rowTotal) : t.labels.empty}
-                        </td>
-                      ) : null}
-                    </tr>
-                  )
-                })
+                    ) : null}
+                  </tr>
+                )
+              })
               : null}
           </tbody>
           {viewMode === 'report' && sortedMembers.length > 0 ? (

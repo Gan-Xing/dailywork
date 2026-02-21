@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 
 import { genderOptions, memberCopy, nationalityOptions, type EmploymentStatus } from '@/lib/i18n/members'
 import { normalizeTagsInput } from '@/lib/members/utils'
+import { useToast } from '@/components/ToastProvider'
 
 import type { FormState, Member } from '../types'
 import { buildChineseProfileForm, buildExpatProfileForm, normalizeProfileNumber, parseBirthDateFromIdNumber } from '../utils'
@@ -15,6 +16,7 @@ type UseMemberEditFormParams = {
 }
 
 export function useMemberEditForm({ member, canAssignRole, t }: UseMemberEditFormParams) {
+  const { addToast } = useToast()
   const [submitting, setSubmitting] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
   const [phoneInput, setPhoneInput] = useState('')
@@ -215,8 +217,11 @@ export function useMemberEditForm({ member, canAssignRole, t }: UseMemberEditFor
         const data = await res.json().catch(() => ({}))
         throw new Error(data.error ?? t.feedback.submitError)
       }
+      addToast(t.feedback.submitSuccess, { tone: 'success' })
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : t.feedback.submitError)
+      const msg = error instanceof Error ? error.message : t.feedback.submitError
+      setActionError(msg)
+      addToast(msg, { tone: 'danger' })
       return false
     } finally {
       setSubmitting(false)

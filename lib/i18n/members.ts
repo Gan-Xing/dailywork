@@ -229,7 +229,7 @@ export const memberCopy: Record<
       | 'userCount'
       | 'created'
       | 'updated'
-    ,
+      ,
       string
     >
     actions: {
@@ -538,6 +538,7 @@ export const memberCopy: Record<
       loadError: string
       empty: string
       emptyHistory: string
+      submitSuccess: string
       submitError: string
       deleteConfirm: (username: string) => string
       importSuccess: (count: number) => string
@@ -620,6 +621,8 @@ export const memberCopy: Record<
         exportingPdf: string
         exportAttendance: string
         exportingAttendance: string
+        exportBankTransfer: string
+        exportingBankTransfer: string
       }
       confirm: {
         clearRun: (label: string) => string
@@ -1211,6 +1214,7 @@ export const memberCopy: Record<
       loadError: '加载失败',
       empty: '暂无成员，试试新增一位。',
       emptyHistory: '暂无记录。',
+      submitSuccess: '保存修改成功',
       submitError: '提交失败',
       deleteConfirm: (username: string) => `确认删除成员 ${username} 吗？`,
       importSuccess: (count: number) => `已成功导入 ${count} 条成员。`,
@@ -1296,6 +1300,8 @@ export const memberCopy: Record<
         exportingPdf: '导出中...',
         exportAttendance: '导出考勤表',
         exportingAttendance: '导出考勤中...',
+        exportBankTransfer: '导出银行转账单',
+        exportingBankTransfer: '导出银行转账单...',
       },
       confirm: {
         clearRun: (label: string) => `确认清空 ${label} 的发放记录吗？此操作不可恢复。`,
@@ -1900,6 +1906,7 @@ export const memberCopy: Record<
       loadError: 'Échec du chargement',
       empty: 'Aucun membre pour le moment.',
       emptyHistory: 'Aucun enregistrement.',
+      submitSuccess: 'Modifications sauvegardées avec succès',
       submitError: 'Échec de la soumission',
       deleteConfirm: (username: string) => `Supprimer le membre ${username} ?`,
       importSuccess: (count: number) => `Import réussi : ${count} membres.`,
@@ -1986,6 +1993,8 @@ export const memberCopy: Record<
         exportingPdf: 'Export en cours...',
         exportAttendance: 'Exporter la présence',
         exportingAttendance: 'Export des présences...',
+        exportBankTransfer: 'Exporter Virement',
+        exportingBankTransfer: 'Export Virement...',
       },
       confirm: {
         clearRun: (label: string) =>

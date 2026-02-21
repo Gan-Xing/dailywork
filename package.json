@@ -14,14 +14,16 @@
   "dependencies": {
     "archiver": "^7.0.1",
     "d3-scale": "^4.0.2",
+    "exceljs": "^4.4.0",
+    "file-saver": "^2.0.5",
     "next": "16.1.0-canary.20",
     "pdf-lib": "^1.17.1",
     "puppeteer": "^24.32.1",
     "react": "19.3.0-canary-b061b597-20251212",
     "react-dom": "19.3.0-canary-b061b597-20251212",
     "react-liquid-gauge": "^1.2.4",
-    "sharp": "^0.34.4",
     "server-only": "^0.0.1",
+    "sharp": "^0.34.4",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
