@@ -8,7 +8,7 @@ import dynamic from 'next/dynamic'
 import type { PointView, SelectedSegment } from './phaseEditorTypes'
 import { formatPK, getPointCenter } from './phaseEditorUtils'
 import type { PointProgressWaveProps } from './PointProgressWave'
-import type { IntervalSide, PhaseDTO } from '@/lib/progressTypes'
+import type { IntervalSide, LevelCrossingSide, PhaseDTO } from '@/lib/progressTypes'
 
 const PointProgressWave = dynamic<PointProgressWaveProps>(
   () => import('./PointProgressWave').then((mod) => mod.PointProgressWave),
@@ -72,6 +72,7 @@ interface PointLaneProps {
     endPk: number,
     allowedLayers?: string[],
     locationRoadId?: number | null,
+    levelCrossingSide?: LevelCrossingSide | null,
   ) => {
     percent: number
     completedLayers: number
@@ -130,6 +131,7 @@ export function PointLane({
       spec: item.spec ?? null,
       billQuantity: item.billQuantity ?? null,
       locationRoadId: item.locationRoadId ?? null,
+      levelCrossingSide: item.levelCrossingSide ?? null,
       pointHasSides: phase.pointHasSides,
     })
   }
@@ -170,6 +172,7 @@ export function PointLane({
                   item.endPk,
                   item.layers && item.layers.length ? item.layers : phase.resolvedLayers,
                   item.locationRoadId ?? null,
+                  item.levelCrossingSide ?? null,
                 )
                 return (
                   <button

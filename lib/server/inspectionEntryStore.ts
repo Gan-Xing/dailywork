@@ -1,4 +1,4 @@
-import { DocumentType, InspectionStatus, IntervalSide, PhaseMeasure, Prisma } from '@prisma/client'
+import { DocumentType, InspectionStatus, IntervalSide, LevelCrossingSide, PhaseMeasure, Prisma } from '@prisma/client'
 
 import type {
   InspectionEntryDTO,
@@ -15,6 +15,9 @@ import { LEVEL_CROSSING_ROAD_SLUG } from '@/lib/roadConstants'
 
 const normalizeSide = (side: string | undefined) =>
   side === 'LEFT' || side === 'RIGHT' || side === 'BOTH' ? side : 'BOTH'
+
+const normalizeLevelCrossingSide = (side: unknown): LevelCrossingSide | null =>
+  side === 'LEFT' || side === 'RIGHT' ? side : null
 
 const normalizeLabel = (value: string) => value.trim().toLowerCase()
 
@@ -100,6 +103,7 @@ const mapEntry = (
     locationRoadId: effectiveLocationRoadId ?? null,
     locationRoadName: resolvedLocationRoad?.name ?? null,
     locationRoadSlug: resolvedLocationRoad?.slug ?? null,
+    levelCrossingSide: row.levelCrossingSide ?? null,
     phaseId: row.phaseId,
     phaseName: row.phase.name,
     side: row.side,
@@ -201,6 +205,7 @@ const assertWorkflowSubmissionRules = async (params: {
   phase: { id: number; phaseDefinitionId: number; name?: string }
   roadId: number
   locationRoadId?: number | null
+  levelCrossingSide?: LevelCrossingSide | null
   side: IntervalSide
   startPk: number
   endPk: number
@@ -264,6 +269,7 @@ const assertWorkflowSubmissionRules = async (params: {
       status: { in: [InspectionStatus.SCHEDULED, InspectionStatus.SUBMITTED, InspectionStatus.IN_PROGRESS, InspectionStatus.APPROVED] },
       startPk: { lte: targetRange.endPk },
       endPk: { gte: targetRange.startPk },
+      ...(params.levelCrossingSide ? { levelCrossingSide: params.levelCrossingSide } : {}),
       ...(locationRoadFilter ? { AND: [locationRoadFilter] } : {}),
     },
   })
@@ -526,6 +532,9 @@ export const listInspectionEntries = async (filter: InspectionEntryFilter): Prom
   if (filter.side) {
     where.side = filter.side as IntervalSide
   }
+  if (filter.levelCrossingSide) {
+    where.levelCrossingSide = filter.levelCrossingSide as LevelCrossingSide
+  }
   if (filter.layerNames && filter.layerNames.length) {
     where.layerName = { in: filter.layerNames }
   }
@@ -776,6 +785,7 @@ export const createInspectionEntries = async (
       phase: (typeof phases)[number]
       roadId: number
       locationRoadId: number | null
+      levelCrossingSide: LevelCrossingSide | null
       side: IntervalSide
       startPk: number
       endPk: number
@@ -810,6 +820,10 @@ export const createInspectionEntries = async (
     const isLevelCrossing = road.slug === LEVEL_CROSSING_ROAD_SLUG
     const locationRoadInput = parseOptionalNumber((normalized as any).locationRoadId)
     const locationRoadId = isLevelCrossing ? locationRoadInput : road.id
+    const levelCrossingSideInput = normalizeLevelCrossingSide(
+      (normalized as { levelCrossingSide?: unknown }).levelCrossingSide,
+    )
+    const levelCrossingSide = isLevelCrossing ? levelCrossingSideInput : null
     if (isLevelCrossing) {
       if (!locationRoadId) {
         throw new Error('平交路口报检必须选择所属主路段')
@@ -820,17 +834,21 @@ export const createInspectionEntries = async (
       if (!locationRoadMap.has(locationRoadId)) {
         throw new Error('所属主路段不存在或已删除')
       }
+      if (!levelCrossingSide) {
+        throw new Error('平交路口报检必须选择平交路口侧别')
+      }
     }
 
     if (phase.roadId !== normalized.roadId) {
       throw new Error('分项与路段不匹配，请刷新后重试')
     }
 
-    const groupKey = `${phase.id}:${side}:${range.startPk}:${range.endPk}:${locationRoadId ?? 'null'}`
+    const groupKey = `${phase.id}:${side}:${range.startPk}:${range.endPk}:${locationRoadId ?? 'null'}:${levelCrossingSide ?? 'null'}`
     const group = workflowGroups.get(groupKey) ?? {
       phase,
       roadId: road.id,
       locationRoadId: locationRoadId ?? null,
+      levelCrossingSide,
       side: side as IntervalSide,
       startPk: range.startPk,
       endPk: range.endPk,
@@ -846,6 +864,7 @@ export const createInspectionEntries = async (
         documentId: bindingProvided ? documentId ?? null : undefined,
         roadId: normalized.roadId,
         locationRoadId: locationRoadId ?? undefined,
+        levelCrossingSide: levelCrossingSide ?? undefined,
         phaseId: normalized.phaseId,
         side: side as IntervalSide,
         startPk: range.startPk,
@@ -875,6 +894,7 @@ export const createInspectionEntries = async (
       phase: { id: group.phase.id, phaseDefinitionId: group.phase.phaseDefinitionId },
       roadId: group.roadId,
       locationRoadId: group.locationRoadId,
+      levelCrossingSide: group.levelCrossingSide,
       side: group.side,
       startPk: group.startPk,
       endPk: group.endPk,
@@ -890,6 +910,7 @@ export const createInspectionEntries = async (
     [
       data.roadId,
       data.locationRoadId ?? data.roadId,
+      data.levelCrossingSide ?? 'null',
       data.phaseId,
       data.side,
       data.startPk,
@@ -949,6 +970,7 @@ export const createInspectionEntries = async (
         endPk: data.endPk,
         layerName: data.layerName,
         checkName: data.checkName,
+        levelCrossingSide: data.levelCrossingSide ?? null,
         AND: [locationRoadWhere],
       },
       orderBy: { id: 'asc' },
@@ -969,6 +991,7 @@ export const createInspectionEntries = async (
         types: mergedTypes,
         updatedBy: data.updatedBy,
         locationRoadId: data.locationRoadId ?? undefined,
+        levelCrossingSide: data.levelCrossingSide ?? undefined,
       }
       if (bindingProvided) {
         updateData.documentId = data.documentId ?? null
@@ -1023,6 +1046,7 @@ export const aggregateEntriesAsListItems = async (
     ...(filter.phaseDefinitionId ? { phase: { phaseDefinitionId: filter.phaseDefinitionId } } : {}),
     ...(filter.status?.length ? { status: { in: filter.status as InspectionStatus[] } } : {}),
     ...(filter.side ? { side: filter.side as IntervalSide } : {}),
+    ...(filter.levelCrossingSide ? { levelCrossingSide: filter.levelCrossingSide as LevelCrossingSide } : {}),
     ...(filter.types?.length ? { types: { hasSome: filter.types } } : {}),
     ...(filter.checkId ? { checkId: filter.checkId } : {}),
     ...(filter.checkName ? { checkName: { contains: filter.checkName, mode: 'insensitive' as const } } : {}),
@@ -1125,7 +1149,7 @@ export const aggregateEntriesAsListItems = async (
         : 'layer:unknown'
     const effectiveLocationRoadId =
       entry.locationRoadId ?? (entry.road.slug === LEVEL_CROSSING_ROAD_SLUG ? null : entry.roadId)
-    const baseKey = `${entry.roadId}:${effectiveLocationRoadId ?? 'null'}:${entry.phaseId}:${entry.side}:${entry.startPk}:${entry.endPk}:${entry.documentId ?? ''}`
+    const baseKey = `${entry.roadId}:${effectiveLocationRoadId ?? 'null'}:${entry.levelCrossingSide ?? 'null'}:${entry.phaseId}:${entry.side}:${entry.startPk}:${entry.endPk}:${entry.documentId ?? ''}`
     const key = filter.groupByLayer ? `${baseKey}:${layerKey}` : baseKey
     const priority = statusPriority[entry.status]
     const existing = grouped.get(key)
@@ -1144,6 +1168,7 @@ export const aggregateEntriesAsListItems = async (
         locationRoadId: effectiveLocationRoadId ?? null,
         locationRoadName: resolvedLocationRoad?.name ?? null,
         locationRoadSlug: resolvedLocationRoad?.slug ?? null,
+        levelCrossingSide: entry.levelCrossingSide ?? null,
         phaseId: entry.phaseId,
         phaseName: entry.phase.name,
         documentId: entry.documentId,
@@ -1189,6 +1214,7 @@ export const aggregateEntriesAsListItems = async (
         locationRoadId: existing.locationRoadId ?? effectiveLocationRoadId ?? null,
         locationRoadName: existing.locationRoadName ?? resolvedLocationRoad?.name ?? null,
         locationRoadSlug: existing.locationRoadSlug ?? resolvedLocationRoad?.slug ?? null,
+        levelCrossingSide: existing.levelCrossingSide ?? entry.levelCrossingSide ?? null,
         layers: filter.groupByLayer
           ? existing.layers && existing.layers.length
             ? existing.layers

@@ -446,6 +446,12 @@ const formatPK = (value: number) => {
   return `PK${km}+${String(m).padStart(3, '0')}`
 }
 
+const formatPKRange = (startPk: number, endPk: number) => {
+  const startText = formatPK(startPk)
+  const endText = formatPK(endPk)
+  return startText === endText ? startText : `${startText} → ${endText}`
+}
+
 const formatDate = (value?: string | null, locale: Locale = 'fr') => {
   if (!value) return ''
   const date = new Date(value)
@@ -525,6 +531,7 @@ const buildPage = (
     locale === 'fr'
       ? { LEFT: 'Gauche', RIGHT: 'Droite', BOTH: 'Deux côtés' }
       : { LEFT: '左侧', RIGHT: '右侧', BOTH: '双侧' }
+  const levelCrossingPrefix = locale === 'fr' ? 'Amorce' : '平交'
 
   const isPrefab = inspection.roadSlug === 'prefab'
   const displayRoad =
@@ -540,8 +547,16 @@ const buildPage = (
 
   const phaseTokens = splitInspectionTokens([inspection.phaseName])
   const phaseText = localizePhaseToken(phaseTokens[0] ?? inspection.phaseName, locale)
-  const sideText = isPrefab ? '' : sideCopy[inspection.side] ?? inspection.side
-  const rangeText = isPrefab ? '' : `${formatPK(inspection.startPk)} → ${formatPK(inspection.endPk)}`
+  const mainSideText = sideCopy[inspection.side] ?? inspection.side
+  const levelCrossingSideText = inspection.levelCrossingSide
+    ? sideCopy[inspection.levelCrossingSide] ?? inspection.levelCrossingSide
+    : ''
+  const sideText = isPrefab
+    ? ''
+    : levelCrossingSideText
+      ? `${mainSideText} / ${levelCrossingPrefix}:${levelCrossingSideText}`
+      : mainSideText
+  const rangeText = isPrefab ? '' : formatPKRange(inspection.startPk, inspection.endPk)
   const localisation = isPrefab
     ? `${roadText} · ${phaseText}`
     : `${roadText} · ${phaseText} · ${sideText} · ${rangeText}`

@@ -34,6 +34,11 @@ enum IntervalSide {
   RIGHT
 }
 
+enum LevelCrossingSide {
+  LEFT
+  RIGHT
+}
+
 enum EmploymentStatus {
   ACTIVE
   TERMINATED
@@ -325,6 +330,7 @@ model PhaseInterval {
   phase           RoadPhase        @relation(fields: [phaseId], references: [id], onDelete: Cascade)
   locationRoadId  Int?
   locationRoad    RoadSection?     @relation("PhaseIntervalLocationRoad", fields: [locationRoadId], references: [id], onDelete: SetNull)
+  levelCrossingSide LevelCrossingSide?
   startPk         Float
   endPk           Float
   side            IntervalSide
@@ -337,6 +343,7 @@ model PhaseInterval {
   updatedAt       DateTime         @updatedAt
 
   @@index([locationRoadId])
+  @@index([levelCrossingSide])
 }
 
 model InspectionRequest {
@@ -345,6 +352,7 @@ model InspectionRequest {
   road            RoadSection      @relation(fields: [roadId], references: [id], onDelete: Cascade)
   locationRoadId  Int?
   locationRoad    RoadSection?     @relation("InspectionRequestLocationRoad", fields: [locationRoadId], references: [id], onDelete: SetNull)
+  levelCrossingSide LevelCrossingSide?
   phaseId         Int
   phase           RoadPhase        @relation(fields: [phaseId], references: [id], onDelete: Cascade)
   side            IntervalSide
@@ -369,6 +377,7 @@ model InspectionRequest {
 
   @@index([phaseId, status, updatedAt])
   @@index([locationRoadId])
+  @@index([levelCrossingSide])
 }
 
 model Document {
@@ -430,6 +439,7 @@ model InspectionEntry {
   road            RoadSection      @relation("InspectionEntryRoad", fields: [roadId], references: [id], onDelete: Cascade)
   locationRoadId  Int?
   locationRoad    RoadSection?     @relation("InspectionEntryLocationRoad", fields: [locationRoadId], references: [id], onDelete: SetNull)
+  levelCrossingSide LevelCrossingSide?
   phaseId         Int
   phase           RoadPhase        @relation(fields: [phaseId], references: [id], onDelete: Cascade)
   side            IntervalSide
@@ -456,6 +466,7 @@ model InspectionEntry {
 
   @@index([roadId, phaseId, side, startPk, endPk, status])
   @@index([locationRoadId])
+  @@index([levelCrossingSide])
   @@index([documentId])
 }
 

@@ -2,6 +2,7 @@ import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import type {
   IntervalSide,
+  LevelCrossingSide,
   PhaseDTO,
   RoadPhaseProgressDTO,
   RoadSectionDTO,
@@ -127,11 +128,17 @@ const calcCompletedLinearLength = (
   }, 0)
 }
 
-const buildPointStructureKey = (startPk: number, endPk: number, side: string, locationRoadId?: number | null) => {
+const buildPointStructureKey = (
+  startPk: number,
+  endPk: number,
+  side: string,
+  locationRoadId?: number | null,
+  levelCrossingSide?: LevelCrossingSide | null,
+) => {
   const [start, end] = normalizeSegment(startPk, endPk)
   const startKey = Math.round(start * 1000)
   const endKey = Math.round(end * 1000)
-  return `${startKey}-${endKey}-${side ?? 'BOTH'}-${locationRoadId ?? 'default'}`
+  return `${startKey}-${endKey}-${side ?? 'BOTH'}-${locationRoadId ?? 'default'}-${levelCrossingSide ?? 'default'}`
 }
 
 const resolvePhaseLayers = (phase: {
@@ -171,18 +178,39 @@ const resolveIntervalLayers = (
 }
 
 const buildIntervalLayerMap = (
-  intervals: { startPk: number; endPk: number; side: string; locationRoadId?: number | null; layers?: string[] | null; layerIds?: number[] | null }[],
+  intervals: {
+    startPk: number
+    endPk: number
+    side: string
+    locationRoadId?: number | null
+    levelCrossingSide?: LevelCrossingSide | null
+    layers?: string[] | null
+    layerIds?: number[] | null
+  }[],
   fallbackLayers: string[],
   layerNameById: Map<number, string>,
 ) => {
   const map = new Map<
     string,
-    { startPk: number; endPk: number; side: IntervalSide; layers: string[]; locationRoadId?: number | null }
+    {
+      startPk: number
+      endPk: number
+      side: IntervalSide
+      layers: string[]
+      locationRoadId?: number | null
+      levelCrossingSide?: LevelCrossingSide | null
+    }
   >()
   intervals.forEach((interval) => {
     const [start, end] = normalizeSegment(interval.startPk, interval.endPk)
     const side = (interval.side ?? 'BOTH') as IntervalSide
-    const key = buildPointStructureKey(start, end, side, interval.locationRoadId ?? null)
+    const key = buildPointStructureKey(
+      start,
+      end,
+      side,
+      interval.locationRoadId ?? null,
+      interval.levelCrossingSide ?? null,
+    )
     if (!key) return
     const layers = resolveIntervalLayers(interval, fallbackLayers, layerNameById)
     map.set(key, {
@@ -190,6 +218,7 @@ const buildIntervalLayerMap = (
       endPk: end,
       side,
       locationRoadId: interval.locationRoadId ?? null,
+      levelCrossingSide: interval.levelCrossingSide ?? null,
       layers: layers.map((layer) => normalizeLabel(canonicalizeSingle('layer', layer))).filter(Boolean),
     })
   })
@@ -266,14 +295,41 @@ const ensureIntervalSide = (value?: string | null): IntervalSide =>
   value === 'LEFT' || value === 'RIGHT' || value === 'BOTH' ? value : 'BOTH'
 
 const buildInspectionRangesFromEntries = (
-  entries: { startPk: number; endPk: number; side: string; locationRoadId?: number | null }[],
+  entries: {
+    startPk: number
+    endPk: number
+    side: string
+    locationRoadId?: number | null
+    levelCrossingSide?: LevelCrossingSide | null
+  }[],
 ) => {
-  const map = new Map<string, { startPk: number; endPk: number; side: IntervalSide }>()
+  const map = new Map<
+    string,
+    {
+      startPk: number
+      endPk: number
+      side: IntervalSide
+      locationRoadId?: number | null
+      levelCrossingSide?: LevelCrossingSide | null
+    }
+  >()
   entries.forEach((entry) => {
-    const key = buildPointStructureKey(entry.startPk, entry.endPk, entry.side, entry.locationRoadId ?? null)
+    const key = buildPointStructureKey(
+      entry.startPk,
+      entry.endPk,
+      entry.side,
+      entry.locationRoadId ?? null,
+      entry.levelCrossingSide ?? null,
+    )
     if (!key || map.has(key)) return
     const [start, end] = normalizeSegment(entry.startPk, entry.endPk)
-    map.set(key, { startPk: start, endPk: end, side: ensureIntervalSide(entry.side) })
+    map.set(key, {
+      startPk: start,
+      endPk: end,
+      side: ensureIntervalSide(entry.side),
+      locationRoadId: entry.locationRoadId ?? null,
+      levelCrossingSide: entry.levelCrossingSide ?? null,
+    })
   })
   return Array.from(map.values())
 }
@@ -292,10 +348,25 @@ const isSubbasePhase = (phase: {
 }
 
 const calcCompletedPointStructures = (
-  entries: { startPk: number; endPk: number; side: string; layerName: string; checkName: string; locationRoadId?: number | null }[],
+  entries: {
+    startPk: number
+    endPk: number
+    side: string
+    layerName: string
+    checkName: string
+    locationRoadId?: number | null
+    levelCrossingSide?: LevelCrossingSide | null
+  }[],
   intervalLayers: Map<
     string,
-    { startPk: number; endPk: number; side: IntervalSide; layers: string[]; locationRoadId?: number | null }
+    {
+      startPk: number
+      endPk: number
+      side: IntervalSide
+      layers: string[]
+      locationRoadId?: number | null
+      levelCrossingSide?: LevelCrossingSide | null
+    }
   >,
   workflow?: WorkflowBinding | null,
 ) => {
@@ -306,7 +377,13 @@ const calcCompletedPointStructures = (
 
   const entriesByStructure = new Map<string, Array<{ layerKey: string; checkKey: string }>>()
   entries.forEach((entry) => {
-    const key = buildPointStructureKey(entry.startPk, entry.endPk, entry.side, entry.locationRoadId ?? null)
+    const key = buildPointStructureKey(
+      entry.startPk,
+      entry.endPk,
+      entry.side,
+      entry.locationRoadId ?? null,
+      entry.levelCrossingSide ?? null,
+    )
     if (!key) return
     const layerKey = normalizeLabel(canonicalizeSingle('layer', entry.layerName))
     const checkKey = normalizeLabel(canonicalizeSingle('check', entry.checkName))
@@ -335,7 +412,13 @@ const calcCompletedPointStructures = (
         ? (['BOTH', 'LEFT', 'RIGHT'] as string[])
         : ([interval.side, 'BOTH'] as string[])
     candidateSides.forEach((candidateSide) => {
-      const key = buildPointStructureKey(interval.startPk, interval.endPk, candidateSide, interval.locationRoadId ?? null)
+      const key = buildPointStructureKey(
+        interval.startPk,
+        interval.endPk,
+        candidateSide,
+        interval.locationRoadId ?? null,
+        interval.levelCrossingSide ?? null,
+      )
       if (!key) return
       const structureEntries = entriesByStructure.get(key) ?? []
       structureEntries.forEach((entry) => {
@@ -375,7 +458,16 @@ export const listRoadSectionsWithProgress = async (): Promise<RoadSectionProgres
           inspections: {
             where: { status: { in: ['SCHEDULED', 'SUBMITTED', 'IN_PROGRESS', 'APPROVED'] } },
             orderBy: { updatedAt: 'desc' },
-            select: { startPk: true, endPk: true, side: true, layers: true, updatedAt: true, status: true, locationRoadId: true },
+            select: {
+              startPk: true,
+              endPk: true,
+              side: true,
+              layers: true,
+              updatedAt: true,
+              status: true,
+              locationRoadId: true,
+              levelCrossingSide: true,
+            },
           },
           entries: {
             where: { status: 'APPROVED' },
@@ -386,6 +478,7 @@ export const listRoadSectionsWithProgress = async (): Promise<RoadSectionProgres
               layerName: true,
               checkName: true,
               locationRoadId: true,
+              levelCrossingSide: true,
             },
           },
           intervals: {
@@ -397,6 +490,7 @@ export const listRoadSectionsWithProgress = async (): Promise<RoadSectionProgres
               layers: true,
               layerIds: true,
               locationRoadId: true,
+              levelCrossingSide: true,
             },
           },
           layerLinks: {
@@ -479,7 +573,17 @@ export const listRoadSectionsWithProgress = async (): Promise<RoadSectionProgres
       const intervalLayerMap =
         phase.measure === 'POINT' || phase.measure === 'LINEAR'
           ? buildIntervalLayerMap(phase.intervals ?? [], resolvedLayers, layerNameById)
-          : new Map<string, { startPk: number; endPk: number; side: IntervalSide; layers: string[]; locationRoadId?: number | null }>()
+          : new Map<
+              string,
+              {
+                startPk: number
+                endPk: number
+                side: IntervalSide
+                layers: string[]
+                locationRoadId?: number | null
+                levelCrossingSide?: LevelCrossingSide | null
+              }
+            >()
       const stageByLayer = phase.measure === 'LINEAR' ? buildWorkflowStageByLayer(workflow) : new Map()
       const terminalLayerMap =
         phase.measure === 'LINEAR'
@@ -493,11 +597,23 @@ export const listRoadSectionsWithProgress = async (): Promise<RoadSectionProgres
       const filteredLinearEntries =
         phase.measure === 'LINEAR' && !isEarthworkPhase(phase)
           ? approvedEntries.filter((entry) => {
-              const key = buildPointStructureKey(entry.startPk, entry.endPk, entry.side, entry.locationRoadId ?? null)
+              const key = buildPointStructureKey(
+                entry.startPk,
+                entry.endPk,
+                entry.side,
+                entry.locationRoadId ?? null,
+                entry.levelCrossingSide ?? null,
+              )
               const candidateKey = key ?? ''
               const bothKey =
                 entry.side !== 'BOTH'
-                  ? buildPointStructureKey(entry.startPk, entry.endPk, 'BOTH', entry.locationRoadId ?? null)
+                  ? buildPointStructureKey(
+                      entry.startPk,
+                      entry.endPk,
+                      'BOTH',
+                      entry.locationRoadId ?? null,
+                      entry.levelCrossingSide ?? null,
+                    )
                   : null
               const terminalLayers =
                 terminalLayerMap.get(candidateKey) ??
@@ -524,6 +640,7 @@ export const listRoadSectionsWithProgress = async (): Promise<RoadSectionProgres
         endPk: interval.endPk,
         side: interval.side,
         locationRoadId: interval.locationRoadId ?? road.id,
+        levelCrossingSide: interval.levelCrossingSide ?? null,
         spec: interval.spec ?? null,
         layers: (interval as { layers?: string[] }).layers ?? [],
         layerIds: (interval as { layerIds?: number[] }).layerIds ?? [],
@@ -538,6 +655,7 @@ export const listRoadSectionsWithProgress = async (): Promise<RoadSectionProgres
                 endPk: inspection.endPk,
                 side: ensureIntervalSide(inspection.side),
                 locationRoadId: inspection.locationRoadId ?? road.id,
+                levelCrossingSide: inspection.levelCrossingSide ?? null,
               }))
       return {
         phaseId: phase.id,

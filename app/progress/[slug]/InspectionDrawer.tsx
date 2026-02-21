@@ -160,6 +160,7 @@ export function InspectionDrawer({
       checkId: check.id,
       checkName: check.name,
       locationRoadId: selectedSegment.locationRoadId ?? null,
+      levelCrossingSide: selectedSegment.levelCrossingSide ?? null,
       side,
       startPk: targetStart,
       endPk: targetEnd,
@@ -178,6 +179,7 @@ export function InspectionDrawer({
       checkId: null,
       checkName: check.name,
       locationRoadId: selectedSegment.locationRoadId ?? null,
+      levelCrossingSide: selectedSegment.levelCrossingSide ?? null,
       side,
       startPk: targetStart,
       endPk: targetEnd,
@@ -195,6 +197,7 @@ export function InspectionDrawer({
       checkId: check.id,
       checkName: check.name,
       locationRoadId: selectedSegment.locationRoadId ?? null,
+      levelCrossingSide: selectedSegment.levelCrossingSide ?? null,
       startPk: targetStart,
       endPk: targetEnd,
     })
@@ -211,6 +214,7 @@ export function InspectionDrawer({
       checkId: null,
       checkName: check.name,
       locationRoadId: selectedSegment.locationRoadId ?? null,
+      levelCrossingSide: selectedSegment.levelCrossingSide ?? null,
       startPk: targetStart,
       endPk: targetEnd,
     })
@@ -270,6 +274,14 @@ export function InspectionDrawer({
             <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200">
               {selectedSegment.sideLabel}
             </span>
+            {selectedSegment.levelCrossingSide ? (
+              <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200">
+                {t.inspection.levelCrossingSideLabel}：
+                {selectedSegment.levelCrossingSide === 'LEFT'
+                  ? t.inspection.sideLeft
+                  : t.inspection.sideRight}
+              </span>
+            ) : null}
             <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200">
               {formatPK(selectedSegment.start)} → {formatPK(selectedSegment.end)}
             </span>

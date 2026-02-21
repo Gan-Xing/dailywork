@@ -1,6 +1,7 @@
 import type {
   InspectionStatus,
   IntervalSide,
+  LevelCrossingSide,
   PhaseDTO,
   PhaseIntervalPayload,
   PhaseMeasure,
@@ -50,6 +51,10 @@ export const normalizePhaseDTO = (phase: PhaseDTO): PhaseDTO => ({
     endPk: Number(interval.endPk) || 0,
     side: interval.side,
     locationRoadId: interval.locationRoadId ?? null,
+    levelCrossingSide:
+      interval.levelCrossingSide === 'LEFT' || interval.levelCrossingSide === 'RIGHT'
+        ? interval.levelCrossingSide
+        : null,
     spec: interval.spec ?? null,
     layers: Array.isArray((interval as { layers?: string[] }).layers)
       ? ((interval as { layers?: string[] }).layers ?? []).filter(Boolean)
@@ -90,6 +95,7 @@ export type CheckStatusKeyInput = {
   checkId?: string | null | number
   checkName?: string | null
   locationRoadId?: number | null
+  levelCrossingSide?: LevelCrossingSide | null
   startPk: number
   endPk: number
 }
@@ -101,6 +107,7 @@ export const buildCheckStatusBaseKey = (input: CheckStatusKeyInput) => {
     normalizeEntityKey(input.layerId, input.layerName),
     normalizeEntityKey(input.checkId, input.checkName),
     `loc:${input.locationRoadId ?? 'default'}`,
+    `lcs:${input.levelCrossingSide ?? 'default'}`,
     `${start}-${end}`,
   ].join('|')
 }
@@ -140,6 +147,10 @@ export const normalizeInterval = (interval: PhaseIntervalPayload, measure: Phase
     endPk: orderedEnd,
     side: interval.side,
     locationRoadId: interval.locationRoadId ?? null,
+    levelCrossingSide:
+      interval.levelCrossingSide === 'LEFT' || interval.levelCrossingSide === 'RIGHT'
+        ? interval.levelCrossingSide
+        : null,
     spec: typeof interval.spec === 'string' && interval.spec.trim() ? interval.spec.trim() : null,
     layers: Array.isArray((interval as { layers?: string[] }).layers)
       ? ((interval as { layers?: string[] }).layers ?? []).filter(Boolean)
@@ -202,11 +213,15 @@ export const snapshotMatches =
     targetStart: number,
     targetEnd: number,
     targetLocationRoadId?: number | null,
+    targetLevelCrossingSide?: LevelCrossingSide | null,
   ) =>
   (snapshot: LatestPointInspection) => {
     if (snapshot.phaseId !== phaseId) return false
     if (targetLocationRoadId !== undefined && targetLocationRoadId !== null) {
       if ((snapshot.locationRoadId ?? null) !== targetLocationRoadId) return false
+    }
+    if (targetLevelCrossingSide !== undefined && targetLevelCrossingSide !== null) {
+      if ((snapshot.levelCrossingSide ?? null) !== targetLevelCrossingSide) return false
     }
     const [snapshotStart, snapshotEnd] = normalizeRange(snapshot.startPk, snapshot.endPk)
     const [targetStartOrdered, targetEndOrdered] = normalizeRange(targetStart, targetEnd)
@@ -221,7 +236,12 @@ export const mergeAdjacentSegments = (segments: Segment[]) => {
   const merged: Segment[] = []
   segments.forEach((seg) => {
     const last = merged[merged.length - 1]
-    const sameSpec = (last?.spec ?? null) === (seg.spec ?? null) && (last?.billQuantity ?? null) === (seg.billQuantity ?? null)
+    const sameSpec =
+      (last?.spec ?? null) === (seg.spec ?? null) &&
+      (last?.billQuantity ?? null) === (seg.billQuantity ?? null) &&
+      (last?.locationRoadId ?? null) === (seg.locationRoadId ?? null) &&
+      (last?.levelCrossingSide ?? null) === (seg.levelCrossingSide ?? null) &&
+      Boolean(last?.pointHasSides) === Boolean(seg.pointHasSides)
     if (last && last.status === seg.status && sameSpec && Math.abs(last.end - seg.start) < 1e-6) {
       merged[merged.length - 1] = { ...last, end: seg.end }
     } else {
@@ -256,6 +276,9 @@ export const applyInspectionStatuses = (segments: Segment[], inspections: Inspec
         if (design.locationRoadId !== null && design.locationRoadId !== undefined) {
           if ((insp.locationRoadId ?? null) !== design.locationRoadId) return false
         }
+        if (design.levelCrossingSide !== null && design.levelCrossingSide !== undefined) {
+          if ((insp.levelCrossingSide ?? null) !== design.levelCrossingSide) return false
+        }
         return Math.max(start, insp.startPk) < Math.min(end, insp.endPk)
       })
       if (overlaps.length) {
@@ -280,6 +303,8 @@ export const applyInspectionStatuses = (segments: Segment[], inspections: Inspec
       status,
       spec: design.spec,
       billQuantity: design.billQuantity,
+      locationRoadId: design.locationRoadId ?? null,
+      levelCrossingSide: design.levelCrossingSide ?? null,
       pointHasSides: design.pointHasSides,
     })
   }
@@ -309,6 +334,7 @@ export const buildLinearView = (
       spec: interval.spec,
       billQuantity: interval.billQuantity,
       locationRoadId: interval.locationRoadId ?? null,
+      levelCrossingSide: interval.levelCrossingSide ?? null,
       pointHasSides: Boolean(phase.pointHasSides),
     }
     if (interval.side === 'LEFT') left.push(baseSegment)

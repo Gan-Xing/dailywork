@@ -51,6 +51,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       side?: string
       spec?: string
       locationRoadId?: number
+      levelCrossingSide?: string
       billQuantity?: number
       layers?: string[]
     }[]
@@ -110,6 +111,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
               throw new Error('所属主路段不存在')
             }
             return locationRoadId
+          })(),
+          levelCrossingSide: (() => {
+            if (!isLevelCrossing) return null
+            const side = i.levelCrossingSide
+            if (side !== 'LEFT' && side !== 'RIGHT') {
+              throw new Error('平交路口区间必须选择平交路口侧别')
+            }
+            return side
           })(),
           layers: Array.isArray(i.layers) ? i.layers.filter(Boolean) : undefined,
           billQuantity:

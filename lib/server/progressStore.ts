@@ -1,4 +1,4 @@
-import { IntervalSide, PhaseMeasure, Prisma } from '@prisma/client'
+import { IntervalSide, LevelCrossingSide, PhaseMeasure, Prisma } from '@prisma/client'
 import type { CheckDefinition, LayerDefinition } from '@prisma/client'
 
 import type { CheckDefinitionDTO, LayerDefinitionDTO, PhaseDTO, PhaseDefinitionDTO, PhasePayload } from '@/lib/progressTypes'
@@ -16,6 +16,7 @@ type NormalizedInterval = {
   endPk: number
   side: IntervalSide
   locationRoadId: number | null
+  levelCrossingSide: LevelCrossingSide | null
   spec: string | null
   layers: string[]
   billQuantity: number | null
@@ -46,6 +47,11 @@ const normalizeInterval = (
     billValue === null || billValue === undefined ? null : Number(billValue)
   const rawLocationRoadId = (interval as { locationRoadId?: unknown }).locationRoadId
   const parsedLocationRoadId = Number(rawLocationRoadId)
+  const rawLevelCrossingSide = (interval as { levelCrossingSide?: unknown }).levelCrossingSide
+  const levelCrossingSide =
+    rawLevelCrossingSide === 'LEFT' || rawLevelCrossingSide === 'RIGHT'
+      ? rawLevelCrossingSide
+      : null
 
   const side = interval.side ?? 'BOTH'
   const normalizedSide =
@@ -63,6 +69,7 @@ const normalizeInterval = (
     endPk: ordered[1],
     side: normalizedSide as IntervalSide,
     locationRoadId,
+    levelCrossingSide,
     spec: spec || null,
     layers,
     billQuantity:
@@ -207,6 +214,7 @@ const mapPhaseToDTO = (
       endPk: i.endPk,
       side: i.side,
       locationRoadId: i.locationRoadId ?? phase.roadId,
+      levelCrossingSide: i.levelCrossingSide ?? null,
       spec: i.spec,
       layers: (i as { layers?: string[] }).layers ?? [],
       layerIds: i.layerIds ?? [],
@@ -367,15 +375,16 @@ export const createPhase = async (roadId: number, payload: PhasePayload) => {
           intervals: {
             create: normalizedIntervals.map((item, idx) => {
               const layerMetadata = intervalLayerData[idx]
-      return {
-        startPk: item.startPk,
-        endPk: item.endPk,
-        side: item.side,
-        locationRoadId: item.locationRoadId ?? undefined,
-        spec: item.spec || undefined,
-        layers: layerMetadata.layers,
-        layerIds: layerMetadata.layerIds,
-        billQuantity: item.billQuantity ?? undefined,
+              return {
+                startPk: item.startPk,
+                endPk: item.endPk,
+                side: item.side,
+                locationRoadId: item.locationRoadId ?? undefined,
+                levelCrossingSide: item.levelCrossingSide ?? undefined,
+                spec: item.spec || undefined,
+                layers: layerMetadata.layers,
+                layerIds: layerMetadata.layerIds,
+                billQuantity: item.billQuantity ?? undefined,
               }
             }),
           },
@@ -521,7 +530,15 @@ export const updatePhase = async (roadId: number, phaseId: number, payload: Phas
 
       const existingIntervals = await tx.phaseInterval.findMany({
         where: { phaseId },
-        select: { id: true, startPk: true, endPk: true, side: true, spec: true, locationRoadId: true },
+        select: {
+          id: true,
+          startPk: true,
+          endPk: true,
+          side: true,
+          spec: true,
+          locationRoadId: true,
+          levelCrossingSide: true,
+        },
       })
       const buildIntervalKey = (interval: {
         startPk: number
@@ -529,8 +546,9 @@ export const updatePhase = async (roadId: number, phaseId: number, payload: Phas
         side: IntervalSide
         spec?: string | null
         locationRoadId?: number | null
+        levelCrossingSide?: LevelCrossingSide | null
       }) =>
-        `${interval.startPk}|${interval.endPk}|${interval.side}|${interval.spec ?? ''}|${interval.locationRoadId ?? 'null'}`
+        `${interval.startPk}|${interval.endPk}|${interval.side}|${interval.spec ?? ''}|${interval.locationRoadId ?? 'null'}|${interval.levelCrossingSide ?? 'null'}`
       const existingByKey = new Map<string, number[]>()
       existingIntervals.forEach((interval) => {
         const key = buildIntervalKey(interval)
@@ -576,6 +594,7 @@ export const updatePhase = async (roadId: number, phaseId: number, payload: Phas
                 endPk: interval.endPk,
                 side: interval.side,
                 locationRoadId: interval.locationRoadId ?? undefined,
+                levelCrossingSide: interval.levelCrossingSide ?? undefined,
                 spec: interval.spec || undefined,
                 layers: interval.layerMetadata.layers,
                 layerIds: interval.layerMetadata.layerIds,
@@ -593,6 +612,7 @@ export const updatePhase = async (roadId: number, phaseId: number, payload: Phas
             endPk: interval.endPk,
             side: interval.side,
             locationRoadId: interval.locationRoadId ?? undefined,
+            levelCrossingSide: interval.levelCrossingSide ?? undefined,
             spec: interval.spec || undefined,
             layers: interval.layerMetadata.layers,
             layerIds: interval.layerMetadata.layerIds,

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 
-import type { InspectionStatus, IntervalSide } from '@prisma/client'
+import type { InspectionStatus, IntervalSide, LevelCrossingSide } from '@prisma/client'
 import { DocumentType } from '@prisma/client'
 import { getSessionUser, hasPermission } from '@/lib/server/authSession'
 import { canonicalizeProgressList } from '@/lib/i18n/progressDictionary'
@@ -11,6 +11,7 @@ type PatchPayload = {
   startPk?: number
   endPk?: number
   side?: IntervalSide
+  levelCrossingSide?: LevelCrossingSide | null
   layerName?: string
   checkName?: string
   types?: string[]
@@ -125,6 +126,10 @@ export async function POST(request: Request) {
           data: {
             phaseId: normalizedPatch.phaseId,
             side: normalizedPatch.side,
+            levelCrossingSide:
+              normalizedPatch.levelCrossingSide === undefined
+                ? undefined
+                : normalizedPatch.levelCrossingSide,
             startPk: normalizedPatch.startPk,
             endPk: normalizedPatch.endPk,
             layerName: normalizedPatch.layerName,

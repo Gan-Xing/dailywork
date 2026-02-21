@@ -111,6 +111,8 @@ export async function GET(request: Request) {
     phaseDefinitionIds: phaseDefinitionParams.length ? phaseDefinitionParams : undefined,
     status: statusParams.length ? statusParams : undefined,
     side: (searchParams.get('side') as 'LEFT' | 'RIGHT' | 'BOTH' | null) ?? undefined,
+    levelCrossingSide:
+      (searchParams.get('levelCrossingSide') as 'LEFT' | 'RIGHT' | null) ?? undefined,
     layerNames: layerParams.length ? layerParams : undefined,
     types: typeParams.length ? typeParams : undefined,
     checkId: searchParams.get('checkId') ? Number(searchParams.get('checkId')) : undefined,

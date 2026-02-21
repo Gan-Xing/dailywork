@@ -28,7 +28,13 @@ export interface RoadPhaseProgressDTO {
   completedLength: number
   completedPercent: number
   intervals: PhaseIntervalProgress[]
-  inspections: { startPk: number; endPk: number; side: IntervalSide; locationRoadId?: number | null }[]
+  inspections: {
+    startPk: number
+    endPk: number
+    side: IntervalSide
+    locationRoadId?: number | null
+    levelCrossingSide?: LevelCrossingSide | null
+  }[]
   updatedAt: string
 }
 
@@ -58,6 +64,7 @@ export interface InspectionFilter {
   phaseDefinitionId?: number
   status?: InspectionStatus[]
   side?: IntervalSide
+  levelCrossingSide?: LevelCrossingSide
   types?: string[]
   check?: string
   keyword?: string
@@ -86,6 +93,7 @@ export interface InspectionListItem {
   documentCode?: string | null
   submissionCode?: string | null
   side: IntervalSide
+  levelCrossingSide?: LevelCrossingSide | null
   startPk: number
   endPk: number
   layers: string[]
@@ -112,6 +120,7 @@ export interface InspectionListResponse {
 
 export type PhaseMeasure = 'LINEAR' | 'POINT'
 export type IntervalSide = 'BOTH' | 'LEFT' | 'RIGHT'
+export type LevelCrossingSide = 'LEFT' | 'RIGHT'
 export interface SubmissionDTO {
   id: number
   code: string
@@ -127,6 +136,7 @@ export interface InspectionEntryPayload {
   documentId?: number | null
   roadId: number
   locationRoadId?: number | null
+  levelCrossingSide?: LevelCrossingSide | null
   phaseId: number
   side: IntervalSide
   startPk: number
@@ -177,6 +187,7 @@ export interface InspectionEntryFilter {
   phaseDefinitionIds?: number[]
   status?: InspectionStatus[]
   side?: IntervalSide
+  levelCrossingSide?: LevelCrossingSide
   layerNames?: string[]
   types?: string[]
   checkId?: number
@@ -250,6 +261,7 @@ export interface PhaseIntervalPayload {
   endPk: number
   side: IntervalSide
   locationRoadId?: number | null
+  levelCrossingSide?: LevelCrossingSide | null
   spec?: string | null
   layers?: string[]
   layerIds?: number[]
@@ -261,6 +273,7 @@ export interface PhaseIntervalProgress {
   endPk: number
   side: IntervalSide
   locationRoadId?: number | null
+  levelCrossingSide?: LevelCrossingSide | null
   spec: string | null
   layers?: string[]
   layerIds: number[]
@@ -326,6 +339,7 @@ export interface InspectionPayload {
   startPk: number
   endPk: number
   side: IntervalSide
+  levelCrossingSide?: LevelCrossingSide | null
   layers: string[]
   checks: string[]
   types: string[]
@@ -345,6 +359,7 @@ export interface InspectionBulkPayload {
   startPk?: number
   endPk?: number
   side?: IntervalSide
+  levelCrossingSide?: LevelCrossingSide | null
   layers?: string[]
   checks?: string[]
   types?: string[]

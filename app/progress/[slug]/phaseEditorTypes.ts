@@ -2,6 +2,7 @@ import type { AlertTone } from '@/components/AlertDialog'
 import type {
   InspectionStatus,
   IntervalSide,
+  LevelCrossingSide,
   PhaseDTO,
   PhaseDefinitionDTO,
   PhaseMeasure,
@@ -28,6 +29,7 @@ export type InspectionSlice = {
   startPk: number
   endPk: number
   locationRoadId?: number | null
+  levelCrossingSide?: LevelCrossingSide | null
   status: InspectionStatus
   updatedAt: number
 }
@@ -40,6 +42,7 @@ export type LatestPointInspection = {
   checkId?: string | null
   checkName?: string | null
   side: IntervalSide
+  levelCrossingSide?: LevelCrossingSide | null
   startPk: number
   endPk: number
   locationRoadId?: number | null
@@ -54,6 +57,7 @@ export interface Segment {
   spec?: string | null
   billQuantity?: number | null
   locationRoadId?: number | null
+  levelCrossingSide?: LevelCrossingSide | null
   workflow?: WorkflowBinding
   workflowLayers?: WorkflowLayerTemplate[]
   workflowTypeOptions?: string[]
@@ -87,6 +91,7 @@ export interface PointView {
     spec?: string | null
     billQuantity?: number | null
     locationRoadId?: number | null
+    levelCrossingSide?: LevelCrossingSide | null
     layers?: string[]
   }[]
 }
@@ -104,6 +109,7 @@ export interface SelectedSegment {
   spec?: string | null
   billQuantity?: number | null
   locationRoadId?: number | null
+  levelCrossingSide?: LevelCrossingSide | null
   workflow?: WorkflowBinding
   workflowLayers?: WorkflowLayerTemplate[]
   workflowTypeOptions?: string[]
@@ -142,6 +148,7 @@ export type InspectionSubmitBatch = {
 export type InspectionEntrySubmitPayload = {
   roadId: number
   locationRoadId?: number | null
+  levelCrossingSide?: LevelCrossingSide | null
   phaseId: number
   side: IntervalSide
   startPk: number

@@ -109,6 +109,7 @@ export function usePhaseManagement({
       layers: [],
       billQuantity: null,
       locationRoadId: defaultLocationRoadId,
+      levelCrossingSide: null,
     },
   ])
   const [error, setError] = useState<string | null>(null)
@@ -192,6 +193,7 @@ export function usePhaseManagement({
       layers: defaultLayers,
       billQuantity: null,
       locationRoadId: defaultLocationRoadId,
+      levelCrossingSide: null,
     }),
     [defaultLayers, defaultLocationRoadId, roadEnd, roadStart],
   )
@@ -289,6 +291,7 @@ export function usePhaseManagement({
         layers: Array.isArray(i.layers) ? i.layers : [],
         billQuantity: i.billQuantity ?? null,
         locationRoadId: i.locationRoadId ?? defaultLocationRoadId,
+        levelCrossingSide: i.levelCrossingSide ?? null,
       })),
     )
     setPointHasSides(Boolean(normalized.pointHasSides))
@@ -321,6 +324,14 @@ export function usePhaseManagement({
         })
         if (missingLocation) {
           setError(t.errors.locationRoadMissing ?? t.errors.invalidRange)
+          return
+        }
+        const missingLevelCrossingSide = intervals.some((item) => {
+          const side = item.levelCrossingSide
+          return side !== 'LEFT' && side !== 'RIGHT'
+        })
+        if (missingLevelCrossingSide) {
+          setError(t.errors.levelCrossingSideMissing ?? t.errors.invalidRange)
           return
         }
       }
@@ -360,12 +371,17 @@ export function usePhaseManagement({
         const locationRoadId = isLevelCrossing
           ? (Number.isFinite(Number(item.locationRoadId)) ? Number(item.locationRoadId) : null)
           : road.id
+        const levelCrossingSide =
+          isLevelCrossing && (item.levelCrossingSide === 'LEFT' || item.levelCrossingSide === 'RIGHT')
+            ? item.levelCrossingSide
+            : null
         return {
           id: item.id,
           startPk,
           endPk,
           side: item.side,
           locationRoadId,
+          levelCrossingSide,
           spec: spec || undefined,
           layers,
           layerIds,

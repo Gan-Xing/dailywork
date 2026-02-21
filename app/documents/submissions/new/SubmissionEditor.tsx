@@ -112,6 +112,12 @@ export default function SubmissionEditor({ initialSubmission, canManage = false,
     return `PK${km}+${String(m).padStart(3, '0')}`
   }
 
+  const formatPkRange = (startPk: number, endPk: number) => {
+    const startText = formatPk(startPk)
+    const endText = formatPk(endPk)
+    return startText === endText ? startText : `${startText} → ${endText}`
+  }
+
   const getRawLayers = (inspection: InspectionListItem) => {
     if (inspection.layers && inspection.layers.length) return inspection.layers
     const layer = (inspection as any).layerName
@@ -154,14 +160,18 @@ export default function SubmissionEditor({ initialSubmission, canManage = false,
     const locale: Locale = 'fr' // 对齐 PDF 默认法语导出
     const sideLabelMap: Record<string, string> = { LEFT: 'Gauche', RIGHT: 'Droite', BOTH: 'Deux côtés' }
     const sideLabel = sideLabelMap[inspection.side] ?? inspection.side
-    const rangeText = `${formatPk(inspection.startPk)} → ${formatPk(inspection.endPk)}`
+    const levelCrossingSideLabel = inspection.levelCrossingSide
+      ? sideLabelMap[inspection.levelCrossingSide] ?? inspection.levelCrossingSide
+      : null
+    const combinedSide = levelCrossingSideLabel ? `${sideLabel} / Amorce:${levelCrossingSideLabel}` : sideLabel
+    const rangeText = formatPkRange(inspection.startPk, inspection.endPk)
     const displayRoad = {
       slug: inspection.locationRoadSlug ?? inspection.roadSlug,
       name: inspection.locationRoadName ?? inspection.roadName,
     }
     const roadText = resolveRoadName(displayRoad, locale)
     const phaseText = localizeProgressTerm('phase', normalizeInspectionToken(inspection.phaseName), locale)
-    const localisation = `${roadText} · ${phaseText} · ${sideLabel} · ${rangeText}`
+    const localisation = `${roadText} · ${phaseText} · ${combinedSide} · ${rangeText}`
     const rawLayers = splitInspectionTokens(getRawLayers(inspection))
     const rawChecks = splitInspectionTokens(getRawChecks(inspection))
     const layers = localizeProgressList('layer', rawLayers, locale, { phaseName: inspection.phaseName })
@@ -182,7 +192,14 @@ export default function SubmissionEditor({ initialSubmission, canManage = false,
 
     const [roadPart, phasePart, sidePart, ...rangeParts] = headParts
     const rangePart = rangeParts.join(' · ').trim()
-    if (!rangePart || !/^PK\d+\+\d{3}\s*→\s*PK\d+\+\d{3}$/i.test(rangePart)) return designation ?? ''
+    const rangeMatch = rangePart.match(/^(PK\d+\+\d{3})(?:\s*→\s*(PK\d+\+\d{3}))?$/i)
+    if (!rangeMatch) return designation ?? ''
+    const normalizedRangeStart = rangeMatch[1].toUpperCase()
+    const normalizedRangeEnd = rangeMatch[2]?.toUpperCase()
+    const normalizedRangePart =
+      normalizedRangeEnd && normalizedRangeEnd !== normalizedRangeStart
+        ? `${normalizedRangeStart} → ${normalizedRangeEnd}`
+        : normalizedRangeStart
 
     const normalizedPhase = localizeProgressTerm('phase', normalizeInspectionToken(phasePart), 'fr')
     const normalizedRoad = resolveRoadName({ name: roadPart }, 'fr')
@@ -199,7 +216,7 @@ export default function SubmissionEditor({ initialSubmission, canManage = false,
     }
     const normalizedSide = sideMap[sidePart] ?? sidePart
 
-    const normalizedHead = [normalizedRoad, normalizedPhase, normalizedSide, rangePart].join(' · ')
+    const normalizedHead = [normalizedRoad, normalizedPhase, normalizedSide, normalizedRangePart].join(' · ')
 
     const normalizedBody = lines
       .slice(1)
@@ -481,6 +498,7 @@ export default function SubmissionEditor({ initialSubmission, canManage = false,
           locationKey,
           inspection.phaseId,
           inspection.side,
+          inspection.levelCrossingSide ?? 'null',
           inspection.startPk,
           inspection.endPk,
           layerKey,

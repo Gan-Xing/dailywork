@@ -214,6 +214,8 @@ type PhaseCopy = {
     intervalSpec: string
     intervalLocationRoad: string
     intervalLocationRoadPlaceholder: string
+    intervalLevelCrossingSide: string
+    intervalLevelCrossingSidePlaceholder: string
     intervalBillQuantity: string
     sideBoth: string
     sideLeft: string
@@ -282,6 +284,7 @@ type PhaseCopy = {
   errors: {
     invalidRange: string
     locationRoadMissing: string
+    levelCrossingSideMissing: string
     definitionMissing: string
     saveFailed: string
     deleteFailed: string
@@ -300,6 +303,7 @@ type PhaseCopy = {
   inspection: {
     title: string
     sideLabel: string
+    levelCrossingSideLabel: string
     sideBoth: string
     sideLeft: string
     sideRight: string
@@ -713,6 +717,8 @@ const progressCopy: Record<Locale, ProgressCopy> = {
         intervalSpec: '规格',
         intervalLocationRoad: '所属主路段',
         intervalLocationRoadPlaceholder: '选择主路段',
+        intervalLevelCrossingSide: '平交路口侧别',
+        intervalLevelCrossingSidePlaceholder: '选择平交侧别',
         intervalBillQuantity: '计量工程量',
         sideBoth: '双侧',
         sideLeft: '左侧',
@@ -785,24 +791,26 @@ const progressCopy: Record<Locale, ProgressCopy> = {
       errors: {
         invalidRange: '请填写有效的起点/终点',
         locationRoadMissing: '请选择所属主路段',
+        levelCrossingSideMissing: '请选择平交路口侧别',
         saveFailed: '保存失败',
         deleteFailed: '删除失败',
-      submitRangeInvalid: '请输入有效的起点和终点',
-      submitLayerMissing: '请选择至少一个层次',
-      submitCheckMissing: '请选择至少一个验收内容',
-      submitTypeMissing: '请选择至少一个验收类型',
-      submitAppointmentMissing: '请选择预约日期',
-      submitSubmissionNumberInvalid: '提交单编号需为数字（可留空）',
-      submitFailed: '提交失败',
-      definitionMissing: '请选择分项模板',
-    },
-    success: {
-      created: '分项「{name}」已创建',
-      updated: '分项「{name}」已更新',
-    },
+        submitRangeInvalid: '请输入有效的起点和终点',
+        submitLayerMissing: '请选择至少一个层次',
+        submitCheckMissing: '请选择至少一个验收内容',
+        submitTypeMissing: '请选择至少一个验收类型',
+        submitAppointmentMissing: '请选择预约日期',
+        submitSubmissionNumberInvalid: '提交单编号需为数字（可留空）',
+        submitFailed: '提交失败',
+        definitionMissing: '请选择分项模板',
+      },
+      success: {
+        created: '分项「{name}」已创建',
+        updated: '分项「{name}」已更新',
+      },
       inspection: {
         title: '预约报检',
         sideLabel: '侧别',
+        levelCrossingSideLabel: '平交路口侧别',
         sideBoth: '双侧',
         sideLeft: '左侧',
         sideRight: '右侧',
@@ -1325,6 +1333,8 @@ const progressCopy: Record<Locale, ProgressCopy> = {
         intervalSpec: 'Spécification',
         intervalLocationRoad: 'Tronçon principal',
         intervalLocationRoadPlaceholder: 'Sélectionner le tronçon',
+        intervalLevelCrossingSide: 'Côté du carrefour',
+        intervalLevelCrossingSidePlaceholder: 'Sélectionner le côté du carrefour',
         intervalBillQuantity: 'Quantité métrée',
         sideBoth: 'Deux côtés',
         sideLeft: 'Gauche',
@@ -1398,6 +1408,7 @@ const progressCopy: Record<Locale, ProgressCopy> = {
       errors: {
         invalidRange: 'Renseignez un début/fin valides',
         locationRoadMissing: 'Sélectionnez le tronçon principal',
+        levelCrossingSideMissing: 'Sélectionnez le côté du carrefour',
         saveFailed: "Échec de l'enregistrement",
         deleteFailed: 'Échec de la suppression',
         submitRangeInvalid: 'Début/fin invalides',
@@ -1416,6 +1427,7 @@ const progressCopy: Record<Locale, ProgressCopy> = {
       inspection: {
         title: 'Demande de réception',
         sideLabel: 'Côté',
+        levelCrossingSideLabel: 'Côté du carrefour',
         sideBoth: 'Deux côtés',
         sideLeft: 'Gauche',
         sideRight: 'Droite',

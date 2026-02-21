@@ -7,6 +7,7 @@ import type {
   InspectionListItem,
   InspectionStatus,
   IntervalSide,
+  LevelCrossingSide,
   RoadSectionWithPhasesDTO,
 } from '@/lib/progressTypes'
 import { resolveRoadName } from '@/lib/i18n/roadDictionary'
@@ -185,6 +186,7 @@ const mapEntryToListItem = (entry: InspectionEntryDTO): InspectionListItem => {
     documentCode: entry.documentCode ?? undefined,
     submissionNumber: entry.submissionNumber ?? null,
     side: entry.side,
+    levelCrossingSide: entry.levelCrossingSide ?? null,
     startPk: entry.startPk,
     endPk: entry.endPk,
     layers: entry.layerName ? [entry.layerName] : [],
@@ -227,6 +229,13 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
     LEFT: copy.filters.sideLeft,
     RIGHT: copy.filters.sideRight,
     BOTH: copy.filters.sideBoth,
+  }
+  const levelCrossingSidePrefix = locale === 'fr' ? 'Amorce' : '平交'
+  const formatSideText = (side: IntervalSide, levelCrossingSide?: LevelCrossingSide | null) => {
+    const mainSide = sideCopy[side] ?? side
+    if (!levelCrossingSide) return mainSide
+    const crossingSide = sideCopy[levelCrossingSide] ?? levelCrossingSide
+    return `${mainSide} · ${levelCrossingSidePrefix}:${crossingSide}`
   }
   const prefabRoadLabel = copy.prefabRoadName
   const formatPhaseDefinitionLabel = useCallback(
@@ -1262,7 +1271,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
             case 'phase':
               return item.phaseName ? localizeProgressTerm('phase', item.phaseName, locale) : '—'
             case 'side':
-              return isPrefab ? '—' : sideCopy[item.side] ?? item.side
+              return isPrefab ? '—' : formatSideText(item.side, item.levelCrossingSide)
             case 'range':
               return isPrefab ? '—' : `${formatPK(item.startPk)} → ${formatPK(item.endPk)}`
             case 'layers':
@@ -1781,8 +1790,8 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                     const roadText = isPrefab
                       ? prefabRoadLabel
                       : formatRoadName(displayRoad.slug, displayRoad.name)
-                    const sideText = isPrefab ? '—' : sideCopy[item.side] ?? item.side
-    const rangeText = isPrefab ? '—' : `${formatPK(item.startPk)} → ${formatPK(item.endPk)}`
+                    const sideText = isPrefab ? '—' : formatSideText(item.side, item.levelCrossingSide)
+                    const rangeText = isPrefab ? '—' : `${formatPK(item.startPk)} → ${formatPK(item.endPk)}`
                     const layersText = normalizeLayerLabels(
                       Array.isArray(item.layers) ? item.layers : [],
                       item.phaseName,
@@ -1793,8 +1802,8 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
                     const submittedByText = item.submittedBy?.username ?? '—'
                     const createdByText = item.createdBy?.username ?? '—'
                     const updatedByText = item.updatedBy?.username ?? '—'
-                  const remarkText = item.remark ?? '—'
-                  return (
+                    const remarkText = item.remark ?? '—'
+                    return (
                     <tr
                       key={item.id}
                       className={`border-t border-slate-200 transition ${isRowSelected ? 'bg-emerald-400/10' : 'bg-white/0'} hover:bg-white`}
@@ -2021,7 +2030,7 @@ export function InspectionBoard({ roads, loadError, canBulkEdit }: Props) {
           >
             {(() => {
               const isPrefab = isPrefabItem(selected)
-              const sideText = isPrefab ? '—' : sideCopy[selected.side] ?? selected.side
+              const sideText = isPrefab ? '—' : formatSideText(selected.side, selected.levelCrossingSide)
               const rangeText = isPrefab ? '—' : `${formatPK(selected.startPk)} → ${formatPK(selected.endPk)}`
               const displayRoad = resolveDisplayRoad(selected)
               const roadText = isPrefab ? prefabRoadLabel : formatRoadName(displayRoad.slug, displayRoad.name)

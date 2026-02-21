@@ -2,7 +2,14 @@
 
 import type { RefObject } from 'react'
 
-import type { IntervalSide, PhaseDefinitionDTO, PhaseIntervalPayload, PhaseMeasure, RoadSectionDTO } from '@/lib/progressTypes'
+import type {
+  IntervalSide,
+  LevelCrossingSide,
+  PhaseDefinitionDTO,
+  PhaseIntervalPayload,
+  PhaseMeasure,
+  RoadSectionDTO,
+} from '@/lib/progressTypes'
 import type { Locale } from '@/lib/i18n'
 import type { getProgressCopy } from '@/lib/i18n/progress'
 import { formatProgressCopy } from '@/lib/i18n/progress'
@@ -27,6 +34,7 @@ export interface PhaseFormModalProps {
   isLevelCrossing: boolean
   locationRoadOptions: RoadSectionDTO[]
   sideOptions: { value: IntervalSide; label: string }[]
+  levelCrossingSideOptions: { value: LevelCrossingSide; label: string }[]
   defaultLayers: string[]
   layerOptions: string[]
   isPending: boolean
@@ -62,6 +70,7 @@ export function PhaseFormModal({
   isLevelCrossing,
   locationRoadOptions,
   sideOptions,
+  levelCrossingSideOptions,
   defaultLayers,
   layerOptions,
   isPending,
@@ -216,7 +225,7 @@ export function PhaseFormModal({
                   <div
                     key={index}
                     className={`grid grid-cols-1 gap-3 rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-700 md:items-center ${
-                      isLevelCrossing ? 'md:grid-cols-7' : 'md:grid-cols-6'
+                      isLevelCrossing ? 'md:grid-cols-8' : 'md:grid-cols-6'
                     }`}
                   >
                     <label className="flex flex-col items-center gap-1 text-center">
@@ -289,6 +298,31 @@ export function PhaseFormModal({
                         </select>
                       </label>
                     ) : null}
+                    {isLevelCrossing ? (
+                      <label className="flex flex-col items-center gap-1 text-center">
+                        {t.form.intervalLevelCrossingSide}
+                        <select
+                          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-emerald-300 focus:outline-none"
+                          value={item.levelCrossingSide ?? ''}
+                          onChange={(e) =>
+                            onIntervalChange(index, {
+                              levelCrossingSide:
+                                e.target.value === ''
+                                  ? null
+                                  : (e.target.value as LevelCrossingSide),
+                            })
+                          }
+                          required={isLevelCrossing}
+                        >
+                          <option value="">{t.form.intervalLevelCrossingSidePlaceholder}</option>
+                          {levelCrossingSideOptions.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    ) : null}
                     <div className="md:col-span-2 flex flex-col gap-3 md:flex-row md:items-center md:gap-3">
                       <label className="flex w-full flex-col items-center gap-1 text-center md:mb-0">
                         {t.form.intervalBillQuantity}
@@ -314,7 +348,7 @@ export function PhaseFormModal({
                       ) : null}
                     </div>
                     {measure === 'POINT' && layerOptions.length ? (
-                      <div className="md:col-span-6 flex flex-wrap gap-2">
+                      <div className={`${isLevelCrossing ? 'md:col-span-8' : 'md:col-span-6'} flex flex-wrap gap-2`}>
                         {(layerOptions.length ? layerOptions : defaultLayers).map((layer) => {
                           const selected =
                             (item.layers?.length ? item.layers : defaultLayers).some(

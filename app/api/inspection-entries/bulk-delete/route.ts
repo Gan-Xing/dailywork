@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 
 import { getSessionUser, hasPermission } from '@/lib/server/authSession'
-import type { IntervalSide } from '@prisma/client'
+import type { IntervalSide, LevelCrossingSide } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 
 export async function POST(request: Request) {
@@ -34,21 +34,40 @@ export async function POST(request: Request) {
   try {
     const seedEntries = await prisma.inspectionEntry.findMany({
       where: { id: { in: ids } },
-      select: { roadId: true, locationRoadId: true, phaseId: true, side: true, startPk: true, endPk: true, documentId: true },
+      select: {
+        roadId: true,
+        locationRoadId: true,
+        levelCrossingSide: true,
+        phaseId: true,
+        side: true,
+        startPk: true,
+        endPk: true,
+        documentId: true,
+      },
     })
     if (!seedEntries.length) {
       return NextResponse.json({ message: '未找到需要删除的报检明细' }, { status: 404 })
     }
     const groupMap = new Map<
       string,
-      { roadId: number; locationRoadId: number | null; phaseId: number; side: IntervalSide; startPk: number; endPk: number; documentId: number | null }
+      {
+        roadId: number
+        locationRoadId: number | null
+        levelCrossingSide: LevelCrossingSide | null
+        phaseId: number
+        side: IntervalSide
+        startPk: number
+        endPk: number
+        documentId: number | null
+      }
     >()
     seedEntries.forEach((entry) => {
-      const key = `${entry.roadId}:${entry.locationRoadId ?? 'null'}:${entry.phaseId}:${entry.side}:${entry.startPk}:${entry.endPk}:${entry.documentId ?? 'null'}`
+      const key = `${entry.roadId}:${entry.locationRoadId ?? 'null'}:${entry.levelCrossingSide ?? 'null'}:${entry.phaseId}:${entry.side}:${entry.startPk}:${entry.endPk}:${entry.documentId ?? 'null'}`
       if (!groupMap.has(key)) {
         groupMap.set(key, {
           roadId: entry.roadId,
           locationRoadId: entry.locationRoadId ?? null,
+          levelCrossingSide: entry.levelCrossingSide ?? null,
           phaseId: entry.phaseId,
           side: entry.side,
           startPk: entry.startPk,
@@ -60,6 +79,7 @@ export async function POST(request: Request) {
     const groupFilters = Array.from(groupMap.values()).map((entry) => ({
       roadId: entry.roadId,
       locationRoadId: entry.locationRoadId,
+      levelCrossingSide: entry.levelCrossingSide,
       phaseId: entry.phaseId,
       side: entry.side,
       startPk: entry.startPk,

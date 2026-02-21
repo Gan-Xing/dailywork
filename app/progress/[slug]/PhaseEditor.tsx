@@ -20,7 +20,7 @@ import { getProgressCopy, formatProgressCopy } from '@/lib/i18n/progress'
 import { localizeProgressTerm } from '@/lib/i18n/progressDictionary'
 import { locales } from '@/lib/i18n'
 import { usePreferredLocale } from '@/lib/usePreferredLocale'
-import type { IntervalSide, PhaseMeasure } from '@/lib/progressTypes'
+import type { IntervalSide, LevelCrossingSide, PhaseMeasure } from '@/lib/progressTypes'
 import { LEVEL_CROSSING_ROAD_SLUG } from '@/lib/roadConstants'
 
 const PhaseFormModal = dynamic<PhaseFormModalProps>(
@@ -59,6 +59,13 @@ export function PhaseEditor({
       { value: 'RIGHT', label: t.form.sideRight },
     ],
     [t.form.sideBoth, t.form.sideLeft, t.form.sideRight],
+  )
+  const levelCrossingSideOptions = useMemo<{ value: LevelCrossingSide; label: string }[]>(
+    () => [
+      { value: 'LEFT', label: t.form.sideLeft },
+      { value: 'RIGHT', label: t.form.sideRight },
+    ],
+    [t.form.sideLeft, t.form.sideRight],
   )
   const sideLabelMap = useMemo(
     () => ({
@@ -236,6 +243,7 @@ export function PhaseEditor({
           isLevelCrossing={isLevelCrossing}
           locationRoadOptions={locationRoadOptions}
           sideOptions={sideOptions}
+          levelCrossingSideOptions={levelCrossingSideOptions}
           defaultLayers={phaseState.defaultLayers}
           layerOptions={phaseState.layerOptions}
           isPending={phaseState.isPending}
@@ -417,6 +425,7 @@ export function PhaseEditor({
                                               spec: seg.spec ?? null,
                                               billQuantity: seg.billQuantity ?? null,
                                               locationRoadId: seg.locationRoadId ?? null,
+                                              levelCrossingSide: seg.levelCrossingSide ?? null,
                                               pointHasSides: phase.pointHasSides,
                                             })
                                           }}

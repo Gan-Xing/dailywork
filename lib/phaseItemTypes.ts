@@ -1,4 +1,4 @@
-import type { IntervalSide, PhaseMeasure } from '@/lib/progressTypes'
+import type { IntervalSide, LevelCrossingSide, PhaseMeasure } from '@/lib/progressTypes'
 
 export type PhaseIntervalManagementRow = {
   intervalId: number
@@ -12,6 +12,7 @@ export type PhaseIntervalManagementRow = {
   locationRoadId?: number | null
   locationRoadName?: string | null
   locationRoadSlug?: string | null
+  levelCrossingSide?: LevelCrossingSide | null
   projectId: number | null
   projectName: string | null
   projectCode: string | null
@@ -74,6 +75,7 @@ export type PhaseIntervalDTO = {
   startPk: number
   endPk: number
   side: IntervalSide
+  levelCrossingSide?: LevelCrossingSide | null
   spec: string | null
   billQuantity: number | null
 }

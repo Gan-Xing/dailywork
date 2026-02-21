@@ -381,7 +381,7 @@
      2. `phaseDefinitionId`：关联 `PhaseDefinition`（必填）。
      3. `name`：显示名称，默认继承模板，可在实例层重命名。
      4. `measure`：枚举，默认继承模板；如与模板不同则以实例为准。
-    5. `intervals`：区间列表 `{ startPk, endPk, side, locationRoadId?, spec?, billQuantity? }`，实例必填（设计量由此计算）。
+    5. `intervals`：区间列表 `{ startPk, endPk, side, locationRoadId?, levelCrossingSide?, spec?, billQuantity? }`，实例必填（设计量由此计算）。
         - `spec`：规格，针对边沟、路缘石、过道涵等同一路段存在多种规格的结构物，选填；与层次/验收内容一样绑定在分项上，并在报检弹窗展示。
         - `billQuantity`：计量工程量，选填，无单位。用于结算口径，独立于现场延米/单体展示量。
      6. `pointHasSides`：布尔，仅当 `measure=POINT` 时生效；为 `true` 时单体分项前端按左右侧分开展示点位，默认 `false`。
@@ -402,11 +402,12 @@
      2. `startPk` / `endPk`：区间起止桩号。
     3. `side`：区间侧别（`BOTH` / `LEFT` / `RIGHT`）。
     4. `locationRoadId?`：真实路段（平交路口时必填；普通路段默认等于 `roadId`）。
-    5. `spec?`：规格文字。
-    6. `layers`：字符串数组，记录当前区间可选层次名称，来自提交时 `PhasePayload.intervals.layers`。
-    7. `layerIds`：整数数组，对应 `LayerDefinition.id`，由当前区间的层次名称映射为模板的定义 ID，用于区分每条区间各自的层次集合。
-    8. `billQuantity?`：计量工料值。
-    9. `createdAt` / `updatedAt`：时间戳。
+    5. `levelCrossingSide?`：平交路口自身侧别（`LEFT` / `RIGHT`），仅平交路口必填。
+    6. `spec?`：规格文字。
+    7. `layers`：字符串数组，记录当前区间可选层次名称，来自提交时 `PhasePayload.intervals.layers`。
+    8. `layerIds`：整数数组，对应 `LayerDefinition.id`，由当前区间的层次名称映射为模板的定义 ID，用于区分每条区间各自的层次集合。
+    9. `billQuantity?`：计量工料值。
+   10. `createdAt` / `updatedAt`：时间戳。
 
 > 说明：保存时会根据模板 `defaultLayers` 里的 `LayerDefinition` 名称做名称 → ID 映射，若某个名称不属于模板则报错；该映射结果记录在 `layerIds`，使每个区间都能各自声明层次 ID 而不会只用分项级的 `layerIds`。
 
@@ -414,16 +415,17 @@
 - **用途**：记录分项的报检预约与提交信息。
 - **字段**
      0. `roadId` / `phaseId`：关联路段与分项。
-     1. `locationRoadId?`：真实路段（平交路口时必填；普通路段默认等于 `roadId`）。
-     2. `side`：枚举 `BOTH` / `LEFT` / `RIGHT`。
-     3. `startPk` / `endPk`：起讫桩号。
-     4. `appointmentDate`：预约报检日期（日期粒度）。
-     5. `submittedAt` / `submittedBy`：报检提交时间与提交人。
-     6. `status`：枚举 `PENDING` / `SCHEDULED` / `SUBMITTED` / `IN_PROGRESS` / `APPROVED`。
-     7. `updatedAt` / `updatedBy`：最近更新时间与更新人。
-     8. `layers` / `checks` / `types`：数组字段，记录层次、验收内容、报检类型。
-     9. `submissionOrder`：提交单编号（历史字段，已弃用），数字，可空；新绑定以 `InspectionEntry.documentId` → `Submission.submissionNumber` 为准。
-    10. `remark`：多行备注。
+    1. `locationRoadId?`：真实路段（平交路口时必填；普通路段默认等于 `roadId`）。
+    2. `levelCrossingSide?`：平交路口自身侧别（`LEFT` / `RIGHT`），仅平交路口必填。
+    3. `side`：枚举 `BOTH` / `LEFT` / `RIGHT`（主路段侧别）。
+    4. `startPk` / `endPk`：起讫桩号。
+    5. `appointmentDate`：预约报检日期（日期粒度）。
+    6. `submittedAt` / `submittedBy`：报检提交时间与提交人。
+    7. `status`：枚举 `PENDING` / `SCHEDULED` / `SUBMITTED` / `IN_PROGRESS` / `APPROVED`。
+    8. `updatedAt` / `updatedBy`：最近更新时间与更新人。
+    9. `layers` / `checks` / `types`：数组字段，记录层次、验收内容、报检类型。
+   10. `submissionOrder`：提交单编号（历史字段，已弃用），数字，可空；新绑定以 `InspectionEntry.documentId` → `Submission.submissionNumber` 为准。
+   11. `remark`：多行备注。
 
 ## 财务记账字段（FinanceEntry）
 

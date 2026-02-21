@@ -111,6 +111,12 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         : Number(payload.submissionOrder)
   const hasLocationRoadField = Object.prototype.hasOwnProperty.call(payload as any, 'locationRoadId')
   const locationRoadId = hasLocationRoadField ? parseOptionalNumber(payload.locationRoadId) : undefined
+  const hasLevelCrossingSideField = Object.prototype.hasOwnProperty.call(payload as any, 'levelCrossingSide')
+  const levelCrossingSide = hasLevelCrossingSideField
+    ? payload.levelCrossingSide === 'LEFT' || payload.levelCrossingSide === 'RIGHT'
+      ? payload.levelCrossingSide
+      : null
+    : undefined
 
   try {
     const updated = await prisma.inspectionEntry.update({
@@ -119,6 +125,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         documentId: documentId === undefined ? undefined : documentId,
         roadId: payload.roadId,
         locationRoadId: locationRoadId === undefined ? undefined : locationRoadId,
+        levelCrossingSide: levelCrossingSide === undefined ? undefined : levelCrossingSide,
         phaseId: payload.phaseId,
         side: payload.side,
         startPk: Number(payload.startPk),

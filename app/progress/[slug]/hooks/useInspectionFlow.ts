@@ -23,7 +23,7 @@ import {
 } from '../phaseEditorTypes'
 import { type AlertTone } from '@/components/AlertDialog'
 import type { Locale } from '@/lib/i18n'
-import type { IntervalSide, InspectionStatus, PhaseDTO } from '@/lib/progressTypes'
+import type { IntervalSide, InspectionStatus, LevelCrossingSide, PhaseDTO } from '@/lib/progressTypes'
 import type { WorkflowBinding, WorkflowLayerTemplate } from '@/lib/progressWorkflow'
 import { localizeProgressList, localizeProgressTerm, localizeProgressText } from '@/lib/i18n/progressDictionary'
 
@@ -41,6 +41,8 @@ export type InspectionDrawerProps = {
   setEndPkInput: (value: string) => void
   appointmentDateInput: string
   setAppointmentDateInput: (value: string) => void
+  submissionNumberInput: string
+  setSubmissionNumberInput: (value: string) => void
   selectedLayers: string[]
   selectedChecks: string[]
   selectedTypes: string[]
@@ -531,6 +533,7 @@ export function useInspectionFlow({
         checkId: snapshot.checkId ?? null,
         checkName: snapshot.checkName ?? snapshot.checkId ?? null,
         locationRoadId: snapshot.locationRoadId ?? null,
+        levelCrossingSide: snapshot.levelCrossingSide ?? null,
         startPk: targetStart,
         endPk: targetEnd,
       }
@@ -828,6 +831,7 @@ export function useInspectionFlow({
             checkId?: string | number | null
             checkName?: string | null
             locationRoadId?: number | null
+            levelCrossingSide?: LevelCrossingSide | null
             updatedAt: string
           }>
         }
@@ -844,6 +848,7 @@ export function useInspectionFlow({
             checkId: snapshot.checkId,
             checkName: snapshot.checkName,
             locationRoadId: snapshot.locationRoadId ?? null,
+            levelCrossingSide: snapshot.levelCrossingSide ?? null,
             side: snapshot.side,
             startPk: snapshot.startPk,
             endPk: snapshot.endPk,
@@ -871,7 +876,7 @@ export function useInspectionFlow({
             restrictToTopLayer && (!normalizedLayerName || !topLayerNames.has(normalizedLayerName))
 
           if (!skipSlice) {
-            const sliceKey = `${snapshot.phaseId}:${snapshot.locationRoadId ?? 'null'}:${snapshot.side}:${snapshot.startPk}:${snapshot.endPk}`
+            const sliceKey = `${snapshot.phaseId}:${snapshot.locationRoadId ?? 'null'}:${snapshot.levelCrossingSide ?? 'null'}:${snapshot.side}:${snapshot.startPk}:${snapshot.endPk}`
             const prevSlice = sliceMap.get(sliceKey)
             const prevPriority = statusPriority[prevSlice?.status ?? 'PENDING'] ?? 0
             if (
@@ -885,6 +890,7 @@ export function useInspectionFlow({
                 startPk: snapshot.startPk,
                 endPk: snapshot.endPk,
                 locationRoadId: snapshot.locationRoadId ?? null,
+                levelCrossingSide: snapshot.levelCrossingSide ?? null,
                 status: snapshot.status ?? 'PENDING',
                 updatedAt: ts,
               })
@@ -911,6 +917,7 @@ export function useInspectionFlow({
             startPk: orderedStart,
             endPk: orderedEnd,
             locationRoadId: item.locationRoadId ?? null,
+            levelCrossingSide: item.levelCrossingSide ?? null,
             status: item.status ?? 'PENDING',
             updatedAt: ts,
           }
@@ -995,9 +1002,30 @@ export function useInspectionFlow({
       return { left: false, right: false, both: false, lockedSide: null as IntervalSide | null }
     }
     const [rangeStart, rangeEnd] = intervalRange
-    const matchLeft = snapshotMatches(selectedSegment.phaseId, 'LEFT', rangeStart, rangeEnd, selectedSegment.locationRoadId ?? null)
-    const matchRight = snapshotMatches(selectedSegment.phaseId, 'RIGHT', rangeStart, rangeEnd, selectedSegment.locationRoadId ?? null)
-    const matchBoth = snapshotMatches(selectedSegment.phaseId, 'BOTH', rangeStart, rangeEnd, selectedSegment.locationRoadId ?? null)
+    const matchLeft = snapshotMatches(
+      selectedSegment.phaseId,
+      'LEFT',
+      rangeStart,
+      rangeEnd,
+      selectedSegment.locationRoadId ?? null,
+      selectedSegment.levelCrossingSide ?? null,
+    )
+    const matchRight = snapshotMatches(
+      selectedSegment.phaseId,
+      'RIGHT',
+      rangeStart,
+      rangeEnd,
+      selectedSegment.locationRoadId ?? null,
+      selectedSegment.levelCrossingSide ?? null,
+    )
+    const matchBoth = snapshotMatches(
+      selectedSegment.phaseId,
+      'BOTH',
+      rangeStart,
+      rangeEnd,
+      selectedSegment.locationRoadId ?? null,
+      selectedSegment.levelCrossingSide ?? null,
+    )
     let left = false
     let right = false
     let both = false
@@ -1078,6 +1106,7 @@ export function useInspectionFlow({
       endPk: number,
       allowedLayers: string[] = [],
       locationRoadId?: number | null,
+      levelCrossingSide?: LevelCrossingSide | null,
     ) => {
       const workflowLayers = workflowLayersByPhaseId.get(phaseId)
       const phaseNameFallback = phases.find((item) => item.id === phaseId)?.name ?? ''
@@ -1113,6 +1142,7 @@ export function useInspectionFlow({
               checkId: check.id,
               checkName: check.name,
               locationRoadId: locationRoadId ?? null,
+              levelCrossingSide: levelCrossingSide ?? null,
               side: candidateSide,
               startPk: targetStart,
               endPk: targetEnd,
@@ -1125,6 +1155,7 @@ export function useInspectionFlow({
               checkId: null,
               checkName: check.name,
               locationRoadId: locationRoadId ?? null,
+              levelCrossingSide: levelCrossingSide ?? null,
               side: candidateSide,
               startPk: targetStart,
               endPk: targetEnd,
@@ -1163,6 +1194,7 @@ export function useInspectionFlow({
           checkId: check.id,
           checkName: check.name,
           locationRoadId: selectedSegment.locationRoadId ?? null,
+          levelCrossingSide: selectedSegment.levelCrossingSide ?? null,
           startPk: rangeStart,
           endPk: rangeEnd,
         })
@@ -1196,6 +1228,7 @@ export function useInspectionFlow({
           checkId: check.id,
           checkName: check.name,
           locationRoadId: selectedSegment.locationRoadId ?? null,
+          levelCrossingSide: selectedSegment.levelCrossingSide ?? null,
           startPk: rangeStart,
           endPk: rangeEnd,
         })
@@ -1393,6 +1426,7 @@ export function useInspectionFlow({
         uniqueChecks.map<InspectionEntrySubmitPayload>((checkName) => ({
           roadId: road.id,
           locationRoadId: selectedSegment.locationRoadId ?? road.id,
+          levelCrossingSide: selectedSegment.levelCrossingSide ?? null,
           phaseId: payload.phaseId,
           side: payload.side,
           startPk: normalizedStart,
