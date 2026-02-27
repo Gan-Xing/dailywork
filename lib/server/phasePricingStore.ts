@@ -26,6 +26,21 @@ export interface PhasePricingGroup {
   specOptions: string[]
 }
 
+export class PhaseItemDeleteBlockedError extends Error {
+  boqBindingCount: number
+  hasFormula: boolean
+
+  constructor(options: { boqBindingCount: number; hasFormula: boolean }) {
+    const reasons: string[] = []
+    if (options.boqBindingCount > 0) reasons.push(`已绑定 ${options.boqBindingCount} 个清单条目`)
+    if (options.hasFormula) reasons.push('已配置公式')
+    super(`该分项名称${reasons.join('、')}，请先解绑/删除配置后再删除`)
+    this.name = 'PhaseItemDeleteBlockedError'
+    this.boqBindingCount = options.boqBindingCount
+    this.hasFormula = options.hasFormula
+  }
+}
+
 const toOptionalNumber = (value: number | Prisma.Decimal | null | undefined) => {
   if (value == null) {
     return null
@@ -195,6 +210,30 @@ export const updatePhaseItem = async (
 
 export const deactivatePhaseItem = async (priceItemId: number) => {
   try {
+    const existing = await prisma.phaseItem.findUnique({
+      where: { id: priceItemId },
+      include: {
+        formula: { select: { id: true } },
+        boqLinks: {
+          where: {
+            isActive: true,
+            boqItem: { isActive: true },
+          },
+          select: { id: true },
+        },
+      },
+    })
+
+    if (!existing) {
+      throw new Error('分项名称不存在')
+    }
+
+    const boqBindingCount = existing.boqLinks.length
+    const hasFormula = Boolean(existing.formula)
+    if (boqBindingCount > 0 || hasFormula) {
+      throw new PhaseItemDeleteBlockedError({ boqBindingCount, hasFormula })
+    }
+
     const updated = await prisma.phaseItem.update({
       where: { id: priceItemId },
       data: { isActive: false },

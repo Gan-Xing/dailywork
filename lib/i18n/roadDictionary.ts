@@ -58,6 +58,16 @@ const roadNameEntries: RoadDictionaryEntry[] = [
     fr: 'Tanda 5B',
   },
   {
+    slug: 'tanda-voie5c',
+    zh: '丹达5C路',
+    fr: 'Tanda 5C',
+  },
+  {
+    slug: 'tanda-voie7',
+    zh: '丹达7号路',
+    fr: 'Tanda 7',
+  },
+  {
     slug: 'level-crossing',
     zh: '平交路口',
     fr: 'Amorce',

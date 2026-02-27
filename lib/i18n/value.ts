@@ -529,6 +529,11 @@ export type PriceManagerCopy = {
     nameRequired: string
     deleted: string
     deleteConfirm: string
+    deleteTargetLabel: string
+    deleteSoftHint: string
+    deleteBlockedSummary: string
+    deleteBlockedByBoq: string
+    deleteBlockedByFormula: string
   }
 }
 
@@ -625,7 +630,12 @@ export const priceManagerCopy: Record<Locale, PriceManagerCopy> = {
       updateError: '更新失败，请检查输入',
       nameRequired: '名称不能为空',
       deleted: '已删除',
-      deleteConfirm: '确定要删除该分项名称吗？'
+      deleteConfirm: '确定要删除该分项名称吗？',
+      deleteTargetLabel: '分项名称',
+      deleteSoftHint: '删除为停用（软删除），不会物理删除历史数据。',
+      deleteBlockedSummary: '当前分项名称存在关键关联，无法删除。请先解除以下关联：',
+      deleteBlockedByBoq: '已绑定 {count} 个清单条目',
+      deleteBlockedByFormula: '已配置公式'
     }
   },
   fr: {
@@ -709,7 +719,12 @@ export const priceManagerCopy: Record<Locale, PriceManagerCopy> = {
       updateError: 'Échec de la mise à jour, vérifiez la saisie',
       nameRequired: 'Le nom est requis',
       deleted: 'Supprimé',
-      deleteConfirm: 'Confirmez-vous la suppression de ce poste ?'
+      deleteConfirm: 'Confirmez-vous la suppression de ce poste ?',
+      deleteTargetLabel: 'Poste',
+      deleteSoftHint: 'La suppression désactive ce poste (suppression logique) et conserve les données historiques.',
+      deleteBlockedSummary: 'Ce poste ne peut pas être supprimé tant que les liaisons/configurations suivantes existent :',
+      deleteBlockedByBoq: '{count} liaison(s) au bordereau',
+      deleteBlockedByFormula: 'Formule configurée'
     }
   }
 }

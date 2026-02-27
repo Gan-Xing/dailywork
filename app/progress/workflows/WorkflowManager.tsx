@@ -53,6 +53,7 @@ export function WorkflowManager({ initialWorkflows }: Props) {
     (name: string) => localizeProgressTerm('layer', name, locale, { phaseName: selected?.phaseName }),
     [locale, selected?.phaseName],
   )
+  const displayPhaseName = useCallback((name?: string) => (name ? localizeProgressTerm('phase', name, locale) : ''), [locale])
   const displayCheckName = useCallback(
     (name: string) => localizeProgressTerm('check', name, locale),
     [locale],
@@ -66,9 +67,9 @@ export function WorkflowManager({ initialWorkflows }: Props) {
       if (!tpl) return copy.templateEmpty
       const measureLabel = tpl.measure === 'POINT' ? copy.measurePoint : copy.measureLinear
       const sideLabel = tpl.measure === 'POINT' && tpl.pointHasSides ? copy.pointHasSidesLabel : ''
-      return [tpl.phaseName, measureLabel, sideLabel].filter(Boolean).join(' · ')
+      return [displayPhaseName(tpl.phaseName), measureLabel, sideLabel].filter(Boolean).join(' · ')
     },
-    [copy.measureLinear, copy.measurePoint, copy.pointHasSidesLabel, copy.templateEmpty],
+    [copy.measureLinear, copy.measurePoint, copy.pointHasSidesLabel, copy.templateEmpty, displayPhaseName],
   )
 
   useEffect(() => {
@@ -424,7 +425,7 @@ export function WorkflowManager({ initialWorkflows }: Props) {
       const deps =
         layer.dependencies.length > 0
           ? formatProgressCopy(copy.ruleDepends, {
-              name: layer.name,
+              name: displayLayerName(layer.name),
               deps: layer.dependencies
                 .map((id) =>
                   displayLayerName(selected.layers.find((item) => item.id === id)?.name || id),
@@ -435,7 +436,7 @@ export function WorkflowManager({ initialWorkflows }: Props) {
       const locks =
         (layer.lockStepWith?.length ?? 0) > 0
           ? formatProgressCopy(copy.ruleLock, {
-              name: layer.name,
+              name: displayLayerName(layer.name),
               peers: (layer.lockStepWith || [])
                 .map((id) =>
                   displayLayerName(selected.layers.find((item) => item.id === id)?.name || id),
@@ -509,7 +510,7 @@ export function WorkflowManager({ initialWorkflows }: Props) {
                 </div>
                 <div className="flex flex-wrap justify-end gap-2">
                   <span className="rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-600">
-                    {selected?.phaseName || copy.templateEmpty}
+                    {displayPhaseName(selected?.phaseName) || copy.templateEmpty}
                   </span>
                   {selected ? (
                     <>
@@ -771,7 +772,7 @@ export function WorkflowManager({ initialWorkflows }: Props) {
                           <option value="">{copy.quick.deletePlaceholder}</option>
                           {sortedLayers.map((layer) => (
                             <option key={layer.id} value={layer.id}>
-                              {layer.name}
+                              {displayLayerName(layer.name)}
                             </option>
                           ))}
                         </select>
@@ -887,7 +888,7 @@ export function WorkflowManager({ initialWorkflows }: Props) {
                                     : 'border border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'
                                 }`}
                               >
-                                {target.name}
+                                {displayLayerName(target.name)}
                               </button>
                             ))}
                             {others.length === 0 ? (
@@ -909,7 +910,7 @@ export function WorkflowManager({ initialWorkflows }: Props) {
                                     : 'border border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'
                                 }`}
                               >
-                                {target.name}
+                                {displayLayerName(target.name)}
                               </button>
                             ))}
                             {others.length === 0 ? (
@@ -933,7 +934,7 @@ export function WorkflowManager({ initialWorkflows }: Props) {
                                   : 'border border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'
                               }`}
                             >
-                              {target.name}
+                              {displayLayerName(target.name)}
                             </button>
                           ))}
                           {others.length === 0 ? (
@@ -1024,7 +1025,7 @@ export function WorkflowManager({ initialWorkflows }: Props) {
                                         : 'border border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'
                                     }`}
                                   >
-                                    {type}
+                                    {displayTypeName(type)}
                                   </button>
                                 ))}
                               </div>
@@ -1060,7 +1061,7 @@ export function WorkflowManager({ initialWorkflows }: Props) {
                   </p>
                   <h2 className="text-xl font-semibold text-slate-900">
                     {formatProgressCopy(copy.timelineTitle, {
-                      phase: selected?.phaseName ?? copy.templateEmpty,
+                      phase: displayPhaseName(selected?.phaseName) || copy.templateEmpty,
                     })}
                   </h2>
                   <p className="text-xs text-slate-600">{copy.timelineHint}</p>

@@ -146,6 +146,10 @@ export function InspectionDrawer({
     ? normalizeRange(startValue, endValue)
     : normalizeRange(selectedSegment.start ?? 0, selectedSegment.end ?? 0)
   const phaseNameForKey = workflowPhaseNameForContext ?? selectedSegment.workflow?.phaseName ?? selectedSegment.phase
+  const localizeWorkflowLayerRef = (value: string) =>
+    localizeProgressTerm('layer', value, locale, {
+      phaseName: workflowPhaseNameForContext ?? undefined,
+    })
 
   const buildCheckKeyForSide = (
     layer: WorkflowLayerTemplate,
@@ -424,9 +428,15 @@ export function InspectionDrawer({
                           sideSequence = [selectedSide]
                         }
                         return sideSequence.map((sideKey) => {
-                          const dependsNames = (layer.dependencies ?? []).map((id) => workflowLayerNameMapSafe.get(id) ?? id)
-                          const lockNames = (layer.lockStepWith ?? []).map((id) => workflowLayerNameMapSafe.get(id) ?? id)
-                          const parallelNames = (layer.parallelWith ?? []).map((id) => workflowLayerNameMapSafe.get(id) ?? id)
+                          const dependsNames = (layer.dependencies ?? [])
+                            .map((id) => workflowLayerNameMapSafe.get(id) ?? id)
+                            .map(localizeWorkflowLayerRef)
+                          const lockNames = (layer.lockStepWith ?? [])
+                            .map((id) => workflowLayerNameMapSafe.get(id) ?? id)
+                            .map(localizeWorkflowLayerRef)
+                          const parallelNames = (layer.parallelWith ?? [])
+                            .map((id) => workflowLayerNameMapSafe.get(id) ?? id)
+                            .map(localizeWorkflowLayerRef)
                           const localizedLayerName = localizeProgressTerm('layer', layer.name, locale, {
                             phaseName: workflowPhaseNameForContext ?? undefined,
                           })
@@ -654,9 +664,15 @@ export function InspectionDrawer({
                     </div>
                     <div className="grid gap-2 md:grid-cols-2">
                       {selectedSegment.workflowLayers.map((layer) => {
-                        const dependsNames = (layer.dependencies ?? []).map((id) => workflowLayerNameMapSafe.get(id) ?? id)
-                        const lockNames = (layer.lockStepWith ?? []).map((id) => workflowLayerNameMapSafe.get(id) ?? id)
-                        const parallelNames = (layer.parallelWith ?? []).map((id) => workflowLayerNameMapSafe.get(id) ?? id)
+                        const dependsNames = (layer.dependencies ?? [])
+                          .map((id) => workflowLayerNameMapSafe.get(id) ?? id)
+                          .map(localizeWorkflowLayerRef)
+                        const lockNames = (layer.lockStepWith ?? [])
+                          .map((id) => workflowLayerNameMapSafe.get(id) ?? id)
+                          .map(localizeWorkflowLayerRef)
+                        const parallelNames = (layer.parallelWith ?? [])
+                          .map((id) => workflowLayerNameMapSafe.get(id) ?? id)
+                          .map(localizeWorkflowLayerRef)
                         const localizedLayerName = localizeProgressTerm('layer', layer.name, locale, {
                           phaseName: workflowPhaseNameForContext ?? undefined,
                         })

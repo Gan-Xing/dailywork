@@ -6,6 +6,7 @@ import { hasPermission } from '@/lib/server/authSession'
 import {
   createPhaseItem,
   deactivatePhaseItem,
+  PhaseItemDeleteBlockedError,
   listPhasePricing,
   updatePhaseItem,
 } from '@/lib/server/phasePricingStore'
@@ -276,6 +277,18 @@ export async function DELETE(request: Request) {
     const removed = await deactivatePhaseItem(id)
     return NextResponse.json({ item: removed })
   } catch (error) {
+    if (error instanceof PhaseItemDeleteBlockedError) {
+      return NextResponse.json(
+        {
+          message: error.message,
+          blockers: {
+            boqBindingCount: error.boqBindingCount,
+            hasFormula: error.hasFormula,
+          },
+        },
+        { status: 409 },
+      )
+    }
     return respond((error as Error).message ?? '删除价格项失败', 500)
   }
 }

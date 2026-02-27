@@ -7,9 +7,9 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { AccessDenied } from '@/components/AccessDenied'
 import { PageHeaderNav } from '@/components/PageHeaderNav'
 import { useToast } from '@/components/ToastProvider'
-import { usePreferredLocale } from '@/lib/usePreferredLocale'
-import { locales, type Locale } from '@/lib/i18n'
+import { formatCopy, locales, type Locale } from '@/lib/i18n'
 import { measureLabels, priceManagerCopy, productionValueCopy } from '@/lib/i18n/value'
+import { usePreferredLocale } from '@/lib/usePreferredLocale'
 import type { PhaseItem, PhasePricingGroup } from '@/lib/server/phasePricingStore'
 
 type FetchStatus = 'idle' | 'loading' | 'success' | 'error'
@@ -36,6 +36,8 @@ export default function PhaseDefinitionDetailPage() {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [createName, setCreateName] = useState('')
   const [creating, setCreating] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<PhaseItem | null>(null)
+  const [deletingItemId, setDeletingItemId] = useState<number | null>(null)
   const errorToastRef = useRef<string | null>(null)
 
   useEffect(() => {
@@ -97,6 +99,17 @@ export default function PhaseDefinitionDetailPage() {
     return [...group.priceItems].sort((a, b) => a.name.localeCompare(b.name, localeId))
   }, [group, localeId])
 
+  const getDeleteBlockReasons = (item: PhaseItem) => {
+    const reasons: string[] = []
+    if (item.boqBindingCount > 0) {
+      reasons.push(formatCopy(copy.messages.deleteBlockedByBoq, { count: item.boqBindingCount }))
+    }
+    if (item.formulaConfigured) {
+      reasons.push(copy.messages.deleteBlockedByFormula)
+    }
+    return reasons
+  }
+
   const handleCreate = async () => {
     if (!group) return
     const trimmedName = createName.trim()
@@ -144,6 +157,47 @@ export default function PhaseDefinitionDetailPage() {
       addToast((createError as Error).message ?? copy.messages.updateError, { tone: 'danger' })
     } finally {
       setCreating(false)
+    }
+  }
+
+  const handleRequestDelete = (item: PhaseItem) => {
+    const reasons = getDeleteBlockReasons(item)
+    if (reasons.length > 0) {
+      addToast(`${copy.messages.deleteBlockedSummary} ${reasons.join('；')}`, { tone: 'warning' })
+      return
+    }
+    setDeleteTarget(item)
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return
+    const target = deleteTarget
+    setDeletingItemId(target.id)
+    try {
+      const response = await fetch('/api/value/prices', {
+        method: 'DELETE',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ priceItemId: target.id }),
+      })
+      const result = (await response.json().catch(() => ({}))) as { item?: PhaseItem; message?: string }
+      if (!response.ok) {
+        throw new Error(result.message ?? copy.messages.updateError)
+      }
+      setGroup((prev) =>
+        prev
+          ? {
+              ...prev,
+              priceItems: prev.priceItems.filter((item) => item.id !== target.id),
+            }
+          : prev,
+      )
+      setDeleteTarget(null)
+      addToast(copy.messages.deleted, { tone: 'success' })
+    } catch (deleteError) {
+      addToast((deleteError as Error).message ?? copy.messages.updateError, { tone: 'danger' })
+    } finally {
+      setDeletingItemId(null)
     }
   }
 
@@ -214,18 +268,37 @@ export default function PhaseDefinitionDetailPage() {
             <div className="mt-6 grid gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
               {sortedItems.map((item) => {
                 const formulaReady = item.formulaConfigured && item.boqBindingCount > 0
+                const deleteBlocked = item.boqBindingCount > 0 || item.formulaConfigured
                 return (
-                  <Link
-                    key={item.id}
-                    href={`/value/prices/items/${item.id}`}
-                    className={`flex h-16 items-center justify-center rounded-xl border px-3 text-center text-sm font-semibold shadow-sm transition hover:-translate-y-0.5 ${
-                      formulaReady
-                        ? 'border-emerald-200 bg-emerald-50/70 text-emerald-700 hover:border-emerald-300 hover:bg-emerald-100/70'
-                        : 'border-slate-200 bg-white text-slate-900 hover:border-emerald-200 hover:bg-emerald-50/40'
-                    }`}
-                  >
-                    <span className="line-clamp-2">{item.name}</span>
-                  </Link>
+                  <div key={item.id} className="relative">
+                    <Link
+                      href={`/value/prices/items/${item.id}`}
+                      className={`flex h-20 items-center justify-center rounded-xl border px-3 pr-14 text-center text-sm font-semibold shadow-sm transition hover:-translate-y-0.5 ${
+                        formulaReady
+                          ? 'border-emerald-200 bg-emerald-50/70 text-emerald-700 hover:border-emerald-300 hover:bg-emerald-100/70'
+                          : 'border-slate-200 bg-white text-slate-900 hover:border-emerald-200 hover:bg-emerald-50/40'
+                      }`}
+                    >
+                      <span className="line-clamp-2">{item.name}</span>
+                    </Link>
+                    <button
+                      type="button"
+                      className={`absolute right-2 top-2 inline-flex h-7 min-w-7 items-center justify-center rounded-full border px-2 text-[10px] font-semibold uppercase tracking-[0.16em] shadow-sm transition ${
+                        deleteBlocked
+                          ? 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100'
+                          : 'border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100'
+                      }`}
+                      title={deleteBlocked ? getDeleteBlockReasons(item).join(' / ') : copy.actions.delete}
+                      aria-label={`${copy.actions.delete} ${item.name}`}
+                      onClick={(event) => {
+                        event.preventDefault()
+                        event.stopPropagation()
+                        handleRequestDelete(item)
+                      }}
+                    >
+                      X
+                    </button>
+                  </div>
                 )
               })}
             </div>
@@ -274,6 +347,52 @@ export default function PhaseDefinitionDetailPage() {
                 disabled={creating}
               >
                 {creating ? `${copy.actions.save}…` : copy.actions.save}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {deleteTarget ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-xl">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-lg font-semibold text-slate-900">{copy.actions.delete}</h2>
+              <button
+                type="button"
+                className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 hover:text-slate-700"
+                onClick={() => setDeleteTarget(null)}
+                disabled={deletingItemId === deleteTarget.id}
+              >
+                {copy.actions.cancel}
+              </button>
+            </div>
+            <div className="mt-4 space-y-3 text-sm text-slate-700">
+              <p>{copy.messages.deleteConfirm}</p>
+              <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                  {copy.messages.deleteTargetLabel}
+                </div>
+                <div className="mt-1 font-semibold text-slate-900">{deleteTarget.name}</div>
+              </div>
+              <p className="text-xs text-slate-500">{copy.messages.deleteSoftHint}</p>
+            </div>
+            <div className="mt-6 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.25em] text-slate-600 transition hover:-translate-y-0.5 hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+                onClick={() => setDeleteTarget(null)}
+                disabled={deletingItemId === deleteTarget.id}
+              >
+                {copy.actions.cancel}
+              </button>
+              <button
+                type="button"
+                className="inline-flex items-center rounded-full bg-rose-500 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.25em] text-white shadow-sm shadow-rose-200/60 transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+                onClick={handleConfirmDelete}
+                disabled={deletingItemId === deleteTarget.id}
+              >
+                {deletingItemId === deleteTarget.id ? `${copy.actions.delete}…` : copy.actions.delete}
               </button>
             </div>
           </div>

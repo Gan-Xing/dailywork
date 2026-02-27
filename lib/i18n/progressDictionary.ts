@@ -70,6 +70,8 @@ const dictionaries: Record<DictionaryKind, Record<string, Entry>> = {
     [normalize("Couche d'accrochage")]: { zh: '粘层', fr: "Couche d'accrochage" },
     [normalize('旧路缘石拆除')]: { zh: '旧路缘石拆除', fr: 'Dépose des anciennes bordures' },
     [normalize('Dépose des anciennes bordures')]: { zh: '旧路缘石拆除', fr: 'Dépose des anciennes bordures' },
+    [normalize('旧路再生')]: { zh: '旧路再生', fr: "Recyclage de l'ancienne chaussée" },
+    [normalize("Recyclage de l'ancienne chaussée")]: { zh: '旧路再生', fr: "Recyclage de l'ancienne chaussée" },
   },
   layer: {
     [normalize('预制边沟')]: { zh: '预制边沟', fr: 'Caniveau préfabriqué' },
@@ -157,6 +159,8 @@ const dictionaries: Record<DictionaryKind, Record<string, Entry>> = {
     [normalize('Bordure existante')]: { zh: '原有路缘石', fr: 'Bordure existante' },
     [normalize('粘层')]: { zh: '粘层', fr: "Couche d'accrochage" },
     [normalize("Couche d'accrochage")]: { zh: '粘层', fr: "Couche d'accrochage" },
+    [normalize('旧路再生')]: { zh: '旧路再生', fr: "Recyclage de l'ancienne chaussée" },
+    [normalize("Recyclage de l'ancienne chaussée")]: { zh: '旧路再生', fr: "Recyclage de l'ancienne chaussée" },
   },
   check: {
     [normalize('钢筋绑扎验收')]: { zh: '钢筋绑扎验收', fr: 'Ferraillage' },
@@ -287,6 +291,8 @@ const dictionaries: Record<DictionaryKind, Record<string, Entry>> = {
     [normalize('Restauration de la végétation')]: { zh: '植被恢复', fr: 'Restauration de la végétation' },
     [normalize('钻芯取样验收')]: { zh: '钻芯取样验收', fr: 'Réception des carottages' },
     [normalize('Réception des carottages')]: { zh: '钻芯取样验收', fr: 'Réception des carottages' },
+    [normalize('旧路再生')]: { zh: '旧路再生', fr: "Recyclage de l'ancienne chaussée" },
+    [normalize("Recyclage de l'ancienne chaussée")]: { zh: '旧路再生', fr: "Recyclage de l'ancienne chaussée" },
   },
   type: {
     [normalize('现场验收')]: { zh: '现场验收', fr: 'GENIE CIVIL' },

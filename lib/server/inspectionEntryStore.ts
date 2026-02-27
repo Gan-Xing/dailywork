@@ -216,20 +216,34 @@ const assertWorkflowSubmissionRules = async (params: {
   const workflow = await getWorkflowByPhaseDefinitionId(params.phase.phaseDefinitionId)
   if (!workflow || !workflow.layers?.length) return
 
+  const canonicalizeLayerName = (value: string) =>
+    canonicalizeProgressList('layer', [value]).at(0) ?? value
+  const canonicalizeCheckName = (value: string) =>
+    canonicalizeProgressList('check', [value]).at(0) ?? value
+
   const layerIdByName = new Map<string, string>()
   const layerNameById = new Map<string, string>()
   const checkMetaByName = new Map<string, WorkflowCheckMeta[]>()
   const workflowCheckOrderByLayerId = new Map<string, string[]>()
 
   workflow.layers.forEach((layer) => {
-    const normalizedLayer = normalizeLabel(layer.name)
-    layerIdByName.set(normalizedLayer, layer.id)
-    layerNameById.set(layer.id, layer.name)
-    workflowCheckOrderByLayerId.set(layer.id, layer.checks.map((check) => check.name))
+    const layerNamesForMatch = Array.from(new Set([layer.name, canonicalizeLayerName(layer.name)]))
+    layerNamesForMatch.forEach((name) => {
+      const normalizedLayer = normalizeLabel(name)
+      if (!layerIdByName.has(normalizedLayer)) {
+        layerIdByName.set(normalizedLayer, layer.id)
+      }
+    })
+    layerNameById.set(layer.id, canonicalizeLayerName(layer.name))
+    workflowCheckOrderByLayerId.set(layer.id, layer.checks.map((check) => canonicalizeCheckName(check.name)))
     layer.checks.forEach((check, idx) => {
-      const list = checkMetaByName.get(normalizeLabel(check.name)) ?? []
-      list.push({ layerId: layer.id, order: Number.isFinite(check.order) ? (check.order as number) : idx })
-      checkMetaByName.set(normalizeLabel(check.name), list)
+      const checkNamesForMatch = Array.from(new Set([check.name, canonicalizeCheckName(check.name)]))
+      checkNamesForMatch.forEach((name) => {
+        const key = normalizeLabel(name)
+        const list = checkMetaByName.get(key) ?? []
+        list.push({ layerId: layer.id, order: Number.isFinite(check.order) ? (check.order as number) : idx })
+        checkMetaByName.set(key, list)
+      })
     })
   })
 
