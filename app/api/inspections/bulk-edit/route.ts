@@ -30,6 +30,12 @@ const parseOptionalNumber = (value: unknown) => {
   return Number.isFinite(num) ? num : null
 }
 
+const normalizeLevelCrossingSide = (value: unknown): LevelCrossingSide | null | undefined => {
+  if (value === undefined) return undefined
+  if (value === null || value === '') return null
+  return value === 'LEFT' || value === 'RIGHT' || value === 'BOTH' ? value : null
+}
+
 const resolveDocumentId = async (payload: PatchPayload) => {
   const hasDocumentIdField =
     Object.prototype.hasOwnProperty.call(payload as any, 'documentId') ||
@@ -113,6 +119,7 @@ export async function POST(request: Request) {
     ...payload,
     documentId: resolvedDocumentId,
     submissionNumber: undefined,
+    levelCrossingSide: normalizeLevelCrossingSide(payload.levelCrossingSide),
     layerName: payload.layerName ? canonicalizeProgressList('layer', [payload.layerName]).at(0) : undefined,
     checkName: payload.checkName ? canonicalizeProgressList('check', [payload.checkName]).at(0) : undefined,
     types: payload.types ? canonicalizeProgressList('type', payload.types) : undefined,

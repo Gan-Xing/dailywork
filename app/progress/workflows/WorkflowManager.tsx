@@ -43,6 +43,7 @@ export function WorkflowManager({ initialWorkflows }: Props) {
   const [newTemplateName, setNewTemplateName] = useState('')
   const [newTemplateMeasure, setNewTemplateMeasure] = useState<WorkflowTemplate['measure']>('LINEAR')
   const [newTemplatePointHasSides, setNewTemplatePointHasSides] = useState(false)
+  const [newTemplateAllowLevelCrossingBoth, setNewTemplateAllowLevelCrossingBoth] = useState(false)
 
   const selected = useMemo(
     () => workflows.find((item) => item.id === selectedId) ?? workflows[0],
@@ -67,9 +68,18 @@ export function WorkflowManager({ initialWorkflows }: Props) {
       if (!tpl) return copy.templateEmpty
       const measureLabel = tpl.measure === 'POINT' ? copy.measurePoint : copy.measureLinear
       const sideLabel = tpl.measure === 'POINT' && tpl.pointHasSides ? copy.pointHasSidesLabel : ''
-      return [displayPhaseName(tpl.phaseName), measureLabel, sideLabel].filter(Boolean).join(' · ')
+      const levelCrossingBothLabel =
+        tpl.measure === 'POINT' && tpl.allowLevelCrossingBoth ? copy.allowLevelCrossingBothLabel : ''
+      return [displayPhaseName(tpl.phaseName), measureLabel, sideLabel, levelCrossingBothLabel].filter(Boolean).join(' · ')
     },
-    [copy.measureLinear, copy.measurePoint, copy.pointHasSidesLabel, copy.templateEmpty, displayPhaseName],
+    [
+      copy.allowLevelCrossingBothLabel,
+      copy.measureLinear,
+      copy.measurePoint,
+      copy.pointHasSidesLabel,
+      copy.templateEmpty,
+      displayPhaseName,
+    ],
   )
 
   useEffect(() => {
@@ -151,6 +161,7 @@ export function WorkflowManager({ initialWorkflows }: Props) {
           name: selected?.phaseName ?? '',
           measure: selected?.measure,
           pointHasSides: selected?.pointHasSides,
+          allowLevelCrossingBoth: selected?.allowLevelCrossingBoth,
         }),
       })
       if (!res.ok) {
@@ -204,6 +215,8 @@ export function WorkflowManager({ initialWorkflows }: Props) {
           name,
           measure: newTemplateMeasure,
           pointHasSides: newTemplateMeasure === 'POINT' ? newTemplatePointHasSides : false,
+          allowLevelCrossingBoth:
+            newTemplateMeasure === 'POINT' ? newTemplateAllowLevelCrossingBoth : false,
           workflow: {
             id: `phase-${Date.now().toString(36)}`,
             phaseName: name,
@@ -222,6 +235,7 @@ export function WorkflowManager({ initialWorkflows }: Props) {
       setNewTemplateName('')
       setNewTemplateMeasure('LINEAR')
       setNewTemplatePointHasSides(false)
+      setNewTemplateAllowLevelCrossingBoth(false)
       setLayerNameDraft('')
       addToast(copy.templateCreated, { tone: 'success' })
     } catch (err) {
@@ -522,6 +536,11 @@ export function WorkflowManager({ initialWorkflows }: Props) {
                           {copy.pointHasSidesLabel}
                         </span>
                       ) : null}
+                      {selected.measure === 'POINT' && selected.allowLevelCrossingBoth ? (
+                        <span className="rounded-full bg-sky-200/50 px-2 py-1 text-[11px] text-sky-700">
+                          {copy.allowLevelCrossingBothLabel}
+                        </span>
+                      ) : null}
                     </>
                   ) : null}
                 </div>
@@ -571,6 +590,8 @@ export function WorkflowManager({ initialWorkflows }: Props) {
                           ...tpl,
                           measure: e.target.value as WorkflowTemplate['measure'],
                           pointHasSides: e.target.value === 'POINT' ? tpl.pointHasSides ?? false : false,
+                          allowLevelCrossingBoth:
+                            e.target.value === 'POINT' ? tpl.allowLevelCrossingBoth ?? false : false,
                         }))
                       }
                       className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 shadow-inner shadow-slate-900/40 focus:border-emerald-300 focus:outline-none"
@@ -580,20 +601,36 @@ export function WorkflowManager({ initialWorkflows }: Props) {
                     </select>
                   </label>
                   {selected?.measure === 'POINT' ? (
-                    <label className="flex items-center gap-2 text-sm text-slate-600">
-                      <input
-                        type="checkbox"
-                        checked={Boolean(selected.pointHasSides)}
-                        onChange={(e) =>
-                          updateSelectedWorkflow((tpl) => ({
-                            ...tpl,
-                            pointHasSides: e.target.checked,
-                          }))
-                        }
-                        className="h-4 w-4 rounded border-slate-200 bg-white text-emerald-600 focus:ring-0"
-                      />
-                      <span>{copy.pointHasSidesLabel}</span>
-                    </label>
+                    <div className="flex flex-col gap-2 text-sm text-slate-600">
+                      <label className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(selected.pointHasSides)}
+                          onChange={(e) =>
+                            updateSelectedWorkflow((tpl) => ({
+                              ...tpl,
+                              pointHasSides: e.target.checked,
+                            }))
+                          }
+                          className="h-4 w-4 rounded border-slate-200 bg-white text-emerald-600 focus:ring-0"
+                        />
+                        <span>{copy.pointHasSidesLabel}</span>
+                      </label>
+                      <label className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(selected.allowLevelCrossingBoth)}
+                          onChange={(e) =>
+                            updateSelectedWorkflow((tpl) => ({
+                              ...tpl,
+                              allowLevelCrossingBoth: e.target.checked,
+                            }))
+                          }
+                          className="h-4 w-4 rounded border-slate-200 bg-white text-sky-600 focus:ring-0"
+                        />
+                        <span>{copy.allowLevelCrossingBothLabel}</span>
+                      </label>
+                    </div>
                   ) : null}
                 </div>
                 {selected ? (
@@ -673,22 +710,40 @@ export function WorkflowManager({ initialWorkflows }: Props) {
                 />
                 <select
                   value={newTemplateMeasure}
-                  onChange={(e) => setNewTemplateMeasure(e.target.value as WorkflowTemplate['measure'])}
+                  onChange={(e) => {
+                    const value = e.target.value as WorkflowTemplate['measure']
+                    setNewTemplateMeasure(value)
+                    if (value !== 'POINT') {
+                      setNewTemplatePointHasSides(false)
+                      setNewTemplateAllowLevelCrossingBoth(false)
+                    }
+                  }}
                   className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-emerald-300/60 sm:w-auto"
                 >
                   <option value="LINEAR">{copy.measureLinear}</option>
                   <option value="POINT">{copy.measurePoint}</option>
                 </select>
                 {newTemplateMeasure === 'POINT' ? (
-                  <label className="flex items-center gap-2 text-xs text-slate-600">
-                    <input
-                      type="checkbox"
-                      checked={newTemplatePointHasSides}
-                      onChange={(e) => setNewTemplatePointHasSides(e.target.checked)}
-                      className="h-4 w-4 rounded border-slate-200 bg-white text-emerald-600 focus:ring-0"
-                    />
-                    <span>{copy.pointHasSidesLabel}</span>
-                  </label>
+                  <div className="flex flex-col gap-2 text-xs text-slate-600">
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={newTemplatePointHasSides}
+                        onChange={(e) => setNewTemplatePointHasSides(e.target.checked)}
+                        className="h-4 w-4 rounded border-slate-200 bg-white text-emerald-600 focus:ring-0"
+                      />
+                      <span>{copy.pointHasSidesLabel}</span>
+                    </label>
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={newTemplateAllowLevelCrossingBoth}
+                        onChange={(e) => setNewTemplateAllowLevelCrossingBoth(e.target.checked)}
+                        className="h-4 w-4 rounded border-slate-200 bg-white text-sky-600 focus:ring-0"
+                      />
+                      <span>{copy.allowLevelCrossingBothLabel}</span>
+                    </label>
+                  </div>
                 ) : null}
                 <button
                   type="button"

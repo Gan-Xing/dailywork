@@ -15,6 +15,10 @@ type WorkflowItem = WorkflowBinding
 type LayerDefinition = Prisma.LayerDefinitionGetPayload<{}>
 type CheckDefinition = Prisma.CheckDefinitionGetPayload<{}>
 
+const WORKFLOW_TRANSACTION_TIMEOUT_MS = 45000
+const BULK_CREATE_BATCH_SIZE = 1000
+const UPDATE_MANY_PHASE_BATCH_SIZE = 400
+
 const normalizeNames = (value?: string[] | null) =>
   Array.from(new Set((Array.isArray(value) ? value : []).map((item) => `${item}`.trim()).filter(Boolean)))
 
@@ -41,6 +45,25 @@ const toPrismaMeasure = (measure: PhaseMeasure) =>
 const inferMeasure = (measure: PrismaPhaseMeasure | PhaseMeasure): PhaseMeasure => {
   const normalized = `${measure}`
   return normalized === 'POINT' ? 'POINT' : 'LINEAR'
+}
+
+const chunk = <T>(values: T[], size: number): T[][] => {
+  if (size <= 0) return [values]
+  const out: T[][] = []
+  for (let idx = 0; idx < values.length; idx += size) {
+    out.push(values.slice(idx, idx + size))
+  }
+  return out
+}
+
+const equalNumberSets = (left: number[], right: number[]) => {
+  if (left.length !== right.length) return false
+  const leftSorted = [...left].sort((a, b) => a - b)
+  const rightSorted = [...right].sort((a, b) => a - b)
+  for (let idx = 0; idx < leftSorted.length; idx += 1) {
+    if (leftSorted[idx] !== rightSorted[idx]) return false
+  }
+  return true
 }
 
 const buildTemplateFromDefinition = (
@@ -122,6 +145,7 @@ const normalizeWorkflow = (
     phaseDefinitionId: definition.id,
     isActive: definition.isActive,
     pointHasSides: definition.pointHasSides,
+    allowLevelCrossingBoth: definition.allowLevelCrossingBoth,
   }
 }
 
@@ -269,47 +293,72 @@ const syncPhasesWithTemplate = async (
   definition: Prisma.PhaseDefinitionGetPayload<{
     include: { defaultLayers: { include: { layerDefinition: true } }; defaultChecks: { include: { checkDefinition: true } } }
   }>,
+  options?: {
+    syncPhaseMeta?: boolean
+    syncLayerBindings?: boolean
+    syncCheckBindings?: boolean
+    syncIntervalLayers?: boolean
+  },
 ) => {
+  const syncPhaseMeta = options?.syncPhaseMeta ?? true
+  const syncLayerBindings = options?.syncLayerBindings ?? true
+  const syncCheckBindings = options?.syncCheckBindings ?? true
+  const syncIntervalLayers = options?.syncIntervalLayers ?? true
+  if (!syncPhaseMeta && !syncLayerBindings && !syncCheckBindings && !syncIntervalLayers) {
+    return
+  }
+
   const layerIds = definition.defaultLayers.map((item) => item.layerDefinitionId)
   const checkIds = definition.defaultChecks.map((item) => item.checkDefinitionId)
   const layerNames = canonicalizeProgressList(
     'layer',
     definition.defaultLayers.map((item) => item.layerDefinition.name),
   )
-  const layerNameSet = new Set(layerNames)
-
   const phases = await tx.roadPhase.findMany({
     where: { phaseDefinitionId: definition.id },
-    include: { intervals: true },
+    select: { id: true },
   })
+  if (!phases.length) return
+  const phaseIds = phases.map((item) => item.id)
 
-  for (const phase of phases) {
-    await tx.roadPhase.update({
-      where: { id: phase.id },
+  if (syncPhaseMeta) {
+    await tx.roadPhase.updateMany({
+      where: { id: { in: phaseIds } },
       data: {
         measure: definition.measure,
         pointHasSides: definition.measure === PrismaPhaseMeasure.POINT ? definition.pointHasSides : false,
       },
     })
+  }
 
-    await tx.roadPhaseLayer.deleteMany({ where: { roadPhaseId: phase.id } })
+  if (syncLayerBindings) {
+    await tx.roadPhaseLayer.deleteMany({ where: { roadPhaseId: { in: phaseIds } } })
     if (layerIds.length) {
-      await tx.roadPhaseLayer.createMany({
-        data: layerIds.map((id) => ({ roadPhaseId: phase.id, layerDefinitionId: id })),
-      })
+      const layerBindings = phaseIds.flatMap((phaseId) =>
+        layerIds.map((layerDefinitionId) => ({ roadPhaseId: phaseId, layerDefinitionId })),
+      )
+      for (const batch of chunk(layerBindings, BULK_CREATE_BATCH_SIZE)) {
+        await tx.roadPhaseLayer.createMany({ data: batch })
+      }
     }
+  }
 
-    await tx.roadPhaseCheck.deleteMany({ where: { roadPhaseId: phase.id } })
+  if (syncCheckBindings) {
+    await tx.roadPhaseCheck.deleteMany({ where: { roadPhaseId: { in: phaseIds } } })
     if (checkIds.length) {
-      await tx.roadPhaseCheck.createMany({
-        data: checkIds.map((id) => ({ roadPhaseId: phase.id, checkDefinitionId: id })),
-      })
+      const checkBindings = phaseIds.flatMap((phaseId) =>
+        checkIds.map((checkDefinitionId) => ({ roadPhaseId: phaseId, checkDefinitionId })),
+      )
+      for (const batch of chunk(checkBindings, BULK_CREATE_BATCH_SIZE)) {
+        await tx.roadPhaseCheck.createMany({ data: batch })
+      }
     }
+  }
 
-    for (const interval of phase.intervals) {
-      // 先过滤非法名称，再覆盖为模板全集，保证新模板层次自动追加，模板外层次剔除
-      await tx.phaseInterval.update({
-        where: { id: interval.id },
+  if (syncIntervalLayers) {
+    for (const phaseIdBatch of chunk(phaseIds, UPDATE_MANY_PHASE_BATCH_SIZE)) {
+      await tx.phaseInterval.updateMany({
+        where: { phaseId: { in: phaseIdBatch } },
         data: { layers: layerNames },
       })
     }
@@ -322,6 +371,7 @@ export const updateWorkflowTemplate = async (params: {
   name?: string
   measure?: PhaseMeasure
   pointHasSides?: boolean
+  allowLevelCrossingBoth?: boolean
 }): Promise<WorkflowItem> => {
   const definition = await fetchDefinitionWithRelations(params.phaseDefinitionId)
   if (!definition) {
@@ -333,76 +383,99 @@ export const updateWorkflowTemplate = async (params: {
   const prismaMeasure = toPrismaMeasure(nextMeasure)
   const nextPointHasSides =
     nextMeasure === 'POINT' ? Boolean(params.pointHasSides ?? definition.pointHasSides) : false
+  const nextAllowLevelCrossingBoth =
+    nextMeasure === 'POINT'
+      ? Boolean(params.allowLevelCrossingBoth ?? definition.allowLevelCrossingBoth)
+      : false
   const layerNames = normalizeNames(params.workflow.layers?.map((item) => item.name))
   const checkNames = normalizeNames(
     params.workflow.layers?.flatMap((item) => item.checks?.map((check) => check.name) || []),
   )
   assertNonEmptyTemplate(layerNames, checkNames)
 
-  const { definition: savedDefinition, workflow: savedWorkflow } = await prisma.$transaction(async (tx) => {
-    const duplicate = await tx.phaseDefinition.findFirst({
-      where: {
-        name: nextName,
-        measure: prismaMeasure,
-        NOT: { id: definition.id },
-      },
-    })
-    if (duplicate) {
-      throw new Error('已存在同名且计量方式相同的模板，请更换名称或计量方式。')
-    }
+  const { definition: savedDefinition, workflow: savedWorkflow } = await prisma.$transaction(
+    async (tx) => {
+      const duplicate = await tx.phaseDefinition.findFirst({
+        where: {
+          name: nextName,
+          measure: prismaMeasure,
+          NOT: { id: definition.id },
+        },
+      })
+      if (duplicate) {
+        throw new Error('已存在同名且计量方式相同的模板，请更换名称或计量方式。')
+      }
 
-    const layerDefs = await ensureLayerDefinitions(layerNames, tx)
-    const checkDefs = await ensureCheckDefinitions(checkNames, tx)
-    await syncDefinitionBindings(tx, {
-      definitionId: definition.id,
-      layerIds: layerDefs.map((l) => l.id),
-      checkIds: checkDefs.map((c) => c.id),
-    })
+      const layerDefs = await ensureLayerDefinitions(layerNames, tx)
+      const checkDefs = await ensureCheckDefinitions(checkNames, tx)
+      await syncDefinitionBindings(tx, {
+        definitionId: definition.id,
+        layerIds: layerDefs.map((l) => l.id),
+        checkIds: checkDefs.map((c) => c.id),
+      })
 
-    const updated = await tx.phaseDefinition.update({
-      where: { id: definition.id },
-      data: {
-        name: nextName,
-        measure: prismaMeasure,
-        pointHasSides: nextPointHasSides,
-        updatedAt: new Date(),
-      },
-    })
+      const updated = await tx.phaseDefinition.update({
+        where: { id: definition.id },
+        data: {
+          name: nextName,
+          measure: prismaMeasure,
+          pointHasSides: nextPointHasSides,
+          allowLevelCrossingBoth: nextAllowLevelCrossingBoth,
+          updatedAt: new Date(),
+        },
+      })
 
-    const normalizedWorkflow = normalizeWorkflowForSave(
-      {
-        ...definition,
-        name: nextName,
-        measure: prismaMeasure,
-        pointHasSides: nextPointHasSides,
-      },
-      params.workflow,
-    )
+      const normalizedWorkflow = normalizeWorkflowForSave(
+        {
+          ...definition,
+          name: nextName,
+          measure: prismaMeasure,
+          pointHasSides: nextPointHasSides,
+          allowLevelCrossingBoth: nextAllowLevelCrossingBoth,
+        },
+        params.workflow,
+      )
 
-    await tx.phaseWorkflowDefinition.upsert({
-      where: { phaseDefinitionId: definition.id },
-      create: { phaseDefinitionId: definition.id, config: normalizedWorkflow },
-      update: { config: normalizedWorkflow },
-    })
+      await tx.phaseWorkflowDefinition.upsert({
+        where: { phaseDefinitionId: definition.id },
+        create: { phaseDefinitionId: definition.id, config: normalizedWorkflow },
+        update: { config: normalizedWorkflow },
+      })
 
-    const definitionWithRelations = {
-      ...updated,
-      defaultLayers: layerDefs.map((layer) => ({
-        phaseDefinitionId: updated.id,
-        layerDefinitionId: layer.id,
-        layerDefinition: layer,
-      })),
-      defaultChecks: checkDefs.map((check) => ({
-        phaseDefinitionId: updated.id,
-        checkDefinitionId: check.id,
-        checkDefinition: check,
-      })),
-    }
+      const definitionWithRelations = {
+        ...updated,
+        defaultLayers: layerDefs.map((layer) => ({
+          phaseDefinitionId: updated.id,
+          layerDefinitionId: layer.id,
+          layerDefinition: layer,
+        })),
+        defaultChecks: checkDefs.map((check) => ({
+          phaseDefinitionId: updated.id,
+          checkDefinitionId: check.id,
+          checkDefinition: check,
+        })),
+      }
 
-    await syncPhasesWithTemplate(tx, definitionWithRelations)
+      const previousLayerIds = definition.defaultLayers.map((item) => item.layerDefinitionId)
+      const previousCheckIds = definition.defaultChecks.map((item) => item.checkDefinitionId)
+      const nextLayerIds = layerDefs.map((item) => item.id)
+      const nextCheckIds = checkDefs.map((item) => item.id)
+      const phaseMetaChanged =
+        definition.measure !== prismaMeasure || definition.pointHasSides !== nextPointHasSides
+      const layerBindingsChanged = !equalNumberSets(previousLayerIds, nextLayerIds)
+      const checkBindingsChanged = !equalNumberSets(previousCheckIds, nextCheckIds)
 
-    return { definition: definitionWithRelations, workflow: normalizedWorkflow }
-  })
+      await syncPhasesWithTemplate(tx, definitionWithRelations, {
+        syncPhaseMeta: phaseMetaChanged,
+        syncLayerBindings: layerBindingsChanged,
+        syncCheckBindings: checkBindingsChanged,
+        syncIntervalLayers: layerBindingsChanged,
+      })
+
+      return { definition: definitionWithRelations, workflow: normalizedWorkflow }
+    },
+    { timeout: WORKFLOW_TRANSACTION_TIMEOUT_MS },
+  )
 
   return normalizeWorkflow(savedDefinition, savedWorkflow)
 }
@@ -411,6 +484,7 @@ export const createWorkflowTemplate = async (params: {
   name: string
   measure: PhaseMeasure
   pointHasSides?: boolean
+  allowLevelCrossingBoth?: boolean
   workflow?: WorkflowTemplate
 }): Promise<WorkflowItem> => {
   const name = params.name.trim()
@@ -420,6 +494,8 @@ export const createWorkflowTemplate = async (params: {
 
   const measure = toPrismaMeasure(params.measure)
   const pointHasSides = params.measure === 'POINT' ? Boolean(params.pointHasSides) : false
+  const allowLevelCrossingBoth =
+    params.measure === 'POINT' ? Boolean(params.allowLevelCrossingBoth) : false
   const existing = await prisma.phaseDefinition.findFirst({
     where: { name, measure },
   })
@@ -442,47 +518,51 @@ export const createWorkflowTemplate = async (params: {
   )
   assertNonEmptyTemplate(layerNames, checkNames)
 
-  const created = await prisma.$transaction(async (tx) => {
-    const layerDefs = await ensureLayerDefinitions(layerNames, tx)
-    const checkDefs = await ensureCheckDefinitions(checkNames, tx)
+  const created = await prisma.$transaction(
+    async (tx) => {
+      const layerDefs = await ensureLayerDefinitions(layerNames, tx)
+      const checkDefs = await ensureCheckDefinitions(checkNames, tx)
 
-    const definition = await tx.phaseDefinition.create({
-      data: {
-        name,
-        measure,
-        pointHasSides,
-        isActive: true,
-        defaultLayers: layerDefs.length
-          ? {
-              create: layerDefs.map((layer) => ({ layerDefinitionId: layer.id })),
-            }
-          : undefined,
-        defaultChecks: checkDefs.length
-          ? {
-              create: checkDefs.map((check) => ({ checkDefinitionId: check.id })),
-            }
-          : undefined,
-      },
-      include: {
-        defaultLayers: { include: { layerDefinition: true } },
-        defaultChecks: { include: { checkDefinition: true } },
-      },
-    })
+      const definition = await tx.phaseDefinition.create({
+        data: {
+          name,
+          measure,
+          pointHasSides,
+          allowLevelCrossingBoth,
+          isActive: true,
+          defaultLayers: layerDefs.length
+            ? {
+                create: layerDefs.map((layer) => ({ layerDefinitionId: layer.id })),
+              }
+            : undefined,
+          defaultChecks: checkDefs.length
+            ? {
+                create: checkDefs.map((check) => ({ checkDefinitionId: check.id })),
+              }
+            : undefined,
+        },
+        include: {
+          defaultLayers: { include: { layerDefinition: true } },
+          defaultChecks: { include: { checkDefinition: true } },
+        },
+      })
 
-    const normalizedWorkflow = normalizeWorkflowForSave(definition, {
-      ...initialWorkflow,
-      phaseName: name,
-      measure: params.measure,
-    })
+      const normalizedWorkflow = normalizeWorkflowForSave(definition, {
+        ...initialWorkflow,
+        phaseName: name,
+        measure: params.measure,
+      })
 
-    await tx.phaseWorkflowDefinition.create({
-      data: { phaseDefinitionId: definition.id, config: normalizedWorkflow },
-    })
+      await tx.phaseWorkflowDefinition.create({
+        data: { phaseDefinitionId: definition.id, config: normalizedWorkflow },
+      })
 
-    await syncPhasesWithTemplate(tx, definition)
+      await syncPhasesWithTemplate(tx, definition)
 
-    return { definition, workflow: normalizedWorkflow }
-  })
+      return { definition, workflow: normalizedWorkflow }
+    },
+    { timeout: WORKFLOW_TRANSACTION_TIMEOUT_MS },
+  )
 
   return normalizeWorkflow(created.definition, created.workflow)
 }

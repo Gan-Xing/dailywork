@@ -55,7 +55,11 @@ async function ProgressContent({ canManage, canViewInspections }: ProgressConten
     loadError = (error as Error).message
   }
 
-  const aggregatedPhases = aggregatePhaseProgress(roads, { locale: 'zh', splitBySpec: false })
+  const aggregatedPhases = aggregatePhaseProgress(roads, {
+    locale: 'zh',
+    splitBySpec: false,
+    keyMode: 'name-only',
+  })
   const summaryRoads: RoadSectionProgressSummaryDTO[] = roads.map((road) => ({
     id: road.id,
     slug: road.slug,

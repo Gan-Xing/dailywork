@@ -26,7 +26,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const detail = await getRoadPhaseQuantityDetail(phaseId)
+    const detail = await getRoadPhaseQuantityDetail(phaseId, { intervalId })
     if (!detail) return respond('未找到详情', 404)
 
     const hasInterval = detail.intervals.some((interval) => interval.id === intervalId)
@@ -43,4 +43,3 @@ export async function GET(request: Request) {
     return respond((error as Error).message ?? '加载详情失败', 500)
   }
 }
-

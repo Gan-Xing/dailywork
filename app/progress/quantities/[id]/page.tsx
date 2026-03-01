@@ -37,7 +37,9 @@ export default async function PhaseQuantityDetailPage({
     return <ProgressNotFound />
   }
 
-  const detail = await getRoadPhaseQuantityDetail(phaseId)
+  const detail = await getRoadPhaseQuantityDetail(phaseId, {
+    intervalId: Number.isInteger(intervalId) && intervalId > 0 ? intervalId : undefined,
+  })
   if (!detail) {
     return <ProgressNotFound />
   }

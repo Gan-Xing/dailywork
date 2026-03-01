@@ -182,6 +182,7 @@ const mapEntryToListItem = (entry: InspectionEntryDTO): InspectionListItem => {
     locationRoadSlug: entry.locationRoadSlug ?? null,
     phaseId: entry.phaseId,
     phaseName: entry.phaseName ?? rawPhase?.name ?? '',
+    intervalId: entry.intervalId ?? null,
     documentId: entry.documentId ?? null,
     documentCode: entry.documentCode ?? undefined,
     submissionNumber: entry.submissionNumber ?? null,

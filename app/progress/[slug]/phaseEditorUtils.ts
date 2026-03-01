@@ -52,7 +52,9 @@ export const normalizePhaseDTO = (phase: PhaseDTO): PhaseDTO => ({
     side: interval.side,
     locationRoadId: interval.locationRoadId ?? null,
     levelCrossingSide:
-      interval.levelCrossingSide === 'LEFT' || interval.levelCrossingSide === 'RIGHT'
+      interval.levelCrossingSide === 'LEFT' ||
+      interval.levelCrossingSide === 'RIGHT' ||
+      interval.levelCrossingSide === 'BOTH'
         ? interval.levelCrossingSide
         : null,
     spec: interval.spec ?? null,
@@ -89,6 +91,7 @@ const normalizeEntityKey = (id?: string | number | null, name?: string | null) =
 
 export type CheckStatusKeyInput = {
   phaseId: number
+  intervalId?: number | null
   phaseName?: string | null
   layerId?: string | null | number
   layerName?: string | null
@@ -104,6 +107,7 @@ export const buildCheckStatusBaseKey = (input: CheckStatusKeyInput) => {
   const [start, end] = normalizeRange(input.startPk, input.endPk)
   return [
     normalizeEntityKey(input.phaseId, input.phaseName),
+    `interval:${input.intervalId ?? 'default'}`,
     normalizeEntityKey(input.layerId, input.layerName),
     normalizeEntityKey(input.checkId, input.checkName),
     `loc:${input.locationRoadId ?? 'default'}`,
@@ -143,12 +147,15 @@ export const normalizeInterval = (interval: PhaseIntervalPayload, measure: Phase
   const safeEnd = Number.isFinite(end) ? end : safeStart
   const [orderedStart, orderedEnd] = safeStart <= safeEnd ? [safeStart, safeEnd] : [safeEnd, safeStart]
   return {
+    intervalId: typeof interval.id === 'number' ? interval.id : null,
     startPk: orderedStart,
     endPk: orderedEnd,
     side: interval.side,
     locationRoadId: interval.locationRoadId ?? null,
     levelCrossingSide:
-      interval.levelCrossingSide === 'LEFT' || interval.levelCrossingSide === 'RIGHT'
+      interval.levelCrossingSide === 'LEFT' ||
+      interval.levelCrossingSide === 'RIGHT' ||
+      interval.levelCrossingSide === 'BOTH'
         ? interval.levelCrossingSide
         : null,
     spec: typeof interval.spec === 'string' && interval.spec.trim() ? interval.spec.trim() : null,
@@ -212,11 +219,15 @@ export const snapshotMatches =
     targetSide: IntervalSide,
     targetStart: number,
     targetEnd: number,
+    targetIntervalId?: number | null,
     targetLocationRoadId?: number | null,
     targetLevelCrossingSide?: LevelCrossingSide | null,
   ) =>
   (snapshot: LatestPointInspection) => {
     if (snapshot.phaseId !== phaseId) return false
+    if (targetIntervalId !== null && targetIntervalId !== undefined && (snapshot.intervalId ?? null) !== targetIntervalId) {
+      return false
+    }
     if (targetLocationRoadId !== undefined && targetLocationRoadId !== null) {
       if ((snapshot.locationRoadId ?? null) !== targetLocationRoadId) return false
     }
@@ -236,7 +247,19 @@ export const mergeAdjacentSegments = (segments: Segment[]) => {
   const merged: Segment[] = []
   segments.forEach((seg) => {
     const last = merged[merged.length - 1]
+    const normalizeLayers = (values?: string[]) =>
+      (values ?? [])
+        .map((item) => normalizeLabel(item))
+        .filter(Boolean)
+        .sort()
+    const lastLayers = normalizeLayers(last?.layers)
+    const segLayers = normalizeLayers(seg.layers)
+    const sameLayers =
+      lastLayers.length === segLayers.length &&
+      lastLayers.every((item, idx) => item === segLayers[idx])
     const sameSpec =
+      (last?.intervalId ?? null) === (seg.intervalId ?? null) &&
+      sameLayers &&
       (last?.spec ?? null) === (seg.spec ?? null) &&
       (last?.billQuantity ?? null) === (seg.billQuantity ?? null) &&
       (last?.locationRoadId ?? null) === (seg.locationRoadId ?? null) &&
@@ -273,6 +296,20 @@ export const applyInspectionStatuses = (segments: Segment[], inspections: Inspec
     let status = design.status
     if (design.status !== 'nonDesign') {
       const overlaps = inspections.filter((insp) => {
+        const hasDesignIntervalId = design.intervalId !== null && design.intervalId !== undefined
+        const hasInspectionIntervalId = insp.intervalId !== null && insp.intervalId !== undefined
+        const isLevelCrossingSegment =
+          design.levelCrossingSide !== null && design.levelCrossingSide !== undefined
+        if (hasDesignIntervalId) {
+          if (isLevelCrossingSegment) {
+            // Level-crossing segments must match exact interval id.
+            if ((insp.intervalId ?? null) !== design.intervalId) return false
+          } else if (hasInspectionIntervalId && (insp.intervalId ?? null) !== design.intervalId) {
+            // Non-level-crossing segments allow legacy rows with null intervalId.
+            // If the row has intervalId, enforce consistency.
+            return false
+          }
+        }
         if (design.locationRoadId !== null && design.locationRoadId !== undefined) {
           if ((insp.locationRoadId ?? null) !== design.locationRoadId) return false
         }
@@ -301,6 +338,8 @@ export const applyInspectionStatuses = (segments: Segment[], inspections: Inspec
       start,
       end,
       status,
+      intervalId: design.intervalId ?? null,
+      layers: design.layers ?? [],
       spec: design.spec,
       billQuantity: design.billQuantity,
       locationRoadId: design.locationRoadId ?? null,
@@ -328,9 +367,11 @@ export const buildLinearView = (
   const right: Segment[] = []
   normalized.forEach((interval) => {
     const baseSegment = {
+      intervalId: interval.intervalId,
       start: interval.startPk,
       end: interval.endPk,
       status: 'pending' as Status,
+      layers: interval.layers ?? [],
       spec: interval.spec,
       billQuantity: interval.billQuantity,
       locationRoadId: interval.locationRoadId ?? null,
@@ -385,7 +426,17 @@ export const buildPointView = (phase: PhaseDTO, fallbackStart: number, fallbackE
   return {
     min: safeMin,
     max: safeMax,
-    points: normalized,
+    points: normalized.map((item) => ({
+      intervalId: item.intervalId ?? undefined,
+      startPk: item.startPk,
+      endPk: item.endPk,
+      side: item.side,
+      spec: item.spec ?? null,
+      billQuantity: item.billQuantity ?? null,
+      locationRoadId: item.locationRoadId ?? null,
+      levelCrossingSide: item.levelCrossingSide ?? null,
+      layers: item.layers,
+    })),
   }
 }
 

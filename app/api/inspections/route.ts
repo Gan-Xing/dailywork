@@ -20,7 +20,7 @@ export async function GET(request: Request) {
     status: statusParams.length ? statusParams : undefined,
     side: (searchParams.get('side') as 'LEFT' | 'RIGHT' | 'BOTH' | null) ?? undefined,
     levelCrossingSide:
-      (searchParams.get('levelCrossingSide') as 'LEFT' | 'RIGHT' | null) ?? undefined,
+      (searchParams.get('levelCrossingSide') as 'LEFT' | 'RIGHT' | 'BOTH' | null) ?? undefined,
     types: typeParams.length ? typeParams : undefined,
     check: searchParams.get('check') ?? undefined,
     keyword: searchParams.get('keyword') ?? undefined,

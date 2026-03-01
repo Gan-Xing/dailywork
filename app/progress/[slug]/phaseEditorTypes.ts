@@ -25,6 +25,7 @@ export type Status = 'pending' | 'scheduled' | 'submitted' | 'inProgress' | 'app
 
 export type InspectionSlice = {
   phaseId: number
+  intervalId?: number | null
   side: IntervalSide
   startPk: number
   endPk: number
@@ -36,6 +37,7 @@ export type InspectionSlice = {
 
 export type LatestPointInspection = {
   phaseId: number
+  intervalId?: number | null
   phaseName?: string | null
   layerId?: string | null
   layerName?: string | null
@@ -51,9 +53,11 @@ export type LatestPointInspection = {
 }
 
 export interface Segment {
+  intervalId?: number | null
   start: number
   end: number
   status: Status
+  layers?: string[]
   spec?: string | null
   billQuantity?: number | null
   locationRoadId?: number | null
@@ -85,6 +89,7 @@ export interface PointView {
   min: number
   max: number
   points: {
+    intervalId?: number
     startPk: number
     endPk: number
     side: IntervalSide
@@ -99,6 +104,7 @@ export interface PointView {
 export interface SelectedSegment {
   phase: string
   phaseId: number
+  intervalId?: number | null
   measure: PhaseMeasure
   layers: string[]
   checks: string[]
@@ -135,6 +141,7 @@ export type SideBooking = {
 
 export type InspectionSubmitBatch = {
   phaseId: number
+  intervalId?: number | null
   side: IntervalSide
   startPk: number
   endPk: number
@@ -150,6 +157,7 @@ export type InspectionEntrySubmitPayload = {
   locationRoadId?: number | null
   levelCrossingSide?: LevelCrossingSide | null
   phaseId: number
+  intervalId?: number | null
   side: IntervalSide
   startPk: number
   endPk: number

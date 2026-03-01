@@ -33,7 +33,7 @@ const parseOptionalNumber = (value: unknown) => {
 const normalizeLevelCrossingSide = (value: unknown): LevelCrossingSide | null | undefined => {
   if (value === undefined) return undefined
   if (value === null || value === '') return null
-  return value === 'LEFT' || value === 'RIGHT' ? value : null
+  return value === 'LEFT' || value === 'RIGHT' || value === 'BOTH' ? value : null
 }
 
 const resolveDocumentId = async (payload: PatchPayload) => {
@@ -110,6 +110,7 @@ export async function POST(request: Request) {
       locationRoadId: true,
       levelCrossingSide: true,
       phaseId: true,
+      intervalId: true,
       side: true,
       startPk: true,
       endPk: true,
@@ -126,6 +127,7 @@ export async function POST(request: Request) {
       locationRoadId: number | null
       levelCrossingSide: LevelCrossingSide | null
       phaseId: number
+      intervalId: number | null
       side: IntervalSide
       startPk: number
       endPk: number
@@ -133,13 +135,14 @@ export async function POST(request: Request) {
     }
   >()
   seedEntries.forEach((entry) => {
-    const key = `${entry.roadId}:${entry.locationRoadId ?? 'null'}:${entry.levelCrossingSide ?? 'null'}:${entry.phaseId}:${entry.side}:${entry.startPk}:${entry.endPk}:${entry.documentId ?? 'null'}`
+    const key = `${entry.roadId}:${entry.locationRoadId ?? 'null'}:${entry.levelCrossingSide ?? 'null'}:${entry.phaseId}:${entry.intervalId ?? 'null'}:${entry.side}:${entry.startPk}:${entry.endPk}:${entry.documentId ?? 'null'}`
     if (!groupMap.has(key)) {
       groupMap.set(key, {
         roadId: entry.roadId,
         locationRoadId: entry.locationRoadId ?? null,
         levelCrossingSide: entry.levelCrossingSide ?? null,
         phaseId: entry.phaseId,
+        intervalId: entry.intervalId ?? null,
         side: entry.side,
         startPk: entry.startPk,
         endPk: entry.endPk,
@@ -152,6 +155,7 @@ export async function POST(request: Request) {
     locationRoadId: entry.locationRoadId,
     levelCrossingSide: entry.levelCrossingSide,
     phaseId: entry.phaseId,
+    intervalId: entry.intervalId,
     side: entry.side,
     startPk: entry.startPk,
     endPk: entry.endPk,

@@ -33,6 +33,7 @@ export type WorkflowBinding = WorkflowTemplate & {
   phaseDefinitionId: number
   isActive?: boolean
   pointHasSides?: boolean
+  allowLevelCrossingBoth?: boolean
 }
 
 export const FIXED_INSPECTION_TYPES = ['现场验收', '测量验收', '试验验收', '其他']
@@ -279,8 +280,14 @@ export const sideDitchWorkflow: WorkflowTemplate = {
   description: '基坑验收后进行边沟安装，可并行左/右侧施工。',
   defaultTypes: defaultWorkflowTypes,
   layers: [
-    simpleLayer('excavation', '基坑', 1, ['放样与开挖']),
-    simpleLayer('ditch', '边沟', 2, ['安装验收'], ['excavation']),
+    {
+      ...simpleLayer('excavation', '基坑', 1, ['放样与开挖']),
+      parallelWith: ['ditch'],
+    },
+    {
+      ...simpleLayer('ditch', '边沟', 2, ['安装验收'], ['excavation']),
+      parallelWith: ['excavation'],
+    },
   ],
 }
 

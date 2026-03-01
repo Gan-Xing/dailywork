@@ -275,7 +275,16 @@ export const listBoqCompletion = async (params: {
   const inputs = await prisma.phaseItemInput.findMany({
     where: {
       phaseItemId: { in: phaseItemIds },
-      interval: { phase: { road: { projectId } } },
+      interval: {
+        OR: [
+          { locationRoad: { is: { projectId } } },
+          {
+            locationRoad: { is: { projectId: null } },
+            phase: { road: { projectId } },
+          },
+          { locationRoadId: null, phase: { road: { projectId } } },
+        ],
+      },
     },
     select: {
       phaseItemId: true,
@@ -378,7 +387,16 @@ export const listBoqCompletionDetails = async (params: {
   const inputs = await prisma.phaseItemInput.findMany({
     where: {
       phaseItemId: { in: phaseItemIds },
-      interval: { phase: { road: { projectId } } },
+      interval: {
+        OR: [
+          { locationRoad: { is: { projectId } } },
+          {
+            locationRoad: { is: { projectId: null } },
+            phase: { road: { projectId } },
+          },
+          { locationRoadId: null, phase: { road: { projectId } } },
+        ],
+      },
     },
     select: {
       id: true,

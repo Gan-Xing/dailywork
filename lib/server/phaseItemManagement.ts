@@ -16,7 +16,14 @@ import type {
   PhaseItemDTO,
   PhaseItemInputDTO,
   PhaseIntervalDTO,
+  PhaseIntervalFilter,
+  PhaseIntervalManagementFacet,
+  PhaseIntervalManagementListResponse,
   PhaseIntervalManagementRow,
+  PhaseIntervalBindingStatus,
+  PhaseIntervalQuantitySource,
+  PhaseIntervalSortField,
+  PhaseIntervalSortSpec,
   IntervalBoundPhaseItemDTO,
   RoadPhaseQuantityDetailDTO,
 } from '@/lib/phaseItemTypes'
@@ -100,11 +107,13 @@ const buildPointStructureKey = (
   side: IntervalSide,
   locationRoadId?: number | null,
   levelCrossingSide?: LevelCrossingSide | null,
+  intervalId?: number | null,
 ) => {
   const [start, end] = normalizeRange(startPk, endPk)
   const startKey = Math.round(start * 1000)
   const endKey = Math.round(end * 1000)
-  return `${startKey}-${endKey}-${side ?? 'BOTH'}-${locationRoadId ?? 'default'}-${levelCrossingSide ?? 'default'}`
+  const intervalKey = levelCrossingSide ? (intervalId ?? 'default') : 'default'
+  return `${intervalKey}-${startKey}-${endKey}-${side ?? 'BOTH'}-${locationRoadId ?? 'default'}-${levelCrossingSide ?? 'default'}`
 }
 
 const resolvePhaseLayers = (phase: {
@@ -203,6 +212,7 @@ const calcLinearIntervalPercent = (
 
 const calcPointIntervalPercent = (params: {
   interval: {
+    id?: number
     startPk: number
     endPk: number
     side: IntervalSide
@@ -242,6 +252,7 @@ const calcPointIntervalPercent = (params: {
       side,
       interval.locationRoadId ?? null,
       interval.levelCrossingSide ?? null,
+      interval.id ?? null,
     )
     const entries = entriesByStructure.get(key) ?? []
     entries.forEach((entry) => {
@@ -255,7 +266,223 @@ const calcPointIntervalPercent = (params: {
   return Math.min(100, Math.round(percent))
 }
 
-export const listPhaseIntervalManagementRows = async (): Promise<PhaseIntervalManagementRow[]> => {
+const sideSortWeight: Record<string, number> = {
+  LEFT: 1,
+  RIGHT: 2,
+  BOTH: 3,
+}
+
+const displaySortLabels: Record<string, string> = {
+  LINEAR: '延米',
+  POINT: '单体',
+}
+
+const compareText = (a: string, b: string) =>
+  a.localeCompare(b, 'zh-CN', { sensitivity: 'base' })
+
+const resolveEffectiveProject = (params: {
+  phaseRoadProjectId: number | null | undefined
+  phaseRoadProjectName: string | null | undefined
+  phaseRoadProjectCode: string | null | undefined
+  locationRoadProjectId?: number | null
+  locationRoadProjectName?: string | null
+  locationRoadProjectCode?: string | null
+}) => {
+  if (params.locationRoadProjectId) {
+    return {
+      projectId: params.locationRoadProjectId,
+      projectName: params.locationRoadProjectName ?? null,
+      projectCode: params.locationRoadProjectCode ?? null,
+    }
+  }
+  return {
+    projectId: params.phaseRoadProjectId ?? null,
+    projectName: params.phaseRoadProjectName ?? null,
+    projectCode: params.phaseRoadProjectCode ?? null,
+  }
+}
+
+const toSortStack = (sort?: PhaseIntervalSortSpec[]): PhaseIntervalSortSpec[] =>
+  sort?.length ? sort : [{ field: 'updatedAt', order: 'desc' }]
+
+const NO_PROJECT = '__none__'
+
+const formatUpdatedDate = (value: string) => value.slice(0, 10)
+
+const getCompletionBucket = (percent: number) => {
+  if (percent >= 100) return '100%'
+  if (percent >= 50) return '50-99%'
+  if (percent > 0) return '1-49%'
+  return '0%'
+}
+
+const getProjectKey = (row: PhaseIntervalManagementRow) =>
+  row.projectId ? String(row.projectId) : NO_PROJECT
+
+const getBindingStatus = (row: PhaseIntervalManagementRow): PhaseIntervalBindingStatus =>
+  row.hasBoundItems ? 'BOUND' : 'UNBOUND'
+
+const getQuantitySource = (row: PhaseIntervalManagementRow): PhaseIntervalQuantitySource =>
+  row.quantityOverridden ? 'MANUAL' : 'AUTO'
+
+const normalizeFilterNumbers = (values: number[] | undefined) =>
+  values?.filter((value) => Number.isFinite(value)) ?? []
+
+const normalizeFilterStrings = (values: string[] | undefined) =>
+  values?.map((value) => value.trim()).filter(Boolean) ?? []
+
+const applyPhaseIntervalFilters = (
+  rows: PhaseIntervalManagementRow[],
+  filter?: PhaseIntervalFilter,
+) => {
+  if (!filter) return rows
+
+  const projectSet = new Set(normalizeFilterStrings(filter.projectKeys))
+  const roadSet = new Set(normalizeFilterNumbers(filter.roadIds).map((value) => String(value)))
+  const phaseSet = new Set(normalizeFilterStrings(filter.phases))
+  const startPkSet = new Set(normalizeFilterNumbers(filter.startPks).map((value) => String(value)))
+  const endPkSet = new Set(normalizeFilterNumbers(filter.endPks).map((value) => String(value)))
+  const sideSet = new Set(normalizeFilterStrings(filter.sides))
+  const displaySet = new Set(normalizeFilterStrings(filter.displays))
+  const completionSet = new Set(normalizeFilterStrings(filter.completions))
+  const updatedDateSet = new Set(normalizeFilterStrings(filter.updatedDates))
+  const bindingSet = new Set(normalizeFilterStrings(filter.bindings))
+  const quantitySourceSet = new Set(normalizeFilterStrings(filter.quantitySources))
+
+  return rows.filter((row) => {
+    if (projectSet.size && !projectSet.has(getProjectKey(row))) return false
+    if (roadSet.size && !roadSet.has(String(row.locationRoadId ?? row.roadId))) return false
+    if (phaseSet.size && !phaseSet.has(row.phaseName)) return false
+    if (startPkSet.size && !startPkSet.has(String(row.startPk))) return false
+    if (endPkSet.size && !endPkSet.has(String(row.endPk))) return false
+    if (sideSet.size && !sideSet.has(row.side)) return false
+    if (displaySet.size && !displaySet.has(row.measure)) return false
+    if (completionSet.size && !completionSet.has(getCompletionBucket(row.completedPercent))) return false
+    if (updatedDateSet.size && !updatedDateSet.has(formatUpdatedDate(row.updatedAt))) return false
+    if (bindingSet.size && !bindingSet.has(getBindingStatus(row))) return false
+    if (quantitySourceSet.size && !quantitySourceSet.has(getQuantitySource(row))) return false
+    return true
+  })
+}
+
+const buildPhaseIntervalFacets = (rows: PhaseIntervalManagementRow[]): PhaseIntervalManagementFacet => {
+  const projects = new Map<
+    string,
+    { key: string; projectId: number | null; projectName: string | null; projectCode: string | null }
+  >()
+  const roads = new Map<number, { id: number; name: string; slug: string }>()
+  const phases = new Set<string>()
+  const startPks = new Set<number>()
+  const endPks = new Set<number>()
+  const sides = new Set<IntervalSide>()
+  const displays = new Set<'LINEAR' | 'POINT'>()
+  const completions = new Set<string>()
+  const updatedDates = new Set<string>()
+  const bindings = new Set<PhaseIntervalBindingStatus>()
+  const quantitySources = new Set<PhaseIntervalQuantitySource>()
+
+  rows.forEach((row) => {
+    const projectKey = getProjectKey(row)
+    if (!projects.has(projectKey)) {
+      projects.set(projectKey, {
+        key: projectKey,
+        projectId: row.projectId,
+        projectName: row.projectName,
+        projectCode: row.projectCode,
+      })
+    }
+    const roadId = row.locationRoadId ?? row.roadId
+    if (!roads.has(roadId)) {
+      roads.set(roadId, {
+        id: roadId,
+        name: row.locationRoadName ?? row.roadName,
+        slug: row.locationRoadSlug ?? row.roadSlug,
+      })
+    }
+    phases.add(row.phaseName)
+    startPks.add(row.startPk)
+    endPks.add(row.endPk)
+    sides.add(row.side)
+    displays.add(row.measure)
+    completions.add(getCompletionBucket(row.completedPercent))
+    updatedDates.add(formatUpdatedDate(row.updatedAt))
+    bindings.add(getBindingStatus(row))
+    quantitySources.add(getQuantitySource(row))
+  })
+
+  return {
+    projects: Array.from(projects.values()).sort((left, right) =>
+      compareText(
+        left.projectName ? `${left.projectName}${left.projectCode ? `（${left.projectCode}）` : ''}` : '未绑定项目',
+        right.projectName ? `${right.projectName}${right.projectCode ? `（${right.projectCode}）` : ''}` : '未绑定项目',
+      ),
+    ),
+    roads: Array.from(roads.values()).sort((left, right) => compareText(left.name, right.name)),
+    phases: Array.from(phases).sort(compareText),
+    startPks: Array.from(startPks).sort((a, b) => a - b),
+    endPks: Array.from(endPks).sort((a, b) => a - b),
+    sides: Array.from(sides.values()).sort(
+      (left, right) => (sideSortWeight[left] ?? 99) - (sideSortWeight[right] ?? 99),
+    ),
+    displays: Array.from(displays.values()).sort((left, right) =>
+      compareText(displaySortLabels[left] ?? left, displaySortLabels[right] ?? right),
+    ),
+    completions: Array.from(completions.values()).sort(compareText),
+    updatedDates: Array.from(updatedDates.values()).sort((a, b) => b.localeCompare(a)),
+    bindings: Array.from(bindings.values()).sort(compareText),
+    quantitySources: Array.from(quantitySources.values()).sort(compareText),
+  }
+}
+
+const comparePhaseRows = (
+  left: PhaseIntervalManagementRow,
+  right: PhaseIntervalManagementRow,
+  field: PhaseIntervalSortField,
+) => {
+  switch (field) {
+    case 'project': {
+      const leftLabel = left.projectName
+        ? left.projectCode
+          ? `${left.projectName}（${left.projectCode}）`
+          : left.projectName
+        : '未绑定项目'
+      const rightLabel = right.projectName
+        ? right.projectCode
+          ? `${right.projectName}（${right.projectCode}）`
+          : right.projectName
+        : '未绑定项目'
+      return compareText(leftLabel, rightLabel)
+    }
+    case 'road':
+      return compareText(left.locationRoadName ?? left.roadName, right.locationRoadName ?? right.roadName)
+    case 'phase':
+      return compareText(left.phaseName, right.phaseName)
+    case 'startPk':
+      return left.startPk - right.startPk
+    case 'endPk':
+      return left.endPk - right.endPk
+    case 'side':
+      return (sideSortWeight[left.side] ?? 99) - (sideSortWeight[right.side] ?? 99)
+    case 'quantity':
+      return left.quantity - right.quantity
+    case 'display':
+      return compareText(
+        displaySortLabels[left.measure] ?? left.measure,
+        displaySortLabels[right.measure] ?? right.measure,
+      )
+    case 'completed':
+      return left.completedPercent - right.completedPercent
+    case 'updatedAt':
+      return new Date(left.updatedAt).getTime() - new Date(right.updatedAt).getTime()
+    default:
+      return 0
+  }
+}
+
+export const listPhaseIntervalManagementRows = async (options?: {
+  filter?: PhaseIntervalFilter
+  sort?: PhaseIntervalSortSpec[]
+}): Promise<PhaseIntervalManagementRow[]> => {
   const [progressRoads, phases] = await Promise.all([
     listRoadSectionsWithProgress(),
     prisma.roadPhase.findMany({
@@ -271,7 +498,17 @@ export const listPhaseIntervalManagementRows = async (): Promise<PhaseIntervalMa
         },
         intervals: {
           orderBy: [{ startPk: 'asc' }, { endPk: 'asc' }, { side: 'asc' }],
-          include: { locationRoad: { select: { id: true, name: true, slug: true } } },
+          include: {
+            locationRoad: {
+              select: {
+                id: true,
+                name: true,
+                slug: true,
+                projectId: true,
+                project: { select: { name: true, code: true } },
+              },
+            },
+          },
         },
         layerLinks: { include: { layerDefinition: { select: { id: true, name: true } } } },
         phaseDefinition: {
@@ -305,6 +542,7 @@ export const listPhaseIntervalManagementRows = async (): Promise<PhaseIntervalMa
         startPk: number
         endPk: number
         side: IntervalSide
+        intervalId?: number | null
         locationRoadId?: number | null
         levelCrossingSide?: LevelCrossingSide | null
       }[]
@@ -317,6 +555,7 @@ export const listPhaseIntervalManagementRows = async (): Promise<PhaseIntervalMa
           startPk: inspection.startPk,
           endPk: inspection.endPk,
           side: ensureIntervalSide(inspection.side),
+          intervalId: (inspection as { intervalId?: number | null }).intervalId ?? null,
           locationRoadId: inspection.locationRoadId ?? road.id,
           levelCrossingSide: inspection.levelCrossingSide ?? null,
         })),
@@ -336,6 +575,7 @@ export const listPhaseIntervalManagementRows = async (): Promise<PhaseIntervalMa
           startPk: true,
           endPk: true,
           side: true,
+          intervalId: true,
           layerName: true,
           checkName: true,
           locationRoadId: true,
@@ -350,6 +590,7 @@ export const listPhaseIntervalManagementRows = async (): Promise<PhaseIntervalMa
       startPk: number
       endPk: number
       side: IntervalSide
+      intervalId?: number | null
       layerName: string
       checkName: string
       locationRoadId?: number | null
@@ -362,6 +603,7 @@ export const listPhaseIntervalManagementRows = async (): Promise<PhaseIntervalMa
       startPk: entry.startPk,
       endPk: entry.endPk,
       side: ensureIntervalSide(entry.side),
+      intervalId: entry.intervalId ?? null,
       layerName: entry.layerName,
       checkName: entry.checkName,
       locationRoadId: entry.locationRoadId ?? null,
@@ -404,6 +646,7 @@ export const listPhaseIntervalManagementRows = async (): Promise<PhaseIntervalMa
         entry.side,
         entry.locationRoadId ?? null,
         entry.levelCrossingSide ?? null,
+        entry.intervalId ?? null,
       )
       const layerKey = normalizeLabel(canonicalizeSingle('layer', entry.layerName))
       const checkKey = normalizeLabel(canonicalizeSingle('check', entry.checkName))
@@ -425,6 +668,14 @@ export const listPhaseIntervalManagementRows = async (): Promise<PhaseIntervalMa
       const resolvedLocationRoad =
         interval.locationRoad ??
         (intervalLocationRoadId === phase.road.id ? phase.road : null)
+      const effectiveProject = resolveEffectiveProject({
+        phaseRoadProjectId: phase.road.projectId ?? null,
+        phaseRoadProjectName: phase.road.project?.name ?? null,
+        phaseRoadProjectCode: phase.road.project?.code ?? null,
+        locationRoadProjectId: interval.locationRoad?.projectId ?? null,
+        locationRoadProjectName: interval.locationRoad?.project?.name ?? null,
+        locationRoadProjectCode: interval.locationRoad?.project?.code ?? null,
+      })
       const rawQuantity =
         phase.measure === 'POINT'
           ? 1
@@ -448,6 +699,7 @@ export const listPhaseIntervalManagementRows = async (): Promise<PhaseIntervalMa
           ? calcPointIntervalPercent({
               interval: {
                 ...interval,
+                id: interval.id,
                 locationRoadId: intervalLocationRoadId,
                 levelCrossingSide: intervalLevelCrossingSide,
               },
@@ -471,9 +723,9 @@ export const listPhaseIntervalManagementRows = async (): Promise<PhaseIntervalMa
         locationRoadName: resolvedLocationRoad?.name ?? null,
         locationRoadSlug: resolvedLocationRoad?.slug ?? null,
         levelCrossingSide: intervalLevelCrossingSide,
-        projectId: phase.road.projectId ?? null,
-        projectName: phase.road.project?.name ?? null,
-        projectCode: phase.road.project?.code ?? null,
+        projectId: effectiveProject.projectId,
+        projectName: effectiveProject.projectName,
+        projectCode: effectiveProject.projectCode,
         startPk: interval.startPk,
         endPk: interval.endPk,
         side: interval.side,
@@ -487,7 +739,47 @@ export const listPhaseIntervalManagementRows = async (): Promise<PhaseIntervalMa
     })
   })
 
-  return rows
+  const filteredRows = applyPhaseIntervalFilters(rows, options?.filter)
+  const sortStack = toSortStack(options?.sort)
+  return filteredRows.sort((left, right) => {
+    for (const spec of sortStack) {
+      const direction = spec.order === 'asc' ? 1 : -1
+      const result = comparePhaseRows(left, right, spec.field)
+      if (result !== 0) {
+        return result * direction
+      }
+    }
+    return left.intervalId - right.intervalId
+  })
+}
+
+export const listPhaseIntervalManagementPage = async (options?: {
+  filter?: PhaseIntervalFilter
+  sort?: PhaseIntervalSortSpec[]
+  page?: number
+  pageSize?: number
+}): Promise<PhaseIntervalManagementListResponse> => {
+  const page = Math.max(1, options?.page ?? 1)
+  const pageSize = Math.max(1, Math.min(200, options?.pageSize ?? 20))
+
+  const allRows = await listPhaseIntervalManagementRows({ sort: options?.sort })
+  const filteredRows = applyPhaseIntervalFilters(allRows, options?.filter)
+  const facets = buildPhaseIntervalFacets(allRows)
+  const total = filteredRows.length
+  const unfilteredTotal = allRows.length
+  const totalPages = Math.max(1, Math.ceil(total / pageSize))
+  const safePage = Math.min(page, totalPages)
+  const offset = (safePage - 1) * pageSize
+  const items = filteredRows.slice(offset, offset + pageSize)
+
+  return {
+    items,
+    total,
+    unfilteredTotal,
+    page: safePage,
+    pageSize,
+    facets,
+  }
 }
 
 export const listIntervalBoundPhaseItems = async (
@@ -642,6 +934,7 @@ export const deletePhaseItemInput = async (inputId: number) => {
 
 export const getRoadPhaseQuantityDetail = async (
   phaseId: number,
+  options?: { intervalId?: number | null },
 ): Promise<RoadPhaseQuantityDetailDTO | null> => {
   if (!Number.isInteger(phaseId) || phaseId <= 0) {
     throw new Error('分项 ID 无效')
@@ -659,14 +952,40 @@ export const getRoadPhaseQuantityDetail = async (
           project: { select: { name: true, code: true } },
         },
       },
-      intervals: { orderBy: [{ startPk: 'asc' }, { endPk: 'asc' }, { side: 'asc' }] },
+      intervals: {
+        orderBy: [{ startPk: 'asc' }, { endPk: 'asc' }, { side: 'asc' }],
+        include: {
+          locationRoad: {
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+              projectId: true,
+              project: { select: { name: true, code: true } },
+            },
+          },
+        },
+      },
       phaseDefinition: { select: { id: true, name: true } },
     },
   })
 
   if (!phase) return null
 
-  const projectId = phase.road.projectId ?? null
+  const contextIntervalId = options?.intervalId ?? null
+  const contextInterval =
+    contextIntervalId && Number.isInteger(contextIntervalId)
+      ? phase.intervals.find((interval) => interval.id === contextIntervalId) ?? null
+      : null
+  const effectiveProject = resolveEffectiveProject({
+    phaseRoadProjectId: phase.road.projectId ?? null,
+    phaseRoadProjectName: phase.road.project?.name ?? null,
+    phaseRoadProjectCode: phase.road.project?.code ?? null,
+    locationRoadProjectId: contextInterval?.locationRoad?.projectId ?? null,
+    locationRoadProjectName: contextInterval?.locationRoad?.project?.name ?? null,
+    locationRoadProjectCode: contextInterval?.locationRoad?.project?.code ?? null,
+  })
+  const projectId = effectiveProject.projectId
   const phaseItems = await prisma.phaseItem.findMany({
     where: { phaseDefinitionId: phase.phaseDefinitionId, isActive: true },
     include: {
@@ -710,6 +1029,7 @@ export const getRoadPhaseQuantityDetail = async (
     startPk: interval.startPk,
     endPk: interval.endPk,
     side: interval.side,
+    levelCrossingSide: interval.levelCrossingSide ?? null,
     spec: interval.spec,
     billQuantity: interval.billQuantity ?? null,
   }))
@@ -779,9 +1099,9 @@ export const getRoadPhaseQuantityDetail = async (
       id: phase.road.id,
       name: phase.road.name,
       slug: phase.road.slug,
-      projectId: phase.road.projectId ?? null,
-      projectName: phase.road.project?.name ?? null,
-      projectCode: phase.road.project?.code ?? null,
+      projectId: effectiveProject.projectId,
+      projectName: effectiveProject.projectName,
+      projectCode: effectiveProject.projectCode,
     },
     intervals,
     phaseItems: phaseItemDtos,

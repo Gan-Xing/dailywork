@@ -347,7 +347,7 @@ export function PhaseFormModal({
                         </button>
                       ) : null}
                     </div>
-                    {measure === 'POINT' && layerOptions.length ? (
+                    {layerOptions.length ? (
                       <div className={`${isLevelCrossing ? 'md:col-span-8' : 'md:col-span-6'} flex flex-wrap gap-2`}>
                         {(layerOptions.length ? layerOptions : defaultLayers).map((layer) => {
                           const selected =

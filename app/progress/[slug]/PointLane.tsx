@@ -73,6 +73,7 @@ interface PointLaneProps {
     allowedLayers?: string[],
     locationRoadId?: number | null,
     levelCrossingSide?: LevelCrossingSide | null,
+    intervalId?: number | null,
   ) => {
     percent: number
     completedLayers: number
@@ -121,6 +122,7 @@ export function PointLane({
     onPointSelect({
       phase: phase.name,
       phaseId: phase.id,
+      intervalId: item.intervalId ?? null,
       measure: phase.measure,
       layers: item.layers && item.layers.length ? item.layers : phase.resolvedLayers,
       checks: phase.resolvedChecks,
@@ -173,6 +175,7 @@ export function PointLane({
                   item.layers && item.layers.length ? item.layers : phase.resolvedLayers,
                   item.locationRoadId ?? null,
                   item.levelCrossingSide ?? null,
+                  item.intervalId ?? null,
                 )
                 return (
                   <button

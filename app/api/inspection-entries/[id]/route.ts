@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 
 import type { InspectionEntryPayload } from '@/lib/progressTypes'
 import { canonicalizeProgressList } from '@/lib/i18n/progressDictionary'
+import { LEVEL_CROSSING_ROAD_SLUG } from '@/lib/roadConstants'
 import { getSessionUser, hasPermission } from '@/lib/server/authSession'
 import { prisma } from '@/lib/prisma'
 
@@ -113,12 +114,48 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   const locationRoadId = hasLocationRoadField ? parseOptionalNumber(payload.locationRoadId) : undefined
   const hasLevelCrossingSideField = Object.prototype.hasOwnProperty.call(payload as any, 'levelCrossingSide')
   const levelCrossingSide = hasLevelCrossingSideField
-    ? payload.levelCrossingSide === 'LEFT' || payload.levelCrossingSide === 'RIGHT'
+    ? payload.levelCrossingSide === 'LEFT' ||
+      payload.levelCrossingSide === 'RIGHT' ||
+      payload.levelCrossingSide === 'BOTH'
       ? payload.levelCrossingSide
       : null
     : undefined
+  const hasIntervalIdField = Object.prototype.hasOwnProperty.call(payload as any, 'intervalId')
+  const intervalId = hasIntervalIdField ? parseOptionalNumber((payload as any).intervalId) : undefined
 
   try {
+    const existing = await prisma.inspectionEntry.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        intervalId: true,
+        phaseId: true,
+        levelCrossingSide: true,
+        road: { select: { slug: true } },
+      },
+    })
+    if (!existing) {
+      return NextResponse.json({ message: '报检记录不存在或已删除' }, { status: 404 })
+    }
+    const effectiveIntervalId = intervalId === undefined ? existing.intervalId ?? null : intervalId
+    const effectiveLevelCrossingSide =
+      levelCrossingSide === undefined ? existing.levelCrossingSide ?? null : levelCrossingSide
+    const effectivePhaseId = Number(payload.phaseId || existing.phaseId)
+    if (existing.road.slug === LEVEL_CROSSING_ROAD_SLUG && !effectiveIntervalId) {
+      return NextResponse.json({ message: '平交路口报检必须指定分项区间' }, { status: 400 })
+    }
+    if (existing.road.slug === LEVEL_CROSSING_ROAD_SLUG && effectiveLevelCrossingSide === 'BOTH') {
+      const phase = await prisma.roadPhase.findUnique({
+        where: { id: effectivePhaseId },
+        select: { measure: true, phaseDefinition: { select: { allowLevelCrossingBoth: true } } },
+      })
+      const canUseBoth =
+        phase?.measure === 'POINT' && Boolean(phase.phaseDefinition?.allowLevelCrossingBoth)
+      if (!canUseBoth) {
+        return NextResponse.json({ message: '当前分项模板未启用“平交路口双侧”' }, { status: 400 })
+      }
+    }
+
     const updated = await prisma.inspectionEntry.update({
       where: { id },
       data: {
@@ -127,6 +164,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         locationRoadId: locationRoadId === undefined ? undefined : locationRoadId,
         levelCrossingSide: levelCrossingSide === undefined ? undefined : levelCrossingSide,
         phaseId: payload.phaseId,
+        intervalId: intervalId === undefined ? undefined : intervalId,
         side: payload.side,
         startPk: Number(payload.startPk),
         endPk: Number(payload.endPk),

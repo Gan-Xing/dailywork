@@ -36,6 +36,7 @@ export async function POST(request: Request) {
         name: String(payload.name || ''),
         measure: (payload.measure as any) ?? 'LINEAR',
         pointHasSides: Boolean(payload.pointHasSides),
+        allowLevelCrossingBoth: Boolean(payload.allowLevelCrossingBoth),
         workflow: payload.workflow as any,
       })
       return NextResponse.json({ workflow }, { status: 201 })
@@ -61,6 +62,7 @@ export async function POST(request: Request) {
       name: (payload.name as string | undefined) ?? (payload.workflow as any)?.phaseName,
       measure: (payload.measure as any) ?? (payload.workflow as any)?.measure,
       pointHasSides: payload.pointHasSides as boolean | undefined,
+      allowLevelCrossingBoth: payload.allowLevelCrossingBoth as boolean | undefined,
     })
     return NextResponse.json({ workflow })
   } catch (error) {

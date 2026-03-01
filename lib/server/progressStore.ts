@@ -4,6 +4,7 @@ import type { CheckDefinition, LayerDefinition } from '@prisma/client'
 import type { CheckDefinitionDTO, LayerDefinitionDTO, PhaseDTO, PhaseDefinitionDTO, PhasePayload } from '@/lib/progressTypes'
 import { prisma } from '@/lib/prisma'
 import { canonicalizeProgressList } from '@/lib/i18n/progressDictionary'
+import { LEVEL_CROSSING_ROAD_SLUG } from '@/lib/roadConstants'
 
 const TRANSACTION_TIMEOUT_MS = 15000
 
@@ -29,6 +30,38 @@ type IntervalLayerMetadata = {
 
 type IntervalWithLayer = NormalizedInterval & { layerMetadata: IntervalLayerMetadata }
 
+const normalizeLevelCrossingSide = (value: unknown): LevelCrossingSide | null =>
+  value === 'LEFT' || value === 'RIGHT' || value === 'BOTH' ? value : null
+
+const validateLevelCrossingIntervals = (params: {
+  roadId: number
+  isLevelCrossing: boolean
+  measure: PhaseMeasure
+  allowLevelCrossingBoth: boolean
+  intervals: NormalizedInterval[]
+}) => {
+  if (!params.isLevelCrossing) {
+    if (params.intervals.some((item) => item.levelCrossingSide !== null)) {
+      throw new Error('仅平交路口区间可设置平交路口侧别')
+    }
+    return params.intervals.map((item) => ({ ...item, levelCrossingSide: null }))
+  }
+
+  const canUseBoth = params.measure === PhaseMeasure.POINT && params.allowLevelCrossingBoth
+  return params.intervals.map((item) => {
+    if (!item.locationRoadId || item.locationRoadId === params.roadId) {
+      throw new Error('平交路口区间必须选择所属主路段')
+    }
+    if (!item.levelCrossingSide) {
+      throw new Error('平交路口区间必须选择平交路口侧别')
+    }
+    if (item.levelCrossingSide === 'BOTH' && !canUseBoth) {
+      throw new Error('当前分项模板未启用“平交路口双侧”')
+    }
+    return item
+  })
+}
+
 const normalizeInterval = (
   interval: PhasePayload['intervals'][number],
   measure: PhasePayload['measure'],
@@ -48,10 +81,7 @@ const normalizeInterval = (
   const rawLocationRoadId = (interval as { locationRoadId?: unknown }).locationRoadId
   const parsedLocationRoadId = Number(rawLocationRoadId)
   const rawLevelCrossingSide = (interval as { levelCrossingSide?: unknown }).levelCrossingSide
-  const levelCrossingSide =
-    rawLevelCrossingSide === 'LEFT' || rawLevelCrossingSide === 'RIGHT'
-      ? rawLevelCrossingSide
-      : null
+  const levelCrossingSide = normalizeLevelCrossingSide(rawLevelCrossingSide)
 
   const side = interval.side ?? 'BOTH'
   const normalizedSide =
@@ -143,6 +173,7 @@ const mapDefinitionToDTO = (
   name: definition.name,
   measure: definition.measure,
   pointHasSides: definition.pointHasSides,
+  allowLevelCrossingBoth: definition.allowLevelCrossingBoth,
   defaultLayers: definition.defaultLayers.map((l) => l.layerDefinition.name),
   defaultLayerObjects: definition.defaultLayers.map((l) => ({
     id: l.layerDefinition.id,
@@ -326,6 +357,14 @@ export const createPhase = async (roadId: number, payload: PhasePayload) => {
       }
 
       const definition = await fetchDefinitionWithRelations(tx, targetDefinitionId)
+      const road = await tx.roadSection.findUnique({
+        where: { id: roadId },
+        select: { slug: true },
+      })
+      if (!road) {
+        throw new Error('路段不存在或已删除')
+      }
+      const isLevelCrossing = road.slug === LEVEL_CROSSING_ROAD_SLUG
       const measureFromDefinition = definition.measure
       const pointHasSidesFromDefinition = definition.pointHasSides
       if (measureFromDefinition !== (payload.measure === 'POINT' ? PhaseMeasure.POINT : PhaseMeasure.LINEAR)) {
@@ -338,6 +377,13 @@ export const createPhase = async (roadId: number, payload: PhasePayload) => {
       ) {
         throw new Error('分项左右侧设置必须与模板一致')
       }
+      const validatedIntervals = validateLevelCrossingIntervals({
+        roadId,
+        isLevelCrossing,
+        measure: measureFromDefinition,
+        allowLevelCrossingBoth: definition.allowLevelCrossingBoth,
+        intervals: normalizedIntervals,
+      })
 
       const allowedLayerIds = definition.defaultLayers.map((item) => item.layerDefinitionId)
       const allowedCheckIds = definition.defaultChecks.map((item) => item.checkDefinitionId)
@@ -373,7 +419,7 @@ export const createPhase = async (roadId: number, payload: PhasePayload) => {
           pointHasSides: measureFromDefinition === PhaseMeasure.POINT ? pointHasSidesFromDefinition : false,
           designLength,
           intervals: {
-            create: normalizedIntervals.map((item, idx) => {
+            create: validatedIntervals.map((item, idx) => {
               const layerMetadata = intervalLayerData[idx]
               return {
                 startPk: item.startPk,
@@ -474,6 +520,14 @@ export const updatePhase = async (roadId: number, phaseId: number, payload: Phas
       }
 
       const definition = await fetchDefinitionWithRelations(tx, targetDefinitionId)
+      const road = await tx.roadSection.findUnique({
+        where: { id: roadId },
+        select: { slug: true },
+      })
+      if (!road) {
+        throw new Error('路段不存在或已删除')
+      }
+      const isLevelCrossing = road.slug === LEVEL_CROSSING_ROAD_SLUG
       const measureFromDefinition = definition.measure
       const pointHasSidesFromDefinition = definition.pointHasSides
       if (measureFromDefinition !== (payload.measure === 'POINT' ? PhaseMeasure.POINT : PhaseMeasure.LINEAR)) {
@@ -486,6 +540,13 @@ export const updatePhase = async (roadId: number, phaseId: number, payload: Phas
       ) {
         throw new Error('分项左右侧设置必须与模板一致')
       }
+      const validatedIntervals = validateLevelCrossingIntervals({
+        roadId,
+        isLevelCrossing,
+        measure: measureFromDefinition,
+        allowLevelCrossingBoth: definition.allowLevelCrossingBoth,
+        intervals: normalizedIntervals,
+      })
 
       const allowedLayerIds = definition.defaultLayers.map((item) => item.layerDefinitionId)
       const allowedCheckIds = definition.defaultChecks.map((item) => item.checkDefinitionId)
@@ -494,7 +555,7 @@ export const updatePhase = async (roadId: number, phaseId: number, payload: Phas
         resolveIntervalLayers((item as { layers?: string[] }).layers, allowedLayerMap),
       )
       const intervalsWithLayers: IntervalWithLayer[] =
-        normalizedIntervals.map((interval, idx) => ({
+        validatedIntervals.map((interval, idx) => ({
           ...interval,
           layerMetadata: intervalLayerData[idx],
         }))

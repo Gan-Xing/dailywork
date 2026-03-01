@@ -40,6 +40,7 @@ type UsePhaseManagementResult = {
   name: string
   measure: PhaseMeasure
   pointHasSides: boolean
+  allowLevelCrossingBoth: boolean
   intervals: PhaseIntervalPayload[]
   error: string | null
   isPending: boolean
@@ -99,6 +100,9 @@ export function usePhaseManagement({
   const [name, setName] = useState(() => phaseDefinitions[0]?.name ?? '')
   const [measure, setMeasure] = useState<PhaseMeasure>(() => phaseDefinitions[0]?.measure ?? 'LINEAR')
   const [pointHasSides, setPointHasSides] = useState(() => Boolean(phaseDefinitions[0]?.pointHasSides))
+  const [allowLevelCrossingBoth, setAllowLevelCrossingBoth] = useState(
+    () => Boolean(phaseDefinitions[0]?.allowLevelCrossingBoth),
+  )
   const defaultLocationRoadId = isLevelCrossing ? null : road.id
   const [intervals, setIntervals] = useState<PhaseIntervalPayload[]>([
     {
@@ -220,6 +224,9 @@ export function usePhaseManagement({
       setName(definition.name)
       setMeasure(definition.measure)
       setPointHasSides(definition.measure === 'POINT' ? Boolean(definition.pointHasSides) : false)
+      setAllowLevelCrossingBoth(
+        definition.measure === 'POINT' ? Boolean(definition.allowLevelCrossingBoth) : false,
+      )
     },
     [],
   )
@@ -252,6 +259,7 @@ export function usePhaseManagement({
     setName(defaultDefinition?.name ?? '')
     setMeasure(defaultDefinition?.measure ?? 'LINEAR')
     setPointHasSides(Boolean(defaultDefinition?.pointHasSides))
+    setAllowLevelCrossingBoth(Boolean(defaultDefinition?.allowLevelCrossingBoth))
     setIntervals([defaultInterval])
     setEditingId(null)
     setError(null)
@@ -295,6 +303,13 @@ export function usePhaseManagement({
       })),
     )
     setPointHasSides(Boolean(normalized.pointHasSides))
+    setAllowLevelCrossingBoth(
+      normalized.measure === 'POINT'
+        ? Boolean(
+          definitions.find((item) => item.id === normalized.definitionId)?.allowLevelCrossingBoth,
+        )
+        : false,
+    )
     setEditingId(normalized.id)
     setError(null)
     requestAnimationFrame(() => {
@@ -328,7 +343,8 @@ export function usePhaseManagement({
         }
         const missingLevelCrossingSide = intervals.some((item) => {
           const side = item.levelCrossingSide
-          return side !== 'LEFT' && side !== 'RIGHT'
+          if (side === 'LEFT' || side === 'RIGHT') return false
+          return !(measure === 'POINT' && allowLevelCrossingBoth && side === 'BOTH')
         })
         if (missingLevelCrossingSide) {
           setError(t.errors.levelCrossingSideMissing ?? t.errors.invalidRange)
@@ -352,19 +368,16 @@ export function usePhaseManagement({
           billQuantityInput === null || billQuantityInput === undefined
             ? null
             : Number(billQuantityInput)
-        const layers =
-          measure === 'POINT'
-            ? Array.from(
-              new Set(
-                (item.layers?.length
-                  ? item.layers
-                  : layerOptions.length
-                    ? layerOptions
-                    : defaultLayers
-                ).filter(Boolean),
-              ),
-            )
-            : []
+        const layers = Array.from(
+          new Set(
+            (item.layers?.length
+              ? item.layers
+              : layerOptions.length
+                ? layerOptions
+                : defaultLayers
+            ).filter(Boolean),
+          ),
+        )
         const layerIds = layers
           .map((name) => allowedLayerIdByName.get(normalizeLabel(name)))
           .filter((id): id is number => Number.isInteger(id))
@@ -372,7 +385,10 @@ export function usePhaseManagement({
           ? (Number.isFinite(Number(item.locationRoadId)) ? Number(item.locationRoadId) : null)
           : road.id
         const levelCrossingSide =
-          isLevelCrossing && (item.levelCrossingSide === 'LEFT' || item.levelCrossingSide === 'RIGHT')
+          isLevelCrossing &&
+            (item.levelCrossingSide === 'LEFT' ||
+              item.levelCrossingSide === 'RIGHT' ||
+              (measure === 'POINT' && allowLevelCrossingBoth && item.levelCrossingSide === 'BOTH'))
             ? item.levelCrossingSide
             : null
         return {
@@ -426,6 +442,9 @@ export function usePhaseManagement({
               name: phase.definitionName,
               measure: phase.measure,
               pointHasSides: phase.pointHasSides,
+              allowLevelCrossingBoth:
+                definitions.find((item) => item.id === phase.definitionId)?.allowLevelCrossingBoth ??
+                false,
               defaultLayers: phase.resolvedLayers,
               defaultLayerObjects: phase.allowedLayers ?? [],
               defaultChecks: phase.resolvedChecks,
@@ -442,6 +461,8 @@ export function usePhaseManagement({
               ...item,
               measure: phase.measure,
               pointHasSides: phase.pointHasSides,
+              allowLevelCrossingBoth:
+                item.allowLevelCrossingBoth ?? definitions.find((def) => def.id === item.id)?.allowLevelCrossingBoth ?? false,
               defaultLayers: phase.resolvedLayers,
               defaultLayerObjects: phase.allowedLayers ?? [],
               defaultChecks: phase.resolvedChecks,
@@ -507,6 +528,7 @@ export function usePhaseManagement({
     name,
     measure,
     pointHasSides,
+    allowLevelCrossingBoth,
     intervals,
     error,
     isPending,

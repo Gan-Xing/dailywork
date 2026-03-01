@@ -107,7 +107,9 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       : undefined
     const hasLevelCrossingSideField = Object.prototype.hasOwnProperty.call(payload as any, 'levelCrossingSide')
     const parsedLevelCrossingSide = hasLevelCrossingSideField
-      ? payload.levelCrossingSide === 'LEFT' || payload.levelCrossingSide === 'RIGHT'
+      ? payload.levelCrossingSide === 'LEFT' ||
+        payload.levelCrossingSide === 'RIGHT' ||
+        payload.levelCrossingSide === 'BOTH'
         ? payload.levelCrossingSide
         : null
       : undefined
@@ -118,6 +120,11 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const effectiveLevelCrossingSide = isLevelCrossing
       ? (parsedLevelCrossingSide ?? existing.levelCrossingSide ?? null)
       : null
+    const hasIntervalIdField = Object.prototype.hasOwnProperty.call(payload as any, 'intervalId')
+    const parsedIntervalId = hasIntervalIdField ? parseOptionalNumber((payload as any).intervalId) : undefined
+    const effectiveIntervalId = isLevelCrossing
+      ? (parsedIntervalId ?? existing.intervalId ?? null)
+      : null
     if (isLevelCrossing) {
       if (!effectiveLocationRoadId) {
         return NextResponse.json({ message: '平交路口必须指定所属主路段' }, { status: 400 })
@@ -127,6 +134,20 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       }
       if (!effectiveLevelCrossingSide) {
         return NextResponse.json({ message: '平交路口必须指定平交路口侧别' }, { status: 400 })
+      }
+      if (effectiveLevelCrossingSide === 'BOTH') {
+        const phase = await prisma.roadPhase.findUnique({
+          where: { id: payload.phaseId || existing.phaseId },
+          select: { measure: true, phaseDefinition: { select: { allowLevelCrossingBoth: true } } },
+        })
+        const canUseBoth =
+          phase?.measure === 'POINT' && Boolean(phase.phaseDefinition?.allowLevelCrossingBoth)
+        if (!canUseBoth) {
+          return NextResponse.json({ message: '当前分项模板未启用“平交路口双侧”' }, { status: 400 })
+        }
+      }
+      if (!effectiveIntervalId) {
+        return NextResponse.json({ message: '平交路口必须指定分项区间' }, { status: 400 })
       }
     }
     const locationRoadWhere =
@@ -142,6 +163,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         documentId: existing.documentId,
         roadId: existing.roadId,
         phaseId: existing.phaseId,
+        intervalId: effectiveIntervalId ?? null,
         side: existing.side,
         startPk: existing.startPk,
         endPk: existing.endPk,
@@ -159,6 +181,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
               locationRoadId: effectiveLocationRoadId ?? undefined,
               levelCrossingSide: effectiveLevelCrossingSide ?? undefined,
               phaseId: payload.phaseId,
+              intervalId: effectiveIntervalId ?? undefined,
               side: payload.side as any,
               startPk: Number(payload.startPk),
               endPk: Number(payload.endPk),
@@ -197,6 +220,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       locationRoadId: first.locationRoadId ?? null,
       levelCrossingSide: first.levelCrossingSide ?? null,
       phaseId: first.phaseId,
+      intervalId: first.intervalId ?? null,
       phaseName: first.phase.name,
       documentId: first.documentId,
       documentCode: first.document?.code ?? null,

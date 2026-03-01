@@ -1,5 +1,27 @@
 import type { IntervalSide, LevelCrossingSide, PhaseMeasure } from '@/lib/progressTypes'
 
+export type PhaseIntervalSortField =
+  | 'project'
+  | 'road'
+  | 'phase'
+  | 'startPk'
+  | 'endPk'
+  | 'side'
+  | 'quantity'
+  | 'display'
+  | 'completed'
+  | 'updatedAt'
+
+export type PhaseIntervalSortOrder = 'asc' | 'desc'
+
+export type PhaseIntervalSortSpec = {
+  field: PhaseIntervalSortField
+  order: PhaseIntervalSortOrder
+}
+
+export type PhaseIntervalBindingStatus = 'BOUND' | 'UNBOUND'
+export type PhaseIntervalQuantitySource = 'MANUAL' | 'AUTO'
+
 export type PhaseIntervalManagementRow = {
   intervalId: number
   phaseId: number
@@ -25,6 +47,52 @@ export type PhaseIntervalManagementRow = {
   completedPercent: number
   hasBoundItems: boolean
   updatedAt: string
+}
+
+export type PhaseIntervalFilter = {
+  projectKeys?: string[]
+  roadIds?: number[]
+  phases?: string[]
+  startPks?: number[]
+  endPks?: number[]
+  sides?: IntervalSide[]
+  displays?: PhaseMeasure[]
+  completions?: string[]
+  updatedDates?: string[]
+  bindings?: PhaseIntervalBindingStatus[]
+  quantitySources?: PhaseIntervalQuantitySource[]
+}
+
+export type PhaseIntervalManagementFacet = {
+  projects: Array<{
+    key: string
+    projectId: number | null
+    projectName: string | null
+    projectCode: string | null
+  }>
+  roads: Array<{
+    id: number
+    name: string
+    slug: string
+  }>
+  phases: string[]
+  startPks: number[]
+  endPks: number[]
+  sides: IntervalSide[]
+  displays: PhaseMeasure[]
+  completions: string[]
+  updatedDates: string[]
+  bindings: PhaseIntervalBindingStatus[]
+  quantitySources: PhaseIntervalQuantitySource[]
+}
+
+export type PhaseIntervalManagementListResponse = {
+  items: PhaseIntervalManagementRow[]
+  total: number
+  unfilteredTotal: number
+  page: number
+  pageSize: number
+  facets: PhaseIntervalManagementFacet
 }
 
 export type IntervalBoundPhaseItemDTO = {

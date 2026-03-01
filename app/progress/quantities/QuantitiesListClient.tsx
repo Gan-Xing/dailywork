@@ -1,11 +1,19 @@
 'use client'
 
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import type { MultiSelectOption } from '@/components/MultiSelectFilter'
 import { MultiSelectFilter } from '@/components/MultiSelectFilter'
 import { useToast } from '@/components/ToastProvider'
-import type { IntervalBoundPhaseItemDTO, PhaseIntervalManagementRow } from '@/lib/phaseItemTypes'
+import { formatProgressCopy, getProgressCopy } from '@/lib/i18n/progress'
+import { localizeProgressTerm } from '@/lib/i18n/progressDictionary'
+import type {
+  IntervalBoundPhaseItemDTO,
+  PhaseIntervalManagementFacet,
+  PhaseIntervalManagementRow,
+  PhaseIntervalSortField,
+  PhaseIntervalSortSpec,
+} from '@/lib/phaseItemTypes'
 import { locales } from '@/lib/i18n'
 import { usePreferredLocale } from '@/lib/usePreferredLocale'
 
@@ -13,21 +21,10 @@ import { ProgressHeader } from '../ProgressHeader'
 import { QuantitiesDetailModal } from './QuantitiesDetailModal'
 
 type Props = {
-  rows: PhaseIntervalManagementRow[]
   canEdit: boolean
 }
 
-type SortKey =
-  | 'project'
-  | 'road'
-  | 'phase'
-  | 'startPk'
-  | 'endPk'
-  | 'side'
-  | 'quantity'
-  | 'display'
-  | 'completed'
-  | 'updatedAt'
+type SortKey = PhaseIntervalSortField
 
 type ColumnKey =
   | 'project'
@@ -43,6 +40,7 @@ type ColumnKey =
 
 type DisplayRow = PhaseIntervalManagementRow & {
   displayLabel: string
+  phaseLabel: string
   displayRoadId: number
   displayRoadName: string
   displayRoadSlug: string
@@ -55,24 +53,47 @@ type DisplayRow = PhaseIntervalManagementRow & {
   bindingLabel: string
 }
 
+type PhaseIntervalListPayload = {
+  items?: PhaseIntervalManagementRow[]
+  total?: number
+  unfilteredTotal?: number
+  page?: number
+  pageSize?: number
+  facets?: PhaseIntervalManagementFacet
+  message?: string
+}
+
+type StoredFilters = {
+  projects: string[]
+  roads: string[]
+  phases: string[]
+  startPks: string[]
+  endPks: string[]
+  sides: string[]
+  displays: string[]
+  completions: string[]
+  dates: string[]
+  bindings: string[]
+  quantitySources: string[]
+}
+
+const defaultFacets: PhaseIntervalManagementFacet = {
+  projects: [],
+  roads: [],
+  phases: [],
+  startPks: [],
+  endPks: [],
+  sides: [],
+  displays: [],
+  completions: [],
+  updatedDates: [],
+  bindings: [],
+  quantitySources: [],
+}
+
 const NO_PROJECT = '__none__'
 const COLUMN_STORAGE_KEY = 'progress-quantity-columns'
-
-const displayLabels: Record<string, string> = {
-  LINEAR: '延米',
-  POINT: '单体',
-}
-
-const sideLabels: Record<string, string> = {
-  LEFT: '左',
-  RIGHT: '右',
-  BOTH: '双侧',
-}
-
-const bindingLabels: Record<DisplayRow['bindingStatus'], string> = {
-  BOUND: '已绑定',
-  UNBOUND: '未绑定',
-}
+const FILTER_STORAGE_KEY = 'progress-quantity-filters-v1'
 
 const defaultVisibleColumns: ColumnKey[] = [
   'road',
@@ -86,18 +107,42 @@ const defaultVisibleColumns: ColumnKey[] = [
   'updatedAt',
 ]
 
-const columnOptions: Array<{ key: ColumnKey; label: string }> = [
-  { key: 'project', label: '项目' },
-  { key: 'road', label: '路段' },
-  { key: 'phase', label: '分项名称' },
-  { key: 'startPk', label: '起点 PK' },
-  { key: 'endPk', label: '终点 PK' },
-  { key: 'side', label: '位置' },
-  { key: 'quantity', label: '数量' },
-  { key: 'display', label: '显示方式' },
-  { key: 'completed', label: '完成率' },
-  { key: 'updatedAt', label: '更新时间' },
+const columnKeys: ColumnKey[] = [
+  'project',
+  'road',
+  'phase',
+  'startPk',
+  'endPk',
+  'side',
+  'quantity',
+  'display',
+  'completed',
+  'updatedAt',
 ]
+
+const PAGE_SIZE_OPTIONS = [10, 20, 50, 100, 200]
+
+const isSameSelection = (left: string[], right: string[]) => {
+  if (left.length !== right.length) return false
+  const leftSorted = [...left].sort()
+  const rightSorted = [...right].sort()
+  return leftSorted.every((value, index) => value === rightSorted[index])
+}
+
+const sortSelectedFirst = (options: MultiSelectOption[], selected: string[]) => {
+  if (!selected.length) return options
+  const selectedSet = new Set(selected)
+  const selectedOptions: MultiSelectOption[] = []
+  const unselectedOptions: MultiSelectOption[] = []
+  options.forEach((option) => {
+    if (selectedSet.has(option.value)) {
+      selectedOptions.push(option)
+    } else {
+      unselectedOptions.push(option)
+    }
+  })
+  return [...selectedOptions, ...unselectedOptions]
+}
 
 const buildOptions = (options: MultiSelectOption[]) => {
   const map = new Map<string, MultiSelectOption>()
@@ -110,12 +155,6 @@ const buildOptions = (options: MultiSelectOption[]) => {
 }
 
 const formatUpdatedDate = (value: string) => value.slice(0, 10)
-
-const formatNumber = (value: number, digits = 2) =>
-  new Intl.NumberFormat('zh-CN', { maximumFractionDigits: digits }).format(value)
-
-const compareText = (a: string, b: string) =>
-  a.localeCompare(b, 'zh-CN', { sensitivity: 'base' })
 
 const getCompletionBucket = (percent: number) => {
   if (percent >= 100) return '100%'
@@ -130,9 +169,64 @@ const sideSortWeight: Record<string, number> = {
   BOTH: 3,
 }
 
-export default function QuantitiesListClient({ rows, canEdit }: Props) {
+export default function QuantitiesListClient({ canEdit }: Props) {
   const { locale, setLocale } = usePreferredLocale('zh', locales)
   const { addToast } = useToast()
+  const copy = getProgressCopy(locale).quantitiesBoard
+  const localeTag = locale === 'fr' ? 'fr-FR' : 'zh-CN'
+  const numberFormatter = useMemo(
+    () => new Intl.NumberFormat(localeTag, { maximumFractionDigits: 2 }),
+    [localeTag],
+  )
+  const collator = useMemo(
+    () => new Intl.Collator(localeTag, { sensitivity: 'base' }),
+    [localeTag],
+  )
+  const displayLabels = useMemo(
+    () => ({
+      LINEAR: copy.options.displayLinear,
+      POINT: copy.options.displayPoint,
+    }),
+    [copy.options.displayLinear, copy.options.displayPoint],
+  )
+  const sideLabels = useMemo(
+    () => ({
+      LEFT: copy.options.sideLeft,
+      RIGHT: copy.options.sideRight,
+      BOTH: copy.options.sideBoth,
+    }),
+    [copy.options.sideBoth, copy.options.sideLeft, copy.options.sideRight],
+  )
+  const bindingLabels = useMemo(
+    () => ({
+      BOUND: copy.options.bindingBound,
+      UNBOUND: copy.options.bindingUnbound,
+    }),
+    [copy.options.bindingBound, copy.options.bindingUnbound],
+  )
+  const quantitySourceOptions = useMemo<MultiSelectOption[]>(
+    () => [
+      { value: 'MANUAL', label: copy.options.quantitySourceManual },
+      { value: 'AUTO', label: copy.options.quantitySourceAuto },
+    ],
+    [copy.options.quantitySourceAuto, copy.options.quantitySourceManual],
+  )
+  const formatNumber = useCallback(
+    (value: number, digits = 2) =>
+      new Intl.NumberFormat(localeTag, { maximumFractionDigits: digits }).format(value),
+    [localeTag],
+  )
+  const compareText = useCallback((a: string, b: string) => collator.compare(a, b), [collator])
+  const [listRows, setListRows] = useState<PhaseIntervalManagementRow[]>([])
+  const [totalRows, setTotalRows] = useState(0)
+  const [unfilteredTotalRows, setUnfilteredTotalRows] = useState(0)
+  const [facets, setFacets] = useState<PhaseIntervalManagementFacet>(defaultFacets)
+  const [page, setPage] = useState(1)
+  const [pageInput, setPageInput] = useState('1')
+  const [pageSize, setPageSize] = useState(20)
+  const [filtersHydrated, setFiltersHydrated] = useState(false)
+  const [listLoading, setListLoading] = useState(false)
+  const [listError, setListError] = useState<string | null>(null)
   const [detailOpen, setDetailOpen] = useState(false)
   const [detailPhaseId, setDetailPhaseId] = useState<number | null>(null)
   const [detailIntervalId, setDetailIntervalId] = useState<number | null>(null)
@@ -143,273 +237,482 @@ export default function QuantitiesListClient({ rows, canEdit }: Props) {
   const [boundLoading, setBoundLoading] = useState<Set<number>>(() => new Set())
   const [boundErrors, setBoundErrors] = useState<Map<number, string>>(() => new Map())
   const [selectedProjects, setSelectedProjects] = useState<string[]>([])
+  const [draftProjects, setDraftProjects] = useState<string[]>([])
   const [selectedRoads, setSelectedRoads] = useState<string[]>([])
+  const [draftRoads, setDraftRoads] = useState<string[]>([])
   const [selectedPhases, setSelectedPhases] = useState<string[]>([])
+  const [draftPhases, setDraftPhases] = useState<string[]>([])
   const [selectedStartPks, setSelectedStartPks] = useState<string[]>([])
+  const [draftStartPks, setDraftStartPks] = useState<string[]>([])
   const [selectedEndPks, setSelectedEndPks] = useState<string[]>([])
+  const [draftEndPks, setDraftEndPks] = useState<string[]>([])
   const [selectedSides, setSelectedSides] = useState<string[]>([])
+  const [draftSides, setDraftSides] = useState<string[]>([])
   const [selectedDisplays, setSelectedDisplays] = useState<string[]>([])
+  const [draftDisplays, setDraftDisplays] = useState<string[]>([])
   const [selectedCompletions, setSelectedCompletions] = useState<string[]>([])
+  const [draftCompletions, setDraftCompletions] = useState<string[]>([])
   const [selectedDates, setSelectedDates] = useState<string[]>([])
+  const [draftDates, setDraftDates] = useState<string[]>([])
   const [selectedBindings, setSelectedBindings] = useState<string[]>([])
-  const [sortKey, setSortKey] = useState<SortKey>('updatedAt')
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
+  const [draftBindings, setDraftBindings] = useState<string[]>([])
+  const [selectedQuantitySources, setSelectedQuantitySources] = useState<string[]>([])
+  const [draftQuantitySources, setDraftQuantitySources] = useState<string[]>([])
+  const [sortStack, setSortStack] = useState<PhaseIntervalSortSpec[]>([
+    { field: 'updatedAt', order: 'desc' },
+  ])
   const [visibleColumns, setVisibleColumns] = useState<ColumnKey[]>(() => defaultVisibleColumns)
   const [showColumnSelector, setShowColumnSelector] = useState(false)
   const [columnsReady, setColumnsReady] = useState(false)
+  const [exporting, setExporting] = useState(false)
   const columnSelectorRef = useRef<HTMLDivElement | null>(null)
+  const columnOptions = useMemo<Array<{ key: ColumnKey; label: string }>>(
+    () => [
+      { key: 'project', label: copy.columns.project },
+      { key: 'road', label: copy.columns.road },
+      { key: 'phase', label: copy.columns.phase },
+      { key: 'startPk', label: copy.columns.startPk },
+      { key: 'endPk', label: copy.columns.endPk },
+      { key: 'side', label: copy.columns.side },
+      { key: 'quantity', label: copy.columns.quantity },
+      { key: 'display', label: copy.columns.display },
+      { key: 'completed', label: copy.columns.completed },
+      { key: 'updatedAt', label: copy.columns.updatedAt },
+    ],
+    [copy.columns],
+  )
+
+  const mapRowToDisplayRow = useCallback(
+    (row: PhaseIntervalManagementRow): DisplayRow => {
+      const projectKey = row.projectId ? String(row.projectId) : NO_PROJECT
+      const unboundProjectLabel = copy.options.projectUnbound
+      const projectLabel = row.projectName
+        ? row.projectCode
+          ? `${row.projectName} (${row.projectCode})`
+          : row.projectName
+        : unboundProjectLabel
+      const displayRoadId = row.locationRoadId ?? row.roadId
+      const displayRoadName = row.locationRoadName ?? row.roadName
+      const displayRoadSlug = row.locationRoadSlug ?? row.roadSlug
+      const completedPercent = Math.min(100, Math.max(0, row.completedPercent ?? 0))
+      const bindingStatus = row.hasBoundItems ? 'BOUND' : 'UNBOUND'
+      const phaseLabel = localizeProgressTerm('phase', row.phaseName, locale)
+      return {
+        ...row,
+        displayLabel: displayLabels[row.measure] ?? row.measure,
+        phaseLabel,
+        displayRoadId,
+        displayRoadName,
+        displayRoadSlug,
+        projectKey,
+        projectLabel,
+        updatedDate: formatUpdatedDate(row.updatedAt),
+        sideLabel: sideLabels[row.side] ?? row.side,
+        completionBucket: getCompletionBucket(completedPercent),
+        bindingStatus,
+        bindingLabel: bindingLabels[bindingStatus],
+      }
+    },
+    [bindingLabels, copy.options.projectUnbound, displayLabels, locale, sideLabels],
+  )
 
   const rowsWithMeta = useMemo<DisplayRow[]>(
-    () =>
-      rows.map((row) => {
-        const projectKey = row.projectId ? String(row.projectId) : NO_PROJECT
-        const projectLabel = row.projectName
-          ? row.projectCode
-            ? `${row.projectName}（${row.projectCode}）`
-            : row.projectName
-          : '未绑定项目'
-        const displayRoadId = row.locationRoadId ?? row.roadId
-        const displayRoadName = row.locationRoadName ?? row.roadName
-        const displayRoadSlug = row.locationRoadSlug ?? row.roadSlug
-        const completedPercent = Math.min(100, Math.max(0, row.completedPercent ?? 0))
-        const bindingStatus = row.hasBoundItems ? 'BOUND' : 'UNBOUND'
-        return {
-          ...row,
-          displayLabel: displayLabels[row.measure] ?? row.measure,
-          displayRoadId,
-          displayRoadName,
-          displayRoadSlug,
-          projectKey,
-          projectLabel,
-          updatedDate: formatUpdatedDate(row.updatedAt),
-          sideLabel: sideLabels[row.side] ?? row.side,
-          completionBucket: getCompletionBucket(completedPercent),
-          bindingStatus,
-          bindingLabel: bindingLabels[bindingStatus],
-        }
-      }),
-    [rows],
+    () => listRows.map((row) => mapRowToDisplayRow(row)),
+    [listRows, mapRowToDisplayRow],
   )
 
   const projectOptions = useMemo(
     () =>
       buildOptions(
-        rowsWithMeta.map((row) => ({
-          value: row.projectKey,
-          label: row.projectLabel,
+        facets.projects.map((project) => ({
+          value: project.key,
+          label: project.projectName
+            ? project.projectCode
+              ? `${project.projectName} (${project.projectCode})`
+              : project.projectName
+            : copy.options.projectUnbound,
         })),
       ).sort((a, b) => compareText(a.label, b.label)),
-    [rowsWithMeta],
+    [compareText, copy.options.projectUnbound, facets.projects],
   )
   const roadOptions = useMemo(
     () =>
       buildOptions(
-        rowsWithMeta.map((row) => ({
-          value: String(row.displayRoadId),
-          label: `${row.displayRoadName}（${row.displayRoadSlug}）`,
+        facets.roads.map((road) => ({
+          value: String(road.id),
+          label: `${road.name}（${road.slug}）`,
         })),
       ).sort((a, b) => compareText(a.label, b.label)),
-    [rowsWithMeta],
+    [compareText, facets.roads],
   )
   const phaseOptions = useMemo(
     () =>
       buildOptions(
-        rowsWithMeta.map((row) => ({
-          value: row.phaseName,
-          label: row.phaseName,
+        facets.phases.map((phaseName) => ({
+          value: phaseName,
+          label: localizeProgressTerm('phase', phaseName, locale),
         })),
       ).sort((a, b) => compareText(a.label, b.label)),
-    [rowsWithMeta],
+    [compareText, facets.phases, locale],
   )
   const startPkOptions = useMemo(
     () =>
       buildOptions(
-        rowsWithMeta.map((row) => ({
-          value: String(row.startPk),
-          label: formatNumber(row.startPk, 3),
+        facets.startPks.map((startPk) => ({
+          value: String(startPk),
+          label: formatNumber(startPk, 3),
         })),
       ).sort((a, b) => Number(a.value) - Number(b.value)),
-    [rowsWithMeta],
+    [facets.startPks, formatNumber],
   )
   const endPkOptions = useMemo(
     () =>
       buildOptions(
-        rowsWithMeta.map((row) => ({
-          value: String(row.endPk),
-          label: formatNumber(row.endPk, 3),
+        facets.endPks.map((endPk) => ({
+          value: String(endPk),
+          label: formatNumber(endPk, 3),
         })),
       ).sort((a, b) => Number(a.value) - Number(b.value)),
-    [rowsWithMeta],
+    [facets.endPks, formatNumber],
   )
   const sideOptions = useMemo(
     () =>
       buildOptions(
-        rowsWithMeta.map((row) => ({
-          value: row.side,
-          label: row.sideLabel,
+        facets.sides.map((side) => ({
+          value: side,
+          label: sideLabels[side] ?? side,
         })),
       ).sort((a, b) => (sideSortWeight[a.value] ?? 99) - (sideSortWeight[b.value] ?? 99)),
-    [rowsWithMeta],
+    [facets.sides, sideLabels],
   )
   const displayOptions = useMemo(
     () =>
       buildOptions(
-        rowsWithMeta.map((row) => ({
-          value: row.measure,
-          label: row.displayLabel,
+        facets.displays.map((display) => ({
+          value: display,
+          label: displayLabels[display] ?? display,
         })),
       ).sort((a, b) => compareText(a.label, b.label)),
-    [rowsWithMeta],
+    [compareText, displayLabels, facets.displays],
   )
   const completionOptions = useMemo(
     () =>
       buildOptions(
-        rowsWithMeta.map((row) => ({
-          value: row.completionBucket,
-          label: row.completionBucket,
+        facets.completions.map((completionBucket) => ({
+          value: completionBucket,
+          label: completionBucket,
         })),
       ).sort((a, b) => compareText(a.label, b.label)),
-    [rowsWithMeta],
+    [compareText, facets.completions],
   )
   const bindingOptions = useMemo(
     () =>
       buildOptions(
-        rowsWithMeta.map((row) => ({
-          value: row.bindingStatus,
-          label: row.bindingLabel,
+        facets.bindings.map((bindingStatus) => ({
+          value: bindingStatus,
+          label: bindingLabels[bindingStatus] ?? bindingStatus,
         })),
       ).sort((a, b) => compareText(a.label, b.label)),
-    [rowsWithMeta],
+    [bindingLabels, compareText, facets.bindings],
   )
   const updatedOptions = useMemo(
     () =>
       buildOptions(
-        rowsWithMeta.map((row) => ({
-          value: row.updatedDate,
-          label: row.updatedDate,
+        facets.updatedDates.map((updatedDate) => ({
+          value: updatedDate,
+          label: updatedDate,
         })),
       ).sort((a, b) => b.value.localeCompare(a.value)),
-    [rowsWithMeta],
+    [facets.updatedDates],
   )
 
   const filterControlProps = {
-    allLabel: '全部',
-    selectedLabel: (count: number) => `已选 ${count} 项`,
-    selectAllLabel: '全选',
-    clearLabel: '清空',
-    noOptionsLabel: '暂无选项',
-    searchPlaceholder: '搜索',
+    allLabel: copy.filters.all,
+    selectedLabel: (count: number) =>
+      formatProgressCopy(copy.filters.selected, { count }),
+    selectAllLabel: copy.filters.selectAll,
+    clearLabel: copy.filters.clear,
+    noOptionsLabel: copy.filters.noOptions,
+    searchPlaceholder: copy.filters.search,
   }
   const sharedFilterProps = { ...filterControlProps, className: 'w-full text-slate-700' }
 
-  const filteredRows = useMemo(() => {
-    return rowsWithMeta.filter((row) => {
-      if (selectedProjects.length && !selectedProjects.includes(row.projectKey)) {
-        return false
-      }
-      if (selectedRoads.length && !selectedRoads.includes(String(row.displayRoadId))) {
-        return false
-      }
-      if (selectedPhases.length && !selectedPhases.includes(row.phaseName)) {
-        return false
-      }
-      if (selectedStartPks.length && !selectedStartPks.includes(String(row.startPk))) {
-        return false
-      }
-      if (selectedEndPks.length && !selectedEndPks.includes(String(row.endPk))) {
-        return false
-      }
-      if (selectedSides.length && !selectedSides.includes(row.side)) {
-        return false
-      }
-      if (selectedDisplays.length && !selectedDisplays.includes(row.measure)) {
-        return false
-      }
-      if (selectedCompletions.length && !selectedCompletions.includes(row.completionBucket)) {
-        return false
-      }
-      if (selectedBindings.length && !selectedBindings.includes(row.bindingStatus)) {
-        return false
-      }
-      if (selectedDates.length && !selectedDates.includes(row.updatedDate)) {
-        return false
-      }
-      return true
-    })
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(FILTER_STORAGE_KEY)
+      if (!raw) return
+      const parsed = JSON.parse(raw) as Partial<StoredFilters>
+      const toArray = (value: unknown) =>
+        Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : []
+      setSelectedProjects(toArray(parsed.projects))
+      setSelectedRoads(toArray(parsed.roads))
+      setSelectedPhases(toArray(parsed.phases))
+      setSelectedStartPks(toArray(parsed.startPks))
+      setSelectedEndPks(toArray(parsed.endPks))
+      setSelectedSides(toArray(parsed.sides))
+      setSelectedDisplays(toArray(parsed.displays))
+      setSelectedCompletions(toArray(parsed.completions))
+      setSelectedDates(toArray(parsed.dates))
+      setSelectedBindings(toArray(parsed.bindings))
+      setSelectedQuantitySources(toArray(parsed.quantitySources))
+    } catch {
+      // ignore
+    } finally {
+      setFiltersHydrated(true)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!filtersHydrated) return
+    const next: StoredFilters = {
+      projects: selectedProjects,
+      roads: selectedRoads,
+      phases: selectedPhases,
+      startPks: selectedStartPks,
+      endPks: selectedEndPks,
+      sides: selectedSides,
+      displays: selectedDisplays,
+      completions: selectedCompletions,
+      dates: selectedDates,
+      bindings: selectedBindings,
+      quantitySources: selectedQuantitySources,
+    }
+    try {
+      localStorage.setItem(FILTER_STORAGE_KEY, JSON.stringify(next))
+    } catch {
+      // ignore
+    }
   }, [
-    rowsWithMeta,
-    selectedProjects,
-    selectedRoads,
-    selectedPhases,
-    selectedStartPks,
-    selectedEndPks,
-    selectedSides,
-    selectedDisplays,
-    selectedCompletions,
+    filtersHydrated,
     selectedBindings,
+    selectedCompletions,
     selectedDates,
+    selectedDisplays,
+    selectedEndPks,
+    selectedPhases,
+    selectedProjects,
+    selectedQuantitySources,
+    selectedRoads,
+    selectedSides,
+    selectedStartPks,
   ])
 
-  const sortedRows = useMemo(() => {
-    const direction = sortOrder === 'asc' ? 1 : -1
-    const sorted = [...filteredRows].sort((a, b) => {
-      let result = 0
-      switch (sortKey) {
-        case 'project':
-          result = compareText(a.projectLabel, b.projectLabel)
-          break
-      case 'road':
-        result = compareText(a.displayRoadName, b.displayRoadName)
-        break
-        case 'phase':
-          result = compareText(a.phaseName, b.phaseName)
-          break
-        case 'startPk':
-          result = a.startPk - b.startPk
-          break
-        case 'endPk':
-          result = a.endPk - b.endPk
-          break
-        case 'side':
-          result = (sideSortWeight[a.side] ?? 99) - (sideSortWeight[b.side] ?? 99)
-          break
-        case 'quantity':
-          result = a.quantity - b.quantity
-          break
-        case 'display':
-          result = compareText(a.displayLabel, b.displayLabel)
-          break
-        case 'completed':
-          result = a.completedPercent - b.completedPercent
-          break
-        case 'updatedAt':
-          result = new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime()
-          break
-        default:
-          result = 0
+  const buildQueryParams = useCallback(
+    (overrides?: { page?: number; pageSize?: number }) => {
+      const params = new URLSearchParams()
+      sortStack.forEach((spec) => params.append('sort', `${spec.field}:${spec.order}`))
+      selectedProjects.forEach((value) => params.append('project', value))
+      selectedRoads.forEach((value) => params.append('roadId', value))
+      selectedPhases.forEach((value) => params.append('phase', value))
+      selectedStartPks.forEach((value) => params.append('startPk', value))
+      selectedEndPks.forEach((value) => params.append('endPk', value))
+      selectedSides.forEach((value) => params.append('side', value))
+      selectedDisplays.forEach((value) => params.append('display', value))
+      selectedCompletions.forEach((value) => params.append('completed', value))
+      selectedBindings.forEach((value) => params.append('binding', value))
+      selectedQuantitySources.forEach((value) => params.append('quantitySource', value))
+      selectedDates.forEach((value) => params.append('updatedAt', value))
+      params.set('page', String(overrides?.page ?? page))
+      params.set('pageSize', String(overrides?.pageSize ?? pageSize))
+      return params
+    },
+    [
+      page,
+      pageSize,
+      selectedBindings,
+      selectedCompletions,
+      selectedDates,
+      selectedDisplays,
+      selectedEndPks,
+      selectedPhases,
+      selectedProjects,
+      selectedQuantitySources,
+      selectedRoads,
+      selectedSides,
+      selectedStartPks,
+      sortStack,
+    ],
+  )
+
+  useEffect(() => {
+    if (!filtersHydrated) return
+    let stopped = false
+    const controller = new AbortController()
+
+    const loadRows = async () => {
+      setListLoading(true)
+      setListError(null)
+      try {
+        const query = buildQueryParams().toString()
+        const response = await fetch(
+          query ? `/api/progress/quantities?${query}` : '/api/progress/quantities',
+          {
+            credentials: 'include',
+            signal: controller.signal,
+          },
+        )
+        const payload = (await response.json().catch(() => ({}))) as PhaseIntervalListPayload
+        if (!response.ok || !Array.isArray(payload.items)) {
+          throw new Error(payload.message ?? copy.messages.listLoadFailed)
+        }
+        if (!stopped) {
+          setListRows(payload.items)
+          setTotalRows(payload.total ?? payload.items.length)
+          setUnfilteredTotalRows(payload.unfilteredTotal ?? payload.total ?? payload.items.length)
+          setFacets(payload.facets ?? defaultFacets)
+          if (typeof payload.page === 'number' && Number.isFinite(payload.page)) {
+            setPage(payload.page)
+          }
+          if (typeof payload.pageSize === 'number' && Number.isFinite(payload.pageSize)) {
+            setPageSize(payload.pageSize)
+          }
+        }
+      } catch (error) {
+        if (!stopped && (error as Error).name !== 'AbortError') {
+          setListError((error as Error).message ?? copy.messages.listLoadFailed)
+        }
+      } finally {
+        if (!stopped) {
+          setListLoading(false)
+        }
       }
-      if (result === 0) {
-        return (a.intervalId - b.intervalId) * direction
-      }
-      return result * direction
-    })
-    return sorted
-  }, [filteredRows, sortKey, sortOrder])
+    }
+
+    void loadRows()
+
+    return () => {
+      stopped = true
+      controller.abort()
+    }
+  }, [buildQueryParams, copy.messages.listLoadFailed, filtersHydrated])
+
+  const sortedRows = rowsWithMeta
+  const totalPages = Math.max(1, Math.ceil(totalRows / Math.max(pageSize, 1)))
+
+  const hasPendingFilterChanges = useMemo(
+    () =>
+      !isSameSelection(draftProjects, selectedProjects) ||
+      !isSameSelection(draftRoads, selectedRoads) ||
+      !isSameSelection(draftPhases, selectedPhases) ||
+      !isSameSelection(draftStartPks, selectedStartPks) ||
+      !isSameSelection(draftEndPks, selectedEndPks) ||
+      !isSameSelection(draftSides, selectedSides) ||
+      !isSameSelection(draftDisplays, selectedDisplays) ||
+      !isSameSelection(draftCompletions, selectedCompletions) ||
+      !isSameSelection(draftBindings, selectedBindings) ||
+      !isSameSelection(draftQuantitySources, selectedQuantitySources) ||
+      !isSameSelection(draftDates, selectedDates),
+    [
+      draftBindings,
+      draftCompletions,
+      draftDates,
+      draftDisplays,
+      draftEndPks,
+      draftPhases,
+      draftProjects,
+      draftQuantitySources,
+      draftRoads,
+      draftSides,
+      draftStartPks,
+      selectedBindings,
+      selectedCompletions,
+      selectedDates,
+      selectedDisplays,
+      selectedEndPks,
+      selectedPhases,
+      selectedProjects,
+      selectedQuantitySources,
+      selectedRoads,
+      selectedSides,
+      selectedStartPks,
+    ],
+  )
+
+  const applyDraftFilters = useCallback(() => {
+    setSelectedProjects(draftProjects)
+    setSelectedRoads(draftRoads)
+    setSelectedPhases(draftPhases)
+    setSelectedStartPks(draftStartPks)
+    setSelectedEndPks(draftEndPks)
+    setSelectedSides(draftSides)
+    setSelectedDisplays(draftDisplays)
+    setSelectedCompletions(draftCompletions)
+    setSelectedBindings(draftBindings)
+    setSelectedQuantitySources(draftQuantitySources)
+    setSelectedDates(draftDates)
+    setPage(1)
+    setPageInput('1')
+  }, [
+    draftBindings,
+    draftCompletions,
+    draftDates,
+    draftDisplays,
+    draftEndPks,
+    draftPhases,
+    draftProjects,
+    draftQuantitySources,
+    draftRoads,
+    draftSides,
+    draftStartPks,
+  ])
+
+  const resetAllFilters = useCallback(() => {
+    const empty: string[] = []
+    setDraftProjects(empty)
+    setDraftRoads(empty)
+    setDraftPhases(empty)
+    setDraftStartPks(empty)
+    setDraftEndPks(empty)
+    setDraftSides(empty)
+    setDraftDisplays(empty)
+    setDraftCompletions(empty)
+    setDraftBindings(empty)
+    setDraftQuantitySources(empty)
+    setDraftDates(empty)
+    setSelectedProjects(empty)
+    setSelectedRoads(empty)
+    setSelectedPhases(empty)
+    setSelectedStartPks(empty)
+    setSelectedEndPks(empty)
+    setSelectedSides(empty)
+    setSelectedDisplays(empty)
+    setSelectedCompletions(empty)
+    setSelectedBindings(empty)
+    setSelectedQuantitySources(empty)
+    setSelectedDates(empty)
+    setPage(1)
+    setPageInput('1')
+  }, [])
 
   const handleSort = (key: SortKey) => {
-    if (sortKey === key) {
-      setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'))
-      return
-    }
-    setSortKey(key)
-    setSortOrder('asc')
+    setSortStack((prev) => {
+      const existing = prev.find((item) => item.field === key)
+      const nextOrder: 'asc' | 'desc' = existing ? (existing.order === 'asc' ? 'desc' : 'asc') : 'desc'
+      const filtered = prev.filter((item) => item.field !== key)
+      return [{ field: key, order: nextOrder }, ...filtered].slice(0, 4)
+    })
+    setPage(1)
+    setPageInput('1')
   }
 
+  const onPageChange = useCallback((next: number) => {
+    const safe = Math.min(totalPages, Math.max(1, next))
+    setPage(safe)
+    setPageInput(String(safe))
+  }, [totalPages])
+
+  const onPageSizeChange = useCallback((next: number) => {
+    if (!Number.isFinite(next) || next <= 0) return
+    setPageSize(next)
+    setPage(1)
+    setPageInput('1')
+  }, [])
+
   const renderSortIcon = (key: SortKey) => {
-    if (sortKey !== key) return <span className="text-[10px] text-slate-400">↕</span>
-    return (
-      <span className="text-[10px] text-emerald-600">{sortOrder === 'asc' ? '↑' : '↓'}</span>
-    )
+    const idx = sortStack.findIndex((item) => item.field === key)
+    if (idx === -1) return <span className="text-[10px] text-slate-400">↕</span>
+    const arrow = sortStack[idx].order === 'asc' ? '↑' : '↓'
+    return <span className="text-[10px] text-emerald-600">{`${arrow}${idx + 1}`}</span>
   }
 
   const isVisible = (key: ColumnKey) => visibleColumns.includes(key)
@@ -449,7 +752,7 @@ export default function QuantitiesListClient({ rows, canEdit }: Props) {
     } finally {
       setColumnsReady(true)
     }
-  }, [])
+  }, [columnOptions])
 
   useEffect(() => {
     if (!columnsReady) return
@@ -470,12 +773,159 @@ export default function QuantitiesListClient({ rows, canEdit }: Props) {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
+  useEffect(() => {
+    setPageInput(String(page))
+  }, [page])
+
+  useEffect(() => {
+    setDraftProjects(selectedProjects)
+  }, [selectedProjects])
+  useEffect(() => {
+    setDraftRoads(selectedRoads)
+  }, [selectedRoads])
+  useEffect(() => {
+    setDraftPhases(selectedPhases)
+  }, [selectedPhases])
+  useEffect(() => {
+    setDraftStartPks(selectedStartPks)
+  }, [selectedStartPks])
+  useEffect(() => {
+    setDraftEndPks(selectedEndPks)
+  }, [selectedEndPks])
+  useEffect(() => {
+    setDraftSides(selectedSides)
+  }, [selectedSides])
+  useEffect(() => {
+    setDraftDisplays(selectedDisplays)
+  }, [selectedDisplays])
+  useEffect(() => {
+    setDraftCompletions(selectedCompletions)
+  }, [selectedCompletions])
+  useEffect(() => {
+    setDraftBindings(selectedBindings)
+  }, [selectedBindings])
+  useEffect(() => {
+    setDraftQuantitySources(selectedQuantitySources)
+  }, [selectedQuantitySources])
+  useEffect(() => {
+    setDraftDates(selectedDates)
+  }, [selectedDates])
+
   const columnCount = visibleColumns.length + 1
 
   const openDetail = (phaseId: number, intervalId: number) => {
     setDetailPhaseId(phaseId)
     setDetailIntervalId(intervalId)
     setDetailOpen(true)
+  }
+
+  const handleExportExcel = async () => {
+    if (exporting) return
+    try {
+      const selectedColumns = columnOptions.filter((option) => visibleColumns.includes(option.key))
+      if (selectedColumns.length === 0) {
+        addToast(copy.export.missingColumns, { tone: 'warning' })
+        return
+      }
+      if (!totalRows) {
+        addToast(copy.export.noData, { tone: 'warning' })
+        return
+      }
+
+      setExporting(true)
+      const exportPageSize = 200
+      const expectedPages = Math.max(1, Math.ceil(totalRows / exportPageSize))
+      const exportRows: DisplayRow[] = []
+      for (let exportPage = 1; exportPage <= expectedPages; exportPage += 1) {
+        const params = buildQueryParams({ page: exportPage, pageSize: exportPageSize })
+        const response = await fetch(`/api/progress/quantities?${params.toString()}`, {
+          credentials: 'include',
+        })
+        const payload = (await response.json().catch(() => ({}))) as PhaseIntervalListPayload
+        if (!response.ok || !Array.isArray(payload.items)) {
+          throw new Error(payload.message ?? copy.export.failed)
+        }
+        payload.items.forEach((row) => {
+          exportRows.push(mapRowToDisplayRow(row))
+        })
+      }
+      if (!exportRows.length) {
+        addToast(copy.export.noData, { tone: 'warning' })
+        return
+      }
+
+      const XLSX = await import('xlsx')
+      const headerRow = selectedColumns.map((column) => {
+        switch (column.key) {
+          case 'project':
+            return copy.columns.project
+          case 'road':
+            return copy.columns.road
+          case 'phase':
+            return copy.columns.phase
+          case 'startPk':
+            return copy.columns.startPk
+          case 'endPk':
+            return copy.columns.endPk
+          case 'side':
+            return copy.columns.side
+          case 'quantity':
+            return copy.columns.quantity
+          case 'display':
+            return copy.columns.display
+          case 'completed':
+            return copy.columns.completed
+          case 'updatedAt':
+            return copy.columns.updatedAt
+          default:
+            return column.label
+        }
+      })
+      const dataRows = exportRows.map((row) =>
+        selectedColumns.map((column) => {
+          switch (column.key) {
+            case 'project':
+              return row.projectLabel
+            case 'road':
+              return `${row.displayRoadName} (${row.displayRoadSlug})`
+            case 'phase':
+              return `${row.phaseLabel}${row.spec ? ` (${row.spec})` : ''}`
+            case 'startPk':
+              return formatNumber(row.startPk, 3)
+            case 'endPk':
+              return formatNumber(row.endPk, 3)
+            case 'side':
+              return row.sideLabel
+            case 'quantity': {
+              const quantity = formatNumber(row.quantity, 3)
+              return row.quantityOverridden
+                ? formatProgressCopy(copy.export.quantityWithManual, { value: quantity })
+                : quantity
+            }
+            case 'display':
+              return row.displayLabel
+            case 'completed':
+              return `${Math.min(100, Math.max(0, row.completedPercent))}%`
+            case 'updatedAt':
+              return new Date(row.updatedAt).toLocaleString(localeTag, {
+                dateStyle: 'medium',
+                timeStyle: 'short',
+              })
+            default:
+              return ''
+          }
+        }),
+      )
+      const worksheet = XLSX.utils.aoa_to_sheet([headerRow, ...dataRows])
+      const workbook = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(workbook, worksheet, copy.export.sheetName)
+      const filename = `${copy.export.filenamePrefix}-${new Date().toISOString().slice(0, 10)}.xlsx`
+      XLSX.writeFile(workbook, filename, { bookType: 'xlsx' })
+    } catch (error) {
+      addToast((error as Error).message || copy.export.failed, { tone: 'danger' })
+    } finally {
+      setExporting(false)
+    }
   }
 
   const unbindInput = async (intervalId: number, inputId: number) => {
@@ -487,7 +937,7 @@ export default function QuantitiesListClient({ rows, canEdit }: Props) {
       })
       const payload = (await response.json().catch(() => ({}))) as { message?: string }
       if (!response.ok) {
-        throw new Error(payload.message ?? '解绑失败')
+        throw new Error(payload.message ?? copy.messages.unbindFailed)
       }
       setBoundItemsByInterval((prev) => {
         const next = new Map(prev)
@@ -498,9 +948,9 @@ export default function QuantitiesListClient({ rows, canEdit }: Props) {
         )
         return next
       })
-      addToast('已解绑该分项内容', { tone: 'success' })
+      addToast(copy.messages.unbindSuccess, { tone: 'success' })
     } catch (error) {
-      addToast((error as Error).message ?? '解绑失败', { tone: 'danger' })
+      addToast((error as Error).message ?? copy.messages.unbindFailed, { tone: 'danger' })
     }
   }
 
@@ -529,7 +979,7 @@ export default function QuantitiesListClient({ rows, canEdit }: Props) {
         message?: string
       }
       if (!response.ok) {
-        throw new Error(payload.message ?? '加载绑定明细失败')
+        throw new Error(payload.message ?? copy.messages.boundLoadFailed)
       }
       const itemsByInterval = payload.itemsByInterval ?? {}
       setBoundItemsByInterval((prev) => {
@@ -548,7 +998,7 @@ export default function QuantitiesListClient({ rows, canEdit }: Props) {
     } catch (error) {
       setBoundErrors((prev) => {
         const next = new Map(prev)
-        pending.forEach((id) => next.set(id, (error as Error).message ?? '加载失败'))
+        pending.forEach((id) => next.set(id, (error as Error).message ?? copy.bound.loadFailed))
         return next
       })
     } finally {
@@ -569,12 +1019,12 @@ export default function QuantitiesListClient({ rows, canEdit }: Props) {
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900">
       <ProgressHeader
-        title="分项工程管理列表"
-        subtitle="按区间查看分项工程进度，进入详情可配置公式与清单绑定。"
+        title={copy.title}
+        subtitle={copy.description}
         breadcrumbs={[
-          { label: '首页', href: '/' },
-          { label: '进度管理', href: '/progress' },
-          { label: '分项工程管理' },
+          { label: copy.breadcrumb.home, href: '/' },
+          { label: copy.breadcrumb.progress, href: '/progress' },
+          { label: copy.breadcrumb.current },
         ]}
         locale={locale}
         onLocaleChange={setLocale}
@@ -584,15 +1034,28 @@ export default function QuantitiesListClient({ rows, canEdit }: Props) {
         <section className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-slate-200 bg-white p-4 text-sm text-slate-600 shadow-sm">
             <span>
-              共 {rowsWithMeta.length} 条区间记录，筛选后 {sortedRows.length} 条
+              {formatProgressCopy(copy.summary.totalFiltered, {
+                total: unfilteredTotalRows,
+                filtered: totalRows,
+              })}
             </span>
+            {listLoading ? <span className="text-xs text-slate-500">{copy.summary.sortedLoading}</span> : null}
+            {listError ? <span className="text-xs text-rose-600">{listError}</span> : null}
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
                 onClick={() => setShowAllDetails((prev) => !prev)}
                 className="inline-flex items-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
               >
-                {showAllDetails ? '收起全部明细' : '展开全部明细'}
+                {showAllDetails ? copy.actions.collapseDetails : copy.actions.expandDetails}
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleExportExcel()}
+                disabled={exporting}
+                className="inline-flex items-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {exporting ? copy.actions.exporting : copy.actions.exportExcel}
               </button>
               <div className="relative" ref={columnSelectorRef}>
               <button
@@ -601,7 +1064,9 @@ export default function QuantitiesListClient({ rows, canEdit }: Props) {
                 onClick={() => setShowColumnSelector((prev) => !prev)}
               >
                 <span className="truncate">
-                  {visibleColumns.length ? `已选 ${visibleColumns.length} 列` : '未选择列'}
+                  {visibleColumns.length
+                    ? formatProgressCopy(copy.actions.selectedColumns, { count: visibleColumns.length })
+                    : copy.actions.noColumns}
                 </span>
                 <span className="text-xs text-slate-400">⌕</span>
               </button>
@@ -609,14 +1074,14 @@ export default function QuantitiesListClient({ rows, canEdit }: Props) {
                 <div className="absolute right-0 z-10 mt-2 w-80 max-w-sm rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-700 shadow-lg shadow-slate-900/10">
                   <div className="flex items-center justify-between border-b border-slate-200 pb-2 text-[11px] text-slate-600">
                     <button className="text-emerald-600 hover:underline" onClick={handleSelectAllColumns}>
-                      全选
+                      {copy.actions.selectAll}
                     </button>
                     <div className="flex gap-2">
                       <button className="text-slate-500 hover:underline" onClick={handleRestoreDefaultColumns}>
-                        恢复默认
+                        {copy.actions.restoreDefault}
                       </button>
                       <button className="text-slate-500 hover:underline" onClick={handleClearColumns}>
-                        清空
+                        {copy.actions.clear}
                       </button>
                     </div>
                   </div>
@@ -645,75 +1110,99 @@ export default function QuantitiesListClient({ rows, canEdit }: Props) {
           <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
               <MultiSelectFilter
-                label="项目"
-                options={projectOptions}
-                selected={selectedProjects}
-                onChange={setSelectedProjects}
+                label={copy.filters.project}
+                options={sortSelectedFirst(projectOptions, draftProjects)}
+                selected={draftProjects}
+                onChange={setDraftProjects}
                 {...sharedFilterProps}
               />
               <MultiSelectFilter
-                label="路段"
-                options={roadOptions}
-                selected={selectedRoads}
-                onChange={setSelectedRoads}
+                label={copy.filters.road}
+                options={sortSelectedFirst(roadOptions, draftRoads)}
+                selected={draftRoads}
+                onChange={setDraftRoads}
                 {...sharedFilterProps}
               />
               <MultiSelectFilter
-                label="分项名称"
-                options={phaseOptions}
-                selected={selectedPhases}
-                onChange={setSelectedPhases}
+                label={copy.filters.phase}
+                options={sortSelectedFirst(phaseOptions, draftPhases)}
+                selected={draftPhases}
+                onChange={setDraftPhases}
                 {...sharedFilterProps}
               />
               <MultiSelectFilter
-                label="起点 PK"
-                options={startPkOptions}
-                selected={selectedStartPks}
-                onChange={setSelectedStartPks}
+                label={copy.filters.startPk}
+                options={sortSelectedFirst(startPkOptions, draftStartPks)}
+                selected={draftStartPks}
+                onChange={setDraftStartPks}
                 {...sharedFilterProps}
               />
               <MultiSelectFilter
-                label="终点 PK"
-                options={endPkOptions}
-                selected={selectedEndPks}
-                onChange={setSelectedEndPks}
+                label={copy.filters.endPk}
+                options={sortSelectedFirst(endPkOptions, draftEndPks)}
+                selected={draftEndPks}
+                onChange={setDraftEndPks}
                 {...sharedFilterProps}
               />
               <MultiSelectFilter
-                label="位置"
-                options={sideOptions}
-                selected={selectedSides}
-                onChange={setSelectedSides}
+                label={copy.filters.side}
+                options={sortSelectedFirst(sideOptions, draftSides)}
+                selected={draftSides}
+                onChange={setDraftSides}
                 {...sharedFilterProps}
               />
               <MultiSelectFilter
-                label="显示方式"
-                options={displayOptions}
-                selected={selectedDisplays}
-                onChange={setSelectedDisplays}
+                label={copy.filters.display}
+                options={sortSelectedFirst(displayOptions, draftDisplays)}
+                selected={draftDisplays}
+                onChange={setDraftDisplays}
                 {...sharedFilterProps}
               />
               <MultiSelectFilter
-                label="完成率"
-                options={completionOptions}
-                selected={selectedCompletions}
-                onChange={setSelectedCompletions}
+                label={copy.filters.completed}
+                options={sortSelectedFirst(completionOptions, draftCompletions)}
+                selected={draftCompletions}
+                onChange={setDraftCompletions}
                 {...sharedFilterProps}
               />
               <MultiSelectFilter
-                label="绑定状态"
-                options={bindingOptions}
-                selected={selectedBindings}
-                onChange={setSelectedBindings}
+                label={copy.filters.binding}
+                options={sortSelectedFirst(bindingOptions, draftBindings)}
+                selected={draftBindings}
+                onChange={setDraftBindings}
                 {...sharedFilterProps}
               />
               <MultiSelectFilter
-                label="更新时间"
-                options={updatedOptions}
-                selected={selectedDates}
-                onChange={setSelectedDates}
+                label={copy.filters.quantitySource}
+                options={sortSelectedFirst(quantitySourceOptions, draftQuantitySources)}
+                selected={draftQuantitySources}
+                onChange={setDraftQuantitySources}
                 {...sharedFilterProps}
               />
+              <MultiSelectFilter
+                label={copy.filters.updatedAt}
+                options={sortSelectedFirst(updatedOptions, draftDates)}
+                selected={draftDates}
+                onChange={setDraftDates}
+                {...sharedFilterProps}
+              />
+            </div>
+            <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={resetAllFilters}
+                className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+              >
+                {copy.filters.reset}
+              </button>
+              <button
+                type="button"
+                onClick={applyDraftFilters}
+                disabled={!hasPendingFilterChanges}
+                className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 transition hover:border-emerald-300 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {copy.filters.apply}
+              </button>
             </div>
           </div>
 
@@ -729,7 +1218,7 @@ export default function QuantitiesListClient({ rows, canEdit }: Props) {
                           onClick={() => handleSort('project')}
                           className="flex items-center gap-2 text-left"
                         >
-                          项目
+                          {copy.columns.project}
                           {renderSortIcon('project')}
                         </button>
                       </th>
@@ -741,7 +1230,7 @@ export default function QuantitiesListClient({ rows, canEdit }: Props) {
                           onClick={() => handleSort('road')}
                           className="flex items-center gap-2 text-left"
                         >
-                          路段
+                          {copy.columns.road}
                           {renderSortIcon('road')}
                         </button>
                       </th>
@@ -753,7 +1242,7 @@ export default function QuantitiesListClient({ rows, canEdit }: Props) {
                           onClick={() => handleSort('phase')}
                           className="flex items-center gap-2 text-left"
                         >
-                          分项名称
+                          {copy.columns.phase}
                           {renderSortIcon('phase')}
                         </button>
                       </th>
@@ -765,7 +1254,7 @@ export default function QuantitiesListClient({ rows, canEdit }: Props) {
                           onClick={() => handleSort('startPk')}
                           className="flex items-center gap-2 text-left"
                         >
-                          起点 PK
+                          {copy.columns.startPk}
                           {renderSortIcon('startPk')}
                         </button>
                       </th>
@@ -777,7 +1266,7 @@ export default function QuantitiesListClient({ rows, canEdit }: Props) {
                           onClick={() => handleSort('endPk')}
                           className="flex items-center gap-2 text-left"
                         >
-                          终点 PK
+                          {copy.columns.endPk}
                           {renderSortIcon('endPk')}
                         </button>
                       </th>
@@ -789,7 +1278,7 @@ export default function QuantitiesListClient({ rows, canEdit }: Props) {
                           onClick={() => handleSort('side')}
                           className="flex items-center gap-2 text-left"
                         >
-                          位置
+                          {copy.columns.side}
                           {renderSortIcon('side')}
                         </button>
                       </th>
@@ -801,7 +1290,7 @@ export default function QuantitiesListClient({ rows, canEdit }: Props) {
                           onClick={() => handleSort('quantity')}
                           className="flex items-center gap-2 text-left"
                         >
-                          数量
+                          {copy.columns.quantity}
                           {renderSortIcon('quantity')}
                         </button>
                       </th>
@@ -813,7 +1302,7 @@ export default function QuantitiesListClient({ rows, canEdit }: Props) {
                           onClick={() => handleSort('display')}
                           className="flex items-center gap-2 text-left"
                         >
-                          显示方式
+                          {copy.columns.display}
                           {renderSortIcon('display')}
                         </button>
                       </th>
@@ -825,7 +1314,7 @@ export default function QuantitiesListClient({ rows, canEdit }: Props) {
                           onClick={() => handleSort('completed')}
                           className="flex items-center gap-2 text-left"
                         >
-                          完成率
+                          {copy.columns.completed}
                           {renderSortIcon('completed')}
                         </button>
                       </th>
@@ -837,19 +1326,19 @@ export default function QuantitiesListClient({ rows, canEdit }: Props) {
                           onClick={() => handleSort('updatedAt')}
                           className="flex items-center gap-2 text-left"
                         >
-                          更新时间
+                          {copy.columns.updatedAt}
                           {renderSortIcon('updatedAt')}
                         </button>
                       </th>
                     ) : null}
-                    <th className="px-4 py-3 text-right whitespace-nowrap">操作</th>
+                    <th className="px-4 py-3 text-right whitespace-nowrap">{copy.columns.actions}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
                   {sortedRows.length === 0 ? (
                     <tr>
                       <td colSpan={columnCount} className="px-4 py-6 text-center text-slate-500">
-                        暂无区间记录
+                        {copy.summary.empty}
                       </td>
                     </tr>
                   ) : (
@@ -871,10 +1360,10 @@ export default function QuantitiesListClient({ rows, canEdit }: Props) {
                               <div className="text-xs text-slate-500">{row.displayRoadSlug}</div>
                               </td>
                             ) : null}
-                          {isVisible('phase') ? (
+                            {isVisible('phase') ? (
                             <td className="px-4 py-3">
-                              {row.phaseName}
-                              {row.spec ? `（${row.spec}）` : ''}
+                              {row.phaseLabel}
+                              {row.spec ? ` (${row.spec})` : ''}
                             </td>
                           ) : null}
                             {isVisible('startPk') ? (
@@ -894,15 +1383,15 @@ export default function QuantitiesListClient({ rows, canEdit }: Props) {
                               <td className="px-4 py-3 text-slate-600">
                                 <div className="flex items-center gap-2">
                                   <span>{formatNumber(row.quantity, 3)}</span>
-                                  {row.quantityOverridden ? (
-                                    <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
-                                      手动
-                                    </span>
-                                  ) : null}
+                                                    {row.quantityOverridden ? (
+                                                      <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
+                                                        {copy.badges.manual}
+                                                      </span>
+                                                    ) : null}
                                 </div>
                                 {row.quantityOverridden ? (
                                   <div className="mt-1 text-[10px] text-slate-400">
-                                    PK差 {formatNumber(row.rawQuantity, 3)}
+                                    PK diff {formatNumber(row.rawQuantity, 3)}
                                   </div>
                                 ) : null}
                               </td>
@@ -925,7 +1414,7 @@ export default function QuantitiesListClient({ rows, canEdit }: Props) {
                             ) : null}
                             {isVisible('updatedAt') ? (
                               <td className="px-4 py-3 text-slate-500">
-                                {new Date(row.updatedAt).toLocaleString('zh-CN', {
+                                {new Date(row.updatedAt).toLocaleString(localeTag, {
                                   dateStyle: 'medium',
                                   timeStyle: 'short',
                                 })}
@@ -938,7 +1427,7 @@ export default function QuantitiesListClient({ rows, canEdit }: Props) {
                                   onClick={() => openDetail(row.phaseId, row.intervalId)}
                                   className="inline-flex items-center whitespace-nowrap rounded-full border border-emerald-200 bg-emerald-50 px-4 py-1 text-xs font-semibold text-emerald-700 transition hover:border-emerald-300 hover:bg-emerald-100"
                                 >
-                                  进入详情
+                                  {copy.actions.enterDetail}
                                 </button>
                               </div>
                             </td>
@@ -949,27 +1438,29 @@ export default function QuantitiesListClient({ rows, canEdit }: Props) {
                                 <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                                   <div className="flex items-center justify-between gap-3">
                                     <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                                      已绑定分项内容
+                                      {copy.bound.title}
                                     </div>
-                                    <div className="text-xs text-slate-500">区间 #{row.intervalId}</div>
+                                    <div className="text-xs text-slate-500">
+                                      {formatProgressCopy(copy.bound.intervalId, { id: row.intervalId })}
+                                    </div>
                                   </div>
 
                                   {isBoundLoading ? (
-                                    <div className="mt-3 text-sm text-slate-500">正在加载…</div>
+                                    <div className="mt-3 text-sm text-slate-500">{copy.bound.loading}</div>
                                   ) : boundError ? (
                                     <div className="mt-3 text-sm text-rose-600">{boundError}</div>
                                   ) : !boundItems || boundItems.length === 0 ? (
-                                    <div className="mt-3 text-sm text-slate-500">暂无绑定明细</div>
+                                    <div className="mt-3 text-sm text-slate-500">{copy.bound.empty}</div>
                                   ) : (
                                     <div className="mt-3 overflow-x-auto">
                                       <table className="min-w-full text-sm">
                                         <thead className="bg-slate-50 text-xs uppercase tracking-[0.16em] text-slate-500">
                                           <tr>
-                                            <th className="px-3 py-2 text-left">分项内容</th>
-                                            <th className="px-3 py-2 text-right">工程量</th>
-                                            <th className="px-3 py-2 text-left">单位</th>
-                                            <th className="px-3 py-2 text-left">清单编号</th>
-                                            <th className="px-3 py-2 text-right">操作</th>
+                                            <th className="px-3 py-2 text-left">{copy.bound.phaseItem}</th>
+                                            <th className="px-3 py-2 text-right">{copy.bound.quantity}</th>
+                                            <th className="px-3 py-2 text-left">{copy.bound.unit}</th>
+                                            <th className="px-3 py-2 text-left">{copy.bound.boqCode}</th>
+                                            <th className="px-3 py-2 text-right">{copy.bound.actions}</th>
                                           </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-200">
@@ -988,8 +1479,8 @@ export default function QuantitiesListClient({ rows, canEdit }: Props) {
                                                     {intervalSpec} {name}
                                                   </div>
                                                   <div className="mt-0.5 text-[11px] text-slate-500">
-                                                    inputId {item.inputId} ·{' '}
-                                                    {new Date(item.updatedAt).toLocaleString('zh-CN', {
+                                                    {formatProgressCopy(copy.bound.inputId, { id: item.inputId })} ·{' '}
+                                                    {new Date(item.updatedAt).toLocaleString(localeTag, {
                                                       dateStyle: 'medium',
                                                       timeStyle: 'short',
                                                     })}
@@ -1000,7 +1491,7 @@ export default function QuantitiesListClient({ rows, canEdit }: Props) {
                                                     <span>{quantityLabel}</span>
                                                     {hasManual ? (
                                                       <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
-                                                        手动
+                                                        {copy.badges.manual}
                                                       </span>
                                                     ) : null}
                                                   </div>
@@ -1014,10 +1505,10 @@ export default function QuantitiesListClient({ rows, canEdit }: Props) {
                                                       onClick={() => unbindInput(row.intervalId, item.inputId)}
                                                       className="inline-flex items-center rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-700 transition hover:border-rose-300 hover:bg-rose-100"
                                                     >
-                                                      解绑
+                                                      {copy.actions.unbind}
                                                     </button>
                                                   ) : (
-                                                    <span className="text-xs text-slate-400">无权限</span>
+                                                    <span className="text-xs text-slate-400">{copy.actions.noPermission}</span>
                                                   )}
                                                 </td>
                                               </tr>
@@ -1037,6 +1528,76 @@ export default function QuantitiesListClient({ rows, canEdit }: Props) {
                   )}
                 </tbody>
               </table>
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 px-5 py-3 text-sm text-slate-600">
+              <span>{formatProgressCopy(copy.pagination.summary, { total: totalRows, page, totalPages })}</span>
+              <div className="flex items-center gap-2">
+                <label className="flex items-center gap-2 text-xs text-slate-600">
+                  <span className="text-slate-500">{copy.pagination.pageSizeLabel}</span>
+                  <select
+                    value={pageSize}
+                    onChange={(event) => {
+                      const value = Number(event.target.value)
+                      if (!Number.isFinite(value)) return
+                      onPageSizeChange(value)
+                    }}
+                    className="h-8 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-900 focus:border-emerald-300 focus:outline-none"
+                    aria-label={copy.pagination.pageSizeLabel}
+                  >
+                    {PAGE_SIZE_OPTIONS.map((size) => (
+                      <option key={size} value={size}>
+                        {size}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <button
+                  type="button"
+                  className="rounded-xl border border-slate-200 px-3 py-1 text-xs text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:opacity-40"
+                  disabled={page <= 1}
+                  onClick={() => onPageChange(Math.max(1, page - 1))}
+                >
+                  {copy.pagination.prev}
+                </button>
+                <div className="flex items-center gap-1 text-xs text-slate-600">
+                  <input
+                    type="number"
+                    min={1}
+                    max={totalPages}
+                    value={pageInput}
+                    onChange={(event) => setPageInput(event.target.value)}
+                    onBlur={() => {
+                      const value = Number(pageInput)
+                      if (!Number.isFinite(value)) {
+                        setPageInput(String(page))
+                        return
+                      }
+                      onPageChange(Math.min(totalPages, Math.max(1, Math.round(value))))
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') {
+                        const value = Number(pageInput)
+                        if (!Number.isFinite(value)) {
+                          setPageInput(String(page))
+                          return
+                        }
+                        onPageChange(Math.min(totalPages, Math.max(1, Math.round(value))))
+                      }
+                    }}
+                    className="h-8 w-14 rounded-lg border border-slate-200 bg-white px-2 py-1 text-center text-xs text-slate-900 focus:border-emerald-300 focus:outline-none"
+                    aria-label={copy.pagination.goTo}
+                  />
+                  <span className="text-slate-500">/ {totalPages}</span>
+                </div>
+                <button
+                  type="button"
+                  className="rounded-xl border border-slate-200 px-3 py-1 text-xs text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:opacity-40"
+                  disabled={page >= totalPages}
+                  onClick={() => onPageChange(Math.min(totalPages, page + 1))}
+                >
+                  {copy.pagination.next}
+                </button>
+              </div>
             </div>
           </div>
         </section>

@@ -17,7 +17,7 @@ const normalizeSide = (side: string | undefined) =>
   side === 'LEFT' || side === 'RIGHT' || side === 'BOTH' ? side : 'BOTH'
 
 const normalizeLevelCrossingSide = (side: unknown): LevelCrossingSide | null =>
-  side === 'LEFT' || side === 'RIGHT' ? side : null
+  side === 'LEFT' || side === 'RIGHT' || side === 'BOTH' ? side : null
 
 const normalizeLabel = (value: string) => value.trim().toLowerCase()
 
@@ -28,6 +28,92 @@ const normalizeRange = (start: number, end: number) => {
   return { startPk: ordered[0], endPk: ordered[1] }
 }
 
+const isIntervalSideCompatible = (
+  intervalSide: IntervalSide,
+  targetSide: IntervalSide,
+) => {
+  if (intervalSide === targetSide) return true
+  // A BOTH-designed interval can host single-side submissions.
+  if (intervalSide === 'BOTH' && (targetSide === 'LEFT' || targetSide === 'RIGHT')) return true
+  return false
+}
+
+type IntervalMatchCandidate = {
+  id: number
+  startPk: number
+  endPk: number
+  side: IntervalSide
+  locationRoadId: number | null
+  levelCrossingSide: LevelCrossingSide | null
+}
+
+const resolveMatchedIntervalForNonLevel = <T extends IntervalMatchCandidate>(params: {
+  phaseIntervals: T[]
+  phaseRoadId: number
+  side: IntervalSide
+  range: { startPk: number; endPk: number }
+  locationRoadId: number | null
+  levelCrossingSide: LevelCrossingSide | null
+  intervalIdInput: number | null
+}) => {
+  const matchesByScope = (interval: T) => {
+    const intervalRange = normalizeRange(interval.startPk, interval.endPk)
+    const containsTargetRange =
+      params.range.startPk >= intervalRange.startPk - 1e-6 &&
+      params.range.endPk <= intervalRange.endPk + 1e-6
+    if (!containsTargetRange) {
+      return false
+    }
+    if (!isIntervalSideCompatible(interval.side, params.side)) {
+      return false
+    }
+    const intervalLocationRoadId = interval.locationRoadId ?? params.phaseRoadId
+    if ((intervalLocationRoadId ?? null) !== (params.locationRoadId ?? null)) {
+      return false
+    }
+    if ((interval.levelCrossingSide ?? null) !== (params.levelCrossingSide ?? null)) {
+      return false
+    }
+    return true
+  }
+
+  if (params.intervalIdInput) {
+    const byId = params.phaseIntervals.find((interval) => interval.id === params.intervalIdInput)
+    if (!byId) {
+      throw new Error('报检区间不存在或已删除')
+    }
+    if (!matchesByScope(byId)) {
+      throw new Error('报检区间与所选区间里程/侧别不一致')
+    }
+    return byId
+  }
+
+  const candidates = params.phaseIntervals.filter(matchesByScope)
+  if (candidates.length === 1) {
+    return candidates[0]
+  }
+  if (candidates.length > 1) {
+    const pool = (() => {
+      const exactSide = candidates.filter((item) => item.side === params.side)
+      return exactSide.length ? exactSide : candidates
+    })()
+    const spanOf = (item: T) => {
+      const intervalRange = normalizeRange(item.startPk, item.endPk)
+      return intervalRange.endPk - intervalRange.startPk
+    }
+    const sortedBySpan = [...pool].sort((a, b) => spanOf(a) - spanOf(b))
+    if (sortedBySpan.length === 1) {
+      return sortedBySpan[0]
+    }
+    const bestSpan = spanOf(sortedBySpan[0])
+    const bestCandidates = sortedBySpan.filter((item) => Math.abs(spanOf(item) - bestSpan) < 1e-6)
+    if (bestCandidates.length === 1) {
+      return bestCandidates[0]
+    }
+  }
+  return null
+}
+
 const overlapsRange = (startA: number, endA: number, startB: number, endB: number) =>
   Math.max(startA, startB) < Math.min(endA, endB)
 
@@ -35,6 +121,13 @@ const parseOptionalNumber = (value: unknown) => {
   if (value === null || value === undefined || value === '') return null
   const num = Number(value)
   return Number.isFinite(num) ? num : null
+}
+
+const toOptionalIntervalId = (value: unknown) => {
+  const parsed = parseOptionalNumber(value)
+  if (parsed === null) return null
+  if (!Number.isInteger(parsed) || parsed <= 0) return null
+  return parsed
 }
 
 const statusPriority: Record<InspectionStatus, number> = {
@@ -106,6 +199,7 @@ const mapEntry = (
     levelCrossingSide: row.levelCrossingSide ?? null,
     phaseId: row.phaseId,
     phaseName: row.phase.name,
+    intervalId: row.intervalId ?? null,
     side: row.side,
     startPk: row.startPk,
     endPk: row.endPk,
@@ -176,8 +270,8 @@ const isWorkflowSatisfied = (status?: InspectionStatus) =>
   (statusPriority[status ?? InspectionStatus.PENDING] ?? 0) >= (statusPriority.SCHEDULED ?? 0)
 
 const resolvePhaseLayers = (phase: {
-  layerLinks?: { layerDefinition?: { name: string | null } | null }[]
-  phaseDefinition?: { defaultLayers?: { layerDefinition?: { name: string | null } | null }[] } | null
+  layerLinks?: { layerDefinition?: { id?: number | null; name: string | null } | null }[]
+  phaseDefinition?: { defaultLayers?: { layerDefinition?: { id?: number | null; name: string | null } | null }[] } | null
 }) => {
   const instanceLayers =
     phase.layerLinks?.map((link) => link.layerDefinition?.name).filter(Boolean) ?? []
@@ -187,6 +281,28 @@ const resolvePhaseLayers = (phase: {
   const defaultLayers =
     phase.phaseDefinition?.defaultLayers?.map((item) => item.layerDefinition?.name).filter(Boolean) ?? []
   return Array.from(new Set(defaultLayers)) as string[]
+}
+
+const resolveIntervalAllowedLayers = (params: {
+  interval: { layers?: string[] | null; layerIds?: number[] | null }
+  fallbackLayers: string[]
+  layerNameById: Map<number, string>
+}) => {
+  const fromNames = Array.isArray(params.interval.layers) ? params.interval.layers : []
+  const normalizedNames = canonicalizeProgressList('layer', fromNames)
+  if (normalizedNames.length) {
+    return Array.from(new Set(normalizedNames))
+  }
+  const fromIds = Array.isArray(params.interval.layerIds)
+    ? params.interval.layerIds
+        .map((id) => params.layerNameById.get(id))
+        .filter((value): value is string => Boolean(value))
+    : []
+  const normalizedFromIds = canonicalizeProgressList('layer', fromIds)
+  if (normalizedFromIds.length) {
+    return Array.from(new Set(normalizedFromIds))
+  }
+  return Array.from(new Set(canonicalizeProgressList('layer', params.fallbackLayers)))
 }
 
 export class WorkflowValidationError extends Error {
@@ -211,6 +327,7 @@ const assertWorkflowSubmissionRules = async (params: {
   endPk: number
   layers: string[]
   checks: string[]
+  layerChecks?: Array<{ layerName: string; checkName: string }>
   availableLayers?: string[]
 }) => {
   const workflow = await getWorkflowByPhaseDefinitionId(params.phase.phaseDefinitionId)
@@ -260,7 +377,6 @@ const assertWorkflowSubmissionRules = async (params: {
     const matched = layerIdByName.get(normalizeLabel(layer))
     if (matched) selectedLayerIds.add(matched)
   })
-  const selectedChecksNormalized = new Set(params.checks.map((item) => normalizeLabel(item)))
   const invalidLayers = params.layers.filter((layer) => !layerIdByName.has(normalizeLabel(layer)))
   if (invalidLayers.length) {
     throw new WorkflowValidationError('报检层次不在模板中', invalidLayers)
@@ -269,6 +385,50 @@ const assertWorkflowSubmissionRules = async (params: {
   if (invalidChecks.length) {
     throw new WorkflowValidationError('报检内容不在模板中', invalidChecks)
   }
+  if (availableLayerIds.size) {
+    const disabledLayers = params.layers.filter((layer) => {
+      const matched = layerIdByName.get(normalizeLabel(layer))
+      return matched ? !availableLayerIds.has(matched) : false
+    })
+    if (disabledLayers.length) {
+      throw new WorkflowValidationError('报检层次未在该区间启用', disabledLayers)
+    }
+  }
+
+  const selectedLayerChecksInput =
+    params.layerChecks && params.layerChecks.length
+      ? params.layerChecks
+      : params.layers.flatMap((layerName) =>
+          params.checks.map((checkName) => ({ layerName, checkName })),
+        )
+  const resolvedLayerChecks: Array<{ layerId: string; order: number; checkName: string }> = []
+  const invalidLayerChecks = new Set<string>()
+  selectedLayerChecksInput.forEach((pair) => {
+    const layerId = layerIdByName.get(normalizeLabel(pair.layerName))
+    if (!layerId) return
+    const orderedChecks = workflowCheckOrderByLayerId.get(layerId) ?? []
+    const order = orderedChecks.findIndex(
+      (name) => normalizeLabel(name) === normalizeLabel(pair.checkName),
+    )
+    if (order < 0) {
+      invalidLayerChecks.add(`${pair.layerName} → ${pair.checkName}`)
+      return
+    }
+    resolvedLayerChecks.push({ layerId, order, checkName: pair.checkName })
+  })
+  if (invalidLayerChecks.size) {
+    throw new WorkflowValidationError(
+      '验收内容与层次不匹配',
+      Array.from(invalidLayerChecks),
+    )
+  }
+  const selectedChecksByLayer = new Map<string, Set<string>>()
+  resolvedLayerChecks.forEach((pair) => {
+    const set = selectedChecksByLayer.get(pair.layerId) ?? new Set<string>()
+    set.add(normalizeLabel(pair.checkName))
+    selectedChecksByLayer.set(pair.layerId, set)
+  })
+
   const targetRange = normalizeRange(params.startPk, params.endPk)
   const locationRoadFilter = (() => {
     if (!params.locationRoadId) return null
@@ -422,22 +582,15 @@ const assertWorkflowSubmissionRules = async (params: {
 
   const targetSides: IntervalSide[] = params.side === 'BOTH' ? ['LEFT', 'RIGHT'] : [params.side]
   const missingChecks = new Set<string>()
-  params.checks.forEach((check) => {
-    const candidates = checkMetaByName.get(normalizeLabel(check))
-    if (!candidates || !candidates.length) return
-    const meta =
-      candidates.find((item) => selectedLayerIds.has(item.layerId)) ??
-      candidates.find((item) => {
-        const orderedChecks = workflowCheckOrderByLayerId.get(item.layerId) ?? []
-        return orderedChecks.some((name) => normalizeLabel(name) === normalizeLabel(check))
-      }) ??
-      candidates[0]
-    const orderedChecks = workflowCheckOrderByLayerId.get(meta.layerId) ?? []
-    for (let idx = 0; idx < meta.order; idx += 1) {
+  resolvedLayerChecks.forEach((pair) => {
+    const orderedChecks = workflowCheckOrderByLayerId.get(pair.layerId) ?? []
+    for (let idx = 0; idx < pair.order; idx += 1) {
       const requiredName = orderedChecks[idx]
       const normalizedRequired = normalizeLabel(requiredName)
-      const selectedNow = selectedChecksNormalized.has(normalizedRequired)
-      const completed = targetSides.every((side) => hasCompletedCheck(meta.layerId, side, requiredName))
+      const selectedNow = selectedChecksByLayer.get(pair.layerId)?.has(normalizedRequired) ?? false
+      const completed = targetSides.every((side) =>
+        hasCompletedCheck(pair.layerId, side, requiredName),
+      )
       if (!selectedNow && !completed) {
         missingChecks.add(requiredName)
       }
@@ -791,6 +944,51 @@ export const createInspectionEntries = async (
   }
   const phaseMap = new Map(phases.map((phase) => [phase.id, phase]))
   const resolvedLayersByPhaseId = new Map<number, string[]>(phases.map((phase) => [phase.id, resolvePhaseLayers(phase)]))
+  const intervalLayersByPhaseId = new Map<number, Map<number, string[]>>()
+  phases.forEach((phase) => {
+    const fallbackLayers = resolvedLayersByPhaseId.get(phase.id) ?? []
+    const layerNameById = new Map<number, string>()
+    phase.layerLinks?.forEach((link) => {
+      const layerId = link.layerDefinition?.id
+      const layerName = link.layerDefinition?.name
+      if (typeof layerId === 'number' && layerName) {
+        layerNameById.set(layerId, layerName)
+      }
+    })
+    phase.phaseDefinition?.defaultLayers?.forEach((item) => {
+      const layerId = item.layerDefinition?.id
+      const layerName = item.layerDefinition?.name
+      if (typeof layerId === 'number' && layerName && !layerNameById.has(layerId)) {
+        layerNameById.set(layerId, layerName)
+      }
+    })
+    const intervalMap = new Map<number, string[]>()
+    phase.intervals.forEach((interval) => {
+      if (!interval.id) return
+      const availableLayers = resolveIntervalAllowedLayers({
+        interval: {
+          layers: (interval as { layers?: string[] | null }).layers,
+          layerIds: (interval as { layerIds?: number[] | null }).layerIds,
+        },
+        fallbackLayers,
+        layerNameById,
+      })
+      intervalMap.set(interval.id, availableLayers)
+    })
+    intervalLayersByPhaseId.set(phase.id, intervalMap)
+  })
+  const encodeLayerCheckPair = (layerName: string, checkName: string) => JSON.stringify([layerName, checkName])
+  const decodeLayerCheckPair = (value: string): { layerName: string; checkName: string } | null => {
+    try {
+      const parsed = JSON.parse(value) as unknown
+      if (!Array.isArray(parsed) || parsed.length !== 2) return null
+      const [layerName, checkName] = parsed
+      if (typeof layerName !== 'string' || typeof checkName !== 'string') return null
+      return { layerName, checkName }
+    } catch {
+      return null
+    }
+  }
 
   const prepared: { data: InspectionEntryCreateData; meta: { roadSlug: string }; bindingProvided: boolean }[] = []
   const workflowGroups = new Map<
@@ -798,6 +996,7 @@ export const createInspectionEntries = async (
     {
       phase: (typeof phases)[number]
       roadId: number
+      intervalId: number | null
       locationRoadId: number | null
       levelCrossingSide: LevelCrossingSide | null
       side: IntervalSide
@@ -805,6 +1004,7 @@ export const createInspectionEntries = async (
       endPk: number
       layers: Set<string>
       checks: Set<string>
+      layerChecks: Set<string>
     }
   >()
   for (const raw of entries) {
@@ -851,16 +1051,63 @@ export const createInspectionEntries = async (
       if (!levelCrossingSide) {
         throw new Error('平交路口报检必须选择平交路口侧别')
       }
+      if (
+        levelCrossingSide === 'BOTH' &&
+        !(
+          phase.measure === 'POINT' &&
+          Boolean(phase.phaseDefinition?.allowLevelCrossingBoth)
+        )
+      ) {
+        throw new Error('当前分项模板未启用“平交路口双侧”')
+      }
     }
 
     if (phase.roadId !== normalized.roadId) {
       throw new Error('分项与路段不匹配，请刷新后重试')
     }
 
-    const groupKey = `${phase.id}:${side}:${range.startPk}:${range.endPk}:${locationRoadId ?? 'null'}:${levelCrossingSide ?? 'null'}`
+    const intervalIdInput = toOptionalIntervalId((normalized as { intervalId?: unknown }).intervalId)
+    let phaseInterval = intervalIdInput
+      ? phase.intervals.find((interval) => interval.id === intervalIdInput)
+      : null
+    if (isLevelCrossing) {
+      if (!intervalIdInput) {
+        throw new Error('平交路口报检必须指定分项区间')
+      }
+      if (!phaseInterval) {
+        throw new Error('平交路口报检必须指定有效的分项区间')
+      }
+      if ((phaseInterval.locationRoadId ?? null) !== (locationRoadId ?? null)) {
+        throw new Error('平交路口报检区间与所属主路段不匹配')
+      }
+      if ((phaseInterval.levelCrossingSide ?? null) !== (levelCrossingSide ?? null)) {
+        throw new Error('平交路口报检区间与平交路口侧别不匹配')
+      }
+      const intervalRange = normalizeRange(phaseInterval.startPk, phaseInterval.endPk)
+      if (intervalRange.startPk !== range.startPk || intervalRange.endPk !== range.endPk) {
+        throw new Error('平交路口报检区间里程与分项区间不一致')
+      }
+      if (phaseInterval.side !== side) {
+        throw new Error('平交路口报检区间侧别与分项区间不一致')
+      }
+    } else {
+      phaseInterval = resolveMatchedIntervalForNonLevel({
+        phaseIntervals: phase.intervals,
+        phaseRoadId: phase.roadId,
+        side: side as IntervalSide,
+        range,
+        locationRoadId: locationRoadId ?? null,
+        levelCrossingSide: levelCrossingSide ?? null,
+        intervalIdInput,
+      })
+    }
+    const intervalId = phaseInterval?.id ?? null
+
+    const groupKey = `${phase.id}:${intervalId ?? 'null'}:${side}:${range.startPk}:${range.endPk}:${locationRoadId ?? 'null'}:${levelCrossingSide ?? 'null'}`
     const group = workflowGroups.get(groupKey) ?? {
       phase,
       roadId: road.id,
+      intervalId,
       locationRoadId: locationRoadId ?? null,
       levelCrossingSide,
       side: side as IntervalSide,
@@ -868,9 +1115,11 @@ export const createInspectionEntries = async (
       endPk: range.endPk,
       layers: new Set<string>(),
       checks: new Set<string>(),
+      layerChecks: new Set<string>(),
     }
     group.layers.add(normalized.layerName)
     group.checks.add(normalized.checkName)
+    group.layerChecks.add(encodeLayerCheckPair(normalized.layerName, normalized.checkName))
     workflowGroups.set(groupKey, group)
 
     prepared.push({
@@ -880,6 +1129,7 @@ export const createInspectionEntries = async (
         locationRoadId: locationRoadId ?? undefined,
         levelCrossingSide: levelCrossingSide ?? undefined,
         phaseId: normalized.phaseId,
+        intervalId: intervalId ?? undefined,
         side: side as IntervalSide,
         startPk: range.startPk,
         endPk: range.endPk,
@@ -903,7 +1153,10 @@ export const createInspectionEntries = async (
   }
 
   for (const group of Array.from(workflowGroups.values())) {
-    const availableLayers = resolvedLayersByPhaseId.get(group.phase.id)
+    const intervalLayerMap = intervalLayersByPhaseId.get(group.phase.id)
+    const availableLayers =
+      (group.intervalId ? intervalLayerMap?.get(group.intervalId) : null) ??
+      resolvedLayersByPhaseId.get(group.phase.id)
     await assertWorkflowSubmissionRules({
       phase: { id: group.phase.id, phaseDefinitionId: group.phase.phaseDefinitionId },
       roadId: group.roadId,
@@ -914,6 +1167,9 @@ export const createInspectionEntries = async (
       endPk: group.endPk,
       layers: Array.from(group.layers),
       checks: Array.from(group.checks),
+      layerChecks: Array.from(group.layerChecks)
+        .map((item) => decodeLayerCheckPair(item))
+        .filter((item): item is { layerName: string; checkName: string } => Boolean(item)),
       availableLayers,
     })
   }
@@ -926,6 +1182,7 @@ export const createInspectionEntries = async (
       data.locationRoadId ?? data.roadId,
       data.levelCrossingSide ?? 'null',
       data.phaseId,
+      data.intervalId ?? 'null',
       data.side,
       data.startPk,
       data.endPk,
@@ -979,6 +1236,7 @@ export const createInspectionEntries = async (
       where: {
         roadId: data.roadId,
         phaseId: data.phaseId,
+        intervalId: data.intervalId ?? null,
         side: data.side,
         startPk: data.startPk,
         endPk: data.endPk,
@@ -1006,6 +1264,7 @@ export const createInspectionEntries = async (
         updatedBy: data.updatedBy,
         locationRoadId: data.locationRoadId ?? undefined,
         levelCrossingSide: data.levelCrossingSide ?? undefined,
+        intervalId: data.intervalId ?? undefined,
       }
       if (bindingProvided) {
         updateData.documentId = data.documentId ?? null
@@ -1163,7 +1422,7 @@ export const aggregateEntriesAsListItems = async (
         : 'layer:unknown'
     const effectiveLocationRoadId =
       entry.locationRoadId ?? (entry.road.slug === LEVEL_CROSSING_ROAD_SLUG ? null : entry.roadId)
-    const baseKey = `${entry.roadId}:${effectiveLocationRoadId ?? 'null'}:${entry.levelCrossingSide ?? 'null'}:${entry.phaseId}:${entry.side}:${entry.startPk}:${entry.endPk}:${entry.documentId ?? ''}`
+    const baseKey = `${entry.roadId}:${effectiveLocationRoadId ?? 'null'}:${entry.levelCrossingSide ?? 'null'}:${entry.phaseId}:${entry.intervalId ?? 'null'}:${entry.side}:${entry.startPk}:${entry.endPk}:${entry.documentId ?? ''}`
     const key = filter.groupByLayer ? `${baseKey}:${layerKey}` : baseKey
     const priority = statusPriority[entry.status]
     const existing = grouped.get(key)
@@ -1185,6 +1444,7 @@ export const aggregateEntriesAsListItems = async (
         levelCrossingSide: entry.levelCrossingSide ?? null,
         phaseId: entry.phaseId,
         phaseName: entry.phase.name,
+        intervalId: entry.intervalId ?? null,
         documentId: entry.documentId,
         documentCode: entry.document?.code ?? null,
         submissionId: entry.documentId,

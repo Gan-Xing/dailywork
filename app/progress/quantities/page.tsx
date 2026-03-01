@@ -1,6 +1,5 @@
 import { AccessDenied } from '@/components/AccessDenied'
 import { getSessionUser } from '@/lib/server/authSession'
-import { listPhaseIntervalManagementRows } from '@/lib/server/phaseItemManagement'
 
 import QuantitiesListClient from './QuantitiesListClient'
 
@@ -16,7 +15,5 @@ export default async function PhaseQuantityListPage() {
     return <AccessDenied permissions={['progress:view']} hint="需要进度查看权限" />
   }
 
-  const rows = await listPhaseIntervalManagementRows()
-
-  return <QuantitiesListClient rows={rows} canEdit={canEdit} />
+  return <QuantitiesListClient canEdit={canEdit} />
 }

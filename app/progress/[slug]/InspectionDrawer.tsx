@@ -150,6 +150,7 @@ export function InspectionDrawer({
     localizeProgressTerm('layer', value, locale, {
       phaseName: workflowPhaseNameForContext ?? undefined,
     })
+  const intervalIdForKey = selectedSegment.levelCrossingSide ? (selectedSegment.intervalId ?? null) : null
 
   const buildCheckKeyForSide = (
     layer: WorkflowLayerTemplate,
@@ -158,6 +159,7 @@ export function InspectionDrawer({
   ) =>
     buildCheckStatusKey({
       phaseId: selectedSegment.phaseId,
+      intervalId: intervalIdForKey,
       phaseName: phaseNameForKey,
       layerId: layer.id,
       layerName: layer.name,
@@ -177,6 +179,7 @@ export function InspectionDrawer({
   ) =>
     buildCheckStatusKey({
       phaseId: selectedSegment.phaseId,
+      intervalId: intervalIdForKey,
       phaseName: phaseNameForKey,
       layerId: null,
       layerName: layer.name,
@@ -195,6 +198,7 @@ export function InspectionDrawer({
   ) =>
     buildCheckStatusBaseKey({
       phaseId: selectedSegment.phaseId,
+      intervalId: intervalIdForKey,
       phaseName: phaseNameForKey,
       layerId: layer.id,
       layerName: layer.name,
@@ -212,6 +216,7 @@ export function InspectionDrawer({
   ) =>
     buildCheckStatusBaseKey({
       phaseId: selectedSegment.phaseId,
+      intervalId: intervalIdForKey,
       phaseName: phaseNameForKey,
       layerId: null,
       layerName: layer.name,
@@ -283,7 +288,9 @@ export function InspectionDrawer({
                 {t.inspection.levelCrossingSideLabel}：
                 {selectedSegment.levelCrossingSide === 'LEFT'
                   ? t.inspection.sideLeft
-                  : t.inspection.sideRight}
+                  : selectedSegment.levelCrossingSide === 'RIGHT'
+                    ? t.inspection.sideRight
+                    : t.inspection.sideBoth}
               </span>
             ) : null}
             <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200">

@@ -5,6 +5,7 @@ import type { InspectionStatus, InspectionEntryFilter } from '@/lib/progressType
 import { hasPermission, getSessionUser } from '@/lib/server/authSession'
 import {
   createInspectionEntries,
+  isWorkflowValidationError,
   listInspectionEntries,
 } from '@/lib/server/inspectionEntryStore'
 
@@ -112,7 +113,7 @@ export async function GET(request: Request) {
     status: statusParams.length ? statusParams : undefined,
     side: (searchParams.get('side') as 'LEFT' | 'RIGHT' | 'BOTH' | null) ?? undefined,
     levelCrossingSide:
-      (searchParams.get('levelCrossingSide') as 'LEFT' | 'RIGHT' | null) ?? undefined,
+      (searchParams.get('levelCrossingSide') as 'LEFT' | 'RIGHT' | 'BOTH' | null) ?? undefined,
     layerNames: layerParams.length ? layerParams : undefined,
     types: typeParams.length ? typeParams : undefined,
     checkId: searchParams.get('checkId') ? Number(searchParams.get('checkId')) : undefined,
@@ -171,12 +172,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ entries })
   } catch (error) {
     const err = error as Error
+    const details = isWorkflowValidationError(error) ? error.details : undefined
     const friendlyMessage =
       error instanceof Prisma.PrismaClientValidationError
         ? '报检数据格式不正确，请检查必填项后重试。'
         : error instanceof Prisma.PrismaClientKnownRequestError
           ? '报检保存失败，请稍后重试或联系管理员。'
           : err.message
-    return NextResponse.json({ message: friendlyMessage }, { status: 400 })
+    return NextResponse.json({ message: friendlyMessage, details }, { status: 400 })
   }
 }

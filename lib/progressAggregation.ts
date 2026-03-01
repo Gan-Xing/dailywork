@@ -6,6 +6,7 @@ import type {
   RoadPhaseProgressDTO,
   RoadSectionProgressDTO,
 } from '@/lib/progressTypes'
+import { canonicalizeProgressList } from '@/lib/i18n/progressDictionary'
 
 const SPEC_SPLIT_PHASES = new Set(['边沟', '过道涵', '路缘石'])
 
@@ -17,6 +18,14 @@ const normalizeSpecValue = (value?: string | null): string | null => {
   }
   const trimmed = value.trim()
   return trimmed ? trimmed : null
+}
+
+type AggregationKeyMode = 'name-and-measure' | 'name-only'
+
+const canonicalizePhaseName = (value: string) => {
+  const normalized = value.trim()
+  if (!normalized) return value
+  return canonicalizeProgressList('phase', [normalized]).at(0) ?? normalized
 }
 
 const ensureSide = (side?: IntervalSide): IntervalSide =>
@@ -210,8 +219,8 @@ const createSpecEntries = (
 interface AggregationRecord {
   id: string
   name: string
-  measure: AggregatedPhaseProgress['measure']
-  definitionId?: number
+  measures: Set<PhaseMeasure>
+  definitionIds: Set<number>
   spec?: string | null
   totalDesignLength: number
   totalCompletedLength: number
@@ -221,34 +230,44 @@ interface AggregationRecord {
 
 export function aggregatePhaseProgress(
   roads: RoadSectionProgressDTO[],
-  options: { locale?: Locale; splitBySpec?: boolean } = {},
+  options: { locale?: Locale; splitBySpec?: boolean; keyMode?: AggregationKeyMode } = {},
 ): AggregatedPhaseProgress[] {
   const locale = options.locale ?? 'zh'
   const splitBySpec = options.splitBySpec ?? true
+  const keyMode = options.keyMode ?? 'name-and-measure'
   const map = new Map<string, AggregationRecord>()
 
   roads.forEach((road) => {
     road.phases.forEach((phase) => {
+      const canonicalPhaseName = canonicalizePhaseName(phase.phaseName)
       const specEntries = createSpecEntries(phase, splitBySpec)
       const updatedAtRaw = new Date(phase.updatedAt).getTime()
       const updatedAt = Number.isFinite(updatedAtRaw) ? updatedAtRaw : 0
 
       specEntries.forEach((entry) => {
         const specKey = splitBySpec ? entry.spec ?? '' : ''
-        const key = `${phase.phaseName}::${phase.phaseMeasure}::${specKey}`
+        const measureKey = keyMode === 'name-only' ? 'ALL' : phase.phaseMeasure
+        const key = `${canonicalPhaseName}::${measureKey}::${specKey}`
         const existing = map.get(key)
         if (existing) {
           existing.totalDesignLength += entry.designLength
           existing.totalCompletedLength += entry.completedLength
           existing.latestUpdatedAt = Math.max(existing.latestUpdatedAt, updatedAt)
           existing.roadNames.add(road.name)
+          existing.measures.add(phase.phaseMeasure)
+          if (Number.isInteger(phase.phaseDefinitionId) && phase.phaseDefinitionId > 0) {
+            existing.definitionIds.add(phase.phaseDefinitionId)
+          }
           return
         }
         map.set(key, {
           id: key,
-          name: phase.phaseName,
-          measure: phase.phaseMeasure,
-          definitionId: phase.phaseDefinitionId,
+          name: canonicalPhaseName,
+          measures: new Set([phase.phaseMeasure]),
+          definitionIds:
+            Number.isInteger(phase.phaseDefinitionId) && phase.phaseDefinitionId > 0
+              ? new Set([phase.phaseDefinitionId])
+              : new Set<number>(),
           spec: splitBySpec ? entry.spec ?? null : null,
           totalDesignLength: entry.designLength,
           totalCompletedLength: entry.completedLength,
@@ -269,17 +288,25 @@ export function aggregatePhaseProgress(
         designTotal <= 0
           ? 0
           : Math.min(100, Math.round((cappedCompleted / designTotal) * 100))
+      const measure =
+        item.measures.size === 1
+          ? Array.from(item.measures)[0]
+          : item.measures.has('LINEAR')
+            ? 'LINEAR'
+            : 'POINT'
+      const definitionId =
+        item.definitionIds.size === 1 ? Array.from(item.definitionIds)[0] : undefined
       return {
         id: item.id,
         name: item.name,
-        measure: item.measure,
+        measure,
         totalDesignLength: Math.round(designTotal * 100) / 100,
         totalCompletedLength: Math.round(cappedCompleted * 100) / 100,
         completedPercent: percent,
         latestUpdatedAt: item.latestUpdatedAt,
         roadNames: Array.from(item.roadNames),
         spec: item.spec ?? null,
-        phaseDefinitionId: item.definitionId,
+        phaseDefinitionId: definitionId,
       } satisfies AggregatedPhaseProgress
     })
     .sort((a, b) => {

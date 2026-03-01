@@ -115,7 +115,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           levelCrossingSide: (() => {
             if (!isLevelCrossing) return null
             const side = i.levelCrossingSide
-            if (side !== 'LEFT' && side !== 'RIGHT') {
+            if (side !== 'LEFT' && side !== 'RIGHT' && side !== 'BOTH') {
               throw new Error('平交路口区间必须选择平交路口侧别')
             }
             return side

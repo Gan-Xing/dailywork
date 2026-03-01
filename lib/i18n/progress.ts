@@ -89,6 +89,7 @@ type ProgressCopy = {
   }
   phase: PhaseCopy
   workflow: WorkflowCopy
+  quantitiesBoard: QuantitiesBoardCopy
   inspectionBoard: InspectionBoardCopy
 }
 
@@ -125,6 +126,7 @@ type WorkflowCopy = {
   measureLinear: string
   measurePoint: string
   pointHasSidesLabel: string
+  allowLevelCrossingBothLabel: string
   newTemplateBadge: string
   newTemplateTitle: string
   newTemplateHint: string
@@ -599,6 +601,121 @@ type InspectionBoardCopy = {
   }
 }
 
+type QuantitiesBoardCopy = {
+  title: string
+  description: string
+  breadcrumb: {
+    home: string
+    progress: string
+    current: string
+  }
+  summary: {
+    totalFiltered: string
+    loading: string
+    sortedLoading: string
+    empty: string
+  }
+  actions: {
+    expandDetails: string
+    collapseDetails: string
+    selectedColumns: string
+    noColumns: string
+    selectAll: string
+    restoreDefault: string
+    clear: string
+    exportExcel: string
+    exporting: string
+    enterDetail: string
+    unbind: string
+    unbinding: string
+    noPermission: string
+  }
+  filters: {
+    project: string
+    road: string
+    phase: string
+    startPk: string
+    endPk: string
+    side: string
+    display: string
+    completed: string
+    binding: string
+    quantitySource: string
+    updatedAt: string
+    all: string
+    selected: string
+    selectAll: string
+    clear: string
+    reset: string
+    apply: string
+    noOptions: string
+    search: string
+  }
+  options: {
+    projectUnbound: string
+    displayLinear: string
+    displayPoint: string
+    sideLeft: string
+    sideRight: string
+    sideBoth: string
+    bindingBound: string
+    bindingUnbound: string
+    quantitySourceManual: string
+    quantitySourceAuto: string
+  }
+  columns: {
+    project: string
+    road: string
+    phase: string
+    startPk: string
+    endPk: string
+    side: string
+    quantity: string
+    display: string
+    completed: string
+    updatedAt: string
+    actions: string
+  }
+  badges: {
+    manual: string
+  }
+  bound: {
+    title: string
+    count: string
+    loading: string
+    loadFailed: string
+    empty: string
+    phaseItem: string
+    quantity: string
+    unit: string
+    boqCode: string
+    actions: string
+    inputId: string
+    intervalId: string
+  }
+  export: {
+    sheetName: string
+    filenamePrefix: string
+    missingColumns: string
+    noData: string
+    failed: string
+    quantityWithManual: string
+  }
+  pagination: {
+    summary: string
+    prev: string
+    next: string
+    goTo: string
+    pageSizeLabel: string
+  }
+  messages: {
+    listLoadFailed: string
+    unbindSuccess: string
+    unbindFailed: string
+    boundLoadFailed: string
+  }
+}
+
 const progressCopy: Record<Locale, ProgressCopy> = {
   zh: {
     hero: {
@@ -888,6 +1005,7 @@ const progressCopy: Record<Locale, ProgressCopy> = {
       measureLinear: '延米',
       measurePoint: '单体',
       pointHasSidesLabel: '单体分左右侧展示',
+      allowLevelCrossingBothLabel: '平交路口可选双侧',
       newTemplateBadge: '新增模板',
       newTemplateTitle: '创建新的分项模板',
       newTemplateHint: '填写名称与显示方式即可创建，后续可在右侧补充层次与验收内容。',
@@ -944,6 +1062,120 @@ const progressCopy: Record<Locale, ProgressCopy> = {
       empty: '暂无可用模板',
       saveFailed: '保存失败，请稍后重试',
       saving: '保存中...',
+    },
+    quantitiesBoard: {
+      title: '分项工程管理列表',
+      description: '按区间查看分项工程进度，进入详情可配置公式与清单绑定。',
+      breadcrumb: {
+        home: '首页',
+        progress: '进度管理',
+        current: '分项工程管理',
+      },
+      summary: {
+        totalFiltered: '共 {total} 条区间记录，筛选后 {filtered} 条',
+        loading: '正在加载区间详情…',
+        sortedLoading: '正在按排序规则刷新列表…',
+        empty: '暂无区间记录',
+      },
+      actions: {
+        expandDetails: '展开全部明细',
+        collapseDetails: '收起全部明细',
+        selectedColumns: '已选 {count} 列',
+        noColumns: '未选择列',
+        selectAll: '全选',
+        restoreDefault: '恢复默认',
+        clear: '清空',
+        exportExcel: '导出 Excel',
+        exporting: '导出中...',
+        enterDetail: '进入详情',
+        unbind: '解绑',
+        unbinding: '解绑中…',
+        noPermission: '无权限',
+      },
+      filters: {
+        project: '项目',
+        road: '路段',
+        phase: '分项名称',
+        startPk: '起点 PK',
+        endPk: '终点 PK',
+        side: '位置',
+        display: '显示方式',
+        completed: '完成率',
+        binding: '绑定状态',
+        quantitySource: '数量来源',
+        updatedAt: '更新时间',
+        all: '全部',
+        selected: '已选 {count} 项',
+        selectAll: '全选',
+        clear: '清空',
+        reset: '重置筛选',
+        apply: '应用筛选',
+        noOptions: '暂无选项',
+        search: '搜索',
+      },
+      options: {
+        projectUnbound: '未绑定项目',
+        displayLinear: '延米',
+        displayPoint: '单体',
+        sideLeft: '左',
+        sideRight: '右',
+        sideBoth: '双侧',
+        bindingBound: '已绑定',
+        bindingUnbound: '未绑定',
+        quantitySourceManual: '仅手动',
+        quantitySourceAuto: '仅自动',
+      },
+      columns: {
+        project: '项目',
+        road: '路段',
+        phase: '分项名称',
+        startPk: '起点 PK',
+        endPk: '终点 PK',
+        side: '位置',
+        quantity: '数量',
+        display: '显示方式',
+        completed: '完成率',
+        updatedAt: '更新时间',
+        actions: '操作',
+      },
+      badges: {
+        manual: '手动',
+      },
+      bound: {
+        title: '已绑定分项内容',
+        count: '共 {count} 条',
+        loading: '正在加载…',
+        loadFailed: '加载失败',
+        empty: '暂无绑定明细',
+        phaseItem: '分项内容',
+        quantity: '工程量',
+        unit: '单位',
+        boqCode: '清单编号',
+        actions: '操作',
+        inputId: 'inputId {id}',
+        intervalId: '区间 #{id}',
+      },
+      export: {
+        sheetName: '分项工程管理',
+        filenamePrefix: 'quantities-export',
+        missingColumns: '请选择至少一列导出',
+        noData: '无数据可导出',
+        failed: '导出失败',
+        quantityWithManual: '{value}（手动）',
+      },
+      pagination: {
+        summary: '共 {total} 条，第 {page}/{totalPages} 页',
+        prev: '上一页',
+        next: '下一页',
+        goTo: '跳转页码',
+        pageSizeLabel: '每页条数',
+      },
+      messages: {
+        listLoadFailed: '加载分项工程列表失败',
+        unbindSuccess: '已解绑该分项内容',
+        unbindFailed: '解绑失败',
+        boundLoadFailed: '加载绑定明细失败',
+      },
     },
     inspectionBoard: {
       badge: '报检列表',
@@ -1507,6 +1739,7 @@ const progressCopy: Record<Locale, ProgressCopy> = {
       measureLinear: 'Linéaire',
       measurePoint: 'Unitaire',
       pointHasSidesLabel: 'Séparer les unités par côté',
+      allowLevelCrossingBothLabel: 'Autoriser le double côté au carrefour',
       newTemplateBadge: 'Nouveau modèle',
       newTemplateTitle: 'Créer un modèle',
       newTemplateHint: 'Renseignez un nom et un mode；ajoutez ensuite les couches/contrôles à droite.',
@@ -1563,6 +1796,121 @@ const progressCopy: Record<Locale, ProgressCopy> = {
       empty: 'Aucun modèle disponible',
       saveFailed: 'Échec de sauvegarde, réessayez.',
       saving: 'Enregistrement...',
+    },
+    quantitiesBoard: {
+      title: 'Liste de gestion des phases',
+      description:
+        'Consultez l’avancement par intervalle et ouvrez le détail pour configurer les formules et les liaisons BOQ.',
+      breadcrumb: {
+        home: 'Accueil',
+        progress: "Suivi d'avancement",
+        current: 'Gestion des phases',
+      },
+      summary: {
+        totalFiltered: '{total} intervalles au total, {filtered} après filtrage',
+        loading: 'Chargement des détails...',
+        sortedLoading: 'Actualisation selon le tri...',
+        empty: 'Aucun intervalle',
+      },
+      actions: {
+        expandDetails: 'Déplier tous les détails',
+        collapseDetails: 'Replier tous les détails',
+        selectedColumns: '{count} colonnes',
+        noColumns: 'Aucune colonne',
+        selectAll: 'Tout',
+        restoreDefault: 'Par défaut',
+        clear: 'Vider',
+        exportExcel: 'Exporter Excel',
+        exporting: 'Export en cours...',
+        enterDetail: 'Voir le détail',
+        unbind: 'Délier',
+        unbinding: 'Déliaison…',
+        noPermission: 'Pas de droit',
+      },
+      filters: {
+        project: 'Projet',
+        road: 'Tronçon',
+        phase: 'Nom de phase',
+        startPk: 'PK début',
+        endPk: 'PK fin',
+        side: 'Position',
+        display: 'Affichage',
+        completed: 'Avancement',
+        binding: 'Statut de liaison',
+        quantitySource: 'Source de quantité',
+        updatedAt: 'Mise à jour',
+        all: 'Tout',
+        selected: '{count} sélectionné(s)',
+        selectAll: 'Tout',
+        clear: 'Vider',
+        reset: 'Réinitialiser les filtres',
+        apply: 'Appliquer les filtres',
+        noOptions: 'Aucune option',
+        search: 'Rechercher',
+      },
+      options: {
+        projectUnbound: 'Projet non lié',
+        displayLinear: 'Linéaire',
+        displayPoint: 'Ponctuel',
+        sideLeft: 'Gauche',
+        sideRight: 'Droite',
+        sideBoth: 'Deux côtés',
+        bindingBound: 'Lié',
+        bindingUnbound: 'Non lié',
+        quantitySourceManual: 'Manuel uniquement',
+        quantitySourceAuto: 'Automatique uniquement',
+      },
+      columns: {
+        project: 'Projet',
+        road: 'Tronçon',
+        phase: 'Phase',
+        startPk: 'PK début',
+        endPk: 'PK fin',
+        side: 'Position',
+        quantity: 'Quantité',
+        display: 'Affichage',
+        completed: 'Avancement',
+        updatedAt: 'Mise à jour',
+        actions: 'Actions',
+      },
+      badges: {
+        manual: 'Manuel',
+      },
+      bound: {
+        title: 'Éléments de phase liés',
+        count: '{count} ligne(s)',
+        loading: 'Chargement...',
+        loadFailed: 'Échec du chargement',
+        empty: 'Aucune liaison',
+        phaseItem: 'Élément de phase',
+        quantity: 'Quantité',
+        unit: 'Unité',
+        boqCode: 'Code BOQ',
+        actions: 'Actions',
+        inputId: 'inputId {id}',
+        intervalId: 'Intervalle #{id}',
+      },
+      export: {
+        sheetName: 'Gestion des phases',
+        filenamePrefix: 'quantities-export',
+        missingColumns: 'Veuillez sélectionner au moins une colonne à exporter',
+        noData: "Aucune donnée à exporter",
+        failed: "Échec de l'export",
+        quantityWithManual: '{value} (manuel)',
+      },
+      pagination: {
+        summary: '{total} lignes au total, page {page}/{totalPages}',
+        prev: 'Précédent',
+        next: 'Suivant',
+        goTo: 'Aller à la page',
+        pageSizeLabel: 'Par page',
+      },
+      messages: {
+        listLoadFailed: "Échec du chargement de la liste des phases",
+        unbindSuccess: "L'élément de phase a été délié",
+        unbindFailed: 'Échec de la déliaison',
+        boundLoadFailed: 'Échec du chargement des liaisons',
+      },
     },
     inspectionBoard: {
       badge: 'Contrôles',

@@ -60,13 +60,6 @@ export function PhaseEditor({
     ],
     [t.form.sideBoth, t.form.sideLeft, t.form.sideRight],
   )
-  const levelCrossingSideOptions = useMemo<{ value: LevelCrossingSide; label: string }[]>(
-    () => [
-      { value: 'LEFT', label: t.form.sideLeft },
-      { value: 'RIGHT', label: t.form.sideRight },
-    ],
-    [t.form.sideLeft, t.form.sideRight],
-  )
   const sideLabelMap = useMemo(
     () => ({
       BOTH: t.form.sideBoth,
@@ -107,6 +100,17 @@ export function PhaseEditor({
     onSelectionReset: () => resetInspectionFormRef.current(),
     clearSelectedSegment: () => clearSelectedSegmentRef.current(),
   })
+
+  const levelCrossingSideOptions = useMemo<{ value: LevelCrossingSide; label: string }[]>(
+    () => [
+      { value: 'LEFT', label: t.form.sideLeft },
+      { value: 'RIGHT', label: t.form.sideRight },
+      ...(phaseState.measure === 'POINT' && phaseState.allowLevelCrossingBoth
+        ? ([{ value: 'BOTH', label: t.form.sideBoth }] as const)
+        : []),
+    ],
+    [phaseState.allowLevelCrossingBoth, phaseState.measure, t.form.sideBoth, t.form.sideLeft, t.form.sideRight],
+  )
 
   const roadLength = useMemo(() => {
     const start = Number(road.startPk)
@@ -415,8 +419,9 @@ export function PhaseEditor({
                                             openInspectionModal(phase, {
                                               phase: phase.name,
                                               phaseId: phase.id,
+                                              intervalId: seg.intervalId ?? null,
                                               measure: phase.measure,
-                                              layers: phase.resolvedLayers,
+                                              layers: seg.layers?.length ? seg.layers : phase.resolvedLayers,
                                               checks: phase.resolvedChecks,
                                               side: sideValue,
                                               sideLabel,

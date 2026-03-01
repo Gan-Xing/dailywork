@@ -279,10 +279,11 @@
      1. `name`：分项名称（如“土方”），与 `measure` 组合唯一，必填。
      2. `measure`：枚举 `LINEAR` / `POINT`，必填。
      3. `pointHasSides`：布尔，仅对 `POINT` 有意义；为 `true` 时单体分项在展示/报检时按左右侧分别呈现，默认 `false`（单行展示）。
-     3. `defaultLayers`：字符串数组，模板级默认层次列表，可为空。
-     4. `defaultChecks`：字符串数组，模板级默认验收内容列表，可为空。
-     5. `isActive`：布尔，控制是否可被新实例选择，默认 `true`。
-   6. `createdAt` / `updatedAt`：系统时间戳。
+     4. `allowLevelCrossingBoth`：布尔，仅对 `POINT` 有意义；为 `true` 时允许平交路口区间/报检选择 `levelCrossingSide=BOTH`，默认 `false`。
+     5. `defaultLayers`：字符串数组，模板级默认层次列表，可为空。
+     6. `defaultChecks`：字符串数组，模板级默认验收内容列表，可为空。
+     7. `isActive`：布尔，控制是否可被新实例选择，默认 `true`。
+     8. `createdAt` / `updatedAt`：系统时间戳。
 
 ## 分项名称（PhaseItem）
 
@@ -402,7 +403,7 @@
      2. `startPk` / `endPk`：区间起止桩号。
     3. `side`：区间侧别（`BOTH` / `LEFT` / `RIGHT`）。
     4. `locationRoadId?`：真实路段（平交路口时必填；普通路段默认等于 `roadId`）。
-    5. `levelCrossingSide?`：平交路口自身侧别（`LEFT` / `RIGHT`），仅平交路口必填。
+    5. `levelCrossingSide?`：平交路口自身侧别（`LEFT` / `RIGHT` / `BOTH`）；`BOTH` 仅当模板 `allowLevelCrossingBoth=true` 且 `measure=POINT` 时可用。
     6. `spec?`：规格文字。
     7. `layers`：字符串数组，记录当前区间可选层次名称，来自提交时 `PhasePayload.intervals.layers`。
     8. `layerIds`：整数数组，对应 `LayerDefinition.id`，由当前区间的层次名称映射为模板的定义 ID，用于区分每条区间各自的层次集合。
@@ -416,7 +417,7 @@
 - **字段**
      0. `roadId` / `phaseId`：关联路段与分项。
     1. `locationRoadId?`：真实路段（平交路口时必填；普通路段默认等于 `roadId`）。
-    2. `levelCrossingSide?`：平交路口自身侧别（`LEFT` / `RIGHT`），仅平交路口必填。
+    2. `levelCrossingSide?`：平交路口自身侧别（`LEFT` / `RIGHT` / `BOTH`）；`BOTH` 仅当模板 `allowLevelCrossingBoth=true` 且 `measure=POINT` 时可用。
     3. `side`：枚举 `BOTH` / `LEFT` / `RIGHT`（主路段侧别）。
     4. `startPk` / `endPk`：起讫桩号。
     5. `appointmentDate`：预约报检日期（日期粒度）。

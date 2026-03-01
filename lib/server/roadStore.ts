@@ -120,12 +120,25 @@ const calcCompletedLinearLength = (
   inspections: { startPk: number; endPk: number; side: string }[],
 ) => {
   return inspections.reduce((sum, item) => {
-    const [start, end] = normalizeSegment(item.startPk, item.endPk)
-    const raw = end - start
-    const base = raw === 0 ? 1 : Math.max(raw, 0)
-    const factor = item.side === 'BOTH' ? 2 : 1
-    return sum + base * factor
+    return sum + calcIntervalQuantity(item.startPk, item.endPk, item.side)
   }, 0)
+}
+
+const calcIntervalQuantity = (
+  startPk: number,
+  endPk: number,
+  side: string,
+  billQuantity?: number | null,
+) => {
+  const [start, end] = normalizeSegment(startPk, endPk)
+  const raw = end - start
+  const base = raw === 0 ? 1 : Math.max(raw, 0)
+  const factor = side === 'BOTH' ? 2 : 1
+  const computed = base * factor
+  if (typeof billQuantity === 'number' && Number.isFinite(billQuantity)) {
+    return Math.max(0, billQuantity)
+  }
+  return computed
 }
 
 const buildPointStructureKey = (
@@ -186,6 +199,7 @@ const buildIntervalLayerMap = (
     levelCrossingSide?: LevelCrossingSide | null
     layers?: string[] | null
     layerIds?: number[] | null
+    billQuantity?: number | null
   }[],
   fallbackLayers: string[],
   layerNameById: Map<number, string>,
@@ -199,6 +213,7 @@ const buildIntervalLayerMap = (
       layers: string[]
       locationRoadId?: number | null
       levelCrossingSide?: LevelCrossingSide | null
+      billQuantity?: number | null
     }
   >()
   intervals.forEach((interval) => {
@@ -219,6 +234,7 @@ const buildIntervalLayerMap = (
       side,
       locationRoadId: interval.locationRoadId ?? null,
       levelCrossingSide: interval.levelCrossingSide ?? null,
+      billQuantity: interval.billQuantity ?? null,
       layers: layers.map((layer) => normalizeLabel(canonicalizeSingle('layer', layer))).filter(Boolean),
     })
   })
@@ -261,7 +277,18 @@ const resolveTerminalLayers = (
 }
 
 const buildTerminalLayerMap = (
-  intervalLayers: Map<string, { startPk: number; endPk: number; side: IntervalSide; layers: string[] }>,
+  intervalLayers: Map<
+    string,
+    {
+      startPk: number
+      endPk: number
+      side: IntervalSide
+      layers: string[]
+      locationRoadId?: number | null
+      levelCrossingSide?: LevelCrossingSide | null
+      billQuantity?: number | null
+    }
+  >,
   stageByLayer: Map<string, number>,
   fallbackLayers: string[],
 ) => {
@@ -366,6 +393,7 @@ const calcCompletedPointStructures = (
       layers: string[]
       locationRoadId?: number | null
       levelCrossingSide?: LevelCrossingSide | null
+      billQuantity?: number | null
     }
   >,
   workflow?: WorkflowBinding | null,
@@ -428,7 +456,13 @@ const calcCompletedPointStructures = (
         completed.add(`${entry.layerKey}::${entry.checkKey}`)
       })
     })
-    total += Math.min(1, completed.size / totalChecks)
+    const intervalWeight = calcIntervalQuantity(
+      interval.startPk,
+      interval.endPk,
+      interval.side,
+      interval.billQuantity ?? null,
+    )
+    total += intervalWeight * Math.min(1, completed.size / totalChecks)
   })
 
   return total
@@ -489,6 +523,7 @@ export const listRoadSectionsWithProgress = async (): Promise<RoadSectionProgres
               spec: true,
               layers: true,
               layerIds: true,
+              billQuantity: true,
               locationRoadId: true,
               levelCrossingSide: true,
             },
@@ -543,7 +578,13 @@ export const listRoadSectionsWithProgress = async (): Promise<RoadSectionProgres
       ? subbasePhase.inspections.filter((inspection) => inspection.status !== 'PENDING')
       : []
     const phases: RoadPhaseProgressDTO[] = road.phases.map((phase) => {
-      const designLength = Math.max(0, phase.designLength || 0)
+      const pointDesignLength = phase.intervals.reduce((sum, interval) => {
+        return sum + calcIntervalQuantity(interval.startPk, interval.endPk, interval.side, interval.billQuantity)
+      }, 0)
+      const designLength =
+        phase.measure === 'POINT'
+          ? Math.max(0, pointDesignLength)
+          : Math.max(0, phase.designLength || 0)
       const workflow = workflowByDefinitionId.get(phase.phaseDefinitionId) ?? null
       const resolvedLayers =
         phase.measure === 'POINT' || phase.measure === 'LINEAR' ? resolvePhaseLayers(phase) : []
@@ -582,6 +623,7 @@ export const listRoadSectionsWithProgress = async (): Promise<RoadSectionProgres
                 layers: string[]
                 locationRoadId?: number | null
                 levelCrossingSide?: LevelCrossingSide | null
+                billQuantity?: number | null
               }
             >()
       const stageByLayer = phase.measure === 'LINEAR' ? buildWorkflowStageByLayer(workflow) : new Map()
@@ -644,6 +686,7 @@ export const listRoadSectionsWithProgress = async (): Promise<RoadSectionProgres
         spec: interval.spec ?? null,
         layers: (interval as { layers?: string[] }).layers ?? [],
         layerIds: (interval as { layerIds?: number[] }).layerIds ?? [],
+        billQuantity: interval.billQuantity ?? null,
       })) ?? []
       const inspectionRanges =
         phase.measure === 'POINT'

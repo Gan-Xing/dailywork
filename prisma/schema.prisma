@@ -37,6 +37,7 @@ enum IntervalSide {
 enum LevelCrossingSide {
   LEFT
   RIGHT
+  BOTH
 }
 
 enum EmploymentStatus {
@@ -113,6 +114,7 @@ model PhaseDefinition {
   measure       PhaseMeasure
   unitPrice     Decimal?                  @db.Decimal(18, 2)
   pointHasSides Boolean                   @default(false)
+  allowLevelCrossingBoth Boolean          @default(false)
   isActive      Boolean                   @default(true)
   defaultLayers PhaseDefinitionLayer[]
   defaultChecks PhaseDefinitionCheck[]
@@ -339,6 +341,7 @@ model PhaseInterval {
   layerIds        Int[]            @default([])
   billQuantity    Float?
   phaseItemInputs PhaseItemInput[]
+  inspectionEntries InspectionEntry[]
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 
@@ -442,6 +445,8 @@ model InspectionEntry {
   levelCrossingSide LevelCrossingSide?
   phaseId         Int
   phase           RoadPhase        @relation(fields: [phaseId], references: [id], onDelete: Cascade)
+  intervalId      Int?
+  interval        PhaseInterval?   @relation(fields: [intervalId], references: [id], onDelete: SetNull)
   side            IntervalSide
   startPk         Float
   endPk           Float
@@ -467,6 +472,7 @@ model InspectionEntry {
   @@index([roadId, phaseId, side, startPk, endPk, status])
   @@index([locationRoadId])
   @@index([levelCrossingSide])
+  @@index([intervalId])
   @@index([documentId])
 }
 

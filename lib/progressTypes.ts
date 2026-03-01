@@ -87,6 +87,7 @@ export interface InspectionListItem {
   locationRoadSlug?: string | null
   phaseId: number
   phaseName: string
+  intervalId?: number | null
   documentId?: number | null
   submissionId?: number | null
   submissionNumber?: number | null
@@ -120,7 +121,7 @@ export interface InspectionListResponse {
 
 export type PhaseMeasure = 'LINEAR' | 'POINT'
 export type IntervalSide = 'BOTH' | 'LEFT' | 'RIGHT'
-export type LevelCrossingSide = 'LEFT' | 'RIGHT'
+export type LevelCrossingSide = 'LEFT' | 'RIGHT' | 'BOTH'
 export interface SubmissionDTO {
   id: number
   code: string
@@ -138,6 +139,7 @@ export interface InspectionEntryPayload {
   locationRoadId?: number | null
   levelCrossingSide?: LevelCrossingSide | null
   phaseId: number
+  intervalId?: number | null
   side: IntervalSide
   startPk: number
   endPk: number
@@ -277,6 +279,7 @@ export interface PhaseIntervalProgress {
   spec: string | null
   layers?: string[]
   layerIds: number[]
+  billQuantity?: number | null
 }
 
 export interface PhasePayload {
@@ -313,6 +316,7 @@ export interface PhaseDefinitionDTO {
   name: string
   measure: PhaseMeasure
   pointHasSides: boolean
+  allowLevelCrossingBoth: boolean
   defaultLayers: string[]
   defaultLayerObjects: NamedLayer[]
   defaultChecks: string[]
@@ -336,6 +340,7 @@ export interface CheckDefinitionDTO {
 
 export interface InspectionPayload {
   phaseId: number
+  intervalId?: number | null
   startPk: number
   endPk: number
   side: IntervalSide

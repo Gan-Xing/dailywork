@@ -523,10 +523,22 @@ export function useInspectionFlow({
 
     latestPointInspections.forEach((snapshot) => {
       if (snapshot.phaseId !== selectedSegment.phaseId) return
+      if (
+        selectedSegment.levelCrossingSide &&
+        selectedSegment.intervalId !== null &&
+        selectedSegment.intervalId !== undefined &&
+        snapshot.intervalId !== null &&
+        snapshot.intervalId !== undefined &&
+        (snapshot.intervalId ?? null) !== (selectedSegment.intervalId ?? null)
+      ) {
+        return
+      }
       const [snapshotStart, snapshotEnd] = normalizeRange(snapshot.startPk, snapshot.endPk)
       if (snapshotStart !== targetStart || snapshotEnd !== targetEnd) return
+      const effectiveIntervalId = snapshot.levelCrossingSide ? (snapshot.intervalId ?? null) : null
       const keyInput = {
         phaseId: snapshot.phaseId,
+        intervalId: effectiveIntervalId,
         phaseName: snapshot.phaseName ?? (selectedWorkflowPhaseName || selectedPhaseName),
         layerId: snapshot.layerId ?? null,
         layerName: snapshot.layerName ?? snapshot.layerId ?? null,
@@ -617,7 +629,9 @@ export function useInspectionFlow({
         selectedMeta.lockStepWith?.includes(targetId) || meta.lockStepWith?.includes(selectedMeta.id)
       const parallelPair =
         selectedMeta.parallelWith?.includes(targetId) || meta.parallelWith?.includes(selectedMeta.id)
-      return lockPair || parallelPair
+      const dependencyPair =
+        selectedMeta.dependencies?.includes(targetId) || meta.dependencies?.includes(selectedMeta.id)
+      return lockPair || parallelPair || dependencyPair
     }
     const hasSelection = selectedLayers.length > 0
     if (hasSelection && allowedWorkflowStages && !allowedWorkflowStages.has(meta.stage)) {
@@ -821,6 +835,7 @@ export function useInspectionFlow({
         const data = (await res.json()) as {
           items?: Array<{
             phaseId: number
+            intervalId?: number | null
             phaseName?: string | null
             startPk: number
             endPk: number
@@ -840,8 +855,10 @@ export function useInspectionFlow({
         const sliceMap = new Map<string, InspectionSlice>()
         const applySnapshot = (snapshot: LatestPointInspection) => {
           const ts = snapshot.updatedAt ?? 0
+          const statusIntervalId = snapshot.levelCrossingSide ? (snapshot.intervalId ?? null) : null
           const statusKey = buildCheckStatusKey({
             phaseId: snapshot.phaseId,
+            intervalId: statusIntervalId,
             phaseName: snapshot.phaseName,
             layerId: snapshot.layerId,
             layerName: snapshot.layerName,
@@ -876,7 +893,7 @@ export function useInspectionFlow({
             restrictToTopLayer && (!normalizedLayerName || !topLayerNames.has(normalizedLayerName))
 
           if (!skipSlice) {
-            const sliceKey = `${snapshot.phaseId}:${snapshot.locationRoadId ?? 'null'}:${snapshot.levelCrossingSide ?? 'null'}:${snapshot.side}:${snapshot.startPk}:${snapshot.endPk}`
+            const sliceKey = `${snapshot.phaseId}:${snapshot.intervalId ?? 'null'}:${snapshot.locationRoadId ?? 'null'}:${snapshot.levelCrossingSide ?? 'null'}:${snapshot.side}:${snapshot.startPk}:${snapshot.endPk}`
             const prevSlice = sliceMap.get(sliceKey)
             const prevPriority = statusPriority[prevSlice?.status ?? 'PENDING'] ?? 0
             if (
@@ -886,6 +903,7 @@ export function useInspectionFlow({
             ) {
               sliceMap.set(sliceKey, {
                 phaseId: snapshot.phaseId,
+                intervalId: snapshot.intervalId ?? null,
                 side: snapshot.side,
                 startPk: snapshot.startPk,
                 endPk: snapshot.endPk,
@@ -904,6 +922,10 @@ export function useInspectionFlow({
           const side = item.side ?? 'BOTH'
           const snapshot: LatestPointInspection = {
             phaseId: Number(item.phaseId),
+            intervalId:
+              typeof item.intervalId === 'number' && Number.isFinite(item.intervalId)
+                ? item.intervalId
+                : null,
             phaseName: item.phaseName ?? null,
             layerId: item.layerId !== undefined && item.layerId !== null ? String(item.layerId) : null,
             layerName:
@@ -1002,11 +1024,13 @@ export function useInspectionFlow({
       return { left: false, right: false, both: false, lockedSide: null as IntervalSide | null }
     }
     const [rangeStart, rangeEnd] = intervalRange
+    const selectedIntervalIdForMatch = selectedSegment.levelCrossingSide ? (selectedSegment.intervalId ?? null) : null
     const matchLeft = snapshotMatches(
       selectedSegment.phaseId,
       'LEFT',
       rangeStart,
       rangeEnd,
+      selectedIntervalIdForMatch,
       selectedSegment.locationRoadId ?? null,
       selectedSegment.levelCrossingSide ?? null,
     )
@@ -1015,6 +1039,7 @@ export function useInspectionFlow({
       'RIGHT',
       rangeStart,
       rangeEnd,
+      selectedIntervalIdForMatch,
       selectedSegment.locationRoadId ?? null,
       selectedSegment.levelCrossingSide ?? null,
     )
@@ -1023,6 +1048,7 @@ export function useInspectionFlow({
       'BOTH',
       rangeStart,
       rangeEnd,
+      selectedIntervalIdForMatch,
       selectedSegment.locationRoadId ?? null,
       selectedSegment.levelCrossingSide ?? null,
     )
@@ -1107,6 +1133,7 @@ export function useInspectionFlow({
       allowedLayers: string[] = [],
       locationRoadId?: number | null,
       levelCrossingSide?: LevelCrossingSide | null,
+      intervalId?: number | null,
     ) => {
       const workflowLayers = workflowLayersByPhaseId.get(phaseId)
       const phaseNameFallback = phases.find((item) => item.id === phaseId)?.name ?? ''
@@ -1131,11 +1158,13 @@ export function useInspectionFlow({
       }
 
       let completedChecks = 0
+      const effectiveIntervalId = levelCrossingSide ? (intervalId ?? null) : null
       effectiveLayers.forEach((layer) => {
         layer.checks.forEach((check) => {
           const hasApproved = candidatesForSide(side).some((candidateSide) => {
             const keyWithIds = buildCheckStatusKey({
               phaseId,
+              intervalId: effectiveIntervalId,
               phaseName: phaseNameForContext,
               layerId: layer.id,
               layerName: layer.name,
@@ -1149,6 +1178,7 @@ export function useInspectionFlow({
             })
             const keyWithNames = buildCheckStatusKey({
               phaseId,
+              intervalId: effectiveIntervalId,
               phaseName: phaseNameForContext,
               layerId: null,
               layerName: layer.name,
@@ -1160,8 +1190,8 @@ export function useInspectionFlow({
               startPk: targetStart,
               endPk: targetEnd,
             })
-            const snapshot = latestPointInspections.get(keyWithIds) ?? latestPointInspections.get(keyWithNames)
-            return snapshot?.status === 'APPROVED'
+            const directSnapshot = latestPointInspections.get(keyWithIds) ?? latestPointInspections.get(keyWithNames)
+            return directSnapshot?.status === 'APPROVED'
           })
           if (hasApproved) {
             completedChecks += 1
@@ -1188,6 +1218,7 @@ export function useInspectionFlow({
       layer.checks.forEach((check) => {
         const baseKey = buildCheckStatusBaseKey({
           phaseId: selectedSegment.phaseId,
+          intervalId: selectedSegment.levelCrossingSide ? (selectedSegment.intervalId ?? null) : null,
           phaseName: workflowPhaseNameForContext,
           layerId: layer.id,
           layerName: layer.name,
@@ -1222,6 +1253,7 @@ export function useInspectionFlow({
       layer.checks.forEach((check) => {
         const baseKey = buildCheckStatusBaseKey({
           phaseId: selectedSegment.phaseId,
+          intervalId: selectedSegment.levelCrossingSide ? (selectedSegment.intervalId ?? null) : null,
           phaseName: workflowPhaseNameForContext,
           layerId: layer.id,
           layerName: layer.name,
@@ -1291,6 +1323,7 @@ export function useInspectionFlow({
     const targetSide = enforcedSide ?? selectedSide
     const payloadBase: Omit<InspectionSubmitBatch, 'side' | 'layers' | 'checks'> = {
       phaseId: selectedSegment.phaseId,
+      intervalId: selectedSegment.levelCrossingSide ? (selectedSegment.intervalId ?? null) : null,
       startPk,
       endPk,
       types: normalizedTypes,
@@ -1422,24 +1455,54 @@ export function useInspectionFlow({
       const uniqueTypes = Array.from(new Set(payload.types))
       const remarkText = (payload.remark ?? '').trim()
       const appointmentDate = payload.appointmentDate || undefined
-      return uniqueLayers.flatMap((layerName) =>
-        uniqueChecks.map<InspectionEntrySubmitPayload>((checkName) => ({
-          roadId: road.id,
-          locationRoadId: selectedSegment.locationRoadId ?? road.id,
-          levelCrossingSide: selectedSegment.levelCrossingSide ?? null,
-          phaseId: payload.phaseId,
-          side: payload.side,
-          startPk: normalizedStart,
-          endPk: normalizedEnd,
-          layerName,
-          checkName,
-          types: uniqueTypes,
-          remark: remarkText || undefined,
-          appointmentDate,
-          status: 'SCHEDULED',
-          submissionNumber,
-        })),
-      )
+      const normalizedChecks = uniqueChecks.map((checkName) => ({
+        checkName,
+        normalized: normalizeLabel(checkName),
+      }))
+      const workflowPairs: Array<{ layerName: string; checkName: string }> = []
+      if (workflowChecksByLayerName) {
+        uniqueLayers.forEach((layerName) => {
+          const allowedChecksForLayer = workflowChecksByLayerName.get(normalizeLabel(layerName))
+          if (!allowedChecksForLayer?.size) return
+          const allowedCheckNames = new Set(
+            Array.from(allowedChecksForLayer).map((item) => normalizeLabel(item)),
+          )
+          normalizedChecks.forEach((check) => {
+            if (allowedCheckNames.has(check.normalized)) {
+              workflowPairs.push({ layerName, checkName: check.checkName })
+            }
+          })
+        })
+      }
+      const pairs = workflowPairs.length
+        ? Array.from(
+            new Map(
+              workflowPairs.map((pair) => [
+                `${normalizeLabel(pair.layerName)}::${normalizeLabel(pair.checkName)}`,
+                pair,
+              ]),
+            ).values(),
+          )
+        : uniqueLayers.flatMap((layerName) =>
+            uniqueChecks.map((checkName) => ({ layerName, checkName })),
+          )
+      return pairs.map<InspectionEntrySubmitPayload>(({ layerName, checkName }) => ({
+        roadId: road.id,
+        locationRoadId: selectedSegment.locationRoadId ?? road.id,
+        levelCrossingSide: selectedSegment.levelCrossingSide ?? null,
+        phaseId: payload.phaseId,
+        intervalId: payload.intervalId ?? null,
+        side: payload.side,
+        startPk: normalizedStart,
+        endPk: normalizedEnd,
+        layerName,
+        checkName,
+        types: uniqueTypes,
+        remark: remarkText || undefined,
+        appointmentDate,
+        status: 'SCHEDULED',
+        submissionNumber,
+      }))
     })
 
     if (!entries.length) {
