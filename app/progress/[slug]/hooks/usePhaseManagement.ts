@@ -123,6 +123,7 @@ export function usePhaseManagement({
   const [deleteTarget, setDeleteTarget] = useState<PhaseDTO | null>(null)
   const [deleteError, setDeleteError] = useState<string | null>(null)
   const nameInputRef = useRef<HTMLInputElement | null>(null)
+  const nextTempIntervalIdRef = useRef(-1)
 
   const workflowMap = useMemo(() => {
     const map = new Map<number, WorkflowBinding>()
@@ -245,8 +246,17 @@ export function usePhaseManagement({
     )
   }
 
+  const createDraftInterval = useCallback(
+    (base: PhaseIntervalPayload): PhaseIntervalPayload => ({
+      ...base,
+      id: nextTempIntervalIdRef.current--,
+      layers: Array.isArray(base.layers) ? [...base.layers] : [],
+    }),
+    [],
+  )
+
   const addInterval = () => {
-    setIntervals((prev) => [...prev, { ...defaultInterval }])
+    setIntervals((prev) => [createDraftInterval(defaultInterval), ...prev])
   }
 
   const removeInterval = (index: number) => {
@@ -260,7 +270,7 @@ export function usePhaseManagement({
     setMeasure(defaultDefinition?.measure ?? 'LINEAR')
     setPointHasSides(Boolean(defaultDefinition?.pointHasSides))
     setAllowLevelCrossingBoth(Boolean(defaultDefinition?.allowLevelCrossingBoth))
-    setIntervals([defaultInterval])
+    setIntervals([createDraftInterval(defaultInterval)])
     setEditingId(null)
     setError(null)
   }
@@ -291,7 +301,7 @@ export function usePhaseManagement({
     setDefinitionId(normalized.definitionId)
     setIntervals(
       normalized.intervals.map((i) => ({
-        id: i.id,
+        id: Number.isInteger(i.id) && Number(i.id) > 0 ? Number(i.id) : nextTempIntervalIdRef.current--,
         startPk: i.startPk,
         endPk: i.endPk,
         side: i.side,
@@ -360,6 +370,8 @@ export function usePhaseManagement({
         allowedLayerIdByName.set(normalizeLabel(item.name), item.id)
       })
       const payloadIntervals = intervals.map((item) => {
+        const rawId = Number(item.id)
+        const persistedId = Number.isInteger(rawId) && rawId > 0 ? rawId : undefined
         const startPk = Number(item.startPk)
         const endPk = Number(item.endPk)
         const spec = typeof item.spec === 'string' ? item.spec.trim() : ''
@@ -392,7 +404,7 @@ export function usePhaseManagement({
             ? item.levelCrossingSide
             : null
         return {
-          id: item.id,
+          id: persistedId,
           startPk,
           endPk,
           side: item.side,

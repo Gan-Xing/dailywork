@@ -396,6 +396,18 @@ export interface InspectionDTO extends InspectionPayload {
   updatedBy?: { id: number; username: string } | null
 }
 
+export interface AggregatedPhaseRoadBreakdown {
+  roadId: number
+  roadSlug: string
+  roadName: string
+  roadLabels: LocalizedString
+  designLength: number
+  completedLength: number
+  remainingLength: number
+  completedPercent: number
+  latestUpdatedAt: number
+}
+
 export interface AggregatedPhaseProgress {
   id: string
   name: string
@@ -405,6 +417,7 @@ export interface AggregatedPhaseProgress {
   completedPercent: number
   latestUpdatedAt: number
   roadNames: string[]
+  roadBreakdown: AggregatedPhaseRoadBreakdown[]
   spec?: string | null
   phaseDefinitionId?: number
 }

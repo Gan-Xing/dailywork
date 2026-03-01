@@ -142,6 +142,18 @@ export function PhaseFormModal({
           </div>
 
           <form className="mt-5 space-y-4" onSubmit={onSubmit}>
+            <div className="sticky top-0 z-20 -mx-2 flex flex-wrap items-center gap-3 rounded-2xl border border-slate-200 bg-white/95 px-3 py-3 shadow-sm backdrop-blur">
+              <button
+                type="submit"
+                disabled={isPending}
+                className="inline-flex items-center justify-center rounded-2xl bg-emerald-500 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-200/60 transition hover:-translate-y-0.5 hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {t.form.save}
+              </button>
+              {error ? <span className="text-sm text-amber-700">{error}</span> : null}
+              {isPending ? <span className="text-xs text-slate-500">{t.form.saving}</span> : null}
+            </div>
+
             <div className="grid gap-4 md:grid-cols-4">
               <label className="flex flex-col gap-2 text-sm text-slate-700">
                 {t.form.templateLabel}
@@ -223,7 +235,7 @@ export function PhaseFormModal({
               <div className="space-y-3">
                 {intervals.map((item, index) => (
                   <div
-                    key={index}
+                    key={item.id ?? `new-${index}`}
                     className={`grid grid-cols-1 gap-3 rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-700 md:items-center ${
                       isLevelCrossing ? 'md:grid-cols-8' : 'md:grid-cols-6'
                     }`}
@@ -376,17 +388,6 @@ export function PhaseFormModal({
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-3">
-              <button
-                type="submit"
-                disabled={isPending}
-                className="inline-flex items-center justify-center rounded-2xl bg-emerald-500 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-200/60 transition hover:-translate-y-0.5 hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-70"
-              >
-                {t.form.save}
-              </button>
-              {error ? <span className="text-sm text-amber-700">{error}</span> : null}
-              {isPending ? <span className="text-xs text-slate-500">{t.form.saving}</span> : null}
-            </div>
             <p className="text-xs text-slate-500">{t.note.measure}</p>
           </form>
         </div>

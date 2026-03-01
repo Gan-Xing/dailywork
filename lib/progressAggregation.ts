@@ -1,11 +1,13 @@
 import type { Locale } from '@/lib/i18n'
 import type {
   AggregatedPhaseProgress,
+  AggregatedPhaseRoadBreakdown,
   IntervalSide,
   PhaseMeasure,
   RoadPhaseProgressDTO,
   RoadSectionProgressDTO,
 } from '@/lib/progressTypes'
+import { resolveRoadName } from '@/lib/i18n/roadDictionary'
 import { canonicalizeProgressList } from '@/lib/i18n/progressDictionary'
 
 const SPEC_SPLIT_PHASES = new Set(['边沟', '过道涵', '路缘石'])
@@ -226,6 +228,18 @@ interface AggregationRecord {
   totalCompletedLength: number
   latestUpdatedAt: number
   roadNames: Set<string>
+  roadBreakdown: Map<
+    number,
+    {
+      roadId: number
+      roadSlug: string
+      roadName: string
+      roadLabels: RoadSectionProgressDTO['labels']
+      designLength: number
+      completedLength: number
+      latestUpdatedAt: number
+    }
+  >
 }
 
 export function aggregatePhaseProgress(
@@ -255,6 +269,22 @@ export function aggregatePhaseProgress(
           existing.latestUpdatedAt = Math.max(existing.latestUpdatedAt, updatedAt)
           existing.roadNames.add(road.name)
           existing.measures.add(phase.phaseMeasure)
+          const roadEntry = existing.roadBreakdown.get(road.id)
+          if (roadEntry) {
+            roadEntry.designLength += entry.designLength
+            roadEntry.completedLength += entry.completedLength
+            roadEntry.latestUpdatedAt = Math.max(roadEntry.latestUpdatedAt, updatedAt)
+          } else {
+            existing.roadBreakdown.set(road.id, {
+              roadId: road.id,
+              roadSlug: road.slug,
+              roadName: road.name,
+              roadLabels: road.labels,
+              designLength: entry.designLength,
+              completedLength: entry.completedLength,
+              latestUpdatedAt: updatedAt,
+            })
+          }
           if (Number.isInteger(phase.phaseDefinitionId) && phase.phaseDefinitionId > 0) {
             existing.definitionIds.add(phase.phaseDefinitionId)
           }
@@ -273,6 +303,20 @@ export function aggregatePhaseProgress(
           totalCompletedLength: entry.completedLength,
           latestUpdatedAt: updatedAt,
           roadNames: new Set([road.name]),
+          roadBreakdown: new Map([
+            [
+              road.id,
+              {
+                roadId: road.id,
+                roadSlug: road.slug,
+                roadName: road.name,
+                roadLabels: road.labels,
+                designLength: entry.designLength,
+                completedLength: entry.completedLength,
+                latestUpdatedAt: updatedAt,
+              },
+            ],
+          ]),
         })
       })
     })
@@ -294,6 +338,48 @@ export function aggregatePhaseProgress(
           : item.measures.has('LINEAR')
             ? 'LINEAR'
             : 'POINT'
+      const roadBreakdown: AggregatedPhaseRoadBreakdown[] = Array.from(item.roadBreakdown.values())
+        .map((road) => {
+          const roadDesign = Math.max(0, road.designLength)
+          const roadCompletedRaw = Math.max(0, road.completedLength)
+          const roadCompleted = roadDesign <= 0 ? roadCompletedRaw : Math.min(roadDesign, roadCompletedRaw)
+          const roadRemaining = Math.max(roadDesign - roadCompleted, 0)
+          const roadPercent =
+            roadDesign <= 0
+              ? 0
+              : Math.min(100, Math.round((roadCompleted / roadDesign) * 100))
+          return {
+            roadId: road.roadId,
+            roadSlug: road.roadSlug,
+            roadName: road.roadName,
+            roadLabels: road.roadLabels,
+            designLength: Math.round(roadDesign * 100) / 100,
+            completedLength: Math.round(roadCompleted * 100) / 100,
+            remainingLength: Math.round(roadRemaining * 100) / 100,
+            completedPercent: roadPercent,
+            latestUpdatedAt: road.latestUpdatedAt,
+          }
+        })
+        .sort((left, right) =>
+          resolveRoadName(
+            {
+              slug: left.roadSlug,
+              name: left.roadName,
+              labels: left.roadLabels,
+            },
+            locale,
+          ).localeCompare(
+            resolveRoadName(
+              {
+                slug: right.roadSlug,
+                name: right.roadName,
+                labels: right.roadLabels,
+              },
+              locale,
+            ),
+            formatLocaleId(locale),
+          ),
+        )
       const definitionId =
         item.definitionIds.size === 1 ? Array.from(item.definitionIds)[0] : undefined
       return {
@@ -304,7 +390,8 @@ export function aggregatePhaseProgress(
         totalCompletedLength: Math.round(cappedCompleted * 100) / 100,
         completedPercent: percent,
         latestUpdatedAt: item.latestUpdatedAt,
-        roadNames: Array.from(item.roadNames),
+        roadNames: roadBreakdown.map((road) => road.roadName),
+        roadBreakdown,
         spec: item.spec ?? null,
         phaseDefinitionId: definitionId,
       } satisfies AggregatedPhaseProgress

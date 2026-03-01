@@ -40,7 +40,7 @@ export default async function RoadDetailPage({ params }: { params: Promise<{ slu
   const [phases, phaseDefinitions, allRoads] = await Promise.all([
     listPhases(road.id),
     listPhaseDefinitions(),
-    road.slug === LEVEL_CROSSING_ROAD_SLUG ? listRoadSections() : Promise.resolve([]),
+    listRoadSections(),
   ])
   const locationRoadOptions =
     road.slug === LEVEL_CROSSING_ROAD_SLUG
@@ -54,7 +54,7 @@ export default async function RoadDetailPage({ params }: { params: Promise<{ slu
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900">
-      <ProgressDetailHeader road={road} />
+      <ProgressDetailHeader road={road} roads={allRoads} />
       <div className="relative mx-auto max-w-6xl px-6 py-8 sm:px-8 xl:max-w-[1500px] xl:px-10 2xl:max-w-[1700px] 2xl:px-12">
         <div className="absolute inset-x-0 top-0 -z-10 h-48 bg-gradient-to-r from-emerald-200/50 via-sky-200/40 to-amber-200/40 blur-3xl" />
         <PhaseEditor

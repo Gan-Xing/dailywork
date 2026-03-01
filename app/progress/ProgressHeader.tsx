@@ -14,6 +14,7 @@ type ProgressHeaderProps = {
   breadcrumbs: BreadcrumbItem[]
   locale?: Locale
   onLocaleChange?: (locale: Locale) => void
+  rightSlot?: ReactNode
 }
 
 export function ProgressHeader({
@@ -22,6 +23,7 @@ export function ProgressHeader({
   breadcrumbs,
   locale,
   onLocaleChange,
+  rightSlot,
 }: ProgressHeaderProps) {
   const pathname = usePathname()
   const resolvedLocale: Locale = locale ?? 'zh'
@@ -52,6 +54,7 @@ export function ProgressHeader({
       tabs={tabs}
       locale={locale}
       onLocaleChange={onLocaleChange}
+      rightSlot={rightSlot}
       breadcrumbVariant="light"
     />
   )
