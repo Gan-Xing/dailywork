@@ -81,6 +81,7 @@ type ProgressCopy = {
   detail: {
     badge: string
     slugLine: string
+    roadSwitchLabel: string
     back: string
     notFoundTitle: string
     notFoundBody: string
@@ -249,6 +250,17 @@ type PhaseCopy = {
     pointSummary: string
     moreUnits: string
     updatedLabel: string
+    expandAll: string
+    collapseAll: string
+    expand: string
+    collapse: string
+    detailRoad: string
+    detailDesign: string
+    detailCompleted: string
+    detailRemaining: string
+    detailPercent: string
+    detailTotal: string
+    detailEmpty: string
   }
   list: {
     title: string
@@ -671,6 +683,10 @@ type QuantitiesBoardCopy = {
     endPk: string
     side: string
     quantity: string
+    phaseItem: string
+    boundQuantity: string
+    unit: string
+    boqCode: string
     display: string
     completed: string
     updatedAt: string
@@ -795,6 +811,7 @@ const progressCopy: Record<Locale, ProgressCopy> = {
     detail: {
       badge: '路段详情',
       slugLine: '路由：{slug} · 起点：{start} · 终点：{end}',
+      roadSwitchLabel: '切换路段',
       back: '返回列表',
       notFoundTitle: '路段不存在',
       notFoundBody: '未找到对应路段，请返回列表。',
@@ -867,6 +884,17 @@ const progressCopy: Record<Locale, ProgressCopy> = {
         pointSummary: '单体 · 总数 {design} 个 · 已完成 {completed} 个 · 完成 {percent}%',
         moreUnits: '+{count} 个更多',
         updatedLabel: '更新：',
+        expandAll: '展开全部',
+        collapseAll: '收起全部',
+        expand: '展开明细',
+        collapse: '收起明细',
+        detailRoad: '路段',
+        detailDesign: '设计量',
+        detailCompleted: '完成量',
+        detailRemaining: '剩余量',
+        detailPercent: '完成率',
+        detailTotal: '汇总',
+        detailEmpty: '暂无路段明细',
       },
       list: {
         title: '已有分项',
@@ -1133,6 +1161,10 @@ const progressCopy: Record<Locale, ProgressCopy> = {
         endPk: '终点 PK',
         side: '位置',
         quantity: '数量',
+        phaseItem: '分项内容',
+        boundQuantity: '工程量',
+        unit: '单位',
+        boqCode: '清单编号',
         display: '显示方式',
         completed: '完成率',
         updatedAt: '更新时间',
@@ -1526,6 +1558,7 @@ const progressCopy: Record<Locale, ProgressCopy> = {
     detail: {
       badge: 'Détail route',
       slugLine: 'Slug : {slug} · PK début : {start} · PK fin : {end}',
+      roadSwitchLabel: 'Changer de tronçon',
       back: 'Retour à la liste',
       notFoundTitle: 'Route introuvable',
       notFoundBody: 'Aucune route correspondante. Retournez à la liste.',
@@ -1599,6 +1632,17 @@ const progressCopy: Record<Locale, ProgressCopy> = {
         pointSummary: 'Unités · Total {design} · Réalisées {completed} · {percent}%',
         moreUnits: '+{count} supplémentaires',
         updatedLabel: 'MàJ : ',
+        expandAll: 'Tout développer',
+        collapseAll: 'Tout réduire',
+        expand: 'Voir détails',
+        collapse: 'Masquer détails',
+        detailRoad: 'Tronçon',
+        detailDesign: 'Prévu',
+        detailCompleted: 'Réalisé',
+        detailRemaining: 'Restant',
+        detailPercent: 'Taux',
+        detailTotal: 'Total',
+        detailEmpty: 'Aucun détail par tronçon',
       },
       list: {
         title: 'Phases existantes',
@@ -1868,6 +1912,10 @@ const progressCopy: Record<Locale, ProgressCopy> = {
         endPk: 'PK fin',
         side: 'Position',
         quantity: 'Quantité',
+        phaseItem: 'Élément de phase',
+        boundQuantity: 'Quantité liée',
+        unit: 'Unité',
+        boqCode: 'Code BOQ',
         display: 'Affichage',
         completed: 'Avancement',
         updatedAt: 'Mise à jour',

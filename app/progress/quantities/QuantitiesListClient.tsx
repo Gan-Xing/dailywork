@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import type { MultiSelectOption } from '@/components/MultiSelectFilter'
 import { MultiSelectFilter } from '@/components/MultiSelectFilter'
@@ -34,6 +34,10 @@ type ColumnKey =
   | 'endPk'
   | 'side'
   | 'quantity'
+  | 'phaseItem'
+  | 'boundQuantity'
+  | 'unit'
+  | 'boqCode'
   | 'display'
   | 'completed'
   | 'updatedAt'
@@ -51,6 +55,12 @@ type DisplayRow = PhaseIntervalManagementRow & {
   completionBucket: string
   bindingStatus: 'BOUND' | 'UNBOUND'
   bindingLabel: string
+}
+
+type TableDisplayRow = {
+  key: string
+  row: DisplayRow
+  boundItem: IntervalBoundPhaseItemDTO | null
 }
 
 type PhaseIntervalListPayload = {
@@ -102,6 +112,10 @@ const defaultVisibleColumns: ColumnKey[] = [
   'endPk',
   'side',
   'quantity',
+  'phaseItem',
+  'boundQuantity',
+  'unit',
+  'boqCode',
   'display',
   'completed',
   'updatedAt',
@@ -115,12 +129,18 @@ const columnKeys: ColumnKey[] = [
   'endPk',
   'side',
   'quantity',
+  'phaseItem',
+  'boundQuantity',
+  'unit',
+  'boqCode',
   'display',
   'completed',
   'updatedAt',
 ]
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100, 200]
+const BOUND_EXPORT_BATCH_LIMIT = 500
+const boundColumnKeys: ColumnKey[] = ['phaseItem', 'boundQuantity', 'unit', 'boqCode']
 
 const isSameSelection = (left: string[], right: string[]) => {
   if (left.length !== right.length) return false
@@ -265,6 +285,7 @@ export default function QuantitiesListClient({ canEdit }: Props) {
   const [showColumnSelector, setShowColumnSelector] = useState(false)
   const [columnsReady, setColumnsReady] = useState(false)
   const [exporting, setExporting] = useState(false)
+  const [unbindingInputIds, setUnbindingInputIds] = useState<Set<number>>(() => new Set())
   const columnSelectorRef = useRef<HTMLDivElement | null>(null)
   const columnOptions = useMemo<Array<{ key: ColumnKey; label: string }>>(
     () => [
@@ -275,6 +296,10 @@ export default function QuantitiesListClient({ canEdit }: Props) {
       { key: 'endPk', label: copy.columns.endPk },
       { key: 'side', label: copy.columns.side },
       { key: 'quantity', label: copy.columns.quantity },
+      { key: 'phaseItem', label: copy.columns.phaseItem },
+      { key: 'boundQuantity', label: copy.columns.boundQuantity },
+      { key: 'unit', label: copy.columns.unit },
+      { key: 'boqCode', label: copy.columns.boqCode },
       { key: 'display', label: copy.columns.display },
       { key: 'completed', label: copy.columns.completed },
       { key: 'updatedAt', label: copy.columns.updatedAt },
@@ -716,6 +741,49 @@ export default function QuantitiesListClient({ canEdit }: Props) {
   }
 
   const isVisible = (key: ColumnKey) => visibleColumns.includes(key)
+  const needsBoundColumns = boundColumnKeys.some((key) => isVisible(key))
+  const shouldLoadBoundItems = needsBoundColumns || showAllDetails
+
+  const formatBoundItemName = useCallback(
+    (item: IntervalBoundPhaseItemDTO) => {
+      return item.phaseItemName?.trim() || item.phaseItemSpec?.trim() || '—'
+    },
+    [],
+  )
+
+  const formatBoundQuantityValue = useCallback(
+    (item: IntervalBoundPhaseItemDTO) => {
+      if (item.effectiveQuantity === null) return '—'
+      const quantity = formatNumber(item.effectiveQuantity, 3)
+      return item.manualQuantity !== null
+        ? formatProgressCopy(copy.export.quantityWithManual, { value: quantity })
+        : quantity
+    },
+    [copy.export.quantityWithManual, formatNumber],
+  )
+
+  const tableRows = useMemo<TableDisplayRow[]>(() => {
+    const next: TableDisplayRow[] = []
+    sortedRows.forEach((row) => {
+      const boundItems = boundItemsByInterval.get(row.intervalId) ?? []
+      if (showAllDetails && boundItems.length > 0) {
+        boundItems.forEach((item) => {
+          next.push({
+            key: `${row.intervalId}-${item.inputId}`,
+            row,
+            boundItem: item,
+          })
+        })
+        return
+      }
+      next.push({
+        key: `${row.intervalId}-${showAllDetails ? 'empty' : 'summary'}`,
+        row,
+        boundItem: showAllDetails ? null : boundItems[0] ?? null,
+      })
+    })
+    return next
+  }, [boundItemsByInterval, showAllDetails, sortedRows])
 
   const persistVisibleColumns = (next: ColumnKey[]) => {
     setVisibleColumns(next)
@@ -819,6 +887,39 @@ export default function QuantitiesListClient({ canEdit }: Props) {
     setDetailOpen(true)
   }
 
+  const fetchBoundItemsForExport = useCallback(
+    async (intervalIds: number[]) => {
+      const uniqueIds = Array.from(
+        new Set(intervalIds.filter((id) => Number.isInteger(id) && id > 0)),
+      )
+      const map = new Map<number, IntervalBoundPhaseItemDTO[]>()
+      if (!uniqueIds.length) return map
+      for (let start = 0; start < uniqueIds.length; start += BOUND_EXPORT_BATCH_LIMIT) {
+        const chunk = uniqueIds.slice(start, start + BOUND_EXPORT_BATCH_LIMIT)
+        const response = await fetch('/api/progress/quantities/bound-items/batch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ intervalIds: chunk }),
+        })
+        const payload = (await response.json().catch(() => ({}))) as {
+          itemsByInterval?: Record<string, IntervalBoundPhaseItemDTO[]>
+          message?: string
+        }
+        if (!response.ok) {
+          throw new Error(payload.message ?? copy.messages.boundLoadFailed)
+        }
+        const itemsByInterval = payload.itemsByInterval ?? {}
+        chunk.forEach((id) => {
+          const items = itemsByInterval[String(id)]
+          map.set(id, Array.isArray(items) ? items : [])
+        })
+      }
+      return map
+    },
+    [copy.messages.boundLoadFailed],
+  )
+
   const handleExportExcel = async () => {
     if (exporting) return
     try {
@@ -854,6 +955,36 @@ export default function QuantitiesListClient({ canEdit }: Props) {
         return
       }
 
+      const needsBoundRows = selectedColumns.some((column) =>
+        boundColumnKeys.includes(column.key),
+      )
+      let exportTableRows: TableDisplayRow[] = exportRows.map((row) => ({
+        key: `${row.intervalId}-summary`,
+        row,
+        boundItem: null,
+      }))
+
+      if (needsBoundRows) {
+        const boundMap = await fetchBoundItemsForExport(exportRows.map((row) => row.intervalId))
+        exportTableRows = exportRows.flatMap<TableDisplayRow>((row) => {
+          const boundItems = boundMap.get(row.intervalId) ?? []
+          if (boundItems.length === 0) {
+            return [
+              {
+                key: `${row.intervalId}-empty`,
+                row,
+                boundItem: null,
+              },
+            ]
+          }
+          return boundItems.map((item) => ({
+            key: `${row.intervalId}-${item.inputId}`,
+            row,
+            boundItem: item,
+          }))
+        })
+      }
+
       const XLSX = await import('xlsx')
       const headerRow = selectedColumns.map((column) => {
         switch (column.key) {
@@ -871,6 +1002,14 @@ export default function QuantitiesListClient({ canEdit }: Props) {
             return copy.columns.side
           case 'quantity':
             return copy.columns.quantity
+          case 'phaseItem':
+            return copy.columns.phaseItem
+          case 'boundQuantity':
+            return copy.columns.boundQuantity
+          case 'unit':
+            return copy.columns.unit
+          case 'boqCode':
+            return copy.columns.boqCode
           case 'display':
             return copy.columns.display
           case 'completed':
@@ -881,7 +1020,7 @@ export default function QuantitiesListClient({ canEdit }: Props) {
             return column.label
         }
       })
-      const dataRows = exportRows.map((row) =>
+      const dataRows = exportTableRows.map(({ row, boundItem }) =>
         selectedColumns.map((column) => {
           switch (column.key) {
             case 'project':
@@ -902,6 +1041,14 @@ export default function QuantitiesListClient({ canEdit }: Props) {
                 ? formatProgressCopy(copy.export.quantityWithManual, { value: quantity })
                 : quantity
             }
+            case 'phaseItem':
+              return boundItem ? formatBoundItemName(boundItem) : ''
+            case 'boundQuantity':
+              return boundItem ? formatBoundQuantityValue(boundItem) : ''
+            case 'unit':
+              return boundItem?.unit ?? ''
+            case 'boqCode':
+              return boundItem?.boqCode ?? ''
             case 'display':
               return row.displayLabel
             case 'completed':
@@ -930,6 +1077,12 @@ export default function QuantitiesListClient({ canEdit }: Props) {
 
   const unbindInput = async (intervalId: number, inputId: number) => {
     if (!canEdit) return
+    if (unbindingInputIds.has(inputId)) return
+    setUnbindingInputIds((prev) => {
+      const next = new Set(prev)
+      next.add(inputId)
+      return next
+    })
     try {
       const response = await fetch(`/api/progress/quantities/input?inputId=${inputId}`, {
         method: 'DELETE',
@@ -951,70 +1104,86 @@ export default function QuantitiesListClient({ canEdit }: Props) {
       addToast(copy.messages.unbindSuccess, { tone: 'success' })
     } catch (error) {
       addToast((error as Error).message ?? copy.messages.unbindFailed, { tone: 'danger' })
+    } finally {
+      setUnbindingInputIds((prev) => {
+        const next = new Set(prev)
+        next.delete(inputId)
+        return next
+      })
     }
   }
 
-  const loadBoundItemsBatch = async (intervalIds: number[]) => {
-    const pending = intervalIds.filter((id) => !boundItemsByInterval.has(id) && !boundLoading.has(id))
-    if (!pending.length) return
-    setBoundLoading((prev) => {
-      const next = new Set(prev)
-      pending.forEach((id) => next.add(id))
-      return next
-    })
-    setBoundErrors((prev) => {
-      const next = new Map(prev)
-      pending.forEach((id) => next.delete(id))
-      return next
-    })
-    try {
-      const response = await fetch('/api/progress/quantities/bound-items/batch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ intervalIds: pending }),
-      })
-      const payload = (await response.json().catch(() => ({}))) as {
-        itemsByInterval?: Record<string, IntervalBoundPhaseItemDTO[]>
-        message?: string
-      }
-      if (!response.ok) {
-        throw new Error(payload.message ?? copy.messages.boundLoadFailed)
-      }
-      const itemsByInterval = payload.itemsByInterval ?? {}
-      setBoundItemsByInterval((prev) => {
-        const next = new Map(prev)
-        Object.entries(itemsByInterval).forEach(([key, items]) => {
-          const id = Number(key)
-          if (Number.isInteger(id) && id > 0) {
-            next.set(id, Array.isArray(items) ? items : [])
-          }
-        })
-        pending.forEach((id) => {
-          if (!next.has(id)) next.set(id, [])
-        })
-        return next
-      })
-    } catch (error) {
-      setBoundErrors((prev) => {
-        const next = new Map(prev)
-        pending.forEach((id) => next.set(id, (error as Error).message ?? copy.bound.loadFailed))
-        return next
-      })
-    } finally {
+  const loadBoundItemsBatch = useCallback(
+    async (intervalIds: number[]) => {
+      const uniqueIds = Array.from(
+        new Set(intervalIds.filter((id) => Number.isInteger(id) && id > 0)),
+      )
+      const pending = uniqueIds.filter(
+        (id) => !boundItemsByInterval.has(id) && !boundLoading.has(id),
+      )
+      if (!pending.length) return
       setBoundLoading((prev) => {
         const next = new Set(prev)
+        pending.forEach((id) => next.add(id))
+        return next
+      })
+      setBoundErrors((prev) => {
+        const next = new Map(prev)
         pending.forEach((id) => next.delete(id))
         return next
       })
-    }
-  }
+      try {
+        const merged = new Map<number, IntervalBoundPhaseItemDTO[]>()
+        for (let start = 0; start < pending.length; start += BOUND_EXPORT_BATCH_LIMIT) {
+          const chunk = pending.slice(start, start + BOUND_EXPORT_BATCH_LIMIT)
+          const response = await fetch('/api/progress/quantities/bound-items/batch', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ intervalIds: chunk }),
+          })
+          const payload = (await response.json().catch(() => ({}))) as {
+            itemsByInterval?: Record<string, IntervalBoundPhaseItemDTO[]>
+            message?: string
+          }
+          if (!response.ok) {
+            throw new Error(payload.message ?? copy.messages.boundLoadFailed)
+          }
+          const itemsByInterval = payload.itemsByInterval ?? {}
+          chunk.forEach((id) => {
+            const items = itemsByInterval[String(id)]
+            merged.set(id, Array.isArray(items) ? items : [])
+          })
+        }
+
+        setBoundItemsByInterval((prev) => {
+          const next = new Map(prev)
+          pending.forEach((id) => {
+            next.set(id, merged.get(id) ?? [])
+          })
+          return next
+        })
+      } catch (error) {
+        setBoundErrors((prev) => {
+          const next = new Map(prev)
+          pending.forEach((id) => next.set(id, (error as Error).message ?? copy.bound.loadFailed))
+          return next
+        })
+      } finally {
+        setBoundLoading((prev) => {
+          const next = new Set(prev)
+          pending.forEach((id) => next.delete(id))
+          return next
+        })
+      }
+    },
+    [boundItemsByInterval, boundLoading, copy.bound.loadFailed, copy.messages.boundLoadFailed],
+  )
 
   useEffect(() => {
-    if (!showAllDetails) return
+    if (!shouldLoadBoundItems) return
     void loadBoundItemsBatch(sortedRows.map((row) => row.intervalId))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showAllDetails, sortedRows])
+  }, [loadBoundItemsBatch, shouldLoadBoundItems, sortedRows])
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900">
@@ -1295,6 +1464,18 @@ export default function QuantitiesListClient({ canEdit }: Props) {
                         </button>
                       </th>
                     ) : null}
+                    {isVisible('phaseItem') ? (
+                      <th className="px-4 py-3 text-left">{copy.columns.phaseItem}</th>
+                    ) : null}
+                    {isVisible('boundQuantity') ? (
+                      <th className="px-4 py-3 text-left">{copy.columns.boundQuantity}</th>
+                    ) : null}
+                    {isVisible('unit') ? (
+                      <th className="px-4 py-3 text-left">{copy.columns.unit}</th>
+                    ) : null}
+                    {isVisible('boqCode') ? (
+                      <th className="px-4 py-3 text-left">{copy.columns.boqCode}</th>
+                    ) : null}
                     {isVisible('display') ? (
                       <th className="px-4 py-3 text-left">
                         <button
@@ -1335,194 +1516,180 @@ export default function QuantitiesListClient({ canEdit }: Props) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
-                  {sortedRows.length === 0 ? (
+                  {tableRows.length === 0 ? (
                     <tr>
                       <td colSpan={columnCount} className="px-4 py-6 text-center text-slate-500">
                         {copy.summary.empty}
                       </td>
                     </tr>
                   ) : (
-                    sortedRows.map((row) => {
+                    tableRows.map(({ key, row, boundItem }) => {
                       const percent = Math.min(100, Math.max(0, row.completedPercent))
-                      const isExpanded = showAllDetails
-                      const boundItems = boundItemsByInterval.get(row.intervalId)
+                      const boundItems = boundItemsByInterval.get(row.intervalId) ?? []
                       const boundError = boundErrors.get(row.intervalId) ?? null
-                      const isBoundLoading = boundLoading.has(row.intervalId)
+                      const isBoundLoading = shouldLoadBoundItems && boundLoading.has(row.intervalId)
+                      const summaryItem =
+                        !showAllDetails && !boundItem && boundItems.length > 1
+                          ? boundItems[0] ?? null
+                          : null
+                      const displayBoundItem = boundItem ?? summaryItem
+                      const hasSingleBound = !showAllDetails && boundItems.length === 1
+                      const unbindTarget = showAllDetails ? boundItem : hasSingleBound ? boundItems[0] : null
                       return (
-                        <Fragment key={row.intervalId}>
-                          <tr className="text-slate-700">
-                            {isVisible('project') ? (
-                              <td className="px-4 py-3 text-slate-600">{row.projectLabel}</td>
-                            ) : null}
-                            {isVisible('road') ? (
-                              <td className="px-4 py-3">
+                        <tr key={key} className="text-slate-700">
+                          {isVisible('project') ? (
+                            <td className="px-4 py-3 text-slate-600">{row.projectLabel}</td>
+                          ) : null}
+                          {isVisible('road') ? (
+                            <td className="px-4 py-3">
                               <div className="font-semibold text-slate-900">{row.displayRoadName}</div>
                               <div className="text-xs text-slate-500">{row.displayRoadSlug}</div>
-                              </td>
-                            ) : null}
-                            {isVisible('phase') ? (
+                            </td>
+                          ) : null}
+                          {isVisible('phase') ? (
                             <td className="px-4 py-3">
                               {row.phaseLabel}
                               {row.spec ? ` (${row.spec})` : ''}
                             </td>
                           ) : null}
-                            {isVisible('startPk') ? (
-                              <td className="px-4 py-3 text-slate-600">
-                                {formatNumber(row.startPk, 3)}
-                              </td>
-                            ) : null}
-                            {isVisible('endPk') ? (
-                              <td className="px-4 py-3 text-slate-600">
-                                {formatNumber(row.endPk, 3)}
-                              </td>
-                            ) : null}
-                            {isVisible('side') ? (
-                              <td className="px-4 py-3 text-slate-600">{row.sideLabel}</td>
-                            ) : null}
-                            {isVisible('quantity') ? (
-                              <td className="px-4 py-3 text-slate-600">
-                                <div className="flex items-center gap-2">
-                                  <span>{formatNumber(row.quantity, 3)}</span>
-                                                    {row.quantityOverridden ? (
-                                                      <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
-                                                        {copy.badges.manual}
-                                                      </span>
-                                                    ) : null}
-                                </div>
+                          {isVisible('startPk') ? (
+                            <td className="px-4 py-3 text-slate-600">{formatNumber(row.startPk, 3)}</td>
+                          ) : null}
+                          {isVisible('endPk') ? (
+                            <td className="px-4 py-3 text-slate-600">{formatNumber(row.endPk, 3)}</td>
+                          ) : null}
+                          {isVisible('side') ? (
+                            <td className="px-4 py-3 text-slate-600">{row.sideLabel}</td>
+                          ) : null}
+                          {isVisible('quantity') ? (
+                            <td className="px-4 py-3 text-slate-600">
+                              <div className="flex items-center gap-2">
+                                <span>{formatNumber(row.quantity, 3)}</span>
                                 {row.quantityOverridden ? (
-                                  <div className="mt-1 text-[10px] text-slate-400">
-                                    PK diff {formatNumber(row.rawQuantity, 3)}
-                                  </div>
+                                  <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
+                                    {copy.badges.manual}
+                                  </span>
                                 ) : null}
-                              </td>
-                            ) : null}
-                            {isVisible('display') ? (
-                              <td className="px-4 py-3 text-slate-600">{row.displayLabel}</td>
-                            ) : null}
-                            {isVisible('completed') ? (
-                              <td className="px-4 py-3 text-slate-600">
-                                <div className="flex items-center gap-2">
-                                  <div className="h-1.5 w-20 rounded-full bg-slate-200">
-                                    <div
-                                      className="h-1.5 rounded-full bg-emerald-400"
-                                      style={{ width: `${percent}%` }}
-                                    />
-                                  </div>
-                                  <span>{percent}%</span>
+                              </div>
+                              {row.quantityOverridden ? (
+                                <div className="mt-1 text-[10px] text-slate-400">
+                                  PK diff {formatNumber(row.rawQuantity, 3)}
                                 </div>
-                              </td>
-                            ) : null}
-                            {isVisible('updatedAt') ? (
-                              <td className="px-4 py-3 text-slate-500">
-                                {new Date(row.updatedAt).toLocaleString(localeTag, {
-                                  dateStyle: 'medium',
-                                  timeStyle: 'short',
-                                })}
-                              </td>
-                            ) : null}
-                            <td className="px-4 py-3 text-right whitespace-nowrap">
-                              <div className="flex flex-wrap justify-end gap-2">
-                                <button
-                                  type="button"
-                                  onClick={() => openDetail(row.phaseId, row.intervalId)}
-                                  className="inline-flex items-center whitespace-nowrap rounded-full border border-emerald-200 bg-emerald-50 px-4 py-1 text-xs font-semibold text-emerald-700 transition hover:border-emerald-300 hover:bg-emerald-100"
-                                >
-                                  {copy.actions.enterDetail}
-                                </button>
+                              ) : null}
+                            </td>
+                          ) : null}
+                          {isVisible('phaseItem') ? (
+                            <td className="px-4 py-3 text-slate-600">
+                              {isBoundLoading ? (
+                                <span className="text-slate-500">{copy.bound.loading}</span>
+                              ) : boundError ? (
+                                <span className="text-rose-600">{boundError}</span>
+                              ) : displayBoundItem ? (
+                                <div className="space-y-1">
+                                  <div className="font-semibold text-slate-900">
+                                    {formatBoundItemName(displayBoundItem)}
+                                  </div>
+                                </div>
+                              ) : (
+                                <span className="text-slate-400">—</span>
+                              )}
+                            </td>
+                          ) : null}
+                          {isVisible('boundQuantity') ? (
+                            <td className="px-4 py-3 text-slate-600">
+                              {isBoundLoading ? (
+                                <span className="text-slate-500">{copy.bound.loading}</span>
+                              ) : boundError ? (
+                                <span className="text-rose-600">{boundError}</span>
+                              ) : displayBoundItem ? (
+                                <div className="space-y-1">
+                                  <div className="tabular-nums">
+                                    {formatBoundQuantityValue(displayBoundItem)}
+                                  </div>
+                                </div>
+                              ) : (
+                                <span className="text-slate-400">—</span>
+                              )}
+                            </td>
+                          ) : null}
+                          {isVisible('unit') ? (
+                            <td className="px-4 py-3 text-slate-600">
+                              {isBoundLoading ? (
+                                <span className="text-slate-500">{copy.bound.loading}</span>
+                              ) : boundError ? (
+                                <span className="text-rose-600">{boundError}</span>
+                              ) : displayBoundItem ? (
+                                displayBoundItem.unit ?? '—'
+                              ) : (
+                                <span className="text-slate-400">—</span>
+                              )}
+                            </td>
+                          ) : null}
+                          {isVisible('boqCode') ? (
+                            <td className="px-4 py-3 text-slate-600">
+                              {isBoundLoading ? (
+                                <span className="text-slate-500">{copy.bound.loading}</span>
+                              ) : boundError ? (
+                                <span className="text-rose-600">{boundError}</span>
+                              ) : displayBoundItem ? (
+                                displayBoundItem.boqCode ?? '—'
+                              ) : (
+                                <span className="text-slate-400">—</span>
+                              )}
+                            </td>
+                          ) : null}
+                          {isVisible('display') ? (
+                            <td className="px-4 py-3 text-slate-600">{row.displayLabel}</td>
+                          ) : null}
+                          {isVisible('completed') ? (
+                            <td className="px-4 py-3 text-slate-600">
+                              <div className="flex items-center gap-2">
+                                <div className="h-1.5 w-20 rounded-full bg-slate-200">
+                                  <div
+                                    className="h-1.5 rounded-full bg-emerald-400"
+                                    style={{ width: `${percent}%` }}
+                                  />
+                                </div>
+                                <span>{percent}%</span>
                               </div>
                             </td>
-                          </tr>
-                          {isExpanded ? (
-                            <tr className="bg-slate-50/80">
-                              <td colSpan={columnCount} className="px-4 py-4">
-                                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                                  <div className="flex items-center justify-between gap-3">
-                                    <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                                      {copy.bound.title}
-                                    </div>
-                                    <div className="text-xs text-slate-500">
-                                      {formatProgressCopy(copy.bound.intervalId, { id: row.intervalId })}
-                                    </div>
-                                  </div>
-
-                                  {isBoundLoading ? (
-                                    <div className="mt-3 text-sm text-slate-500">{copy.bound.loading}</div>
-                                  ) : boundError ? (
-                                    <div className="mt-3 text-sm text-rose-600">{boundError}</div>
-                                  ) : !boundItems || boundItems.length === 0 ? (
-                                    <div className="mt-3 text-sm text-slate-500">{copy.bound.empty}</div>
-                                  ) : (
-                                    <div className="mt-3 overflow-x-auto">
-                                      <table className="min-w-full text-sm">
-                                        <thead className="bg-slate-50 text-xs uppercase tracking-[0.16em] text-slate-500">
-                                          <tr>
-                                            <th className="px-3 py-2 text-left">{copy.bound.phaseItem}</th>
-                                            <th className="px-3 py-2 text-right">{copy.bound.quantity}</th>
-                                            <th className="px-3 py-2 text-left">{copy.bound.unit}</th>
-                                            <th className="px-3 py-2 text-left">{copy.bound.boqCode}</th>
-                                            <th className="px-3 py-2 text-right">{copy.bound.actions}</th>
-                                          </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-slate-200">
-                                          {boundItems.map((item) => {
-                                            const name = `${item.phaseItemName}${item.phaseItemSpec ? `（${item.phaseItemSpec}）` : ''}`
-                                            const intervalSpec = item.intervalSpec ? `【${item.intervalSpec}】` : ''
-                                            const hasManual = item.manualQuantity !== null
-                                            const quantityLabel =
-                                              item.effectiveQuantity === null
-                                                ? '—'
-                                                : formatNumber(item.effectiveQuantity, 3)
-                                            return (
-                                              <tr key={item.inputId} className="text-slate-700">
-                                                <td className="px-3 py-2">
-                                                  <div className="font-semibold text-slate-900">
-                                                    {intervalSpec} {name}
-                                                  </div>
-                                                  <div className="mt-0.5 text-[11px] text-slate-500">
-                                                    {formatProgressCopy(copy.bound.inputId, { id: item.inputId })} ·{' '}
-                                                    {new Date(item.updatedAt).toLocaleString(localeTag, {
-                                                      dateStyle: 'medium',
-                                                      timeStyle: 'short',
-                                                    })}
-                                                  </div>
-                                                </td>
-                                                <td className="px-3 py-2 text-right tabular-nums">
-                                                  <div className="flex items-center justify-end gap-2">
-                                                    <span>{quantityLabel}</span>
-                                                    {hasManual ? (
-                                                      <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
-                                                        {copy.badges.manual}
-                                                      </span>
-                                                    ) : null}
-                                                  </div>
-                                                </td>
-                                                <td className="px-3 py-2 text-slate-600">{item.unit ?? '—'}</td>
-                                                <td className="px-3 py-2 text-slate-600">{item.boqCode ?? '—'}</td>
-                                                <td className="px-3 py-2 text-right">
-                                                  {canEdit ? (
-                                                    <button
-                                                      type="button"
-                                                      onClick={() => unbindInput(row.intervalId, item.inputId)}
-                                                      className="inline-flex items-center rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-700 transition hover:border-rose-300 hover:bg-rose-100"
-                                                    >
-                                                      {copy.actions.unbind}
-                                                    </button>
-                                                  ) : (
-                                                    <span className="text-xs text-slate-400">{copy.actions.noPermission}</span>
-                                                  )}
-                                                </td>
-                                              </tr>
-                                            )
-                                          })}
-                                        </tbody>
-                                      </table>
-                                    </div>
-                                  )}
-                                </div>
-                              </td>
-                            </tr>
                           ) : null}
-                        </Fragment>
+                          {isVisible('updatedAt') ? (
+                            <td className="px-4 py-3 text-slate-500">
+                              {new Date(row.updatedAt).toLocaleString(localeTag, {
+                                dateStyle: 'medium',
+                                timeStyle: 'short',
+                              })}
+                            </td>
+                          ) : null}
+                          <td className="px-4 py-3 text-right whitespace-nowrap">
+                            <div className="flex flex-wrap justify-end gap-2">
+                              <button
+                                type="button"
+                                onClick={() => openDetail(row.phaseId, row.intervalId)}
+                                className="inline-flex items-center whitespace-nowrap rounded-full border border-emerald-200 bg-emerald-50 px-4 py-1 text-xs font-semibold text-emerald-700 transition hover:border-emerald-300 hover:bg-emerald-100"
+                              >
+                                {copy.actions.enterDetail}
+                              </button>
+                              {unbindTarget ? (
+                                canEdit ? (
+                                  <button
+                                    type="button"
+                                    disabled={unbindingInputIds.has(unbindTarget.inputId)}
+                                    onClick={() => unbindInput(row.intervalId, unbindTarget.inputId)}
+                                    className="inline-flex items-center rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-700 transition hover:border-rose-300 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+                                  >
+                                    {unbindingInputIds.has(unbindTarget.inputId)
+                                      ? copy.actions.unbinding
+                                      : copy.actions.unbind}
+                                  </button>
+                                ) : (
+                                  <span className="text-xs text-slate-400">{copy.actions.noPermission}</span>
+                                )
+                              ) : null}
+                            </div>
+                          </td>
+                        </tr>
                       )
                     })
                   )}
