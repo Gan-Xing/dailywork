@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { useSearchParams } from 'next/navigation'
 
 import { AccessDenied } from '@/components/AccessDenied'
@@ -2635,6 +2635,12 @@ export default function ValuePage() {
   const comparisonHeaders = copy.comparison.tableHeaders
   const comparisonSortHint = copy.comparison.actions.sortHint
   const hasComparisonSort = comparisonSortStack.length > 0
+  const comparisonStickyHeadClass = 'bg-slate-100/95'
+  const [comparisonStickyTop, setComparisonStickyTop] = useState(0)
+  const comparisonStickyStyle = useMemo<CSSProperties>(
+    () => ({ top: `${comparisonStickyTop}px` }),
+    [comparisonStickyTop],
+  )
   const measurementHeaders = copy.measurement.tableHeaders
   const measurementColumnSelectorCopy = copy.measurement.columnSelector
   const measurementBaseColumnOptions = useMemo(
@@ -2762,6 +2768,26 @@ export default function ValuePage() {
   }, [measurementColumnOptions, measurementDefaultColumns])
 
   useEffect(() => {
+    if (activeTab !== 'comparison') return
+    const pageHeader = document.querySelector('header.value-page-header') as HTMLElement | null
+    if (!pageHeader) {
+      setComparisonStickyTop(0)
+      return
+    }
+    const resolveStickyTop = () => {
+      setComparisonStickyTop(Math.ceil(pageHeader.getBoundingClientRect().height))
+    }
+    resolveStickyTop()
+    window.addEventListener('resize', resolveStickyTop)
+    const observer = new ResizeObserver(resolveStickyTop)
+    observer.observe(pageHeader)
+    return () => {
+      observer.disconnect()
+      window.removeEventListener('resize', resolveStickyTop)
+    }
+  }, [activeTab, locale])
+
+  useEffect(() => {
     const currentKeys = measurementPeriodMeta.map((period) => period.key)
     if (measurementPeriodKeysRef.current.length === 0) {
       measurementPeriodKeysRef.current = currentKeys
@@ -2840,7 +2866,7 @@ export default function ValuePage() {
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900">
       <PageHeaderNav
-        className="z-30 py-4"
+        className="value-page-header z-30 py-4"
         breadcrumbs={[{ label: breadcrumbHome, href: '/' }, { label: breadcrumbValue }]}
         title={tabTitle}
         subtitle={tabDescription || undefined}
@@ -3309,16 +3335,19 @@ export default function ValuePage() {
                 {completionStatus === 'success' &&
                 measurementStatus === 'success' &&
                 displayComparisonRows.length ? (
-                  <div className="overflow-x-auto rounded-2xl border border-slate-200">
-                    <table className="min-w-full border-collapse text-left text-sm">
-                      <thead className="bg-slate-100/70">
+                  <div className="overflow-x-auto overflow-y-visible rounded-2xl border border-slate-200 lg:overflow-x-visible">
+                    <table className="min-w-full border-separate border-spacing-0 text-left text-sm">
+                      <thead
+                        className="sticky z-20 bg-slate-100/95 shadow-[0_1px_0_rgba(148,163,184,0.35)]"
+                        style={comparisonStickyStyle}
+                      >
                         <tr
                           className={`text-[11px] font-semibold text-slate-500 ${
                             isFrenchLocale ? 'uppercase tracking-[0.24em]' : 'tracking-[0.12em]'
                           }`}
                         >
                           <th
-                            className="w-[9%] px-3 py-3 text-left"
+                            className={`${comparisonStickyHeadClass} w-[7%] px-3 py-3 text-left`}
                             aria-sort={comparisonAriaSort('source')}
                           >
                             <button
@@ -3340,7 +3369,7 @@ export default function ValuePage() {
                             </button>
                           </th>
                           <th
-                            className="w-[8%] px-3 py-3 text-left"
+                            className={`${comparisonStickyHeadClass} w-[7%] px-3 py-3 text-left`}
                             aria-sort={comparisonAriaSort('code')}
                           >
                             <button
@@ -3361,7 +3390,10 @@ export default function ValuePage() {
                               </span>
                             </button>
                           </th>
-                          <th className="px-3 py-3 text-left" aria-sort={comparisonAriaSort('designation')}>
+                          <th
+                            className={`${comparisonStickyHeadClass} w-[18%] px-3 py-3 text-left`}
+                            aria-sort={comparisonAriaSort('designation')}
+                          >
                             <button
                               type="button"
                               onClick={() => handleComparisonSort('designation')}
@@ -3380,7 +3412,10 @@ export default function ValuePage() {
                               </span>
                             </button>
                           </th>
-                          <th className="w-[8%] px-3 py-3 text-left" aria-sort={comparisonAriaSort('unit')}>
+                          <th
+                            className={`${comparisonStickyHeadClass} w-[6%] px-3 py-3 text-left`}
+                            aria-sort={comparisonAriaSort('unit')}
+                          >
                             <button
                               type="button"
                               onClick={() => handleComparisonSort('unit')}
@@ -3400,7 +3435,7 @@ export default function ValuePage() {
                             </button>
                           </th>
                           <th
-                            className="w-[10%] px-3 py-3 text-right"
+                            className={`${comparisonStickyHeadClass} w-[8%] px-3 py-3 text-right`}
                             aria-sort={comparisonAriaSort('unitPrice')}
                           >
                             <button
@@ -3422,7 +3457,7 @@ export default function ValuePage() {
                             </button>
                           </th>
                           <th
-                            className="w-[10%] px-3 py-3 text-right"
+                            className={`${comparisonStickyHeadClass} w-[8%] px-3 py-3 text-right`}
                             aria-sort={comparisonAriaSort('completedQuantity')}
                           >
                             <button
@@ -3444,7 +3479,7 @@ export default function ValuePage() {
                             </button>
                           </th>
                           <th
-                            className="w-[10%] px-3 py-3 text-right"
+                            className={`${comparisonStickyHeadClass} w-[8%] px-3 py-3 text-right`}
                             aria-sort={comparisonAriaSort('completedValue')}
                           >
                             <button
@@ -3466,7 +3501,7 @@ export default function ValuePage() {
                             </button>
                           </th>
                           <th
-                            className="w-[10%] px-3 py-3 text-right"
+                            className={`${comparisonStickyHeadClass} w-[8%] px-3 py-3 text-right`}
                             aria-sort={comparisonAriaSort('measuredQuantity')}
                           >
                             <button
@@ -3488,7 +3523,7 @@ export default function ValuePage() {
                             </button>
                           </th>
                           <th
-                            className="w-[10%] px-3 py-3 text-right"
+                            className={`${comparisonStickyHeadClass} w-[8%] px-3 py-3 text-right`}
                             aria-sort={comparisonAriaSort('measuredValue')}
                           >
                             <button
@@ -3510,7 +3545,7 @@ export default function ValuePage() {
                             </button>
                           </th>
                           <th
-                            className="w-[10%] px-3 py-3 text-right"
+                            className={`${comparisonStickyHeadClass} w-[8%] px-3 py-3 text-right`}
                             aria-sort={comparisonAriaSort('unmeasuredQuantity')}
                           >
                             <button
@@ -3532,7 +3567,7 @@ export default function ValuePage() {
                             </button>
                           </th>
                           <th
-                            className="w-[10%] px-3 py-3 text-right"
+                            className={`${comparisonStickyHeadClass} w-[8%] px-3 py-3 text-right`}
                             aria-sort={comparisonAriaSort('unmeasuredValue')}
                           >
                             <button
@@ -3554,7 +3589,7 @@ export default function ValuePage() {
                             </button>
                           </th>
                           <th
-                            className="w-[10%] px-3 py-3 text-right"
+                            className={`${comparisonStickyHeadClass} w-[6%] px-3 py-3 text-right`}
                             aria-sort={comparisonAriaSort('overMeasuredValue')}
                           >
                             <button
