@@ -169,6 +169,7 @@ export type ProductionValueCopy = {
     actions: {
       searchLabel: string
       searchPlaceholder: string
+      detailLedger: string
       addPeriod: string
       save: string
       saving: string
@@ -367,6 +368,7 @@ export const productionValueCopy: Record<Locale, ProductionValueCopy> = {
       actions: {
         searchLabel: '检索',
         searchPlaceholder: '输入编号或名称…',
+        detailLedger: '计量明细',
         addPeriod: '新增期次',
         save: '保存计量',
         saving: '保存中…'
@@ -565,6 +567,7 @@ export const productionValueCopy: Record<Locale, ProductionValueCopy> = {
       actions: {
         searchLabel: 'Recherche',
         searchPlaceholder: 'Rechercher par code ou désignation…',
+        detailLedger: 'Détail métré',
         addPeriod: 'Ajouter une période',
         save: 'Enregistrer',
         saving: 'Enregistrement…'

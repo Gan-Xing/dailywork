@@ -3916,6 +3916,16 @@ export default function ValuePage() {
                     >
                       {copy.measurement.actions.addPeriod}
                     </button>
+                    <Link
+                      href={
+                        selectedProjectId
+                          ? `/value/measurement-ledger?projectId=${encodeURIComponent(selectedProjectId)}`
+                          : '/value/measurement-ledger'
+                      }
+                      className="inline-flex items-center rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 transition hover:-translate-y-0.5 hover:border-slate-300 hover:bg-slate-50"
+                    >
+                      {copy.measurement.actions.detailLedger}
+                    </Link>
                     <button
                       type="button"
                       onClick={handleSaveMeasurements}

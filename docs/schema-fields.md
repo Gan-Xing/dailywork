@@ -364,6 +364,20 @@
      8. `note?`：备注。
      9. `createdAt` / `updatedAt`：时间戳。
 
+## 计量明细（BoqMeasurementDetail）
+
+- **用途**：独立记录计量明细行（按项目、期次、分项清单、路段），用于追踪“每条计量来自哪个路段、多少工程量”，并支持和主计量表做累计核对。
+- **字段**
+     1. `id`：唯一标识。
+     2. `projectId`：关联 `Project`（必填）。
+     3. `boqItemId`：关联 `BoqItem`（必填，必须是实际清单条目）。
+     4. `roadId`：关联 `RoadSection`（必填）。
+     5. `period`：期次标识（日期类型，沿用计量期次编码）。
+     6. `quantity`：明细工程量（decimal）。
+     7. `manualAmount?`：手填金额（decimal，可空）；为空时前端按 `quantity * BoqItem.unitPrice` 自动计算展示金额。
+     8. `note?`：备注。
+     9. `createdAt` / `updatedAt`：时间戳。
+
 ## 层次与验收内容定义（LayerDefinition / CheckDefinition）
 
 - **用途**：去重存储全局可选的层次/验收内容，供分项模板或分项实例选择与继承，避免同名条目分散为孤立字符串。
