@@ -112,6 +112,8 @@ export type ProductionValueCopy = {
       sourceAll: string
       sourceContract: string
       sourceNew: string
+      clearSort: string
+      sortHint: string
     }
     tableHeaders: {
       source: string
@@ -130,6 +132,13 @@ export type ProductionValueCopy = {
     sourceLabels: {
       contract: string
       new: string
+    }
+    summaryRows: {
+      totalHtva: string
+      advance: string
+      netHtva: string
+      vat: string
+      totalTtc: string
     }
     messages: {
       loading: string
@@ -301,6 +310,8 @@ export const productionValueCopy: Record<Locale, ProductionValueCopy> = {
         sourceAll: '全部',
         sourceContract: '原合同',
         sourceNew: '新增分项',
+        clearSort: '清空排序',
+        sortHint: '点击表头可叠加排序（最多 4 列）',
       },
       tableHeaders: {
         source: '来源',
@@ -319,6 +330,13 @@ export const productionValueCopy: Record<Locale, ProductionValueCopy> = {
       sourceLabels: {
         contract: '原合同',
         new: '新增分项',
+      },
+      summaryRows: {
+        totalHtva: '不含税总计',
+        advance: '预付款',
+        netHtva: '不含税实收',
+        vat: '增值税',
+        totalTtc: '含税总计',
       },
       messages: {
         loading: '正在加载对比数据…',
@@ -490,6 +508,8 @@ export const productionValueCopy: Record<Locale, ProductionValueCopy> = {
         sourceAll: 'Tout',
         sourceContract: 'Contrat',
         sourceNew: 'Nouveau poste',
+        clearSort: 'Effacer tri',
+        sortHint: "Tri multicritère via les en-têtes (max. 4 colonnes)",
       },
       tableHeaders: {
         source: 'Origine',
@@ -508,6 +528,13 @@ export const productionValueCopy: Record<Locale, ProductionValueCopy> = {
       sourceLabels: {
         contract: 'Contrat',
         new: 'Nouveau poste',
+      },
+      summaryRows: {
+        totalHtva: 'Total HTVA',
+        advance: 'Avance',
+        netHtva: 'Net HTVA',
+        vat: 'TVA',
+        totalTtc: 'Total TTC',
       },
       messages: {
         loading: 'Chargement des données de comparaison…',

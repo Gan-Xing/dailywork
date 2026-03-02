@@ -400,6 +400,40 @@ type ComparisonRow = {
   searchable: string
 }
 
+type ComparisonSortField =
+  | 'source'
+  | 'code'
+  | 'designation'
+  | 'unit'
+  | 'unitPrice'
+  | 'completedQuantity'
+  | 'completedValue'
+  | 'measuredQuantity'
+  | 'measuredValue'
+  | 'unmeasuredQuantity'
+  | 'unmeasuredValue'
+  | 'overMeasuredValue'
+
+type ComparisonSortOrder = 'asc' | 'desc'
+
+type ComparisonSortSpec = {
+  field: ComparisonSortField
+  order: ComparisonSortOrder
+}
+
+type ComparisonSummaryRow = {
+  key: 'totalHtva' | 'advance' | 'netHtva' | 'vat' | 'totalTtc'
+  label: string
+  completedQuantity: number | null
+  completedValue: number
+  measuredQuantity: number | null
+  measuredValue: number
+  amountDelta: number
+  unmeasuredQuantity: number | null
+  unmeasuredValue: number
+  overMeasuredValue: number
+}
+
 type PeriodGroupTotals = {
   quantity: number
   amount: number
@@ -417,6 +451,10 @@ export default function ValuePage() {
   const { addToast } = useToast()
   const copy = productionValueCopy[locale]
   const localeId = formatLocaleId(locale)
+  const comparisonSortCollator = useMemo(
+    () => new Intl.Collator(localeId, { numeric: true, sensitivity: 'base' }),
+    [localeId],
+  )
   const isFrenchLocale = locale === 'fr'
   const { home: breadcrumbHome, value: breadcrumbValue } = copy.breadcrumbs
   const { unauthorized: unauthorizedMessage, projectLoadError } = copy.messages
@@ -466,6 +504,7 @@ export default function ValuePage() {
   const [comparisonSourceFilter, setComparisonSourceFilter] = useState<
     'all' | ComparisonSource
   >('all')
+  const [comparisonSortStack, setComparisonSortStack] = useState<ComparisonSortSpec[]>([])
   const [measurementRecords, setMeasurementRecords] = useState<BoqMeasurementRecord[]>([])
   const [measurementStatus, setMeasurementStatus] = useState<FetchStatus>('idle')
   const [measurementError, setMeasurementError] = useState<string | null>(null)
@@ -2201,6 +2240,40 @@ export default function ValuePage() {
     [comparisonSearch],
   )
 
+  const handleComparisonSort = useCallback((field: ComparisonSortField) => {
+    setComparisonSortStack((prev) => {
+      const existing = prev.find((item) => item.field === field)
+      const nextOrder: ComparisonSortOrder =
+        existing?.order === 'asc' ? 'desc' : existing?.order === 'desc' ? 'asc' : 'desc'
+      const filtered = prev.filter((item) => item.field !== field)
+      return [{ field, order: nextOrder }, ...filtered].slice(0, 4)
+    })
+  }, [])
+
+  const clearComparisonSort = useCallback(() => {
+    setComparisonSortStack([])
+  }, [])
+
+  const comparisonSortIndicator = useCallback(
+    (field: ComparisonSortField) => {
+      const idx = comparisonSortStack.findIndex((item) => item.field === field)
+      if (idx === -1) return ''
+      const arrow = comparisonSortStack[idx].order === 'asc' ? '↑' : '↓'
+      return `${arrow}${idx + 1}`
+    },
+    [comparisonSortStack],
+  )
+
+  const comparisonAriaSort = useCallback(
+    (field: ComparisonSortField): 'none' | 'ascending' | 'descending' | 'other' => {
+      const idx = comparisonSortStack.findIndex((item) => item.field === field)
+      if (idx === -1) return 'none'
+      if (idx > 0) return 'other'
+      return comparisonSortStack[idx].order === 'asc' ? 'ascending' : 'descending'
+    },
+    [comparisonSortStack],
+  )
+
   const { displayBoqRows, highlightedBoqIndices } = useMemo(() => {
     if (!boqRowData.length) {
       return { displayBoqRows: [], highlightedBoqIndices: new Set<number>() }
@@ -2348,17 +2421,88 @@ export default function ValuePage() {
         : comparisonRowData.filter((row) => row.source === comparisonSourceFilter)
 
     const highlightedIds = new Set<number>()
-    if (!comparisonSearchTokens.length) {
-      return { displayComparisonRows: sourceFiltered, highlightedComparisonIds: highlightedIds }
+    const filteredRows = comparisonSearchTokens.length
+      ? sourceFiltered.filter((row) => {
+          const isMatch = comparisonSearchTokens.every((token) => row.searchable.includes(token))
+          if (isMatch) highlightedIds.add(row.id)
+          return isMatch
+        })
+      : sourceFiltered
+
+    if (!comparisonSortStack.length) {
+      return { displayComparisonRows: filteredRows, highlightedComparisonIds: highlightedIds }
     }
 
-    const rows = sourceFiltered.filter((row) => {
-      const isMatch = comparisonSearchTokens.every((token) => row.searchable.includes(token))
-      if (isMatch) highlightedIds.add(row.id)
-      return isMatch
+    const orderById = new Map<number, number>()
+    comparisonRowData.forEach((row, index) => {
+      orderById.set(row.id, index)
     })
-    return { displayComparisonRows: rows, highlightedComparisonIds: highlightedIds }
-  }, [comparisonRowData, comparisonSearchTokens, comparisonSourceFilter])
+
+    const compareNullableNumber = (left: number | null, right: number | null) => {
+      if (left === right) return 0
+      if (left === null) return 1
+      if (right === null) return -1
+      return left - right
+    }
+
+    const sortedRows = [...filteredRows].sort((left, right) => {
+      for (const sort of comparisonSortStack) {
+        let result = 0
+        switch (sort.field) {
+          case 'source':
+            result =
+              (left.source === 'contract' ? 0 : 1) - (right.source === 'contract' ? 0 : 1)
+            break
+          case 'code':
+            result = comparisonSortCollator.compare(left.code, right.code)
+            break
+          case 'designation':
+            result = comparisonSortCollator.compare(left.designation, right.designation)
+            break
+          case 'unit':
+            result = comparisonSortCollator.compare(left.unit ?? '', right.unit ?? '')
+            break
+          case 'unitPrice':
+            result = compareNullableNumber(left.unitPrice, right.unitPrice)
+            break
+          case 'completedQuantity':
+            result = left.completedQuantity - right.completedQuantity
+            break
+          case 'completedValue':
+            result = left.completedValue - right.completedValue
+            break
+          case 'measuredQuantity':
+            result = left.measuredQuantity - right.measuredQuantity
+            break
+          case 'measuredValue':
+            result = left.measuredValue - right.measuredValue
+            break
+          case 'unmeasuredQuantity':
+            result = left.unmeasuredQuantity - right.unmeasuredQuantity
+            break
+          case 'unmeasuredValue':
+            result = left.unmeasuredValue - right.unmeasuredValue
+            break
+          case 'overMeasuredValue':
+            result = left.overMeasuredValue - right.overMeasuredValue
+            break
+          default:
+            result = 0
+        }
+        if (result !== 0) {
+          return sort.order === 'asc' ? result : -result
+        }
+      }
+      return (orderById.get(left.id) ?? 0) - (orderById.get(right.id) ?? 0)
+    })
+    return { displayComparisonRows: sortedRows, highlightedComparisonIds: highlightedIds }
+  }, [
+    comparisonRowData,
+    comparisonSearchTokens,
+    comparisonSourceFilter,
+    comparisonSortCollator,
+    comparisonSortStack,
+  ])
 
   const comparisonTotals = useMemo(
     () =>
@@ -2384,6 +2528,63 @@ export default function ValuePage() {
       ),
     [displayComparisonRows],
   )
+
+  const comparisonSummaryRows = useMemo<ComparisonSummaryRow[]>(() => {
+    const labels = copy.comparison.summaryRows
+    const measuredAdvance = measurementPeriodTotals.overallAdvance ?? 0
+    const totalHtvaCompleted = comparisonTotals.completedValue
+    const totalHtvaMeasured = comparisonTotals.measuredValue
+    const netCompleted = totalHtvaCompleted
+    const netMeasured = totalHtvaMeasured + measuredAdvance
+    const vatCompleted = netCompleted * 0.18
+    const vatMeasured = netMeasured * 0.18
+    const totalTtcCompleted = netCompleted + vatCompleted
+    const totalTtcMeasured = netMeasured + vatMeasured
+
+    const buildRow = (
+      key: ComparisonSummaryRow['key'],
+      label: string,
+      completedValue: number,
+      measuredValue: number,
+      options?: {
+        completedQuantity?: number | null
+        measuredQuantity?: number | null
+        unmeasuredQuantity?: number | null
+        unmeasuredValue?: number
+        overMeasuredValue?: number
+      },
+    ): ComparisonSummaryRow => {
+      const amountDelta = completedValue - measuredValue
+      return {
+        key,
+        label,
+        completedQuantity: options?.completedQuantity ?? null,
+        completedValue,
+        measuredQuantity: options?.measuredQuantity ?? null,
+        measuredValue,
+        amountDelta,
+        unmeasuredQuantity: options?.unmeasuredQuantity ?? null,
+        unmeasuredValue:
+          options?.unmeasuredValue ?? (amountDelta > AMOUNT_EPSILON ? amountDelta : 0),
+        overMeasuredValue:
+          options?.overMeasuredValue ?? (amountDelta < -AMOUNT_EPSILON ? Math.abs(amountDelta) : 0),
+      }
+    }
+
+    return [
+      buildRow('totalHtva', labels.totalHtva, totalHtvaCompleted, totalHtvaMeasured, {
+        completedQuantity: comparisonTotals.completedQuantity,
+        measuredQuantity: comparisonTotals.measuredQuantity,
+        unmeasuredQuantity: comparisonTotals.unmeasuredQuantity,
+        unmeasuredValue: comparisonTotals.unmeasuredValue,
+        overMeasuredValue: comparisonTotals.overMeasuredValue,
+      }),
+      buildRow('advance', labels.advance, 0, measuredAdvance),
+      buildRow('netHtva', labels.netHtva, netCompleted, netMeasured),
+      buildRow('vat', labels.vat, vatCompleted, vatMeasured),
+      buildRow('totalTtc', labels.totalTtc, totalTtcCompleted, totalTtcMeasured),
+    ]
+  }, [comparisonTotals, copy.comparison.summaryRows, measurementPeriodTotals.overallAdvance])
 
   type MeasurementDisplayRow = (typeof measurementRowData)[number] & {
     virtual?: 'advance' | 'net-htva'
@@ -2432,7 +2633,8 @@ export default function ValuePage() {
   const boqHeaders = copy.boq.tableHeaders
   const completionHeaders = copy.completion.tableHeaders
   const comparisonHeaders = copy.comparison.tableHeaders
-  const comparisonSummaryLabel = locale === 'fr' ? 'Total' : '汇总'
+  const comparisonSortHint = copy.comparison.actions.sortHint
+  const hasComparisonSort = comparisonSortStack.length > 0
   const measurementHeaders = copy.measurement.tableHeaders
   const measurementColumnSelectorCopy = copy.measurement.columnSelector
   const measurementBaseColumnOptions = useMemo(
@@ -3042,8 +3244,21 @@ export default function ValuePage() {
                         <option value="new">{copy.comparison.actions.sourceNew}</option>
                       </select>
                     </label>
+                    <button
+                      type="button"
+                      onClick={clearComparisonSort}
+                      disabled={!hasComparisonSort}
+                      className={`inline-flex items-center rounded-xl border px-3 py-2 text-sm font-semibold transition ${
+                        hasComparisonSort
+                          ? 'border-slate-200 bg-white text-slate-700 shadow-sm hover:bg-slate-50'
+                          : 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400'
+                      }`}
+                    >
+                      {copy.comparison.actions.clearSort}
+                    </button>
                   </div>
                 </div>
+                <p className="text-xs text-slate-500">{comparisonSortHint}</p>
 
                 <div className="space-y-1 text-xs text-slate-500">
                   {boqProjectsStatus === 'loading' && (
@@ -3102,31 +3317,263 @@ export default function ValuePage() {
                             isFrenchLocale ? 'uppercase tracking-[0.24em]' : 'tracking-[0.12em]'
                           }`}
                         >
-                          <th className="w-[9%] px-3 py-3 text-left">{comparisonHeaders.source}</th>
-                          <th className="w-[8%] px-3 py-3 text-left">{comparisonHeaders.code}</th>
-                          <th className="px-3 py-3 text-left">{comparisonHeaders.designation}</th>
-                          <th className="w-[8%] px-3 py-3 text-left">{comparisonHeaders.unit}</th>
-                          <th className="w-[10%] px-3 py-3 text-right">{comparisonHeaders.unitPrice}</th>
-                          <th className="w-[10%] px-3 py-3 text-right">
-                            {comparisonHeaders.completedQuantity}
+                          <th
+                            className="w-[9%] px-3 py-3 text-left"
+                            aria-sort={comparisonAriaSort('source')}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => handleComparisonSort('source')}
+                              className="inline-flex w-full items-center gap-1 rounded px-1 py-0.5 transition hover:bg-slate-200/70"
+                              title={comparisonSortHint}
+                            >
+                              <span>{comparisonHeaders.source}</span>
+                              <span
+                                className={`text-[10px] ${
+                                  comparisonSortIndicator('source')
+                                    ? 'text-emerald-600'
+                                    : 'text-slate-400'
+                                }`}
+                              >
+                                {comparisonSortIndicator('source') || '↕'}
+                              </span>
+                            </button>
                           </th>
-                          <th className="w-[10%] px-3 py-3 text-right">
-                            {comparisonHeaders.completedValue}
+                          <th
+                            className="w-[8%] px-3 py-3 text-left"
+                            aria-sort={comparisonAriaSort('code')}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => handleComparisonSort('code')}
+                              className="inline-flex w-full items-center gap-1 rounded px-1 py-0.5 transition hover:bg-slate-200/70"
+                              title={comparisonSortHint}
+                            >
+                              <span>{comparisonHeaders.code}</span>
+                              <span
+                                className={`text-[10px] ${
+                                  comparisonSortIndicator('code')
+                                    ? 'text-emerald-600'
+                                    : 'text-slate-400'
+                                }`}
+                              >
+                                {comparisonSortIndicator('code') || '↕'}
+                              </span>
+                            </button>
                           </th>
-                          <th className="w-[10%] px-3 py-3 text-right">
-                            {comparisonHeaders.measuredQuantity}
+                          <th className="px-3 py-3 text-left" aria-sort={comparisonAriaSort('designation')}>
+                            <button
+                              type="button"
+                              onClick={() => handleComparisonSort('designation')}
+                              className="inline-flex w-full items-center gap-1 rounded px-1 py-0.5 text-left transition hover:bg-slate-200/70"
+                              title={comparisonSortHint}
+                            >
+                              <span>{comparisonHeaders.designation}</span>
+                              <span
+                                className={`text-[10px] ${
+                                  comparisonSortIndicator('designation')
+                                    ? 'text-emerald-600'
+                                    : 'text-slate-400'
+                                }`}
+                              >
+                                {comparisonSortIndicator('designation') || '↕'}
+                              </span>
+                            </button>
                           </th>
-                          <th className="w-[10%] px-3 py-3 text-right">
-                            {comparisonHeaders.measuredValue}
+                          <th className="w-[8%] px-3 py-3 text-left" aria-sort={comparisonAriaSort('unit')}>
+                            <button
+                              type="button"
+                              onClick={() => handleComparisonSort('unit')}
+                              className="inline-flex w-full items-center gap-1 rounded px-1 py-0.5 transition hover:bg-slate-200/70"
+                              title={comparisonSortHint}
+                            >
+                              <span>{comparisonHeaders.unit}</span>
+                              <span
+                                className={`text-[10px] ${
+                                  comparisonSortIndicator('unit')
+                                    ? 'text-emerald-600'
+                                    : 'text-slate-400'
+                                }`}
+                              >
+                                {comparisonSortIndicator('unit') || '↕'}
+                              </span>
+                            </button>
                           </th>
-                          <th className="w-[10%] px-3 py-3 text-right">
-                            {comparisonHeaders.unmeasuredQuantity}
+                          <th
+                            className="w-[10%] px-3 py-3 text-right"
+                            aria-sort={comparisonAriaSort('unitPrice')}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => handleComparisonSort('unitPrice')}
+                              className="inline-flex w-full items-center justify-end gap-1 rounded px-1 py-0.5 transition hover:bg-slate-200/70"
+                              title={comparisonSortHint}
+                            >
+                              <span>{comparisonHeaders.unitPrice}</span>
+                              <span
+                                className={`text-[10px] ${
+                                  comparisonSortIndicator('unitPrice')
+                                    ? 'text-emerald-600'
+                                    : 'text-slate-400'
+                                }`}
+                              >
+                                {comparisonSortIndicator('unitPrice') || '↕'}
+                              </span>
+                            </button>
                           </th>
-                          <th className="w-[10%] px-3 py-3 text-right">
-                            {comparisonHeaders.unmeasuredValue}
+                          <th
+                            className="w-[10%] px-3 py-3 text-right"
+                            aria-sort={comparisonAriaSort('completedQuantity')}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => handleComparisonSort('completedQuantity')}
+                              className="inline-flex w-full items-center justify-end gap-1 rounded px-1 py-0.5 transition hover:bg-slate-200/70"
+                              title={comparisonSortHint}
+                            >
+                              <span>{comparisonHeaders.completedQuantity}</span>
+                              <span
+                                className={`text-[10px] ${
+                                  comparisonSortIndicator('completedQuantity')
+                                    ? 'text-emerald-600'
+                                    : 'text-slate-400'
+                                }`}
+                              >
+                                {comparisonSortIndicator('completedQuantity') || '↕'}
+                              </span>
+                            </button>
                           </th>
-                          <th className="w-[10%] px-3 py-3 text-right">
-                            {comparisonHeaders.overMeasuredValue}
+                          <th
+                            className="w-[10%] px-3 py-3 text-right"
+                            aria-sort={comparisonAriaSort('completedValue')}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => handleComparisonSort('completedValue')}
+                              className="inline-flex w-full items-center justify-end gap-1 rounded px-1 py-0.5 transition hover:bg-slate-200/70"
+                              title={comparisonSortHint}
+                            >
+                              <span>{comparisonHeaders.completedValue}</span>
+                              <span
+                                className={`text-[10px] ${
+                                  comparisonSortIndicator('completedValue')
+                                    ? 'text-emerald-600'
+                                    : 'text-slate-400'
+                                }`}
+                              >
+                                {comparisonSortIndicator('completedValue') || '↕'}
+                              </span>
+                            </button>
+                          </th>
+                          <th
+                            className="w-[10%] px-3 py-3 text-right"
+                            aria-sort={comparisonAriaSort('measuredQuantity')}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => handleComparisonSort('measuredQuantity')}
+                              className="inline-flex w-full items-center justify-end gap-1 rounded px-1 py-0.5 transition hover:bg-slate-200/70"
+                              title={comparisonSortHint}
+                            >
+                              <span>{comparisonHeaders.measuredQuantity}</span>
+                              <span
+                                className={`text-[10px] ${
+                                  comparisonSortIndicator('measuredQuantity')
+                                    ? 'text-emerald-600'
+                                    : 'text-slate-400'
+                                }`}
+                              >
+                                {comparisonSortIndicator('measuredQuantity') || '↕'}
+                              </span>
+                            </button>
+                          </th>
+                          <th
+                            className="w-[10%] px-3 py-3 text-right"
+                            aria-sort={comparisonAriaSort('measuredValue')}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => handleComparisonSort('measuredValue')}
+                              className="inline-flex w-full items-center justify-end gap-1 rounded px-1 py-0.5 transition hover:bg-slate-200/70"
+                              title={comparisonSortHint}
+                            >
+                              <span>{comparisonHeaders.measuredValue}</span>
+                              <span
+                                className={`text-[10px] ${
+                                  comparisonSortIndicator('measuredValue')
+                                    ? 'text-emerald-600'
+                                    : 'text-slate-400'
+                                }`}
+                              >
+                                {comparisonSortIndicator('measuredValue') || '↕'}
+                              </span>
+                            </button>
+                          </th>
+                          <th
+                            className="w-[10%] px-3 py-3 text-right"
+                            aria-sort={comparisonAriaSort('unmeasuredQuantity')}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => handleComparisonSort('unmeasuredQuantity')}
+                              className="inline-flex w-full items-center justify-end gap-1 rounded px-1 py-0.5 transition hover:bg-slate-200/70"
+                              title={comparisonSortHint}
+                            >
+                              <span>{comparisonHeaders.unmeasuredQuantity}</span>
+                              <span
+                                className={`text-[10px] ${
+                                  comparisonSortIndicator('unmeasuredQuantity')
+                                    ? 'text-emerald-600'
+                                    : 'text-slate-400'
+                                }`}
+                              >
+                                {comparisonSortIndicator('unmeasuredQuantity') || '↕'}
+                              </span>
+                            </button>
+                          </th>
+                          <th
+                            className="w-[10%] px-3 py-3 text-right"
+                            aria-sort={comparisonAriaSort('unmeasuredValue')}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => handleComparisonSort('unmeasuredValue')}
+                              className="inline-flex w-full items-center justify-end gap-1 rounded px-1 py-0.5 transition hover:bg-slate-200/70"
+                              title={comparisonSortHint}
+                            >
+                              <span>{comparisonHeaders.unmeasuredValue}</span>
+                              <span
+                                className={`text-[10px] ${
+                                  comparisonSortIndicator('unmeasuredValue')
+                                    ? 'text-emerald-600'
+                                    : 'text-slate-400'
+                                }`}
+                              >
+                                {comparisonSortIndicator('unmeasuredValue') || '↕'}
+                              </span>
+                            </button>
+                          </th>
+                          <th
+                            className="w-[10%] px-3 py-3 text-right"
+                            aria-sort={comparisonAriaSort('overMeasuredValue')}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => handleComparisonSort('overMeasuredValue')}
+                              className="inline-flex w-full items-center justify-end gap-1 rounded px-1 py-0.5 transition hover:bg-slate-200/70"
+                              title={comparisonSortHint}
+                            >
+                              <span>{comparisonHeaders.overMeasuredValue}</span>
+                              <span
+                                className={`text-[10px] ${
+                                  comparisonSortIndicator('overMeasuredValue')
+                                    ? 'text-emerald-600'
+                                    : 'text-slate-400'
+                                }`}
+                              >
+                                {comparisonSortIndicator('overMeasuredValue') || '↕'}
+                              </span>
+                            </button>
                           </th>
                         </tr>
                       </thead>
@@ -3216,53 +3663,84 @@ export default function ValuePage() {
                         })}
                       </tbody>
                       <tfoot className="border-t border-slate-300 bg-slate-100/80">
-                        <tr className="font-semibold text-slate-900">
-                          <td colSpan={5} className="px-3 py-3 text-left">
-                            {comparisonSummaryLabel}
-                          </td>
-                          <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums">
-                            {formatBoqCell(comparisonTotals.completedQuantity, {
-                              numeric: true,
-                              localeId,
-                            })}
-                          </td>
-                          <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums">
-                            {formatBoqCell(comparisonTotals.completedValue, {
-                              numeric: true,
-                              localeId,
-                            })}
-                          </td>
-                          <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums">
-                            {formatBoqCell(comparisonTotals.measuredQuantity, {
-                              numeric: true,
-                              localeId,
-                            })}
-                          </td>
-                          <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums">
-                            {formatBoqCell(comparisonTotals.measuredValue, {
-                              numeric: true,
-                              localeId,
-                            })}
-                          </td>
-                          <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums text-rose-700">
-                            {formatBoqCell(comparisonTotals.unmeasuredQuantity, {
-                              numeric: true,
-                              localeId,
-                            })}
-                          </td>
-                          <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums text-rose-700">
-                            {formatBoqCell(comparisonTotals.unmeasuredValue, {
-                              numeric: true,
-                              localeId,
-                            })}
-                          </td>
-                          <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums text-emerald-700">
-                            {formatBoqCell(comparisonTotals.overMeasuredValue, {
-                              numeric: true,
-                              localeId,
-                            })}
-                          </td>
-                        </tr>
+                        {comparisonSummaryRows.map((summaryRow) => {
+                          const needsReceivable = summaryRow.amountDelta > AMOUNT_EPSILON
+                          const isOverMeasured = summaryRow.amountDelta < -AMOUNT_EPSILON
+                          return (
+                            <tr
+                              key={summaryRow.key}
+                              className={`border-t border-slate-200/70 font-semibold text-slate-900 first:border-t-0 ${
+                                needsReceivable
+                                  ? 'bg-rose-50/70'
+                                  : isOverMeasured
+                                    ? 'bg-emerald-50/50'
+                                    : ''
+                              }`}
+                            >
+                              <td colSpan={5} className="px-3 py-3 text-left">
+                                {summaryRow.label}
+                              </td>
+                              <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums">
+                                {formatBoqCell(summaryRow.completedQuantity, {
+                                  numeric: true,
+                                  localeId,
+                                })}
+                              </td>
+                              <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums">
+                                {formatBoqCell(summaryRow.completedValue, {
+                                  numeric: true,
+                                  localeId,
+                                })}
+                              </td>
+                              <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums">
+                                {formatBoqCell(summaryRow.measuredQuantity, {
+                                  numeric: true,
+                                  localeId,
+                                })}
+                              </td>
+                              <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums">
+                                {formatBoqCell(summaryRow.measuredValue, {
+                                  numeric: true,
+                                  localeId,
+                                })}
+                              </td>
+                              <td
+                                className={`whitespace-nowrap px-3 py-3 text-right tabular-nums ${
+                                  needsReceivable ? 'text-rose-700' : 'text-slate-700'
+                                }`}
+                              >
+                                {formatBoqCell(summaryRow.unmeasuredQuantity, {
+                                  numeric: true,
+                                  localeId,
+                                })}
+                              </td>
+                              <td
+                                className={`whitespace-nowrap px-3 py-3 text-right tabular-nums ${
+                                  needsReceivable ? 'text-rose-700' : 'text-slate-700'
+                                }`}
+                              >
+                                {formatBoqCell(
+                                  summaryRow.unmeasuredValue > AMOUNT_EPSILON
+                                    ? summaryRow.unmeasuredValue
+                                    : null,
+                                  { numeric: true, localeId },
+                                )}
+                              </td>
+                              <td
+                                className={`whitespace-nowrap px-3 py-3 text-right tabular-nums ${
+                                  isOverMeasured ? 'text-emerald-700' : 'text-slate-700'
+                                }`}
+                              >
+                                {formatBoqCell(
+                                  summaryRow.overMeasuredValue > AMOUNT_EPSILON
+                                    ? summaryRow.overMeasuredValue
+                                    : null,
+                                  { numeric: true, localeId },
+                                )}
+                              </td>
+                            </tr>
+                          )
+                        })}
                       </tfoot>
                     </table>
                   </div>
