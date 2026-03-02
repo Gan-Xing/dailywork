@@ -24,6 +24,7 @@ type BoqItemRecord = {
   id: number
   projectId: number
   sheetType: BoqSheetType
+  contractItemId?: number | null
   code: string
   designationZh: string
   designationFr: string
@@ -144,6 +145,8 @@ const formatPercent = (value: number | null, localeId: string) => {
   const formatter = new Intl.NumberFormat(localeId, { maximumFractionDigits: 2 })
   return `${formatter.format(value)}%`
 }
+
+const AMOUNT_EPSILON = 0.01
 
 const formatPk = (value: number) => {
   if (!Number.isFinite(value)) return '—'
@@ -361,7 +364,7 @@ const mapBoqTone = (tone: BoqItemRecord['tone']): BoqRowTone => {
   }
 }
 
-type ValueTabKey = 'completion' | 'boq' | 'measurement'
+type ValueTabKey = 'completion' | 'boq' | 'measurement' | 'comparison'
 
 type CompletionTotals = {
   completedQuantity: number
@@ -375,6 +378,26 @@ type MeasurementTotals = {
   measuredValue: number
   totalPrice: number
   itemCount: number
+}
+
+type ComparisonSource = 'contract' | 'new'
+
+type ComparisonRow = {
+  id: number
+  source: ComparisonSource
+  code: string
+  designation: string
+  unit: string | null
+  unitPrice: number | null
+  completedQuantity: number
+  completedValue: number
+  measuredQuantity: number
+  measuredValue: number
+  amountDelta: number
+  unmeasuredQuantity: number
+  unmeasuredValue: number
+  overMeasuredValue: number
+  searchable: string
 }
 
 type PeriodGroupTotals = {
@@ -401,7 +424,13 @@ export default function ValuePage() {
   const searchParams = useSearchParams()
   const tabParam = searchParams?.get('tab') ?? null
   const activeTab: ValueTabKey =
-    tabParam === 'boq' ? 'boq' : tabParam === 'measurement' ? 'measurement' : 'completion'
+    tabParam === 'boq'
+      ? 'boq'
+      : tabParam === 'measurement'
+        ? 'measurement'
+        : tabParam === 'comparison'
+          ? 'comparison'
+          : 'completion'
   const [boqProjects, setBoqProjects] = useState<BoqProject[]>([])
   const [boqProjectsStatus, setBoqProjectsStatus] = useState<FetchStatus>('idle')
   const [boqProjectsError, setBoqProjectsError] = useState<string | null>(null)
@@ -433,6 +462,10 @@ export default function ValuePage() {
   const [completionSearch, setCompletionSearch] = useState('')
   const [completionViewMode, setCompletionViewMode] = useState<'full' | 'summary'>('full')
   const [measurementSearch, setMeasurementSearch] = useState('')
+  const [comparisonSearch, setComparisonSearch] = useState('')
+  const [comparisonSourceFilter, setComparisonSourceFilter] = useState<
+    'all' | ComparisonSource
+  >('all')
   const [measurementRecords, setMeasurementRecords] = useState<BoqMeasurementRecord[]>([])
   const [measurementStatus, setMeasurementStatus] = useState<FetchStatus>('idle')
   const [measurementError, setMeasurementError] = useState<string | null>(null)
@@ -589,11 +622,20 @@ export default function ValuePage() {
   }, [boqSheetType, copy.boq.messages.loadError, selectedProjectId, unauthorizedMessage])
 
   useEffect(() => {
-    if (!selectedProjectId || (activeTab !== 'completion' && activeTab !== 'measurement')) return
+    if (
+      !selectedProjectId ||
+      (activeTab !== 'completion' &&
+        activeTab !== 'measurement' &&
+        activeTab !== 'comparison')
+    ) {
+      return
+    }
     let cancelled = false
     const loadErrorMessage =
       activeTab === 'measurement'
         ? copy.measurement.messages.loadError
+        : activeTab === 'comparison'
+          ? copy.comparison.messages.loadError
         : copy.completion.messages.loadError
 
     const loadCompletion = async () => {
@@ -648,6 +690,7 @@ export default function ValuePage() {
   }, [
     activeTab,
     copy.completion.messages.loadError,
+    copy.comparison.messages.loadError,
     copy.measurement.messages.loadError,
     selectedProjectId,
     unauthorizedMessage,
@@ -687,7 +730,7 @@ export default function ValuePage() {
   }, [activeTab])
 
   useEffect(() => {
-    if (!selectedProjectId || activeTab !== 'measurement') return
+    if (!selectedProjectId || (activeTab !== 'measurement' && activeTab !== 'comparison')) return
     let cancelled = false
 
     const loadMeasurements = async () => {
@@ -821,6 +864,8 @@ export default function ValuePage() {
     const fallbackMessage =
       activeTab === 'measurement'
         ? copy.measurement.messages.loadError
+        : activeTab === 'comparison'
+          ? copy.comparison.messages.loadError
         : copy.completion.messages.loadError
     const message = completionError ?? fallbackMessage
     if (!message || message === completionToastRef.current) return
@@ -832,6 +877,7 @@ export default function ValuePage() {
     completionError,
     completionStatus,
     copy.completion.messages.loadError,
+    copy.comparison.messages.loadError,
     copy.measurement.messages.loadError,
     permissionDenied,
   ])
@@ -1482,6 +1528,66 @@ export default function ValuePage() {
     measurementPeriodKeys,
   ])
 
+  const comparisonRowData = useMemo<ComparisonRow[]>(() => {
+    const rows = sortBoqItemsByOrder(completionItems)
+      .filter((item) => item.tone === 'ITEM' && normalizeBoqCode(item.code) !== 'AVANCE')
+      .map((item) => {
+        const designation = locale === 'fr' ? item.designationFr : item.designationZh
+        const completion = completionMap.get(item.id)
+        const completedQuantity = Number.isFinite(completion?.completedQuantity ?? NaN)
+          ? (completion?.completedQuantity ?? 0)
+          : 0
+        const unitPrice = parseBoqNumber(item.unitPrice)
+        const completedValue = unitPrice !== null ? completedQuantity * unitPrice : 0
+
+        let measuredQuantity = 0
+        let measuredValue = 0
+        const records = measurementMap.get(item.id)
+        if (records) {
+          records.forEach((record) => {
+            const quantityValue = parseBoqNumber(record.quantity)
+            if (quantityValue !== null) {
+              measuredQuantity += quantityValue
+            }
+            const amountValue = parseBoqNumber(record.amount)
+            if (amountValue !== null) {
+              measuredValue += amountValue
+            } else if (quantityValue !== null && unitPrice !== null) {
+              measuredValue += quantityValue * unitPrice
+            }
+          })
+        }
+
+        const source: ComparisonSource = item.contractItemId ? 'contract' : 'new'
+        const quantityDelta = completedQuantity - measuredQuantity
+        const amountDelta = completedValue - measuredValue
+        const unmeasuredQuantity = quantityDelta > 0 ? quantityDelta : 0
+        const unmeasuredValue = amountDelta > 0 ? amountDelta : 0
+        const overMeasuredValue = amountDelta < 0 ? Math.abs(amountDelta) : 0
+        const searchable = `${item.code} ${designation}`.toLowerCase()
+
+        return {
+          id: item.id,
+          source,
+          code: item.code,
+          designation,
+          unit: item.unit,
+          unitPrice,
+          completedQuantity,
+          completedValue,
+          measuredQuantity,
+          measuredValue,
+          amountDelta,
+          unmeasuredQuantity,
+          unmeasuredValue,
+          overMeasuredValue,
+          searchable,
+        }
+      })
+
+    return rows
+  }, [completionItems, completionMap, locale, measurementMap])
+
   const measurementUnitPriceMap = useMemo(() => {
     const map = new Map<number, string | null>()
     measurementRowData.forEach((row) => {
@@ -2090,6 +2196,11 @@ export default function ValuePage() {
     [measurementSearch],
   )
 
+  const comparisonSearchTokens = useMemo(
+    () => comparisonSearch.trim().toLowerCase().split(/\s+/).filter(Boolean),
+    [comparisonSearch],
+  )
+
   const { displayBoqRows, highlightedBoqIndices } = useMemo(() => {
     if (!boqRowData.length) {
       return { displayBoqRows: [], highlightedBoqIndices: new Set<number>() }
@@ -2226,6 +2337,54 @@ export default function ValuePage() {
     return { displayMeasurementRows: displayRows, highlightedMeasurementIndices: highlightedIndices }
   }, [measurementRowData, measurementSearchTokens])
 
+  const { displayComparisonRows, highlightedComparisonIds } = useMemo(() => {
+    if (!comparisonRowData.length) {
+      return { displayComparisonRows: [], highlightedComparisonIds: new Set<number>() }
+    }
+
+    const sourceFiltered =
+      comparisonSourceFilter === 'all'
+        ? comparisonRowData
+        : comparisonRowData.filter((row) => row.source === comparisonSourceFilter)
+
+    const highlightedIds = new Set<number>()
+    if (!comparisonSearchTokens.length) {
+      return { displayComparisonRows: sourceFiltered, highlightedComparisonIds: highlightedIds }
+    }
+
+    const rows = sourceFiltered.filter((row) => {
+      const isMatch = comparisonSearchTokens.every((token) => row.searchable.includes(token))
+      if (isMatch) highlightedIds.add(row.id)
+      return isMatch
+    })
+    return { displayComparisonRows: rows, highlightedComparisonIds: highlightedIds }
+  }, [comparisonRowData, comparisonSearchTokens, comparisonSourceFilter])
+
+  const comparisonTotals = useMemo(
+    () =>
+      displayComparisonRows.reduce(
+        (acc, row) => ({
+          completedQuantity: acc.completedQuantity + row.completedQuantity,
+          completedValue: acc.completedValue + row.completedValue,
+          measuredQuantity: acc.measuredQuantity + row.measuredQuantity,
+          measuredValue: acc.measuredValue + row.measuredValue,
+          unmeasuredQuantity: acc.unmeasuredQuantity + row.unmeasuredQuantity,
+          unmeasuredValue: acc.unmeasuredValue + row.unmeasuredValue,
+          overMeasuredValue: acc.overMeasuredValue + row.overMeasuredValue,
+        }),
+        {
+          completedQuantity: 0,
+          completedValue: 0,
+          measuredQuantity: 0,
+          measuredValue: 0,
+          unmeasuredQuantity: 0,
+          unmeasuredValue: 0,
+          overMeasuredValue: 0,
+        },
+      ),
+    [displayComparisonRows],
+  )
+
   type MeasurementDisplayRow = (typeof measurementRowData)[number] & {
     virtual?: 'advance' | 'net-htva'
   }
@@ -2272,6 +2431,8 @@ export default function ValuePage() {
 
   const boqHeaders = copy.boq.tableHeaders
   const completionHeaders = copy.completion.tableHeaders
+  const comparisonHeaders = copy.comparison.tableHeaders
+  const comparisonSummaryLabel = locale === 'fr' ? 'Total' : '汇总'
   const measurementHeaders = copy.measurement.tableHeaders
   const measurementColumnSelectorCopy = copy.measurement.columnSelector
   const measurementBaseColumnOptions = useMemo(
@@ -2422,17 +2583,22 @@ export default function ValuePage() {
   const tabTitle =
     activeTab === 'boq'
       ? copy.boq.title
+      : activeTab === 'comparison'
+        ? copy.comparison.title
       : activeTab === 'measurement'
         ? copy.measurement.title
         : copy.completion.title
   const tabDescription =
     activeTab === 'boq'
       ? copy.boq.description
+      : activeTab === 'comparison'
+        ? copy.comparison.description
       : activeTab === 'measurement'
         ? copy.measurement.description
         : copy.completion.description
   const tabItems = [
     { key: 'completion', label: copy.tabs.completion, href: '/value' },
+    { key: 'comparison', label: copy.tabs.comparison, href: '/value?tab=comparison' },
     { key: 'boq', label: copy.tabs.boq, href: '/value?tab=boq' },
     { key: 'measurement', label: copy.tabs.measurement, href: '/value?tab=measurement' },
     { key: 'manage', label: copy.tabs.manage, href: '/value/prices' },
@@ -2817,6 +2983,294 @@ export default function ValuePage() {
                   <p className="text-sm text-slate-500">{copy.completion.messages.noMatches}</p>
                 ) : completionStatus === 'success' ? (
                   <p className="text-sm text-slate-500">{copy.completion.messages.empty}</p>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+
+          {activeTab === 'comparison' ? (
+            <div className="p-6">
+              <div className="space-y-5">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="space-y-1">
+                    <h2 className="text-lg font-semibold text-slate-900">
+                      {copy.comparison.title}
+                    </h2>
+                    <p className="text-sm text-slate-600">{copy.comparison.description}</p>
+                  </div>
+                  <div className="flex flex-wrap items-end gap-3">
+                    <label className="text-sm font-semibold text-slate-700">
+                      <span className="mb-1 block">{copy.comparison.projectLabel}</span>
+                      <select
+                        className="w-full min-w-[200px] rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+                        value={selectedProjectId}
+                        onChange={(event) => setSelectedProjectId(event.target.value)}
+                      >
+                        {!boqProjects.length ? (
+                          <option value="">{copy.comparison.projectPlaceholder}</option>
+                        ) : null}
+                        {boqProjects.map((project) => (
+                          <option key={project.id} value={String(project.id)}>
+                            {resolveProjectLabel(project)}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="text-sm font-semibold text-slate-700">
+                      <span className="mb-1 block">{copy.comparison.actions.searchLabel}</span>
+                      <input
+                        type="search"
+                        className="w-full min-w-[220px] rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+                        value={comparisonSearch}
+                        onChange={(event) => setComparisonSearch(event.target.value)}
+                        placeholder={copy.comparison.actions.searchPlaceholder}
+                      />
+                    </label>
+                    <label className="text-sm font-semibold text-slate-700">
+                      <span className="mb-1 block">{copy.comparison.actions.sourceLabel}</span>
+                      <select
+                        className="w-full min-w-[180px] rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+                        value={comparisonSourceFilter}
+                        onChange={(event) =>
+                          setComparisonSourceFilter(
+                            event.target.value as 'all' | ComparisonSource,
+                          )
+                        }
+                      >
+                        <option value="all">{copy.comparison.actions.sourceAll}</option>
+                        <option value="contract">{copy.comparison.actions.sourceContract}</option>
+                        <option value="new">{copy.comparison.actions.sourceNew}</option>
+                      </select>
+                    </label>
+                  </div>
+                </div>
+
+                <div className="space-y-1 text-xs text-slate-500">
+                  {boqProjectsStatus === 'loading' && (
+                    <p>{copy.comparison.messages.projectLoading}</p>
+                  )}
+                  {boqProjectsStatus === 'error' && (
+                    <p className="text-rose-600">{boqProjectsError ?? projectLoadError}</p>
+                  )}
+                  {completionStatus === 'loading' && (
+                    <p>{copy.comparison.messages.loading}</p>
+                  )}
+                  {completionStatus === 'error' && (
+                    <p className="text-rose-600">
+                      {completionError ?? copy.comparison.messages.loadError}
+                    </p>
+                  )}
+                  {measurementStatus === 'loading' && (
+                    <p>{copy.comparison.messages.loading}</p>
+                  )}
+                  {measurementStatus === 'error' && (
+                    <p className="text-rose-600">
+                      {measurementError ?? copy.comparison.messages.loadError}
+                    </p>
+                  )}
+                </div>
+
+                {hasBoqHeader ? (
+                  <div className="rounded-2xl border border-slate-200 bg-gradient-to-b from-white to-slate-50 px-6 py-5 text-sm text-slate-700 shadow-sm">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      {headerLeftLine ? (
+                        <p className="text-left text-base font-semibold text-slate-900">
+                          {headerLeftLine}
+                        </p>
+                      ) : null}
+                      {headerRightLine ? (
+                        <p className="text-left text-sm font-medium text-slate-700 sm:text-right sm:text-base">
+                          {headerRightLine}
+                        </p>
+                      ) : null}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/60 p-4 text-sm text-slate-400">
+                    {copy.boq.messages.noHeader}
+                  </div>
+                )}
+
+                {completionStatus === 'success' &&
+                measurementStatus === 'success' &&
+                displayComparisonRows.length ? (
+                  <div className="overflow-x-auto rounded-2xl border border-slate-200">
+                    <table className="min-w-full border-collapse text-left text-sm">
+                      <thead className="bg-slate-100/70">
+                        <tr
+                          className={`text-[11px] font-semibold text-slate-500 ${
+                            isFrenchLocale ? 'uppercase tracking-[0.24em]' : 'tracking-[0.12em]'
+                          }`}
+                        >
+                          <th className="w-[9%] px-3 py-3 text-left">{comparisonHeaders.source}</th>
+                          <th className="w-[8%] px-3 py-3 text-left">{comparisonHeaders.code}</th>
+                          <th className="px-3 py-3 text-left">{comparisonHeaders.designation}</th>
+                          <th className="w-[8%] px-3 py-3 text-left">{comparisonHeaders.unit}</th>
+                          <th className="w-[10%] px-3 py-3 text-right">{comparisonHeaders.unitPrice}</th>
+                          <th className="w-[10%] px-3 py-3 text-right">
+                            {comparisonHeaders.completedQuantity}
+                          </th>
+                          <th className="w-[10%] px-3 py-3 text-right">
+                            {comparisonHeaders.completedValue}
+                          </th>
+                          <th className="w-[10%] px-3 py-3 text-right">
+                            {comparisonHeaders.measuredQuantity}
+                          </th>
+                          <th className="w-[10%] px-3 py-3 text-right">
+                            {comparisonHeaders.measuredValue}
+                          </th>
+                          <th className="w-[10%] px-3 py-3 text-right">
+                            {comparisonHeaders.unmeasuredQuantity}
+                          </th>
+                          <th className="w-[10%] px-3 py-3 text-right">
+                            {comparisonHeaders.unmeasuredValue}
+                          </th>
+                          <th className="w-[10%] px-3 py-3 text-right">
+                            {comparisonHeaders.overMeasuredValue}
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-200/70">
+                        {displayComparisonRows.map((row) => {
+                          const isHighlighted = highlightedComparisonIds.has(row.id)
+                          const needsReceivable = row.amountDelta > AMOUNT_EPSILON
+                          const isOverMeasured = row.amountDelta < -AMOUNT_EPSILON
+                          const sourceLabel =
+                            row.source === 'contract'
+                              ? copy.comparison.sourceLabels.contract
+                              : copy.comparison.sourceLabels.new
+                          return (
+                            <tr
+                              key={row.id}
+                              className={`transition hover:bg-slate-50 ${
+                                needsReceivable
+                                  ? 'bg-rose-50/80'
+                                  : isOverMeasured
+                                    ? 'bg-emerald-50/60'
+                                    : isHighlighted
+                                      ? 'bg-amber-50/70'
+                                      : ''
+                              }`}
+                            >
+                              <td className="whitespace-nowrap px-3 py-3 text-slate-700">
+                                {sourceLabel}
+                              </td>
+                              <td className="whitespace-nowrap px-3 py-3 text-xs tracking-[0.2em] text-slate-700">
+                                {row.code}
+                              </td>
+                              <td className="px-3 py-3 text-slate-700">{row.designation}</td>
+                              <td className="whitespace-nowrap px-3 py-3 text-slate-700">
+                                {formatBoqCell(row.unit)}
+                              </td>
+                              <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums text-slate-700">
+                                {formatBoqCell(row.unitPrice, { numeric: true, localeId })}
+                              </td>
+                              <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums text-slate-700">
+                                {formatBoqCell(row.completedQuantity, { numeric: true, localeId })}
+                              </td>
+                              <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums text-slate-700">
+                                {formatBoqCell(row.completedValue, { numeric: true, localeId })}
+                              </td>
+                              <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums text-slate-700">
+                                {formatBoqCell(row.measuredQuantity, { numeric: true, localeId })}
+                              </td>
+                              <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums text-slate-700">
+                                {formatBoqCell(row.measuredValue, { numeric: true, localeId })}
+                              </td>
+                              <td
+                                className={`whitespace-nowrap px-3 py-3 text-right tabular-nums ${
+                                  needsReceivable ? 'text-rose-700' : 'text-slate-700'
+                                }`}
+                              >
+                                {formatBoqCell(row.unmeasuredQuantity, {
+                                  numeric: true,
+                                  localeId,
+                                })}
+                              </td>
+                              <td
+                                className={`whitespace-nowrap px-3 py-3 text-right tabular-nums ${
+                                  needsReceivable ? 'text-rose-700' : 'text-slate-700'
+                                }`}
+                              >
+                                {formatBoqCell(
+                                  row.unmeasuredValue > AMOUNT_EPSILON
+                                    ? row.unmeasuredValue
+                                    : null,
+                                  { numeric: true, localeId },
+                                )}
+                              </td>
+                              <td
+                                className={`whitespace-nowrap px-3 py-3 text-right tabular-nums ${
+                                  isOverMeasured ? 'text-emerald-700' : 'text-slate-700'
+                                }`}
+                              >
+                                {formatBoqCell(
+                                  row.overMeasuredValue > AMOUNT_EPSILON
+                                    ? row.overMeasuredValue
+                                    : null,
+                                  { numeric: true, localeId },
+                                )}
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                      <tfoot className="border-t border-slate-300 bg-slate-100/80">
+                        <tr className="font-semibold text-slate-900">
+                          <td colSpan={5} className="px-3 py-3 text-left">
+                            {comparisonSummaryLabel}
+                          </td>
+                          <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums">
+                            {formatBoqCell(comparisonTotals.completedQuantity, {
+                              numeric: true,
+                              localeId,
+                            })}
+                          </td>
+                          <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums">
+                            {formatBoqCell(comparisonTotals.completedValue, {
+                              numeric: true,
+                              localeId,
+                            })}
+                          </td>
+                          <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums">
+                            {formatBoqCell(comparisonTotals.measuredQuantity, {
+                              numeric: true,
+                              localeId,
+                            })}
+                          </td>
+                          <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums">
+                            {formatBoqCell(comparisonTotals.measuredValue, {
+                              numeric: true,
+                              localeId,
+                            })}
+                          </td>
+                          <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums text-rose-700">
+                            {formatBoqCell(comparisonTotals.unmeasuredQuantity, {
+                              numeric: true,
+                              localeId,
+                            })}
+                          </td>
+                          <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums text-rose-700">
+                            {formatBoqCell(comparisonTotals.unmeasuredValue, {
+                              numeric: true,
+                              localeId,
+                            })}
+                          </td>
+                          <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums text-emerald-700">
+                            {formatBoqCell(comparisonTotals.overMeasuredValue, {
+                              numeric: true,
+                              localeId,
+                            })}
+                          </td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                ) : completionStatus === 'success' && measurementStatus === 'success' &&
+                  (comparisonSearchTokens.length || comparisonSourceFilter !== 'all') ? (
+                  <p className="text-sm text-slate-500">{copy.comparison.messages.noMatches}</p>
+                ) : completionStatus === 'success' && measurementStatus === 'success' ? (
+                  <p className="text-sm text-slate-500">{copy.comparison.messages.empty}</p>
                 ) : null}
               </div>
             </div>

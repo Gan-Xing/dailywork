@@ -17,6 +17,7 @@ export type ProductionValueCopy = {
     boq: string
     manage: string
     measurement: string
+    comparison: string
   }
   messages: {
     unauthorized: string
@@ -99,6 +100,45 @@ export type ProductionValueCopy = {
       noMatches: string
     }
   }
+  comparison: {
+    title: string
+    description: string
+    projectLabel: string
+    projectPlaceholder: string
+    actions: {
+      searchLabel: string
+      searchPlaceholder: string
+      sourceLabel: string
+      sourceAll: string
+      sourceContract: string
+      sourceNew: string
+    }
+    tableHeaders: {
+      source: string
+      code: string
+      designation: string
+      unit: string
+      unitPrice: string
+      completedQuantity: string
+      completedValue: string
+      measuredQuantity: string
+      measuredValue: string
+      unmeasuredQuantity: string
+      unmeasuredValue: string
+      overMeasuredValue: string
+    }
+    sourceLabels: {
+      contract: string
+      new: string
+    }
+    messages: {
+      loading: string
+      projectLoading: string
+      loadError: string
+      empty: string
+      noMatches: string
+    }
+  }
   measurement: {
     title: string
     description: string
@@ -165,7 +205,8 @@ export const productionValueCopy: Record<Locale, ProductionValueCopy> = {
       completion: '产值界面',
       boq: '工程量清单',
       manage: '分项管理',
-      measurement: '计量'
+      measurement: '计量',
+      comparison: '计量对比'
     },
     messages: {
       unauthorized: '需“产值查看”权限才能查看产值界面',
@@ -248,6 +289,45 @@ export const productionValueCopy: Record<Locale, ProductionValueCopy> = {
         noMatches: '未找到匹配的产值记录'
       }
     },
+    comparison: {
+      title: '计量对比',
+      description: '对比已完成产值与累计计量，识别已完成但未计量的分项工程量与产值。',
+      projectLabel: '项目',
+      projectPlaceholder: '选择项目',
+      actions: {
+        searchLabel: '检索',
+        searchPlaceholder: '输入编号或名称…',
+        sourceLabel: '来源',
+        sourceAll: '全部',
+        sourceContract: '原合同',
+        sourceNew: '新增分项',
+      },
+      tableHeaders: {
+        source: '来源',
+        code: '编号',
+        designation: '工程内容',
+        unit: '单位',
+        unitPrice: '单价（F CFA）',
+        completedQuantity: '完成工程量',
+        completedValue: '完成产值',
+        measuredQuantity: '累计计量工程量',
+        measuredValue: '累计计量金额',
+        unmeasuredQuantity: '未计量已完成量',
+        unmeasuredValue: '未计量已完成产值',
+        overMeasuredValue: '超额计量',
+      },
+      sourceLabels: {
+        contract: '原合同',
+        new: '新增分项',
+      },
+      messages: {
+        loading: '正在加载对比数据…',
+        projectLoading: '正在加载项目列表…',
+        loadError: '对比数据加载失败，请稍后重试',
+        empty: '该项目暂无可对比的分项记录',
+        noMatches: '未找到匹配的对比记录',
+      },
+    },
     measurement: {
       title: '计量页面',
       description: '基于实际工程量清单录入分期计量工程量与金额。',
@@ -312,7 +392,8 @@ export const productionValueCopy: Record<Locale, ProductionValueCopy> = {
       completion: 'Valeurs réalisées',
       boq: 'Devis quantitatif',
       manage: 'Postes',
-      measurement: 'Métrés'
+      measurement: 'Métrés',
+      comparison: 'Comparaison'
     },
     messages: {
       unauthorized: 'Permission « value:view » requise pour consulter les valeurs réalisées',
@@ -395,6 +476,46 @@ export const productionValueCopy: Record<Locale, ProductionValueCopy> = {
         empty: 'Aucune ligne de devis réel pour ce projet',
         noMatches: 'Aucune ligne correspondante'
       }
+    },
+    comparison: {
+      title: 'Comparaison',
+      description:
+        'Comparer les valeurs réalisées et les métrés cumulés pour identifier les travaux réalisés non encore métrés.',
+      projectLabel: 'Projet',
+      projectPlaceholder: 'Sélectionner un projet',
+      actions: {
+        searchLabel: 'Recherche',
+        searchPlaceholder: 'Rechercher par code ou désignation…',
+        sourceLabel: 'Origine',
+        sourceAll: 'Tout',
+        sourceContract: 'Contrat',
+        sourceNew: 'Nouveau poste',
+      },
+      tableHeaders: {
+        source: 'Origine',
+        code: 'N° Prix',
+        designation: 'Désignation',
+        unit: 'Unité',
+        unitPrice: 'Prix unitaire (F CFA)',
+        completedQuantity: 'Qté réalisée',
+        completedValue: 'Montant réalisé',
+        measuredQuantity: 'Qté métré cumulée',
+        measuredValue: 'Montant métré cumulé',
+        unmeasuredQuantity: 'Qté réalisée non métré',
+        unmeasuredValue: 'Montant non métré',
+        overMeasuredValue: 'Sur-métré',
+      },
+      sourceLabels: {
+        contract: 'Contrat',
+        new: 'Nouveau poste',
+      },
+      messages: {
+        loading: 'Chargement des données de comparaison…',
+        projectLoading: 'Chargement des projets…',
+        loadError: 'Impossible de charger les données de comparaison',
+        empty: 'Aucun poste comparable pour ce projet',
+        noMatches: 'Aucune ligne correspondante',
+      },
     },
     measurement: {
       title: 'Métrés',
