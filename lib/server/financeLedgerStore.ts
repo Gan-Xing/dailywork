@@ -395,8 +395,8 @@ const applySnapshotPatch = (target: Prisma.FinanceLedgerCaseUncheckedUpdateInput
   }
 }
 
-const buildEventPayloadJson = (patch: FinanceLedgerSnapshotInput) => {
-  const payload: Record<string, unknown> = {}
+const buildEventPayloadJson = (patch: FinanceLedgerSnapshotInput): Prisma.InputJsonObject => {
+  const payload: Prisma.InputJsonObject = {}
   if (hasOwn(patch, 'accountAmount') && patch.accountAmount !== undefined) payload.accountAmount = patch.accountAmount ?? null
   if (hasOwn(patch, 'invoiceAmount') && patch.invoiceAmount !== undefined) payload.invoiceAmount = patch.invoiceAmount ?? null
   if (hasOwn(patch, 'advanceAmount') && patch.advanceAmount !== undefined) payload.advanceAmount = patch.advanceAmount ?? null
@@ -892,10 +892,10 @@ export const updateFinanceLedgerEvent = async (
 
   const existingPayload =
     event.payloadJson && typeof event.payloadJson === 'object' && !Array.isArray(event.payloadJson)
-      ? { ...(event.payloadJson as Record<string, unknown>) }
+      ? ({ ...(event.payloadJson as Prisma.JsonObject) } as Prisma.InputJsonObject)
       : {}
   const patchPayload = buildEventPayloadJson(payload)
-  const nextPayloadJson = { ...existingPayload, ...patchPayload }
+  const nextPayloadJson: Prisma.InputJsonObject = { ...existingPayload, ...patchPayload }
 
   const updatedCase = await prisma.$transaction(async (tx) => {
     await tx.financeLedgerEvent.update({
