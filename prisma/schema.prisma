@@ -96,6 +96,22 @@ enum PaymentStatus {
   PAID
 }
 
+enum FinanceLedgerCaseStatus {
+  IN_PROGRESS
+  DONE
+  BLOCKED
+}
+
+enum FinanceLedgerStage {
+  SITE_SIGNED
+  HQ_BILL_RECEIVED
+  BE_CONFIRMED
+  BE_DELIVERED
+  HQ_INVOICE_RECEIVED
+  CHEQUE_ISSUED
+  CHEQUE_RECEIVED
+}
+
 enum BoqSheetType {
   CONTRACT
   ACTUAL
@@ -241,6 +257,7 @@ model RoadSection {
   locationInspectionEntries  InspectionEntry[]   @relation("InspectionEntryLocationRoad")
   locationPhaseIntervals     PhaseInterval[]     @relation("PhaseIntervalLocationRoad")
   measurementDetails         BoqMeasurementDetail[]
+  financeLedgerCases         FinanceLedgerCase[]
 
   @@index([projectId])
 }
@@ -582,6 +599,11 @@ model User {
   deletedFinances             FinanceEntry[]          @relation("FinanceEntryDeleter")
   handledFinances             FinanceEntry[]          @relation("FinanceEntryHandler")
   updatedFinances             FinanceEntry[]          @relation("FinanceEntryUpdater")
+  createdFinanceLedgerCases   FinanceLedgerCase[]     @relation("FinanceLedgerCaseCreator")
+  updatedFinanceLedgerCases   FinanceLedgerCase[]     @relation("FinanceLedgerCaseUpdater")
+  deletedFinanceLedgerCases   FinanceLedgerCase[]     @relation("FinanceLedgerCaseDeleter")
+  createdFinanceLedgerEvents  FinanceLedgerEvent[]    @relation("FinanceLedgerEventCreator")
+  updatedFinanceLedgerEvents  FinanceLedgerEvent[]    @relation("FinanceLedgerEventUpdater")
   chineseProfile              UserChineseProfile?
   expatProfile                UserExpatProfile?
   expatSupervisees            UserExpatProfile[]      @relation("ExpatChineseSupervisor")
@@ -1012,6 +1034,8 @@ model Project {
   createdAt         DateTime                @default(now())
   updatedAt         DateTime                @updatedAt
   finances          FinanceEntry[]
+  financeLedgerCases FinanceLedgerCase[]
+  financeLedgerSlas FinanceLedgerSla[]
   teamSupervisors   TeamSupervisor[]
   memberAssignments UserProjectAssignment[]
   machineDailyLogs  MachineDailyLog[]
@@ -1170,6 +1194,85 @@ model FinanceEntry {
   @@index([isDeleted])
   @@index([handlerId])
   @@index([paymentStatus])
+}
+
+model FinanceLedgerCase {
+  id                       Int                      @id @default(autoincrement())
+  sequence                 Int                      @default(autoincrement())
+  projectId                Int
+  periodIndex              Int
+  sectionId                Int?
+  status                   FinanceLedgerCaseStatus  @default(IN_PROGRESS)
+  currentStage             FinanceLedgerStage?
+  enteredCurrentStageAt    DateTime?
+  accountAmount            Decimal?                 @db.Decimal(18, 2)
+  invoiceAmount            Decimal?                 @db.Decimal(18, 2)
+  advanceAmount            Decimal?                 @db.Decimal(18, 2)
+  chequeAmount             Decimal?                 @db.Decimal(18, 2)
+  invoiceNumber            String?
+  receiptChequeNumber      String?
+  remark                   String?
+  ptoSiteSignedAt          DateTime?
+  ptoHqBillReceivedAt      DateTime?
+  ptoBeConfirmedAt         DateTime?
+  ptoBeDeliveredAt         DateTime?
+  ptoHqInvoiceReceivedAt   DateTime?
+  chequeIssuedAt           DateTime?
+  chequeReceivedAt         DateTime?
+  isDeleted                Boolean                  @default(false)
+  deletedAt                DateTime?
+  deletedBy                Int?
+  updatedBy                Int?
+  createdAt                DateTime                 @default(now())
+  updatedAt                DateTime                 @updatedAt
+  createdBy                Int?
+  project                  Project                  @relation(fields: [projectId], references: [id])
+  section                  RoadSection?             @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+  events                   FinanceLedgerEvent[]
+  creator                  User?                    @relation("FinanceLedgerCaseCreator", fields: [createdBy], references: [id])
+  updater                  User?                    @relation("FinanceLedgerCaseUpdater", fields: [updatedBy], references: [id])
+  deleter                  User?                    @relation("FinanceLedgerCaseDeleter", fields: [deletedBy], references: [id])
+
+  @@unique([sequence])
+  @@unique([projectId, periodIndex])
+  @@index([projectId, status, currentStage])
+  @@index([sectionId])
+  @@index([isDeleted])
+  @@index([updatedAt])
+}
+
+model FinanceLedgerEvent {
+  id        Int                @id @default(autoincrement())
+  caseId    Int
+  stage     FinanceLedgerStage
+  occurredAt DateTime
+  payloadJson Json?
+  note      String?
+  updatedBy Int?
+  createdBy Int?
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+  ledgerCase FinanceLedgerCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  creator   User?              @relation("FinanceLedgerEventCreator", fields: [createdBy], references: [id])
+  updater   User?              @relation("FinanceLedgerEventUpdater", fields: [updatedBy], references: [id])
+
+  @@unique([caseId, stage])
+  @@index([stage, occurredAt])
+  @@index([caseId, occurredAt])
+}
+
+model FinanceLedgerSla {
+  id        Int                @id @default(autoincrement())
+  projectId Int?
+  fromStage FinanceLedgerStage
+  toStage   FinanceLedgerStage
+  maxDays   Int
+  active    Boolean            @default(true)
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+  project   Project?           @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  @@index([projectId, fromStage, toStage, active])
 }
 
 model DocumentTemplate {

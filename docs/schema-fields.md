@@ -468,6 +468,55 @@
     16. `createdAt` / `updatedAt`：时间戳。
     17. `createdBy`：关联 User（记录填报人）。
 
+## 财务台账字段（FinanceLedger）
+
+- **用途**：按 `projectId + periodIndex` 建立唯一票据跟踪主记录，并通过阶段事件持续补录流程节点。
+
+### FinanceLedgerCase（主记录）
+
+1. `id`：自增主键。
+2. `sequence`：台账流水号（自增，唯一）。
+3. `projectId`：项目 ID（必填）。
+4. `periodIndex`：账单期数（必填，和 `projectId` 组成唯一键）。
+5. `sectionId?`：路段/Section（可选，关联 `RoadSection`）。
+6. `status`：枚举 `IN_PROGRESS` / `DONE` / `BLOCKED`。
+7. `currentStage?`：当前阶段（枚举 `FinanceLedgerStage`）。
+8. `enteredCurrentStageAt?`：进入当前阶段时间，用于 aging。
+9. 金额快照：`accountAmount?`、`invoiceAmount?`、`advanceAmount?`、`chequeAmount?`（decimal）。
+10. 票据字段：`invoiceNumber?`、`receiptChequeNumber?`、`remark?`。
+11. 阶段日期快照：
+   - `ptoSiteSignedAt?`
+   - `ptoHqBillReceivedAt?`
+   - `ptoBeConfirmedAt?`
+   - `ptoBeDeliveredAt?`
+   - `ptoHqInvoiceReceivedAt?`
+   - `chequeIssuedAt?`
+   - `chequeReceivedAt?`
+12. 软删与审计：`isDeleted`、`deletedAt?`、`deletedBy?`、`createdBy?`、`updatedBy?`、`createdAt`、`updatedAt`。
+13. 约束：`@@unique([projectId, periodIndex])`、`@@unique([sequence])`。
+
+### FinanceLedgerEvent（阶段事件）
+
+1. `id`：自增主键。
+2. `caseId`：关联 `FinanceLedgerCase.id`（必填）。
+3. `stage`：阶段枚举，唯一约束为 `@@unique([caseId, stage])`，同阶段仅一条事件。
+4. `occurredAt`：阶段发生日期（必填）。
+5. `payloadJson?`：该阶段附加快照（金额/票据号/备注等）。
+6. `note?`：阶段备注。
+7. `createdBy?` / `updatedBy?`、`createdAt` / `updatedAt`：审计字段。
+
+### FinanceLedgerSla（时效配置）
+
+1. `projectId?`：可选项目维度；为空表示全局默认 SLA。
+2. `fromStage` / `toStage`：阶段转换。
+3. `maxDays`：该转换允许的最大天数。
+4. `active`：是否生效。
+5. `createdAt` / `updatedAt`：审计字段。
+
+### FinanceLedgerStage 枚举顺序
+
+`SITE_SIGNED -> HQ_BILL_RECEIVED -> BE_CONFIRMED -> BE_DELIVERED -> HQ_INVOICE_RECEIVED -> CHEQUE_ISSUED -> CHEQUE_RECEIVED`
+
 ## 财务主数据
 
 - **Project（财务项目）**：`id`、`name`、`code?`、`isActive`、`createdAt`、`updatedAt`；初始 7 个项目：邦杜库市政路项目、邦杜库边境路项目、邦杜库供料项目、铁布高速项目、阿比让办事处、丹达市政路项目、阿尼比莱克鲁市政路项目。

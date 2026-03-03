@@ -1556,6 +1556,20 @@ export default function FinancePage() {
         <div>
           <h1 className="text-2xl font-semibold">财务记账</h1>
           <p className="text-sm text-slate-600">按项目录入流水，支持分类、金额单位与支付方式。</p>
+          <div className="mt-3 inline-flex rounded-lg border border-slate-200 bg-slate-100 p-1 text-xs font-semibold">
+            <Link
+              href="/finance"
+              className="rounded-md bg-white px-3 py-1.5 text-slate-900 shadow-sm ring-1 ring-slate-200"
+            >
+              Entrées
+            </Link>
+            <Link
+              href="/finance/ledger"
+              className="rounded-md px-3 py-1.5 text-slate-600 hover:bg-slate-200/60 hover:text-slate-900"
+            >
+              Tableau de suivi
+            </Link>
+          </div>
         </div>
         <div className="text-sm text-slate-600">
           {session ? `已登录：${session.username}` : '未登录'}
