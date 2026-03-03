@@ -9,6 +9,41 @@ const respond = (message: string, status: number) =>
 const PERIOD_BASE_DATE = new Date(Date.UTC(2000, 0, 1))
 const PERIOD_DAY_MS = 24 * 60 * 60 * 1000
 
+type DetailSide = 'BOTH' | 'LEFT' | 'RIGHT'
+
+const SIDE_ALIAS_MAP: Record<string, DetailSide> = {
+  BOTH: 'BOTH',
+  B: 'BOTH',
+  DOUBLE: 'BOTH',
+  DEUXCOTES: 'BOTH',
+  DEUXCOTE: 'BOTH',
+  TWOSIDES: 'BOTH',
+  BOTHSIDES: 'BOTH',
+  LEFTRIGHT: 'BOTH',
+  RIGHTLEFT: 'BOTH',
+  LR: 'BOTH',
+  RL: 'BOTH',
+  CGCD: 'BOTH',
+  CDCG: 'BOTH',
+  左右: 'BOTH',
+  两侧: 'BOTH',
+  双侧: 'BOTH',
+  LEFT: 'LEFT',
+  L: 'LEFT',
+  G: 'LEFT',
+  GAUCHE: 'LEFT',
+  CG: 'LEFT',
+  左: 'LEFT',
+  左侧: 'LEFT',
+  RIGHT: 'RIGHT',
+  R: 'RIGHT',
+  D: 'RIGHT',
+  DROITE: 'RIGHT',
+  CD: 'RIGHT',
+  右: 'RIGHT',
+  右侧: 'RIGHT',
+}
+
 const formatPeriodKey = (value: number) => String(value)
 
 const resolvePeriodKeyFromDate = (value: Date) => {
@@ -64,6 +99,14 @@ const parseBoqItemId = (value: unknown) => {
   return boqItemId
 }
 
+const parseDetailId = (value: unknown) => {
+  const detailId = Number(value)
+  if (!Number.isInteger(detailId) || detailId <= 0) {
+    throw new Error('明细编号无效')
+  }
+  return detailId
+}
+
 const parseDecimal = (value: unknown, label: string, options?: { allowNull?: boolean }) => {
   if (value === null || value === undefined || value === '') {
     if (options?.allowNull) return null
@@ -87,10 +130,34 @@ const parseDecimal = (value: unknown, label: string, options?: { allowNull?: boo
   throw new Error(`${label}必须为数字`)
 }
 
-const parseNote = (value: unknown) => {
+const parseOptionalText = (value: unknown) => {
   if (value === undefined || value === null) return null
   const text = String(value).trim()
   return text ? text : null
+}
+
+const parsePk = (value: unknown, label: string) => {
+  const text = parseOptionalText(value)
+  if (!text) return null
+  if (text.length > 80) {
+    throw new Error(`${label}长度不能超过 80`)
+  }
+  return text
+}
+
+const parseSide = (value: unknown): DetailSide | null => {
+  const text = parseOptionalText(value)
+  if (!text) return null
+  const normalized = text.toUpperCase().replace(/[\s_\-/]+/g, '')
+  const mapped = SIDE_ALIAS_MAP[normalized]
+  if (!mapped) {
+    throw new Error('侧别无效')
+  }
+  return mapped
+}
+
+const parseNote = (value: unknown) => {
+  return parseOptionalText(value)
 }
 
 const toNumber = (value: unknown) => {
@@ -173,6 +240,8 @@ export async function GET(request: Request) {
               { boqItem: { designationZh: { contains: search, mode: 'insensitive' as const } } },
               { boqItem: { designationFr: { contains: search, mode: 'insensitive' as const } } },
               { road: { name: { contains: search, mode: 'insensitive' as const } } },
+              { startPk: { contains: search, mode: 'insensitive' as const } },
+              { endPk: { contains: search, mode: 'insensitive' as const } },
               { note: { contains: search, mode: 'insensitive' as const } },
             ],
           }
@@ -302,6 +371,9 @@ export async function GET(request: Request) {
         roadId: item.roadId,
         roadName: item.road.name,
         roadSlug: item.road.slug,
+        startPk: item.startPk,
+        endPk: item.endPk,
+        side: item.side,
         quantity,
         manualAmount,
         amount,
@@ -397,6 +469,9 @@ export async function POST(request: Request) {
     roadId?: unknown
     quantity?: unknown
     amount?: unknown
+    startPk?: unknown
+    endPk?: unknown
+    side?: unknown
     note?: unknown
   }
 
@@ -434,6 +509,20 @@ export async function POST(request: Request) {
   }
 
   const note = parseNote(parsed.note)
+  let startPk: string | null
+  let endPk: string | null
+  let side: DetailSide | null
+  try {
+    startPk = parsePk(parsed.startPk, '起点桩号')
+    endPk = parsePk(parsed.endPk, '终点桩号')
+    side = parseSide(parsed.side)
+  } catch (error) {
+    return respond((error as Error).message ?? '参数无效', 400)
+  }
+
+  if ((startPk && !endPk) || (!startPk && endPk)) {
+    return respond('起点桩号和终点桩号需同时填写或同时留空', 400)
+  }
 
   try {
     const [project, boqItem, road] = await Promise.all([
@@ -479,6 +568,9 @@ export async function POST(request: Request) {
         projectId,
         boqItemId,
         roadId,
+        startPk,
+        endPk,
+        side,
         period,
         quantity,
         manualAmount,
@@ -517,6 +609,9 @@ export async function POST(request: Request) {
         roadId: created.roadId,
         roadName: created.road.name,
         roadSlug: created.road.slug,
+        startPk: created.startPk,
+        endPk: created.endPk,
+        side: created.side,
         quantity: toNumber(created.quantity) ?? 0,
         manualAmount: toNumber(created.manualAmount),
         amount: resolveAmount({
@@ -532,5 +627,244 @@ export async function POST(request: Request) {
     })
   } catch (error) {
     return respond((error as Error).message ?? '新增计量明细失败', 500)
+  }
+}
+
+export async function PUT(request: Request) {
+  if (!(await hasPermission('value:update'))) {
+    return respond('缺少产值更新权限', 403)
+  }
+
+  let payload: unknown
+  try {
+    payload = await request.json()
+  } catch {
+    return respond('请求体格式无效', 400)
+  }
+
+  if (!payload || typeof payload !== 'object') {
+    return respond('请求体必须是对象', 400)
+  }
+
+  const parsed = payload as {
+    id?: unknown
+    projectId?: unknown
+    period?: unknown
+    boqItemId?: unknown
+    roadId?: unknown
+    quantity?: unknown
+    amount?: unknown
+    startPk?: unknown
+    endPk?: unknown
+    side?: unknown
+    note?: unknown
+  }
+
+  let detailId: number
+  let projectId: number
+  let boqItemId: number
+  let roadId: number
+  let period: Date | null
+  try {
+    detailId = parseDetailId(parsed.id)
+    projectId = parseProjectId(parsed.projectId)
+    boqItemId = parseBoqItemId(parsed.boqItemId)
+    roadId = parseRoadId(parsed.roadId)
+    period = parsePeriod(parsed.period)
+  } catch (error) {
+    return respond((error as Error).message ?? '参数无效', 400)
+  }
+
+  if (!period) {
+    return respond('期次不能为空', 400)
+  }
+
+  let quantity: string
+  let manualAmount: string | null
+  try {
+    quantity = parseDecimal(parsed.quantity, '数量') as string
+    manualAmount = parseDecimal(parsed.amount, '计量金额', { allowNull: true })
+  } catch (error) {
+    return respond((error as Error).message ?? '数字格式无效', 400)
+  }
+
+  if ((toNumber(quantity) ?? 0) <= 0) {
+    return respond('数量必须大于 0', 400)
+  }
+  if (manualAmount !== null && (toNumber(manualAmount) ?? -1) < 0) {
+    return respond('计量金额不能小于 0', 400)
+  }
+
+  const note = parseNote(parsed.note)
+  let startPk: string | null
+  let endPk: string | null
+  let side: DetailSide | null
+  try {
+    startPk = parsePk(parsed.startPk, '起点桩号')
+    endPk = parsePk(parsed.endPk, '终点桩号')
+    side = parseSide(parsed.side)
+  } catch (error) {
+    return respond((error as Error).message ?? '参数无效', 400)
+  }
+
+  if ((startPk && !endPk) || (!startPk && endPk)) {
+    return respond('起点桩号和终点桩号需同时填写或同时留空', 400)
+  }
+
+  try {
+    const [existing, project, boqItem, road] = await Promise.all([
+      prisma.boqMeasurementDetail.findUnique({
+        where: { id: detailId },
+        select: { id: true, projectId: true },
+      }),
+      prisma.project.findUnique({ where: { id: projectId }, select: { id: true } }),
+      prisma.boqItem.findFirst({
+        where: {
+          id: boqItemId,
+          projectId,
+          sheetType: 'ACTUAL',
+          tone: 'ITEM',
+          isActive: true,
+        },
+        select: {
+          id: true,
+          unitPrice: true,
+          code: true,
+          designationZh: true,
+          designationFr: true,
+          unit: true,
+        },
+      }),
+      prisma.roadSection.findFirst({
+        where: {
+          id: roadId,
+          OR: [{ projectId }, { projectId: null }],
+        },
+        select: { id: true, name: true, slug: true, projectId: true },
+      }),
+    ])
+
+    if (!existing) {
+      return respond('计量明细不存在', 404)
+    }
+    if (existing.projectId !== projectId) {
+      return respond('项目不匹配', 400)
+    }
+    if (!project) {
+      return respond('项目不存在', 400)
+    }
+    if (!boqItem) {
+      return respond('清单条目无效', 400)
+    }
+    if (!road) {
+      return respond('路段无效', 400)
+    }
+
+    const updated = await prisma.boqMeasurementDetail.update({
+      where: { id: detailId },
+      data: {
+        projectId,
+        boqItemId,
+        roadId,
+        startPk,
+        endPk,
+        side,
+        period,
+        quantity,
+        manualAmount,
+        note,
+      },
+      include: {
+        project: { select: { id: true, name: true, code: true } },
+        boqItem: {
+          select: {
+            id: true,
+            code: true,
+            designationZh: true,
+            designationFr: true,
+            unit: true,
+            unitPrice: true,
+          },
+        },
+        road: { select: { id: true, name: true, slug: true, projectId: true } },
+      },
+    })
+
+    return NextResponse.json({
+      detail: {
+        id: updated.id,
+        projectId: updated.projectId,
+        projectName: updated.project.name,
+        projectCode: updated.project.code,
+        period: updated.period.toISOString(),
+        periodKey: resolvePeriodKeyFromDate(updated.period),
+        boqItemId: updated.boqItemId,
+        code: updated.boqItem.code,
+        designationZh: updated.boqItem.designationZh,
+        designationFr: updated.boqItem.designationFr,
+        unit: updated.boqItem.unit,
+        unitPrice: toNumber(updated.boqItem.unitPrice),
+        roadId: updated.roadId,
+        roadName: updated.road.name,
+        roadSlug: updated.road.slug,
+        startPk: updated.startPk,
+        endPk: updated.endPk,
+        side: updated.side,
+        quantity: toNumber(updated.quantity) ?? 0,
+        manualAmount: toNumber(updated.manualAmount),
+        amount: resolveAmount({
+          quantity: updated.quantity,
+          manualAmount: updated.manualAmount,
+          recordUnitPrice: null,
+          boqUnitPrice: updated.boqItem.unitPrice,
+        }),
+        note: updated.note,
+        createdAt: updated.createdAt.toISOString(),
+        updatedAt: updated.updatedAt.toISOString(),
+      },
+    })
+  } catch (error) {
+    return respond((error as Error).message ?? '更新计量明细失败', 500)
+  }
+}
+
+export async function DELETE(request: Request) {
+  if (!(await hasPermission('value:delete'))) {
+    return respond('缺少产值删除权限', 403)
+  }
+
+  let payload: unknown
+  try {
+    payload = await request.json()
+  } catch {
+    return respond('请求体格式无效', 400)
+  }
+
+  if (!payload || typeof payload !== 'object') {
+    return respond('请求体必须是对象', 400)
+  }
+
+  const parsed = payload as { id?: unknown }
+
+  let detailId: number
+  try {
+    detailId = parseDetailId(parsed.id)
+  } catch (error) {
+    return respond((error as Error).message ?? '参数无效', 400)
+  }
+
+  try {
+    const existing = await prisma.boqMeasurementDetail.findUnique({
+      where: { id: detailId },
+      select: { id: true },
+    })
+    if (!existing) {
+      return respond('计量明细不存在', 404)
+    }
+
+    await prisma.boqMeasurementDetail.delete({ where: { id: detailId } })
+    return NextResponse.json({ id: detailId })
+  } catch (error) {
+    return respond((error as Error).message ?? '删除计量明细失败', 500)
   }
 }

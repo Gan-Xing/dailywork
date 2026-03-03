@@ -373,10 +373,13 @@
      3. `boqItemId`：关联 `BoqItem`（必填，必须是实际清单条目）。
      4. `roadId`：关联 `RoadSection`（必填）。
      5. `period`：期次标识（日期类型，沿用计量期次编码）。
-     6. `quantity`：明细工程量（decimal）。
-     7. `manualAmount?`：手填金额（decimal，可空）；为空时前端按 `quantity * BoqItem.unitPrice` 自动计算展示金额。
-     8. `note?`：备注。
-     9. `createdAt` / `updatedAt`：时间戳。
+     6. `startPk?`：起点桩号（文本，可空）。
+     7. `endPk?`：终点桩号（文本，可空）。
+     8. `side?`：侧别（`BOTH` / `LEFT` / `RIGHT`，可空）。
+     9. `quantity`：明细工程量（decimal）。
+    10. `manualAmount?`：手填金额（decimal，可空）；为空时前端按 `quantity * BoqItem.unitPrice` 自动计算展示金额。
+    11. `note?`：备注。
+    12. `createdAt` / `updatedAt`：时间戳。
 
 ## 层次与验收内容定义（LayerDefinition / CheckDefinition）
 

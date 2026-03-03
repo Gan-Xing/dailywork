@@ -1076,6 +1076,9 @@ model BoqMeasurementDetail {
   projectId    Int
   boqItemId    Int
   roadId       Int
+  startPk      String?
+  endPk        String?
+  side         IntervalSide?
   period       DateTime
   quantity     Decimal  @db.Decimal(18, 2)
   manualAmount Decimal? @db.Decimal(18, 2)

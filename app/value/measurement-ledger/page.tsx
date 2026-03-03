@@ -34,6 +34,8 @@ type RoadOption = {
   projectId: number | null
 }
 
+type DetailSide = 'BOTH' | 'LEFT' | 'RIGHT'
+
 type DetailRow = {
   id: number
   projectId: number
@@ -50,6 +52,9 @@ type DetailRow = {
   roadId: number
   roadName: string
   roadSlug: string
+  startPk: string | null
+  endPk: string | null
+  side: DetailSide | null
   quantity: number
   manualAmount: number | null
   amount: number | null
@@ -76,9 +81,12 @@ type LedgerCopy = {
   openMeasurement: string
   actions: {
     add: string
+    edit: string
+    remove: string
     save: string
     saving: string
     cancel: string
+    deleting: string
     autoAmount: string
   }
   labels: {
@@ -90,6 +98,9 @@ type LedgerCopy = {
     designation: string
     unit: string
     unitPrice: string
+    side: string
+    startPk: string
+    endPk: string
     quantity: string
     amount: string
     note: string
@@ -109,6 +120,9 @@ type LedgerCopy = {
     selectCode: string
     quantity: string
     amount: string
+    side: string
+    startPk: string
+    endPk: string
     note: string
   }
   messages: {
@@ -124,10 +138,16 @@ type LedgerCopy = {
     requiredRoad: string
     requiredCode: string
     requiredPeriod: string
+    pkPair: string
     invalidQuantity: string
     invalidAmount: string
     noBoqItems: string
     noRoads: string
+    updateSuccess: string
+    updateError: string
+    deleteSuccess: string
+    deleteError: string
+    deleteConfirm: string
   }
   table: {
     code: string
@@ -136,12 +156,19 @@ type LedgerCopy = {
     unitPrice: string
     project: string
     road: string
+    side: string
+    startPk: string
+    endPk: string
     quantity: string
     amount: string
+    note: string
+    actions: string
   }
   modal: {
     title: string
     subtitle: string
+    editTitle: string
+    editSubtitle: string
     projectReadonly: string
   }
 }
@@ -154,9 +181,12 @@ const ledgerCopy: Record<Locale, LedgerCopy> = {
     openMeasurement: '返回计量页面',
     actions: {
       add: '新增',
+      edit: '编辑',
+      remove: '删除',
       save: '保存',
       saving: '保存中…',
       cancel: '取消',
+      deleting: '删除中…',
       autoAmount: '恢复自动金额',
     },
     labels: {
@@ -168,6 +198,9 @@ const ledgerCopy: Record<Locale, LedgerCopy> = {
       designation: '工程内容',
       unit: '单位',
       unitPrice: '单价（F CFA）',
+      side: '侧别',
+      startPk: '起点桩号',
+      endPk: '终点桩号',
       quantity: '数量',
       amount: '计量金额',
       note: '备注',
@@ -185,6 +218,9 @@ const ledgerCopy: Record<Locale, LedgerCopy> = {
       selectPeriod: '选择期次',
       selectRoad: '选择路段',
       selectCode: '选择编号',
+      side: '选择侧别（可选）',
+      startPk: '如 PK0+000（可选）',
+      endPk: '如 PK1+940（可选）',
       quantity: '输入数量',
       amount: '自动计算，可手改',
       note: '可选备注',
@@ -202,10 +238,16 @@ const ledgerCopy: Record<Locale, LedgerCopy> = {
       requiredRoad: '请选择路段',
       requiredCode: '请选择编号',
       requiredPeriod: '请选择期次',
+      pkPair: '起点桩号和终点桩号需同时填写',
       invalidQuantity: '数量必须大于 0',
       invalidAmount: '计量金额必须是合法数字',
       noBoqItems: '当前项目没有可选编号（实际清单 ITEM）',
       noRoads: '当前项目没有可选路段',
+      updateSuccess: '计量明细已更新',
+      updateError: '更新计量明细失败',
+      deleteSuccess: '计量明细已删除',
+      deleteError: '删除计量明细失败',
+      deleteConfirm: '确认删除该条明细（{code}）？',
     },
     table: {
       code: '编号',
@@ -214,12 +256,19 @@ const ledgerCopy: Record<Locale, LedgerCopy> = {
       unitPrice: '单价（F CFA）',
       project: '项目',
       road: '路段',
+      side: '侧别',
+      startPk: '起点桩号',
+      endPk: '终点桩号',
       quantity: '数量',
       amount: '计量金额',
+      note: '备注',
+      actions: '操作',
     },
     modal: {
       title: '新增计量明细',
       subtitle: '录入一条计量明细，编号信息来自实际工程量清单。',
+      editTitle: '编辑计量明细',
+      editSubtitle: '更新这条计量明细的区间、数量与金额。',
       projectReadonly: '项目（当前）',
     },
   },
@@ -230,9 +279,12 @@ const ledgerCopy: Record<Locale, LedgerCopy> = {
     openMeasurement: 'Retour aux métrés',
     actions: {
       add: 'Ajouter',
+      edit: 'Modifier',
+      remove: 'Supprimer',
       save: 'Enregistrer',
       saving: 'Enregistrement…',
       cancel: 'Annuler',
+      deleting: 'Suppression…',
       autoAmount: 'Revenir au montant auto',
     },
     labels: {
@@ -244,6 +296,9 @@ const ledgerCopy: Record<Locale, LedgerCopy> = {
       designation: 'Désignation',
       unit: 'Unité',
       unitPrice: 'Prix unitaire (F CFA)',
+      side: 'Côté',
+      startPk: 'PK début',
+      endPk: 'PK fin',
       quantity: 'Quantité',
       amount: 'Montant métré',
       note: 'Note',
@@ -261,6 +316,9 @@ const ledgerCopy: Record<Locale, LedgerCopy> = {
       selectPeriod: 'Sélectionner une période',
       selectRoad: 'Sélectionner une section',
       selectCode: 'Sélectionner un code',
+      side: 'Sélectionner un côté (optionnel)',
+      startPk: 'Ex: PK0+000 (optionnel)',
+      endPk: 'Ex: PK1+940 (optionnel)',
       quantity: 'Saisir la quantité',
       amount: 'Calculé automatiquement, modifiable',
       note: 'Note facultative',
@@ -278,10 +336,16 @@ const ledgerCopy: Record<Locale, LedgerCopy> = {
       requiredRoad: 'Sélectionnez une section',
       requiredCode: 'Sélectionnez un code',
       requiredPeriod: 'Sélectionnez une période',
+      pkPair: 'PK début et PK fin doivent être saisis ensemble',
       invalidQuantity: 'La quantité doit être > 0',
       invalidAmount: 'Le montant est invalide',
       noBoqItems: 'Aucun code disponible pour ce projet',
       noRoads: 'Aucune section disponible pour ce projet',
+      updateSuccess: 'Ligne de détail mise à jour',
+      updateError: 'Échec de la mise à jour',
+      deleteSuccess: 'Ligne de détail supprimée',
+      deleteError: 'Échec de la suppression',
+      deleteConfirm: 'Supprimer cette ligne ({code}) ?',
     },
     table: {
       code: 'N° Prix',
@@ -290,12 +354,19 @@ const ledgerCopy: Record<Locale, LedgerCopy> = {
       unitPrice: 'Prix unitaire (F CFA)',
       project: 'Projet',
       road: 'Section',
+      side: 'Côté',
+      startPk: 'PK début',
+      endPk: 'PK fin',
       quantity: 'Quantité',
       amount: 'Montant métré',
+      note: 'Note',
+      actions: 'Actions',
     },
     modal: {
       title: 'Ajouter un détail métré',
       subtitle: 'Le code et ses informations proviennent du devis réel.',
+      editTitle: 'Modifier le détail métré',
+      editSubtitle: 'Mettre à jour la plage, la quantité et le montant de cette ligne.',
       projectReadonly: 'Projet (courant)',
     },
   },
@@ -339,6 +410,54 @@ const normalizePeriodLabel = (template: string, periodKey: string) => {
   return index === null ? periodKey : formatCopy(template, { value: index })
 }
 
+const sideLabels: Record<Locale, Record<DetailSide, string>> = {
+  zh: {
+    BOTH: '双侧',
+    LEFT: '左侧',
+    RIGHT: '右侧',
+  },
+  fr: {
+    BOTH: 'Deux côtés',
+    LEFT: 'Gauche',
+    RIGHT: 'Droite',
+  },
+}
+
+const frProjectNameByCode: Record<string, string> = {
+  'project-bondoukou-city': 'Projet municipal de Bondoukou',
+  'project-bondoukou-border': 'Projet frontalier de Bondoukou',
+  'project-bondoukou-supply': "Projet d'approvisionnement de Bondoukou",
+}
+
+const frRoadNameBySlug: Record<string, string> = {
+  'bondoukou-university': "Voie de l'Université",
+  'level-crossing': 'Carrefour',
+}
+
+const containsCjk = (value: string) => /[\u3400-\u9fff]/.test(value)
+
+const humanizeIdentifier = (value: string) =>
+  value
+    .replace(/[-_]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/\b\w/g, (letter) => letter.toUpperCase())
+
+const resolveProjectDisplayName = (project: { id: number; name: string; code: string | null }, locale: Locale) => {
+  if (locale !== 'fr') return project.name
+  if (project.code && frProjectNameByCode[project.code]) return frProjectNameByCode[project.code]
+  if (!containsCjk(project.name)) return project.name
+  if (project.code) return humanizeIdentifier(project.code)
+  return `Projet #${project.id}`
+}
+
+const resolveRoadDisplayName = (road: { id: number; name: string; slug: string }, locale: Locale) => {
+  if (locale !== 'fr') return road.name
+  if (frRoadNameBySlug[road.slug]) return frRoadNameBySlug[road.slug]
+  if (!containsCjk(road.name)) return road.name
+  return humanizeIdentifier(road.slug)
+}
+
 export default function MeasurementLedgerPage() {
   const { locale, setLocale } = usePreferredLocale('zh', locales)
   const copy = productionValueCopy[locale]
@@ -366,11 +485,16 @@ export default function MeasurementLedgerPage() {
   const [summary, setSummary] = useState<Summary | null>(null)
 
   const [showCreateModal, setShowCreateModal] = useState(false)
+  const [editingId, setEditingId] = useState<number | null>(null)
   const [saving, setSaving] = useState(false)
+  const [deletingId, setDeletingId] = useState<number | null>(null)
   const [form, setForm] = useState({
     period: 'all',
     boqItemId: '',
     roadId: '',
+    side: '',
+    startPk: '',
+    endPk: '',
     quantity: '',
     amount: '',
     amountTouched: false,
@@ -400,6 +524,14 @@ export default function MeasurementLedgerPage() {
 
   const resolveDesignation = (row: { designationZh: string; designationFr: string }) =>
     locale === 'fr' ? row.designationFr || row.designationZh : row.designationZh || row.designationFr
+
+  const resolveSide = (side: DetailSide | null) => (side ? sideLabels[locale][side] : '—')
+  const resolveProjectName = (project: BoqProject) => resolveProjectDisplayName(project, locale)
+  const resolveRoadName = (road: RoadOption) => resolveRoadDisplayName(road, locale)
+  const resolveRowProjectName = (row: DetailRow) =>
+    resolveProjectDisplayName({ id: row.projectId, name: row.projectName, code: row.projectCode }, locale)
+  const resolveRowRoadName = (row: DetailRow) =>
+    resolveRoadDisplayName({ id: row.roadId, name: row.roadName, slug: row.roadSlug }, locale)
 
   useEffect(() => {
     let cancelled = false
@@ -549,6 +681,7 @@ export default function MeasurementLedgerPage() {
           ? periodOptions[periodOptions.length - 1]
           : resolvePeriodKeyFromValue(new Date().toISOString()) ?? ''
 
+    setEditingId(null)
     setForm({
       period: defaultPeriod,
       boqItemId: '',
@@ -556,6 +689,9 @@ export default function MeasurementLedgerPage() {
         selectedRoadId !== 'all' && roads.some((item) => String(item.id) === selectedRoadId)
           ? selectedRoadId
           : String(roads[0]?.id ?? ''),
+      side: '',
+      startPk: '',
+      endPk: '',
       quantity: '',
       amount: '',
       amountTouched: false,
@@ -564,7 +700,56 @@ export default function MeasurementLedgerPage() {
     setShowCreateModal(true)
   }
 
-  const handleCreate = async () => {
+  const openEditModal = (row: DetailRow) => {
+    setEditingId(row.id)
+    setForm({
+      period: row.periodKey ?? resolvePeriodKeyFromValue(row.period) ?? '',
+      boqItemId: String(row.boqItemId),
+      roadId: String(row.roadId),
+      side: row.side ?? '',
+      startPk: row.startPk ?? '',
+      endPk: row.endPk ?? '',
+      quantity: String(row.quantity),
+      amount: row.manualAmount !== null ? String(row.manualAmount) : row.amount !== null ? String(row.amount) : '',
+      amountTouched: row.manualAmount !== null,
+      note: row.note ?? '',
+    })
+    setShowCreateModal(true)
+  }
+
+  const closeModal = () => {
+    setShowCreateModal(false)
+    setEditingId(null)
+  }
+
+  const refreshDetails = async () => {
+    if (!selectedProjectId) return
+    const query = new URLSearchParams({ projectId: selectedProjectId })
+    if (selectedPeriod !== 'all') query.set('period', selectedPeriod)
+    if (selectedRoadId !== 'all') query.set('roadId', selectedRoadId)
+    if (search.trim()) query.set('search', search.trim())
+    const refresh = await fetch(`/api/value/measurement-details?${query.toString()}`, {
+      credentials: 'include',
+    })
+    const refreshPayload = (await refresh
+      .json()
+      .catch(() => ({}))) as {
+      details?: DetailRow[]
+      boqItems?: BoqItemOption[]
+      roads?: RoadOption[]
+      periodOptions?: string[]
+      summary?: Summary
+    }
+    if (refresh.ok) {
+      setRows(refreshPayload.details ?? [])
+      setBoqItems(refreshPayload.boqItems ?? [])
+      setRoads(refreshPayload.roads ?? [])
+      setPeriodOptions(refreshPayload.periodOptions ?? [])
+      setSummary(refreshPayload.summary ?? null)
+    }
+  }
+
+  const handleSave = async () => {
     if (!selectedProjectId) {
       addToast(ledger.messages.requiredProject, { tone: 'warning' })
       return
@@ -579,6 +764,13 @@ export default function MeasurementLedgerPage() {
     }
     if (!form.roadId) {
       addToast(ledger.messages.requiredRoad, { tone: 'warning' })
+      return
+    }
+
+    const startPk = form.startPk.trim()
+    const endPk = form.endPk.trim()
+    if ((startPk && !endPk) || (!startPk && endPk)) {
+      addToast(ledger.messages.pkPair, { tone: 'warning' })
       return
     }
 
@@ -605,15 +797,20 @@ export default function MeasurementLedgerPage() {
 
     setSaving(true)
     try {
+      const isEditing = editingId !== null
       const response = await fetch('/api/value/measurement-details', {
-        method: 'POST',
+        method: isEditing ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
+          ...(isEditing ? { id: editingId } : {}),
           projectId: Number(selectedProjectId),
           period: form.period,
           boqItemId: Number(form.boqItemId),
           roadId: Number(form.roadId),
+          side: form.side || null,
+          startPk: startPk || null,
+          endPk: endPk || null,
           quantity: String(quantity),
           amount: manualAmount,
           note: form.note.trim() || null,
@@ -625,39 +822,51 @@ export default function MeasurementLedgerPage() {
 
       if (!response.ok) {
         if (response.status === 403) setPermissionDenied(true)
-        throw new Error(payload.message ?? ledger.messages.saveError)
+        throw new Error(
+          payload.message ?? (isEditing ? ledger.messages.updateError : ledger.messages.saveError),
+        )
       }
 
-      setShowCreateModal(false)
-      addToast(ledger.messages.saveSuccess, { tone: 'success' })
-
-      const query = new URLSearchParams({ projectId: selectedProjectId })
-      if (selectedPeriod !== 'all') query.set('period', selectedPeriod)
-      if (selectedRoadId !== 'all') query.set('roadId', selectedRoadId)
-      if (search.trim()) query.set('search', search.trim())
-      const refresh = await fetch(`/api/value/measurement-details?${query.toString()}`, {
-        credentials: 'include',
-      })
-      const refreshPayload = (await refresh
-        .json()
-        .catch(() => ({}))) as {
-        details?: DetailRow[]
-        boqItems?: BoqItemOption[]
-        roads?: RoadOption[]
-        periodOptions?: string[]
-        summary?: Summary
-      }
-      if (refresh.ok) {
-        setRows(refreshPayload.details ?? [])
-        setBoqItems(refreshPayload.boqItems ?? [])
-        setRoads(refreshPayload.roads ?? [])
-        setPeriodOptions(refreshPayload.periodOptions ?? [])
-        setSummary(refreshPayload.summary ?? null)
-      }
+      closeModal()
+      addToast(isEditing ? ledger.messages.updateSuccess : ledger.messages.saveSuccess, { tone: 'success' })
+      await refreshDetails()
     } catch (saveError) {
-      addToast((saveError as Error).message ?? ledger.messages.saveError, { tone: 'danger' })
+      const fallback = editingId !== null ? ledger.messages.updateError : ledger.messages.saveError
+      addToast((saveError as Error).message ?? fallback, { tone: 'danger' })
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleDelete = async (row: DetailRow) => {
+    const confirmed = window.confirm(formatCopy(ledger.messages.deleteConfirm, { code: row.code }))
+    if (!confirmed) return
+    setDeletingId(row.id)
+    try {
+      const response = await fetch('/api/value/measurement-details', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ id: row.id }),
+      })
+      const payload = (await response
+        .json()
+        .catch(() => ({}))) as { message?: string }
+
+      if (!response.ok) {
+        if (response.status === 403) setPermissionDenied(true)
+        throw new Error(payload.message ?? ledger.messages.deleteError)
+      }
+
+      if (editingId === row.id) {
+        closeModal()
+      }
+      addToast(ledger.messages.deleteSuccess, { tone: 'success' })
+      await refreshDetails()
+    } catch (deleteError) {
+      addToast((deleteError as Error).message ?? ledger.messages.deleteError, { tone: 'danger' })
+    } finally {
+      setDeletingId(null)
     }
   }
 
@@ -726,7 +935,7 @@ export default function MeasurementLedgerPage() {
                       ) : null}
                       {projects.map((project) => (
                         <option key={project.id} value={String(project.id)}>
-                          {project.name}
+                          {resolveProjectName(project)}
                         </option>
                       ))}
                     </select>
@@ -758,7 +967,7 @@ export default function MeasurementLedgerPage() {
                       <option value="all">{ledger.placeholders.selectRoad}</option>
                       {roads.map((road) => (
                         <option key={road.id} value={String(road.id)}>
-                          {road.name}
+                          {resolveRoadName(road)}
                         </option>
                       ))}
                     </select>
@@ -863,8 +1072,13 @@ export default function MeasurementLedgerPage() {
                         <th className="w-[12%] px-3 py-3 text-right">{ledger.table.unitPrice}</th>
                         <th className="w-[14%] px-3 py-3 text-left">{ledger.table.project}</th>
                         <th className="w-[14%] px-3 py-3 text-left">{ledger.table.road}</th>
-                        <th className="w-[12%] px-3 py-3 text-right">{ledger.table.quantity}</th>
-                        <th className="w-[14%] px-3 py-3 text-right">{ledger.table.amount}</th>
+                        <th className="w-[8%] px-3 py-3 text-left">{ledger.table.side}</th>
+                        <th className="w-[10%] px-3 py-3 text-left">{ledger.table.startPk}</th>
+                        <th className="w-[10%] px-3 py-3 text-left">{ledger.table.endPk}</th>
+                        <th className="w-[10%] px-3 py-3 text-right">{ledger.table.quantity}</th>
+                        <th className="w-[12%] px-3 py-3 text-right">{ledger.table.amount}</th>
+                        <th className="w-[16%] px-3 py-3 text-left">{ledger.table.note}</th>
+                        <th className="w-[10%] px-3 py-3 text-left">{ledger.table.actions}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-200/70">
@@ -880,13 +1094,37 @@ export default function MeasurementLedgerPage() {
                           <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums text-slate-700">
                             {formatNumber(row.unitPrice, localeId)}
                           </td>
-                          <td className="whitespace-nowrap px-3 py-3 text-slate-700">{row.projectName}</td>
-                          <td className="whitespace-nowrap px-3 py-3 text-slate-700">{row.roadName}</td>
+                          <td className="whitespace-nowrap px-3 py-3 text-slate-700">{resolveRowProjectName(row)}</td>
+                          <td className="whitespace-nowrap px-3 py-3 text-slate-700">{resolveRowRoadName(row)}</td>
+                          <td className="whitespace-nowrap px-3 py-3 text-slate-700">{resolveSide(row.side)}</td>
+                          <td className="whitespace-nowrap px-3 py-3 text-slate-700">{row.startPk ?? '—'}</td>
+                          <td className="whitespace-nowrap px-3 py-3 text-slate-700">{row.endPk ?? '—'}</td>
                           <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums text-slate-700">
                             {formatNumber(row.quantity, localeId)}
                           </td>
                           <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums text-slate-700">
                             {formatNumber(row.amount, localeId)}
+                          </td>
+                          <td className="px-3 py-3 text-slate-600">{row.note || '—'}</td>
+                          <td className="whitespace-nowrap px-3 py-3">
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                className="rounded-md border border-slate-200 px-2 py-1 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-100"
+                                onClick={() => openEditModal(row)}
+                                disabled={saving || deletingId === row.id}
+                              >
+                                {ledger.actions.edit}
+                              </button>
+                              <button
+                                type="button"
+                                className="rounded-md border border-rose-200 px-2 py-1 text-xs font-semibold text-rose-700 transition hover:border-rose-300 hover:bg-rose-50 disabled:opacity-60"
+                                onClick={() => handleDelete(row)}
+                                disabled={saving || deletingId === row.id}
+                              >
+                                {deletingId === row.id ? ledger.actions.deleting : ledger.actions.remove}
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -904,17 +1142,21 @@ export default function MeasurementLedgerPage() {
       </section>
 
       {showCreateModal ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
-          <div className="w-full max-w-3xl rounded-2xl border border-slate-200 bg-white p-6 shadow-xl">
+        <div className="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/40 px-4 py-4 sm:items-center sm:py-6">
+          <div className="max-h-[calc(100vh-2rem)] w-full max-w-3xl overflow-y-auto rounded-2xl border border-slate-200 bg-white p-6 shadow-xl sm:max-h-[calc(100vh-3rem)]">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-lg font-semibold text-slate-900">{ledger.modal.title}</h2>
-                <p className="text-xs text-slate-500">{ledger.modal.subtitle}</p>
+                <h2 className="text-lg font-semibold text-slate-900">
+                  {editingId === null ? ledger.modal.title : ledger.modal.editTitle}
+                </h2>
+                <p className="text-xs text-slate-500">
+                  {editingId === null ? ledger.modal.subtitle : ledger.modal.editSubtitle}
+                </p>
               </div>
               <button
                 type="button"
                 className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 hover:text-slate-700"
-                onClick={() => setShowCreateModal(false)}
+                onClick={closeModal}
                 disabled={saving}
               >
                 {ledger.actions.cancel}
@@ -926,7 +1168,9 @@ export default function MeasurementLedgerPage() {
                 {ledger.labels.project}
                 <input
                   className="mt-2 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900"
-                  value={selectedProject?.name ?? ''}
+                  value={
+                    selectedProject ? resolveProjectName(selectedProject) : ''
+                  }
                   readOnly
                 />
               </label>
@@ -984,10 +1228,44 @@ export default function MeasurementLedgerPage() {
                   <option value="">{ledger.placeholders.selectRoad}</option>
                   {roads.map((road) => (
                     <option key={road.id} value={String(road.id)}>
-                      {road.name}
+                      {resolveRoadName(road)}
                     </option>
                   ))}
                 </select>
+              </label>
+
+              <label className="text-xs font-semibold text-slate-500">
+                {ledger.labels.side}
+                <select
+                  className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900"
+                  value={form.side}
+                  onChange={(event) => setForm((prev) => ({ ...prev, side: event.target.value }))}
+                >
+                  <option value="">{ledger.placeholders.side}</option>
+                  <option value="LEFT">{sideLabels[locale].LEFT}</option>
+                  <option value="RIGHT">{sideLabels[locale].RIGHT}</option>
+                  <option value="BOTH">{sideLabels[locale].BOTH}</option>
+                </select>
+              </label>
+
+              <label className="text-xs font-semibold text-slate-500">
+                {ledger.labels.startPk}
+                <input
+                  className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900"
+                  value={form.startPk}
+                  placeholder={ledger.placeholders.startPk}
+                  onChange={(event) => setForm((prev) => ({ ...prev, startPk: event.target.value }))}
+                />
+              </label>
+
+              <label className="text-xs font-semibold text-slate-500">
+                {ledger.labels.endPk}
+                <input
+                  className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900"
+                  value={form.endPk}
+                  placeholder={ledger.placeholders.endPk}
+                  onChange={(event) => setForm((prev) => ({ ...prev, endPk: event.target.value }))}
+                />
               </label>
 
               <label className="text-xs font-semibold text-slate-500">
@@ -1077,7 +1355,7 @@ export default function MeasurementLedgerPage() {
               <button
                 type="button"
                 className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.25em] text-slate-600 transition hover:-translate-y-0.5 hover:bg-white"
-                onClick={() => setShowCreateModal(false)}
+                onClick={closeModal}
                 disabled={saving}
               >
                 {ledger.actions.cancel}
@@ -1085,7 +1363,7 @@ export default function MeasurementLedgerPage() {
               <button
                 type="button"
                 className="inline-flex items-center rounded-full bg-emerald-500 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.25em] text-white shadow-sm shadow-emerald-200/60 transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
-                onClick={handleCreate}
+                onClick={handleSave}
                 disabled={saving}
               >
                 {saving ? ledger.actions.saving : ledger.actions.save}
