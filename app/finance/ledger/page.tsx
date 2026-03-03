@@ -557,7 +557,7 @@ export default function FinanceLedgerPage() {
   const handleSort = (field: FinanceLedgerSortField) => {
     setFilters((prev) => {
       const existing = prev.sortStack.find((item) => item.field === field)
-      const nextOrder = existing?.order === 'asc' ? 'desc' : 'asc'
+      const nextOrder: FinanceLedgerSortSpec['order'] = existing?.order === 'asc' ? 'desc' : 'asc'
       const filtered = prev.sortStack.filter((item) => item.field !== field)
       const nextStack: FinanceLedgerSortSpec[] = [{ field, order: nextOrder }, ...filtered].slice(0, 4)
       return { ...prev, sortStack: nextStack, page: 1 }
@@ -1758,4 +1758,3 @@ export default function FinanceLedgerPage() {
     </main>
   )
 }
-
