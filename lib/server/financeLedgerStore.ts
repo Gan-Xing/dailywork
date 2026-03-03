@@ -353,7 +353,7 @@ const deriveProgressFromEvents = (
         ? 'BLOCKED'
         : 'IN_PROGRESS'
 
-  const stageUpdate: Prisma.FinanceLedgerCaseUpdateInput = {
+  const stageUpdate: Prisma.FinanceLedgerCaseUncheckedUpdateInput = {
     ptoSiteSignedAt: stageDates.get('SITE_SIGNED') ?? null,
     ptoHqBillReceivedAt: stageDates.get('HQ_BILL_RECEIVED') ?? null,
     ptoBeConfirmedAt: stageDates.get('BE_CONFIRMED') ?? null,
@@ -368,10 +368,10 @@ const deriveProgressFromEvents = (
     currentStage,
     enteredCurrentStageAt,
     status,
-  } satisfies Prisma.FinanceLedgerCaseUpdateInput
+  } satisfies Prisma.FinanceLedgerCaseUncheckedUpdateInput
 }
 
-const applySnapshotPatch = (target: Prisma.FinanceLedgerCaseUpdateInput, patch: FinanceLedgerSnapshotInput) => {
+const applySnapshotPatch = (target: Prisma.FinanceLedgerCaseUncheckedUpdateInput, patch: FinanceLedgerSnapshotInput) => {
   if (hasOwn(patch, 'accountAmount') && patch.accountAmount !== undefined) {
     target.accountAmount = toDecimalOrNull(patch.accountAmount)
   }
@@ -773,7 +773,7 @@ export const updateFinanceLedgerCase = async (
     }
   }
 
-  const data: Prisma.FinanceLedgerCaseUpdateInput = {
+  const data: Prisma.FinanceLedgerCaseUncheckedUpdateInput = {
     updatedBy: userId ?? null,
   }
   if (payload.sectionId !== undefined) data.sectionId = payload.sectionId
@@ -799,7 +799,7 @@ export const softDeleteFinanceLedgerCase = async (id: number, userId?: number | 
       deletedAt: new Date(),
       deletedBy: userId ?? null,
       updatedBy: userId ?? null,
-    },
+    } as Prisma.FinanceLedgerCaseUncheckedUpdateInput,
   })
 }
 
@@ -847,7 +847,7 @@ export const createFinanceLedgerEvent = async (
       where: { caseId },
       select: { stage: true, occurredAt: true },
     })
-    const data: Prisma.FinanceLedgerCaseUpdateInput = {
+    const data: Prisma.FinanceLedgerCaseUncheckedUpdateInput = {
       updatedBy: userId ?? null,
       ...deriveProgressFromEvents(events, row.status),
     }
@@ -912,7 +912,7 @@ export const updateFinanceLedgerEvent = async (
       where: { caseId: event.caseId },
       select: { stage: true, occurredAt: true },
     })
-    const data: Prisma.FinanceLedgerCaseUpdateInput = {
+    const data: Prisma.FinanceLedgerCaseUncheckedUpdateInput = {
       updatedBy: userId ?? null,
       ...deriveProgressFromEvents(events, event.ledgerCase.status),
     }
