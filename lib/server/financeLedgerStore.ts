@@ -246,16 +246,6 @@ const parseDateInput = (value: string) => {
   return date
 }
 
-const stageDateFieldMap: Record<FinanceLedgerStage, keyof Prisma.FinanceLedgerCaseUpdateInput> = {
-  SITE_SIGNED: 'ptoSiteSignedAt',
-  HQ_BILL_RECEIVED: 'ptoHqBillReceivedAt',
-  BE_CONFIRMED: 'ptoBeConfirmedAt',
-  BE_DELIVERED: 'ptoBeDeliveredAt',
-  HQ_INVOICE_RECEIVED: 'ptoHqInvoiceReceivedAt',
-  CHEQUE_ISSUED: 'chequeIssuedAt',
-  CHEQUE_RECEIVED: 'chequeReceivedAt',
-}
-
 const extractStageDates = (row: FinanceLedgerCaseRow): Record<FinanceLedgerStage, Date | null> => ({
   SITE_SIGNED: row.ptoSiteSignedAt,
   HQ_BILL_RECEIVED: row.ptoHqBillReceivedAt,
@@ -363,11 +353,15 @@ const deriveProgressFromEvents = (
         ? 'BLOCKED'
         : 'IN_PROGRESS'
 
-  const stageUpdate: Prisma.FinanceLedgerCaseUpdateInput = {}
-  FINANCE_LEDGER_STAGES.forEach((stage) => {
-    const field = stageDateFieldMap[stage]
-    stageUpdate[field] = stageDates.get(stage) ?? null
-  })
+  const stageUpdate: Prisma.FinanceLedgerCaseUpdateInput = {
+    ptoSiteSignedAt: stageDates.get('SITE_SIGNED') ?? null,
+    ptoHqBillReceivedAt: stageDates.get('HQ_BILL_RECEIVED') ?? null,
+    ptoBeConfirmedAt: stageDates.get('BE_CONFIRMED') ?? null,
+    ptoBeDeliveredAt: stageDates.get('BE_DELIVERED') ?? null,
+    ptoHqInvoiceReceivedAt: stageDates.get('HQ_INVOICE_RECEIVED') ?? null,
+    chequeIssuedAt: stageDates.get('CHEQUE_ISSUED') ?? null,
+    chequeReceivedAt: stageDates.get('CHEQUE_RECEIVED') ?? null,
+  }
 
   return {
     ...stageUpdate,
