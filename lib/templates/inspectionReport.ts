@@ -496,6 +496,17 @@ const localizePhaseToken = (token: string, locale: Locale) => {
   return localizeProgressTerm('phase', normalized, locale)
 }
 
+const appendSpecToPhaseText = (phaseText: string, spec?: string | null) => {
+  const normalizedPhase = normalizeInspectionToken(phaseText)
+  const normalizedSpec = normalizeInspectionToken(spec ?? '')
+  if (!normalizedSpec) return normalizedPhase
+  if (!normalizedPhase) return normalizedSpec
+  if (normalizedPhase.toLowerCase().includes(normalizedSpec.toLowerCase())) {
+    return normalizedPhase
+  }
+  return `${normalizedPhase} ${normalizedSpec}`
+}
+
 const localizeNatureToken = (token: string, locale: Locale, phaseName: string) => {
   const normalized = normalizeInspectionToken(token)
   if (!normalized) return ''
@@ -546,7 +557,8 @@ const buildPage = (
     : resolveRoadName(displayRoad, locale)
 
   const phaseTokens = splitInspectionTokens([inspection.phaseName])
-  const phaseText = localizePhaseToken(phaseTokens[0] ?? inspection.phaseName, locale)
+  const phaseTextBase = localizePhaseToken(phaseTokens[0] ?? inspection.phaseName, locale)
+  const phaseText = appendSpecToPhaseText(phaseTextBase, inspection.intervalSpec)
   const mainSideText = sideCopy[inspection.side] ?? inspection.side
   const levelCrossingSideText = inspection.levelCrossingSide
     ? sideCopy[inspection.levelCrossingSide] ?? inspection.levelCrossingSide

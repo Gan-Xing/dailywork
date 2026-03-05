@@ -1212,6 +1212,8 @@ model FinanceLedgerCase {
   invoiceNumber            String?
   receiptChequeNumber      String?
   remark                   String?
+  constructionStartedAt    DateTime?
+  constructionFinishedAt   DateTime?
   ptoSiteSignedAt          DateTime?
   ptoHqBillReceivedAt      DateTime?
   ptoBeConfirmedAt         DateTime?

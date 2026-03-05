@@ -19,6 +19,8 @@ export const FINANCE_LEDGER_SORT_FIELDS = [
   'project',
   'section',
   'period',
+  'constructionStartedAt',
+  'constructionFinishedAt',
   'stage',
   'status',
   'accountAmount',
@@ -62,4 +64,3 @@ export const getNextLedgerStage = (stage: string | null | undefined): FinanceLed
   if (index < 0) return FINANCE_LEDGER_STAGES[0]
   return FINANCE_LEDGER_STAGES[index + 1] ?? null
 }
-

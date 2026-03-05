@@ -64,6 +64,7 @@ interface PointLaneProps {
   label?: string
   showHeader?: boolean
   wrapperClassName?: string
+  isLevelCrossingPointView?: boolean
   sideLabelMap: Record<IntervalSide, string>
   resolvePointProgress: (
     phaseId: number,
@@ -90,6 +91,7 @@ export function PointLane({
   label,
   showHeader = false,
   wrapperClassName = 'space-y-2',
+  isLevelCrossingPointView = false,
   sideLabelMap,
   resolvePointProgress,
   onPointSelect,
@@ -161,12 +163,21 @@ export function PointLane({
               {row.map((entry, idx) => {
                 const item = entry.point
                 const rangeText = `${formatPK(item.startPk)} – ${formatPK(item.endPk)}`
-                const sideLabelText =
+                const mainSideLabelText =
                   item.side === 'LEFT'
                     ? sideLabelMap.LEFT
                     : item.side === 'RIGHT'
                       ? sideLabelMap.RIGHT
                       : sideLabelMap.BOTH
+                const crossingSideLabelText =
+                  item.levelCrossingSide === 'LEFT'
+                    ? sideLabelMap.LEFT
+                    : item.levelCrossingSide === 'RIGHT'
+                      ? sideLabelMap.RIGHT
+                      : item.levelCrossingSide === 'BOTH'
+                        ? sideLabelMap.BOTH
+                        : mainSideLabelText
+                const sideLabelText = isLevelCrossingPointView ? crossingSideLabelText : mainSideLabelText
                 const progress = resolvePointProgress(
                   phase.id,
                   item.side,
@@ -181,17 +192,33 @@ export function PointLane({
                   <button
                     key={`${item.startPk}-${item.endPk}-${idx}`}
                     type="button"
-                    className="flex flex-col items-center gap-1 text-center transition hover:scale-105"
+                    className={`flex flex-col items-center text-center transition hover:scale-105 ${
+                      isLevelCrossingPointView ? 'gap-1.5' : 'gap-1'
+                    }`}
                     onClick={() => handlePointClick(item)}
                     title={`${rangeText} · ${sideLabelText}`}
                   >
-                    <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white p-1 shadow-lg shadow-emerald-200/50 ring-2 ring-slate-200">
-                      <PointProgressWave percent={progress.percent} size={52} className="h-12 w-12" />
-                    </div>
-                    <div className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-700">
-                      {formatPK(entry.centerPk)}
-                    </div>
-                    <p className="text-[10px] text-slate-500">{sideLabelText}</p>
+                    {isLevelCrossingPointView ? (
+                      <>
+                        <p className="text-[10px] font-semibold text-slate-600">{sideLabelText}</p>
+                        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white p-1 shadow-lg shadow-emerald-200/50 ring-2 ring-slate-200">
+                          <PointProgressWave percent={progress.percent} size={52} className="h-12 w-12" />
+                        </div>
+                        <div className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-700">
+                          {formatPK(entry.centerPk)}
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white p-1 shadow-lg shadow-emerald-200/50 ring-2 ring-slate-200">
+                          <PointProgressWave percent={progress.percent} size={52} className="h-12 w-12" />
+                        </div>
+                        <div className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-700">
+                          {formatPK(entry.centerPk)}
+                        </div>
+                        <p className="text-[10px] text-slate-500">{sideLabelText}</p>
+                      </>
+                    )}
                   </button>
                 )
               })}

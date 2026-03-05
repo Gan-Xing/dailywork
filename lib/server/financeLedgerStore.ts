@@ -38,7 +38,21 @@ type FinanceLedgerSnapshotInput = Partial<{
   invoiceNumber: string | null
   receiptChequeNumber: string | null
   remark: string | null
+  constructionStartedAt: string | null
+  constructionFinishedAt: string | null
 }>
+
+type FinanceLedgerStageDateInput = Partial<Record<FinanceLedgerStage, string | null>>
+
+const financeLedgerCaseScalarFieldSet = new Set(
+  Object.values(
+    (Prisma as unknown as { FinanceLedgerCaseScalarFieldEnum?: Record<string, string> })
+      .FinanceLedgerCaseScalarFieldEnum ?? {},
+  ),
+)
+const supportsConstructionDateFields =
+  financeLedgerCaseScalarFieldSet.has('constructionStartedAt') &&
+  financeLedgerCaseScalarFieldSet.has('constructionFinishedAt')
 
 export type FinanceLedgerMetadata = {
   projects: { id: number; name: string; code: string | null }[]
@@ -90,6 +104,8 @@ export type FinanceLedgerCaseDTO = {
   invoiceNumber: string | null
   receiptChequeNumber: string | null
   remark: string | null
+  constructionStartedAt: string | null
+  constructionFinishedAt: string | null
   waitingDays: number
   overdueDays: number
   isOverdue: boolean
@@ -133,6 +149,7 @@ export type FinanceLedgerCreateCaseInput = {
 export type FinanceLedgerUpdateCaseInput = FinanceLedgerSnapshotInput & {
   sectionId?: number | null
   status?: FinanceLedgerCaseStatus
+  stageDates?: FinanceLedgerStageDateInput
 }
 
 export type FinanceLedgerCreateEventInput = FinanceLedgerSnapshotInput & {
@@ -393,6 +410,34 @@ const applySnapshotPatch = (target: Prisma.FinanceLedgerCaseUncheckedUpdateInput
   if (hasOwn(patch, 'remark') && patch.remark !== undefined) {
     target.remark = normalizeOptionalText(patch.remark)
   }
+  // Runtime fallback: some stale Prisma clients may not include construction date columns yet.
+  if (supportsConstructionDateFields) {
+    if (hasOwn(patch, 'constructionStartedAt') && patch.constructionStartedAt !== undefined) {
+      target.constructionStartedAt =
+        patch.constructionStartedAt == null ? null : parseDateInput(patch.constructionStartedAt)
+    }
+    if (hasOwn(patch, 'constructionFinishedAt') && patch.constructionFinishedAt !== undefined) {
+      target.constructionFinishedAt =
+        patch.constructionFinishedAt == null ? null : parseDateInput(patch.constructionFinishedAt)
+    }
+  }
+}
+
+const validateConstructionRange = (
+  startedAt: Date | null | undefined,
+  finishedAt: Date | null | undefined,
+) => {
+  if (!startedAt || !finishedAt) return
+  if (finishedAt.getTime() < startedAt.getTime()) {
+    throw new Error('施工结束日期不能早于施工开始日期')
+  }
+}
+
+const compareNullableIsoDates = (left: string | null, right: string | null) => {
+  if (!left && !right) return 0
+  if (!left) return 1
+  if (!right) return -1
+  return new Date(left).getTime() - new Date(right).getTime()
 }
 
 const buildEventPayloadJson = (patch: FinanceLedgerSnapshotInput): Prisma.InputJsonObject => {
@@ -455,6 +500,10 @@ const compareBySortField = (
       return compareNullableText(collator, left.sectionLabelFr, right.sectionLabelFr)
     case 'period':
       return left.periodIndex - right.periodIndex
+    case 'constructionStartedAt':
+      return compareNullableIsoDates(left.constructionStartedAt, right.constructionStartedAt)
+    case 'constructionFinishedAt':
+      return compareNullableIsoDates(left.constructionFinishedAt, right.constructionFinishedAt)
     case 'stage':
       return getLedgerStageIndex(left.currentStage) - getLedgerStageIndex(right.currentStage)
     case 'status':
@@ -532,6 +581,8 @@ const mapCase = (
     invoiceNumber: row.invoiceNumber ?? null,
     receiptChequeNumber: row.receiptChequeNumber ?? null,
     remark: row.remark ?? null,
+    constructionStartedAt: row.constructionStartedAt?.toISOString() ?? null,
+    constructionFinishedAt: row.constructionFinishedAt?.toISOString() ?? null,
     waitingDays,
     overdueDays,
     isOverdue: overdueDays > 0,
@@ -764,27 +815,120 @@ export const updateFinanceLedgerCase = async (
   if (payload.sectionId !== undefined) {
     await validateSectionOwnership(existing.projectId, payload.sectionId)
   }
-  if (payload.status) {
-    if (payload.status === 'DONE' && existing.currentStage !== 'CHEQUE_RECEIVED') {
-      throw new Error('Le statut DONE nécessite une étape finale CHEQUE_RECEIVED')
+
+  const existingEventByStage = new Map(existing.events.map((event) => [event.stage, event]))
+  const nextStageDateByStage = new Map(
+    existing.events.map((event) => [event.stage, event.occurredAt] as const),
+  )
+
+  if (payload.stageDates !== undefined) {
+    for (const stage of FINANCE_LEDGER_STAGES) {
+      if (!hasOwn(payload.stageDates, stage)) continue
+      const rawValue = payload.stageDates[stage]
+      if (rawValue == null || rawValue === '') {
+        nextStageDateByStage.delete(stage)
+        continue
+      }
+      if (typeof rawValue !== 'string') {
+        throw new Error(`阶段日期无效：${stage}`)
+      }
+      nextStageDateByStage.set(stage, parseDateInput(rawValue))
     }
-    if (payload.status === 'IN_PROGRESS' && existing.currentStage === 'CHEQUE_RECEIVED') {
-      throw new Error('Le dossier finalisé doit rester en statut DONE')
+
+    const filledStages = FINANCE_LEDGER_STAGES.filter((stage) => nextStageDateByStage.has(stage))
+    for (let index = 1; index < filledStages.length; index += 1) {
+      const prevStage = filledStages[index - 1]
+      const currentStage = filledStages[index]
+      const prevDate = nextStageDateByStage.get(prevStage)!
+      const currentDate = nextStageDateByStage.get(currentStage)!
+      if (prevDate.getTime() > currentDate.getTime()) {
+        throw new Error('阶段日期顺序无效，后续阶段日期不能早于前置阶段')
+      }
     }
   }
 
-  const data: Prisma.FinanceLedgerCaseUncheckedUpdateInput = {
-    updatedBy: userId ?? null,
+  const currentStageForValidation = payload.stageDates
+    ? [...FINANCE_LEDGER_STAGES]
+        .reverse()
+        .find((stage) => nextStageDateByStage.has(stage)) ?? null
+    : existing.currentStage
+
+  if (payload.status) {
+    if (payload.status === 'DONE' && currentStageForValidation !== 'CHEQUE_RECEIVED') {
+      throw new Error('状态为“已完成”时，最终阶段必须是“支票收款”')
+    }
+    if (payload.status === 'IN_PROGRESS' && currentStageForValidation === 'CHEQUE_RECEIVED') {
+      throw new Error('已到“支票收款”阶段后，状态不能改回“进行中”')
+    }
   }
+
+  const data: Prisma.FinanceLedgerCaseUncheckedUpdateInput = {}
   if (payload.sectionId !== undefined) data.sectionId = payload.sectionId
-  if (payload.status !== undefined) data.status = payload.status
   applySnapshotPatch(data, payload)
 
-  const updated = await prisma.financeLedgerCase.update({
-    where: { id },
-    data,
-    include: ledgerCaseInclude,
+  const resolvedConstructionStartedAt =
+    data.constructionStartedAt === undefined
+      ? existing.constructionStartedAt
+      : (data.constructionStartedAt as Date | null)
+  const resolvedConstructionFinishedAt =
+    data.constructionFinishedAt === undefined
+      ? existing.constructionFinishedAt
+      : (data.constructionFinishedAt as Date | null)
+  validateConstructionRange(resolvedConstructionStartedAt, resolvedConstructionFinishedAt)
+
+  const updated = await prisma.$transaction(async (tx) => {
+    if (payload.stageDates !== undefined) {
+      for (const stage of FINANCE_LEDGER_STAGES) {
+        if (!hasOwn(payload.stageDates, stage)) continue
+        const existingEvent = existingEventByStage.get(stage)
+        const nextDate = nextStageDateByStage.get(stage) ?? null
+
+        if (existingEvent && !nextDate) {
+          await tx.financeLedgerEvent.delete({ where: { id: existingEvent.id } })
+          continue
+        }
+
+        if (!existingEvent && nextDate) {
+          await tx.financeLedgerEvent.create({
+            data: {
+              caseId: id,
+              stage,
+              occurredAt: nextDate,
+              note: null,
+              payloadJson: {},
+              createdBy: userId ?? null,
+            },
+          })
+          continue
+        }
+
+        if (existingEvent && nextDate && existingEvent.occurredAt.getTime() !== nextDate.getTime()) {
+          await tx.financeLedgerEvent.update({
+            where: { id: existingEvent.id },
+            data: {
+              occurredAt: nextDate,
+            },
+          })
+        }
+      }
+
+      const events = await tx.financeLedgerEvent.findMany({
+        where: { caseId: id },
+        select: { stage: true, occurredAt: true },
+      })
+      const baseStatus = payload.status ?? existing.status
+      Object.assign(data, deriveProgressFromEvents(events, baseStatus))
+    } else if (payload.status !== undefined) {
+      data.status = payload.status
+    }
+
+    return tx.financeLedgerCase.update({
+      where: { id },
+      data,
+      include: ledgerCaseInclude,
+    })
   })
+
   const slaMap = await listSlaMap([updated.projectId])
   return mapCase(updated, slaMap, new Date())
 }
@@ -798,7 +942,6 @@ export const softDeleteFinanceLedgerCase = async (id: number, userId?: number | 
       isDeleted: true,
       deletedAt: new Date(),
       deletedBy: userId ?? null,
-      updatedBy: userId ?? null,
     } as Prisma.FinanceLedgerCaseUncheckedUpdateInput,
   })
 }
@@ -848,7 +991,6 @@ export const createFinanceLedgerEvent = async (
       select: { stage: true, occurredAt: true },
     })
     const data: Prisma.FinanceLedgerCaseUncheckedUpdateInput = {
-      updatedBy: userId ?? null,
       ...deriveProgressFromEvents(events, row.status),
     }
     applySnapshotPatch(data, payload)
@@ -904,7 +1046,6 @@ export const updateFinanceLedgerEvent = async (
         occurredAt: payload.occurredAt ? parseDateInput(payload.occurredAt) : undefined,
         note: payload.note !== undefined ? normalizeOptionalText(payload.note) : undefined,
         payloadJson: nextPayloadJson,
-        updatedBy: userId ?? null,
       },
     })
 
@@ -913,7 +1054,6 @@ export const updateFinanceLedgerEvent = async (
       select: { stage: true, occurredAt: true },
     })
     const data: Prisma.FinanceLedgerCaseUncheckedUpdateInput = {
-      updatedBy: userId ?? null,
       ...deriveProgressFromEvents(events, event.ledgerCase.status),
     }
     applySnapshotPatch(data, payload)

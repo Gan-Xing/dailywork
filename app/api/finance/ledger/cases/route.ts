@@ -33,7 +33,6 @@ export async function POST(request: Request) {
   let payload: {
     projectId?: unknown
     periodIndex?: unknown
-    sectionId?: unknown
   }
   try {
     payload = (await request.json()) as typeof payload
@@ -43,20 +42,12 @@ export async function POST(request: Request) {
 
   const projectId = Number(payload.projectId)
   const periodIndex = Number(payload.periodIndex)
-  const sectionIdRaw = payload.sectionId
-  const sectionId =
-    sectionIdRaw === null || sectionIdRaw === undefined || sectionIdRaw === ''
-      ? null
-      : Number(sectionIdRaw)
 
   if (!Number.isInteger(projectId) || projectId <= 0) {
     return NextResponse.json({ message: 'projectId 无效' }, { status: 400 })
   }
   if (!Number.isInteger(periodIndex) || periodIndex < 0) {
     return NextResponse.json({ message: 'periodIndex 无效' }, { status: 400 })
-  }
-  if (sectionId !== null && (!Number.isInteger(sectionId) || sectionId <= 0)) {
-    return NextResponse.json({ message: 'sectionId 无效' }, { status: 400 })
   }
 
   try {
@@ -65,7 +56,7 @@ export async function POST(request: Request) {
       {
         projectId,
         periodIndex,
-        sectionId,
+        sectionId: null,
       },
       session?.id,
     )
@@ -74,4 +65,3 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: (error as Error).message }, { status: 400 })
   }
 }
-

@@ -484,7 +484,8 @@
 8. `enteredCurrentStageAt?`：进入当前阶段时间，用于 aging。
 9. 金额快照：`accountAmount?`、`invoiceAmount?`、`advanceAmount?`、`chequeAmount?`（decimal）。
 10. 票据字段：`invoiceNumber?`、`receiptChequeNumber?`、`remark?`。
-11. 阶段日期快照：
+11. 施工字段：`constructionStartedAt?`、`constructionFinishedAt?`（可空，按台账主记录维护）。
+12. 阶段日期快照：
    - `ptoSiteSignedAt?`
    - `ptoHqBillReceivedAt?`
    - `ptoBeConfirmedAt?`
@@ -492,8 +493,8 @@
    - `ptoHqInvoiceReceivedAt?`
    - `chequeIssuedAt?`
    - `chequeReceivedAt?`
-12. 软删与审计：`isDeleted`、`deletedAt?`、`deletedBy?`、`createdBy?`、`updatedBy?`、`createdAt`、`updatedAt`。
-13. 约束：`@@unique([projectId, periodIndex])`、`@@unique([sequence])`。
+13. 软删与审计：`isDeleted`、`deletedAt?`、`deletedBy?`、`createdBy?`、`updatedBy?`、`createdAt`、`updatedAt`。
+14. 约束：`@@unique([projectId, periodIndex])`、`@@unique([sequence])`。
 
 ### FinanceLedgerEvent（阶段事件）
 

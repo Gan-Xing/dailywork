@@ -10,7 +10,7 @@ import { useInspectionFlow } from './hooks/useInspectionFlow'
 import { usePhaseManagement } from './hooks/usePhaseManagement'
 import { PointLane } from './PointLane'
 import { calcCompletedBySide, formatPK, statusTone } from './phaseEditorUtils'
-import type { PhaseEditorProps, Status } from './phaseEditorTypes'
+import type { PhaseEditorProps, Segment, Status } from './phaseEditorTypes'
 import type { DeletePhaseDialogProps } from './DeletePhaseDialog'
 import type { InspectionDrawerProps } from './InspectionDrawer'
 import type { PhaseFormModalProps } from './PhaseFormModal'
@@ -18,6 +18,7 @@ import { AlertDialog } from '@/components/AlertDialog'
 import { useToast } from '@/components/ToastProvider'
 import { getProgressCopy, formatProgressCopy } from '@/lib/i18n/progress'
 import { localizeProgressTerm } from '@/lib/i18n/progressDictionary'
+import { resolveRoadName } from '@/lib/i18n/roadDictionary'
 import { locales } from '@/lib/i18n'
 import { usePreferredLocale } from '@/lib/usePreferredLocale'
 import type { IntervalSide, LevelCrossingSide, PhaseMeasure } from '@/lib/progressTypes'
@@ -80,6 +81,20 @@ export function PhaseEditor({
     return Number.isFinite(end) ? end : roadStart
   }, [road.endPk, roadStart])
   const isLevelCrossing = road.slug === LEVEL_CROSSING_ROAD_SLUG
+  const locationRoadNameMap = useMemo(() => {
+    const map = new Map<number, string>()
+    locationRoadOptions.forEach((item) => {
+      map.set(item.id, resolveRoadName(item, locale) + (item.slug ? ` (${item.slug})` : ''))
+    })
+    return map
+  }, [locationRoadOptions, locale])
+  const locationRoadOrderMap = useMemo(() => {
+    const map = new Map<number, number>()
+    locationRoadOptions.forEach((item, index) => {
+      map.set(item.id, index)
+    })
+    return map
+  }, [locationRoadOptions])
 
   const resetInspectionFormRef = useRef<() => void>(() => {})
   const clearSelectedSegmentRef = useRef<() => void>(() => {})
@@ -179,6 +194,19 @@ export function PhaseEditor({
         return t.status.nonDesign
     }
   }
+
+  const sortLocationRoadIds = (ids: number[]) =>
+    [...ids].sort((a, b) => {
+      const orderA = locationRoadOrderMap.get(a)
+      const orderB = locationRoadOrderMap.get(b)
+      if (orderA !== undefined && orderB !== undefined) return orderA - orderB
+      if (orderA !== undefined) return -1
+      if (orderB !== undefined) return 1
+      return a - b
+    })
+
+  const resolveLocationRoadLabel = (id: number) =>
+    locationRoadNameMap.get(id) ?? `${t.form.intervalLocationRoad} #${id}`
 
   return (
     <div className="space-y-8">
@@ -317,6 +345,109 @@ export function PhaseEditor({
                 ? `${formatPK(point.view.min)} – ${formatPK(point.view.max)}`
                 : `${phase.designLength}`
               const localizedPhaseName = localizeProgressTerm('phase', phase.name, locale)
+              const linearLocationRoadIds =
+                isLevelCrossing && linear
+                  ? sortLocationRoadIds(
+                      Array.from(
+                        new Set(
+                          phase.intervals
+                            .map((item) =>
+                              typeof item.locationRoadId === 'number' && item.locationRoadId > 0
+                                ? item.locationRoadId
+                                : null,
+                            )
+                            .filter((id): id is number => id !== null),
+                        ),
+                      ),
+                    )
+                  : []
+              const pointLocationRoadIds =
+                isLevelCrossing && point
+                  ? sortLocationRoadIds(
+                      Array.from(
+                        new Set(
+                          point.view.points
+                            .map((item) =>
+                              typeof item.locationRoadId === 'number' && item.locationRoadId > 0
+                                ? item.locationRoadId
+                                : null,
+                            )
+                            .filter((id): id is number => id !== null),
+                        ),
+                      ),
+                    )
+                  : []
+              const renderLinearSideBlock = (
+                side: { label: string; segments: Segment[]; designTotal: number },
+                keyPrefix: string,
+              ) => {
+                const visibleSegments = side.segments.filter((seg) => seg.status !== 'nonDesign')
+                if (!visibleSegments.length || side.designTotal <= 0) return null
+                const sideStart = formatPK(visibleSegments[0].start)
+                const sideEnd = formatPK(visibleSegments[visibleSegments.length - 1].end)
+                return (
+                  <div key={`${keyPrefix}-${side.label}`} className="space-y-2">
+                    <div className="flex items-center justify-between text-xs text-slate-600">
+                      <span className="rounded-full bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-700">
+                        {side.label}
+                      </span>
+                      <span className="text-slate-500">
+                        {sideStart} – {sideEnd}
+                      </span>
+                    </div>
+                    <div className="rounded-full bg-slate-100 p-1 shadow-inner shadow-slate-200/60">
+                      <div className="flex h-8 overflow-hidden rounded-full bg-slate-200">
+                        {visibleSegments.map((seg, idx) => {
+                          const base = Math.max(side.designTotal, 1)
+                          const width = (Math.max(0, seg.end - seg.start) / base) * 100
+                          const isApprovedLock = seg.status === 'approved' && !(linear?.isDependencyDriven ?? false)
+                          const startLabel = formatPK(seg.start)
+                          const endLabel = formatPK(seg.end)
+                          return (
+                            <button
+                              key={`${seg.start}-${seg.end}-${idx}`}
+                              type="button"
+                              className={`${statusTone[seg.status]} group flex h-full items-center justify-center text-[10px] font-semibold transition hover:opacity-90`}
+                              style={{ width: `${width}%` }}
+                              title={`${side.label} ${startLabel} ~ ${endLabel} · ${statusLabel(seg.status)}`}
+                              onClick={() => {
+                                if (isApprovedLock) return
+                                if (!canInspect) {
+                                  alert(t.alerts.noInspectPermission)
+                                  return
+                                }
+                                const sideLabel = side.label
+                                const sideValue = sideLabel === sideLabelMap.LEFT ? 'LEFT' : 'RIGHT'
+                                openInspectionModal(phase, {
+                                  phase: phase.name,
+                                  phaseId: phase.id,
+                                  intervalId: seg.intervalId ?? null,
+                                  measure: phase.measure,
+                                  layers: seg.layers?.length ? seg.layers : phase.resolvedLayers,
+                                  checks: phase.resolvedChecks,
+                                  side: sideValue,
+                                  sideLabel,
+                                  start: seg.start,
+                                  end: seg.end,
+                                  spec: seg.spec ?? null,
+                                  billQuantity: seg.billQuantity ?? null,
+                                  locationRoadId: seg.locationRoadId ?? null,
+                                  levelCrossingSide: seg.levelCrossingSide ?? null,
+                                  pointHasSides: phase.pointHasSides,
+                                })
+                              }}
+                            >
+                              <span className="px-1 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100">
+                                {startLabel}–{endLabel}
+                              </span>
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                )
+              }
 
               return (
                 <div
@@ -373,122 +504,178 @@ export function PhaseEditor({
                   </div>
 
                   {phase.measure === 'LINEAR' && linear ? (
-                    <div className="mt-4 space-y-4">
-                      {[linear.view.left, linear.view.right]
-                        .filter((side) => side.designTotal > 0)
-                        .map((side) => {
-                          const sideStart = side.segments.length ? formatPK(side.segments[0].start) : ''
-                          const sideEnd = side.segments.length
-                            ? formatPK(side.segments[side.segments.length - 1].end)
-                            : ''
+                    isLevelCrossing && linearLocationRoadIds.length > 0 ? (
+                      <div className="mt-4 space-y-4">
+                        {linearLocationRoadIds.map((locationRoadId) => {
+                          const leftSegments = linear.view.left.segments.filter(
+                            (seg) => seg.locationRoadId === locationRoadId,
+                          )
+                          const rightSegments = linear.view.right.segments.filter(
+                            (seg) => seg.locationRoadId === locationRoadId,
+                          )
+                          const leftDesignTotal = leftSegments.reduce(
+                            (sum, seg) => (seg.status === 'nonDesign' ? sum : sum + Math.max(0, seg.end - seg.start)),
+                            0,
+                          )
+                          const rightDesignTotal = rightSegments.reduce(
+                            (sum, seg) => (seg.status === 'nonDesign' ? sum : sum + Math.max(0, seg.end - seg.start)),
+                            0,
+                          )
+                          const groupedSides = [
+                            { label: linear.view.left.label, segments: leftSegments, designTotal: leftDesignTotal },
+                            { label: linear.view.right.label, segments: rightSegments, designTotal: rightDesignTotal },
+                          ]
+                          const renderedSides = groupedSides
+                            .map((side) => renderLinearSideBlock(side, `${locationRoadId}`))
+                            .filter(Boolean)
+                          if (!renderedSides.length) return null
                           return (
-                            <div key={side.label} className="space-y-2">
-                              <div className="flex items-center justify-between text-xs text-slate-600">
-                                <span className="rounded-full bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-700">
-                                  {side.label}
+                            <div
+                              key={locationRoadId}
+                              className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 shadow-inner shadow-slate-100"
+                            >
+                              <div className="mb-3 flex items-center justify-between gap-2">
+                                <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200">
+                                  {resolveLocationRoadLabel(locationRoadId)}
                                 </span>
-                                <span className="text-slate-500">
-                                  {sideStart} – {sideEnd}
-                                </span>
+                                <span className="text-[11px] text-slate-500">{t.form.intervalLocationRoad}</span>
                               </div>
-                              <div className="rounded-full bg-slate-100 p-1 shadow-inner shadow-slate-200/60">
-                                <div className="flex h-8 overflow-hidden rounded-full bg-slate-200">
-                                  {side.segments
-                                    .filter((seg) => seg.status !== 'nonDesign')
-                                    .map((seg, idx) => {
-                                      const base = Math.max(side.designTotal, 1)
-                                      const width = (Math.max(0, seg.end - seg.start) / base) * 100
-                                      const isApprovedLock = seg.status === 'approved' && !(linear?.isDependencyDriven ?? false)
-                                      const startLabel = formatPK(seg.start)
-                                      const endLabel = formatPK(seg.end)
-                                      return (
-                                        <button
-                                          key={`${seg.start}-${seg.end}-${idx}`}
-                                          type="button"
-                                          className={`${statusTone[seg.status]} group flex h-full items-center justify-center text-[10px] font-semibold transition hover:opacity-90`}
-                                          style={{ width: `${width}%` }}
-                                          title={`${side.label} ${startLabel} ~ ${endLabel} · ${statusLabel(seg.status)}`}
-                                          onClick={() => {
-                                            if (isApprovedLock) return
-                                            if (!canInspect) {
-                                              alert(t.alerts.noInspectPermission)
-                                              return
-                                            }
-                                            const sideLabel = side.label
-                                            const sideValue = sideLabel === sideLabelMap.LEFT ? 'LEFT' : 'RIGHT'
-                                            openInspectionModal(phase, {
-                                              phase: phase.name,
-                                              phaseId: phase.id,
-                                              intervalId: seg.intervalId ?? null,
-                                              measure: phase.measure,
-                                              layers: seg.layers?.length ? seg.layers : phase.resolvedLayers,
-                                              checks: phase.resolvedChecks,
-                                              side: sideValue,
-                                              sideLabel,
-                                              start: seg.start,
-                                              end: seg.end,
-                                              spec: seg.spec ?? null,
-                                              billQuantity: seg.billQuantity ?? null,
-                                              locationRoadId: seg.locationRoadId ?? null,
-                                              levelCrossingSide: seg.levelCrossingSide ?? null,
-                                              pointHasSides: phase.pointHasSides,
-                                            })
-                                          }}
-                                        >
-                                          <span className="px-1 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100">
-                                            {startLabel}–{endLabel}
-                                          </span>
-                                        </button>
-                                      )
-                                    })}
-                                </div>
-                              </div>
+                              <div className="space-y-4">{renderedSides}</div>
                             </div>
                           )
                         })}
-                    </div>
+                      </div>
+                    ) : (
+                      <div className="mt-4 space-y-4">
+                        {[linear.view.left, linear.view.right]
+                          .map((side) =>
+                            renderLinearSideBlock(
+                              {
+                                label: side.label,
+                                segments: side.segments,
+                                designTotal: side.designTotal,
+                              },
+                              `${phase.id}`,
+                            ),
+                          )
+                          .filter(Boolean)}
+                      </div>
+                    )
                   ) : null}
 
                   {phase.measure === 'POINT' && point ? (
-                    <div className="mt-4 space-y-3">
-                      {phase.pointHasSides ? (
-                        <div className="space-y-3">
-                          {[
-                            { side: 'LEFT' as const, label: sideLabelMap.LEFT },
-                            { side: 'RIGHT' as const, label: sideLabelMap.RIGHT },
-                          ].map((row) => {
-                            const rowPoints = point.view.points.filter(
-                              (p) => p.side === row.side || p.side === 'BOTH',
-                            )
-                            if (!rowPoints.length) return null
-                            return (
-                              <PointLane
-                                key={row.side}
-                                phase={phase}
-                                points={rowPoints}
-                                label={row.label}
-                                showHeader
-                                rangeLabel={undefined}
-                                containerClassName="relative h-24 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-5 shadow-inner shadow-slate-100"
-                                sideLabelMap={sideLabelMap}
-                                resolvePointProgress={resolvePointProgress}
-                                onPointSelect={handlePointSelect}
-                              />
-                            )
-                          })}
-                        </div>
-                      ) : (
-                        <PointLane
-                          phase={phase}
-                          points={point.view.points}
-                          rangeLabel={pointRangeLabel}
-                          containerClassName="relative mt-2 h-28 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-5 shadow-inner shadow-slate-100"
-                          sideLabelMap={sideLabelMap}
-                          resolvePointProgress={resolvePointProgress}
-                          onPointSelect={handlePointSelect}
-                        />
-                      )}
-                    </div>
+                    isLevelCrossing && pointLocationRoadIds.length > 0 ? (
+                      <div className="mt-4 space-y-4">
+                        {pointLocationRoadIds.map((locationRoadId) => {
+                          const roadPoints = point.view.points.filter(
+                            (item) => item.locationRoadId === locationRoadId,
+                          )
+                          if (!roadPoints.length) return null
+                          const minPk = Math.min(...roadPoints.map((item) => Math.min(item.startPk, item.endPk)))
+                          const maxPk = Math.max(...roadPoints.map((item) => Math.max(item.startPk, item.endPk)))
+                          const roadRangeLabel = `${formatPK(minPk)} – ${formatPK(maxPk)}`
+
+                          return (
+                            <div
+                              key={locationRoadId}
+                              className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 shadow-inner shadow-slate-100"
+                            >
+                              <div className="mb-3 flex items-center justify-between gap-2">
+                                <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200">
+                                  {resolveLocationRoadLabel(locationRoadId)}
+                                </span>
+                                <span className="text-[11px] text-slate-500">{t.form.intervalLocationRoad}</span>
+                              </div>
+                              {phase.pointHasSides ? (
+                                <div className="space-y-3">
+                                  {[
+                                    { side: 'LEFT' as const, label: sideLabelMap.LEFT },
+                                    { side: 'RIGHT' as const, label: sideLabelMap.RIGHT },
+                                  ].map((row) => {
+                                    const rowPoints = roadPoints.filter(
+                                      (item) => item.side === row.side || item.side === 'BOTH',
+                                    )
+                                    if (!rowPoints.length) return null
+                                    return (
+                                      <PointLane
+                                        key={`${locationRoadId}-${row.side}`}
+                                        phase={phase}
+                                        points={rowPoints}
+                                        label={row.label}
+                                        showHeader
+                                        rangeLabel={undefined}
+                                        containerClassName="relative h-28 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-5 shadow-inner shadow-slate-100"
+                                        isLevelCrossingPointView
+                                        sideLabelMap={sideLabelMap}
+                                        resolvePointProgress={resolvePointProgress}
+                                        onPointSelect={handlePointSelect}
+                                      />
+                                    )
+                                  })}
+                                </div>
+                              ) : (
+                                <PointLane
+                                  phase={phase}
+                                  points={roadPoints}
+                                  rangeLabel={roadRangeLabel}
+                                  containerClassName="relative mt-2 h-32 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-5 shadow-inner shadow-slate-100"
+                                  isLevelCrossingPointView
+                                  sideLabelMap={sideLabelMap}
+                                  resolvePointProgress={resolvePointProgress}
+                                  onPointSelect={handlePointSelect}
+                                />
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    ) : (
+                      <div className="mt-4 space-y-3">
+                        {phase.pointHasSides ? (
+                          <div className="space-y-3">
+                            {[
+                              { side: 'LEFT' as const, label: sideLabelMap.LEFT },
+                              { side: 'RIGHT' as const, label: sideLabelMap.RIGHT },
+                            ].map((row) => {
+                              const rowPoints = point.view.points.filter(
+                                (p) => p.side === row.side || p.side === 'BOTH',
+                              )
+                              if (!rowPoints.length) return null
+                              return (
+                                <PointLane
+                                  key={row.side}
+                                  phase={phase}
+                                  points={rowPoints}
+                                  label={row.label}
+                                  showHeader
+                                  rangeLabel={undefined}
+                                  containerClassName={`relative ${
+                                    isLevelCrossing ? 'h-28' : 'h-24'
+                                  } rounded-2xl border border-slate-200 bg-slate-50 px-4 py-5 shadow-inner shadow-slate-100`}
+                                  isLevelCrossingPointView={isLevelCrossing}
+                                  sideLabelMap={sideLabelMap}
+                                  resolvePointProgress={resolvePointProgress}
+                                  onPointSelect={handlePointSelect}
+                                />
+                              )
+                            })}
+                          </div>
+                        ) : (
+                          <PointLane
+                            phase={phase}
+                            points={point.view.points}
+                            rangeLabel={pointRangeLabel}
+                            containerClassName={`relative mt-2 ${
+                              isLevelCrossing ? 'h-32' : 'h-28'
+                            } rounded-2xl border border-slate-200 bg-slate-50 px-4 py-5 shadow-inner shadow-slate-100`}
+                            isLevelCrossingPointView={isLevelCrossing}
+                            sideLabelMap={sideLabelMap}
+                            resolvePointProgress={resolvePointProgress}
+                            onPointSelect={handlePointSelect}
+                          />
+                        )}
+                      </div>
+                    )
                   ) : null}
                 </div>
               )

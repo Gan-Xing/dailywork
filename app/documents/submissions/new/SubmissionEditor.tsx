@@ -156,6 +156,23 @@ export default function SubmissionEditor({ initialSubmission, canManage = false,
     return result
   }
 
+  const normalizeIntervalSpec = (value?: string | null) => {
+    if (typeof value !== 'string') return null
+    const cleaned = normalizeInspectionToken(value).replace(/\s+/g, ' ')
+    return cleaned || null
+  }
+
+  const appendSpecToPhaseLabel = (phaseLabel: string, intervalSpec?: string | null) => {
+    const normalizedPhase = normalizeInspectionToken(phaseLabel)
+    if (!normalizedPhase) return ''
+    const spec = normalizeIntervalSpec(intervalSpec)
+    if (!spec) return normalizedPhase
+    const compactPhase = normalizedPhase.toLowerCase().replace(/\s+/g, ' ')
+    const compactSpec = spec.toLowerCase().replace(/\s+/g, ' ')
+    if (compactPhase.includes(compactSpec)) return normalizedPhase
+    return `${normalizedPhase} ${spec}`
+  }
+
   const buildInspectionDescription = (inspection: InspectionListItem) => {
     const locale: Locale = 'fr' // 对齐 PDF 默认法语导出
     const sideLabelMap: Record<string, string> = { LEFT: 'Gauche', RIGHT: 'Droite', BOTH: 'Deux côtés' }
@@ -170,7 +187,10 @@ export default function SubmissionEditor({ initialSubmission, canManage = false,
       name: inspection.locationRoadName ?? inspection.roadName,
     }
     const roadText = resolveRoadName(displayRoad, locale)
-    const phaseText = localizeProgressTerm('phase', normalizeInspectionToken(inspection.phaseName), locale)
+    const phaseText = appendSpecToPhaseLabel(
+      localizeProgressTerm('phase', normalizeInspectionToken(inspection.phaseName), locale),
+      inspection.intervalSpec,
+    )
     const localisation = `${roadText} · ${phaseText} · ${combinedSide} · ${rangeText}`
     const rawLayers = splitInspectionTokens(getRawLayers(inspection))
     const rawChecks = splitInspectionTokens(getRawChecks(inspection))

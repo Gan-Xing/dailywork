@@ -88,6 +88,7 @@ export interface InspectionListItem {
   phaseId: number
   phaseName: string
   intervalId?: number | null
+  intervalSpec?: string | null
   documentId?: number | null
   submissionId?: number | null
   submissionNumber?: number | null
@@ -166,6 +167,7 @@ export interface InspectionEntryDTO extends InspectionEntryPayload {
   locationRoadName?: string | null
   locationRoadSlug?: string | null
   phaseName: string
+  intervalSpec?: string | null
   submittedBy?: { id: number; username: string } | null
   createdBy?: { id: number; username: string } | null
   createdAt: string

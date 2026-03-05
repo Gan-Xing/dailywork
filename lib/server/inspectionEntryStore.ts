@@ -20,6 +20,11 @@ const normalizeLevelCrossingSide = (side: unknown): LevelCrossingSide | null =>
   side === 'LEFT' || side === 'RIGHT' || side === 'BOTH' ? side : null
 
 const normalizeLabel = (value: string) => value.trim().toLowerCase()
+const normalizeSpec = (value?: string | null) => {
+  if (typeof value !== 'string') return null
+  const cleaned = value.trim().replace(/\s+/g, ' ')
+  return cleaned || null
+}
 
 const normalizeRange = (start: number, end: number) => {
   const safeStart = Number.isFinite(start) ? start : 0
@@ -170,6 +175,7 @@ const mapEntry = (
       road: true
       locationRoad: true
       phase: true
+      interval: { select: { spec: true } }
       submitter: true
       creator: true
       updater: true
@@ -200,6 +206,7 @@ const mapEntry = (
     phaseId: row.phaseId,
     phaseName: row.phase.name,
     intervalId: row.intervalId ?? null,
+    intervalSpec: normalizeSpec(row.interval?.spec),
     side: row.side,
     startPk: row.startPk,
     endPk: row.endPk,
@@ -798,6 +805,7 @@ export const listInspectionEntries = async (filter: InspectionEntryFilter): Prom
         road: true,
         locationRoad: true,
         phase: true,
+        interval: { select: { spec: true } },
         document: { include: { submission: true } },
         submitter: true,
         creator: true,
@@ -1250,6 +1258,7 @@ export const createInspectionEntries = async (
         road: true,
         locationRoad: true,
         phase: true,
+        interval: { select: { spec: true } },
         document: { include: { submission: true } },
         submitter: true,
         creator: true,
@@ -1280,6 +1289,7 @@ export const createInspectionEntries = async (
           road: true,
           locationRoad: true,
           phase: true,
+          interval: { select: { spec: true } },
           document: { include: { submission: true } },
           submitter: true,
           creator: true,
@@ -1294,6 +1304,7 @@ export const createInspectionEntries = async (
           road: true,
           locationRoad: true,
           phase: true,
+          interval: { select: { spec: true } },
           document: { include: { submission: true } },
           submitter: true,
           creator: true,
@@ -1402,6 +1413,7 @@ export const aggregateEntriesAsListItems = async (
         road: true,
         locationRoad: true,
         phase: true,
+        interval: { select: { spec: true } },
         document: { include: { submission: true } },
         submitter: true,
         creator: true,
@@ -1428,6 +1440,7 @@ export const aggregateEntriesAsListItems = async (
     const existing = grouped.get(key)
     const layerToken = entry.layerName
     const checkToken = entry.checkName
+    const intervalSpecToken = normalizeSpec(entry.interval?.spec)
     const updatedAt = entry.updatedAt.getTime()
     const resolvedLocationRoad =
       entry.locationRoad ??
@@ -1445,6 +1458,7 @@ export const aggregateEntriesAsListItems = async (
         phaseId: entry.phaseId,
         phaseName: entry.phase.name,
         intervalId: entry.intervalId ?? null,
+        intervalSpec: intervalSpecToken,
         documentId: entry.documentId,
         documentCode: entry.document?.code ?? null,
         submissionId: entry.documentId,
@@ -1489,6 +1503,7 @@ export const aggregateEntriesAsListItems = async (
         locationRoadName: existing.locationRoadName ?? resolvedLocationRoad?.name ?? null,
         locationRoadSlug: existing.locationRoadSlug ?? resolvedLocationRoad?.slug ?? null,
         levelCrossingSide: existing.levelCrossingSide ?? entry.levelCrossingSide ?? null,
+        intervalSpec: existing.intervalSpec ?? intervalSpecToken,
         layers: filter.groupByLayer
           ? existing.layers && existing.layers.length
             ? existing.layers

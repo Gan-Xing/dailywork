@@ -238,31 +238,34 @@ export const ensureFinanceCategories = async () => {
   const flat: FlatCategory[] = []
   flattenCategories(financeCategories as FinanceCategoryNode[], null, [], flat, 0)
 
-  await prisma.$transaction(async (tx) => {
-    for (const item of flat) {
-      await tx.financeCategory.upsert({
-        where: { key: item.key },
-        update: {
-          parentKey: item.parentKey ?? null,
-          labelZh: item.labelZh,
-          labelEn: item.labelEn ?? null,
-          labelFr: item.labelFr ?? null,
-          code: item.code ?? null,
-          isActive: true,
-          sortOrder: item.sortOrder,
-        },
-        create: {
-          key: item.key,
-          parentKey: item.parentKey ?? null,
-          labelZh: item.labelZh,
-          labelEn: item.labelEn ?? null,
-          labelFr: item.labelFr ?? null,
-          code: item.code ?? null,
-          sortOrder: item.sortOrder,
-        },
-      })
-    }
-  })
+  const upserts = flat.map((item) =>
+    prisma.financeCategory.upsert({
+      where: { key: item.key },
+      update: {
+        parentKey: item.parentKey ?? null,
+        labelZh: item.labelZh,
+        labelEn: item.labelEn ?? null,
+        labelFr: item.labelFr ?? null,
+        code: item.code ?? null,
+        isActive: true,
+        sortOrder: item.sortOrder,
+      },
+      create: {
+        key: item.key,
+        parentKey: item.parentKey ?? null,
+        labelZh: item.labelZh,
+        labelEn: item.labelEn ?? null,
+        labelFr: item.labelFr ?? null,
+        code: item.code ?? null,
+        sortOrder: item.sortOrder,
+      },
+    }),
+  )
+
+  const chunkSize = 40
+  for (let index = 0; index < upserts.length; index += chunkSize) {
+    await prisma.$transaction(upserts.slice(index, index + chunkSize))
+  }
 }
 
 export const listFinanceMetadata = async () => {

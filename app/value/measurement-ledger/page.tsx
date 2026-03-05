@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 
 import { AccessDenied } from '@/components/AccessDenied'
 import { PageHeaderNav } from '@/components/PageHeaderNav'
@@ -74,6 +74,27 @@ type Summary = {
 
 type FetchStatus = 'idle' | 'loading' | 'success' | 'error'
 
+type LedgerSortField =
+  | 'code'
+  | 'designation'
+  | 'unit'
+  | 'unitPrice'
+  | 'project'
+  | 'road'
+  | 'side'
+  | 'startPk'
+  | 'endPk'
+  | 'quantity'
+  | 'amount'
+  | 'note'
+
+type LedgerSortOrder = 'asc' | 'desc'
+
+type LedgerSortSpec = {
+  field: LedgerSortField
+  order: LedgerSortOrder
+}
+
 type LedgerCopy = {
   title: string
   description: string
@@ -83,6 +104,8 @@ type LedgerCopy = {
     add: string
     edit: string
     remove: string
+    clearSort: string
+    sortHint: string
     save: string
     saving: string
     cancel: string
@@ -183,6 +206,8 @@ const ledgerCopy: Record<Locale, LedgerCopy> = {
       add: '新增',
       edit: '编辑',
       remove: '删除',
+      clearSort: '清除排序',
+      sortHint: '支持多列排序（最多 4 列）',
       save: '保存',
       saving: '保存中…',
       cancel: '取消',
@@ -281,6 +306,8 @@ const ledgerCopy: Record<Locale, LedgerCopy> = {
       add: 'Ajouter',
       edit: 'Modifier',
       remove: 'Supprimer',
+      clearSort: 'Effacer tri',
+      sortHint: 'Tri multicritère (max. 4 colonnes)',
       save: 'Enregistrer',
       saving: 'Enregistrement…',
       cancel: 'Annuler',
@@ -410,6 +437,39 @@ const normalizePeriodLabel = (template: string, periodKey: string) => {
   return index === null ? periodKey : formatCopy(template, { value: index })
 }
 
+const parsePkSortValue = (value: string | null) => {
+  if (!value) return null
+  const normalized = value.trim().toUpperCase().replace(/\s+/g, '')
+  if (!normalized) return null
+
+  const pkPattern = normalized.match(/^PK(\d+)\+(\d{1,3}(?:\.\d+)?)$/)
+  if (pkPattern) {
+    const km = Number(pkPattern[1])
+    const meter = Number(pkPattern[2])
+    if (Number.isFinite(km) && Number.isFinite(meter)) {
+      return km * 1000 + meter
+    }
+  }
+
+  const plusPattern = normalized.match(/^(\d+)\+(\d{1,3}(?:\.\d+)?)$/)
+  if (plusPattern) {
+    const km = Number(plusPattern[1])
+    const meter = Number(plusPattern[2])
+    if (Number.isFinite(km) && Number.isFinite(meter)) {
+      return km * 1000 + meter
+    }
+  }
+
+  const numberOnly = parseNumericValue(normalized.replace(/^PK/, ''))
+  return numberOnly
+}
+
+const sideSortWeight: Record<DetailSide, number> = {
+  LEFT: 0,
+  RIGHT: 1,
+  BOTH: 2,
+}
+
 const sideLabels: Record<Locale, Record<DetailSide, string>> = {
   zh: {
     BOTH: '双侧',
@@ -465,6 +525,10 @@ export default function MeasurementLedgerPage() {
   const { addToast } = useToast()
   const searchParams = useSearchParams()
   const localeId = locale === 'fr' ? 'fr-FR' : 'zh-CN'
+  const ledgerSortCollator = useMemo(
+    () => new Intl.Collator(localeId, { numeric: true, sensitivity: 'base' }),
+    [localeId],
+  )
 
   const [permissionDenied, setPermissionDenied] = useState(false)
   const [projects, setProjects] = useState<BoqProject[]>([])
@@ -483,6 +547,14 @@ export default function MeasurementLedgerPage() {
   const [roads, setRoads] = useState<RoadOption[]>([])
   const [periodOptions, setPeriodOptions] = useState<string[]>([])
   const [summary, setSummary] = useState<Summary | null>(null)
+  const [sortStack, setSortStack] = useState<LedgerSortSpec[]>([])
+  const hasSort = sortStack.length > 0
+  const [ledgerStickyTop, setLedgerStickyTop] = useState(0)
+  const ledgerStickyStyle = useMemo<CSSProperties>(
+    () => ({ top: `${ledgerStickyTop}px` }),
+    [ledgerStickyTop],
+  )
+  const ledgerStickyHeadClass = 'bg-slate-100/95'
 
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
@@ -532,6 +604,188 @@ export default function MeasurementLedgerPage() {
     resolveProjectDisplayName({ id: row.projectId, name: row.projectName, code: row.projectCode }, locale)
   const resolveRowRoadName = (row: DetailRow) =>
     resolveRoadDisplayName({ id: row.roadId, name: row.roadName, slug: row.roadSlug }, locale)
+
+  const handleLedgerSort = useCallback((field: LedgerSortField) => {
+    setSortStack((prev) => {
+      const existing = prev.find((item) => item.field === field)
+      const nextOrder: LedgerSortOrder =
+        existing?.order === 'asc' ? 'desc' : existing?.order === 'desc' ? 'asc' : 'desc'
+      const filtered = prev.filter((item) => item.field !== field)
+      return [{ field, order: nextOrder }, ...filtered].slice(0, 4)
+    })
+  }, [])
+
+  const clearLedgerSort = useCallback(() => {
+    setSortStack([])
+  }, [])
+
+  const ledgerSortIndicator = useCallback(
+    (field: LedgerSortField) => {
+      const idx = sortStack.findIndex((item) => item.field === field)
+      if (idx === -1) return ''
+      const arrow = sortStack[idx].order === 'asc' ? '↑' : '↓'
+      return `${arrow}${idx + 1}`
+    },
+    [sortStack],
+  )
+
+  const ledgerAriaSort = useCallback(
+    (field: LedgerSortField): 'none' | 'ascending' | 'descending' | 'other' => {
+      const idx = sortStack.findIndex((item) => item.field === field)
+      if (idx === -1) return 'none'
+      if (idx > 0) return 'other'
+      return sortStack[idx].order === 'asc' ? 'ascending' : 'descending'
+    },
+    [sortStack],
+  )
+
+  const displayRows = useMemo(() => {
+    if (!sortStack.length) return rows
+
+    const orderById = new Map<number, number>()
+    rows.forEach((row, index) => {
+      orderById.set(row.id, index)
+    })
+
+    const normalizeNullableText = (value: string | null | undefined) => {
+      const normalized = (value ?? '').trim()
+      return normalized ? normalized : null
+    }
+
+    const compareNullableNumber = (left: number | null, right: number | null) => {
+      if (left === right) return 0
+      if (left === null) return 1
+      if (right === null) return -1
+      return left - right
+    }
+
+    const compareNullableText = (
+      left: string | null | undefined,
+      right: string | null | undefined,
+    ) => {
+      const leftText = normalizeNullableText(left)
+      const rightText = normalizeNullableText(right)
+      if (leftText === rightText) return 0
+      if (leftText === null) return 1
+      if (rightText === null) return -1
+      return ledgerSortCollator.compare(leftText, rightText)
+    }
+
+    const comparePk = (left: string | null, right: string | null) => {
+      const leftText = normalizeNullableText(left)
+      const rightText = normalizeNullableText(right)
+      if (leftText === rightText) return 0
+      if (leftText === null) return 1
+      if (rightText === null) return -1
+
+      const leftPk = parsePkSortValue(leftText)
+      const rightPk = parsePkSortValue(rightText)
+      if (leftPk !== null && rightPk !== null && leftPk !== rightPk) {
+        return leftPk - rightPk
+      }
+      if (leftPk !== null && rightPk === null) return -1
+      if (leftPk === null && rightPk !== null) return 1
+      return ledgerSortCollator.compare(leftText, rightText)
+    }
+
+    return [...rows].sort((left, right) => {
+      for (const sort of sortStack) {
+        let result = 0
+        switch (sort.field) {
+          case 'code':
+            result = ledgerSortCollator.compare(left.code, right.code)
+            break
+          case 'designation':
+            result = ledgerSortCollator.compare(
+              locale === 'fr'
+                ? left.designationFr || left.designationZh
+                : left.designationZh || left.designationFr,
+              locale === 'fr'
+                ? right.designationFr || right.designationZh
+                : right.designationZh || right.designationFr,
+            )
+            break
+          case 'unit':
+            result = compareNullableText(left.unit, right.unit)
+            break
+          case 'unitPrice':
+            result = compareNullableNumber(left.unitPrice, right.unitPrice)
+            break
+          case 'project':
+            result = ledgerSortCollator.compare(
+              resolveProjectDisplayName(
+                { id: left.projectId, name: left.projectName, code: left.projectCode },
+                locale,
+              ),
+              resolveProjectDisplayName(
+                { id: right.projectId, name: right.projectName, code: right.projectCode },
+                locale,
+              ),
+            )
+            break
+          case 'road':
+            result = ledgerSortCollator.compare(
+              resolveRoadDisplayName({ id: left.roadId, name: left.roadName, slug: left.roadSlug }, locale),
+              resolveRoadDisplayName(
+                { id: right.roadId, name: right.roadName, slug: right.roadSlug },
+                locale,
+              ),
+            )
+            break
+          case 'side':
+            result = compareNullableNumber(
+              left.side ? sideSortWeight[left.side] : null,
+              right.side ? sideSortWeight[right.side] : null,
+            )
+            break
+          case 'startPk':
+            result = comparePk(left.startPk, right.startPk)
+            break
+          case 'endPk':
+            result = comparePk(left.endPk, right.endPk)
+            break
+          case 'quantity':
+            result = left.quantity - right.quantity
+            break
+          case 'amount':
+            result = compareNullableNumber(left.amount, right.amount)
+            break
+          case 'note':
+            result = compareNullableText(left.note, right.note)
+            break
+          default:
+            result = 0
+        }
+
+        if (result !== 0) {
+          return sort.order === 'asc' ? result : -result
+        }
+      }
+      return (orderById.get(left.id) ?? 0) - (orderById.get(right.id) ?? 0)
+    })
+  }, [ledgerSortCollator, locale, rows, sortStack])
+
+  useEffect(() => {
+    const pageHeader = document.querySelector('header.value-page-header') as HTMLElement | null
+    if (!pageHeader) {
+      setLedgerStickyTop(0)
+      return
+    }
+
+    const resolveStickyTop = () => {
+      setLedgerStickyTop(Math.ceil(pageHeader.getBoundingClientRect().height))
+    }
+
+    resolveStickyTop()
+    window.addEventListener('resize', resolveStickyTop)
+    const observer = new ResizeObserver(resolveStickyTop)
+    observer.observe(pageHeader)
+
+    return () => {
+      observer.disconnect()
+      window.removeEventListener('resize', resolveStickyTop)
+    }
+  }, [locale])
 
   useEffect(() => {
     let cancelled = false
@@ -985,14 +1239,29 @@ export default function MeasurementLedgerPage() {
                   </label>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={openCreateModal}
-                  className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-semibold text-emerald-700 transition hover:-translate-y-0.5 hover:border-emerald-300 hover:bg-emerald-100"
-                >
-                  {ledger.actions.add}
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={clearLedgerSort}
+                    disabled={!hasSort}
+                    className={`inline-flex items-center rounded-xl border px-3 py-2 text-xs font-semibold transition ${
+                      hasSort
+                        ? 'border-slate-200 bg-white text-slate-700 shadow-sm hover:bg-slate-50'
+                        : 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400'
+                    }`}
+                  >
+                    {ledger.actions.clearSort}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={openCreateModal}
+                    className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-semibold text-emerald-700 transition hover:-translate-y-0.5 hover:border-emerald-300 hover:bg-emerald-100"
+                  >
+                    {ledger.actions.add}
+                  </button>
+                </div>
               </div>
+              <p className="text-xs text-slate-500">{ledger.actions.sortHint}</p>
 
               <div className="space-y-1 text-xs text-slate-500">
                 {projectsStatus === 'loading' && <p>{ledger.messages.projectLoading}</p>}
@@ -1057,32 +1326,217 @@ export default function MeasurementLedgerPage() {
                 </div>
               ) : null}
 
-              {rows.length ? (
-                <div className="overflow-x-auto rounded-2xl border border-slate-200">
-                  <table className="min-w-full border-collapse text-left text-sm">
-                    <thead className="bg-slate-100/70">
+              {displayRows.length ? (
+                <div className="overflow-x-auto overflow-y-visible rounded-2xl border border-slate-200 lg:overflow-x-visible">
+                  <table className="min-w-full border-separate border-spacing-0 text-left text-sm">
+                    <thead
+                      className="sticky z-20 bg-slate-100/95 shadow-[0_1px_0_rgba(148,163,184,0.35)]"
+                      style={ledgerStickyStyle}
+                    >
                       <tr
                         className={`text-[11px] font-semibold text-slate-500 ${
                           locale === 'fr' ? 'uppercase tracking-[0.24em]' : 'tracking-[0.12em]'
                         }`}
                       >
-                        <th className="w-[9%] px-3 py-3 text-left">{ledger.table.code}</th>
-                        <th className="px-3 py-3 text-left">{ledger.table.designation}</th>
-                        <th className="w-[8%] px-3 py-3 text-left">{ledger.table.unit}</th>
-                        <th className="w-[12%] px-3 py-3 text-right">{ledger.table.unitPrice}</th>
-                        <th className="w-[14%] px-3 py-3 text-left">{ledger.table.project}</th>
-                        <th className="w-[14%] px-3 py-3 text-left">{ledger.table.road}</th>
-                        <th className="w-[8%] px-3 py-3 text-left">{ledger.table.side}</th>
-                        <th className="w-[10%] px-3 py-3 text-left">{ledger.table.startPk}</th>
-                        <th className="w-[10%] px-3 py-3 text-left">{ledger.table.endPk}</th>
-                        <th className="w-[10%] px-3 py-3 text-right">{ledger.table.quantity}</th>
-                        <th className="w-[12%] px-3 py-3 text-right">{ledger.table.amount}</th>
-                        <th className="w-[16%] px-3 py-3 text-left">{ledger.table.note}</th>
-                        <th className="w-[10%] px-3 py-3 text-left">{ledger.table.actions}</th>
+                        <th
+                          className={`${ledgerStickyHeadClass} w-[9%] px-3 py-3 text-left`}
+                          aria-sort={ledgerAriaSort('code')}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => handleLedgerSort('code')}
+                            className="inline-flex w-full items-center gap-1 rounded px-1 py-0.5 transition hover:bg-slate-200/70"
+                            title={ledger.actions.sortHint}
+                          >
+                            <span>{ledger.table.code}</span>
+                            <span className={`text-[10px] ${ledgerSortIndicator('code') ? 'text-emerald-600' : 'text-slate-400'}`}>
+                              {ledgerSortIndicator('code') || '↕'}
+                            </span>
+                          </button>
+                        </th>
+                        <th
+                          className={`${ledgerStickyHeadClass} px-3 py-3 text-left`}
+                          aria-sort={ledgerAriaSort('designation')}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => handleLedgerSort('designation')}
+                            className="inline-flex w-full items-center gap-1 rounded px-1 py-0.5 text-left transition hover:bg-slate-200/70"
+                            title={ledger.actions.sortHint}
+                          >
+                            <span>{ledger.table.designation}</span>
+                            <span className={`text-[10px] ${ledgerSortIndicator('designation') ? 'text-emerald-600' : 'text-slate-400'}`}>
+                              {ledgerSortIndicator('designation') || '↕'}
+                            </span>
+                          </button>
+                        </th>
+                        <th
+                          className={`${ledgerStickyHeadClass} w-[8%] px-3 py-3 text-left`}
+                          aria-sort={ledgerAriaSort('unit')}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => handleLedgerSort('unit')}
+                            className="inline-flex w-full items-center gap-1 rounded px-1 py-0.5 transition hover:bg-slate-200/70"
+                            title={ledger.actions.sortHint}
+                          >
+                            <span>{ledger.table.unit}</span>
+                            <span className={`text-[10px] ${ledgerSortIndicator('unit') ? 'text-emerald-600' : 'text-slate-400'}`}>
+                              {ledgerSortIndicator('unit') || '↕'}
+                            </span>
+                          </button>
+                        </th>
+                        <th
+                          className={`${ledgerStickyHeadClass} w-[12%] px-3 py-3 text-right`}
+                          aria-sort={ledgerAriaSort('unitPrice')}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => handleLedgerSort('unitPrice')}
+                            className="inline-flex w-full items-center justify-end gap-1 rounded px-1 py-0.5 transition hover:bg-slate-200/70"
+                            title={ledger.actions.sortHint}
+                          >
+                            <span>{ledger.table.unitPrice}</span>
+                            <span className={`text-[10px] ${ledgerSortIndicator('unitPrice') ? 'text-emerald-600' : 'text-slate-400'}`}>
+                              {ledgerSortIndicator('unitPrice') || '↕'}
+                            </span>
+                          </button>
+                        </th>
+                        <th
+                          className={`${ledgerStickyHeadClass} w-[14%] px-3 py-3 text-left`}
+                          aria-sort={ledgerAriaSort('project')}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => handleLedgerSort('project')}
+                            className="inline-flex w-full items-center gap-1 rounded px-1 py-0.5 text-left transition hover:bg-slate-200/70"
+                            title={ledger.actions.sortHint}
+                          >
+                            <span>{ledger.table.project}</span>
+                            <span className={`text-[10px] ${ledgerSortIndicator('project') ? 'text-emerald-600' : 'text-slate-400'}`}>
+                              {ledgerSortIndicator('project') || '↕'}
+                            </span>
+                          </button>
+                        </th>
+                        <th
+                          className={`${ledgerStickyHeadClass} w-[14%] px-3 py-3 text-left`}
+                          aria-sort={ledgerAriaSort('road')}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => handleLedgerSort('road')}
+                            className="inline-flex w-full items-center gap-1 rounded px-1 py-0.5 text-left transition hover:bg-slate-200/70"
+                            title={ledger.actions.sortHint}
+                          >
+                            <span>{ledger.table.road}</span>
+                            <span className={`text-[10px] ${ledgerSortIndicator('road') ? 'text-emerald-600' : 'text-slate-400'}`}>
+                              {ledgerSortIndicator('road') || '↕'}
+                            </span>
+                          </button>
+                        </th>
+                        <th
+                          className={`${ledgerStickyHeadClass} w-[8%] px-3 py-3 text-left`}
+                          aria-sort={ledgerAriaSort('side')}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => handleLedgerSort('side')}
+                            className="inline-flex w-full items-center gap-1 rounded px-1 py-0.5 transition hover:bg-slate-200/70"
+                            title={ledger.actions.sortHint}
+                          >
+                            <span>{ledger.table.side}</span>
+                            <span className={`text-[10px] ${ledgerSortIndicator('side') ? 'text-emerald-600' : 'text-slate-400'}`}>
+                              {ledgerSortIndicator('side') || '↕'}
+                            </span>
+                          </button>
+                        </th>
+                        <th
+                          className={`${ledgerStickyHeadClass} w-[10%] px-3 py-3 text-left`}
+                          aria-sort={ledgerAriaSort('startPk')}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => handleLedgerSort('startPk')}
+                            className="inline-flex w-full items-center gap-1 rounded px-1 py-0.5 transition hover:bg-slate-200/70"
+                            title={ledger.actions.sortHint}
+                          >
+                            <span>{ledger.table.startPk}</span>
+                            <span className={`text-[10px] ${ledgerSortIndicator('startPk') ? 'text-emerald-600' : 'text-slate-400'}`}>
+                              {ledgerSortIndicator('startPk') || '↕'}
+                            </span>
+                          </button>
+                        </th>
+                        <th
+                          className={`${ledgerStickyHeadClass} w-[10%] px-3 py-3 text-left`}
+                          aria-sort={ledgerAriaSort('endPk')}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => handleLedgerSort('endPk')}
+                            className="inline-flex w-full items-center gap-1 rounded px-1 py-0.5 transition hover:bg-slate-200/70"
+                            title={ledger.actions.sortHint}
+                          >
+                            <span>{ledger.table.endPk}</span>
+                            <span className={`text-[10px] ${ledgerSortIndicator('endPk') ? 'text-emerald-600' : 'text-slate-400'}`}>
+                              {ledgerSortIndicator('endPk') || '↕'}
+                            </span>
+                          </button>
+                        </th>
+                        <th
+                          className={`${ledgerStickyHeadClass} w-[10%] px-3 py-3 text-right`}
+                          aria-sort={ledgerAriaSort('quantity')}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => handleLedgerSort('quantity')}
+                            className="inline-flex w-full items-center justify-end gap-1 rounded px-1 py-0.5 transition hover:bg-slate-200/70"
+                            title={ledger.actions.sortHint}
+                          >
+                            <span>{ledger.table.quantity}</span>
+                            <span className={`text-[10px] ${ledgerSortIndicator('quantity') ? 'text-emerald-600' : 'text-slate-400'}`}>
+                              {ledgerSortIndicator('quantity') || '↕'}
+                            </span>
+                          </button>
+                        </th>
+                        <th
+                          className={`${ledgerStickyHeadClass} w-[12%] px-3 py-3 text-right`}
+                          aria-sort={ledgerAriaSort('amount')}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => handleLedgerSort('amount')}
+                            className="inline-flex w-full items-center justify-end gap-1 rounded px-1 py-0.5 transition hover:bg-slate-200/70"
+                            title={ledger.actions.sortHint}
+                          >
+                            <span>{ledger.table.amount}</span>
+                            <span className={`text-[10px] ${ledgerSortIndicator('amount') ? 'text-emerald-600' : 'text-slate-400'}`}>
+                              {ledgerSortIndicator('amount') || '↕'}
+                            </span>
+                          </button>
+                        </th>
+                        <th
+                          className={`${ledgerStickyHeadClass} w-[16%] px-3 py-3 text-left`}
+                          aria-sort={ledgerAriaSort('note')}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => handleLedgerSort('note')}
+                            className="inline-flex w-full items-center gap-1 rounded px-1 py-0.5 text-left transition hover:bg-slate-200/70"
+                            title={ledger.actions.sortHint}
+                          >
+                            <span>{ledger.table.note}</span>
+                            <span className={`text-[10px] ${ledgerSortIndicator('note') ? 'text-emerald-600' : 'text-slate-400'}`}>
+                              {ledgerSortIndicator('note') || '↕'}
+                            </span>
+                          </button>
+                        </th>
+                        <th className={`${ledgerStickyHeadClass} w-[10%] px-3 py-3 text-left`}>
+                          {ledger.table.actions}
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-200/70">
-                      {rows.map((row) => (
+                      {displayRows.map((row) => (
                         <tr key={row.id} className="transition hover:bg-slate-50">
                           <td className="whitespace-nowrap px-3 py-3 text-xs tracking-[0.18em] text-slate-700">
                             {row.code}

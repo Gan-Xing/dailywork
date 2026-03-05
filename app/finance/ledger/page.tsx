@@ -2,7 +2,7 @@
 
 import { FinanceLedgerCaseStatus, FinanceLedgerStage } from '@prisma/client'
 import Link from 'next/link'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { AccessDenied } from '@/components/AccessDenied'
 import { PageHeaderNav } from '@/components/PageHeaderNav'
@@ -30,16 +30,6 @@ type LedgerProject = {
   code: string | null
 }
 
-type LedgerSection = {
-  id: number
-  projectId: number | null
-  slug: string
-  name: string
-  labels: { zh: string; fr: string }
-  startPk: string
-  endPk: string
-}
-
 type LedgerEvent = {
   id: number
   caseId: number
@@ -59,10 +49,6 @@ type LedgerCase = {
   projectId: number
   projectName: string
   projectCode: string | null
-  sectionId: number | null
-  sectionName: string | null
-  sectionSlug: string | null
-  sectionLabelFr: string | null
   periodIndex: number
   status: FinanceLedgerCaseStatus
   currentStage: FinanceLedgerStage | null
@@ -75,6 +61,8 @@ type LedgerCase = {
   invoiceNumber: string | null
   receiptChequeNumber: string | null
   remark: string | null
+  constructionStartedAt: string | null
+  constructionFinishedAt: string | null
   waitingDays: number
   overdueDays: number
   isOverdue: boolean
@@ -146,14 +134,12 @@ type LedgerInsights = {
 
 type LedgerMetadata = {
   projects: LedgerProject[]
-  sections: LedgerSection[]
   stages: FinanceLedgerStage[]
   statuses: FinanceLedgerCaseStatus[]
 }
 
 type LedgerFilters = {
   projectId: string
-  sectionId: string
   status: 'all' | FinanceLedgerCaseStatus
   stage: 'all' | FinanceLedgerStage
   overdue: 'all' | 'true' | 'false'
@@ -166,11 +152,9 @@ type LedgerFilters = {
 type LedgerCreateForm = {
   projectId: string
   periodIndex: string
-  sectionId: string
 }
 
 type LedgerCaseForm = {
-  sectionId: string
   status: FinanceLedgerCaseStatus
   accountAmount: string
   invoiceAmount: string
@@ -179,6 +163,9 @@ type LedgerCaseForm = {
   invoiceNumber: string
   receiptChequeNumber: string
   remark: string
+  constructionStartedAt: string
+  constructionFinishedAt: string
+  stageDates: Record<FinanceLedgerStage, string>
 }
 
 type LedgerEventForm = {
@@ -196,7 +183,56 @@ type LedgerEventForm = {
 
 type PageTab = 'liste' | 'progression' | 'delais'
 
+type LedgerListColumnKey =
+  | 'sequence'
+  | 'project'
+  | 'period'
+  | 'constructionStartedAt'
+  | 'constructionFinishedAt'
+  | 'stage'
+  | 'accountAmount'
+  | 'invoiceAmount'
+  | 'chequeAmount'
+  | 'waitingDays'
+  | 'overdueDays'
+  | 'remark'
+  | 'updatedAt'
+
 const pageSizeOptions = [10, 20, 50, 100]
+const LEDGER_COLUMN_STORAGE_KEY = 'finance-ledger-visible-columns'
+const LEDGER_ACTION_COLUMN_MIN_WIDTH = 72
+const LEDGER_MIN_TABLE_WIDTH = 720
+const ledgerColumnKeys: LedgerListColumnKey[] = [
+  'sequence',
+  'project',
+  'period',
+  'constructionStartedAt',
+  'constructionFinishedAt',
+  'stage',
+  'accountAmount',
+  'invoiceAmount',
+  'chequeAmount',
+  'waitingDays',
+  'overdueDays',
+  'remark',
+  'updatedAt',
+]
+const defaultVisibleLedgerColumns: LedgerListColumnKey[] = ledgerColumnKeys.filter((key) => key !== 'remark')
+const ledgerColumnMinWidthMap: Record<LedgerListColumnKey, number> = {
+  sequence: 56,
+  project: 150,
+  period: 58,
+  constructionStartedAt: 96,
+  constructionFinishedAt: 96,
+  stage: 92,
+  accountAmount: 92,
+  invoiceAmount: 92,
+  chequeAmount: 92,
+  waitingDays: 72,
+  overdueDays: 84,
+  remark: 140,
+  updatedAt: 112,
+}
 
 const containsCjk = (value: string) => /[\u3400-\u9fff]/.test(value)
 
@@ -250,6 +286,389 @@ const statusLabels: Record<Locale, Record<FinanceLedgerCaseStatus, string>> = {
   },
 }
 
+const ledgerText: Record<
+  Locale,
+  {
+    projectFallbackPrefix: string
+    metadataLoadError: string
+    listLoadError: string
+    insightsLoadError: string
+    detailLoadError: string
+    requiredProjectPeriod: string
+    invalidPeriod: string
+    invalidAmount: string
+    invalidConstructionRange: string
+    invalidStageSequence: string
+    invalidStageChronology: string
+    requiredDate: string
+    createCaseFailed: string
+    updateCaseFailed: string
+    deleteCaseFailed: string
+    saveStageFailed: string
+    createCaseSuccess: string
+    updateCaseSuccess: string
+    deleteCaseSuccess: string
+    saveStageSuccess: string
+    deleteCaseConfirm: (sequence: number) => string
+    accessDeniedHint: string
+    breadcrumbHome: string
+    breadcrumbFinance: string
+    breadcrumbLedger: string
+    pageTitle: string
+    pageSubtitle: string
+    tabEntries: string
+    tabLedger: string
+    listTab: string
+    progressionTab: string
+    delaysTab: string
+    createCaseButton: string
+    summaryCases: string
+    summaryAccountAmount: string
+    summaryInvoiceAmount: string
+    summaryChequeAmount: string
+    summaryReceiptRate: string
+    summaryOverdueCases: string
+    labelProject: string
+    labelStatus: string
+    labelStage: string
+    labelOverdue: string
+    labelSearch: string
+    optionAllProjects: string
+    optionAll: string
+    optionAllStages: string
+    optionOverdue: string
+    optionOnTime: string
+    searchPlaceholder: string
+    applyFilters: string
+    resetFilters: string
+    columnSelectorLabel: string
+    columnSelectorSelected: (count: number) => string
+    columnSelectorNone: string
+    columnSelectorAll: string
+    columnSelectorDefault: string
+    columnSelectorClear: string
+    colNumber: string
+    colPeriod: string
+    colConstructionStart: string
+    colConstructionEnd: string
+    colAccount: string
+    colInvoice: string
+    colCheque: string
+    colWaiting: string
+    colRemark: string
+    colUpdatedAt: string
+    colActions: string
+    loading: string
+    emptyCases: string
+    details: string
+    edit: string
+    deleting: string
+    delete: string
+    onTime: string
+    dayShort: string
+    pagination: (total: number, page: number, totalPages: number) => string
+    pageSize: string
+    previous: string
+    next: string
+    analysing: string
+    stageFunnel: string
+    monthlyFlow: string
+    colMonth: string
+    colInvoiceCumulative: string
+    colChequeCumulative: string
+    noData: string
+    agingCurrent: string
+    transitionsSla: string
+    colTransition: string
+    colCount: string
+    colAverage: string
+    colDelayRate: string
+    colImpact: string
+    daysSuffix: string
+    caseLabel: string
+    close: string
+    timeline: string
+    notFilled: string
+    fill: string
+    createCaseTitle: string
+    createCaseSubtitle: string
+    none: string
+    cancel: string
+    creating: string
+    create: string
+    editCaseTitle: (sequence: number) => string
+    accountAmount: string
+    invoiceAmount: string
+    advanceAmount: string
+    chequeAmount: string
+    invoiceNumber: string
+    receiptChequeNumber: string
+    remark: string
+    stageNote: string
+    constructionStartedAt: string
+    constructionFinishedAt: string
+    stageDatesTitle: string
+    saving: string
+    save: string
+    editStage: string
+    fillStage: string
+    stageDate: string
+  }
+> = {
+  fr: {
+    projectFallbackPrefix: 'Projet',
+    metadataLoadError: 'Impossible de charger les métadonnées',
+    listLoadError: 'Impossible de charger la liste',
+    insightsLoadError: 'Impossible de charger les analyses',
+    detailLoadError: 'Impossible de charger le dossier',
+    requiredProjectPeriod: 'Projet et période obligatoires',
+    invalidPeriod: 'Période invalide',
+    invalidAmount: 'Montant invalide',
+    invalidConstructionRange: 'La date de fin des travaux doit être postérieure à la date de début',
+    invalidStageSequence: 'Les dates des étapes doivent être remplies dans l’ordre, sans trou',
+    invalidStageChronology: 'La date d’une étape ne peut pas être antérieure à son étape précédente',
+    requiredDate: 'Date obligatoire',
+    createCaseFailed: 'Création impossible',
+    updateCaseFailed: 'Mise à jour impossible',
+    deleteCaseFailed: 'Suppression impossible',
+    saveStageFailed: "Échec de l'enregistrement de l'étape",
+    createCaseSuccess: 'Dossier créé',
+    updateCaseSuccess: 'Dossier mis à jour',
+    deleteCaseSuccess: 'Dossier supprimé',
+    saveStageSuccess: 'Étape enregistrée',
+    deleteCaseConfirm: (sequence) => `Supprimer le dossier #${sequence} ?`,
+    accessDeniedHint: 'Veuillez demander la permission finance:view.',
+    breadcrumbHome: 'Accueil',
+    breadcrumbFinance: 'Finance',
+    breadcrumbLedger: 'Tableau de suivi',
+    pageTitle: 'Tableau de suivi des factures et encaissements',
+    pageSubtitle: 'Créer un dossier unique par projet+période, puis renseigner les étapes au fil du temps.',
+    tabEntries: 'Entrées',
+    tabLedger: 'Tableau de suivi',
+    listTab: 'Liste',
+    progressionTab: 'Progression',
+    delaysTab: 'Délais',
+    createCaseButton: 'Nouveau dossier',
+    summaryCases: 'Dossiers',
+    summaryAccountAmount: 'Montant compte',
+    summaryInvoiceAmount: 'Montant facture',
+    summaryChequeAmount: 'Montant chèque',
+    summaryReceiptRate: 'Taux encaissement',
+    summaryOverdueCases: 'Dossiers en retard',
+    labelProject: 'Projet',
+    labelStatus: 'Statut',
+    labelStage: 'Étape',
+    labelOverdue: 'Retard',
+    labelSearch: 'Recherche',
+    optionAllProjects: 'Tous les projets',
+    optionAll: 'Tous',
+    optionAllStages: 'Toutes',
+    optionOverdue: 'En retard',
+    optionOnTime: 'Dans le délai',
+    searchPlaceholder: 'Projet, facture, note…',
+    applyFilters: 'Appliquer',
+    resetFilters: 'Réinitialiser',
+    columnSelectorLabel: 'Colonnes',
+    columnSelectorSelected: (count) => `${count} colonnes sélectionnées`,
+    columnSelectorNone: 'Aucune colonne',
+    columnSelectorAll: 'Tout sélectionner',
+    columnSelectorDefault: 'Par défaut',
+    columnSelectorClear: 'Tout masquer',
+    colNumber: 'Numéro',
+    colPeriod: 'Période',
+    colConstructionStart: 'Début travaux',
+    colConstructionEnd: 'Fin travaux',
+    colAccount: 'Compte',
+    colInvoice: 'Facture',
+    colCheque: 'Chèque',
+    colWaiting: 'Attente',
+    colRemark: 'Note',
+    colUpdatedAt: 'Mis à jour',
+    colActions: 'Actions',
+    loading: 'Chargement...',
+    emptyCases: 'Aucun dossier',
+    details: 'Détails',
+    edit: 'Modifier',
+    deleting: 'Suppression...',
+    delete: 'Supprimer',
+    onTime: 'OK',
+    dayShort: 'j',
+    pagination: (total, page, totalPages) => `${total} dossiers · page ${page}/${totalPages}`,
+    pageSize: 'Taille',
+    previous: 'Précédent',
+    next: 'Suivant',
+    analysing: 'Analyse en cours...',
+    stageFunnel: 'Entonnoir des étapes',
+    monthlyFlow: 'Flux mensuel',
+    colMonth: 'Mois',
+    colInvoiceCumulative: 'Cumul facture',
+    colChequeCumulative: 'Cumul chèque',
+    noData: 'Aucune donnée',
+    agingCurrent: 'Aging actuel',
+    transitionsSla: 'Transitions et SLA',
+    colTransition: 'Transition',
+    colCount: 'Nb',
+    colAverage: 'Moyenne',
+    colDelayRate: 'Retard %',
+    colImpact: 'Impact',
+    daysSuffix: 'jours',
+    caseLabel: 'Dossier',
+    close: 'Fermer',
+    timeline: 'Timeline des étapes',
+    notFilled: 'Non renseigné',
+    fill: 'Renseigner',
+    createCaseTitle: 'Nouveau dossier',
+    createCaseSubtitle: 'Créer le couple unique Projet + Période.',
+    none: 'Aucune',
+    cancel: 'Annuler',
+    creating: 'Création...',
+    create: 'Créer',
+    editCaseTitle: (sequence) => `Modifier le dossier #${sequence}`,
+    accountAmount: 'Montant compte',
+    invoiceAmount: 'Montant facture',
+    advanceAmount: 'Acompte',
+    chequeAmount: 'Montant chèque',
+    invoiceNumber: 'Numéro facture',
+    receiptChequeNumber: 'Numéro chèque reçu',
+    remark: 'Note',
+    stageNote: "Note d'étape",
+    constructionStartedAt: 'Début de construction',
+    constructionFinishedAt: 'Fin de construction',
+    stageDatesTitle: 'Dates de jalons',
+    saving: 'Enregistrement...',
+    save: 'Enregistrer',
+    editStage: 'Modifier étape',
+    fillStage: 'Renseigner étape',
+    stageDate: 'Date étape',
+  },
+  zh: {
+    projectFallbackPrefix: '项目',
+    metadataLoadError: '加载元数据失败',
+    listLoadError: '加载列表失败',
+    insightsLoadError: '加载分析失败',
+    detailLoadError: '加载台账详情失败',
+    requiredProjectPeriod: '项目和期数必填',
+    invalidPeriod: '期数无效',
+    invalidAmount: '金额格式错误',
+    invalidConstructionRange: '施工结束日期不能早于施工开始日期',
+    invalidStageSequence: '阶段日期必须按顺序连续填写，不能跳过前置阶段',
+    invalidStageChronology: '后续阶段日期不能早于前置阶段',
+    requiredDate: '日期必填',
+    createCaseFailed: '创建台账失败',
+    updateCaseFailed: '更新台账失败',
+    deleteCaseFailed: '删除台账失败',
+    saveStageFailed: '保存阶段失败',
+    createCaseSuccess: '台账已创建',
+    updateCaseSuccess: '台账已更新',
+    deleteCaseSuccess: '台账已删除',
+    saveStageSuccess: '阶段已保存',
+    deleteCaseConfirm: (sequence) => `确认删除台账 #${sequence} 吗？`,
+    accessDeniedHint: '请联系管理员开通 finance:view 权限。',
+    breadcrumbHome: '首页',
+    breadcrumbFinance: '财务记账',
+    breadcrumbLedger: '台账跟踪',
+    pageTitle: '发票与收款台账跟踪',
+    pageSubtitle: '按“项目+期数”建立唯一台账，并按阶段补录信息。',
+    tabEntries: '财务记账',
+    tabLedger: '台账跟踪',
+    listTab: '列表',
+    progressionTab: '进展',
+    delaysTab: '时效',
+    createCaseButton: '新建台账',
+    summaryCases: '台账数',
+    summaryAccountAmount: '账单金额',
+    summaryInvoiceAmount: '发票金额',
+    summaryChequeAmount: '支票金额',
+    summaryReceiptRate: '收款率',
+    summaryOverdueCases: '超时台账',
+    labelProject: '项目',
+    labelStatus: '状态',
+    labelStage: '阶段',
+    labelOverdue: '超时',
+    labelSearch: '搜索',
+    optionAllProjects: '全部项目',
+    optionAll: '全部',
+    optionAllStages: '全部阶段',
+    optionOverdue: '已超时',
+    optionOnTime: '未超时',
+    searchPlaceholder: '项目、路段、发票号、备注…',
+    applyFilters: '应用筛选',
+    resetFilters: '重置',
+    columnSelectorLabel: '显示列',
+    columnSelectorSelected: (count) => `已选 ${count} 列`,
+    columnSelectorNone: '未选择列',
+    columnSelectorAll: '全选',
+    columnSelectorDefault: '恢复默认',
+    columnSelectorClear: '清空',
+    colNumber: '编号',
+    colPeriod: '期次',
+    colConstructionStart: '施工开始',
+    colConstructionEnd: '施工结束',
+    colAccount: '账单',
+    colInvoice: '发票',
+    colCheque: '支票',
+    colWaiting: '等待',
+    colRemark: '备注',
+    colUpdatedAt: '更新时间',
+    colActions: '操作',
+    loading: '加载中...',
+    emptyCases: '暂无台账',
+    details: '详情',
+    edit: '编辑',
+    deleting: '删除中...',
+    delete: '删除',
+    onTime: '正常',
+    dayShort: '天',
+    pagination: (total, page, totalPages) => `共 ${total} 条 · 第 ${page}/${totalPages} 页`,
+    pageSize: '每页',
+    previous: '上一页',
+    next: '下一页',
+    analysing: '分析计算中...',
+    stageFunnel: '阶段漏斗',
+    monthlyFlow: '月度流转',
+    colMonth: '月份',
+    colInvoiceCumulative: '累计发票',
+    colChequeCumulative: '累计支票',
+    noData: '暂无数据',
+    agingCurrent: '当前等待时长',
+    transitionsSla: '阶段转换与 SLA',
+    colTransition: '阶段转换',
+    colCount: '数量',
+    colAverage: '平均',
+    colDelayRate: '超时率',
+    colImpact: '影响金额',
+    daysSuffix: '天',
+    caseLabel: '台账',
+    close: '关闭',
+    timeline: '阶段时间线',
+    notFilled: '未填写',
+    fill: '登记',
+    createCaseTitle: '新建台账',
+    createCaseSubtitle: '先创建唯一“项目 + 期数”，后续按阶段补录。',
+    none: '无',
+    cancel: '取消',
+    creating: '创建中...',
+    create: '创建',
+    editCaseTitle: (sequence) => `编辑台账 #${sequence}`,
+    accountAmount: '账单金额',
+    invoiceAmount: '发票金额',
+    advanceAmount: '预付款',
+    chequeAmount: '支票金额',
+    invoiceNumber: '发票号',
+    receiptChequeNumber: '收款支票号',
+    remark: '备注',
+    stageNote: '阶段备注',
+    constructionStartedAt: '施工开始时间',
+    constructionFinishedAt: '施工结束时间',
+    stageDatesTitle: '流程节点日期',
+    saving: '保存中...',
+    save: '保存',
+    editStage: '编辑阶段',
+    fillStage: '登记阶段',
+    stageDate: '阶段日期',
+  },
+}
+
 const stageTone: Record<FinanceLedgerCaseStatus, string> = {
   IN_PROGRESS: 'bg-blue-50 text-blue-700 ring-1 ring-blue-100',
   DONE: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100',
@@ -262,6 +681,20 @@ const formatNumber = (value: number | null | undefined, locale: Locale) => {
   if (value == null || !Number.isFinite(value)) return '—'
   const localeId = locale === 'fr' ? 'fr-FR' : 'zh-CN'
   return new Intl.NumberFormat(localeId, { maximumFractionDigits: 2 }).format(value)
+}
+
+const formatDateTime = (value: string | null, locale: Locale) => {
+  if (!value) return '—'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '—'
+  const localeId = locale === 'fr' ? 'fr-FR' : 'zh-CN'
+  return new Intl.DateTimeFormat(localeId, {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date)
 }
 
 const parseMaybeNumber = (value: string) => {
@@ -283,7 +716,7 @@ const resolveProjectName = (project: LedgerProject, locale: Locale) => {
   if (project.code && frProjectNameByCode[project.code]) return frProjectNameByCode[project.code]
   if (!containsCjk(project.name)) return project.name
   if (project.code) return humanizeIdentifier(project.code)
-  return `Projet #${project.id}`
+  return `${ledgerText[locale].projectFallbackPrefix} #${project.id}`
 }
 
 const resolveCaseProjectName = (item: LedgerCase, locale: Locale) => {
@@ -291,27 +724,25 @@ const resolveCaseProjectName = (item: LedgerCase, locale: Locale) => {
   if (item.projectCode && frProjectNameByCode[item.projectCode]) return frProjectNameByCode[item.projectCode]
   if (!containsCjk(item.projectName)) return item.projectName
   if (item.projectCode) return humanizeIdentifier(item.projectCode)
-  return `Projet #${item.projectId}`
-}
-
-const resolveSectionName = (section: LedgerSection, locale: Locale) => {
-  if (locale === 'fr') return section.labels.fr || section.name
-  return section.labels.zh || section.name
-}
-
-const resolveCaseSectionName = (item: LedgerCase, locale: Locale) => {
-  if (locale === 'fr') return item.sectionLabelFr || item.sectionName || '—'
-  return item.sectionName || '—'
+  return `${ledgerText[locale].projectFallbackPrefix} #${item.projectId}`
 }
 
 const defaultCreateForm: LedgerCreateForm = {
   projectId: '',
   periodIndex: '',
-  sectionId: '',
 }
 
+const buildEmptyStageDateForm = (): Record<FinanceLedgerStage, string> => ({
+  SITE_SIGNED: '',
+  HQ_BILL_RECEIVED: '',
+  BE_CONFIRMED: '',
+  BE_DELIVERED: '',
+  HQ_INVOICE_RECEIVED: '',
+  CHEQUE_ISSUED: '',
+  CHEQUE_RECEIVED: '',
+})
+
 const defaultCaseForm: LedgerCaseForm = {
-  sectionId: '',
   status: 'IN_PROGRESS',
   accountAmount: '',
   invoiceAmount: '',
@@ -320,6 +751,9 @@ const defaultCaseForm: LedgerCaseForm = {
   invoiceNumber: '',
   receiptChequeNumber: '',
   remark: '',
+  constructionStartedAt: '',
+  constructionFinishedAt: '',
+  stageDates: buildEmptyStageDateForm(),
 }
 
 const defaultEventForm = (stage: FinanceLedgerStage): LedgerEventForm => ({
@@ -337,7 +771,6 @@ const defaultEventForm = (stage: FinanceLedgerStage): LedgerEventForm => ({
 
 const defaultFilters: LedgerFilters = {
   projectId: 'all',
-  sectionId: 'all',
   status: 'all',
   stage: 'all',
   overdue: 'all',
@@ -348,7 +781,8 @@ const defaultFilters: LedgerFilters = {
 }
 
 export default function FinanceLedgerPage() {
-  const { locale, setLocale } = usePreferredLocale('fr', locales)
+  const { locale, setLocale } = usePreferredLocale('zh', locales)
+  const t = ledgerText[locale]
   const { addToast } = useToast()
 
   const [session, setSession] = useState<SessionUser | null>(null)
@@ -362,7 +796,6 @@ export default function FinanceLedgerPage() {
   const [loading, setLoading] = useState(false)
   const [insightsLoading, setInsightsLoading] = useState(false)
   const [insights, setInsights] = useState<LedgerInsights | null>(null)
-  const [stickyTop, setStickyTop] = useState(0)
   const [message, setMessage] = useState<string | null>(null)
 
   const [showCreateModal, setShowCreateModal] = useState(false)
@@ -380,9 +813,55 @@ export default function FinanceLedgerPage() {
   const [eventForm, setEventForm] = useState<LedgerEventForm>(defaultEventForm('SITE_SIGNED'))
   const [eventSaving, setEventSaving] = useState(false)
   const [deletingId, setDeletingId] = useState<number | null>(null)
+  const [visibleColumns, setVisibleColumns] = useState<LedgerListColumnKey[]>([...defaultVisibleLedgerColumns])
+  const [showColumnSelector, setShowColumnSelector] = useState(false)
+  const columnSelectorRef = useRef<HTMLDivElement | null>(null)
 
   const canView = session?.permissions.includes('finance:view') ?? false
   const canEdit = session?.permissions.includes('finance:edit') ?? false
+  const ledgerActionColumnWidth = canEdit ? 120 : LEDGER_ACTION_COLUMN_MIN_WIDTH
+  const visibleColumnCount = visibleColumns.length + 1
+  const ledgerTableMinWidth = useMemo(() => {
+    const columnsWidth = visibleColumns.reduce((sum, key) => sum + ledgerColumnMinWidthMap[key], 0)
+    return Math.min(980, Math.max(LEDGER_MIN_TABLE_WIDTH, columnsWidth + ledgerActionColumnWidth))
+  }, [ledgerActionColumnWidth, visibleColumns])
+
+  const columnOptions = useMemo<Array<{ key: LedgerListColumnKey; label: string }>>(
+    () => [
+      { key: 'sequence', label: t.colNumber },
+      { key: 'project', label: t.labelProject },
+      { key: 'period', label: t.colPeriod },
+      { key: 'constructionStartedAt', label: t.colConstructionStart },
+      { key: 'constructionFinishedAt', label: t.colConstructionEnd },
+      { key: 'stage', label: t.labelStage },
+      { key: 'accountAmount', label: t.colAccount },
+      { key: 'invoiceAmount', label: t.colInvoice },
+      { key: 'chequeAmount', label: t.colCheque },
+      { key: 'waitingDays', label: t.colWaiting },
+      { key: 'overdueDays', label: t.labelOverdue },
+      { key: 'remark', label: t.colRemark },
+      { key: 'updatedAt', label: t.colUpdatedAt },
+    ],
+    [t],
+  )
+
+  const persistVisibleColumns = useCallback((next: LedgerListColumnKey[]) => {
+    setVisibleColumns(next)
+    if (typeof window === 'undefined') return
+    try {
+      localStorage.setItem(LEDGER_COLUMN_STORAGE_KEY, JSON.stringify(next))
+    } catch (error) {
+      console.error('Failed to persist ledger columns', error)
+    }
+  }, [])
+
+  const toggleVisibleColumn = (key: LedgerListColumnKey) => {
+    persistVisibleColumns(
+      visibleColumns.includes(key)
+        ? visibleColumns.filter((item) => item !== key)
+        : [...visibleColumns, key],
+    )
+  }
 
   const fetchSession = useCallback(async () => {
     try {
@@ -401,7 +880,7 @@ export default function FinanceLedgerPage() {
       const res = await fetch('/api/finance/ledger/metadata', { credentials: 'include' })
       const data = (await res.json()) as LedgerMetadata & { message?: string }
       if (!res.ok) {
-        throw new Error(data.message ?? 'Impossible de charger les métadonnées')
+        throw new Error(data.message ?? t.metadataLoadError)
       }
       setMetadata(data)
       if (data.projects.length && !createForm.projectId) {
@@ -410,12 +889,11 @@ export default function FinanceLedgerPage() {
     } catch (error) {
       setMessage((error as Error).message)
     }
-  }, [createForm.projectId])
+  }, [createForm.projectId, t])
 
   const buildQuery = useCallback((source: LedgerFilters) => {
     const query = new URLSearchParams()
     if (source.projectId !== 'all') query.append('projectId', source.projectId)
-    if (source.sectionId !== 'all') query.append('sectionId', source.sectionId)
     if (source.status !== 'all') query.append('status', source.status)
     if (source.stage !== 'all') query.append('stage', source.stage)
     if (source.overdue !== 'all') query.append('overdue', source.overdue)
@@ -440,7 +918,7 @@ export default function FinanceLedgerPage() {
           message?: string
         }
         if (!res.ok) {
-          throw new Error(data.message ?? 'Impossible de charger la liste')
+          throw new Error(data.message ?? t.listLoadError)
         }
         setCases(data.cases ?? [])
         setTotalCases(data.total ?? 0)
@@ -452,7 +930,7 @@ export default function FinanceLedgerPage() {
         setLoading(false)
       }
     },
-    [buildQuery],
+    [buildQuery, t],
   )
 
   const fetchInsights = useCallback(
@@ -469,7 +947,7 @@ export default function FinanceLedgerPage() {
         })
         const data = (await res.json()) as { insights?: LedgerInsights; message?: string }
         if (!res.ok) {
-          throw new Error(data.message ?? 'Impossible de charger les analyses')
+          throw new Error(data.message ?? t.insightsLoadError)
         }
         setInsights(data.insights ?? null)
       } catch (error) {
@@ -479,7 +957,7 @@ export default function FinanceLedgerPage() {
         setInsightsLoading(false)
       }
     },
-    [buildQuery],
+    [buildQuery, t],
   )
 
   const loadCaseDetail = useCallback(async (id: number) => {
@@ -490,7 +968,7 @@ export default function FinanceLedgerPage() {
       })
       const data = (await res.json()) as { case?: LedgerCase; message?: string }
       if (!res.ok) {
-        throw new Error(data.message ?? 'Impossible de charger le dossier')
+        throw new Error(data.message ?? t.detailLoadError)
       }
       setDetailCase(data.case ?? null)
     } catch (error) {
@@ -498,7 +976,7 @@ export default function FinanceLedgerPage() {
     } finally {
       setDetailLoading(false)
     }
-  }, [addToast])
+  }, [addToast, t])
 
   useEffect(() => {
     void fetchSession()
@@ -516,32 +994,36 @@ export default function FinanceLedgerPage() {
   }, [canView, filters, fetchCases, fetchInsights])
 
   useEffect(() => {
-    const header = document.querySelector('header.finance-ledger-header') as HTMLElement | null
-    if (!header) {
-      setStickyTop(0)
-      return
+    if (typeof window === 'undefined') return
+    try {
+      const stored = localStorage.getItem(LEDGER_COLUMN_STORAGE_KEY)
+      if (!stored) return
+      const parsed = JSON.parse(stored)
+      if (!Array.isArray(parsed)) return
+      const filtered = parsed.filter(
+        (item): item is LedgerListColumnKey =>
+          typeof item === 'string' && ledgerColumnKeys.includes(item as LedgerListColumnKey),
+      )
+      if (filtered.length || stored.trim() === '[]') {
+        setVisibleColumns(filtered)
+      }
+    } catch (error) {
+      console.error('Failed to load ledger columns', error)
     }
-    const resolve = () => setStickyTop(Math.ceil(header.getBoundingClientRect().height))
-    resolve()
-    const observer = new ResizeObserver(resolve)
-    observer.observe(header)
-    window.addEventListener('resize', resolve)
+  }, [])
+
+  useEffect(() => {
+    const onPointerDown = (event: MouseEvent) => {
+      if (!columnSelectorRef.current) return
+      if (!columnSelectorRef.current.contains(event.target as Node)) {
+        setShowColumnSelector(false)
+      }
+    }
+    document.addEventListener('mousedown', onPointerDown)
     return () => {
-      observer.disconnect()
-      window.removeEventListener('resize', resolve)
+      document.removeEventListener('mousedown', onPointerDown)
     }
-  }, [locale])
-
-  const filteredSections = useMemo(() => {
-    if (!metadata?.sections) return []
-    if (filterDraft.projectId === 'all') return metadata.sections
-    return metadata.sections.filter((section) => String(section.projectId) === filterDraft.projectId)
-  }, [filterDraft.projectId, metadata?.sections])
-
-  const createSections = useMemo(() => {
-    if (!metadata?.sections || !createForm.projectId) return []
-    return metadata.sections.filter((section) => String(section.projectId) === createForm.projectId)
-  }, [createForm.projectId, metadata?.sections])
+  }, [])
 
   const detailEventsByStage = useMemo(() => {
     const map = new Map<FinanceLedgerStage, LedgerEvent>()
@@ -578,24 +1060,25 @@ export default function FinanceLedgerPage() {
     return filters.sortStack[index].order === 'asc' ? 'ascending' : 'descending'
   }
 
+  const isVisibleColumn = (key: LedgerListColumnKey) => visibleColumns.includes(key)
+
   const openCreateModal = () => {
     if (!metadata?.projects.length) return
     setCreateForm({
       projectId: String(metadata.projects[0].id),
       periodIndex: '',
-      sectionId: '',
     })
     setShowCreateModal(true)
   }
 
   const handleCreate = async () => {
     if (!createForm.projectId || !createForm.periodIndex.trim()) {
-      addToast(locale === 'fr' ? 'Projet et période obligatoires' : '项目和期数必填', { tone: 'warning' })
+      addToast(t.requiredProjectPeriod, { tone: 'warning' })
       return
     }
     const periodIndex = Number(createForm.periodIndex)
     if (!Number.isInteger(periodIndex) || periodIndex < 0) {
-      addToast(locale === 'fr' ? 'Période invalide' : '期数无效', { tone: 'warning' })
+      addToast(t.invalidPeriod, { tone: 'warning' })
       return
     }
 
@@ -608,12 +1091,11 @@ export default function FinanceLedgerPage() {
         body: JSON.stringify({
           projectId: Number(createForm.projectId),
           periodIndex,
-          sectionId: createForm.sectionId ? Number(createForm.sectionId) : null,
         }),
       })
       const data = (await res.json()) as { case?: LedgerCase; message?: string }
-      if (!res.ok) throw new Error(data.message ?? 'Création impossible')
-      addToast(locale === 'fr' ? 'Dossier créé' : '台账已创建', { tone: 'success' })
+      if (!res.ok) throw new Error(data.message ?? t.createCaseFailed)
+      addToast(t.createCaseSuccess, { tone: 'success' })
       setShowCreateModal(false)
       await fetchCases(filters)
       await fetchInsights(filters)
@@ -625,9 +1107,15 @@ export default function FinanceLedgerPage() {
   }
 
   const openEditCaseModal = (item: LedgerCase) => {
+    const stageDateForm = FINANCE_LEDGER_STAGES.reduce(
+      (acc, stage) => {
+        acc[stage] = formatDateInput(item.stageDates[stage])
+        return acc
+      },
+      buildEmptyStageDateForm(),
+    )
     setEditingCase(item)
     setCaseForm({
-      sectionId: item.sectionId ? String(item.sectionId) : '',
       status: item.status,
       accountAmount: item.accountAmount == null ? '' : String(item.accountAmount),
       invoiceAmount: item.invoiceAmount == null ? '' : String(item.invoiceAmount),
@@ -636,6 +1124,9 @@ export default function FinanceLedgerPage() {
       invoiceNumber: item.invoiceNumber ?? '',
       receiptChequeNumber: item.receiptChequeNumber ?? '',
       remark: item.remark ?? '',
+      constructionStartedAt: formatDateInput(item.constructionStartedAt),
+      constructionFinishedAt: formatDateInput(item.constructionFinishedAt),
+      stageDates: stageDateForm,
     })
   }
 
@@ -646,8 +1137,34 @@ export default function FinanceLedgerPage() {
     const advanceAmount = toInputNumberOrNull(caseForm.advanceAmount)
     const chequeAmount = toInputNumberOrNull(caseForm.chequeAmount)
     if ([accountAmount, invoiceAmount, advanceAmount, chequeAmount].some((item) => Number.isNaN(item))) {
-      addToast(locale === 'fr' ? 'Montant invalide' : '金额格式错误', { tone: 'warning' })
+      addToast(t.invalidAmount, { tone: 'warning' })
       return
+    }
+
+    if (
+      caseForm.constructionStartedAt &&
+      caseForm.constructionFinishedAt &&
+      caseForm.constructionFinishedAt < caseForm.constructionStartedAt
+    ) {
+      addToast(t.invalidConstructionRange, { tone: 'warning' })
+      return
+    }
+
+    const stageDates = FINANCE_LEDGER_STAGES.reduce(
+      (acc, stage) => {
+        acc[stage] = caseForm.stageDates[stage] || null
+        return acc
+      },
+      {} as Record<FinanceLedgerStage, string | null>,
+    )
+    const filledStages = FINANCE_LEDGER_STAGES.filter((stage) => Boolean(stageDates[stage]))
+    for (let index = 1; index < filledStages.length; index += 1) {
+      const prevStage = filledStages[index - 1]
+      const currentStage = filledStages[index]
+      if ((stageDates[currentStage] ?? '') < (stageDates[prevStage] ?? '')) {
+        addToast(t.invalidStageChronology, { tone: 'warning' })
+        return
+      }
     }
 
     setCaseSaving(true)
@@ -657,7 +1174,6 @@ export default function FinanceLedgerPage() {
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
-          sectionId: caseForm.sectionId ? Number(caseForm.sectionId) : null,
           status: caseForm.status,
           accountAmount,
           invoiceAmount,
@@ -666,11 +1182,14 @@ export default function FinanceLedgerPage() {
           invoiceNumber: caseForm.invoiceNumber || null,
           receiptChequeNumber: caseForm.receiptChequeNumber || null,
           remark: caseForm.remark || null,
+          constructionStartedAt: caseForm.constructionStartedAt || null,
+          constructionFinishedAt: caseForm.constructionFinishedAt || null,
+          stageDates,
         }),
       })
       const data = (await res.json()) as { case?: LedgerCase; message?: string }
-      if (!res.ok) throw new Error(data.message ?? 'Mise à jour impossible')
-      addToast(locale === 'fr' ? 'Dossier mis à jour' : '台账已更新', { tone: 'success' })
+      if (!res.ok) throw new Error(data.message ?? t.updateCaseFailed)
+      addToast(t.updateCaseSuccess, { tone: 'success' })
       setEditingCase(null)
       await fetchCases(filters)
       await fetchInsights(filters)
@@ -685,11 +1204,7 @@ export default function FinanceLedgerPage() {
   }
 
   const handleDeleteCase = async (item: LedgerCase) => {
-    const confirmed = window.confirm(
-      locale === 'fr'
-        ? `Supprimer le dossier #${item.sequence} ?`
-        : `确认删除台账 #${item.sequence} 吗？`,
-    )
+    const confirmed = window.confirm(t.deleteCaseConfirm(item.sequence))
     if (!confirmed) return
     setDeletingId(item.id)
     try {
@@ -698,8 +1213,8 @@ export default function FinanceLedgerPage() {
         credentials: 'include',
       })
       const data = (await res.json()) as { message?: string }
-      if (!res.ok) throw new Error(data.message ?? 'Suppression impossible')
-      addToast(locale === 'fr' ? 'Dossier supprimé' : '台账已删除', { tone: 'success' })
+      if (!res.ok) throw new Error(data.message ?? t.deleteCaseFailed)
+      addToast(t.deleteCaseSuccess, { tone: 'success' })
       if (detailCase?.id === item.id) {
         setDetailCase(null)
       }
@@ -744,7 +1259,7 @@ export default function FinanceLedgerPage() {
   const handleSaveEvent = async () => {
     if (!detailCase) return
     if (!eventForm.occurredAt) {
-      addToast(locale === 'fr' ? 'Date obligatoire' : '日期必填', { tone: 'warning' })
+      addToast(t.requiredDate, { tone: 'warning' })
       return
     }
     const accountAmount = toInputNumberOrNull(eventForm.accountAmount)
@@ -752,7 +1267,7 @@ export default function FinanceLedgerPage() {
     const advanceAmount = toInputNumberOrNull(eventForm.advanceAmount)
     const chequeAmount = toInputNumberOrNull(eventForm.chequeAmount)
     if ([accountAmount, invoiceAmount, advanceAmount, chequeAmount].some((item) => Number.isNaN(item))) {
-      addToast(locale === 'fr' ? 'Montant invalide' : '金额格式错误', { tone: 'warning' })
+      addToast(t.invalidAmount, { tone: 'warning' })
       return
     }
 
@@ -783,8 +1298,8 @@ export default function FinanceLedgerPage() {
         },
       )
       const data = (await res.json()) as { case?: LedgerCase; message?: string }
-      if (!res.ok) throw new Error(data.message ?? 'Échec enregistrement étape')
-      addToast(locale === 'fr' ? 'Étape enregistrée' : '阶段已保存', { tone: 'success' })
+      if (!res.ok) throw new Error(data.message ?? t.saveStageFailed)
+      addToast(t.saveStageSuccess, { tone: 'success' })
       setShowEventModal(false)
       setEditingEvent(null)
       await fetchCases(filters)
@@ -819,20 +1334,20 @@ export default function FinanceLedgerPage() {
   const tabs = [
     {
       key: 'entries',
-      label: 'Entrées',
+      label: t.tabEntries,
       href: '/finance',
       active: false,
     },
     {
       key: 'ledger',
-      label: 'Tableau de suivi',
+      label: t.tabLedger,
       href: '/finance/ledger',
       active: true,
     },
   ]
 
   if (authLoaded && !canView) {
-    return <AccessDenied permissions={['finance:view']} hint="Veuillez demander la permission finance:view." />
+    return <AccessDenied permissions={['finance:view']} hint={t.accessDeniedHint} />
   }
 
   return (
@@ -840,16 +1355,12 @@ export default function FinanceLedgerPage() {
       <PageHeaderNav
         className="finance-ledger-header z-30 py-4"
         breadcrumbs={[
-          { label: locale === 'fr' ? 'Accueil' : '首页', href: '/' },
-          { label: 'Finance', href: '/finance' },
-          { label: 'Tableau de suivi' },
+          { label: t.breadcrumbHome, href: '/' },
+          { label: t.breadcrumbFinance, href: '/finance' },
+          { label: t.breadcrumbLedger },
         ]}
-        title="Tableau de suivi des factures et encaissements"
-        subtitle={
-          locale === 'fr'
-            ? 'Créer un dossier unique par projet+période, puis renseigner les étapes au fil du temps.'
-            : '按“项目+期数”建立唯一台账，并按阶段补录信息。'
-        }
+        title={t.pageTitle}
+        subtitle={t.pageSubtitle}
         tabs={tabs}
         locale={locale}
         onLocaleChange={setLocale}
@@ -866,7 +1377,7 @@ export default function FinanceLedgerPage() {
                 onClick={() => setActiveTab('liste')}
                 className={`rounded-md px-3 py-1.5 ${activeTab === 'liste' ? 'bg-white text-slate-900' : 'text-slate-600'}`}
               >
-                Liste
+                {t.listTab}
               </button>
               <button
                 type="button"
@@ -875,14 +1386,14 @@ export default function FinanceLedgerPage() {
                   activeTab === 'progression' ? 'bg-white text-slate-900' : 'text-slate-600'
                 }`}
               >
-                Progression
+                {t.progressionTab}
               </button>
               <button
                 type="button"
                 onClick={() => setActiveTab('delais')}
                 className={`rounded-md px-3 py-1.5 ${activeTab === 'delais' ? 'bg-white text-slate-900' : 'text-slate-600'}`}
               >
-                Délais
+                {t.delaysTab}
               </button>
             </div>
             {canEdit ? (
@@ -891,7 +1402,7 @@ export default function FinanceLedgerPage() {
                 onClick={openCreateModal}
                 className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-500"
               >
-                Nouveau dossier
+                {t.createCaseButton}
               </button>
             ) : null}
           </div>
@@ -899,27 +1410,27 @@ export default function FinanceLedgerPage() {
           {insights ? (
             <div className="mb-4 grid gap-3 md:grid-cols-6">
               <article className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                <p className="text-xs uppercase tracking-wide text-slate-500">Dossiers</p>
+                <p className="text-xs uppercase tracking-wide text-slate-500">{t.summaryCases}</p>
                 <p className="mt-1 text-lg font-semibold">{insights.summary.caseCount}</p>
               </article>
               <article className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                <p className="text-xs uppercase tracking-wide text-slate-500">Montant compte</p>
+                <p className="text-xs uppercase tracking-wide text-slate-500">{t.summaryAccountAmount}</p>
                 <p className="mt-1 text-lg font-semibold">{formatNumber(insights.summary.totalAccountAmount, locale)}</p>
               </article>
               <article className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                <p className="text-xs uppercase tracking-wide text-slate-500">Montant facture</p>
+                <p className="text-xs uppercase tracking-wide text-slate-500">{t.summaryInvoiceAmount}</p>
                 <p className="mt-1 text-lg font-semibold">{formatNumber(insights.summary.totalInvoiceAmount, locale)}</p>
               </article>
               <article className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                <p className="text-xs uppercase tracking-wide text-slate-500">Montant chèque</p>
+                <p className="text-xs uppercase tracking-wide text-slate-500">{t.summaryChequeAmount}</p>
                 <p className="mt-1 text-lg font-semibold">{formatNumber(insights.summary.totalChequeAmount, locale)}</p>
               </article>
               <article className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                <p className="text-xs uppercase tracking-wide text-slate-500">Taux encaissement</p>
+                <p className="text-xs uppercase tracking-wide text-slate-500">{t.summaryReceiptRate}</p>
                 <p className="mt-1 text-lg font-semibold">{formatNumber(insights.summary.receiptRate, locale)}%</p>
               </article>
               <article className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                <p className="text-xs uppercase tracking-wide text-slate-500">Dossiers en retard</p>
+                <p className="text-xs uppercase tracking-wide text-slate-500">{t.summaryOverdueCases}</p>
                 <p className="mt-1 text-lg font-semibold text-rose-700">{insights.summary.overdueCount}</p>
               </article>
             </div>
@@ -935,19 +1446,13 @@ export default function FinanceLedgerPage() {
             <>
               <div className="mb-4 grid gap-3 md:grid-cols-12">
                 <label className="text-sm md:col-span-3">
-                  <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Projet</span>
+                  <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{t.labelProject}</span>
                   <select
                     value={filterDraft.projectId}
-                    onChange={(event) =>
-                      setFilterDraft((prev) => ({
-                        ...prev,
-                        projectId: event.target.value,
-                        sectionId: 'all',
-                      }))
-                    }
+                    onChange={(event) => setFilterDraft((prev) => ({ ...prev, projectId: event.target.value }))}
                     className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
                   >
-                    <option value="all">Tous les projets</option>
+                    <option value="all">{t.optionAllProjects}</option>
                     {metadata?.projects.map((project) => (
                       <option key={project.id} value={String(project.id)}>
                         {resolveProjectName(project, locale)}
@@ -956,27 +1461,7 @@ export default function FinanceLedgerPage() {
                   </select>
                 </label>
                 <label className="text-sm md:col-span-3">
-                  <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Section</span>
-                  <select
-                    value={filterDraft.sectionId}
-                    onChange={(event) =>
-                      setFilterDraft((prev) => ({
-                        ...prev,
-                        sectionId: event.target.value,
-                      }))
-                    }
-                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
-                  >
-                    <option value="all">Toutes les sections</option>
-                    {filteredSections.map((section) => (
-                      <option key={section.id} value={String(section.id)}>
-                        {resolveSectionName(section, locale)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="text-sm md:col-span-2">
-                  <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Statut</span>
+                  <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{t.labelStatus}</span>
                   <select
                     value={filterDraft.status}
                     onChange={(event) =>
@@ -987,14 +1472,14 @@ export default function FinanceLedgerPage() {
                     }
                     className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
                   >
-                    <option value="all">Tous</option>
+                    <option value="all">{t.optionAll}</option>
                     <option value="IN_PROGRESS">{statusLabels[locale].IN_PROGRESS}</option>
                     <option value="DONE">{statusLabels[locale].DONE}</option>
                     <option value="BLOCKED">{statusLabels[locale].BLOCKED}</option>
                   </select>
                 </label>
-                <label className="text-sm md:col-span-2">
-                  <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Étape</span>
+                <label className="text-sm md:col-span-3">
+                  <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{t.labelStage}</span>
                   <select
                     value={filterDraft.stage}
                     onChange={(event) =>
@@ -1005,7 +1490,7 @@ export default function FinanceLedgerPage() {
                     }
                     className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
                   >
-                    <option value="all">Toutes</option>
+                    <option value="all">{t.optionAllStages}</option>
                     {FINANCE_LEDGER_STAGES.map((stage) => (
                       <option key={stage} value={stage}>
                         {stageLabels[locale][stage]}
@@ -1013,8 +1498,8 @@ export default function FinanceLedgerPage() {
                     ))}
                   </select>
                 </label>
-                <label className="text-sm md:col-span-2">
-                  <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Retard</span>
+                <label className="text-sm md:col-span-3">
+                  <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{t.labelOverdue}</span>
                   <select
                     value={filterDraft.overdue}
                     onChange={(event) =>
@@ -1025,170 +1510,308 @@ export default function FinanceLedgerPage() {
                     }
                     className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
                   >
-                    <option value="all">Tous</option>
-                    <option value="true">En retard</option>
-                    <option value="false">Dans le délai</option>
+                    <option value="all">{t.optionAll}</option>
+                    <option value="true">{t.optionOverdue}</option>
+                    <option value="false">{t.optionOnTime}</option>
                   </select>
                 </label>
-                <label className="text-sm md:col-span-8">
-                  <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Recherche</span>
+                <label className="text-sm md:col-span-6">
+                  <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{t.labelSearch}</span>
                   <input
                     value={filterDraft.search}
                     onChange={(event) => setFilterDraft((prev) => ({ ...prev, search: event.target.value }))}
-                    placeholder={locale === 'fr' ? 'Projet, section, facture, note…' : '项目、路段、发票号、备注…'}
+                    placeholder={t.searchPlaceholder}
                     className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
                   />
                 </label>
-                <div className="flex items-end gap-2 md:col-span-4">
+                <div className="text-sm md:col-span-3" ref={columnSelectorRef}>
+                  <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    {t.columnSelectorLabel}
+                  </span>
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setShowColumnSelector((prev) => !prev)}
+                      className="flex w-full items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-sm text-slate-800 shadow-sm hover:bg-slate-50"
+                    >
+                      <span className="truncate">
+                        {visibleColumns.length
+                          ? t.columnSelectorSelected(visibleColumns.length)
+                          : t.columnSelectorNone}
+                      </span>
+                      <span className="text-xs text-slate-500">⌕</span>
+                    </button>
+                    {showColumnSelector ? (
+                      <div className="absolute right-0 z-30 mt-2 w-full min-w-[240px] rounded-lg border border-slate-200 bg-white shadow-lg">
+                        <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2 text-xs text-slate-600">
+                          <button
+                            type="button"
+                            className="text-emerald-700 hover:underline"
+                            onClick={() => persistVisibleColumns([...ledgerColumnKeys])}
+                          >
+                            {t.columnSelectorAll}
+                          </button>
+                          <div className="flex items-center gap-3">
+                            <button
+                              type="button"
+                              className="text-slate-600 hover:underline"
+                              onClick={() => persistVisibleColumns([...defaultVisibleLedgerColumns])}
+                            >
+                              {t.columnSelectorDefault}
+                            </button>
+                            <button
+                              type="button"
+                              className="text-slate-600 hover:underline"
+                              onClick={() => persistVisibleColumns([])}
+                            >
+                              {t.columnSelectorClear}
+                            </button>
+                          </div>
+                        </div>
+                        <div className="max-h-64 space-y-1 overflow-y-auto p-2 text-sm">
+                          {columnOptions.map((column) => (
+                            <label
+                              key={column.key}
+                              className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 hover:bg-slate-50"
+                            >
+                              <input
+                                type="checkbox"
+                                className="h-4 w-4"
+                                checked={visibleColumns.includes(column.key)}
+                                onChange={() => toggleVisibleColumn(column.key)}
+                              />
+                              <span className="truncate">{column.label}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+                <div className="flex items-end gap-2 md:col-span-3">
                   <button
                     type="button"
                     onClick={applyFilters}
                     className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-700"
                   >
-                    Appliquer
+                    {t.applyFilters}
                   </button>
                   <button
                     type="button"
                     onClick={clearFilters}
                     className="rounded-lg border border-slate-200 px-3 py-2 text-sm hover:bg-slate-50"
                   >
-                    Réinitialiser
+                    {t.resetFilters}
                   </button>
                 </div>
               </div>
 
-              <div className="overflow-x-auto overflow-y-visible rounded-xl border border-slate-200">
-                <table className="min-w-[1300px] text-left text-sm">
-                  <thead className="sticky z-20 bg-slate-100/95 shadow-sm" style={{ top: `${stickyTop}px` }}>
-                    <tr className="text-xs uppercase tracking-wide text-slate-600">
-                      <th className="px-3 py-2" aria-sort={sortAria('sequence')}>
-                        <button type="button" className="font-semibold" onClick={() => handleSort('sequence')}>
-                          Numéro {sortIndicator('sequence')}
-                        </button>
+              <div className="overflow-x-auto overflow-y-visible rounded-2xl border border-slate-200">
+                <table
+                  className="w-full border-separate border-spacing-0 text-left text-[12px] leading-5"
+                  style={{ minWidth: `${ledgerTableMinWidth}px` }}
+                >
+                  <thead className="sticky top-0 z-20 border-b border-slate-200 bg-slate-100/95 shadow-sm">
+                    <tr className="text-[12px] font-semibold text-slate-700 [&>th]:!px-2 [&>th]:!py-3">
+                      {isVisibleColumn('sequence') ? (
+                        <th className="px-3 py-2" aria-sort={sortAria('sequence')}>
+                          <button type="button" className="font-semibold" onClick={() => handleSort('sequence')}>
+                            {t.colNumber} {sortIndicator('sequence')}
+                          </button>
+                        </th>
+                      ) : null}
+                      {isVisibleColumn('project') ? (
+                        <th className="px-3 py-2" aria-sort={sortAria('project')}>
+                          <button type="button" className="font-semibold" onClick={() => handleSort('project')}>
+                            {t.labelProject} {sortIndicator('project')}
+                          </button>
+                        </th>
+                      ) : null}
+                      {isVisibleColumn('period') ? (
+                        <th className="px-3 py-2" aria-sort={sortAria('period')}>
+                          <button type="button" className="font-semibold" onClick={() => handleSort('period')}>
+                            {t.colPeriod} {sortIndicator('period')}
+                          </button>
+                        </th>
+                      ) : null}
+                      {isVisibleColumn('constructionStartedAt') ? (
+                        <th className="px-3 py-2" aria-sort={sortAria('constructionStartedAt')}>
+                          <button type="button" className="font-semibold" onClick={() => handleSort('constructionStartedAt')}>
+                            {t.colConstructionStart} {sortIndicator('constructionStartedAt')}
+                          </button>
+                        </th>
+                      ) : null}
+                      {isVisibleColumn('constructionFinishedAt') ? (
+                        <th className="px-3 py-2" aria-sort={sortAria('constructionFinishedAt')}>
+                          <button type="button" className="font-semibold" onClick={() => handleSort('constructionFinishedAt')}>
+                            {t.colConstructionEnd} {sortIndicator('constructionFinishedAt')}
+                          </button>
+                        </th>
+                      ) : null}
+                      {isVisibleColumn('stage') ? (
+                        <th className="px-3 py-2" aria-sort={sortAria('stage')}>
+                          <button type="button" className="font-semibold" onClick={() => handleSort('stage')}>
+                            {t.labelStage} {sortIndicator('stage')}
+                          </button>
+                        </th>
+                      ) : null}
+                      {isVisibleColumn('accountAmount') ? (
+                        <th className="px-3 py-2" aria-sort={sortAria('accountAmount')}>
+                          <button type="button" className="font-semibold" onClick={() => handleSort('accountAmount')}>
+                            {t.colAccount} {sortIndicator('accountAmount')}
+                          </button>
+                        </th>
+                      ) : null}
+                      {isVisibleColumn('invoiceAmount') ? (
+                        <th className="px-3 py-2" aria-sort={sortAria('invoiceAmount')}>
+                          <button type="button" className="font-semibold" onClick={() => handleSort('invoiceAmount')}>
+                            {t.colInvoice} {sortIndicator('invoiceAmount')}
+                          </button>
+                        </th>
+                      ) : null}
+                      {isVisibleColumn('chequeAmount') ? (
+                        <th className="px-3 py-2" aria-sort={sortAria('chequeAmount')}>
+                          <button type="button" className="font-semibold" onClick={() => handleSort('chequeAmount')}>
+                            {t.colCheque} {sortIndicator('chequeAmount')}
+                          </button>
+                        </th>
+                      ) : null}
+                      {isVisibleColumn('waitingDays') ? (
+                        <th className="px-3 py-2" aria-sort={sortAria('waitingDays')}>
+                          <button type="button" className="font-semibold" onClick={() => handleSort('waitingDays')}>
+                            {t.colWaiting} {sortIndicator('waitingDays')}
+                          </button>
+                        </th>
+                      ) : null}
+                      {isVisibleColumn('overdueDays') ? (
+                        <th className="px-3 py-2" aria-sort={sortAria('overdueDays')}>
+                          <button type="button" className="font-semibold" onClick={() => handleSort('overdueDays')}>
+                            {t.labelOverdue} {sortIndicator('overdueDays')}
+                          </button>
+                        </th>
+                      ) : null}
+                      {isVisibleColumn('remark') ? (
+                        <th className="px-3 py-2" aria-sort={sortAria('remark')}>
+                          <button type="button" className="font-semibold" onClick={() => handleSort('remark')}>
+                            {t.colRemark} {sortIndicator('remark')}
+                          </button>
+                        </th>
+                      ) : null}
+                      {isVisibleColumn('updatedAt') ? (
+                        <th className="px-3 py-2" aria-sort={sortAria('updatedAt')}>
+                          <button type="button" className="font-semibold" onClick={() => handleSort('updatedAt')}>
+                            {t.colUpdatedAt} {sortIndicator('updatedAt')}
+                          </button>
+                        </th>
+                      ) : null}
+                      <th
+                        className="px-3 py-2 text-right"
+                        style={{
+                          minWidth: `${ledgerActionColumnWidth}px`,
+                          width: `${ledgerActionColumnWidth}px`,
+                        }}
+                      >
+                        {t.colActions}
                       </th>
-                      <th className="px-3 py-2" aria-sort={sortAria('project')}>
-                        <button type="button" className="font-semibold" onClick={() => handleSort('project')}>
-                          Projet {sortIndicator('project')}
-                        </button>
-                      </th>
-                      <th className="px-3 py-2" aria-sort={sortAria('section')}>
-                        <button type="button" className="font-semibold" onClick={() => handleSort('section')}>
-                          Section {sortIndicator('section')}
-                        </button>
-                      </th>
-                      <th className="px-3 py-2" aria-sort={sortAria('period')}>
-                        <button type="button" className="font-semibold" onClick={() => handleSort('period')}>
-                          Période {sortIndicator('period')}
-                        </button>
-                      </th>
-                      <th className="px-3 py-2" aria-sort={sortAria('stage')}>
-                        <button type="button" className="font-semibold" onClick={() => handleSort('stage')}>
-                          Étape {sortIndicator('stage')}
-                        </button>
-                      </th>
-                      <th className="px-3 py-2" aria-sort={sortAria('accountAmount')}>
-                        <button type="button" className="font-semibold" onClick={() => handleSort('accountAmount')}>
-                          Compte {sortIndicator('accountAmount')}
-                        </button>
-                      </th>
-                      <th className="px-3 py-2" aria-sort={sortAria('invoiceAmount')}>
-                        <button type="button" className="font-semibold" onClick={() => handleSort('invoiceAmount')}>
-                          Facture {sortIndicator('invoiceAmount')}
-                        </button>
-                      </th>
-                      <th className="px-3 py-2" aria-sort={sortAria('chequeAmount')}>
-                        <button type="button" className="font-semibold" onClick={() => handleSort('chequeAmount')}>
-                          Chèque {sortIndicator('chequeAmount')}
-                        </button>
-                      </th>
-                      <th className="px-3 py-2" aria-sort={sortAria('waitingDays')}>
-                        <button type="button" className="font-semibold" onClick={() => handleSort('waitingDays')}>
-                          Attente {sortIndicator('waitingDays')}
-                        </button>
-                      </th>
-                      <th className="px-3 py-2" aria-sort={sortAria('overdueDays')}>
-                        <button type="button" className="font-semibold" onClick={() => handleSort('overdueDays')}>
-                          Retard {sortIndicator('overdueDays')}
-                        </button>
-                      </th>
-                      <th className="px-3 py-2" aria-sort={sortAria('remark')}>
-                        <button type="button" className="font-semibold" onClick={() => handleSort('remark')}>
-                          Note {sortIndicator('remark')}
-                        </button>
-                      </th>
-                      <th className="px-3 py-2 text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {loading ? (
                       <tr>
-                        <td colSpan={12} className="px-3 py-6 text-center text-slate-500">
-                          Chargement...
+                        <td colSpan={visibleColumnCount} className="px-3 py-6 text-center text-slate-500">
+                          {t.loading}
                         </td>
                       </tr>
                     ) : !cases.length ? (
                       <tr>
-                        <td colSpan={12} className="px-3 py-6 text-center text-slate-500">
-                          Aucun dossier
+                        <td colSpan={visibleColumnCount} className="px-3 py-6 text-center text-slate-500">
+                          {t.emptyCases}
                         </td>
                       </tr>
                     ) : (
-                      cases.map((item) => (
-                        <tr key={item.id} className="bg-white hover:bg-slate-50/70">
-                          <td className="px-3 py-2 font-semibold text-slate-800">#{item.sequence}</td>
-                          <td className="px-3 py-2">{resolveCaseProjectName(item, locale)}</td>
-                          <td className="px-3 py-2">{resolveCaseSectionName(item, locale)}</td>
-                          <td className="px-3 py-2">{`P${item.periodIndex}`}</td>
-                          <td className="px-3 py-2">
-                            {item.currentStage ? (
-                              <span className={`rounded-full px-2 py-1 text-xs font-semibold ${stageTone[item.status]}`}>
-                                {stageLabels[locale][item.currentStage]}
-                              </span>
-                            ) : (
-                              '—'
-                            )}
-                          </td>
-                          <td className="px-3 py-2">{formatNumber(item.accountAmount, locale)}</td>
-                          <td className="px-3 py-2">{formatNumber(item.invoiceAmount, locale)}</td>
-                          <td className="px-3 py-2">{formatNumber(item.chequeAmount, locale)}</td>
-                          <td className="px-3 py-2">{item.waitingDays}</td>
-                          <td className="px-3 py-2">
-                            {item.isOverdue ? (
-                              <span className="rounded-full bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-700 ring-1 ring-rose-200">
-                                +{item.overdueDays} j
-                              </span>
-                            ) : (
-                              <span className="rounded-full bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200">
-                                OK
-                              </span>
-                            )}
-                          </td>
-                          <td className="max-w-[220px] truncate px-3 py-2">{item.remark || '—'}</td>
-                          <td className="px-3 py-2 text-right">
-                            <div className="inline-flex gap-2">
+                      cases.map((item, index) => (
+                        <tr
+                          key={item.id}
+                          className="odd:bg-white even:bg-slate-50/40 hover:bg-emerald-50/40 [&>td]:!px-2 [&>td]:!py-2"
+                        >
+                          {isVisibleColumn('sequence') ? (
+                            <td className="font-semibold text-slate-800">
+                              {(filters.page - 1) * filters.pageSize + index + 1}
+                            </td>
+                          ) : null}
+                          {isVisibleColumn('project') ? (
+                            <td className="max-w-[240px] truncate px-3 py-2" title={resolveCaseProjectName(item, locale)}>
+                              {resolveCaseProjectName(item, locale)}
+                            </td>
+                          ) : null}
+                          {isVisibleColumn('period') ? <td>{`P${item.periodIndex}`}</td> : null}
+                          {isVisibleColumn('constructionStartedAt') ? <td>{formatDateInput(item.constructionStartedAt) || '—'}</td> : null}
+                          {isVisibleColumn('constructionFinishedAt') ? <td>{formatDateInput(item.constructionFinishedAt) || '—'}</td> : null}
+                          {isVisibleColumn('stage') ? (
+                            <td className="px-3 py-2">
+                              {item.currentStage ? (
+                                <span className={`rounded-full px-2 py-1 text-xs font-semibold ${stageTone[item.status]}`}>
+                                  {stageLabels[locale][item.currentStage]}
+                                </span>
+                              ) : (
+                                '—'
+                              )}
+                            </td>
+                          ) : null}
+                          {isVisibleColumn('accountAmount') ? <td>{formatNumber(item.accountAmount, locale)}</td> : null}
+                          {isVisibleColumn('invoiceAmount') ? <td>{formatNumber(item.invoiceAmount, locale)}</td> : null}
+                          {isVisibleColumn('chequeAmount') ? <td>{formatNumber(item.chequeAmount, locale)}</td> : null}
+                          {isVisibleColumn('waitingDays') ? <td>{item.waitingDays}</td> : null}
+                          {isVisibleColumn('overdueDays') ? (
+                            <td className="px-3 py-2">
+                              {item.isOverdue ? (
+                                <span className="rounded-full bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-700 ring-1 ring-rose-200">
+                                  +{item.overdueDays} {t.dayShort}
+                                </span>
+                              ) : (
+                                <span className="rounded-full bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200">
+                                  {t.onTime}
+                                </span>
+                              )}
+                            </td>
+                          ) : null}
+                          {isVisibleColumn('remark') ? (
+                            <td className="max-w-[260px] truncate px-3 py-2" title={item.remark ?? '—'}>
+                              {item.remark || '—'}
+                            </td>
+                          ) : null}
+                          {isVisibleColumn('updatedAt') ? <td>{formatDateTime(item.updatedAt, locale)}</td> : null}
+                          <td
+                            className="px-3 py-2 text-right"
+                            style={{
+                              minWidth: `${ledgerActionColumnWidth}px`,
+                              width: `${ledgerActionColumnWidth}px`,
+                            }}
+                          >
+                            <div className="flex flex-wrap justify-end gap-1">
                               <button
                                 type="button"
                                 onClick={() => void loadCaseDetail(item.id)}
-                                className="rounded border border-slate-200 px-2 py-1 text-xs hover:bg-slate-50"
+                                className="rounded border border-slate-200 px-1.5 py-1 text-xs hover:bg-slate-50"
                               >
-                                Détails
+                                {t.details}
                               </button>
                               {canEdit ? (
                                 <>
                                   <button
                                     type="button"
                                     onClick={() => openEditCaseModal(item)}
-                                    className="rounded border border-slate-200 px-2 py-1 text-xs hover:bg-slate-50"
+                                    className="rounded border border-slate-200 px-1.5 py-1 text-xs hover:bg-slate-50"
                                   >
-                                    Modifier
+                                    {t.edit}
                                   </button>
                                   <button
                                     type="button"
                                     disabled={deletingId === item.id}
                                     onClick={() => void handleDeleteCase(item)}
-                                    className="rounded border border-rose-200 px-2 py-1 text-xs text-rose-700 hover:bg-rose-50 disabled:opacity-60"
+                                    className="rounded border border-rose-200 px-1.5 py-1 text-xs text-rose-700 hover:bg-rose-50 disabled:opacity-60"
                                   >
-                                    {deletingId === item.id ? 'Suppression...' : 'Supprimer'}
+                                    {deletingId === item.id ? t.deleting : t.delete}
                                   </button>
                                 </>
                               ) : null}
@@ -1202,12 +1825,10 @@ export default function FinanceLedgerPage() {
               </div>
 
               <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-sm text-slate-600">
-                <p>
-                  {totalCases} dossiers · page {filters.page}/{totalPages}
-                </p>
+                <p>{t.pagination(totalCases, filters.page, totalPages)}</p>
                 <div className="flex items-center gap-2">
                   <label>
-                    <span className="mr-2 text-xs uppercase tracking-wide text-slate-500">Taille</span>
+                    <span className="mr-2 text-xs uppercase tracking-wide text-slate-500">{t.pageSize}</span>
                     <select
                       value={filters.pageSize}
                       onChange={(event) => changePageSize(Number(event.target.value))}
@@ -1226,7 +1847,7 @@ export default function FinanceLedgerPage() {
                     disabled={filters.page <= 1}
                     className="rounded border border-slate-200 px-3 py-1 disabled:opacity-50"
                   >
-                    Précédent
+                    {t.previous}
                   </button>
                   <button
                     type="button"
@@ -1234,7 +1855,7 @@ export default function FinanceLedgerPage() {
                     disabled={filters.page >= totalPages}
                     className="rounded border border-slate-200 px-3 py-1 disabled:opacity-50"
                   >
-                    Suivant
+                    {t.next}
                   </button>
                 </div>
               </div>
@@ -1243,9 +1864,9 @@ export default function FinanceLedgerPage() {
 
           {activeTab === 'progression' ? (
             <div className="space-y-4">
-              {insightsLoading ? <p className="text-sm text-slate-500">Analyse en cours...</p> : null}
+              {insightsLoading ? <p className="text-sm text-slate-500">{t.analysing}</p> : null}
               <article className="rounded-xl border border-slate-200 p-4">
-                <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Entonnoir des étapes</h3>
+                <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">{t.stageFunnel}</h3>
                 <div className="mt-3 space-y-2">
                   {insights?.stageFunnel.map((item) => {
                     const maxCount = Math.max(...(insights.stageFunnel.map((entry) => entry.count) || [1]), 1)
@@ -1264,16 +1885,16 @@ export default function FinanceLedgerPage() {
               </article>
 
               <article className="rounded-xl border border-slate-200 p-4">
-                <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Flux mensuel</h3>
+                <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">{t.monthlyFlow}</h3>
                 <div className="mt-3 overflow-x-auto">
                   <table className="min-w-[720px] text-sm">
                     <thead className="bg-slate-100 text-xs uppercase tracking-wide text-slate-600">
                       <tr>
-                        <th className="px-2 py-2 text-left">Mois</th>
-                        <th className="px-2 py-2 text-right">Facture</th>
-                        <th className="px-2 py-2 text-right">Chèque</th>
-                        <th className="px-2 py-2 text-right">Cumul facture</th>
-                        <th className="px-2 py-2 text-right">Cumul chèque</th>
+                        <th className="px-2 py-2 text-left">{t.colMonth}</th>
+                        <th className="px-2 py-2 text-right">{t.colInvoice}</th>
+                        <th className="px-2 py-2 text-right">{t.colCheque}</th>
+                        <th className="px-2 py-2 text-right">{t.colInvoiceCumulative}</th>
+                        <th className="px-2 py-2 text-right">{t.colChequeCumulative}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -1290,7 +1911,7 @@ export default function FinanceLedgerPage() {
                       ) : (
                         <tr>
                           <td className="px-2 py-3 text-slate-500" colSpan={5}>
-                            Aucune donnée
+                            {t.noData}
                           </td>
                         </tr>
                       )}
@@ -1304,14 +1925,14 @@ export default function FinanceLedgerPage() {
           {activeTab === 'delais' ? (
             <div className="space-y-4">
               <article className="rounded-xl border border-slate-200 p-4">
-                <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Aging actuel</h3>
+                <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">{t.agingCurrent}</h3>
                 <div className="mt-3 space-y-2">
                   {insights?.agingBuckets.map((bucket) => {
                     const maxCount = Math.max(...(insights.agingBuckets.map((item) => item.count) || [1]), 1)
                     const width = maxCount ? Math.max((bucket.count / maxCount) * 100, bucket.count ? 8 : 0) : 0
                     return (
                       <div key={bucket.bucket} className="grid grid-cols-12 items-center gap-2 text-sm">
-                        <span className="col-span-3 text-slate-600">{bucket.bucket} jours</span>
+                        <span className="col-span-3 text-slate-600">{bucket.bucket} {t.daysSuffix}</span>
                         <div className="col-span-7 h-2 rounded-full bg-slate-100">
                           <div className="h-2 rounded-full bg-amber-500" style={{ width: `${width}%` }} />
                         </div>
@@ -1323,18 +1944,18 @@ export default function FinanceLedgerPage() {
               </article>
 
               <article className="rounded-xl border border-slate-200 p-4">
-                <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Transitions et SLA</h3>
+                <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">{t.transitionsSla}</h3>
                 <div className="mt-3 overflow-x-auto">
                   <table className="min-w-[920px] text-sm">
                     <thead className="bg-slate-100 text-xs uppercase tracking-wide text-slate-600">
                       <tr>
-                        <th className="px-2 py-2 text-left">Transition</th>
-                        <th className="px-2 py-2 text-right">Nb</th>
-                        <th className="px-2 py-2 text-right">Moyenne</th>
+                        <th className="px-2 py-2 text-left">{t.colTransition}</th>
+                        <th className="px-2 py-2 text-right">{t.colCount}</th>
+                        <th className="px-2 py-2 text-right">{t.colAverage}</th>
                         <th className="px-2 py-2 text-right">P90</th>
                         <th className="px-2 py-2 text-right">SLA</th>
-                        <th className="px-2 py-2 text-right">Retard %</th>
-                        <th className="px-2 py-2 text-right">Impact</th>
+                        <th className="px-2 py-2 text-right">{t.colDelayRate}</th>
+                        <th className="px-2 py-2 text-right">{t.colImpact}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -1345,9 +1966,9 @@ export default function FinanceLedgerPage() {
                               {stageLabels[locale][row.fromStage]} → {stageLabels[locale][row.toStage]}
                             </td>
                             <td className="px-2 py-2 text-right">{row.count}</td>
-                            <td className="px-2 py-2 text-right">{row.averageDays} j</td>
-                            <td className="px-2 py-2 text-right">{row.p90Days} j</td>
-                            <td className="px-2 py-2 text-right">{row.slaDays} j</td>
+                            <td className="px-2 py-2 text-right">{row.averageDays} {t.dayShort}</td>
+                            <td className="px-2 py-2 text-right">{row.p90Days} {t.dayShort}</td>
+                            <td className="px-2 py-2 text-right">{row.slaDays} {t.dayShort}</td>
                             <td className="px-2 py-2 text-right">{row.overdueRate}%</td>
                             <td className="px-2 py-2 text-right">{formatNumber(row.overdueImpactAmount, locale)}</td>
                           </tr>
@@ -1355,7 +1976,7 @@ export default function FinanceLedgerPage() {
                       ) : (
                         <tr>
                           <td colSpan={7} className="px-2 py-3 text-slate-500">
-                            Aucune donnée
+                            {t.noData}
                           </td>
                         </tr>
                       )}
@@ -1374,7 +1995,7 @@ export default function FinanceLedgerPage() {
             <div className="sticky top-0 z-10 border-b border-slate-200 bg-white px-5 py-4">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-xs uppercase tracking-wide text-slate-500">Dossier</p>
+                  <p className="text-xs uppercase tracking-wide text-slate-500">{t.caseLabel}</p>
                   <h2 className="text-lg font-semibold text-slate-900">#{detailCase.sequence}</h2>
                 </div>
                 <button
@@ -1382,34 +2003,38 @@ export default function FinanceLedgerPage() {
                   onClick={() => setDetailCase(null)}
                   className="rounded border border-slate-200 px-3 py-1 text-sm hover:bg-slate-50"
                 >
-                  Fermer
+                  {t.close}
                 </button>
               </div>
-              {detailLoading ? <p className="mt-2 text-sm text-slate-500">Chargement...</p> : null}
+              {detailLoading ? <p className="mt-2 text-sm text-slate-500">{t.loading}</p> : null}
             </div>
             <div className="space-y-5 px-5 py-4">
               <article className="grid grid-cols-2 gap-3 rounded-xl border border-slate-200 p-3 text-sm">
                 <p>
-                  <span className="text-slate-500">Projet: </span>
+                  <span className="text-slate-500">{t.labelProject}: </span>
                   <strong>{resolveCaseProjectName(detailCase, locale)}</strong>
                 </p>
                 <p>
-                  <span className="text-slate-500">Période: </span>
+                  <span className="text-slate-500">{t.colPeriod}: </span>
                   <strong>{`P${detailCase.periodIndex}`}</strong>
                 </p>
                 <p>
-                  <span className="text-slate-500">Section: </span>
-                  <strong>{resolveCaseSectionName(detailCase, locale)}</strong>
+                  <span className="text-slate-500">{t.labelStatus}: </span>
+                  <strong>{statusLabels[locale][detailCase.status]}</strong>
                 </p>
                 <p>
-                  <span className="text-slate-500">Statut: </span>
-                  <strong>{statusLabels[locale][detailCase.status]}</strong>
+                  <span className="text-slate-500">{t.constructionStartedAt}: </span>
+                  <strong>{formatDateInput(detailCase.constructionStartedAt) || '—'}</strong>
+                </p>
+                <p>
+                  <span className="text-slate-500">{t.constructionFinishedAt}: </span>
+                  <strong>{formatDateInput(detailCase.constructionFinishedAt) || '—'}</strong>
                 </p>
               </article>
 
               <article className="rounded-xl border border-slate-200 p-3">
                 <div className="mb-3 flex items-center justify-between">
-                  <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Timeline des étapes</h3>
+                  <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">{t.timeline}</h3>
                 </div>
                 <div className="space-y-2">
                   {FINANCE_LEDGER_STAGES.map((stage) => {
@@ -1421,7 +2046,7 @@ export default function FinanceLedgerPage() {
                           <div>
                             <p className="font-semibold text-slate-800">{stageLabels[locale][stage]}</p>
                             <p className="text-xs text-slate-500">
-                              {event ? formatDateInput(event.occurredAt) : 'Non renseigné'}
+                              {event ? formatDateInput(event.occurredAt) : t.notFilled}
                             </p>
                             {event?.note ? <p className="mt-1 text-xs text-slate-600">{event.note}</p> : null}
                           </div>
@@ -1432,7 +2057,7 @@ export default function FinanceLedgerPage() {
                                 onClick={() => openEditEventModal(event)}
                                 className="rounded border border-slate-200 px-2 py-1 text-xs hover:bg-slate-50"
                               >
-                                Modifier
+                                {t.edit}
                               </button>
                             ) : canFill ? (
                               <button
@@ -1440,7 +2065,7 @@ export default function FinanceLedgerPage() {
                                 onClick={() => openCreateEventModal(stage)}
                                 className="rounded border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
                               >
-                                Renseigner
+                                {t.fill}
                               </button>
                             ) : (
                               <span className="text-xs text-slate-400">—</span>
@@ -1458,22 +2083,33 @@ export default function FinanceLedgerPage() {
       ) : null}
 
       {showCreateModal ? (
-        <div className="fixed inset-0 z-50 bg-slate-900/40">
-          <div className="mx-auto mt-10 w-[94%] max-w-lg rounded-2xl bg-white shadow-2xl">
-            <div className="border-b border-slate-200 px-5 py-4">
-              <h2 className="text-lg font-semibold">Nouveau dossier</h2>
-              <p className="text-sm text-slate-500">Créer le couple unique Projet + Période.</p>
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/40 p-3 sm:p-6">
+          <div className="mx-auto flex min-h-full items-start justify-center">
+            <div className="my-2 flex max-h-[calc(100vh-1rem)] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-white shadow-2xl sm:my-6 sm:max-h-[calc(100vh-3rem)]">
+            <div className="flex items-start justify-between gap-3 border-b border-slate-200 px-5 py-4">
+              <div>
+                <h2 className="text-lg font-semibold">{t.createCaseTitle}</h2>
+                <p className="text-sm text-slate-500">{t.createCaseSubtitle}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowCreateModal(false)}
+                className="rounded-md border border-slate-200 px-2 py-1 text-sm text-slate-500 hover:bg-slate-100"
+                aria-label={t.close}
+                title={t.close}
+              >
+                &times;
+              </button>
             </div>
-            <div className="max-h-[calc(100vh-6rem)] space-y-3 overflow-y-auto px-5 py-4 text-sm">
+            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-5 py-4 text-sm">
               <label className="block">
-                <span className="mb-1 block text-xs uppercase tracking-wide text-slate-500">Projet</span>
+                <span className="mb-1 block text-xs uppercase tracking-wide text-slate-500">{t.labelProject}</span>
                 <select
                   value={createForm.projectId}
                   onChange={(event) =>
                     setCreateForm((prev) => ({
                       ...prev,
                       projectId: event.target.value,
-                      sectionId: '',
                     }))
                   }
                   className="w-full rounded-lg border border-slate-200 px-3 py-2"
@@ -1486,7 +2122,7 @@ export default function FinanceLedgerPage() {
                 </select>
               </label>
               <label className="block">
-                <span className="mb-1 block text-xs uppercase tracking-wide text-slate-500">Période</span>
+                <span className="mb-1 block text-xs uppercase tracking-wide text-slate-500">{t.colPeriod}</span>
                 <input
                   type="number"
                   min={0}
@@ -1496,21 +2132,6 @@ export default function FinanceLedgerPage() {
                   placeholder="0, 1, 2..."
                 />
               </label>
-              <label className="block">
-                <span className="mb-1 block text-xs uppercase tracking-wide text-slate-500">Section (optionnel)</span>
-                <select
-                  value={createForm.sectionId}
-                  onChange={(event) => setCreateForm((prev) => ({ ...prev, sectionId: event.target.value }))}
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2"
-                >
-                  <option value="">Aucune</option>
-                  {createSections.map((section) => (
-                    <option key={section.id} value={String(section.id)}>
-                      {resolveSectionName(section, locale)}
-                    </option>
-                  ))}
-                </select>
-              </label>
             </div>
             <div className="flex justify-end gap-2 border-t border-slate-200 px-5 py-4">
               <button
@@ -1518,7 +2139,7 @@ export default function FinanceLedgerPage() {
                 onClick={() => setShowCreateModal(false)}
                 className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
               >
-                Annuler
+                {t.cancel}
               </button>
               <button
                 type="button"
@@ -1526,40 +2147,34 @@ export default function FinanceLedgerPage() {
                 onClick={() => void handleCreate()}
                 className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-60"
               >
-                {createSaving ? 'Création...' : 'Créer'}
+                {createSaving ? t.creating : t.create}
               </button>
             </div>
           </div>
         </div>
+        </div>
       ) : null}
 
       {editingCase ? (
-        <div className="fixed inset-0 z-50 bg-slate-900/40">
-          <div className="mx-auto mt-10 w-[94%] max-w-2xl rounded-2xl bg-white shadow-2xl">
-            <div className="border-b border-slate-200 px-5 py-4">
-              <h2 className="text-lg font-semibold">Modifier le dossier #{editingCase.sequence}</h2>
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/40 p-3 sm:p-6">
+          <div className="mx-auto flex min-h-full items-start justify-center">
+            <div className="my-2 flex max-h-[calc(100vh-1rem)] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl sm:my-6 sm:max-h-[calc(100vh-3rem)]">
+            <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-5 py-4">
+              <h2 className="text-lg font-semibold">{t.editCaseTitle(editingCase.sequence)}</h2>
+              <button
+                type="button"
+                onClick={() => setEditingCase(null)}
+                className="rounded-md border border-slate-200 px-2 py-1 text-sm text-slate-500 hover:bg-slate-100"
+                aria-label={t.close}
+                title={t.close}
+              >
+                &times;
+              </button>
             </div>
-            <div className="max-h-[calc(100vh-6rem)] overflow-y-auto px-5 py-4">
+            <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
               <div className="grid gap-3 md:grid-cols-2">
                 <label className="text-sm">
-                  <span className="mb-1 block text-xs uppercase tracking-wide text-slate-500">Section</span>
-                  <select
-                    value={caseForm.sectionId}
-                    onChange={(event) => setCaseForm((prev) => ({ ...prev, sectionId: event.target.value }))}
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2"
-                  >
-                    <option value="">Aucune</option>
-                    {metadata?.sections
-                      .filter((section) => section.projectId === editingCase.projectId)
-                      .map((section) => (
-                        <option key={section.id} value={String(section.id)}>
-                          {resolveSectionName(section, locale)}
-                        </option>
-                      ))}
-                  </select>
-                </label>
-                <label className="text-sm">
-                  <span className="mb-1 block text-xs uppercase tracking-wide text-slate-500">Statut</span>
+                  <span className="mb-1 block text-xs uppercase tracking-wide text-slate-500">{t.labelStatus}</span>
                   <select
                     value={caseForm.status}
                     onChange={(event) =>
@@ -1573,7 +2188,7 @@ export default function FinanceLedgerPage() {
                   </select>
                 </label>
                 <label className="text-sm">
-                  <span className="mb-1 block text-xs uppercase tracking-wide text-slate-500">Montant compte</span>
+                  <span className="mb-1 block text-xs uppercase tracking-wide text-slate-500">{t.accountAmount}</span>
                   <input
                     value={caseForm.accountAmount}
                     onChange={(event) => setCaseForm((prev) => ({ ...prev, accountAmount: event.target.value }))}
@@ -1581,7 +2196,7 @@ export default function FinanceLedgerPage() {
                   />
                 </label>
                 <label className="text-sm">
-                  <span className="mb-1 block text-xs uppercase tracking-wide text-slate-500">Montant facture</span>
+                  <span className="mb-1 block text-xs uppercase tracking-wide text-slate-500">{t.invoiceAmount}</span>
                   <input
                     value={caseForm.invoiceAmount}
                     onChange={(event) => setCaseForm((prev) => ({ ...prev, invoiceAmount: event.target.value }))}
@@ -1589,7 +2204,7 @@ export default function FinanceLedgerPage() {
                   />
                 </label>
                 <label className="text-sm">
-                  <span className="mb-1 block text-xs uppercase tracking-wide text-slate-500">Acompte</span>
+                  <span className="mb-1 block text-xs uppercase tracking-wide text-slate-500">{t.advanceAmount}</span>
                   <input
                     value={caseForm.advanceAmount}
                     onChange={(event) => setCaseForm((prev) => ({ ...prev, advanceAmount: event.target.value }))}
@@ -1597,7 +2212,7 @@ export default function FinanceLedgerPage() {
                   />
                 </label>
                 <label className="text-sm">
-                  <span className="mb-1 block text-xs uppercase tracking-wide text-slate-500">Montant chèque</span>
+                  <span className="mb-1 block text-xs uppercase tracking-wide text-slate-500">{t.chequeAmount}</span>
                   <input
                     value={caseForm.chequeAmount}
                     onChange={(event) => setCaseForm((prev) => ({ ...prev, chequeAmount: event.target.value }))}
@@ -1605,7 +2220,7 @@ export default function FinanceLedgerPage() {
                   />
                 </label>
                 <label className="text-sm md:col-span-2">
-                  <span className="mb-1 block text-xs uppercase tracking-wide text-slate-500">Numéro facture</span>
+                  <span className="mb-1 block text-xs uppercase tracking-wide text-slate-500">{t.invoiceNumber}</span>
                   <input
                     value={caseForm.invoiceNumber}
                     onChange={(event) => setCaseForm((prev) => ({ ...prev, invoiceNumber: event.target.value }))}
@@ -1613,7 +2228,7 @@ export default function FinanceLedgerPage() {
                   />
                 </label>
                 <label className="text-sm md:col-span-2">
-                  <span className="mb-1 block text-xs uppercase tracking-wide text-slate-500">Numéro chèque reçu</span>
+                  <span className="mb-1 block text-xs uppercase tracking-wide text-slate-500">{t.receiptChequeNumber}</span>
                   <input
                     value={caseForm.receiptChequeNumber}
                     onChange={(event) =>
@@ -1622,8 +2237,56 @@ export default function FinanceLedgerPage() {
                     className="w-full rounded-lg border border-slate-200 px-3 py-2"
                   />
                 </label>
+                <label className="text-sm">
+                  <span className="mb-1 block text-xs uppercase tracking-wide text-slate-500">{t.constructionStartedAt}</span>
+                  <input
+                    type="date"
+                    value={caseForm.constructionStartedAt}
+                    onChange={(event) =>
+                      setCaseForm((prev) => ({ ...prev, constructionStartedAt: event.target.value }))
+                    }
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2"
+                  />
+                </label>
+                <label className="text-sm">
+                  <span className="mb-1 block text-xs uppercase tracking-wide text-slate-500">{t.constructionFinishedAt}</span>
+                  <input
+                    type="date"
+                    value={caseForm.constructionFinishedAt}
+                    onChange={(event) =>
+                      setCaseForm((prev) => ({ ...prev, constructionFinishedAt: event.target.value }))
+                    }
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2"
+                  />
+                </label>
+                <div className="md:col-span-2">
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">{t.stageDatesTitle}</p>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    {FINANCE_LEDGER_STAGES.map((stage) => (
+                      <label key={stage} className="text-sm">
+                        <span className="mb-1 block text-xs uppercase tracking-wide text-slate-500">
+                          {stageLabels[locale][stage]}
+                        </span>
+                        <input
+                          type="date"
+                          value={caseForm.stageDates[stage]}
+                          onChange={(event) =>
+                            setCaseForm((prev) => ({
+                              ...prev,
+                              stageDates: {
+                                ...prev.stageDates,
+                                [stage]: event.target.value,
+                              },
+                            }))
+                          }
+                          className="w-full rounded-lg border border-slate-200 px-3 py-2"
+                        />
+                      </label>
+                    ))}
+                  </div>
+                </div>
                 <label className="text-sm md:col-span-2">
-                  <span className="mb-1 block text-xs uppercase tracking-wide text-slate-500">Note</span>
+                  <span className="mb-1 block text-xs uppercase tracking-wide text-slate-500">{t.remark}</span>
                   <textarea
                     value={caseForm.remark}
                     onChange={(event) => setCaseForm((prev) => ({ ...prev, remark: event.target.value }))}
@@ -1638,7 +2301,7 @@ export default function FinanceLedgerPage() {
                 onClick={() => setEditingCase(null)}
                 className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
               >
-                Annuler
+                {t.cancel}
               </button>
               <button
                 type="button"
@@ -1646,25 +2309,39 @@ export default function FinanceLedgerPage() {
                 onClick={() => void handleUpdateCase()}
                 className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white disabled:opacity-60"
               >
-                {caseSaving ? 'Enregistrement...' : 'Enregistrer'}
+                {caseSaving ? t.saving : t.save}
               </button>
             </div>
           </div>
         </div>
+        </div>
       ) : null}
 
       {showEventModal ? (
-        <div className="fixed inset-0 z-50 bg-slate-900/40">
-          <div className="mx-auto mt-10 w-[94%] max-w-2xl rounded-2xl bg-white shadow-2xl">
-            <div className="border-b border-slate-200 px-5 py-4">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/40 p-3 sm:p-6">
+          <div className="mx-auto flex min-h-full items-start justify-center">
+            <div className="my-2 flex max-h-[calc(100vh-1rem)] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl sm:my-6 sm:max-h-[calc(100vh-3rem)]">
+            <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-5 py-4">
               <h2 className="text-lg font-semibold">
-                {editingEvent ? 'Modifier étape' : 'Renseigner étape'}: {stageLabels[locale][eventForm.stage]}
+                {editingEvent ? t.editStage : t.fillStage}: {stageLabels[locale][eventForm.stage]}
               </h2>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowEventModal(false)
+                  setEditingEvent(null)
+                }}
+                className="rounded-md border border-slate-200 px-2 py-1 text-sm text-slate-500 hover:bg-slate-100"
+                aria-label={t.close}
+                title={t.close}
+              >
+                &times;
+              </button>
             </div>
-            <div className="max-h-[calc(100vh-6rem)] overflow-y-auto px-5 py-4">
+            <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
               <div className="grid gap-3 md:grid-cols-2">
                 <label className="text-sm md:col-span-2">
-                  <span className="mb-1 block text-xs uppercase tracking-wide text-slate-500">Date étape</span>
+                  <span className="mb-1 block text-xs uppercase tracking-wide text-slate-500">{t.stageDate}</span>
                   <input
                     type="date"
                     value={eventForm.occurredAt}
@@ -1673,7 +2350,7 @@ export default function FinanceLedgerPage() {
                   />
                 </label>
                 <label className="text-sm">
-                  <span className="mb-1 block text-xs uppercase tracking-wide text-slate-500">Montant compte</span>
+                  <span className="mb-1 block text-xs uppercase tracking-wide text-slate-500">{t.accountAmount}</span>
                   <input
                     value={eventForm.accountAmount}
                     onChange={(event) => setEventForm((prev) => ({ ...prev, accountAmount: event.target.value }))}
@@ -1681,7 +2358,7 @@ export default function FinanceLedgerPage() {
                   />
                 </label>
                 <label className="text-sm">
-                  <span className="mb-1 block text-xs uppercase tracking-wide text-slate-500">Montant facture</span>
+                  <span className="mb-1 block text-xs uppercase tracking-wide text-slate-500">{t.invoiceAmount}</span>
                   <input
                     value={eventForm.invoiceAmount}
                     onChange={(event) => setEventForm((prev) => ({ ...prev, invoiceAmount: event.target.value }))}
@@ -1689,7 +2366,7 @@ export default function FinanceLedgerPage() {
                   />
                 </label>
                 <label className="text-sm">
-                  <span className="mb-1 block text-xs uppercase tracking-wide text-slate-500">Acompte</span>
+                  <span className="mb-1 block text-xs uppercase tracking-wide text-slate-500">{t.advanceAmount}</span>
                   <input
                     value={eventForm.advanceAmount}
                     onChange={(event) => setEventForm((prev) => ({ ...prev, advanceAmount: event.target.value }))}
@@ -1697,7 +2374,7 @@ export default function FinanceLedgerPage() {
                   />
                 </label>
                 <label className="text-sm">
-                  <span className="mb-1 block text-xs uppercase tracking-wide text-slate-500">Montant chèque</span>
+                  <span className="mb-1 block text-xs uppercase tracking-wide text-slate-500">{t.chequeAmount}</span>
                   <input
                     value={eventForm.chequeAmount}
                     onChange={(event) => setEventForm((prev) => ({ ...prev, chequeAmount: event.target.value }))}
@@ -1705,7 +2382,7 @@ export default function FinanceLedgerPage() {
                   />
                 </label>
                 <label className="text-sm md:col-span-2">
-                  <span className="mb-1 block text-xs uppercase tracking-wide text-slate-500">Numéro facture</span>
+                  <span className="mb-1 block text-xs uppercase tracking-wide text-slate-500">{t.invoiceNumber}</span>
                   <input
                     value={eventForm.invoiceNumber}
                     onChange={(event) => setEventForm((prev) => ({ ...prev, invoiceNumber: event.target.value }))}
@@ -1713,7 +2390,7 @@ export default function FinanceLedgerPage() {
                   />
                 </label>
                 <label className="text-sm md:col-span-2">
-                  <span className="mb-1 block text-xs uppercase tracking-wide text-slate-500">Numéro chèque reçu</span>
+                  <span className="mb-1 block text-xs uppercase tracking-wide text-slate-500">{t.receiptChequeNumber}</span>
                   <input
                     value={eventForm.receiptChequeNumber}
                     onChange={(event) =>
@@ -1723,7 +2400,7 @@ export default function FinanceLedgerPage() {
                   />
                 </label>
                 <label className="text-sm md:col-span-2">
-                  <span className="mb-1 block text-xs uppercase tracking-wide text-slate-500">Note</span>
+                  <span className="mb-1 block text-xs uppercase tracking-wide text-slate-500">{t.stageNote}</span>
                   <textarea
                     value={eventForm.note}
                     onChange={(event) => setEventForm((prev) => ({ ...prev, note: event.target.value }))}
@@ -1741,7 +2418,7 @@ export default function FinanceLedgerPage() {
                 }}
                 className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
               >
-                Annuler
+                {t.cancel}
               </button>
               <button
                 type="button"
@@ -1749,10 +2426,11 @@ export default function FinanceLedgerPage() {
                 onClick={() => void handleSaveEvent()}
                 className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-60"
               >
-                {eventSaving ? 'Enregistrement...' : 'Enregistrer'}
+                {eventSaving ? t.saving : t.save}
               </button>
             </div>
           </div>
+        </div>
         </div>
       ) : null}
     </main>
