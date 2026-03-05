@@ -86,6 +86,8 @@ const dictionaries: Record<DictionaryKind, Record<string, Entry>> = {
     [normalize('边沟')]: { zh: '边沟', fr: 'Caniveau' },
     [normalize('原有边沟')]: { zh: '原有边沟', fr: 'Caniveau existant' },
     [normalize('过道涵')]: { zh: '过道涵', fr: 'Dalot traversée' },
+    [normalize('过道涵安装')]: { zh: '过道涵安装', fr: 'Pose de dalot traversée' },
+    [normalize('Pose de dalot traversée')]: { zh: '过道涵安装', fr: 'Pose de dalot traversée' },
     [normalize('底基层')]: { zh: '底基层', fr: 'Fondation' },
     [normalize('基层')]: { zh: '基层', fr: 'Couche de base' },
     // French aliases (so French UI values can be canonicalized back to zh)
@@ -186,8 +188,17 @@ const dictionaries: Record<DictionaryKind, Record<string, Entry>> = {
     [normalize('弯沉验收')]: { zh: '弯沉验收', fr: 'Déflexion' },
     [normalize('安装验收')]: { zh: '安装验收', fr: 'Réception de pose' },
     [normalize('Réception de pose')]: { zh: '安装验收', fr: 'Réception de pose' },
+    [normalize('过道涵安装')]: { zh: '过道涵安装', fr: 'Réception de pose du dalot traversée' },
+    [normalize('Réception de pose du dalot traversée')]: {
+      zh: '过道涵安装',
+      fr: 'Réception de pose du dalot traversée',
+    },
     // French aliases for consistency
     [normalize('Reception Pose')]: { zh: '安装验收', fr: 'Réception de pose' },
+    [normalize('Reception de pose du dalot traversee')]: {
+      zh: '过道涵安装',
+      fr: 'Réception de pose du dalot traversée',
+    },
     [normalize('Deflextion')]: { zh: '弯沉验收', fr: 'Déflexion' },
     [normalize('Déflexion')]: { zh: '弯沉验收', fr: 'Déflexion' },
     [normalize('Nivelement')]: { zh: '标高验收', fr: 'Nivellement' },

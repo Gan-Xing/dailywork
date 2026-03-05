@@ -7,7 +7,8 @@ import { DocumentStatus, DocumentType } from '@prisma/client'
 
 import { formatCopy, locales, type Locale } from '@/lib/i18n'
 import { getDocumentsCopy } from '@/lib/i18n/documents'
-import { localizeProgressList, localizeProgressTerm } from '@/lib/i18n/progressDictionary'
+import { getProgressCopy } from '@/lib/i18n/progress'
+import { canonicalizeProgressList, localizeProgressList, localizeProgressTerm } from '@/lib/i18n/progressDictionary'
 import { resolveRoadName } from '@/lib/i18n/roadDictionary'
 import type { InspectionListItem } from '@/lib/progressTypes'
 import { usePreferredLocale } from '@/lib/usePreferredLocale'
@@ -95,6 +96,10 @@ export default function SubmissionEditor({ initialSubmission, canManage = false,
   const [loadingInspections, setLoadingInspections] = useState(false)
   const hasLoadedInspectionBindingRef = useRef(false)
   const isReadOnly = !canEdit
+  const inspectionStatusCopy = useMemo(
+    () => getProgressCopy(locale).inspectionBoard.status as Record<string, string>,
+    [locale],
+  )
   const statusLabel = copy.status.document[status] ?? status
   const statusText = formatCopy(copy.submissionEditor.template.statusTemplate, { status: statusLabel })
 
@@ -988,6 +993,27 @@ export default function SubmissionEditor({ initialSubmission, canManage = false,
                     const layers = item.layers ?? []
                     const checks = item.checks ?? []
                     const types = item.types ?? []
+                    const localizedRoad = resolveRoadName(
+                      {
+                        slug: item.locationRoadSlug ?? item.roadSlug,
+                        name: item.locationRoadName ?? item.roadName,
+                      },
+                      locale,
+                    )
+                    const localizedPhase = item.phaseName ? localizeProgressTerm('phase', item.phaseName, locale) : '—'
+                    const localizedLayers = localizeProgressList(
+                      'layer',
+                      canonicalizeProgressList('layer', layers),
+                      locale,
+                      { phaseName: item.phaseName },
+                    )
+                    const localizedChecks = localizeProgressList(
+                      'check',
+                      canonicalizeProgressList('check', checks),
+                      locale,
+                      { phaseName: item.phaseName },
+                    )
+                    const localizedTypes = localizeProgressList('type', canonicalizeProgressList('type', types), locale)
                     const boundToCurrent = initialSubmission?.id && item.documentId === initialSubmission.id
                     const boundMeta = `${
                       item.submissionNumber ? `#${item.submissionNumber}` : ''
@@ -1021,7 +1047,7 @@ export default function SubmissionEditor({ initialSubmission, canManage = false,
                           <div className="grid gap-2 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-center">
                             <div className="flex flex-wrap items-center gap-2">
                               <span className="text-sm font-semibold text-slate-900">
-                                {item.roadName} · {item.phaseName}
+                                {localizedRoad} · {localizedPhase}
                               </span>
                               <span className="rounded-full bg-slate-900/80 px-2 py-1 text-[11px] font-semibold text-slate-50">
                                 {formatPk(item.startPk)} → {formatPk(item.endPk)}
@@ -1029,7 +1055,7 @@ export default function SubmissionEditor({ initialSubmission, canManage = false,
                             </div>
                             <div className="flex flex-wrap items-center gap-2">
                               <span className="rounded-full bg-white px-2 py-1 text-[11px] font-semibold text-slate-700 ring-1 ring-slate-200">
-                                {item.status}
+                                {inspectionStatusCopy[item.status] ?? item.status}
                               </span>
                               <span
                                 className={`rounded-full px-2 py-1 text-[11px] font-semibold ${
@@ -1045,19 +1071,19 @@ export default function SubmissionEditor({ initialSubmission, canManage = false,
                             </div>
                           </div>
                           <div className="grid gap-2 text-[11px] text-slate-700 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
-                            {layers.length ? (
+                            {localizedLayers.length ? (
                               <span className="inline-flex rounded-full bg-white px-2 py-1 ring-1 ring-slate-200">
-                                {copy.submissionEditor.inspections.labels.layer}：{layers.join(' / ')}
+                                {copy.submissionEditor.inspections.labels.layer}：{localizedLayers.join(' / ')}
                               </span>
                             ) : null}
-                            {checks.length ? (
+                            {localizedChecks.length ? (
                               <span className="inline-flex rounded-full bg-white px-2 py-1 ring-1 ring-slate-200">
-                                {copy.submissionEditor.inspections.labels.content}：{checks.join(' / ')}
+                                {copy.submissionEditor.inspections.labels.content}：{localizedChecks.join(' / ')}
                               </span>
                             ) : null}
-                            {types.length ? (
+                            {localizedTypes.length ? (
                               <span className="inline-flex rounded-full bg-white px-2 py-1 ring-1 ring-slate-200">
-                                {copy.submissionEditor.inspections.labels.type}：{types.join(' / ')}
+                                {copy.submissionEditor.inspections.labels.type}：{localizedTypes.join(' / ')}
                               </span>
                             ) : null}
                             {item.appointmentDate ? (

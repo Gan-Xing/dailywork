@@ -326,8 +326,9 @@ export default function LogExtractorPage() {
   }
 
   useEffect(() => {
+    const promptTimers = leaderPromptTimers.current
     return () => {
-      Object.values(leaderPromptTimers.current).forEach((timer) => clearTimeout(timer))
+      Object.values(promptTimers).forEach((timer) => clearTimeout(timer))
     }
   }, [])
 
