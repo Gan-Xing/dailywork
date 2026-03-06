@@ -14,6 +14,7 @@ export type ReceivedDocumentLedgerListFilters = {
   search?: string
   category?: string
   projectId?: number | null
+  excludeProjectIds?: number[]
   roadSectionId?: number | null
   status?: string
   attachmentState?: ReceivedDocumentLedgerAttachmentState
@@ -135,9 +136,22 @@ const combineWhereConditions = (
 
 const buildWhere = (filters: ReceivedDocumentLedgerListFilters): Prisma.ReceivedDocumentLedgerWhereInput => {
   const where: Prisma.ReceivedDocumentLedgerWhereInput = {}
+  const andConditions: Prisma.ReceivedDocumentLedgerWhereInput[] = []
   const category = filters.category?.trim()
   const status = filters.status?.trim()
   const search = filters.search?.trim()
+  const insensitiveMode: Prisma.QueryMode = 'insensitive'
+  const selectedProjectId =
+    Number.isInteger(filters.projectId) && (filters.projectId as number) > 0
+      ? (filters.projectId as number)
+      : null
+  const excludedProjectIds = Array.from(
+    new Set(
+      (filters.excludeProjectIds ?? [])
+        .map((item) => Number(item))
+        .filter((item) => Number.isInteger(item) && item > 0),
+    ),
+  )
 
   if (category) {
     where.category = category
@@ -145,8 +159,13 @@ const buildWhere = (filters: ReceivedDocumentLedgerListFilters): Prisma.Received
   if (status) {
     where.status = status as ReceivedDocumentLedgerStatus
   }
-  if (Number.isInteger(filters.projectId) && (filters.projectId as number) > 0) {
-    where.projectId = filters.projectId as number
+  if (selectedProjectId) {
+    if (excludedProjectIds.includes(selectedProjectId)) {
+      return { id: -1 }
+    }
+    andConditions.push({ projectId: selectedProjectId })
+  } else if (excludedProjectIds.length) {
+    andConditions.push({ projectId: { notIn: excludedProjectIds } })
   }
   if (Number.isInteger(filters.roadSectionId) && (filters.roadSectionId as number) > 0) {
     where.roadSectionId = filters.roadSectionId as number
@@ -155,27 +174,33 @@ const buildWhere = (filters: ReceivedDocumentLedgerListFilters): Prisma.Received
   if (search) {
     const tokens = splitSearchTokens(search)
     if (tokens.length) {
-      where.AND = tokens.map((token) => ({
-        OR: [
-          { documentName: { contains: token, mode: 'insensitive' } },
-          { documentCode: { contains: token, mode: 'insensitive' } },
-          { structureName: { contains: token, mode: 'insensitive' } },
-          { sizeSpec: { contains: token, mode: 'insensitive' } },
-          { versionTag: { contains: token, mode: 'insensitive' } },
-          { coverageScope: { contains: token, mode: 'insensitive' } },
-          { sourceOrg: { contains: token, mode: 'insensitive' } },
-          { remark: { contains: token, mode: 'insensitive' } },
-          { receivedByText: { contains: token, mode: 'insensitive' } },
-          { category: { contains: token, mode: 'insensitive' } },
-          { project: { name: { contains: token, mode: 'insensitive' } } },
-          { project: { code: { contains: token, mode: 'insensitive' } } },
-          { roadSection: { name: { contains: token, mode: 'insensitive' } } },
-          { roadSection: { slug: { contains: token, mode: 'insensitive' } } },
-          { receivedBy: { name: { contains: token, mode: 'insensitive' } } },
-          { receivedBy: { username: { contains: token, mode: 'insensitive' } } },
-        ],
-      }))
+      andConditions.push(
+        ...tokens.map((token) => ({
+          OR: [
+            { documentName: { contains: token, mode: insensitiveMode } },
+            { documentCode: { contains: token, mode: insensitiveMode } },
+            { structureName: { contains: token, mode: insensitiveMode } },
+            { sizeSpec: { contains: token, mode: insensitiveMode } },
+            { versionTag: { contains: token, mode: insensitiveMode } },
+            { coverageScope: { contains: token, mode: insensitiveMode } },
+            { sourceOrg: { contains: token, mode: insensitiveMode } },
+            { remark: { contains: token, mode: insensitiveMode } },
+            { receivedByText: { contains: token, mode: insensitiveMode } },
+            { category: { contains: token, mode: insensitiveMode } },
+            { project: { name: { contains: token, mode: insensitiveMode } } },
+            { project: { code: { contains: token, mode: insensitiveMode } } },
+            { roadSection: { name: { contains: token, mode: insensitiveMode } } },
+            { roadSection: { slug: { contains: token, mode: insensitiveMode } } },
+            { receivedBy: { name: { contains: token, mode: insensitiveMode } } },
+            { receivedBy: { username: { contains: token, mode: insensitiveMode } } },
+          ],
+        })),
+      )
     }
+  }
+
+  if (andConditions.length) {
+    where.AND = andConditions
   }
 
   return where

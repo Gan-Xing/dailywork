@@ -21,6 +21,15 @@ const parsePositiveInt = (value: unknown) => {
   return parsed
 }
 
+const parsePositiveIntList = (values: string[]) =>
+  Array.from(
+    new Set(
+      values
+        .map((value) => Number(value))
+        .filter((value) => Number.isInteger(value) && value > 0),
+    ),
+  )
+
 const parseNullableString = (value: unknown) => {
   if (typeof value !== 'string') return null
   const trimmed = value.trim()
@@ -156,6 +165,7 @@ export async function GET(request: NextRequest) {
     category: searchParams.get('category')?.trim() ?? '',
     status: searchParams.get('status')?.trim() ?? '',
     attachmentState: parseAttachmentState(searchParams.get('attachmentState')),
+    excludeProjectIds: parsePositiveIntList(searchParams.getAll('excludeProjectId')),
     projectId: Number.isInteger(projectIdRaw) && projectIdRaw > 0 ? projectIdRaw : null,
     roadSectionId: Number.isInteger(roadSectionIdRaw) && roadSectionIdRaw > 0 ? roadSectionIdRaw : null,
     sortBy: parseSortField(searchParams.get('sortBy')),

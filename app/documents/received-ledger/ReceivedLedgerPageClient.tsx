@@ -15,6 +15,7 @@ import {
   isReceivedDocumentLedgerStatus,
 } from '@/lib/documents/receivedLedger'
 import { locales, type Locale } from '@/lib/i18n'
+import { resolveRoadName } from '@/lib/i18n/roadDictionary'
 import { usePreferredLocale } from '@/lib/usePreferredLocale'
 
 import type { ReceivedLedgerListResult, ReceivedLedgerRow } from './types'
@@ -29,6 +30,7 @@ type ProjectOption = {
 
 type RoadOption = {
   id: number
+  slug: string
   name: string
   projectId: number | null
 }
@@ -425,6 +427,7 @@ type Props = {
   projects: ProjectOption[]
   roadSections: RoadOption[]
   users: UserOption[]
+  hiddenProjectIds: number[]
   sourceOrgOptions: string[]
   canCreate: boolean
   canUpdate: boolean
@@ -436,6 +439,7 @@ export function ReceivedLedgerPageClient({
   projects,
   roadSections,
   users,
+  hiddenProjectIds,
   sourceOrgOptions,
   canCreate,
   canUpdate,
@@ -467,6 +471,10 @@ export function ReceivedLedgerPageClient({
     () => new Map(projects.map((project) => [project.id, project])),
     [projects],
   )
+  const roadsById = useMemo(
+    () => new Map(roadSections.map((road) => [road.id, road])),
+    [roadSections],
+  )
 
   const normalizedSourceOrgOptions = useMemo(
     () =>
@@ -478,6 +486,15 @@ export function ReceivedLedgerPageClient({
 
   const getProjectLabel = useCallback(
     (project: ProjectOption) => resolveProjectDisplayName(project, locale),
+    [locale],
+  )
+
+  const getRoadLabel = useCallback(
+    (road: Pick<RoadOption, 'name' | 'slug'>) => {
+      if (locale !== 'fr') return road.name
+      const resolved = resolveRoadName({ slug: road.slug, name: road.name }, 'fr')
+      return resolved || road.name
+    },
     [locale],
   )
 
@@ -513,6 +530,9 @@ export function ReceivedLedgerPageClient({
         if (nextFilters.projectId) params.set('projectId', nextFilters.projectId)
         if (nextFilters.roadSectionId) params.set('roadSectionId', nextFilters.roadSectionId)
         if (nextFilters.status) params.set('status', nextFilters.status)
+        hiddenProjectIds.forEach((projectId) => {
+          params.append('excludeProjectId', String(projectId))
+        })
         if (nextFilters.attachmentState && nextFilters.attachmentState !== 'all') {
           params.set('attachmentState', nextFilters.attachmentState)
         }
@@ -537,7 +557,7 @@ export function ReceivedLedgerPageClient({
         }
       }
     },
-    [addToast, copy.messages.loadingFailed],
+    [addToast, copy.messages.loadingFailed, hiddenProjectIds],
   )
 
   const handleApplyFilters = () => {
@@ -889,7 +909,7 @@ export function ReceivedLedgerPageClient({
               <option value="">{copy.filters.all}</option>
               {filteredRoads.map((road) => (
                 <option key={road.id} value={String(road.id)}>
-                  {road.name}
+                  {getRoadLabel(road)}
                 </option>
               ))}
             </select>
@@ -1021,6 +1041,12 @@ export function ReceivedLedgerPageClient({
                   const statusLabel = isReceivedDocumentLedgerStatus(row.status)
                     ? getReceivedDocumentLedgerStatusLabel(locale, row.status)
                     : row.status
+                  const roadOption = row.roadSectionId ? roadsById.get(row.roadSectionId) : undefined
+                  const roadSectionLabel = roadOption
+                    ? getRoadLabel(roadOption)
+                    : row.roadSectionName
+                      ? resolveRoadName({ name: row.roadSectionName }, locale)
+                      : copy.labels.noRoad
 
                   return (
                     <tr key={row.id} className="align-top hover:bg-slate-50">
@@ -1044,7 +1070,7 @@ export function ReceivedLedgerPageClient({
                               return row.projectName
                             })()}
                           </div>
-                          <div>{row.roadSectionName || copy.labels.noRoad}</div>
+                          <div>{roadSectionLabel}</div>
                           <div>
                             {[row.structureName, row.sizeSpec].filter(Boolean).join(' / ') || '-'}
                           </div>
@@ -1291,7 +1317,7 @@ export function ReceivedLedgerPageClient({
                     <option value="">{copy.filters.all}</option>
                     {draftRoadOptions.map((road) => (
                       <option key={road.id} value={String(road.id)}>
-                        {road.name}
+                        {getRoadLabel(road)}
                       </option>
                     ))}
                   </select>
