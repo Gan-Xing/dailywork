@@ -858,7 +858,7 @@
     12. `receivedAt`：接收日期（必填）。
     13. `receivedById?`：接收人（关联 `User`，可空）。
     14. `receivedByText?`：接收人文本（用于外部人员，`receivedById` 可空时填写）。
-    15. `status`：台账状态（`RECEIVED` / `PENDING_COMPLETION` / `VOID`）。
+    15. `status`：台账状态（`RECEIVED` / `PENDING_COMPLETION` / `LATEST_VERSION` / `VOID`）。
     16. `remark?`：备注（可空）。
     17. `createdById?` / `updatedById?`：操作人（可空）。
     18. `createdAt` / `updatedAt`：时间戳。

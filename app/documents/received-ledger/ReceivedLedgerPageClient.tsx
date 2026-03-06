@@ -425,6 +425,7 @@ type Props = {
   projects: ProjectOption[]
   roadSections: RoadOption[]
   users: UserOption[]
+  sourceOrgOptions: string[]
   canCreate: boolean
   canUpdate: boolean
   canDelete: boolean
@@ -435,6 +436,7 @@ export function ReceivedLedgerPageClient({
   projects,
   roadSections,
   users,
+  sourceOrgOptions,
   canCreate,
   canUpdate,
   canDelete,
@@ -464,6 +466,14 @@ export function ReceivedLedgerPageClient({
   const projectsById = useMemo(
     () => new Map(projects.map((project) => [project.id, project])),
     [projects],
+  )
+
+  const normalizedSourceOrgOptions = useMemo(
+    () =>
+      Array.from(new Set(sourceOrgOptions.map((item) => item.trim()).filter(Boolean))).sort((a, b) =>
+        a.localeCompare(b, 'zh-Hans-CN'),
+      ),
+    [sourceOrgOptions],
   )
 
   const getProjectLabel = useCallback(
@@ -1392,12 +1402,18 @@ export function ReceivedLedgerPageClient({
                 <label className="text-xs font-semibold text-slate-500 md:col-span-2">
                   {copy.form.sourceOrg}
                   <input
+                    list="received-ledger-source-org-options"
                     value={draft.sourceOrg}
                     onChange={(event) =>
                       setDraft((prev) => ({ ...prev, sourceOrg: event.target.value }))
                     }
                     className="mt-2 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm text-slate-800"
                   />
+                  <datalist id="received-ledger-source-org-options">
+                    {normalizedSourceOrgOptions.map((sourceOrg) => (
+                      <option key={sourceOrg} value={sourceOrg} />
+                    ))}
+                  </datalist>
                 </label>
 
                 <label className="text-xs font-semibold text-slate-500 md:col-span-2">

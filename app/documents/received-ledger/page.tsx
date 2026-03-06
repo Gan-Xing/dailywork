@@ -20,7 +20,7 @@ export default async function ReceivedLedgerPage() {
     return <DocumentsAccessDenied permissions={['file:view']} variant="receivedLedgerList" />
   }
 
-  const [projects, roadSections, users, initialResult] = await Promise.all([
+  const [projects, roadSections, users, sourceOrgRows, initialResult] = await Promise.all([
     prisma.project.findMany({
       where: { isActive: true },
       select: { id: true, name: true, code: true },
@@ -34,8 +34,18 @@ export default async function ReceivedLedgerPage() {
       select: { id: true, name: true, username: true },
       orderBy: [{ name: 'asc' }, { id: 'asc' }],
     }),
+    prisma.receivedDocumentLedger.findMany({
+      where: { sourceOrg: { not: null } },
+      select: { sourceOrg: true },
+      distinct: ['sourceOrg'],
+      orderBy: [{ sourceOrg: 'asc' }],
+    }),
     listReceivedDocumentLedgers({ page: 1, pageSize: 20 }),
   ])
+
+  const sourceOrgOptions = sourceOrgRows
+    .map((row) => row.sourceOrg?.trim() ?? '')
+    .filter((item): item is string => Boolean(item))
 
   return (
     <ReceivedLedgerPageClient
@@ -43,6 +53,7 @@ export default async function ReceivedLedgerPage() {
       projects={projects}
       roadSections={roadSections}
       users={users}
+      sourceOrgOptions={sourceOrgOptions}
       canCreate={canCreate}
       canUpdate={canUpdate}
       canDelete={canDelete}

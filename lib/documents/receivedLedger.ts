@@ -22,6 +22,7 @@ export const RECEIVED_DOCUMENT_LEDGER_FILE_PURPOSE_MAIN = 'main-pdf' as const
 export const RECEIVED_DOCUMENT_LEDGER_STATUSES: ReceivedDocumentLedgerStatus[] = [
   'RECEIVED',
   'PENDING_COMPLETION',
+  'LATEST_VERSION',
   'VOID',
 ]
 
@@ -48,11 +49,13 @@ const statusLabels: Record<Locale, Record<ReceivedDocumentLedgerStatus, string>>
   zh: {
     RECEIVED: '已接收',
     PENDING_COMPLETION: '待补全',
+    LATEST_VERSION: '最新版本',
     VOID: '作废',
   },
   fr: {
     RECEIVED: 'Recu',
     PENDING_COMPLETION: 'A completer',
+    LATEST_VERSION: 'Derniere version',
     VOID: 'Annule',
   },
 }

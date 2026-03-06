@@ -1,0 +1,2 @@
+ALTER TYPE "ReceivedDocumentLedgerStatus"
+ADD VALUE IF NOT EXISTS 'LATEST_VERSION';

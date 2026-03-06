@@ -94,6 +94,7 @@ enum DocumentStatus {
 enum ReceivedDocumentLedgerStatus {
   RECEIVED
   PENDING_COMPLETION
+  LATEST_VERSION
   VOID
 }
 
