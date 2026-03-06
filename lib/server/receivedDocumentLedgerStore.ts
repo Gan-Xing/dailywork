@@ -16,6 +16,7 @@ export type ReceivedDocumentLedgerListFilters = {
   projectId?: number | null
   roadSectionId?: number | null
   status?: string
+  attachmentState?: ReceivedDocumentLedgerAttachmentState
   sortBy?: ReceivedDocumentLedgerSortField
   sortDir?: ReceivedDocumentLedgerSortDir
   page?: number
@@ -32,6 +33,8 @@ export type ReceivedDocumentLedgerSortField =
   | 'updatedAt'
 
 export type ReceivedDocumentLedgerSortDir = 'asc' | 'desc'
+
+export type ReceivedDocumentLedgerAttachmentState = 'all' | 'withMain' | 'withoutMain'
 
 export type ReceivedDocumentLedgerMainPdf = {
   id: number
@@ -73,6 +76,10 @@ export type ReceivedDocumentLedgerListResult = {
   page: number
   pageSize: number
   totalPages: number
+  summary: {
+    missingMainPdfCount: number
+    withMainPdfCount: number
+  }
 }
 
 export type ReceivedDocumentLedgerWriteInput = {
@@ -111,6 +118,20 @@ const splitSearchTokens = (value: string) =>
     .split(/[\s,，;；|]+/)
     .map((item) => item.trim())
     .filter(Boolean)
+
+const normalizeAttachmentState = (
+  value: ReceivedDocumentLedgerListFilters['attachmentState'],
+): ReceivedDocumentLedgerAttachmentState =>
+  value === 'withMain' || value === 'withoutMain' ? value : 'all'
+
+const combineWhereConditions = (
+  ...parts: Array<Prisma.ReceivedDocumentLedgerWhereInput | undefined>
+): Prisma.ReceivedDocumentLedgerWhereInput => {
+  const valid = parts.filter((part) => part && Object.keys(part).length) as Prisma.ReceivedDocumentLedgerWhereInput[]
+  if (!valid.length) return {}
+  if (valid.length === 1) return valid[0]
+  return { AND: valid }
+}
 
 const buildWhere = (filters: ReceivedDocumentLedgerListFilters): Prisma.ReceivedDocumentLedgerWhereInput => {
   const where: Prisma.ReceivedDocumentLedgerWhereInput = {}
@@ -179,6 +200,56 @@ const buildOrderBy = (filters: ReceivedDocumentLedgerListFilters): Prisma.Receiv
     case 'receivedAt':
     default:
       return [{ receivedAt: dir }, { id: 'desc' }]
+  }
+}
+
+const loadMainPdfLedgerIdList = async () => {
+  const links = await prisma.fileAssetLink.findMany({
+    where: {
+      entityType: RECEIVED_DOCUMENT_LEDGER_FILE_ENTITY_TYPE,
+      purpose: RECEIVED_DOCUMENT_LEDGER_FILE_PURPOSE_MAIN,
+    },
+    select: {
+      entityId: true,
+    },
+    distinct: ['entityId'],
+  })
+
+  return links
+    .map((link) => Number(link.entityId))
+    .filter((value) => Number.isInteger(value) && value > 0)
+}
+
+const buildAttachmentWhere = (
+  attachmentState: ReceivedDocumentLedgerAttachmentState,
+  mainPdfLedgerIds: number[],
+): Prisma.ReceivedDocumentLedgerWhereInput | undefined => {
+  if (attachmentState === 'withMain') {
+    return {
+      id: {
+        in: mainPdfLedgerIds.length ? mainPdfLedgerIds : [-1],
+      },
+    }
+  }
+  if (attachmentState === 'withoutMain') {
+    if (!mainPdfLedgerIds.length) return undefined
+    return {
+      id: {
+        notIn: mainPdfLedgerIds,
+      },
+    }
+  }
+  return undefined
+}
+
+const buildMissingMainPdfWhere = (
+  mainPdfLedgerIds: number[],
+): Prisma.ReceivedDocumentLedgerWhereInput | undefined => {
+  if (!mainPdfLedgerIds.length) return undefined
+  return {
+    id: {
+      notIn: mainPdfLedgerIds,
+    },
   }
 }
 
@@ -288,8 +359,16 @@ export const listReceivedDocumentLedgers = async (
 ): Promise<ReceivedDocumentLedgerListResult> => {
   const page = Math.max(1, Number(filters.page ?? 1) || 1)
   const pageSize = normalizePageSize(filters.pageSize)
-  const where = buildWhere(filters)
+  const baseWhere = buildWhere(filters)
   const orderBy = buildOrderBy(filters)
+  const attachmentState = normalizeAttachmentState(filters.attachmentState)
+  const mainPdfLedgerIds = await loadMainPdfLedgerIdList()
+  const attachmentWhere = buildAttachmentWhere(attachmentState, mainPdfLedgerIds)
+  const where = combineWhereConditions(baseWhere, attachmentWhere)
+  const missingMainPdfWhere = combineWhereConditions(
+    baseWhere,
+    buildMissingMainPdfWhere(mainPdfLedgerIds),
+  )
 
   const [total, rows] = await prisma.$transaction([
     prisma.receivedDocumentLedger.count({ where }),
@@ -309,6 +388,19 @@ export const listReceivedDocumentLedgers = async (
   const fileSummaryMap = await loadFileSummaryMap(rows.map((row) => row.id))
   const items = rows.map((row) => mapRow(row, fileSummaryMap.get(String(row.id))))
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
+  let missingMainPdfCount = 0
+
+  if (attachmentState === 'withoutMain') {
+    missingMainPdfCount = total
+  } else if (attachmentState === 'withMain') {
+    missingMainPdfCount = 0
+  } else if (mainPdfLedgerIds.length) {
+    missingMainPdfCount = await prisma.receivedDocumentLedger.count({
+      where: missingMainPdfWhere,
+    })
+  } else {
+    missingMainPdfCount = total
+  }
 
   return {
     items,
@@ -316,6 +408,10 @@ export const listReceivedDocumentLedgers = async (
     page,
     pageSize,
     totalPages,
+    summary: {
+      missingMainPdfCount,
+      withMainPdfCount: Math.max(0, total - missingMainPdfCount),
+    },
   }
 }
 

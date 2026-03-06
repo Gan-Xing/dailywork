@@ -8,6 +8,7 @@ import {
 import { getSessionUser, hasPermission } from '@/lib/server/authSession'
 import {
   createReceivedDocumentLedger,
+  type ReceivedDocumentLedgerAttachmentState,
   listReceivedDocumentLedgers,
   type ReceivedDocumentLedgerSortDir,
   type ReceivedDocumentLedgerSortField,
@@ -58,6 +59,11 @@ const parseSortField = (value: string | null): ReceivedDocumentLedgerSortField =
 
 const parseSortDir = (value: string | null): ReceivedDocumentLedgerSortDir =>
   value === 'asc' ? 'asc' : 'desc'
+
+const parseAttachmentState = (value: string | null): ReceivedDocumentLedgerAttachmentState => {
+  if (value === 'withMain' || value === 'withoutMain') return value
+  return 'all'
+}
 
 const parseWritePayload = (payload: Record<string, unknown>): ReceivedDocumentLedgerWriteInput => {
   const categoryRaw = typeof payload.category === 'string' ? payload.category.trim() : ''
@@ -149,6 +155,7 @@ export async function GET(request: NextRequest) {
     search: searchParams.get('search')?.trim() ?? '',
     category: searchParams.get('category')?.trim() ?? '',
     status: searchParams.get('status')?.trim() ?? '',
+    attachmentState: parseAttachmentState(searchParams.get('attachmentState')),
     projectId: Number.isInteger(projectIdRaw) && projectIdRaw > 0 ? projectIdRaw : null,
     roadSectionId: Number.isInteger(roadSectionIdRaw) && roadSectionIdRaw > 0 ? roadSectionIdRaw : null,
     sortBy: parseSortField(searchParams.get('sortBy')),

@@ -38,4 +38,8 @@ export type ReceivedLedgerListResult = {
   page: number
   pageSize: number
   totalPages: number
+  summary: {
+    missingMainPdfCount: number
+    withMainPdfCount: number
+  }
 }

@@ -45,6 +45,7 @@ type FilterState = {
   projectId: string
   roadSectionId: string
   status: string
+  attachmentState: 'all' | 'withMain' | 'withoutMain'
 }
 
 type SortField =
@@ -93,6 +94,7 @@ const copyByLocale: Record<Locale, {
     project: string
     roadSection: string
     status: string
+    attachment: string
     apply: string
     reset: string
     all: string
@@ -129,6 +131,7 @@ const copyByLocale: Record<Locale, {
   actions: {
     upload: string
     open: string
+    download: string
     edit: string
     delete: string
   }
@@ -138,6 +141,9 @@ const copyByLocale: Record<Locale, {
     noPdf: string
     noRemark: string
     attachmentCount: string
+    hasMainPdf: string
+    missingMainPdf: string
+    missingMainPdfSummary: string
   }
   messages: {
     loadingFailed: string
@@ -174,6 +180,7 @@ const copyByLocale: Record<Locale, {
       project: '项目',
       roadSection: '路段',
       status: '状态',
+      attachment: '附件',
       apply: '应用筛选',
       reset: '重置',
       all: '全部',
@@ -210,6 +217,7 @@ const copyByLocale: Record<Locale, {
     actions: {
       upload: '上传PDF',
       open: '查看',
+      download: '下载',
       edit: '编辑',
       delete: '删除',
     },
@@ -219,6 +227,9 @@ const copyByLocale: Record<Locale, {
       noPdf: '未上传',
       noRemark: '—',
       attachmentCount: '附件数',
+      hasMainPdf: '已上传',
+      missingMainPdf: '缺附件',
+      missingMainPdfSummary: '缺附件 {count} 条',
     },
     messages: {
       loadingFailed: '加载台账失败',
@@ -256,6 +267,7 @@ const copyByLocale: Record<Locale, {
       project: 'Projet',
       roadSection: 'Section',
       status: 'Statut',
+      attachment: 'Piece jointe',
       apply: 'Appliquer',
       reset: 'Reinitialiser',
       all: 'Tous',
@@ -292,6 +304,7 @@ const copyByLocale: Record<Locale, {
     actions: {
       upload: 'Televerser PDF',
       open: 'Ouvrir',
+      download: 'Telecharger',
       edit: 'Modifier',
       delete: 'Supprimer',
     },
@@ -301,6 +314,9 @@ const copyByLocale: Record<Locale, {
       noPdf: 'Aucun PDF',
       noRemark: '-',
       attachmentCount: 'Pieces',
+      hasMainPdf: 'Avec PDF',
+      missingMainPdf: 'Sans PDF',
+      missingMainPdfSummary: '{count} lignes sans PDF',
     },
     messages: {
       loadingFailed: 'Chargement echoue',
@@ -433,6 +449,7 @@ export function ReceivedLedgerPageClient({
     projectId: '',
     roadSectionId: '',
     status: '',
+    attachmentState: 'all',
   })
   const [sortState, setSortState] = useState<SortState>({ field: 'receivedAt', dir: 'desc' })
   const [result, setResult] = useState<ReceivedLedgerListResult>(initialResult)
@@ -486,6 +503,9 @@ export function ReceivedLedgerPageClient({
         if (nextFilters.projectId) params.set('projectId', nextFilters.projectId)
         if (nextFilters.roadSectionId) params.set('roadSectionId', nextFilters.roadSectionId)
         if (nextFilters.status) params.set('status', nextFilters.status)
+        if (nextFilters.attachmentState && nextFilters.attachmentState !== 'all') {
+          params.set('attachmentState', nextFilters.attachmentState)
+        }
         params.set('sortBy', nextSort.field)
         params.set('sortDir', nextSort.dir)
 
@@ -521,6 +541,7 @@ export function ReceivedLedgerPageClient({
       projectId: '',
       roadSectionId: '',
       status: '',
+      attachmentState: 'all' as const,
     }
     setFilters(empty)
     void fetchRows(1, result.pageSize, empty, sortState)
@@ -674,6 +695,33 @@ export function ReceivedLedgerPageClient({
     }
   }
 
+  const downloadMainPdf = async (row: ReceivedLedgerRow) => {
+    if (!row.mainPdf) {
+      addToast(copy.labels.noPdf, { tone: 'warning' })
+      return
+    }
+    try {
+      const response = await fetch(`/api/files/${row.mainPdf.id}?includeUrl=1`, { credentials: 'include' })
+      const body = (await response.json().catch(() => ({}))) as {
+        file?: { url?: string | null; previewUrl?: string | null }
+        message?: string
+      }
+      const target = body.file?.url || body.file?.previewUrl
+      if (!response.ok || !target) {
+        throw new Error(body.message ?? copy.messages.openFailed)
+      }
+      const link = document.createElement('a')
+      link.href = target
+      link.download = row.mainPdf.originalName
+      link.target = '_blank'
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+    } catch (error) {
+      addToast((error as Error).message, { tone: 'danger' })
+    }
+  }
+
   const uploadMainPdf = async (row: ReceivedLedgerRow, file: File | null) => {
     if (!file) return
     const lowerName = file.name.toLowerCase()
@@ -769,8 +817,8 @@ export function ReceivedLedgerPageClient({
           ) : null}
         </div>
 
-        <div className="mt-5 grid gap-3 md:grid-cols-5">
-          <label className="text-xs font-semibold text-slate-500 md:col-span-2">
+        <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-7">
+          <label className="text-xs font-semibold text-slate-500 sm:col-span-2 lg:col-span-2">
             {copy.filters.keyword}
             <input
               value={filters.search}
@@ -851,23 +899,47 @@ export function ReceivedLedgerPageClient({
               ))}
             </select>
           </label>
-          <div className="md:col-span-5 flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={handleApplyFilters}
-              className="rounded-lg bg-slate-900 px-4 py-2 text-xs font-semibold text-white"
-              disabled={loading}
+          <label className="text-xs font-semibold text-slate-500">
+            {copy.filters.attachment}
+            <select
+              value={filters.attachmentState}
+              onChange={(event) =>
+                setFilters((prev) => ({
+                  ...prev,
+                  attachmentState: event.target.value as FilterState['attachmentState'],
+                }))
+              }
+              className="mt-2 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm text-slate-800"
             >
-              {copy.filters.apply}
-            </button>
-            <button
-              type="button"
-              onClick={handleResetFilters}
-              className="rounded-lg border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700"
-              disabled={loading}
-            >
-              {copy.filters.reset}
-            </button>
+              <option value="all">{copy.filters.all}</option>
+              <option value="withMain">{copy.labels.hasMainPdf}</option>
+              <option value="withoutMain">{copy.labels.missingMainPdf}</option>
+            </select>
+          </label>
+          <div className="sm:col-span-2 lg:col-span-7 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2">
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={handleApplyFilters}
+                className="rounded-lg bg-slate-900 px-4 py-2 text-xs font-semibold text-white"
+                disabled={loading}
+              >
+                {copy.filters.apply}
+              </button>
+              <button
+                type="button"
+                onClick={handleResetFilters}
+                className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700"
+                disabled={loading}
+              >
+                {copy.filters.reset}
+              </button>
+            </div>
+            <span className="inline-flex items-center rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-semibold text-amber-700">
+              {formatCopy(copy.labels.missingMainPdfSummary, {
+                count: result.summary.missingMainPdfCount,
+              })}
+            </span>
           </div>
         </div>
 
@@ -978,18 +1050,43 @@ export function ReceivedLedgerPageClient({
                       </td>
                       <td className="px-3 py-3 text-xs text-slate-700">
                         <div className="space-y-2">
+                          <div
+                            className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                              row.mainPdf
+                                ? 'bg-emerald-100 text-emerald-700'
+                                : 'bg-amber-100 text-amber-700'
+                            }`}
+                          >
+                            {row.mainPdf ? copy.labels.hasMainPdf : copy.labels.missingMainPdf}
+                          </div>
+                          <div className="rounded-lg border border-slate-200 px-2 py-1 text-[11px]">
+                            {row.mainPdf ? (
+                              <>
+                                <div className="truncate font-semibold">{row.mainPdf.originalName}</div>
+                                <div className="text-slate-500">{formatBytes(row.mainPdf.size)}</div>
+                              </>
+                            ) : (
+                              <div className="text-slate-400">{copy.labels.noPdf}</div>
+                            )}
+                          </div>
                           {row.mainPdf ? (
-                            <button
-                              type="button"
-                              onClick={() => void openMainPdf(row)}
-                              className="block w-full rounded-lg border border-slate-200 px-2 py-1 text-left text-[11px] hover:border-emerald-200"
-                            >
-                              <div className="truncate font-semibold">{row.mainPdf.originalName}</div>
-                              <div className="text-slate-500">{formatBytes(row.mainPdf.size)}</div>
-                            </button>
-                          ) : (
-                            <div className="text-[11px] text-slate-400">{copy.labels.noPdf}</div>
-                          )}
+                            <div className="flex flex-wrap gap-1">
+                              <button
+                                type="button"
+                                onClick={() => void openMainPdf(row)}
+                                className="rounded-md border border-slate-200 px-2 py-1 text-[11px] font-semibold text-slate-700 hover:border-emerald-200"
+                              >
+                                {copy.actions.open}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => void downloadMainPdf(row)}
+                                className="rounded-md border border-slate-200 px-2 py-1 text-[11px] font-semibold text-slate-700 hover:border-emerald-200"
+                              >
+                                {copy.actions.download}
+                              </button>
+                            </div>
+                          ) : null}
                           <div className="text-[11px] text-slate-500">
                             {copy.labels.attachmentCount}: {row.attachmentCount}
                           </div>
