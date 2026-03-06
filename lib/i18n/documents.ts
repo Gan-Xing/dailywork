@@ -9,6 +9,7 @@ export type DocumentsCopy = {
       submissions: string
       templates: string
       letters: string
+      receivedLedger: string
     }
     aria: {
       expand: string
@@ -26,6 +27,7 @@ export type DocumentsCopy = {
     letters: string
     lettersNew: string
     letterDetailFallback: string
+    receivedLedger: string
     templates: string
     templatesNew: string
     templateDetailFallback: string
@@ -39,6 +41,7 @@ export type DocumentsCopy = {
     letterCreate: string
     letterDetail: string
     filesList: string
+    receivedLedgerList: string
     templatesList: string
     templateCreate: string
     templateDetail: string
@@ -555,6 +558,7 @@ export const documentsCopy: Record<Locale, DocumentsCopy> = {
         submissions: '提交单',
         templates: '模版管理',
         letters: '函件',
+        receivedLedger: '文件收件台账',
       },
       aria: {
         expand: '展开导航',
@@ -572,6 +576,7 @@ export const documentsCopy: Record<Locale, DocumentsCopy> = {
       letters: '函件',
       lettersNew: '新建函件',
       letterDetailFallback: '函件详情',
+      receivedLedger: '文件收件台账',
       templates: '模版',
       templatesNew: '新建模版',
       templateDetailFallback: '模版详情',
@@ -585,6 +590,7 @@ export const documentsCopy: Record<Locale, DocumentsCopy> = {
       letterCreate: '需要函件新增权限才能创建函件。',
       letterDetail: '需要函件查看权限才能访问详情。',
       filesList: '需要文件查看权限才能访问文件管理。',
+      receivedLedgerList: '需要文件查看权限才能访问文件收件台账。',
       templatesList: '需要模板查看权限才能访问模版管理。',
       templateCreate: '需要模板新增权限才能创建模版。',
       templateDetail: '需要模板查看权限才能访问详情。',
@@ -859,6 +865,7 @@ export const documentsCopy: Record<Locale, DocumentsCopy> = {
           user: '项目成员 (User)',
           inspection: '报检单 (Inspection)',
           submission: '提交单 (Submission)',
+          'received-document-ledger': '文件收件台账',
           'actual-boq-item': '工程内容',
           'leader-log': '原始日志',
           other: '其他 (Other)',
@@ -867,6 +874,7 @@ export const documentsCopy: Record<Locale, DocumentsCopy> = {
           signature: '签名 (signature)',
           avatar: '头像 (avatar)',
           attachment: '附件 (attachment)',
+          'main-pdf': '主PDF (main-pdf)',
         },
         purposePlaceholder: '选择或输入用途',
       },
@@ -947,6 +955,7 @@ export const documentsCopy: Record<Locale, DocumentsCopy> = {
         'face-photo': '人脸照片',
         'site-photo': '现场照片',
         'machine-photo': '机械照片',
+        'received-document': '文件收件台账',
         attachment: '附件',
         other: '其他',
       },
@@ -1184,6 +1193,7 @@ export const documentsCopy: Record<Locale, DocumentsCopy> = {
         submissions: 'Bordereaux',
         templates: 'Modèles',
         letters: 'Courriers',
+        receivedLedger: 'Registre des fichiers reçus',
       },
       aria: {
         expand: 'Déplier la navigation',
@@ -1201,6 +1211,7 @@ export const documentsCopy: Record<Locale, DocumentsCopy> = {
       letters: 'Courriers',
       lettersNew: 'Nouveau courrier',
       letterDetailFallback: 'Détail du courrier',
+      receivedLedger: 'Registre des fichiers reçus',
       templates: 'Modèles',
       templatesNew: 'Nouveau modèle',
       templateDetailFallback: 'Détail du modèle',
@@ -1214,6 +1225,7 @@ export const documentsCopy: Record<Locale, DocumentsCopy> = {
       letterCreate: "Le droit de création de courriers est requis pour créer un courrier.",
       letterDetail: "Le droit de consultation des courriers est requis pour voir le détail.",
       filesList: "Le droit de consultation des fichiers est requis pour accéder à la gestion des fichiers.",
+      receivedLedgerList: "Le droit de consultation des fichiers est requis pour voir le registre des fichiers reçus.",
       templatesList: "Le droit de consultation des modèles est requis pour accéder à la gestion des modèles.",
       templateCreate: "Le droit de création de modèles est requis pour créer un modèle.",
       templateDetail: "Le droit de consultation des modèles est requis pour voir le détail.",
@@ -1488,6 +1500,7 @@ export const documentsCopy: Record<Locale, DocumentsCopy> = {
           user: 'Membre (User)',
           inspection: 'Inspection',
           submission: 'Bordereau (Submission)',
+          'received-document-ledger': 'Registre des fichiers reçus',
           'actual-boq-item': 'BoqItem',
           'leader-log': 'Journal brut',
           other: 'Autre',
@@ -1496,6 +1509,7 @@ export const documentsCopy: Record<Locale, DocumentsCopy> = {
           signature: 'Signature',
           avatar: 'Avatar',
           attachment: 'Pièce jointe',
+          'main-pdf': 'PDF principal (main-pdf)',
         },
         purposePlaceholder: 'Choisir ou saisir usage',
       },
@@ -1576,6 +1590,7 @@ export const documentsCopy: Record<Locale, DocumentsCopy> = {
         'face-photo': 'Photo visage',
         'site-photo': 'Photo de chantier',
         'machine-photo': 'Photo machine',
+        'received-document': 'Registre des fichiers reçus',
         attachment: 'Pièce jointe',
         other: 'Autre',
       },

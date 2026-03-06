@@ -91,6 +91,12 @@ enum DocumentStatus {
   ARCHIVED
 }
 
+enum ReceivedDocumentLedgerStatus {
+  RECEIVED
+  PENDING_COMPLETION
+  VOID
+}
+
 enum PaymentStatus {
   PENDING
   PAID
@@ -125,20 +131,20 @@ enum BoqItemTone {
 }
 
 model PhaseDefinition {
-  id            Int                       @id @default(autoincrement())
-  name          String
-  measure       PhaseMeasure
-  unitPrice     Decimal?                  @db.Decimal(18, 2)
-  pointHasSides Boolean                   @default(false)
-  allowLevelCrossingBoth Boolean          @default(false)
-  isActive      Boolean                   @default(true)
-  defaultLayers PhaseDefinitionLayer[]
-  defaultChecks PhaseDefinitionCheck[]
-  phases        RoadPhase[]
-  priceItems    PhaseItem[]
-  workflows     PhaseWorkflowDefinition[]
-  createdAt     DateTime                  @default(now())
-  updatedAt     DateTime                  @updatedAt
+  id                     Int                       @id @default(autoincrement())
+  name                   String
+  measure                PhaseMeasure
+  unitPrice              Decimal?                  @db.Decimal(18, 2)
+  pointHasSides          Boolean                   @default(false)
+  allowLevelCrossingBoth Boolean                   @default(false)
+  isActive               Boolean                   @default(true)
+  defaultLayers          PhaseDefinitionLayer[]
+  defaultChecks          PhaseDefinitionCheck[]
+  phases                 RoadPhase[]
+  priceItems             PhaseItem[]
+  workflows              PhaseWorkflowDefinition[]
+  createdAt              DateTime                  @default(now())
+  updatedAt              DateTime                  @updatedAt
 
   @@unique([name, measure])
 }
@@ -241,23 +247,24 @@ model LeaderLogPrompt {
 }
 
 model RoadSection {
-  id                         Int                 @id @default(autoincrement())
+  id                         Int                      @id @default(autoincrement())
   projectId                  Int?
-  slug                       String              @unique
+  slug                       String                   @unique
   name                       String
   startPk                    String
   endPk                      String
-  createdAt                  DateTime            @default(now())
-  updatedAt                  DateTime            @updatedAt
-  project                    Project?            @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  createdAt                  DateTime                 @default(now())
+  updatedAt                  DateTime                 @updatedAt
+  project                    Project?                 @relation(fields: [projectId], references: [id], onDelete: SetNull)
   phases                     RoadPhase[]
   inspections                InspectionRequest[]
-  locationInspectionRequests InspectionRequest[] @relation("InspectionRequestLocationRoad")
-  inspectionEntries          InspectionEntry[]   @relation("InspectionEntryRoad")
-  locationInspectionEntries  InspectionEntry[]   @relation("InspectionEntryLocationRoad")
-  locationPhaseIntervals     PhaseInterval[]     @relation("PhaseIntervalLocationRoad")
+  locationInspectionRequests InspectionRequest[]      @relation("InspectionRequestLocationRoad")
+  inspectionEntries          InspectionEntry[]        @relation("InspectionEntryRoad")
+  locationInspectionEntries  InspectionEntry[]        @relation("InspectionEntryLocationRoad")
+  locationPhaseIntervals     PhaseInterval[]          @relation("PhaseIntervalLocationRoad")
   measurementDetails         BoqMeasurementDetail[]
   financeLedgerCases         FinanceLedgerCase[]
+  receivedDocumentLedgers    ReceivedDocumentLedger[]
 
   @@index([projectId])
 }
@@ -345,56 +352,56 @@ model PhaseItemInput {
 }
 
 model PhaseInterval {
-  id              Int              @id @default(autoincrement())
-  phaseId         Int
-  phase           RoadPhase        @relation(fields: [phaseId], references: [id], onDelete: Cascade)
-  locationRoadId  Int?
-  locationRoad    RoadSection?     @relation("PhaseIntervalLocationRoad", fields: [locationRoadId], references: [id], onDelete: SetNull)
+  id                Int                @id @default(autoincrement())
+  phaseId           Int
+  phase             RoadPhase          @relation(fields: [phaseId], references: [id], onDelete: Cascade)
+  locationRoadId    Int?
+  locationRoad      RoadSection?       @relation("PhaseIntervalLocationRoad", fields: [locationRoadId], references: [id], onDelete: SetNull)
   levelCrossingSide LevelCrossingSide?
-  startPk         Float
-  endPk           Float
-  side            IntervalSide
-  spec            String?
-  layers          String[]         @default([])
-  layerIds        Int[]            @default([])
-  billQuantity    Float?
-  phaseItemInputs PhaseItemInput[]
+  startPk           Float
+  endPk             Float
+  side              IntervalSide
+  spec              String?
+  layers            String[]           @default([])
+  layerIds          Int[]              @default([])
+  billQuantity      Float?
+  phaseItemInputs   PhaseItemInput[]
   inspectionEntries InspectionEntry[]
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
 
   @@index([locationRoadId])
   @@index([levelCrossingSide])
 }
 
 model InspectionRequest {
-  id              Int              @id @default(autoincrement())
-  roadId          Int
-  road            RoadSection      @relation(fields: [roadId], references: [id], onDelete: Cascade)
-  locationRoadId  Int?
-  locationRoad    RoadSection?     @relation("InspectionRequestLocationRoad", fields: [locationRoadId], references: [id], onDelete: SetNull)
+  id                Int                @id @default(autoincrement())
+  roadId            Int
+  road              RoadSection        @relation(fields: [roadId], references: [id], onDelete: Cascade)
+  locationRoadId    Int?
+  locationRoad      RoadSection?       @relation("InspectionRequestLocationRoad", fields: [locationRoadId], references: [id], onDelete: SetNull)
   levelCrossingSide LevelCrossingSide?
-  phaseId         Int
-  phase           RoadPhase        @relation(fields: [phaseId], references: [id], onDelete: Cascade)
-  side            IntervalSide
-  startPk         Float
-  endPk           Float
-  layers          String[]
-  checks          String[]
-  types           String[]
-  submissionOrder Int?
-  remark          String?
-  status          InspectionStatus @default(PENDING)
-  appointmentDate DateTime?
-  submittedAt     DateTime         @default(now())
-  submittedBy     Int?
-  submitter       User?            @relation("InspectionSubmitter", fields: [submittedBy], references: [id])
-  createdBy       Int?
-  creator         User?            @relation("InspectionCreator", fields: [createdBy], references: [id])
-  updatedBy       Int?
-  updater         User?            @relation("InspectionUpdater", fields: [updatedBy], references: [id])
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  phaseId           Int
+  phase             RoadPhase          @relation(fields: [phaseId], references: [id], onDelete: Cascade)
+  side              IntervalSide
+  startPk           Float
+  endPk             Float
+  layers            String[]
+  checks            String[]
+  types             String[]
+  submissionOrder   Int?
+  remark            String?
+  status            InspectionStatus   @default(PENDING)
+  appointmentDate   DateTime?
+  submittedAt       DateTime           @default(now())
+  submittedBy       Int?
+  submitter         User?              @relation("InspectionSubmitter", fields: [submittedBy], references: [id])
+  createdBy         Int?
+  creator           User?              @relation("InspectionCreator", fields: [createdBy], references: [id])
+  updatedBy         Int?
+  updater           User?              @relation("InspectionUpdater", fields: [updatedBy], references: [id])
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
 
   @@index([phaseId, status, updatedAt])
   @@index([locationRoadId])
@@ -429,6 +436,40 @@ model Document {
   @@index([updatedAt])
 }
 
+model ReceivedDocumentLedger {
+  id             Int                          @id @default(autoincrement())
+  category       String
+  projectId      Int
+  roadSectionId  Int?
+  structureName  String?
+  sizeSpec       String?
+  versionTag     String?
+  documentName   String
+  documentCode   String?
+  coverageScope  String?
+  sourceOrg      String?
+  receivedAt     DateTime
+  receivedById   Int?
+  receivedByText String?
+  status         ReceivedDocumentLedgerStatus @default(RECEIVED)
+  remark         String?
+  createdById    Int?
+  updatedById    Int?
+  createdAt      DateTime                     @default(now())
+  updatedAt      DateTime                     @updatedAt
+  project        Project                      @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  roadSection    RoadSection?                 @relation(fields: [roadSectionId], references: [id], onDelete: SetNull)
+  receivedBy     User?                        @relation("ReceivedDocumentLedgerReceiver", fields: [receivedById], references: [id], onDelete: SetNull)
+  creator        User?                        @relation("ReceivedDocumentLedgerCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  updater        User?                        @relation("ReceivedDocumentLedgerUpdater", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@index([projectId, receivedAt])
+  @@index([category, projectId, receivedAt])
+  @@index([roadSectionId])
+  @@index([status])
+  @@index([versionTag])
+}
+
 model Letter {
   id           Int       @id @default(autoincrement())
   documentId   Int       @unique
@@ -453,39 +494,39 @@ model Letter {
 }
 
 model InspectionEntry {
-  id              Int              @id @default(autoincrement())
-  documentId      Int?
-  document        Document?        @relation(fields: [documentId], references: [id], onDelete: Cascade)
-  roadId          Int
-  road            RoadSection      @relation("InspectionEntryRoad", fields: [roadId], references: [id], onDelete: Cascade)
-  locationRoadId  Int?
-  locationRoad    RoadSection?     @relation("InspectionEntryLocationRoad", fields: [locationRoadId], references: [id], onDelete: SetNull)
+  id                Int                @id @default(autoincrement())
+  documentId        Int?
+  document          Document?          @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  roadId            Int
+  road              RoadSection        @relation("InspectionEntryRoad", fields: [roadId], references: [id], onDelete: Cascade)
+  locationRoadId    Int?
+  locationRoad      RoadSection?       @relation("InspectionEntryLocationRoad", fields: [locationRoadId], references: [id], onDelete: SetNull)
   levelCrossingSide LevelCrossingSide?
-  phaseId         Int
-  phase           RoadPhase        @relation(fields: [phaseId], references: [id], onDelete: Cascade)
-  intervalId      Int?
-  interval        PhaseInterval?   @relation(fields: [intervalId], references: [id], onDelete: SetNull)
-  side            IntervalSide
-  startPk         Float
-  endPk           Float
-  layerId         Int?
-  layerName       String
-  checkId         Int?
-  checkName       String
-  types           String[]
-  status          InspectionStatus @default(PENDING)
-  appointmentDate DateTime?
-  remark          String?
-  submissionOrder Int?
-  submittedAt     DateTime         @default(now())
-  submittedBy     Int?
-  submitter       User?            @relation("InspectionEntrySubmitter", fields: [submittedBy], references: [id])
-  createdBy       Int?
-  creator         User?            @relation("InspectionEntryCreator", fields: [createdBy], references: [id])
-  updatedBy       Int?
-  updater         User?            @relation("InspectionEntryUpdater", fields: [updatedBy], references: [id])
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  phaseId           Int
+  phase             RoadPhase          @relation(fields: [phaseId], references: [id], onDelete: Cascade)
+  intervalId        Int?
+  interval          PhaseInterval?     @relation(fields: [intervalId], references: [id], onDelete: SetNull)
+  side              IntervalSide
+  startPk           Float
+  endPk             Float
+  layerId           Int?
+  layerName         String
+  checkId           Int?
+  checkName         String
+  types             String[]
+  status            InspectionStatus   @default(PENDING)
+  appointmentDate   DateTime?
+  remark            String?
+  submissionOrder   Int?
+  submittedAt       DateTime           @default(now())
+  submittedBy       Int?
+  submitter         User?              @relation("InspectionEntrySubmitter", fields: [submittedBy], references: [id])
+  createdBy         Int?
+  creator           User?              @relation("InspectionEntryCreator", fields: [createdBy], references: [id])
+  updatedBy         Int?
+  updater           User?              @relation("InspectionEntryUpdater", fields: [updatedBy], references: [id])
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
 
   @@index([roadId, phaseId, side, startPk, endPk, status])
   @@index([locationRoadId])
@@ -574,80 +615,83 @@ model Role {
 }
 
 model User {
-  id                          Int                     @id @default(autoincrement())
-  name                        String                  @default("")
-  gender                      String?
-  nationality                 String?
-  phones                      String[]                @default([])
-  tags                        String[]                @default([])
-  joinDate                    DateTime?
-  birthDate                   DateTime?
-  position                    String?
-  employmentStatus            EmploymentStatus        @default(ACTIVE)
-  terminationDate             DateTime?
-  terminationReason           String?
-  username                    String                  @unique
-  passwordHash                String
-  roles                       UserRole[]
-  submittedInspections        InspectionRequest[]     @relation("InspectionSubmitter")
-  createdInspections          InspectionRequest[]     @relation("InspectionCreator")
-  updatedInspections          InspectionRequest[]     @relation("InspectionUpdater")
-  submittedInspectionEntries  InspectionEntry[]       @relation("InspectionEntrySubmitter")
-  createdInspectionEntries    InspectionEntry[]       @relation("InspectionEntryCreator")
-  updatedInspectionEntries    InspectionEntry[]       @relation("InspectionEntryUpdater")
-  createdFinances             FinanceEntry[]          @relation("FinanceEntryCreator")
-  deletedFinances             FinanceEntry[]          @relation("FinanceEntryDeleter")
-  handledFinances             FinanceEntry[]          @relation("FinanceEntryHandler")
-  updatedFinances             FinanceEntry[]          @relation("FinanceEntryUpdater")
-  createdFinanceLedgerCases   FinanceLedgerCase[]     @relation("FinanceLedgerCaseCreator")
-  updatedFinanceLedgerCases   FinanceLedgerCase[]     @relation("FinanceLedgerCaseUpdater")
-  deletedFinanceLedgerCases   FinanceLedgerCase[]     @relation("FinanceLedgerCaseDeleter")
-  createdFinanceLedgerEvents  FinanceLedgerEvent[]    @relation("FinanceLedgerEventCreator")
-  updatedFinanceLedgerEvents  FinanceLedgerEvent[]    @relation("FinanceLedgerEventUpdater")
-  chineseProfile              UserChineseProfile?
-  expatProfile                UserExpatProfile?
-  expatSupervisees            UserExpatProfile[]      @relation("ExpatChineseSupervisor")
-  teamSupervisorBindings      TeamSupervisor[]
-  supervisedLeaderDailyLogs   LeaderDailyLog[]        @relation("LeaderDailyLogSupervisor")
-  createdLeaderDailyLogs      LeaderDailyLog[]        @relation("LeaderDailyLogCreator")
-  updatedLeaderDailyLogs      LeaderDailyLog[]        @relation("LeaderDailyLogUpdater")
-  leaderLogPrompt             LeaderLogPrompt?        @relation("LeaderLogPromptSupervisor")
-  leaderLogPromptsUpdated     LeaderLogPrompt[]       @relation("LeaderLogPromptUpdater")
-  logExtractionConfigsUpdated LogExtractionConfig[]   @relation("LogExtractionConfigUpdater")
-  contractChangeSupervisees   UserContractChange[]    @relation("ContractChangeSupervisor")
-  payrollChangeSupervisees    UserPayrollChange[]     @relation("PayrollChangeSupervisor")
-  payrollPayoutSupervisees    UserPayrollPayout[]     @relation("PayrollPayoutSupervisor")
-  contractChanges             UserContractChange[]
-  payrollChanges              UserPayrollChange[]
-  payrollPayouts              UserPayrollPayout[]
-  projectAssignments          UserProjectAssignment[]
-  ownedFileAssets             FileAsset[]             @relation("FileAssetOwner")
-  createdFileAssets           FileAsset[]             @relation("FileAssetCreator")
-  createdFileLinks            FileAssetLink[]         @relation("FileAssetLinkCreator")
-  signatures                  UserSignature[]
-  createdSignatures           UserSignature[]         @relation("UserSignatureCreator")
-  createdById                 Int?
-  updatedById                 Int?
-  createdBy                   User?                   @relation("UserCreator", fields: [createdById], references: [id])
-  updatedBy                   User?                   @relation("UserUpdater", fields: [updatedById], references: [id])
-  createdUsers                User[]                  @relation("UserCreator")
-  updatedUsers                User[]                  @relation("UserUpdater")
-  roadmapIdeasCreated         RoadmapIdea[]           @relation("RoadmapIdeaCreator")
-  roadmapIdeasUpdated         RoadmapIdea[]           @relation("RoadmapIdeaUpdater")
-  createdDocumentTemplates    DocumentTemplate[]      @relation("DocumentTemplateCreator")
-  updatedDocumentTemplates    DocumentTemplate[]      @relation("DocumentTemplateUpdater")
-  createdDocuments            Document[]              @relation("DocumentCreator")
-  updatedDocuments            Document[]              @relation("DocumentUpdater")
-  createdMachineAssets        MachineAsset[]          @relation("MachineAssetCreator")
-  updatedMachineAssets        MachineAsset[]          @relation("MachineAssetUpdater")
-  supervisedMachineDailyLogs  MachineDailyLog[]       @relation("MachineDailyLogSupervisor")
-  operatedMachineDailyLogs    MachineDailyLog[]       @relation("MachineDailyLogOperator")
-  createdMachineDailyLogs     MachineDailyLog[]       @relation("MachineDailyLogCreator")
-  updatedMachineDailyLogs     MachineDailyLog[]       @relation("MachineDailyLogUpdater")
-  createdFuelSourceDailyLogs  FuelSourceDailyLog[]    @relation("FuelSourceDailyLogCreator")
-  updatedFuelSourceDailyLogs  FuelSourceDailyLog[]    @relation("FuelSourceDailyLogUpdater")
-  createdAt                   DateTime                @default(now())
-  updatedAt                   DateTime                @updatedAt
+  id                              Int                      @id @default(autoincrement())
+  name                            String                   @default("")
+  gender                          String?
+  nationality                     String?
+  phones                          String[]                 @default([])
+  tags                            String[]                 @default([])
+  joinDate                        DateTime?
+  birthDate                       DateTime?
+  position                        String?
+  employmentStatus                EmploymentStatus         @default(ACTIVE)
+  terminationDate                 DateTime?
+  terminationReason               String?
+  username                        String                   @unique
+  passwordHash                    String
+  roles                           UserRole[]
+  submittedInspections            InspectionRequest[]      @relation("InspectionSubmitter")
+  createdInspections              InspectionRequest[]      @relation("InspectionCreator")
+  updatedInspections              InspectionRequest[]      @relation("InspectionUpdater")
+  submittedInspectionEntries      InspectionEntry[]        @relation("InspectionEntrySubmitter")
+  createdInspectionEntries        InspectionEntry[]        @relation("InspectionEntryCreator")
+  updatedInspectionEntries        InspectionEntry[]        @relation("InspectionEntryUpdater")
+  createdFinances                 FinanceEntry[]           @relation("FinanceEntryCreator")
+  deletedFinances                 FinanceEntry[]           @relation("FinanceEntryDeleter")
+  handledFinances                 FinanceEntry[]           @relation("FinanceEntryHandler")
+  updatedFinances                 FinanceEntry[]           @relation("FinanceEntryUpdater")
+  createdFinanceLedgerCases       FinanceLedgerCase[]      @relation("FinanceLedgerCaseCreator")
+  updatedFinanceLedgerCases       FinanceLedgerCase[]      @relation("FinanceLedgerCaseUpdater")
+  deletedFinanceLedgerCases       FinanceLedgerCase[]      @relation("FinanceLedgerCaseDeleter")
+  createdFinanceLedgerEvents      FinanceLedgerEvent[]     @relation("FinanceLedgerEventCreator")
+  updatedFinanceLedgerEvents      FinanceLedgerEvent[]     @relation("FinanceLedgerEventUpdater")
+  chineseProfile                  UserChineseProfile?
+  expatProfile                    UserExpatProfile?
+  expatSupervisees                UserExpatProfile[]       @relation("ExpatChineseSupervisor")
+  teamSupervisorBindings          TeamSupervisor[]
+  supervisedLeaderDailyLogs       LeaderDailyLog[]         @relation("LeaderDailyLogSupervisor")
+  createdLeaderDailyLogs          LeaderDailyLog[]         @relation("LeaderDailyLogCreator")
+  updatedLeaderDailyLogs          LeaderDailyLog[]         @relation("LeaderDailyLogUpdater")
+  leaderLogPrompt                 LeaderLogPrompt?         @relation("LeaderLogPromptSupervisor")
+  leaderLogPromptsUpdated         LeaderLogPrompt[]        @relation("LeaderLogPromptUpdater")
+  logExtractionConfigsUpdated     LogExtractionConfig[]    @relation("LogExtractionConfigUpdater")
+  contractChangeSupervisees       UserContractChange[]     @relation("ContractChangeSupervisor")
+  payrollChangeSupervisees        UserPayrollChange[]      @relation("PayrollChangeSupervisor")
+  payrollPayoutSupervisees        UserPayrollPayout[]      @relation("PayrollPayoutSupervisor")
+  contractChanges                 UserContractChange[]
+  payrollChanges                  UserPayrollChange[]
+  payrollPayouts                  UserPayrollPayout[]
+  projectAssignments              UserProjectAssignment[]
+  ownedFileAssets                 FileAsset[]              @relation("FileAssetOwner")
+  createdFileAssets               FileAsset[]              @relation("FileAssetCreator")
+  createdFileLinks                FileAssetLink[]          @relation("FileAssetLinkCreator")
+  signatures                      UserSignature[]
+  createdSignatures               UserSignature[]          @relation("UserSignatureCreator")
+  createdById                     Int?
+  updatedById                     Int?
+  createdBy                       User?                    @relation("UserCreator", fields: [createdById], references: [id])
+  updatedBy                       User?                    @relation("UserUpdater", fields: [updatedById], references: [id])
+  createdUsers                    User[]                   @relation("UserCreator")
+  updatedUsers                    User[]                   @relation("UserUpdater")
+  roadmapIdeasCreated             RoadmapIdea[]            @relation("RoadmapIdeaCreator")
+  roadmapIdeasUpdated             RoadmapIdea[]            @relation("RoadmapIdeaUpdater")
+  createdDocumentTemplates        DocumentTemplate[]       @relation("DocumentTemplateCreator")
+  updatedDocumentTemplates        DocumentTemplate[]       @relation("DocumentTemplateUpdater")
+  createdDocuments                Document[]               @relation("DocumentCreator")
+  updatedDocuments                Document[]               @relation("DocumentUpdater")
+  createdMachineAssets            MachineAsset[]           @relation("MachineAssetCreator")
+  updatedMachineAssets            MachineAsset[]           @relation("MachineAssetUpdater")
+  supervisedMachineDailyLogs      MachineDailyLog[]        @relation("MachineDailyLogSupervisor")
+  operatedMachineDailyLogs        MachineDailyLog[]        @relation("MachineDailyLogOperator")
+  createdMachineDailyLogs         MachineDailyLog[]        @relation("MachineDailyLogCreator")
+  updatedMachineDailyLogs         MachineDailyLog[]        @relation("MachineDailyLogUpdater")
+  createdFuelSourceDailyLogs      FuelSourceDailyLog[]     @relation("FuelSourceDailyLogCreator")
+  updatedFuelSourceDailyLogs      FuelSourceDailyLog[]     @relation("FuelSourceDailyLogUpdater")
+  receivedDocumentLedgersReceived ReceivedDocumentLedger[] @relation("ReceivedDocumentLedgerReceiver")
+  createdReceivedDocumentLedgers  ReceivedDocumentLedger[] @relation("ReceivedDocumentLedgerCreator")
+  updatedReceivedDocumentLedgers  ReceivedDocumentLedger[] @relation("ReceivedDocumentLedgerUpdater")
+  createdAt                       DateTime                 @default(now())
+  updatedAt                       DateTime                 @updatedAt
 }
 
 model MachineAsset {
@@ -1027,23 +1071,24 @@ model UserPayrollPayout {
 }
 
 model Project {
-  id                Int                     @id @default(autoincrement())
-  name              String                  @unique
-  code              String?                 @unique
-  isActive          Boolean                 @default(true)
-  createdAt         DateTime                @default(now())
-  updatedAt         DateTime                @updatedAt
-  finances          FinanceEntry[]
-  financeLedgerCases FinanceLedgerCase[]
-  financeLedgerSlas FinanceLedgerSla[]
-  teamSupervisors   TeamSupervisor[]
-  memberAssignments UserProjectAssignment[]
-  machineDailyLogs  MachineDailyLog[]
-  boqItems          BoqItem[]
-  boqMeasurements   BoqMeasurement[]
-  measurementDetails BoqMeasurementDetail[]
-  letters           Letter[]
-  roadSections      RoadSection[]
+  id                      Int                      @id @default(autoincrement())
+  name                    String                   @unique
+  code                    String?                  @unique
+  isActive                Boolean                  @default(true)
+  createdAt               DateTime                 @default(now())
+  updatedAt               DateTime                 @updatedAt
+  finances                FinanceEntry[]
+  financeLedgerCases      FinanceLedgerCase[]
+  financeLedgerSlas       FinanceLedgerSla[]
+  teamSupervisors         TeamSupervisor[]
+  memberAssignments       UserProjectAssignment[]
+  machineDailyLogs        MachineDailyLog[]
+  boqItems                BoqItem[]
+  boqMeasurements         BoqMeasurement[]
+  measurementDetails      BoqMeasurementDetail[]
+  letters                 Letter[]
+  roadSections            RoadSection[]
+  receivedDocumentLedgers ReceivedDocumentLedger[]
 }
 
 model BoqItem {
@@ -1064,13 +1109,13 @@ model BoqItem {
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
-  project        Project            @relation(fields: [projectId], references: [id])
-  contractItem   BoqItem?           @relation("BoqItemContractLink", fields: [contractItemId], references: [id])
-  derivedItems   BoqItem[]          @relation("BoqItemContractLink")
-  measurements   BoqMeasurement[]
+  project            Project                @relation(fields: [projectId], references: [id])
+  contractItem       BoqItem?               @relation("BoqItemContractLink", fields: [contractItemId], references: [id])
+  derivedItems       BoqItem[]              @relation("BoqItemContractLink")
+  measurements       BoqMeasurement[]
   measurementDetails BoqMeasurementDetail[]
-  phaseItemLinks PhaseItemBoqItem[]
-  letters        Letter[]
+  phaseItemLinks     PhaseItemBoqItem[]
+  letters            Letter[]
 
   @@index([projectId, sheetType, sortOrder])
   @@index([projectId, sheetType, code])
@@ -1096,7 +1141,7 @@ model BoqMeasurement {
 }
 
 model BoqMeasurementDetail {
-  id           Int      @id @default(autoincrement())
+  id           Int           @id @default(autoincrement())
   projectId    Int
   boqItemId    Int
   roadId       Int
@@ -1104,11 +1149,11 @@ model BoqMeasurementDetail {
   endPk        String?
   side         IntervalSide?
   period       DateTime
-  quantity     Decimal  @db.Decimal(18, 2)
-  manualAmount Decimal? @db.Decimal(18, 2)
+  quantity     Decimal       @db.Decimal(18, 2)
+  manualAmount Decimal?      @db.Decimal(18, 2)
   note         String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
 
   project Project     @relation(fields: [projectId], references: [id])
   boqItem BoqItem     @relation(fields: [boqItemId], references: [id], onDelete: Cascade)
@@ -1197,43 +1242,43 @@ model FinanceEntry {
 }
 
 model FinanceLedgerCase {
-  id                       Int                      @id @default(autoincrement())
-  sequence                 Int                      @default(autoincrement())
-  projectId                Int
-  periodIndex              Int
-  sectionId                Int?
-  status                   FinanceLedgerCaseStatus  @default(IN_PROGRESS)
-  currentStage             FinanceLedgerStage?
-  enteredCurrentStageAt    DateTime?
-  accountAmount            Decimal?                 @db.Decimal(18, 2)
-  invoiceAmount            Decimal?                 @db.Decimal(18, 2)
-  advanceAmount            Decimal?                 @db.Decimal(18, 2)
-  chequeAmount             Decimal?                 @db.Decimal(18, 2)
-  invoiceNumber            String?
-  receiptChequeNumber      String?
-  remark                   String?
-  constructionStartedAt    DateTime?
-  constructionFinishedAt   DateTime?
-  ptoSiteSignedAt          DateTime?
-  ptoHqBillReceivedAt      DateTime?
-  ptoBeConfirmedAt         DateTime?
-  ptoBeDeliveredAt         DateTime?
-  ptoHqInvoiceReceivedAt   DateTime?
-  chequeIssuedAt           DateTime?
-  chequeReceivedAt         DateTime?
-  isDeleted                Boolean                  @default(false)
-  deletedAt                DateTime?
-  deletedBy                Int?
-  updatedBy                Int?
-  createdAt                DateTime                 @default(now())
-  updatedAt                DateTime                 @updatedAt
-  createdBy                Int?
-  project                  Project                  @relation(fields: [projectId], references: [id])
-  section                  RoadSection?             @relation(fields: [sectionId], references: [id], onDelete: SetNull)
-  events                   FinanceLedgerEvent[]
-  creator                  User?                    @relation("FinanceLedgerCaseCreator", fields: [createdBy], references: [id])
-  updater                  User?                    @relation("FinanceLedgerCaseUpdater", fields: [updatedBy], references: [id])
-  deleter                  User?                    @relation("FinanceLedgerCaseDeleter", fields: [deletedBy], references: [id])
+  id                     Int                     @id @default(autoincrement())
+  sequence               Int                     @default(autoincrement())
+  projectId              Int
+  periodIndex            Int
+  sectionId              Int?
+  status                 FinanceLedgerCaseStatus @default(IN_PROGRESS)
+  currentStage           FinanceLedgerStage?
+  enteredCurrentStageAt  DateTime?
+  accountAmount          Decimal?                @db.Decimal(18, 2)
+  invoiceAmount          Decimal?                @db.Decimal(18, 2)
+  advanceAmount          Decimal?                @db.Decimal(18, 2)
+  chequeAmount           Decimal?                @db.Decimal(18, 2)
+  invoiceNumber          String?
+  receiptChequeNumber    String?
+  remark                 String?
+  constructionStartedAt  DateTime?
+  constructionFinishedAt DateTime?
+  ptoSiteSignedAt        DateTime?
+  ptoHqBillReceivedAt    DateTime?
+  ptoBeConfirmedAt       DateTime?
+  ptoBeDeliveredAt       DateTime?
+  ptoHqInvoiceReceivedAt DateTime?
+  chequeIssuedAt         DateTime?
+  chequeReceivedAt       DateTime?
+  isDeleted              Boolean                 @default(false)
+  deletedAt              DateTime?
+  deletedBy              Int?
+  updatedBy              Int?
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+  createdBy              Int?
+  project                Project                 @relation(fields: [projectId], references: [id])
+  section                RoadSection?            @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+  events                 FinanceLedgerEvent[]
+  creator                User?                   @relation("FinanceLedgerCaseCreator", fields: [createdBy], references: [id])
+  updater                User?                   @relation("FinanceLedgerCaseUpdater", fields: [updatedBy], references: [id])
+  deleter                User?                   @relation("FinanceLedgerCaseDeleter", fields: [deletedBy], references: [id])
 
   @@unique([sequence])
   @@unique([projectId, periodIndex])
@@ -1244,19 +1289,19 @@ model FinanceLedgerCase {
 }
 
 model FinanceLedgerEvent {
-  id        Int                @id @default(autoincrement())
-  caseId    Int
-  stage     FinanceLedgerStage
-  occurredAt DateTime
+  id          Int                @id @default(autoincrement())
+  caseId      Int
+  stage       FinanceLedgerStage
+  occurredAt  DateTime
   payloadJson Json?
-  note      String?
-  updatedBy Int?
-  createdBy Int?
-  createdAt DateTime           @default(now())
-  updatedAt DateTime           @updatedAt
-  ledgerCase FinanceLedgerCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
-  creator   User?              @relation("FinanceLedgerEventCreator", fields: [createdBy], references: [id])
-  updater   User?              @relation("FinanceLedgerEventUpdater", fields: [updatedBy], references: [id])
+  note        String?
+  updatedBy   Int?
+  createdBy   Int?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  ledgerCase  FinanceLedgerCase  @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  creator     User?              @relation("FinanceLedgerEventCreator", fields: [createdBy], references: [id])
+  updater     User?              @relation("FinanceLedgerEventUpdater", fields: [updatedBy], references: [id])
 
   @@unique([caseId, stage])
   @@index([stage, occurredAt])

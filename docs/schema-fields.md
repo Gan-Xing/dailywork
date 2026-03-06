@@ -701,7 +701,7 @@
 
 ### FileAsset（非结构化文件）
 - `id`：自增整型。
-- `category`：文件分类（初始枚举：`signature`、`inspection-receipt`、`inspection-acceptance`、`attendance-sheet`、`letter-receipt`、`face-photo`、`site-photo`、`machine-photo`、`attachment`、`other`）。
+- `category`：文件分类（初始枚举：`signature`、`inspection-receipt`、`inspection-acceptance`、`attendance-sheet`、`letter-receipt`、`face-photo`、`site-photo`、`machine-photo`、`received-document`、`attachment`、`other`）。
 - `storageKey`：存储桶对象键（唯一）。
 - `bucket`：存储桶名称。
 - `originalName`：原始文件名。
@@ -718,7 +718,7 @@
 ### FileAssetLink（文件关联）
 - `id`：自增整型。
 - `fileId`：关联 `FileAsset`。
-- `entityType`：关联对象类型（如 `user`、`document`、`inspection`、`actual-boq-item`）。
+- `entityType`：关联对象类型（如 `user`、`document`、`inspection`、`actual-boq-item`、`received-document-ledger`）。
 - `entityId`：关联对象 ID（字符串，兼容数值 ID）。
 - `purpose?`：用途标识（如 `receipt`、`acceptance`、`attendance`）。
 - `label?`：前端展示用名称（可选）。
@@ -839,6 +839,33 @@
      - `Document.status` 作为函件状态来源（`DRAFT`/`FINAL`/`ARCHIVED`）。
      - 附件通过 `FileAssetLink` 绑定至 `Document`（`entityType=document`，`entityId=Document.id`），签收件使用 `letter-receipt` 分类。
      - 函件正文写入 `Document.data.content`，收/发件人姓名可写入 `Document.data.senderName` / `Document.data.recipientName`。
+
+## 文件收件台账（ReceivedDocumentLedger）
+
+- **用途**：在文档管理中按“分类 + 项目 + 路段”维护已收文件台账，逐行补录元数据并上传对应 PDF。
+- **字段**
+     1. `id`：唯一标识。
+     2. `category`：收件分类（`ROAD_DRAWING`、`STRUCTURE_DRAWING`、`GEOTECH_SURVEY`、`APPROVAL_CERTIFICATE`、`METHOD_STATEMENT`、`OTHER_TECHNICAL_FILE`）。
+     3. `projectId`：关联 `Project`（必填）。
+     4. `roadSectionId?`：关联 `RoadSection`（可空，支持非路段级文件）。
+     5. `structureName?`：结构名称（可空）。
+     6. `sizeSpec?`：规格/尺寸（可空）。
+     7. `versionTag?`：版本标签（如 `Ind 02`，可空）。
+     8. `documentName`：图纸/文件名称（必填）。
+     9. `documentCode?`：文件编号或图号（可空）。
+    10. `coverageScope?`：覆盖范围（如 `P01-P131` / `PK` 区间，可空）。
+    11. `sourceOrg?`：来源单位（可空）。
+    12. `receivedAt`：接收日期（必填）。
+    13. `receivedById?`：接收人（关联 `User`，可空）。
+    14. `receivedByText?`：接收人文本（用于外部人员，`receivedById` 可空时填写）。
+    15. `status`：台账状态（`RECEIVED` / `PENDING_COMPLETION` / `VOID`）。
+    16. `remark?`：备注（可空）。
+    17. `createdById?` / `updatedById?`：操作人（可空）。
+    18. `createdAt` / `updatedAt`：时间戳。
+- **关联规则**：
+     - 行级 PDF 通过 `FileAssetLink` 绑定（`entityType=received-document-ledger`，`entityId=台账ID`）。
+     - 主文件推荐使用 `purpose=main-pdf`，文件分类使用 `received-document`。
+     - 删除台账时，仅清理该台账对应的 `FileAssetLink` 关联，不直接删除底层 `FileAsset`。
 
 ## 日志抽取配置（LogExtractionConfig）
 

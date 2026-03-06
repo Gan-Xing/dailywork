@@ -8,6 +8,7 @@ export const FILE_CATEGORIES = [
   'face-photo',
   'site-photo',
   'machine-photo',
+  'received-document',
   'attachment',
   'other',
 ] as const

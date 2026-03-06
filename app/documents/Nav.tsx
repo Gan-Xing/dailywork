@@ -15,6 +15,7 @@ export function DocumentsNav() {
   const navItems = [
     { href: '/documents', label: copy.nav.items.overview },
     { href: '/documents/files', label: copy.nav.items.files },
+    { href: '/documents/received-ledger', label: copy.nav.items.receivedLedger },
     { href: '/documents/submissions', label: copy.nav.items.submissions },
     { href: '/documents/letters', label: copy.nav.items.letters },
     { href: '/documents/templates', label: copy.nav.items.templates },
@@ -32,6 +33,12 @@ export function DocumentsNav() {
   } else if (pathname?.startsWith('/documents/files')) {
     currentPageTitle = copy.breadcrumbs.files
     breadcrumbItem = { href: '/documents/files', label: copy.breadcrumbs.files }
+  } else if (pathname?.startsWith('/documents/received-ledger')) {
+    currentPageTitle = copy.breadcrumbs.receivedLedger
+    breadcrumbItem = {
+      href: '/documents/received-ledger',
+      label: copy.breadcrumbs.receivedLedger,
+    }
   } else if (pathname?.startsWith('/documents/submissions')) {
     currentPageTitle = copy.breadcrumbs.submissions
     breadcrumbItem = { href: '/documents/submissions', label: copy.breadcrumbs.submissions }

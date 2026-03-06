@@ -14,6 +14,7 @@ type AccessVariant =
   | 'letterCreate'
   | 'letterDetail'
   | 'filesList'
+  | 'receivedLedgerList'
   | 'templatesList'
   | 'templateCreate'
   | 'templateDetail'
