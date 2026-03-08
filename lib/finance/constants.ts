@@ -26,5 +26,5 @@ export type FinanceSortSpec = {
 }
 
 export const DEFAULT_FINANCE_SORT_STACK: FinanceSortSpec[] = [
-  { field: 'paymentDate', order: 'desc' },
+  { field: 'sequence', order: 'desc' },
 ]

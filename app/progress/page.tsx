@@ -45,12 +45,10 @@ async function ProgressContent({ canManage, canViewInspections }: ProgressConten
 
   try {
     roads = await listRoadSectionsWithProgress()
-    if (canManage) {
-      projects = await prisma.project.findMany({
-        select: { id: true, name: true, code: true },
-        orderBy: [{ name: 'asc' }, { id: 'asc' }],
-      })
-    }
+    projects = await prisma.project.findMany({
+      select: { id: true, name: true, code: true },
+      orderBy: [{ name: 'asc' }, { id: 'asc' }],
+    })
   } catch (error) {
     loadError = (error as Error).message
   }

@@ -66,7 +66,21 @@ type ProgressCopy = {
     overview: string
     none: string
     count: string
+    groupCount: string
     emptyHelp: string
+  }
+  group: {
+    projectLabel: string
+    specialLabel: string
+    ungroupedLabel: string
+    roadCount: string
+    phaseCount: string
+    expand: string
+    collapse: string
+    updated: string
+    moreRoads: string
+    ungroupedTitle: string
+    projectFallback: string
   }
   card: {
     label: string
@@ -795,7 +809,21 @@ const progressCopy: Record<Locale, ProgressCopy> = {
       overview: '路段总览',
       none: '尚未添加',
       count: '共 {count} 条',
+      groupCount: '共 {count} 组',
       emptyHelp: '暂无路段，先在上方填写“名称 + 起点 + 终点”添加第一条。',
+    },
+    group: {
+      projectLabel: '项目',
+      specialLabel: '特殊',
+      ungroupedLabel: '未分组',
+      roadCount: '{count} 条路段',
+      phaseCount: '{count} 个分项',
+      expand: '展开路段',
+      collapse: '收起路段',
+      updated: '最近更新：',
+      moreRoads: '+{count} 条更多',
+      ungroupedTitle: '未分组路段',
+      projectFallback: '项目 {id}',
     },
     card: {
       label: '路段',
@@ -1541,8 +1569,22 @@ const progressCopy: Record<Locale, ProgressCopy> = {
       overview: 'Vue d’ensemble',
       none: 'Aucun tronçon',
       count: '{count} tronçons',
+      groupCount: '{count} groupes',
       emptyHelp:
         'Aucune route pour le moment. Ajoutez-en une avec Nom + PK début/fin depuis le formulaire ci-dessus.',
+    },
+    group: {
+      projectLabel: 'Projet',
+      specialLabel: 'Spécial',
+      ungroupedLabel: 'Non classé',
+      roadCount: '{count} tronçon(s)',
+      phaseCount: '{count} phase(s)',
+      expand: 'Afficher les tronçons',
+      collapse: 'Masquer les tronçons',
+      updated: 'Dernière mise à jour : ',
+      moreRoads: '+{count} de plus',
+      ungroupedTitle: 'Tronçons non classés',
+      projectFallback: 'Projet {id}',
     },
     card: {
       label: 'Tronçon',
