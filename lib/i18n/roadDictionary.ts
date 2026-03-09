@@ -96,20 +96,36 @@ roadNameEntries.forEach((entry) => {
 
 const normalize = (value?: string) => (value ? value.trim() : '')
 
+const deriveIndexedRoadLabels = (
+  normalizedName: string,
+  pattern: RegExp,
+  frPrefix: string,
+): LocalizedString | null => {
+  const match = normalizedName.match(pattern)
+  if (!match) return null
+
+  const suffix = match[1].trim().replace(/号$/, '')
+  if (!suffix) return null
+
+  return {
+    zh: normalizedName,
+    fr: `${frPrefix} ${suffix}`,
+  }
+}
+
 const deriveRoadLabels = (name?: string): LocalizedString | null => {
   const normalizedName = normalize(name)
   if (!normalizedName) return null
 
-  const agnibilekrouMatch = normalizedName.match(/^阿尼比莱克鲁(.+)路$/)
-  if (agnibilekrouMatch) {
-    const suffix = agnibilekrouMatch[1].trim().replace(/号$/, '')
-    if (suffix) {
-      return {
-        zh: normalizedName,
-        fr: `Agnibilékrou ${suffix}`,
-      }
-    }
-  }
+  const bondoukouLabels = deriveIndexedRoadLabels(normalizedName, /^邦杜库(.+)路$/, 'Bondoukou')
+  if (bondoukouLabels) return bondoukouLabels
+
+  const agnibilekrouLabels = deriveIndexedRoadLabels(
+    normalizedName,
+    /^阿尼比莱克鲁(.+)路$/,
+    'Agnibilékrou',
+  )
+  if (agnibilekrouLabels) return agnibilekrouLabels
 
   return null
 }

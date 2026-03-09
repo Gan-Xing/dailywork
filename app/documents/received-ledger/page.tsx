@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { getSessionUser } from '@/lib/server/authSession'
 import { listReceivedDocumentLedgers } from '@/lib/server/receivedDocumentLedgerStore'
+import { listRoadSections } from '@/lib/server/roadStore'
 
 import { DocumentsAccessDenied } from '../DocumentsAccessDenied'
 import { ReceivedLedgerPageClient } from './ReceivedLedgerPageClient'
@@ -33,10 +34,7 @@ export default async function ReceivedLedgerPage() {
       select: { id: true, name: true, code: true },
       orderBy: [{ name: 'asc' }, { id: 'asc' }],
     }),
-    prisma.roadSection.findMany({
-      select: { id: true, slug: true, name: true, projectId: true },
-      orderBy: [{ name: 'asc' }, { id: 'asc' }],
-    }),
+    listRoadSections(),
     prisma.user.findMany({
       select: { id: true, name: true, username: true },
       orderBy: [{ name: 'asc' }, { id: 'asc' }],
@@ -57,6 +55,9 @@ export default async function ReceivedLedgerPage() {
   const projects = projectsRaw.filter((project) => !hiddenProjectIdSet.has(project.id))
   const roadSections = roadSectionsRaw.filter(
     (section) => !section.projectId || !hiddenProjectIdSet.has(section.projectId),
+  )
+  roadSections.sort(
+    (left, right) => left.name.localeCompare(right.name, 'zh-Hans-CN') || left.id - right.id,
   )
 
   const initialResult = await listReceivedDocumentLedgers({

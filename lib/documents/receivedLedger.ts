@@ -18,6 +18,7 @@ export const RECEIVED_DOCUMENT_LEDGER_FILE_CATEGORY = 'received-document' as con
 export const RECEIVED_DOCUMENT_LEDGER_FILE_ENTITY_TYPE =
   'received-document-ledger' as const
 export const RECEIVED_DOCUMENT_LEDGER_FILE_PURPOSE_MAIN = 'main-pdf' as const
+export const RECEIVED_DOCUMENT_LEDGER_OTHER_ROAD_VALUE = '__other-road__' as const
 
 export const RECEIVED_DOCUMENT_LEDGER_STATUSES: ReceivedDocumentLedgerStatus[] = [
   'RECEIVED',

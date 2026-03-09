@@ -16,6 +16,7 @@ export type ReceivedDocumentLedgerListFilters = {
   projectId?: number | null
   excludeProjectIds?: number[]
   roadSectionId?: number | null
+  otherRoad?: boolean
   status?: string
   attachmentState?: ReceivedDocumentLedgerAttachmentState
   sortBy?: ReceivedDocumentLedgerSortField
@@ -167,7 +168,9 @@ const buildWhere = (filters: ReceivedDocumentLedgerListFilters): Prisma.Received
   } else if (excludedProjectIds.length) {
     andConditions.push({ projectId: { notIn: excludedProjectIds } })
   }
-  if (Number.isInteger(filters.roadSectionId) && (filters.roadSectionId as number) > 0) {
+  if (filters.otherRoad) {
+    where.roadSectionId = null
+  } else if (Number.isInteger(filters.roadSectionId) && (filters.roadSectionId as number) > 0) {
     where.roadSectionId = filters.roadSectionId as number
   }
 

@@ -7,6 +7,7 @@ import {
   RECEIVED_DOCUMENT_LEDGER_CATEGORIES,
   RECEIVED_DOCUMENT_LEDGER_FILE_CATEGORY,
   RECEIVED_DOCUMENT_LEDGER_FILE_ENTITY_TYPE,
+  RECEIVED_DOCUMENT_LEDGER_OTHER_ROAD_VALUE,
   RECEIVED_DOCUMENT_LEDGER_FILE_PURPOSE_MAIN,
   RECEIVED_DOCUMENT_LEDGER_STATUSES,
   getReceivedDocumentLedgerCategoryLabel,
@@ -16,6 +17,7 @@ import {
 } from '@/lib/documents/receivedLedger'
 import { locales, type Locale } from '@/lib/i18n'
 import { resolveRoadName } from '@/lib/i18n/roadDictionary'
+import type { RoadSectionDTO } from '@/lib/progressTypes'
 import { usePreferredLocale } from '@/lib/usePreferredLocale'
 
 import type { ReceivedLedgerListResult, ReceivedLedgerRow } from './types'
@@ -28,11 +30,10 @@ type ProjectOption = {
   code: string | null
 }
 
-type RoadOption = {
-  id: number
-  slug: string
-  name: string
-  projectId: number | null
+type RoadOption = Pick<RoadSectionDTO, 'id' | 'slug' | 'name' | 'projectId' | 'labels'>
+type RoadSelectOption = {
+  value: string
+  label: string
 }
 
 type UserOption = {
@@ -138,6 +139,7 @@ const copyByLocale: Record<Locale, {
     delete: string
   }
   labels: {
+    otherRoad: string
     noRoad: string
     noReceiver: string
     noPdf: string
@@ -224,6 +226,7 @@ const copyByLocale: Record<Locale, {
       delete: '删除',
     },
     labels: {
+      otherRoad: '其他路段',
       noRoad: '未选择路段',
       noReceiver: '未填写接收人',
       noPdf: '未上传',
@@ -311,6 +314,7 @@ const copyByLocale: Record<Locale, {
       delete: 'Supprimer',
     },
     labels: {
+      otherRoad: 'Autre section',
       noRoad: 'Sans section',
       noReceiver: 'Receptionnaire vide',
       noPdf: 'Aucun PDF',
@@ -365,6 +369,8 @@ const formatBytes = (size: number) => {
   return `${(size / 1024 / 1024).toFixed(1)} MB`
 }
 
+const isOtherRoadValue = (value: string) => value === RECEIVED_DOCUMENT_LEDGER_OTHER_ROAD_VALUE
+
 const frProjectNameByCode: Record<string, string> = {
   'project-bondoukou-city': 'Projet municipal de Bondoukou',
   'project-bondoukou-border': 'Projet frontalier de Bondoukou',
@@ -407,7 +413,7 @@ const buildEmptyDraft = (): FormState => ({
 const toDraft = (row: ReceivedLedgerRow): FormState => ({
   category: row.category,
   projectId: String(row.projectId),
-  roadSectionId: row.roadSectionId ? String(row.roadSectionId) : '',
+  roadSectionId: row.roadSectionId ? String(row.roadSectionId) : RECEIVED_DOCUMENT_LEDGER_OTHER_ROAD_VALUE,
   structureName: row.structureName ?? '',
   sizeSpec: row.sizeSpec ?? '',
   versionTag: row.versionTag ?? '',
@@ -490,11 +496,7 @@ export function ReceivedLedgerPageClient({
   )
 
   const getRoadLabel = useCallback(
-    (road: Pick<RoadOption, 'name' | 'slug'>) => {
-      if (locale !== 'fr') return road.name
-      const resolved = resolveRoadName({ slug: road.slug, name: road.name }, 'fr')
-      return resolved || road.name
-    },
+    (road: Pick<RoadOption, 'name' | 'slug' | 'labels'>) => resolveRoadName(road, locale),
     [locale],
   )
 
@@ -504,11 +506,35 @@ export function ReceivedLedgerPageClient({
     return roadSections.filter((road) => road.projectId === projectId)
   }, [filters.projectId, roadSections])
 
+  const filteredRoadOptions = useMemo<RoadSelectOption[]>(() => {
+    const options = filteredRoads.map((road) => ({
+      value: String(road.id),
+      label: getRoadLabel(road),
+    }))
+    if (!filters.projectId) return options
+    return [
+      { value: RECEIVED_DOCUMENT_LEDGER_OTHER_ROAD_VALUE, label: copy.labels.otherRoad },
+      ...options,
+    ]
+  }, [copy.labels.otherRoad, filteredRoads, filters.projectId, getRoadLabel])
+
   const draftRoadOptions = useMemo(() => {
     const projectId = Number(draft.projectId)
     if (!projectId) return roadSections
     return roadSections.filter((road) => road.projectId === projectId)
   }, [draft.projectId, roadSections])
+
+  const draftRoadSelectOptions = useMemo<RoadSelectOption[]>(() => {
+    const options = draftRoadOptions.map((road) => ({
+      value: String(road.id),
+      label: getRoadLabel(road),
+    }))
+    if (!draft.projectId) return options
+    return [
+      { value: RECEIVED_DOCUMENT_LEDGER_OTHER_ROAD_VALUE, label: copy.labels.otherRoad },
+      ...options,
+    ]
+  }, [copy.labels.otherRoad, draft.projectId, draftRoadOptions, getRoadLabel])
 
   const fetchRows = useCallback(
     async (
@@ -641,7 +667,10 @@ export function ReceivedLedgerPageClient({
       const payload = {
         category: draft.category,
         projectId: Number(draft.projectId),
-        roadSectionId: draft.roadSectionId ? Number(draft.roadSectionId) : null,
+        roadSectionId:
+          draft.roadSectionId && !isOtherRoadValue(draft.roadSectionId)
+            ? Number(draft.roadSectionId)
+            : null,
         structureName: draft.structureName.trim() || null,
         sizeSpec: draft.sizeSpec.trim() || null,
         versionTag: draft.versionTag.trim() || null,
@@ -907,9 +936,9 @@ export function ReceivedLedgerPageClient({
               className="mt-2 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm text-slate-800"
             >
               <option value="">{copy.filters.all}</option>
-              {filteredRoads.map((road) => (
-                <option key={road.id} value={String(road.id)}>
-                  {getRoadLabel(road)}
+              {filteredRoadOptions.map((road) => (
+                <option key={road.value} value={road.value}>
+                  {road.label}
                 </option>
               ))}
             </select>
@@ -1046,7 +1075,7 @@ export function ReceivedLedgerPageClient({
                     ? getRoadLabel(roadOption)
                     : row.roadSectionName
                       ? resolveRoadName({ name: row.roadSectionName }, locale)
-                      : copy.labels.noRoad
+                      : copy.labels.otherRoad
 
                   return (
                     <tr key={row.id} className="align-top hover:bg-slate-50">
@@ -1292,7 +1321,9 @@ export function ReceivedLedgerPageClient({
                       setDraft((prev) => ({
                         ...prev,
                         projectId: event.target.value,
-                        roadSectionId: '',
+                        roadSectionId: event.target.value
+                          ? RECEIVED_DOCUMENT_LEDGER_OTHER_ROAD_VALUE
+                          : '',
                       }))
                     }
                     className="mt-2 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm text-slate-800"
@@ -1314,10 +1345,10 @@ export function ReceivedLedgerPageClient({
                     }
                     className="mt-2 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm text-slate-800"
                   >
-                    <option value="">{copy.filters.all}</option>
-                    {draftRoadOptions.map((road) => (
-                      <option key={road.id} value={String(road.id)}>
-                        {getRoadLabel(road)}
+                    {draft.projectId ? null : <option value="">{copy.filters.all}</option>}
+                    {draftRoadSelectOptions.map((road) => (
+                      <option key={road.value} value={road.value}>
+                        {road.label}
                       </option>
                     ))}
                   </select>

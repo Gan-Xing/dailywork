@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { ReceivedDocumentLedgerStatus } from '@prisma/client'
 
 import {
+  RECEIVED_DOCUMENT_LEDGER_OTHER_ROAD_VALUE,
   isReceivedDocumentLedgerCategory,
   isReceivedDocumentLedgerStatus,
 } from '@/lib/documents/receivedLedger'
@@ -158,7 +159,9 @@ export async function GET(request: NextRequest) {
   const page = Number(searchParams.get('page') ?? '1')
   const pageSize = Number(searchParams.get('pageSize') ?? '20')
   const projectIdRaw = Number(searchParams.get('projectId') ?? '0')
-  const roadSectionIdRaw = Number(searchParams.get('roadSectionId') ?? '0')
+  const roadSectionIdParam = searchParams.get('roadSectionId')?.trim() ?? ''
+  const roadSectionIdRaw = Number(roadSectionIdParam)
+  const otherRoad = roadSectionIdParam === RECEIVED_DOCUMENT_LEDGER_OTHER_ROAD_VALUE
 
   const result = await listReceivedDocumentLedgers({
     search: searchParams.get('search')?.trim() ?? '',
@@ -168,6 +171,7 @@ export async function GET(request: NextRequest) {
     excludeProjectIds: parsePositiveIntList(searchParams.getAll('excludeProjectId')),
     projectId: Number.isInteger(projectIdRaw) && projectIdRaw > 0 ? projectIdRaw : null,
     roadSectionId: Number.isInteger(roadSectionIdRaw) && roadSectionIdRaw > 0 ? roadSectionIdRaw : null,
+    otherRoad,
     sortBy: parseSortField(searchParams.get('sortBy')),
     sortDir: parseSortDir(searchParams.get('sortDir')),
     page,
