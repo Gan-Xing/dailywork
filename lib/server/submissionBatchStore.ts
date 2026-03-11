@@ -469,7 +469,7 @@ export const executeSubmissionBatch = async (
           templateId: prepared.templateId,
           templateVersion: prepared.templateVersion,
           assignNextSubmissionNumber: true,
-          data: {
+          data: ({
             ...draft.data,
             documentMeta: {
               ...draft.data.documentMeta,
@@ -488,7 +488,7 @@ export const executeSubmissionBatch = async (
                 ...item
               }) => item,
             ),
-          } as Prisma.InputJsonValue,
+          } as unknown) as Prisma.InputJsonValue,
         },
         userId,
       )
