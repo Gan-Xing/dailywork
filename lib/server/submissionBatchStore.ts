@@ -475,8 +475,20 @@ export const executeSubmissionBatch = async (
               ...draft.data.documentMeta,
               subject: prepared.subject,
             },
-            items: chunk.map(({ sourceInspectionIds, rawInspectionIds: _rawInspectionIds, roadName, phaseName, side, startPk, endPk, linePreview, ...item }) => item),
-          },
+            items: chunk.map(
+              ({
+                sourceInspectionIds,
+                rawInspectionIds: _rawInspectionIds,
+                roadName,
+                phaseName,
+                side,
+                startPk,
+                endPk,
+                linePreview,
+                ...item
+              }) => item,
+            ),
+          } as Prisma.InputJsonValue,
         },
         userId,
       )
