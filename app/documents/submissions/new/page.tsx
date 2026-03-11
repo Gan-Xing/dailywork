@@ -1,4 +1,5 @@
 import { getSessionUser } from '@/lib/server/authSession'
+import { getNextSubmissionNumber } from '@/lib/server/submissionDocStore'
 
 import { DocumentsAccessDenied } from '../../DocumentsAccessDenied'
 import { NewSubmissionPageClient } from './NewSubmissionPageClient'
@@ -14,6 +15,11 @@ export default async function NewSubmissionPage() {
   }
 
   return (
-    <NewSubmissionPageClient canManage={canManage} canEdit={canCreate} currentUser={sessionUser} />
+    <NewSubmissionPageClient
+      canManage={canManage}
+      canEdit={canCreate}
+      currentUser={sessionUser}
+      suggestedSubmissionNumber={await getNextSubmissionNumber()}
+    />
   )
 }

@@ -1,12 +1,22 @@
 import { Prisma, DocumentStatus } from '@prisma/client'
 
+import { applySubmissionNumberToData } from '@/lib/documents/submissionDefaults'
+
 import { prisma } from '../prisma'
 
-const generateCode = async () => {
-  const latest = await prisma.document.findFirst({ orderBy: { id: 'desc' }, select: { id: true } })
+export type SubmissionStoreClient = Pick<Prisma.TransactionClient, 'document' | 'submission'>
+
+const generateCode = async (client: SubmissionStoreClient = prisma) => {
+  const latest = await client.document.findFirst({ orderBy: { id: 'desc' }, select: { id: true } })
   const next = (latest?.id ?? 0) + 1
   return `SUB-${String(next).padStart(3, '0')}`
 }
+
+export const getNextSubmissionNumber = async (client: SubmissionStoreClient = prisma) =>
+  ((await client.submission.findFirst({
+    orderBy: { submissionNumber: 'desc' },
+    select: { submissionNumber: true },
+  }))?.submissionNumber ?? 0) + 1
 
 const submissionInclude = {
   template: { select: { id: true, name: true, version: true, status: true } },
@@ -88,12 +98,17 @@ const extractHead = (data: any): SubmissionHead => {
 
 const extractItems = (data: any): SubmissionItemInput[] => {
   const items = Array.isArray(data?.items) ? data.items : []
-  return items.map((item: any, idx: number) => ({
-    designation: item?.designation ?? '',
-    quantity: item?.quantity ?? null,
-    observation: item?.observation ?? null,
-    order: idx + 1,
-  }))
+  return items
+    .map((item: any) => ({
+      designation: item?.designation ?? '',
+      quantity: item?.quantity ?? null,
+      observation: item?.observation ?? null,
+    }))
+    .filter((item) => item.designation.trim() || String(item.observation ?? '').trim())
+    .map((item, idx) => ({
+      ...item,
+      order: idx + 1,
+    }))
 }
 
 export type SubmissionDocInput = {
@@ -102,30 +117,40 @@ export type SubmissionDocInput = {
   data?: Prisma.InputJsonValue | null
   templateId?: string | null
   templateVersion?: number | null
+  assignNextSubmissionNumber?: boolean
 }
 
-export const createSubmissionDoc = async (input: SubmissionDocInput, userId?: number | null) => {
-  const code = await generateCode()
-  const head = extractHead(input.data ?? {})
-  const items = extractItems(input.data ?? {})
-  const nextNumber =
-    head.submissionNumber && head.submissionNumber > 0
-      ? head.submissionNumber
-      : ((await prisma.submission.findFirst({ orderBy: { submissionNumber: 'desc' }, select: { submissionNumber: true } }))?.submissionNumber ??
-          0) + 1
+export const createSubmissionDocWithClient = async (
+  client: SubmissionStoreClient,
+  input: SubmissionDocInput,
+  userId?: number | null,
+) => {
+  const requestedHead = extractHead(input.data ?? {})
+  const resolvedNumber =
+    input.assignNextSubmissionNumber || !(requestedHead.submissionNumber && requestedHead.submissionNumber > 0)
+      ? await getNextSubmissionNumber(client)
+      : requestedHead.submissionNumber
+  const normalizedData = applySubmissionNumberToData(input.data ?? {}, resolvedNumber) as Prisma.InputJsonValue
+  const head = extractHead(normalizedData ?? {})
+  const items = extractItems(normalizedData ?? {})
+  const code = await generateCode(client)
 
-  const document = await prisma.document.create({
+  return client.document.create({
     data: {
       code,
       title: input.title ?? undefined,
       status: input.status ?? DocumentStatus.DRAFT,
-      data: input.data ?? undefined,
+      data: normalizedData ?? undefined,
       templateId: input.templateId ?? undefined,
       templateVersion: input.templateVersion ?? undefined,
       createdById: userId ?? undefined,
       updatedById: userId ?? undefined,
       submission: {
-        create: { ...head, submissionNumber: nextNumber },
+        create: {
+          ...head,
+          submissionNumber: resolvedNumber,
+          bordereauNumber: resolvedNumber,
+        },
       },
       items: items.length
         ? {
@@ -139,7 +164,10 @@ export const createSubmissionDoc = async (input: SubmissionDocInput, userId?: nu
       submission: true,
     },
   })
-  return document
+}
+
+export const createSubmissionDoc = async (input: SubmissionDocInput, userId?: number | null) => {
+  return prisma.$transaction((tx) => createSubmissionDocWithClient(tx, input, userId))
 }
 
 export const updateSubmissionDoc = async (id: number, input: SubmissionDocInput, userId?: number | null) => {

@@ -4,6 +4,7 @@ import { PDFDocument } from 'pdf-lib'
 import puppeteer from 'puppeteer'
 
 import { renderBordereauTemplate } from '@/lib/documents/render'
+import { MAX_SUBMISSION_ITEM_ROWS } from '@/lib/documents/submissionItems'
 import { loadBordereauTemplateFromFile } from '@/lib/documents/templateLoader'
 import { hasPermission } from '@/lib/server/authSession'
 import { aggregateEntriesAsListItems } from '@/lib/server/inspectionEntryStore'
@@ -41,7 +42,7 @@ export async function POST(request: Request) {
   const html = renderBordereauTemplate(fallback.html, payload.data as any, {
     pageNumberText: payload.pageNumberText ?? '',
     minItemRows: 10,
-    maxItemRows: 12,
+    maxItemRows: MAX_SUBMISSION_ITEM_ROWS,
     baseUrl: origin,
   })
 

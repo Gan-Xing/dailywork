@@ -37,6 +37,7 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
     data?: unknown
     templateId?: string | null
     templateVersion?: number | null
+    assignNextSubmissionNumber?: boolean
   }
   try {
     payload = (await request.json()) as typeof payload
@@ -57,6 +58,7 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
         data: payload.data ?? undefined,
         templateId: payload.templateId ?? null,
         templateVersion: payload.templateVersion ?? null,
+        assignNextSubmissionNumber: payload.assignNextSubmissionNumber === true,
       },
       sessionUser.id,
     )

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 
 import { renderBordereauTemplate } from '@/lib/documents/render'
+import { MAX_SUBMISSION_ITEM_ROWS } from '@/lib/documents/submissionItems'
 import { loadBordereauTemplateFromFile } from '@/lib/documents/templateLoader'
 import { hasPermission } from '@/lib/server/authSession'
 import { getTemplate } from '@/lib/server/templateStore'
@@ -32,7 +33,7 @@ export async function POST(request: Request) {
   const rendered = renderBordereauTemplate(fallback.html, payload.data as any, {
     pageNumberText: payload.pageNumberText ?? '',
     minItemRows: 10,
-    maxItemRows: 12,
+    maxItemRows: MAX_SUBMISSION_ITEM_ROWS,
     baseUrl: origin,
   })
 

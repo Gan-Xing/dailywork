@@ -5,7 +5,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { DocumentStatus, DocumentType } from '@prisma/client'
 
-import { formatCopy, locales, type Locale } from '@/lib/i18n'
+import { buildDefaultSubmissionDraft } from '@/lib/documents/submissionDefaults'
+import {
+  buildSubmissionAutoItemsFromInspections,
+  dedupeSubmissionItems,
+  sanitizeSubmissionItems,
+} from '@/lib/documents/submissionItems'
+import { formatCopy, locales } from '@/lib/i18n'
 import { getDocumentsCopy } from '@/lib/i18n/documents'
 import { getProgressCopy } from '@/lib/i18n/progress'
 import { canonicalizeProgressList, localizeProgressList, localizeProgressTerm } from '@/lib/i18n/progressDictionary'
@@ -36,42 +42,18 @@ type Props = {
   canManage?: boolean
   canEdit?: boolean
   currentUser?: { id: number; username: string } | null
-}
-
-const buildDefaultData = (): SubmissionData => {
-  const now = new Date()
-  const today = now.toISOString().slice(0, 10)
-  const currentTime = now.toISOString().slice(11, 16)
-  return {
-    documentMeta: {
-      projectName:
-        "TRAVAUX DE RENFORCEMENT DE LA ROUTE BONDOUKOU -BOUNA Y COMPRIS L'AMENAGEMENT DES TRAVERSEES DE BOUNA, BONDOUKOU ET AGNIBILEKROU",
-      projectCode: 'QUA-VOIR-BDK-TANDA',
-      contractNumbers: ['090/2025', '091/2025'],
-      bordereauNumber: 1,
-      subject: 'Transmission de Demandes de Réception',
-    },
-    parties: {
-      sender: {
-        organization: 'CRBC',
-        date: today,
-        lastName: 'GAN',
-        firstName: 'XING',
-        time: currentTime,
-      },
-      recipient: {
-        organization: 'PORTEO',
-        date: '',
-        lastName: '',
-        firstName: '',
-      },
-    },
-    items: [{ designation: '', quantity: 1, observation: '' }],
-    comments: '',
+  defaultDraft?: {
+    title: string
+    data: SubmissionData
   }
 }
 
-export default function SubmissionEditor({ initialSubmission, canManage = false, canEdit = false }: Props) {
+export default function SubmissionEditor({
+  initialSubmission,
+  canManage = false,
+  canEdit = false,
+  defaultDraft,
+}: Props) {
   const { locale } = usePreferredLocale('zh', locales)
   const copy = getDocumentsCopy(locale)
   const [templates, setTemplates] = useState<TemplateOption[]>([])
@@ -81,10 +63,12 @@ export default function SubmissionEditor({ initialSubmission, canManage = false,
   const [downloadingPdf, setDownloadingPdf] = useState(false)
   const [activeTab, setActiveTab] = useState<'form' | 'preview'>('form')
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(initialSubmission?.templateId ?? 'file-bordereau')
-  const [data, setData] = useState<SubmissionData>(initialSubmission?.data ?? buildDefaultData())
+  const [data, setData] = useState<SubmissionData>(
+    () => initialSubmission?.data ?? defaultDraft?.data ?? buildDefaultSubmissionDraft({ suggestedSubmissionNumber: 1 }).data,
+  )
   const [renderedHtml, setRenderedHtml] = useState<string | null>(null)
   const [status, setStatus] = useState<DocumentStatus>(initialSubmission?.status ?? DocumentStatus.DRAFT)
-  const [title, setTitle] = useState(initialSubmission?.title ?? '')
+  const [title, setTitle] = useState(() => initialSubmission?.title ?? defaultDraft?.title ?? '')
   const [error, setError] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [showBaseModal, setShowBaseModal] = useState(false)
@@ -94,6 +78,7 @@ export default function SubmissionEditor({ initialSubmission, canManage = false,
   const [inspectionSearch, setInspectionSearch] = useState('')
   const [inspectionError, setInspectionError] = useState<string | null>(null)
   const [loadingInspections, setLoadingInspections] = useState(false)
+  const [submissionNumberTouched, setSubmissionNumberTouched] = useState(Boolean(initialSubmission))
   const hasLoadedInspectionBindingRef = useRef(false)
   const isReadOnly = !canEdit
   const inspectionStatusCopy = useMemo(
@@ -102,6 +87,22 @@ export default function SubmissionEditor({ initialSubmission, canManage = false,
   )
   const statusLabel = copy.status.document[status] ?? status
   const statusText = formatCopy(copy.submissionEditor.template.statusTemplate, { status: statusLabel })
+  const baseItems = useMemo<SubmissionItem[]>(
+    () => sanitizeSubmissionItems(data.items || []),
+    [data.items],
+  )
+  const selectedInspections = useMemo(
+    () => inspectionOptions.filter((item) => selectedInspectionIds.includes(item.id)),
+    [inspectionOptions, selectedInspectionIds],
+  )
+  const autoItems = useMemo(
+    () => buildSubmissionAutoItemsFromInspections(selectedInspections, baseItems),
+    [baseItems, selectedInspections],
+  )
+  const itemsPayload = useMemo(
+    () => dedupeSubmissionItems([...baseItems, ...autoItems.map(({ sourceInspectionIds, ...item }) => item)]),
+    [autoItems, baseItems],
+  )
 
   const selectedTemplate = useMemo(
     () => templates.find((tpl) => tpl.id === selectedTemplateId),
@@ -115,213 +116,6 @@ export default function SubmissionEditor({ initialSubmission, canManage = false,
     const km = Math.floor(value / 1000)
     const m = Math.round(value % 1000)
     return `PK${km}+${String(m).padStart(3, '0')}`
-  }
-
-  const formatPkRange = (startPk: number, endPk: number) => {
-    const startText = formatPk(startPk)
-    const endText = formatPk(endPk)
-    return startText === endText ? startText : `${startText} → ${endText}`
-  }
-
-  const getRawLayers = (inspection: InspectionListItem) => {
-    if (inspection.layers && inspection.layers.length) return inspection.layers
-    const layer = (inspection as any).layerName
-    return layer ? [layer] : []
-  }
-
-  const getRawChecks = (inspection: InspectionListItem) => {
-    if (inspection.checks && inspection.checks.length) return inspection.checks
-    const check = (inspection as any).checkName
-    return check ? [check] : []
-  }
-
-  const normalizeInspectionToken = (value: string) =>
-    value.replace(/[\u200B-\u200D\uFEFF]/g, '').trim()
-
-  const splitInspectionTokens = (values: string[]) => {
-    const result: string[] = []
-    const seen = new Set<string>()
-    values.forEach((value) => {
-      const cleaned = normalizeInspectionToken(value)
-      if (!cleaned) return
-      const slashParts = cleaned.split(/\s+\/\s+/)
-      slashParts.forEach((part) => {
-        part
-          .split(/[、，,\n]/)
-          .map((item) => normalizeInspectionToken(item))
-          .filter(Boolean)
-          .forEach((token) => {
-            const key = token.toLowerCase()
-            if (seen.has(key)) return
-            seen.add(key)
-            result.push(token)
-          })
-      })
-    })
-    return result
-  }
-
-  const sortInspectionTokens = (values: string[], locale: Locale = 'fr') =>
-    [...values].sort((left, right) => left.localeCompare(right, locale, { sensitivity: 'base' }))
-
-  const normalizeIntervalSpec = (value?: string | null) => {
-    if (typeof value !== 'string') return null
-    const cleaned = normalizeInspectionToken(value).replace(/\s+/g, ' ')
-    return cleaned || null
-  }
-
-  const appendSpecToPhaseLabel = (phaseLabel: string, intervalSpec?: string | null) => {
-    const normalizedPhase = normalizeInspectionToken(phaseLabel)
-    if (!normalizedPhase) return ''
-    const spec = normalizeIntervalSpec(intervalSpec)
-    if (!spec) return normalizedPhase
-    const compactPhase = normalizedPhase.toLowerCase().replace(/\s+/g, ' ')
-    const compactSpec = spec.toLowerCase().replace(/\s+/g, ' ')
-    if (compactPhase.includes(compactSpec)) return normalizedPhase
-    return `${normalizedPhase} ${spec}`
-  }
-
-  const buildInspectionDescription = (inspection: InspectionListItem) => {
-    const locale: Locale = 'fr' // 对齐 PDF 默认法语导出
-    const sideLabelMap: Record<string, string> = { LEFT: 'Gauche', RIGHT: 'Droite', BOTH: 'Deux côtés' }
-    const sideLabel = sideLabelMap[inspection.side] ?? inspection.side
-    const levelCrossingSideLabel = inspection.levelCrossingSide
-      ? sideLabelMap[inspection.levelCrossingSide] ?? inspection.levelCrossingSide
-      : null
-    const combinedSide = levelCrossingSideLabel ? `${sideLabel} / Amorce:${levelCrossingSideLabel}` : sideLabel
-    const rangeText = formatPkRange(inspection.startPk, inspection.endPk)
-    const displayRoad = {
-      slug: inspection.locationRoadSlug ?? inspection.roadSlug,
-      name: inspection.locationRoadName ?? inspection.roadName,
-    }
-    const roadText = resolveRoadName(displayRoad, locale)
-    const phaseText = appendSpecToPhaseLabel(
-      localizeProgressTerm('phase', normalizeInspectionToken(inspection.phaseName), locale),
-      inspection.intervalSpec,
-    )
-    const localisation = `${roadText} · ${phaseText} · ${combinedSide} · ${rangeText}`
-    const rawLayers = sortInspectionTokens(splitInspectionTokens(getRawLayers(inspection)), locale)
-    const rawChecks = sortInspectionTokens(splitInspectionTokens(getRawChecks(inspection)), locale)
-    const layers = sortInspectionTokens(
-      localizeProgressList('layer', rawLayers, locale, { phaseName: inspection.phaseName }),
-      locale,
-    )
-    const checks = sortInspectionTokens(
-      localizeProgressList('check', rawChecks, locale, { phaseName: inspection.phaseName }),
-      locale,
-    )
-    const nature = [...layers, ...checks].filter(Boolean).join(' / ')
-    const descriptionParts = [localisation]
-    if (nature) descriptionParts.push(nature)
-    return descriptionParts.join('\n')
-  }
-
-  const normalizeLegacyInspectionDesignation = (designation?: string | null) => {
-    const raw = (designation ?? '').trim()
-    if (!raw || !raw.includes(' · ') || !raw.includes('PK')) return designation ?? ''
-
-    const lines = raw.split('\n')
-    const headParts = lines[0]?.split(' · ').map((part) => part.trim()) ?? []
-    if (headParts.length < 4) return designation ?? ''
-
-    const [roadPart, phasePart, sidePart, ...rangeParts] = headParts
-    const rangePart = rangeParts.join(' · ').trim()
-    const rangeMatch = rangePart.match(/^(PK\d+\+\d{3})(?:\s*→\s*(PK\d+\+\d{3}))?$/i)
-    if (!rangeMatch) return designation ?? ''
-    const normalizedRangeStart = rangeMatch[1].toUpperCase()
-    const normalizedRangeEnd = rangeMatch[2]?.toUpperCase()
-    const normalizedRangePart =
-      normalizedRangeEnd && normalizedRangeEnd !== normalizedRangeStart
-        ? `${normalizedRangeStart} → ${normalizedRangeEnd}`
-        : normalizedRangeStart
-
-    const normalizedPhase = localizeProgressTerm('phase', normalizeInspectionToken(phasePart), 'fr')
-    const normalizedRoad = resolveRoadName({ name: roadPart }, 'fr')
-    const sideMap: Record<string, string> = {
-      LEFT: 'Gauche',
-      RIGHT: 'Droite',
-      BOTH: 'Deux côtés',
-      Gauche: 'Gauche',
-      Droite: 'Droite',
-      'Deux côtés': 'Deux côtés',
-      左侧: 'Gauche',
-      右侧: 'Droite',
-      双侧: 'Deux côtés',
-    }
-    const normalizedSide = sideMap[sidePart] ?? sidePart
-
-    const normalizedHead = [normalizedRoad, normalizedPhase, normalizedSide, normalizedRangePart].join(' · ')
-
-    const normalizedBody = lines
-      .slice(1)
-      .map((line) => {
-        if (!line.trim()) return line
-        return line
-          .split(/\s+\/\s+/)
-          .map((item) => {
-            const token = normalizeInspectionToken(item)
-            if (!token) return token
-            const checkToken = localizeProgressTerm('check', token, 'fr', { phaseName: phasePart })
-            if (checkToken !== token) return checkToken
-            return localizeProgressTerm('layer', token, 'fr', { phaseName: phasePart })
-          })
-          .filter(Boolean)
-          .join(' / ')
-      })
-
-    return [normalizedHead, ...normalizedBody].join('\n')
-  }
-
-  const buildInspectionDesignationKey = (designation?: string | null) => {
-    const normalized = normalizeLegacyInspectionDesignation(designation)
-      .split(/\r?\n/)
-      .map((line) => normalizeInspectionToken(line).replace(/\s+/g, ' '))
-      .filter(Boolean)
-
-    if (!normalized.length) return ''
-
-    const [head, ...body] = normalized
-    if (!head.includes(' · ') || !head.includes('PK')) {
-      return ''
-    }
-
-    const bodyTokens = sortInspectionTokens(
-      splitInspectionTokens(body)
-        .map((token) => {
-          const normalizedToken = normalizeInspectionToken(token)
-          if (!normalizedToken) return normalizedToken
-          const checkToken = localizeProgressTerm('check', normalizedToken, 'fr')
-          if (checkToken !== normalizedToken) return checkToken
-          return localizeProgressTerm('layer', normalizedToken, 'fr')
-        })
-        .map((token) => normalizeInspectionToken(token))
-        .filter(Boolean),
-      'fr',
-    ).map((token) => token.toLowerCase())
-
-    return bodyTokens.length ? `${head.toLowerCase()}\n${bodyTokens.join(' / ')}` : head.toLowerCase()
-  }
-
-  const dedupeSubmissionItems = (items: SubmissionItem[]) => {
-    const seenInspectionKeys = new Set<string>()
-
-    return items
-      .map((item) => ({
-        ...item,
-        designation: normalizeLegacyInspectionDesignation(item.designation),
-      }))
-      .filter((item) => {
-        const designationKey = buildInspectionDesignationKey(item.designation)
-        const observation = normalizeInspectionToken(item.observation ?? '')
-        const quantity = item.quantity ?? 1
-        const isGeneratedInspectionItem = Boolean(designationKey) && !observation && quantity === 1
-
-        if (!isGeneratedInspectionItem) return true
-        if (seenInspectionKeys.has(designationKey)) return false
-
-        seenInspectionKeys.add(designationKey)
-        return true
-      })
   }
 
   const parseErrorMessage = useCallback(async (res: Response) => {
@@ -348,8 +142,6 @@ export default function SubmissionEditor({ initialSubmission, canManage = false,
     if (!data.documentMeta.subject.trim()) errs.subject = copy.submissionEditor.validation.subject
     if (!data.parties.sender.organization.trim()) errs.senderOrg = copy.submissionEditor.validation.senderOrg
     if (!data.parties.recipient.organization.trim()) errs.recipientOrg = copy.submissionEditor.validation.recipientOrg
-    const hasItem = (data.items || []).length > 0
-    if (!hasItem) errs.items = copy.submissionEditor.validation.items
     setFieldErrors(errs)
     return Object.keys(errs).length === 0
   }, [copy.submissionEditor.validation, data])
@@ -362,7 +154,7 @@ export default function SubmissionEditor({ initialSubmission, canManage = false,
       const res = await fetch('/api/documents/submissions/render', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ templateId: selectedTemplateId, data }),
+        body: JSON.stringify({ templateId: selectedTemplateId, data: { ...data, items: itemsPayload } }),
       })
       if (!res.ok) {
         throw new Error(await parseErrorMessage(res))
@@ -374,7 +166,7 @@ export default function SubmissionEditor({ initialSubmission, canManage = false,
     } finally {
       setRendering(false)
     }
-  }, [data, parseErrorMessage, selectedTemplateId, validateForm])
+  }, [data, itemsPayload, parseErrorMessage, selectedTemplateId, validateForm])
 
   const fetchInspectionOptions = useCallback(async (options?: { keepSelection?: boolean; searchTerm?: string }) => {
     setLoadingInspections(true)
@@ -516,9 +308,10 @@ export default function SubmissionEditor({ initialSubmission, canManage = false,
   }, [fetchInspectionOptions, initialSubmission?.id])
 
   useEffect(() => {
-    const now = new Date()
-    const dateNow = now.toISOString().slice(0, 10)
-    const timeNow = now.toISOString().slice(11, 16)
+    const senderDefaults = buildDefaultSubmissionDraft({
+      suggestedSubmissionNumber: data.documentMeta.bordereauNumber || 1,
+      now: new Date(),
+    }).data.parties.sender
     if (data.parties.sender.date && data.parties.sender.time) return
     setData((prev) => ({
       ...prev,
@@ -526,12 +319,12 @@ export default function SubmissionEditor({ initialSubmission, canManage = false,
         ...prev.parties,
         sender: {
           ...prev.parties.sender,
-          date: prev.parties.sender.date || dateNow,
-          time: prev.parties.sender.time || timeNow,
+          date: prev.parties.sender.date || senderDefaults.date,
+          time: prev.parties.sender.time || senderDefaults.time,
         },
       },
     }))
-  }, [data.parties.sender.date, data.parties.sender.time])
+  }, [data.documentMeta.bordereauNumber, data.parties.sender.date, data.parties.sender.time])
 
   useEffect(() => {
     if (!selectedTemplateId || rendering) return
@@ -553,77 +346,13 @@ export default function SubmissionEditor({ initialSubmission, canManage = false,
     setSaving(true)
     setError(null)
     try {
-      const baseItems =
-        data.items && data.items.length === 1 && isEmptyItem(data.items[0])
-          ? []
-          : (data.items || []).map((item) => ({
-              ...item,
-              designation: normalizeLegacyInspectionDesignation(item.designation),
-            }))
-
-      const selectedInspections = inspectionOptions.filter((item) => selectedInspectionIds.includes(item.id))
-      const existingDesignationKeys = new Set(
-        baseItems.map((item) => buildInspectionDesignationKey(item.designation)).filter(Boolean),
-      )
-
-      const grouped = new Map<
-        string,
-        {
-          sample: InspectionListItem
-          checks: Set<string>
-          layers: Set<string>
-        }
-      >()
-
-      selectedInspections.forEach((inspection) => {
-        const rawLayers = getRawLayers(inspection)
-        const layerKey = rawLayers.length ? rawLayers[0].trim().toLowerCase() : ''
-        const locationKey = inspection.locationRoadId ?? inspection.roadId
-        const key = [
-          inspection.roadId,
-          locationKey,
-          inspection.phaseId,
-          inspection.intervalId ?? 'null',
-          inspection.side,
-          inspection.levelCrossingSide ?? 'null',
-          inspection.startPk,
-          inspection.endPk,
-          layerKey,
-        ].join('|')
-        const existing = grouped.get(key)
-        if (existing) {
-          getRawChecks(inspection).forEach((check) => existing.checks.add(check))
-          rawLayers.forEach((layer) => existing.layers.add(layer))
-        } else {
-          grouped.set(key, {
-            sample: inspection,
-            checks: new Set(getRawChecks(inspection)),
-            layers: new Set(rawLayers),
-          })
-        }
-      })
-
-      const autoItems =
-        Array.from(grouped.values())
-          .map((group) => {
-            const merged: InspectionListItem = {
-              ...group.sample,
-              layers: Array.from(group.layers),
-              checks: Array.from(group.checks),
-            }
-            return buildInspectionDescription(merged).trim()
-          })
-          .filter((desc) => Boolean(desc))
-          .filter((desc) => !existingDesignationKeys.has(buildInspectionDesignationKey(desc)))
-          .map((desc) => ({ designation: desc, quantity: 1, observation: '' })) ?? []
-      const itemsPayload = dedupeSubmissionItems([...baseItems, ...autoItems])
-
       const payload = {
         title,
         status: nextStatus,
         data: { ...data, items: itemsPayload },
         templateId: selectedTemplateId,
         templateVersion: selectedTemplate?.version ?? null,
+        assignNextSubmissionNumber: !initialSubmission && !submissionNumberTouched,
       }
       const res = await fetch(initialSubmission ? `/api/documents/submissions/${initialSubmission.id}` : '/api/documents/submissions', {
         method: initialSubmission ? 'PATCH' : 'POST',
@@ -639,9 +368,7 @@ export default function SubmissionEditor({ initialSubmission, canManage = false,
       const submissionId = initialSubmission?.id ?? json.submission?.id ?? null
       const submissionNumber = json.submission?.submission?.submissionNumber ?? null
       if (submissionId) {
-        if (autoItems.length) {
-          setData((prev) => ({ ...prev, items: itemsPayload }))
-        }
+        setData((prev) => ({ ...prev, items: itemsPayload }))
         await applyInspectionBinding(submissionId)
         void fetchInspectionOptions({ keepSelection: true, searchTerm: inspectionSearch })
       }
@@ -666,7 +393,7 @@ export default function SubmissionEditor({ initialSubmission, canManage = false,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           templateId: selectedTemplateId,
-          data,
+          data: { ...data, items: itemsPayload },
           submissionId: initialSubmission?.id,
         }),
       })
@@ -704,15 +431,6 @@ export default function SubmissionEditor({ initialSubmission, canManage = false,
       nextItems[index] = updated
       return { ...prev, items: nextItems }
     })
-  }
-
-  const isEmptyItem = (item?: SubmissionItem | null) => {
-    if (!item) return true
-    const designation = (item.designation ?? '').trim()
-    const observation = (item.observation ?? '').trim()
-    const quantity = item.quantity
-    const quantityEmpty = quantity === null || quantity === undefined || Number.isNaN(Number(quantity))
-    return !designation && !observation && quantityEmpty
   }
 
   const removeItem = (index: number) => {
@@ -859,12 +577,13 @@ export default function SubmissionEditor({ initialSubmission, canManage = false,
                     <input
                       type="number"
                       value={data.documentMeta.bordereauNumber}
-                      onChange={(e) =>
+                      onChange={(e) => {
+                        setSubmissionNumberTouched(true)
                         setData({
                           ...data,
                           documentMeta: { ...data.documentMeta, bordereauNumber: Number(e.target.value) || 0 },
                         })
-                      }
+                      }}
                       className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:border-emerald-300 focus:outline-none"
                     />
                     {fieldErrors.bordereauNumber ? <span className="text-xs text-amber-700">{fieldErrors.bordereauNumber}</span> : null}
@@ -996,9 +715,6 @@ export default function SubmissionEditor({ initialSubmission, canManage = false,
                       </div>
                     </div>
                   ))}
-                  {(data.items || []).length === 0 && fieldErrors.items ? (
-                    <p className="text-xs text-amber-700">{fieldErrors.items}</p>
-                  ) : null}
                 </div>
               </div>
 
