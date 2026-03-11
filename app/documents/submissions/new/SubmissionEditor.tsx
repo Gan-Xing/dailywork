@@ -161,6 +161,9 @@ export default function SubmissionEditor({ initialSubmission, canManage = false,
     return result
   }
 
+  const sortInspectionTokens = (values: string[], locale: Locale = 'fr') =>
+    [...values].sort((left, right) => left.localeCompare(right, locale, { sensitivity: 'base' }))
+
   const normalizeIntervalSpec = (value?: string | null) => {
     if (typeof value !== 'string') return null
     const cleaned = normalizeInspectionToken(value).replace(/\s+/g, ' ')
@@ -197,10 +200,16 @@ export default function SubmissionEditor({ initialSubmission, canManage = false,
       inspection.intervalSpec,
     )
     const localisation = `${roadText} · ${phaseText} · ${combinedSide} · ${rangeText}`
-    const rawLayers = splitInspectionTokens(getRawLayers(inspection))
-    const rawChecks = splitInspectionTokens(getRawChecks(inspection))
-    const layers = localizeProgressList('layer', rawLayers, locale, { phaseName: inspection.phaseName })
-    const checks = localizeProgressList('check', rawChecks, locale, { phaseName: inspection.phaseName })
+    const rawLayers = sortInspectionTokens(splitInspectionTokens(getRawLayers(inspection)), locale)
+    const rawChecks = sortInspectionTokens(splitInspectionTokens(getRawChecks(inspection)), locale)
+    const layers = sortInspectionTokens(
+      localizeProgressList('layer', rawLayers, locale, { phaseName: inspection.phaseName }),
+      locale,
+    )
+    const checks = sortInspectionTokens(
+      localizeProgressList('check', rawChecks, locale, { phaseName: inspection.phaseName }),
+      locale,
+    )
     const nature = [...layers, ...checks].filter(Boolean).join(' / ')
     const descriptionParts = [localisation]
     if (nature) descriptionParts.push(nature)
@@ -261,6 +270,58 @@ export default function SubmissionEditor({ initialSubmission, canManage = false,
       })
 
     return [normalizedHead, ...normalizedBody].join('\n')
+  }
+
+  const buildInspectionDesignationKey = (designation?: string | null) => {
+    const normalized = normalizeLegacyInspectionDesignation(designation)
+      .split(/\r?\n/)
+      .map((line) => normalizeInspectionToken(line).replace(/\s+/g, ' '))
+      .filter(Boolean)
+
+    if (!normalized.length) return ''
+
+    const [head, ...body] = normalized
+    if (!head.includes(' · ') || !head.includes('PK')) {
+      return ''
+    }
+
+    const bodyTokens = sortInspectionTokens(
+      splitInspectionTokens(body)
+        .map((token) => {
+          const normalizedToken = normalizeInspectionToken(token)
+          if (!normalizedToken) return normalizedToken
+          const checkToken = localizeProgressTerm('check', normalizedToken, 'fr')
+          if (checkToken !== normalizedToken) return checkToken
+          return localizeProgressTerm('layer', normalizedToken, 'fr')
+        })
+        .map((token) => normalizeInspectionToken(token))
+        .filter(Boolean),
+      'fr',
+    ).map((token) => token.toLowerCase())
+
+    return bodyTokens.length ? `${head.toLowerCase()}\n${bodyTokens.join(' / ')}` : head.toLowerCase()
+  }
+
+  const dedupeSubmissionItems = (items: SubmissionItem[]) => {
+    const seenInspectionKeys = new Set<string>()
+
+    return items
+      .map((item) => ({
+        ...item,
+        designation: normalizeLegacyInspectionDesignation(item.designation),
+      }))
+      .filter((item) => {
+        const designationKey = buildInspectionDesignationKey(item.designation)
+        const observation = normalizeInspectionToken(item.observation ?? '')
+        const quantity = item.quantity ?? 1
+        const isGeneratedInspectionItem = Boolean(designationKey) && !observation && quantity === 1
+
+        if (!isGeneratedInspectionItem) return true
+        if (seenInspectionKeys.has(designationKey)) return false
+
+        seenInspectionKeys.add(designationKey)
+        return true
+      })
   }
 
   const parseErrorMessage = useCallback(async (res: Response) => {
@@ -501,8 +562,8 @@ export default function SubmissionEditor({ initialSubmission, canManage = false,
             }))
 
       const selectedInspections = inspectionOptions.filter((item) => selectedInspectionIds.includes(item.id))
-      const existingDesignations = new Set(
-        baseItems.map((item) => (item.designation ?? '').trim()).filter(Boolean),
+      const existingDesignationKeys = new Set(
+        baseItems.map((item) => buildInspectionDesignationKey(item.designation)).filter(Boolean),
       )
 
       const grouped = new Map<
@@ -552,9 +613,10 @@ export default function SubmissionEditor({ initialSubmission, canManage = false,
             }
             return buildInspectionDescription(merged).trim()
           })
-          .filter((desc) => desc && !existingDesignations.has(desc))
+          .filter((desc) => Boolean(desc))
+          .filter((desc) => !existingDesignationKeys.has(buildInspectionDesignationKey(desc)))
           .map((desc) => ({ designation: desc, quantity: 1, observation: '' })) ?? []
-      const itemsPayload = [...baseItems, ...autoItems]
+      const itemsPayload = dedupeSubmissionItems([...baseItems, ...autoItems])
 
       const payload = {
         title,
