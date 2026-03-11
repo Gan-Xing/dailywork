@@ -104,8 +104,8 @@ const extractItems = (data: any): SubmissionItemInput[] => {
       quantity: item?.quantity ?? null,
       observation: item?.observation ?? null,
     }))
-    .filter((item) => item.designation.trim() || String(item.observation ?? '').trim())
-    .map((item, idx) => ({
+    .filter((item: SubmissionItemInput) => item.designation.trim() || String(item.observation ?? '').trim())
+    .map((item: SubmissionItemInput, idx: number) => ({
       ...item,
       order: idx + 1,
     }))
