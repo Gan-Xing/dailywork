@@ -493,7 +493,7 @@ export const executeSubmissionBatch = async (
         userId,
       )
 
-      const patch: Prisma.InspectionEntryUpdateManyMutationInput = {
+      const patch: Prisma.InspectionEntryUncheckedUpdateManyInput = {
         documentId: submission.id,
         updatedBy: userId ?? undefined,
       }
