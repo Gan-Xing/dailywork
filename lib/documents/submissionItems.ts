@@ -288,7 +288,7 @@ export const buildSubmissionAutoItemsFromInspections = (
   })
 
   return Array.from(grouped.values())
-    .map((group) => {
+    .map((group): SubmissionAutoItem | null => {
       const merged: InspectionListItem = {
         ...group.sample,
         layers: Array.from(group.layers),
