@@ -83,6 +83,7 @@ type PayoutRecordRow = {
   id: number
   team: string
   memberName: string
+  position: string
   supervisor: string
   amountsByDate: Record<string, number>
   total: number
@@ -2113,6 +2114,7 @@ const PayoutRecordsTable = ({
   labels: {
     team: string
     member: string
+    position: string
     supervisor: string
     total: string
   }
@@ -2142,6 +2144,13 @@ const PayoutRecordsTable = ({
             >
               {labels.member}
               {renderSort('member')}
+            </th>
+            <th
+              className="px-3 py-2 text-left font-semibold cursor-pointer"
+              onClick={() => onSortChange('position')}
+            >
+              {labels.position}
+              {renderSort('position')}
             </th>
             <th
               className="px-3 py-2 text-left font-semibold cursor-pointer"
@@ -2182,6 +2191,7 @@ const PayoutRecordsTable = ({
                   {row.memberName}
                 </button>
               </td>
+              <td className="px-3 py-2 text-slate-500">{row.position}</td>
               <td className="px-3 py-2 text-slate-500">{row.supervisor}</td>
               {columns.map((column) => {
                 const value = row.amountsByDate[column]
@@ -4600,12 +4610,14 @@ export function MembersOverviewTab({
       const teamValue = normalizeText(member.expatProfile?.team)
       const team = teamValue ? resolveTeamLabel(teamValue) : t.overview.labels.unassignedTeam
       const memberName = member.name ?? member.username ?? `#${member.id}`
+      const position = normalizeText(member.position) || t.labels.empty
       const amountsByDate = payoutsByMember.get(member.id) ?? {}
       const total = Object.values(amountsByDate).reduce((sum, value) => sum + value, 0)
       return {
         id: member.id,
         team,
         memberName,
+        position,
         supervisor: supervisorLabel,
         amountsByDate,
         total,
@@ -4619,6 +4631,8 @@ export function MembersOverviewTab({
         diff = nameCollator.compare(a.team, b.team)
       } else if (key === 'member') {
         diff = nameCollator.compare(a.memberName, b.memberName)
+      } else if (key === 'position') {
+        diff = nameCollator.compare(a.position, b.position)
       } else if (key === 'supervisor') {
         diff = nameCollator.compare(a.supervisor, b.supervisor)
       } else if (key === 'total') {
@@ -4640,6 +4654,7 @@ export function MembersOverviewTab({
     nameCollator,
     resolveTeamLabel,
     showTeamPayroll,
+    t.labels.empty,
     t.overview.labels.unassignedSupervisor,
     t.overview.labels.unassignedTeam,
   ])
@@ -5303,6 +5318,7 @@ export function MembersOverviewTab({
               labels={{
                 team: t.table.team,
                 member: t.table.name,
+                position: t.table.position,
                 supervisor: t.table.chineseSupervisor,
                 total: t.overview.labels.payoutTotal,
               }}
