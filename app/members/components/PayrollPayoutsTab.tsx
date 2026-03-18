@@ -1127,7 +1127,11 @@ export function PayrollPayoutsTab({
       if (eligibleMembers.length === 0) return
 
       const ExcelJS = (await import('exceljs')).default
-      const { saveAs } = await import('file-saver')
+      const fileSaver = await import('file-saver')
+      const saveAs =
+        fileSaver.default ??
+        fileSaver.saveAs ??
+        fileSaver
 
       const workbook = new ExcelJS.Workbook()
       const worksheet = workbook.addWorksheet(t.payroll.title)
@@ -1261,6 +1265,9 @@ export function PayrollPayoutsTab({
 
       const buffer = await workbook.xlsx.writeBuffer()
       const filename = `Virement_${selectedMonth}_Run${run.sequence}.xlsx`
+      if (typeof saveAs !== 'function') {
+        throw new Error(t.payroll.errors.exportFailed)
+      }
       saveAs(new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), filename)
 
     } catch (err) {
