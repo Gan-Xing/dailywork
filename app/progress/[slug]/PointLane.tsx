@@ -65,6 +65,7 @@ interface PointLaneProps {
   showHeader?: boolean
   wrapperClassName?: string
   isLevelCrossingPointView?: boolean
+  showInlineSideLabel?: boolean
   sideLabelMap: Record<IntervalSide, string>
   resolvePointProgress: (
     phaseId: number,
@@ -92,6 +93,7 @@ export function PointLane({
   showHeader = false,
   wrapperClassName = 'space-y-2',
   isLevelCrossingPointView = false,
+  showInlineSideLabel = true,
   sideLabelMap,
   resolvePointProgress,
   onPointSelect,
@@ -216,7 +218,9 @@ export function PointLane({
                         <div className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-700">
                           {formatPK(entry.centerPk)}
                         </div>
-                        <p className="text-[10px] text-slate-500">{sideLabelText}</p>
+                        {showInlineSideLabel ? (
+                          <p className="text-[10px] text-slate-500">{sideLabelText}</p>
+                        ) : null}
                       </>
                     )}
                   </button>

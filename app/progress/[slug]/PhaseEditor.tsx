@@ -603,6 +603,7 @@ export function PhaseEditor({
                                         points={rowPoints}
                                         label={row.label}
                                         showHeader
+                                        showInlineSideLabel={false}
                                         rangeLabel={undefined}
                                         containerClassName="relative h-28 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-5 shadow-inner shadow-slate-100"
                                         isLevelCrossingPointView
@@ -648,6 +649,7 @@ export function PhaseEditor({
                                   points={rowPoints}
                                   label={row.label}
                                   showHeader
+                                  showInlineSideLabel={false}
                                   rangeLabel={undefined}
                                   containerClassName={`relative ${
                                     isLevelCrossing ? 'h-28' : 'h-24'
