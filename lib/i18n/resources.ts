@@ -3,7 +3,7 @@ import type { Locale } from '@/lib/i18n'
 const formatCopy = (template: string, values: Record<string, string | number>): string =>
   template.replace(/\{(\w+)\}/g, (_, key) => String(values[key] ?? ''))
 
-export type ResourcesTabKey = 'overview' | 'machines' | 'machineLogs' | 'materials'
+export type ResourcesTabKey = 'overview' | 'machines' | 'machineLogs' | 'materials' | 'weeklyPlans'
 
 export type ResourcesCopy = {
   title: string
@@ -241,6 +241,138 @@ export type ResourcesCopy = {
     subtitle: string
     comingSoon: string
   }
+  weeklyPlans: {
+    list: {
+      title: string
+      create: string
+      empty: string
+      allProjects: string
+      noRange: string
+      rowCount: (count: number) => string
+      viewDetail: string
+      monthSession: (month: number, session: number) => string
+      approverEditor: (approver?: string | null, editor?: string | null) => string
+    }
+    createDialog: {
+      title: string
+      fields: {
+        project: string
+        month: string
+        session: string
+        weekStartDate: string
+        weekEndDate: string
+        approverName: string
+        editorName: string
+      }
+      placeholders: {
+        selectProject: string
+        month: string
+        session: string
+        approverName: string
+        editorName: string
+      }
+      actions: {
+        create: string
+        creating: string
+        cancel: string
+      }
+    }
+    detail: {
+      title: string
+      rangePrefix: string
+      rangeMissing: string
+      exportPlan: string
+      statusNote: string
+      deletePlan: string
+      deletePlanConfirm: string
+      editRow: string
+      createRowTitle: string
+      editRowTitle: string
+      rowDialogHint: string
+      saveRow: string
+      savingRow: string
+      savePlanInfo: string
+      savingPlanInfo: string
+      planSaved: string
+      startDateRequired: string
+      modelEditTag: string
+      addRow: string
+      addingRow: string
+      deleteRow: string
+      saveModel: string
+      noData: string
+      noValue: string
+      summary: {
+        planned: string
+        inTransit: string
+        arrived: string
+        cancelled: string
+        proxyCost: string
+      }
+      statusOptions: {
+        planned: string
+        in_transit: string
+        arrived: string
+        cancelled: string
+      }
+      columns: {
+        number: string
+        goodsName: string
+        model: string
+        status: string
+        deliveryDate: string
+        supplier: string
+        unit: string
+        plannedQty: string
+        transporter: string
+        headPlateNumber: string
+        tailPlateNumber: string
+        phone: string
+        actualQty: string
+        unitPrice: string
+        proxyCost: string
+        actions: string
+      }
+      form: {
+        weekStartDate: string
+        weekEndDate: string
+        approverName: string
+        editorName: string
+      }
+      modelEditor: {
+        title: string
+        hint: string
+        addDimension: string
+        removeDimension: string
+        dimensionLabelPlaceholder: string
+        dimensionValuePlaceholder: string
+        dimensionUnitPlaceholder: string
+        previewLabel: string
+        cancel: string
+      }
+      executionCard: {
+        title: string
+        plannedHint: string
+        inTransitHint: string
+        arrivedHint: string
+        cancelledHint: string
+        actualQtyHelper: string
+        proxyCostLabel: string
+      }
+    }
+    status: {
+      loading: string
+      loadFailed: string
+      notFound: string
+      createFailed: string
+      createValidationFailed: string
+      duplicatePlan: string
+      invalidStartDate: string
+      permissionDenied: string
+      saveFailed: string
+      deleteFailed: string
+    }
+  }
 }
 
 export const getResourcesCopy = (locale: Locale): ResourcesCopy => {
@@ -260,12 +392,14 @@ export const getResourcesCopy = (locale: Locale): ResourcesCopy => {
         machines: 'Machines',
         machineLogs: 'Journal',
         materials: 'Matériaux',
+        weeklyPlans: 'Plan hebdo',
       },
       tabDescriptions: {
         overview: 'Entrées unifiées et accès rapides.',
         machines: 'Registre des machines (import Excel, filtres, export).',
         machineLogs: 'Journal quotidien (ravitaillement, affectations, amortissement).',
         materials: 'Catalogue et mouvements (bientôt disponible).',
+        weeklyPlans: 'Planification hebdomadaire des livraisons de gros matériaux.',
       },
       access: {
         needAnyView: "Autorisation requise: machine:view, machine-log:view ou material:view.",
@@ -502,6 +636,141 @@ export const getResourcesCopy = (locale: Locale): ResourcesCopy => {
         subtitle: 'Catalogue et mouvements (entrées/sorties).',
         comingSoon: 'À venir: catalogue des matériaux et journal des mouvements.',
       },
+      weeklyPlans: {
+        list: {
+          title: 'Liste des plans hebdomadaires',
+          create: 'Nouveau cycle',
+          empty: 'Aucun plan hebdomadaire. Créez le premier cycle pour démarrer.',
+          allProjects: 'Tous les projets',
+          noRange: 'Période non définie',
+          rowCount: (count) => formatCopy('{count} ligne(s)', { count }),
+          viewDetail: 'Voir le détail',
+          monthSession: (month, session) => formatCopy('Mois {month} · Session {session}', { month, session }),
+          approverEditor: (approver, editor) =>
+            [approver ? `Approbateur: ${approver}` : '', editor ? `Rédacteur: ${editor}` : '']
+              .filter(Boolean)
+              .join(' · '),
+        },
+        createDialog: {
+          title: 'Créer un plan hebdomadaire',
+          fields: {
+            project: 'Projet',
+            month: 'Mois (M)',
+            session: 'Session (S)',
+            weekStartDate: 'Date de début',
+            weekEndDate: 'Date de fin',
+            approverName: 'Approbateur',
+            editorName: 'Rédacteur',
+          },
+          placeholders: {
+            selectProject: 'Sélectionnez un projet',
+            month: 'Ex. 3',
+            session: 'Ex. 3',
+            approverName: "Nom de l'approbateur (optionnel)",
+            editorName: 'Nom du rédacteur (optionnel)',
+          },
+          actions: {
+            create: 'Créer',
+            creating: 'Création…',
+            cancel: 'Annuler',
+          },
+        },
+        detail: {
+          title: 'Plan hebdomadaire de livraison',
+          rangePrefix: 'Période du plan',
+          rangeMissing: 'Veuillez renseigner la date de début du cycle.',
+          exportPlan: 'Exporter le plan',
+          statusNote: "Le statut sert uniquement au suivi interne. Les lignes annulées n'apparaissent pas dans l'export du plan.",
+          deletePlan: 'Supprimer le cycle',
+          deletePlanConfirm: 'Supprimer définitivement ce cycle de planification ?',
+          editRow: 'Modifier',
+          createRowTitle: 'Ajouter une ligne',
+          editRowTitle: 'Modifier la ligne',
+          rowDialogHint: 'Saisissez toute la ligne dans cette fenêtre, puis enregistrez une seule fois.',
+          saveRow: 'Enregistrer la ligne',
+          savingRow: 'Enregistrement…',
+          savePlanInfo: 'Enregistrer les informations',
+          savingPlanInfo: 'Enregistrement…',
+          planSaved: 'Informations du plan enregistrées.',
+          startDateRequired: 'Veuillez saisir la date de début.',
+          modelEditTag: 'Édition…',
+          addRow: 'Ajouter une ligne',
+          addingRow: 'Ajout…',
+          deleteRow: 'Supprimer',
+          saveModel: 'Enregistrer la spécification',
+          noData: 'Plan introuvable',
+          noValue: '—',
+          summary: {
+            planned: 'Planifié',
+            inTransit: 'En transit',
+            arrived: 'Arrivé',
+            cancelled: 'Annulé',
+            proxyCost: 'Frais mandataire',
+          },
+          statusOptions: {
+            planned: 'Planifié',
+            in_transit: 'En transit',
+            arrived: 'Arrivé',
+            cancelled: 'Annulé',
+          },
+          columns: {
+            number: 'N°',
+            goodsName: 'Nom',
+            model: 'Spécification',
+            status: 'Statut',
+            deliveryDate: 'Nom/Le temps',
+            supplier: 'Fournisseur',
+            unit: 'Unité',
+            plannedQty: 'Quantité',
+            transporter: 'Transporteur',
+            headPlateNumber: 'Plaque avant',
+            tailPlateNumber: 'Plaque arrière',
+            phone: 'Téléphone',
+            actualQty: 'Quantité reçue',
+            unitPrice: 'Prix unitaire',
+            proxyCost: 'Frais mandataire',
+            actions: 'Actions',
+          },
+          form: {
+            weekStartDate: 'Date de début',
+            weekEndDate: 'Date de fin',
+            approverName: 'Approbateur',
+            editorName: 'Rédacteur',
+          },
+          modelEditor: {
+            title: 'Spécification',
+            hint: 'Saisissez manuellement les dimensions, valeurs et unités. Le dernier prix sera retrouvé à partir du nom du produit et de la spécification.',
+            addDimension: '+ Ajouter une ligne',
+            removeDimension: 'Supprimer',
+            dimensionLabelPlaceholder: 'Nom de dimension, ex. Longueur',
+            dimensionValuePlaceholder: 'Valeur, ex. 6',
+            dimensionUnitPlaceholder: 'Unité',
+            previewLabel: 'Aperçu',
+            cancel: 'Annuler',
+          },
+          executionCard: {
+            title: 'Suivi de réception',
+            plannedHint: "La ligne est encore au stade du plan. Le prix peut être saisi à l'avance si nécessaire.",
+            inTransitHint: 'La marchandise est en transit. Complétez la quantité reçue après la livraison.',
+            arrivedHint: 'La marchandise est arrivée. Vérifiez la quantité reçue et le prix unitaire.',
+            cancelledHint: "Cette ligne est annulée. Elle reste visible pour l'historique, mais ne sera pas exportée dans le plan.",
+            actualQtyHelper: "La quantité reçue n'est renseignée qu'après passage au statut Arrivé.",
+            proxyCostLabel: 'Frais mandataire',
+          },
+        },
+        status: {
+          loading: 'Chargement…',
+          loadFailed: 'Échec du chargement',
+          notFound: 'Plan introuvable',
+          createFailed: 'Échec de la création',
+          createValidationFailed: 'Veuillez renseigner le projet, le mois, la session et la date de début.',
+          duplicatePlan: 'Un cycle existe déjà pour ce projet, ce mois et cette session.',
+          invalidStartDate: 'Le format de la date de début est invalide.',
+          permissionDenied: "Vous n'avez pas l'autorisation requise pour cette opération.",
+          saveFailed: "Échec de l'enregistrement",
+          deleteFailed: 'Échec de la suppression',
+        },
+      },
     }
   }
 
@@ -520,12 +789,14 @@ export const getResourcesCopy = (locale: Locale): ResourcesCopy => {
       machines: '机械台账',
       machineLogs: '机械日志',
       materials: '物资台账',
+      weeklyPlans: '周计划',
     },
     tabDescriptions: {
       overview: '统一入口与快速跳转。',
       machines: '机械台账（Excel 导入、筛选、导出）。',
       machineLogs: '机械日志（每日运行/加油/库存/折旧）。',
       materials: '大宗材料与出入库（建设中）。',
+      weeklyPlans: '大宗物资周计划：填写计划、跟踪状态、导出 Excel。',
     },
     access: {
       needAnyView: '需要权限：machine:view 或 machine-log:view 或 material:view。',
@@ -760,6 +1031,139 @@ export const getResourcesCopy = (locale: Locale): ResourcesCopy => {
       title: '物资台账',
       subtitle: '大宗材料与出入库台账',
       comingSoon: '建设中：将提供大宗材料字典与出入库流水。',
+    },
+    weeklyPlans: {
+      list: {
+        title: '大宗物资周计划列表',
+        create: '新建届次',
+        empty: '暂无周计划，点击“新建届次”创建第一份。',
+        allProjects: '全部项目',
+        noRange: '未设置计划周期',
+        rowCount: (count) => formatCopy('{count} 行', { count }),
+        viewDetail: '查看详情',
+        monthSession: (month, session) => formatCopy('第 {month} 月 · 第 {session} 届', { month, session }),
+        approverEditor: (approver, editor) =>
+          [approver ? `审批：${approver}` : '', editor ? `编制：${editor}` : ''].filter(Boolean).join(' · '),
+      },
+      createDialog: {
+        title: '新建周计划届次',
+        fields: {
+          project: '项目',
+          month: '月份 (M)',
+          session: '届次 (S)',
+          weekStartDate: '开始日期',
+          weekEndDate: '结束日期',
+          approverName: '审批人',
+          editorName: '编制人',
+        },
+        placeholders: {
+          selectProject: '请选择项目',
+          month: '如 3',
+          session: '如 3',
+          approverName: '审批人姓名（可选）',
+          editorName: '编制人姓名（可选）',
+        },
+        actions: {
+          create: '创建',
+          creating: '创建中…',
+          cancel: '取消',
+        },
+      },
+      detail: {
+        title: '大宗物资周计划',
+        rangePrefix: '周计划范围',
+        rangeMissing: '请先填写本届计划的开始日期。',
+        exportPlan: '导出计划',
+        statusNote: '状态仅用于页面内部跟踪；取消的行不会出现在导出的计划表里。',
+        deletePlan: '删除届次',
+        deletePlanConfirm: '确定删除整个届次计划吗？此操作不可撤销。',
+        editRow: '编辑',
+        createRowTitle: '新增一行',
+        editRowTitle: '编辑本行',
+        rowDialogHint: '这一行的数据都在弹窗里一次性填写，确认后统一保存。',
+        saveRow: '保存本行',
+        savingRow: '保存中…',
+        savePlanInfo: '保存计划信息',
+        savingPlanInfo: '保存中…',
+        planSaved: '计划信息已保存。',
+        startDateRequired: '请先填写开始日期。',
+        modelEditTag: '编辑中...',
+        addRow: '添加行',
+        addingRow: '添加中…',
+        deleteRow: '删除',
+        saveModel: '保存规格',
+        noData: '计划不存在',
+        noValue: '—',
+        summary: {
+          planned: '计划中',
+          inTransit: '在途',
+          arrived: '到货',
+          cancelled: '取消',
+          proxyCost: '代付合计',
+        },
+        statusOptions: {
+          planned: '计划中',
+          in_transit: '在途',
+          arrived: '到货',
+          cancelled: '取消',
+        },
+        columns: {
+          number: '序号',
+          goodsName: '货物名称',
+          model: '规格',
+          status: '状态',
+          deliveryDate: '日期/编号',
+          supplier: '供应商',
+          unit: '单位',
+          plannedQty: '计划数量',
+          transporter: '承运方',
+          headPlateNumber: '车头车牌',
+          tailPlateNumber: '车尾车牌',
+          phone: '电话',
+          actualQty: '收到数量',
+          unitPrice: '单价',
+          proxyCost: '代付费用',
+          actions: '操作',
+        },
+        form: {
+          weekStartDate: '开始日期',
+          weekEndDate: '结束日期',
+          approverName: '审批人',
+          editorName: '编制人',
+        },
+        modelEditor: {
+          title: '规格',
+          hint: '手动填写维度名、数值与单位，系统会按货物名称 + 规格自动匹配最新单价。',
+          addDimension: '+ 添加一行',
+          removeDimension: '删除',
+          dimensionLabelPlaceholder: '维度名，如 长度',
+          dimensionValuePlaceholder: '数值，如 6',
+          dimensionUnitPlaceholder: '单位',
+          previewLabel: '展示预览',
+          cancel: '取消',
+        },
+        executionCard: {
+          title: '到货跟踪',
+          plannedHint: '这条记录还处于计划阶段，需要的话可以先维护参考单价。',
+          inTransitHint: '货物已经在途，到货后再补录收到数量。',
+          arrivedHint: '货物已经到货，请补全收到数量和单价。',
+          cancelledHint: '这条记录已经取消，会保留在页面里，但不会出现在计划导出里。',
+          actualQtyHelper: '只有切换为“到货”后，才需要填写收到数量。',
+          proxyCostLabel: '代付费用',
+        },
+      },
+      status: {
+        loading: '加载中…',
+        loadFailed: '加载失败',
+        notFound: '计划不存在',
+        createFailed: '创建失败',
+        createValidationFailed: '请填写项目、月份、届次和开始日期。',
+        duplicatePlan: '该项目下同一月份届次已存在。',
+        invalidStartDate: '开始日期格式不正确。',
+        permissionDenied: '当前没有执行此操作的权限。',
+        saveFailed: '保存失败',
+        deleteFailed: '删除失败',
+      },
     },
   }
 }

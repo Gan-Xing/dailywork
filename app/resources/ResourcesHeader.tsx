@@ -28,6 +28,9 @@ const resolveActiveTab = (pathname: string | null): ResourcesTabKey => {
   if (pathname === '/resources/materials' || pathname.startsWith('/resources/materials/')) {
     return 'materials'
   }
+  if (pathname === '/resources/weekly-plans' || pathname.startsWith('/resources/weekly-plans/')) {
+    return 'weeklyPlans'
+  }
   return 'overview'
 }
 
@@ -41,6 +44,7 @@ export function ResourcesHeader({ locale, onLocaleChange, breadcrumbs, title, su
     { key: 'machines', label: t.tabs.machines, href: '/resources/machines' },
     { key: 'machineLogs', label: t.tabs.machineLogs, href: '/resources/machines/logs' },
     { key: 'materials', label: t.tabs.materials, href: '/resources/materials' },
+    { key: 'weeklyPlans', label: t.tabs.weeklyPlans, href: '/resources/weekly-plans' },
   ].map((tab) => ({
     ...tab,
     active: tab.key === activeTab,

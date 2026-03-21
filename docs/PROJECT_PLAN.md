@@ -72,6 +72,30 @@
 - 设计落地：字段定义见 `docs/schema-fields.md` 的“文档管理”章节；计划在 Prisma schema 新增 `DocumentTemplate`（或 `SubmissionTemplate`）并扩展 `Submission`。
 - 近期任务：解析/存储 HTML 模板、自动生成表单、保存 `Submission.data`、生成/缓存渲染 HTML + PDF 导出；列表筛选基于 `Submission.status`/更新时间。
 
+## 13. 大宗物资周计划模块（Weekly Delivery Plan）
+
+- 目标：在 `/resources/weekly-plans` 提供大宗物资周计划录入、状态流转跟踪、Excel 导出与代付费用计算，逐步替代当前 Excel/PDF 模板。
+- 页面结构：
+  - 列表页：按项目查看周计划届次，显示 `M/S` 标识、项目、计划周期、审批/编制人与条目数。
+  - 详情页：维护计划头信息（开始日期、结束日期、审批人、编制人）与明细表；通过 `planned / in_transit / arrived` 三个状态跟踪执行进度，并在同一页补录到货数量与单价。
+- 计划头规则：
+  - `month` / `session` 继续保留，用于沿用 `M3S3` 这种届次表达。
+  - `weekStartDate` 手工输入，`weekEndDate` 由系统按 `weekStartDate + 7 天` 自动计算。
+- 明细规则：
+  - `goodsName` 手工输入，不做硬编码固定列表。
+  - `model` 为 JSON 结构，按维度数组保存（维度名 / 数值 / 单位），前端展示时拼成 `6m*5cm*5cm*5mm` 之类文本。
+  - `Contact` 实际语义为车牌信息，拆成 `headPlateNumber`（车头车牌）+ `tailPlateNumber`（车尾车牌，可空）；导出时再拼成单列。Prisma 字段通过 `@map` 兼容已存在数据库列。
+  - `status` 用于页面内部流转，默认 `planned`；货物出发后改为 `in_transit`，到货后改为 `arrived` 并补录收到数量；若计划作废则改为 `cancelled`。
+  - `supplier`、`goodsName`、`unit`、`transporter`、`headPlateNumber`、`tailPlateNumber`、`phone` 保持可手输，同时读取同项目历史记录并去重后形成下拉建议，方便复用。
+  - `unitPrice` 录入后会同步刷新“最新历史价”；同货物名 + 同规格使用最新价格，旧价格归档。
+- 历史价策略：
+  - 新建 `WeeklyMaterialLatestPrice` 保存当前最新价。
+  - 新建 `WeeklyMaterialPriceHistory` 归档旧价格记录。
+  - 当没有历史价时，单价为空；一旦出现记录，后续相同“货物名 + 规格”默认带出最新价，允许人工覆盖。
+- 导出：
+  - 仅保留计划版导出，延续原表头结构。
+  - `status`、收到数量、单价与代付费用用于页面跟踪，不写入导出列；`cancelled` 状态的行不会参与导出。
+
 ## 待处理任务
 - [ ] API 尚未添加鉴权/多角色保护，后续需要接入登录与访问控制。
 - [ ] 编写 Prisma/接口层的自动化测试与数据校验（含输入 schema 校验、防止脏数据）。

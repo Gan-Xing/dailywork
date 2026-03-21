@@ -619,6 +619,72 @@
 - **目标**：先覆盖大宗材料（柴油、汽油、水泥、钢筋、沥青、润滑油），后续补齐小类（标号/类型/包装）与出入库流水。
 - **说明**：物资库存建议以“出入库流水”聚合计算，避免单字段库存导致后期对账困难。
 
+### 大宗物资周计划（WeeklyDeliveryPlan）
+
+- **用途**：记录每一届大宗物资周计划的头信息，对应 Excel/PDF 模板中的 `M3S3` 与计划时间范围。
+- **字段**
+  1. `projectId`：关联项目。
+  2. `month`：月份编号（M）。
+  3. `session`：届次编号（S）。
+  4. `title`：标题快照，格式如 `M3S3`。
+  5. `weekStartDate`：计划开始日期（手工录入）。
+  6. `weekEndDate`：计划结束日期（系统按开始日期 + 7 天计算）。
+  7. `approverName` / `editorName`：审批人与编制人快照，可空。
+  8. `createdById` / `updatedById`、`createdAt` / `updatedAt`：审计字段。
+- **约束**
+  1. `@@unique([projectId, month, session])`：同一项目同一届次唯一。
+
+### 周计划明细（WeeklyDeliveryPlanItem）
+
+- **用途**：按行记录周计划中的单笔运输/送货安排，并在同一条记录上跟踪计划、在途、到货状态。
+- **字段**
+  1. `planId`：所属周计划。
+  2. `sortOrder`：表格行顺序。
+  3. `deliveryDate`：计划到货日期，前端使用日期选择框录入，按 `YYYY-MM-DD` 保存。
+  4. `supplier`：供应商。
+  5. `goodsName` / `goodsNameKey`：货物名称原文与标准化键（用于价格匹配）。
+  6. `model`：规格，按维度数组保存：`[{ label, value, unit? }]`。
+  7. `modelKey`：规格标准化键，用于绑定最新单价。
+  8. `unit`：单位。
+  9. `status`：执行状态，取值 `planned` / `in_transit` / `arrived` / `cancelled`，默认 `planned`，仅用于页面内部跟踪。
+  10. `plannedQty`：计划数量。
+  11. `transporter`：承运方。
+  12. `headPlateNumber`：车头车牌（Prisma 字段映射到数据库列 `tractorPlateNumber`）。
+  13. `tailPlateNumber`：车尾车牌，可空；散装水泥等可只填车头（Prisma 字段映射到数据库列 `trailerPlateNumber`）。
+  14. `phone`：电话，可空。
+  15. `actualQty`：收到数量，仅在状态切换到 `arrived` 后补录，可空。
+  16. `unitPrice`：参考/结算单价，可空；若存在相同“货物名 + 规格”的历史价，则默认带出最新价。
+  17. `note`：备注，可空。
+  18. `createdAt` / `updatedAt`：时间戳。
+- **导出规则**
+  1. 模板里的 `Contact` 列由 `headPlateNumber` 与 `tailPlateNumber` 拼接生成；若车尾为空则只导出车头车牌。
+  2. `status` 不导出；导出始终保持原计划版结构，`cancelled` 状态的行自动排除。
+  3. `supplier`、`goodsName`、`unit`、`transporter`、`headPlateNumber`、`tailPlateNumber`、`phone` 在前端可从同项目历史记录中去重后形成建议下拉，但仍允许手动输入新值。
+  4. `代付费用` 不单独存字段，按 `actualQty * unitPrice` 即时计算，用于页面展示。
+
+### 最新历史价（WeeklyMaterialLatestPrice）
+
+- **用途**：保存“同货物名 + 同规格”的最新价格记录，供周计划录入时自动带出单价。
+- **字段**
+  1. `goodsName` / `goodsNameKey`：货物名称原文与标准化键。
+  2. `model` / `modelKey`：规格与规格标准化键。
+  3. `unitPrice`：当前最新单价。
+  4. `sourceItemId`：来源周计划明细 ID，可空。
+  5. `createdAt` / `updatedAt`：时间戳。
+- **约束**
+  1. `@@unique([goodsNameKey, modelKey])`：每组货物+规格只保留一条当前最新价。
+
+### 历史价归档（WeeklyMaterialPriceHistory）
+
+- **用途**：归档被最新价覆盖的旧价格，保留价格变更轨迹。
+- **字段**
+  1. `goodsName` / `goodsNameKey`：货物名称原文与标准化键。
+  2. `model` / `modelKey`：规格与规格标准化键。
+  3. `unitPrice`：归档时的旧单价。
+  4. `sourceItemId`：来源周计划明细 ID，可空。
+  5. `archivedAt`：归档时间。
+  6. `createdAt`：原记录创建时间快照。
+
 ## 权限与账户模型
 
 - **Permission**：`code`（唯一标识，如 `road:manage`、`report:edit`）、`name`、`status`（`ACTIVE`/`ARCHIVED`，默认 `ACTIVE`）、`createdAt`、`updatedAt`；当前权限编码覆盖：

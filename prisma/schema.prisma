@@ -691,6 +691,8 @@ model User {
   receivedDocumentLedgersReceived ReceivedDocumentLedger[] @relation("ReceivedDocumentLedgerReceiver")
   createdReceivedDocumentLedgers  ReceivedDocumentLedger[] @relation("ReceivedDocumentLedgerCreator")
   updatedReceivedDocumentLedgers  ReceivedDocumentLedger[] @relation("ReceivedDocumentLedgerUpdater")
+  createdWeeklyDeliveryPlans      WeeklyDeliveryPlan[]     @relation("WeeklyDeliveryPlanCreator")
+  updatedWeeklyDeliveryPlans      WeeklyDeliveryPlan[]     @relation("WeeklyDeliveryPlanUpdater")
   createdAt                       DateTime                 @default(now())
   updatedAt                       DateTime                 @updatedAt
 }
@@ -1090,6 +1092,7 @@ model Project {
   letters                 Letter[]
   roadSections            RoadSection[]
   receivedDocumentLedgers ReceivedDocumentLedger[]
+  weeklyDeliveryPlans     WeeklyDeliveryPlan[]
 }
 
 model BoqItem {
@@ -1361,4 +1364,84 @@ model RoadmapIdea {
   updatedAt   DateTime      @updatedAt
 
   @@index([status, createdAt])
+}
+
+model WeeklyDeliveryPlan {
+  id           Int                      @id @default(autoincrement())
+  projectId    Int
+  project      Project                  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  month        Int
+  session      Int
+  title        String
+  weekStartDate DateTime?
+  weekEndDate   DateTime?
+  approverName String?
+  editorName   String?
+  createdById  Int?
+  updatedById  Int?
+  createdBy    User?                    @relation("WeeklyDeliveryPlanCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy    User?                    @relation("WeeklyDeliveryPlanUpdater", fields: [updatedById], references: [id], onDelete: SetNull)
+  items        WeeklyDeliveryPlanItem[]
+  createdAt    DateTime                 @default(now())
+  updatedAt    DateTime                 @updatedAt
+
+  @@unique([projectId, month, session])
+  @@index([projectId])
+}
+
+model WeeklyDeliveryPlanItem {
+  id                Int                @id @default(autoincrement())
+  planId            Int
+  plan              WeeklyDeliveryPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  sortOrder         Int                @default(0)
+  deliveryDate      String?
+  supplier          String?
+  goodsName         String?
+  goodsNameKey      String?
+  model             Json?
+  modelKey          String?
+  unit              String?
+  status            String             @default("planned")
+  plannedQty        Decimal?           @db.Decimal(18, 4)
+  transporter       String?
+  headPlateNumber   String?            @map("tractorPlateNumber")
+  tailPlateNumber   String?            @map("trailerPlateNumber")
+  phone             String?
+  actualQty         Decimal?           @db.Decimal(18, 4)
+  unitPrice         Decimal?           @db.Decimal(18, 4)
+  note              String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  @@index([planId, sortOrder])
+  @@index([goodsNameKey, modelKey])
+}
+
+model WeeklyMaterialLatestPrice {
+  id          Int      @id @default(autoincrement())
+  goodsName   String
+  goodsNameKey String
+  model       Json?
+  modelKey    String
+  unitPrice   Decimal  @db.Decimal(18, 4)
+  sourceItemId Int?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([goodsNameKey, modelKey])
+  @@index([updatedAt])
+}
+
+model WeeklyMaterialPriceHistory {
+  id          Int      @id @default(autoincrement())
+  goodsName   String
+  goodsNameKey String
+  model       Json?
+  modelKey    String
+  unitPrice   Decimal  @db.Decimal(18, 4)
+  sourceItemId Int?
+  archivedAt  DateTime @default(now())
+  createdAt   DateTime @default(now())
+
+  @@index([goodsNameKey, modelKey, archivedAt])
 }
