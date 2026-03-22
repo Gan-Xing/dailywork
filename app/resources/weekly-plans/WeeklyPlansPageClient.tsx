@@ -1,26 +1,29 @@
 'use client'
 
 import Link from 'next/link'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { AccessDenied } from '@/components/AccessDenied'
-import { usePreferredLocale } from '@/lib/usePreferredLocale'
 import { getResourcesCopy } from '@/lib/i18n/resources'
+import { usePreferredLocale } from '@/lib/usePreferredLocale'
 
 import { ResourcesHeader } from '../ResourcesHeader'
 import { useResourcesSession } from '../hooks/useResourcesSession'
-import {
-  calculateWeekEndDate,
-  formatDateInput,
-  formatPlanDateRange,
-} from './materialsConfig'
+import { calculateWeekEndDate, formatDateInput, formatPlanDateRange } from './materialsConfig'
 
 type Project = { id: number; name: string }
+
+type PlanProjectLink = {
+  projectId: number
+  sortOrder: number
+  project: Project
+}
 
 type Plan = {
   id: number
   projectId: number
   project: Project
+  projects: PlanProjectLink[]
   month: number
   session: number
   title: string
@@ -31,6 +34,96 @@ type Plan = {
   _count: { items: number }
   createdAt: string
   updatedAt: string
+}
+
+function ProjectMultiSelect({
+  projects,
+  selectedIds,
+  onChange,
+  label,
+  placeholder,
+}: {
+  projects: Project[]
+  selectedIds: string[]
+  onChange: (next: string[]) => void
+  label: string
+  placeholder: string
+}) {
+  const [open, setOpen] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const handler = (event: MouseEvent | TouchEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    document.addEventListener('touchstart', handler)
+    return () => {
+      document.removeEventListener('mousedown', handler)
+      document.removeEventListener('touchstart', handler)
+    }
+  }, [open])
+
+  const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds])
+  const selectedProjects = projects.filter((project) => selectedSet.has(String(project.id)))
+
+  const toggleProject = (projectId: string) => {
+    const next = selectedSet.has(projectId)
+      ? selectedIds.filter((id) => id !== projectId)
+      : [...selectedIds, projectId]
+    onChange(next)
+  }
+
+  return (
+    <label className="flex flex-col gap-1 text-sm text-slate-700">
+      {label}
+      <div ref={containerRef} className="relative">
+        <button
+          type="button"
+          onClick={() => setOpen((current) => !current)}
+          className="flex min-h-[42px] w-full flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-left text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+        >
+          {selectedProjects.length ? (
+            selectedProjects.map((project) => (
+              <span
+                key={project.id}
+                className="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 ring-1 ring-blue-200"
+              >
+                {project.name}
+              </span>
+            ))
+          ) : (
+            <span className="text-slate-400">{placeholder}</span>
+          )}
+        </button>
+
+        {open ? (
+          <div className="absolute z-20 mt-2 max-h-64 w-full overflow-y-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
+            {projects.map((project) => {
+              const checked = selectedSet.has(String(project.id))
+              return (
+                <label
+                  key={project.id}
+                  className="flex cursor-pointer items-center gap-3 rounded-xl px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => toggleProject(String(project.id))}
+                    className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-400"
+                  />
+                  <span>{project.name}</span>
+                </label>
+              )
+            })}
+          </div>
+        ) : null}
+      </div>
+    </label>
+  )
 }
 
 export default function WeeklyPlansPageClient() {
@@ -45,11 +138,11 @@ export default function WeeklyPlansPageClient() {
   const [error, setError] = useState<string | null>(null)
   const [filterProject, setFilterProject] = useState<string>('')
 
-  // New plan dialog state
   const [newOpen, setNewOpen] = useState(false)
-  const [newProject, setNewProject] = useState('')
+  const [newProjectIds, setNewProjectIds] = useState<string[]>([])
   const [newMonth, setNewMonth] = useState('')
   const [newSession, setNewSession] = useState('')
+  const [newTitle, setNewTitle] = useState('')
   const [newWeekStartDate, setNewWeekStartDate] = useState('')
   const [newApprover, setNewApprover] = useState('')
   const [newEditor, setNewEditor] = useState('')
@@ -84,7 +177,8 @@ export default function WeeklyPlansPageClient() {
     try {
       const params = new URLSearchParams()
       if (filterProject) params.set('projectId', filterProject)
-      const res = await fetch(`/api/weekly-plans?${params.toString()}`, { credentials: 'include' })
+      const query = params.toString()
+      const res = await fetch(`/api/weekly-plans${query ? `?${query}` : ''}`, { credentials: 'include' })
       const data = (await res.json()) as { plans?: Plan[] }
       if (!res.ok) throw new Error(resolveListErrorMessage(res.status))
       setPlans(data.plans ?? [])
@@ -106,10 +200,13 @@ export default function WeeklyPlansPageClient() {
     }
   }, [])
 
-  useEffect(() => { void fetchPlans() }, [fetchPlans])
-  useEffect(() => { void fetchProjects() }, [fetchProjects])
+  useEffect(() => {
+    void fetchPlans()
+  }, [fetchPlans])
+  useEffect(() => {
+    void fetchProjects()
+  }, [fetchProjects])
 
-  // Close dialog on outside click
   useEffect(() => {
     if (!newOpen) return
     const handler = (e: MouseEvent | TouchEvent) => {
@@ -125,19 +222,27 @@ export default function WeeklyPlansPageClient() {
     }
   }, [newOpen])
 
+  useEffect(() => {
+    if (!newMonth || !newSession) return
+    setNewTitle((current) => (current.trim() ? current : `M${newMonth}S${newSession}`))
+  }, [newMonth, newSession])
+
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault()
     setCreating(true)
     setCreateError(null)
     try {
+      const projectIds = newProjectIds.map(Number).filter((value) => Number.isInteger(value) && value > 0)
       const res = await fetch('/api/weekly-plans', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          projectId: Number(newProject),
+          projectIds,
+          projectId: projectIds[0],
           month: Number(newMonth),
           session: Number(newSession),
+          title: newTitle || undefined,
           weekStartDate: newWeekStartDate,
           approverName: newApprover || undefined,
           editorName: newEditor || undefined,
@@ -145,9 +250,10 @@ export default function WeeklyPlansPageClient() {
       })
       if (!res.ok) throw new Error(resolveCreateErrorMessage(res.status))
       setNewOpen(false)
-      setNewProject('')
+      setNewProjectIds([])
       setNewMonth('')
       setNewSession('')
+      setNewTitle('')
       setNewWeekStartDate('')
       setNewApprover('')
       setNewEditor('')
@@ -160,13 +266,7 @@ export default function WeeklyPlansPageClient() {
   }
 
   if (shouldShowAccessDenied) {
-    return (
-      <AccessDenied
-        locale={locale}
-        permissions={['material:view']}
-        hint={t.access.needMaterialView}
-      />
-    )
+    return <AccessDenied locale={locale} permissions={['material:view']} hint={t.access.needMaterialView} />
   }
 
   const computedWeekEndDate = formatDateInput(calculateWeekEndDate(newWeekStartDate))
@@ -184,11 +284,9 @@ export default function WeeklyPlansPageClient() {
       />
 
       <section className="mx-auto max-w-[1700px] px-6 pb-14 pt-6 sm:px-8 xl:px-12 2xl:px-14">
-        {/* toolbar */}
         <div className="mb-6 flex flex-wrap items-center gap-3">
           <h2 className="text-lg font-semibold text-slate-900">{weeklyT.list.title}</h2>
           <div className="ml-auto flex items-center gap-3">
-            {/* project filter */}
             <select
               className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
               value={filterProject}
@@ -196,11 +294,13 @@ export default function WeeklyPlansPageClient() {
             >
               <option value="">{weeklyT.list.allProjects}</option>
               {projects.map((p) => (
-                <option key={p.id} value={String(p.id)}>{p.name}</option>
+                <option key={p.id} value={String(p.id)}>
+                  {p.name}
+                </option>
               ))}
             </select>
 
-            {canCreateMaterials && (
+            {canCreateMaterials ? (
               <button
                 type="button"
                 onClick={() => setNewOpen(true)}
@@ -208,68 +308,76 @@ export default function WeeklyPlansPageClient() {
               >
                 + {weeklyT.list.create}
               </button>
-            )}
+            ) : null}
           </div>
         </div>
 
-        {/* list */}
-        {loading && (
+        {loading ? (
           <div className="flex items-center justify-center py-20 text-slate-400">{weeklyT.status.loading}</div>
-        )}
-        {!loading && error && (
+        ) : null}
+        {!loading && error ? (
           <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div>
-        )}
-        {!loading && !error && plans.length === 0 && (
+        ) : null}
+        {!loading && !error && plans.length === 0 ? (
           <div className="flex flex-col items-center gap-3 py-20 text-slate-400">
             <span className="text-4xl">📋</span>
             <p>{weeklyT.list.empty}</p>
           </div>
-        )}
-        {!loading && !error && plans.length > 0 && (
+        ) : null}
+
+        {!loading && !error && plans.length > 0 ? (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {plans.map((plan) => (
-              <Link
-                key={plan.id}
-                href={`/resources/weekly-plans/${plan.id}`}
-                className="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-md transition hover:-translate-y-1 hover:shadow-xl hover:shadow-slate-900/10"
-              >
-                <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-gradient-to-br from-blue-200 via-indigo-200 to-sky-200 opacity-40 transition group-hover:opacity-70 blur-2xl" />
-                <div className="relative">
-                  <div className="flex items-start justify-between gap-2">
-                    <span className="inline-flex items-center rounded-lg bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 ring-1 ring-blue-200">
-                      {plan.title}
-                    </span>
-                    <span className="text-xs text-slate-400">{weeklyT.list.rowCount(plan._count.items)}</span>
-                  </div>
-                  <p className="mt-2 text-sm font-semibold text-slate-900 truncate">{plan.project.name}</p>
-                  <p className="mt-1 text-xs text-slate-500">
-                    {weeklyT.list.monthSession(plan.month, plan.session)}
-                  </p>
-                  <p className="mt-1 text-xs text-slate-400">
-                    {formatPlanDateRange(plan.weekStartDate, plan.weekEndDate) || weeklyT.list.noRange}
-                  </p>
-                  {plan.approverName || plan.editorName ? (
-                    <p className="mt-2 text-xs text-slate-400 truncate">
-                      {weeklyT.list.approverEditor(plan.approverName, plan.editorName)}
+            {plans.map((plan) => {
+              const projectLinks = plan.projects.length
+                ? plan.projects
+                : [{ projectId: plan.projectId, sortOrder: 0, project: plan.project }]
+              return (
+                <Link
+                  key={plan.id}
+                  href={`/resources/weekly-plans/${plan.id}`}
+                  className="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-md transition hover:-translate-y-1 hover:shadow-xl hover:shadow-slate-900/10"
+                >
+                  <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-gradient-to-br from-blue-200 via-indigo-200 to-sky-200 opacity-40 transition group-hover:opacity-70 blur-2xl" />
+                  <div className="relative">
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="inline-flex items-center rounded-lg bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 ring-1 ring-blue-200">
+                        {plan.title}
+                      </span>
+                      <span className="text-xs text-slate-400">{weeklyT.list.rowCount(plan._count.items)}</span>
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {projectLinks.map((entry) => (
+                        <span
+                          key={`${plan.id}-${entry.projectId}`}
+                          className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200"
+                        >
+                          {entry.project.name}
+                        </span>
+                      ))}
+                    </div>
+                    <p className="mt-2 text-xs text-slate-500">{weeklyT.list.monthSession(plan.month, plan.session)}</p>
+                    <p className="mt-1 text-xs text-slate-400">
+                      {formatPlanDateRange(plan.weekStartDate, plan.weekEndDate) || weeklyT.list.noRange}
                     </p>
-                  ) : null}
-                  <div className="mt-3 flex items-center gap-1 text-xs font-semibold text-slate-600 transition group-hover:translate-x-0.5">
-                    {weeklyT.list.viewDetail} <span className="text-sm">→</span>
+                    {plan.approverName || plan.editorName ? (
+                      <p className="mt-2 text-xs text-slate-400 truncate">
+                        {weeklyT.list.approverEditor(plan.approverName, plan.editorName)}
+                      </p>
+                    ) : null}
+                    <div className="mt-3 flex items-center gap-1 text-xs font-semibold text-slate-600 transition group-hover:translate-x-0.5">
+                      {weeklyT.list.viewDetail} <span className="text-sm">→</span>
+                    </div>
                   </div>
-                </div>
-              </Link>
-            ))}
+                </Link>
+              )
+            })}
           </div>
-        )}
+        ) : null}
       </section>
 
-      {/* Create plan dialog */}
-      {newOpen && canCreateMaterials && (
+      {newOpen && canCreateMaterials ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
-          <div
-            ref={dialogRef}
-            className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl"
-          >
+          <div ref={dialogRef} className="w-full max-w-xl rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold text-slate-900">{weeklyT.createDialog.title}</h3>
               <button
@@ -281,21 +389,14 @@ export default function WeeklyPlansPageClient() {
               </button>
             </div>
 
-            <form className="mt-4 space-y-3" onSubmit={(e) => { void handleCreate(e) }}>
-              <label className="flex flex-col gap-1 text-sm text-slate-700">
-                {weeklyT.createDialog.fields.project} <span className="text-rose-500">*</span>
-                <select
-                  required
-                  value={newProject}
-                  onChange={(e) => setNewProject(e.target.value)}
-                  className="rounded-xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
-                >
-                  <option value="">{weeklyT.createDialog.placeholders.selectProject}</option>
-                  {projects.map((p) => (
-                    <option key={p.id} value={String(p.id)}>{p.name}</option>
-                  ))}
-                </select>
-              </label>
+            <form className="mt-4 space-y-3" onSubmit={(e) => void handleCreate(e)}>
+              <ProjectMultiSelect
+                projects={projects}
+                selectedIds={newProjectIds}
+                onChange={setNewProjectIds}
+                label={`${weeklyT.createDialog.fields.projects} *`}
+                placeholder={weeklyT.createDialog.placeholders.selectProject}
+              />
 
               <div className="flex gap-3">
                 <label className="flex flex-1 flex-col gap-1 text-sm text-slate-700">
@@ -324,6 +425,17 @@ export default function WeeklyPlansPageClient() {
                   />
                 </label>
               </div>
+
+              <label className="flex flex-col gap-1 text-sm text-slate-700">
+                {weeklyT.createDialog.fields.title}
+                <input
+                  type="text"
+                  placeholder={weeklyT.createDialog.placeholders.title}
+                  value={newTitle}
+                  onChange={(e) => setNewTitle(e.target.value)}
+                  className="rounded-xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+                />
+              </label>
 
               <div className="flex gap-3">
                 <label className="flex flex-1 flex-col gap-1 text-sm text-slate-700">
@@ -369,9 +481,7 @@ export default function WeeklyPlansPageClient() {
                 />
               </label>
 
-              {createError && (
-                <p className="text-xs text-rose-600">{createError}</p>
-              )}
+              {createError ? <p className="text-xs text-rose-600">{createError}</p> : null}
 
               <div className="flex gap-3 pt-1">
                 <button
@@ -392,7 +502,7 @@ export default function WeeklyPlansPageClient() {
             </form>
           </div>
         </div>
-      )}
+      ) : null}
     </main>
   )
 }

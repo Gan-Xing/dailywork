@@ -1,7 +1,8 @@
 'use client'
 
+import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { getResourcesCopy } from '@/lib/i18n/resources'
 import { usePreferredLocale } from '@/lib/usePreferredLocale'
@@ -15,10 +16,18 @@ import {
   formatMaterialModel,
   formatPlanDateRange,
   normalizeMaterialModel,
-  type MaterialModel,
   normalizeWeeklyPlanItemStatus,
+  type MaterialModel,
   type WeeklyPlanItemStatus,
 } from '../materialsConfig'
+
+type Project = { id: number; name: string }
+
+type PlanProjectLink = {
+  projectId: number
+  sortOrder: number
+  project: Project
+}
 
 type PlanItem = {
   id: number
@@ -43,7 +52,8 @@ type PlanItem = {
 type Plan = {
   id: number
   projectId: number
-  project: { id: number; name: string }
+  project: Project
+  projects: PlanProjectLink[]
   month: number
   session: number
   title: string
@@ -66,9 +76,34 @@ type TableField = {
     | 'phone'
     | 'actualQty'
     | 'unitPrice'
+    | 'proxyCost'
   label: string
   width: string
 }
+
+type ColumnKey =
+  | 'deliveryDate'
+  | 'supplier'
+  | 'unit'
+  | 'plannedQty'
+  | 'transporter'
+  | 'headPlateNumber'
+  | 'tailPlateNumber'
+  | 'phone'
+  | 'actualQty'
+  | 'unitPrice'
+  | 'proxyCost'
+
+const WEEKLY_PLAN_COLUMNS_STORAGE_KEY = 'weekly-plan-visible-columns'
+const defaultVisibleColumns: ColumnKey[] = [
+  'deliveryDate',
+  'supplier',
+  'unit',
+  'plannedQty',
+  'transporter',
+  'headPlateNumber',
+  'tailPlateNumber',
+]
 
 type RowFormState = {
   deliveryDate: string
@@ -101,11 +136,14 @@ type HistoryOptions = {
   phone: string[]
 }
 
-type HistorySuggestionInputProps = {
-  label: string
-  value: string
-  onChange: (value: string) => void
-  options: string[]
+type PlanFormState = {
+  projectIds: string[]
+  month: string
+  session: string
+  title: string
+  weekStartDate: string
+  approverName: string
+  editorName: string
 }
 
 const EMPTY_HISTORY_OPTIONS: HistoryOptions = {
@@ -118,15 +156,21 @@ const EMPTY_HISTORY_OPTIONS: HistoryOptions = {
   phone: [],
 }
 
-function HistorySuggestionInput({ label, value, onChange, options }: HistorySuggestionInputProps) {
+function HistorySuggestionInput({
+  label,
+  value,
+  onChange,
+  options,
+}: {
+  label: string
+  value: string
+  onChange: (value: string) => void
+  options: string[]
+}) {
   const [open, setOpen] = useState(false)
-
   const filteredOptions = useMemo(() => {
     const keyword = value.trim().toLowerCase()
-    const baseOptions = keyword
-      ? options.filter((option) => option.toLowerCase().includes(keyword))
-      : options
-
+    const baseOptions = keyword ? options.filter((option) => option.toLowerCase().includes(keyword)) : options
     return baseOptions.slice(0, 8)
   }, [options, value])
 
@@ -142,7 +186,6 @@ function HistorySuggestionInput({ label, value, onChange, options }: HistorySugg
           onChange={(e) => onChange(e.target.value)}
           className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-300"
         />
-
         {open && filteredOptions.length > 0 ? (
           <div className="absolute z-20 mt-1 max-h-52 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-lg">
             {filteredOptions.map((option) => (
@@ -166,37 +209,116 @@ function HistorySuggestionInput({ label, value, onChange, options }: HistorySugg
   )
 }
 
-function proxyCostValue(actualQty: string | null | undefined, unitPrice: string | null | undefined): number | null {
+function ProjectMultiSelect({
+  projects,
+  selectedIds,
+  onChange,
+  label,
+}: {
+  projects: Project[]
+  selectedIds: string[]
+  onChange: (next: string[]) => void
+  label: string
+}) {
+  const [open, setOpen] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const handler = (event: MouseEvent | TouchEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    document.addEventListener('touchstart', handler)
+    return () => {
+      document.removeEventListener('mousedown', handler)
+      document.removeEventListener('touchstart', handler)
+    }
+  }, [open])
+
+  const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds])
+  const selectedProjects = projects.filter((project) => selectedSet.has(String(project.id)))
+
+  const toggleProject = (projectId: string) => {
+    const next = selectedSet.has(projectId)
+      ? selectedIds.filter((id) => id !== projectId)
+      : [...selectedIds, projectId]
+    onChange(next)
+  }
+
+  return (
+    <label className="flex flex-col gap-1 text-sm text-slate-700">
+      {label}
+      <div ref={containerRef} className="relative">
+        <button
+          type="button"
+          onClick={() => setOpen((current) => !current)}
+          className="flex min-h-[42px] w-full flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-left text-sm outline-none focus:ring-2 focus:ring-blue-300"
+        >
+          {selectedProjects.length ? (
+            selectedProjects.map((project) => (
+              <span
+                key={project.id}
+                className="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 ring-1 ring-blue-200"
+              >
+                {project.name}
+              </span>
+            ))
+          ) : (
+            <span className="text-slate-400">—</span>
+          )}
+        </button>
+        {open ? (
+          <div className="absolute z-20 mt-2 max-h-64 w-full overflow-y-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
+            {projects.map((project) => (
+              <label
+                key={project.id}
+                className="flex cursor-pointer items-center gap-3 rounded-xl px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+              >
+                <input
+                  type="checkbox"
+                  checked={selectedSet.has(String(project.id))}
+                  onChange={() => toggleProject(String(project.id))}
+                  className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-400"
+                />
+                <span>{project.name}</span>
+              </label>
+            ))}
+          </div>
+        ) : null}
+      </div>
+    </label>
+  )
+}
+
+const proxyCostValue = (actualQty: string | null | undefined, unitPrice: string | null | undefined): number | null => {
   const parsedActualQty = parseFloat(actualQty ?? '')
   const parsedUnitPrice = parseFloat(unitPrice ?? '')
   if (!Number.isFinite(parsedActualQty) || !Number.isFinite(parsedUnitPrice)) return null
   return parsedActualQty * parsedUnitPrice
 }
 
-function proxyCost(item: Pick<PlanItem, 'actualQty' | 'unitPrice'>, locale: string): string {
+const proxyCost = (item: Pick<PlanItem, 'actualQty' | 'unitPrice'>, locale: string): string => {
   const total = proxyCostValue(item.actualQty, item.unitPrice)
   if (total == null) return '—'
-  return total.toLocaleString(locale === 'fr' ? 'fr-FR' : 'zh-CN', {
-    maximumFractionDigits: 2,
-  })
+  return total.toLocaleString(locale === 'fr' ? 'fr-FR' : 'zh-CN', { maximumFractionDigits: 2 })
 }
 
-function getStatusTone(status: WeeklyPlanItemStatus): string {
+const getStatusTone = (status: WeeklyPlanItemStatus): string => {
   if (status === 'in_transit') return 'bg-amber-50 hover:bg-amber-100/70'
   if (status === 'arrived') return 'bg-emerald-50 hover:bg-emerald-100/70'
   if (status === 'cancelled') return 'bg-rose-50 hover:bg-rose-100/70'
   return 'hover:bg-slate-50'
 }
 
-function getStatusBadgeClass(status: WeeklyPlanItemStatus): string {
+const getStatusBadgeClass = (status: WeeklyPlanItemStatus): string => {
   if (status === 'in_transit') return 'bg-amber-100 text-amber-700 ring-1 ring-amber-200'
   if (status === 'arrived') return 'bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200'
   if (status === 'cancelled') return 'bg-rose-100 text-rose-700 ring-1 ring-rose-200'
   return 'bg-slate-100 text-slate-700 ring-1 ring-slate-200'
 }
 
-const toEditableModel = (value: unknown): MaterialModel =>
-  normalizeMaterialModel(value) ?? createEmptyMaterialModel()
+const toEditableModel = (value: unknown): MaterialModel => normalizeMaterialModel(value) ?? createEmptyMaterialModel()
 
 const createEmptyRowForm = (): RowFormState => ({
   deliveryDate: '',
@@ -252,10 +374,15 @@ export default function WeeklyPlanDetailClient() {
   const planId = params?.id as string
 
   const [plan, setPlan] = useState<Plan | null>(null)
+  const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [deleting, setDeleting] = useState<number | null>(null)
-  const [planForm, setPlanForm] = useState({
+  const [planForm, setPlanForm] = useState<PlanFormState>({
+    projectIds: [],
+    month: '',
+    session: '',
+    title: '',
     weekStartDate: '',
     approverName: '',
     editorName: '',
@@ -267,10 +394,50 @@ export default function WeeklyPlanDetailClient() {
   const [historyOptions, setHistoryOptions] = useState<HistoryOptions>(EMPTY_HISTORY_OPTIONS)
   const [rowSaving, setRowSaving] = useState(false)
   const [rowError, setRowError] = useState<string | null>(null)
+  const [visibleColumns, setVisibleColumns] = useState<ColumnKey[]>(defaultVisibleColumns)
+  const [columnsReady, setColumnsReady] = useState(false)
+  const [columnSelectorOpen, setColumnSelectorOpen] = useState(false)
+  const columnSelectorRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     document.title = `${plan ? `${plan.title} · ` : ''}${weeklyT.detail.title} | ${t.title}`
   }, [plan, t.title, weeklyT.detail.title])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      const raw = window.localStorage.getItem(WEEKLY_PLAN_COLUMNS_STORAGE_KEY)
+      if (raw) {
+        const parsed = JSON.parse(raw) as ColumnKey[]
+        const valid = parsed.filter((item) => defaultVisibleColumns.includes(item) || ['phone', 'actualQty', 'unitPrice', 'proxyCost'].includes(item))
+        if (valid.length) setVisibleColumns(valid)
+      }
+    } catch {
+      // ignore
+    } finally {
+      setColumnsReady(true)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!columnsReady || typeof window === 'undefined') return
+    window.localStorage.setItem(WEEKLY_PLAN_COLUMNS_STORAGE_KEY, JSON.stringify(visibleColumns))
+  }, [columnsReady, visibleColumns])
+
+  useEffect(() => {
+    if (!columnSelectorOpen) return
+    const handler = (event: MouseEvent | TouchEvent) => {
+      if (columnSelectorRef.current && !columnSelectorRef.current.contains(event.target as Node)) {
+        setColumnSelectorOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    document.addEventListener('touchstart', handler)
+    return () => {
+      document.removeEventListener('mousedown', handler)
+      document.removeEventListener('touchstart', handler)
+    }
+  }, [columnSelectorOpen])
 
   const resolveLoadErrorMessage = useCallback((status: number) => {
     if (status === 401 || status === 403) return weeklyT.status.permissionDenied
@@ -281,10 +448,11 @@ export default function WeeklyPlanDetailClient() {
   const resolvePlanSaveErrorMessage = useCallback((status: number) => {
     if (status === 400) return weeklyT.status.invalidStartDate
     if (status === 401 || status === 403) return weeklyT.status.permissionDenied
+    if (status === 409) return weeklyT.status.duplicatePlan
     return weeklyT.status.saveFailed
-  }, [weeklyT.status.invalidStartDate, weeklyT.status.permissionDenied, weeklyT.status.saveFailed])
+  }, [weeklyT.status.duplicatePlan, weeklyT.status.invalidStartDate, weeklyT.status.permissionDenied, weeklyT.status.saveFailed])
 
-  const rowFields: TableField[] = [
+  const columnOptions: TableField[] = [
     { key: 'deliveryDate', label: weeklyT.detail.columns.deliveryDate, width: '160px' },
     { key: 'supplier', label: weeklyT.detail.columns.supplier, width: '130px' },
     { key: 'unit', label: weeklyT.detail.columns.unit, width: '90px' },
@@ -295,11 +463,26 @@ export default function WeeklyPlanDetailClient() {
     { key: 'headPlateNumber', label: weeklyT.detail.columns.headPlateNumber, width: '140px' },
     { key: 'tailPlateNumber', label: weeklyT.detail.columns.tailPlateNumber, width: '140px' },
     { key: 'phone', label: weeklyT.detail.columns.phone, width: '120px' },
+    { key: 'proxyCost', label: weeklyT.detail.columns.proxyCost, width: '130px' },
   ]
 
-  const fetchHistoryOptions = useCallback(async (projectId: number) => {
+  const fetchProjects = useCallback(async () => {
     try {
-      const res = await fetch(`/api/weekly-plans/options?projectId=${projectId}`, { credentials: 'include' })
+      const res = await fetch('/api/finance/projects', { credentials: 'include' })
+      if (!res.ok) return
+      const data = (await res.json()) as { projects?: Project[] }
+      setProjects(data.projects ?? [])
+    } catch {
+      // ignore
+    }
+  }, [])
+
+  const fetchHistoryOptions = useCallback(async (projectIds: number[]) => {
+    if (!projectIds.length) return
+    try {
+      const params = new URLSearchParams()
+      projectIds.forEach((projectId) => params.append('projectId', String(projectId)))
+      const res = await fetch(`/api/weekly-plans/options?${params.toString()}`, { credentials: 'include' })
       if (!res.ok) return
       const data = (await res.json()) as { options?: Partial<HistoryOptions> }
       setHistoryOptions({
@@ -312,7 +495,7 @@ export default function WeeklyPlanDetailClient() {
         phone: data.options?.phone ?? [],
       })
     } catch {
-      // Ignore history dropdown failures and keep manual input available.
+      // Ignore history dropdown failures.
     }
   }, [])
 
@@ -327,12 +510,19 @@ export default function WeeklyPlanDetailClient() {
       const nextPlan = data.plan ?? null
       setPlan(nextPlan)
       if (nextPlan) {
+        const nextProjectIds = (nextPlan.projects.length
+          ? nextPlan.projects
+          : [{ projectId: nextPlan.projectId, sortOrder: 0, project: nextPlan.project }]).map((entry) => String(entry.projectId))
         setPlanForm({
+          projectIds: nextProjectIds,
+          month: String(nextPlan.month),
+          session: String(nextPlan.session),
+          title: nextPlan.title,
           weekStartDate: formatDateInput(nextPlan.weekStartDate),
           approverName: nextPlan.approverName ?? '',
           editorName: nextPlan.editorName ?? '',
         })
-        void fetchHistoryOptions(nextPlan.projectId)
+        void fetchHistoryOptions(nextProjectIds.map(Number))
       }
     } catch (e) {
       setError((e as Error).message)
@@ -342,8 +532,9 @@ export default function WeeklyPlanDetailClient() {
   }, [fetchHistoryOptions, planId, resolveLoadErrorMessage])
 
   useEffect(() => {
+    void fetchProjects()
     void fetchPlan()
-  }, [fetchPlan])
+  }, [fetchPlan, fetchProjects])
 
   const fetchRecentPrice = async (goodsName: string, model: MaterialModel | null) => {
     try {
@@ -410,9 +601,7 @@ export default function WeeklyPlanDetailClient() {
   const addRowModelDimension = () => {
     setRowForm((current) => ({
       ...current,
-      model: {
-        dimensions: [...current.model.dimensions, { label: '', value: '', unit: '' }],
-      },
+      model: { dimensions: [...current.model.dimensions, { label: '', value: '', unit: '' }] },
     }))
   }
 
@@ -430,7 +619,6 @@ export default function WeeklyPlanDetailClient() {
 
   const handleSaveRow = async () => {
     if (!rowDialog || !canCreateMaterials) return
-
     setRowSaving(true)
     setRowError(null)
 
@@ -438,7 +626,6 @@ export default function WeeklyPlanDetailClient() {
       const normalizedModel = normalizeMaterialModel(rowForm.model)
       const goodsName = trimNullable(rowForm.goodsName)
       const currentUnitPrice = rowForm.unitPrice.trim()
-
       let fallbackPrice: number | null = null
       if (!currentUnitPrice && goodsName && normalizedModel) {
         fallbackPrice = await fetchRecentPrice(goodsName, normalizedModel)
@@ -471,28 +658,9 @@ export default function WeeklyPlanDetailClient() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       })
-
       if (!res.ok) throw new Error(weeklyT.status.saveFailed)
-      const data = (await res.json()) as { item: PlanItem }
-
-      setPlan((currentPlan) => {
-        if (!currentPlan) return currentPlan
-        if (isCreate) {
-          return {
-            ...currentPlan,
-            items: [...currentPlan.items, data.item],
-          }
-        }
-        return {
-          ...currentPlan,
-          items: currentPlan.items.map((entry) => (entry.id === data.item.id ? data.item : entry)),
-        }
-      })
-
+      await fetchPlan()
       closeRowDialog()
-      if (plan?.projectId) {
-        void fetchHistoryOptions(plan.projectId)
-      }
     } catch (e) {
       setRowError((e as Error).message)
     } finally {
@@ -508,15 +676,11 @@ export default function WeeklyPlanDetailClient() {
         credentials: 'include',
       })
       if (!res.ok) throw new Error(weeklyT.status.deleteFailed)
-      setPlan((currentPlan) => {
-        if (!currentPlan) return currentPlan
-        return {
-          ...currentPlan,
-          items: currentPlan.items.filter((entry) => entry.id !== itemId),
-        }
-      })
+      setPlan((currentPlan) =>
+        currentPlan ? { ...currentPlan, items: currentPlan.items.filter((entry) => entry.id !== itemId) } : currentPlan,
+      )
     } catch {
-      // Ignore here and keep UX lightweight.
+      // Ignore here.
     } finally {
       setDeleting(null)
     }
@@ -532,14 +696,10 @@ export default function WeeklyPlanDetailClient() {
     }
   }
 
-  const handleExport = () => {
-    window.open(`/api/weekly-plans/${planId}/export`, '_blank')
-  }
-
   const handlePlanSave = async () => {
     if (!canCreateMaterials) return
-    if (!planForm.weekStartDate) {
-      setPlanMessage({ type: 'error', text: weeklyT.detail.startDateRequired })
+    if (!planForm.weekStartDate || !planForm.projectIds.length || !planForm.month || !planForm.session) {
+      setPlanMessage({ type: 'error', text: weeklyT.status.createValidationFailed })
       return
     }
 
@@ -551,20 +711,18 @@ export default function WeeklyPlanDetailClient() {
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          projectIds: planForm.projectIds.map(Number),
+          month: Number(planForm.month),
+          session: Number(planForm.session),
+          title: planForm.title || undefined,
           weekStartDate: planForm.weekStartDate,
           approverName: planForm.approverName || null,
           editorName: planForm.editorName || null,
         }),
       })
-      const data = (await res.json()) as { plan?: Partial<Plan> }
       if (!res.ok) throw new Error(resolvePlanSaveErrorMessage(res.status))
-
-      setPlan((currentPlan) => {
-        if (!currentPlan || !data.plan) return currentPlan
-        return { ...currentPlan, ...data.plan }
-      })
       setPlanMessage({ type: 'success', text: weeklyT.detail.planSaved })
-      void fetchPlan()
+      await fetchPlan()
     } catch (e) {
       setPlanMessage({ type: 'error', text: (e as Error).message })
     } finally {
@@ -572,11 +730,19 @@ export default function WeeklyPlanDetailClient() {
     }
   }
 
-  if (loading) return <div className="flex items-center justify-center py-20 text-slate-400">{weeklyT.status.loading}</div>
-  if (error || !plan) return <div className="p-20 text-center text-rose-600">{error ?? weeklyT.status.notFound}</div>
+  if (loading) {
+    return <div className="flex items-center justify-center py-20 text-slate-400">{weeklyT.status.loading}</div>
+  }
+  if (error || !plan) {
+    return <div className="p-20 text-center text-rose-600">{error ?? weeklyT.status.notFound}</div>
+  }
 
   const computedEndDate = formatDateInput(calculateWeekEndDate(planForm.weekStartDate))
   const planRange = formatPlanDateRange(plan.weekStartDate, plan.weekEndDate)
+  const planProjects = plan.projects.length ? plan.projects : [{ projectId: plan.projectId, sortOrder: 0, project: plan.project }]
+  const visibleColumnSet = new Set(visibleColumns)
+  const displayedFields = columnOptions.filter((field) => visibleColumnSet.has(field.key))
+
   const statusSummary = plan.items.reduce(
     (summary, item) => {
       const status = normalizeWeeklyPlanItemStatus(item.status)
@@ -611,21 +777,36 @@ export default function WeeklyPlanDetailClient() {
       <section className="mx-auto max-w-[1900px] px-4 pb-14 pt-6 sm:px-6 xl:px-10">
         <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">{plan.project.name}</p>
-            <h1 className="mt-1 text-2xl font-bold text-slate-900">
+            <div className="mb-3">
+              <Link
+                href="/resources/weekly-plans"
+                className="inline-flex items-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm hover:bg-slate-50"
+              >
+                ← {weeklyT.detail.backToList}
+              </Link>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {planProjects.map((entry) => (
+                <span
+                  key={`${plan.id}-${entry.projectId}`}
+                  className="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 ring-1 ring-blue-200"
+                >
+                  {entry.project.name}
+                </span>
+              ))}
+            </div>
+            <h1 className="mt-2 text-2xl font-bold text-slate-900">
               {weeklyT.detail.title} <span className="text-blue-600">{plan.title}</span>
             </h1>
             <p className="mt-2 text-sm text-slate-500">
-              {planRange
-                ? `${weeklyT.detail.rangePrefix}${locale === 'fr' ? ' : ' : '：'}${planRange}`
-                : weeklyT.detail.rangeMissing}
+              {planRange ? `${weeklyT.detail.rangePrefix}${locale === 'fr' ? ' : ' : '：'}${planRange}` : weeklyT.detail.rangeMissing}
             </p>
           </div>
 
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              onClick={() => handleExport()}
+              onClick={() => window.open(`/api/weekly-plans/${planId}/export`, '_blank')}
               className="inline-flex items-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm"
             >
               {weeklyT.detail.exportPlan}
@@ -633,9 +814,7 @@ export default function WeeklyPlanDetailClient() {
             {canCreateMaterials ? (
               <button
                 type="button"
-                onClick={() => {
-                  void handleDeletePlan()
-                }}
+                onClick={() => void handleDeletePlan()}
                 className="inline-flex items-center rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-600"
               >
                 {weeklyT.detail.deletePlan}
@@ -645,7 +824,48 @@ export default function WeeklyPlanDetailClient() {
         </div>
 
         <div className="mb-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="grid gap-4 xl:grid-cols-[220px_220px_1fr_1fr_auto]">
+          <div className="grid gap-4 xl:grid-cols-[1.4fr_120px_120px_180px_180px_1fr_1fr_auto]">
+            <ProjectMultiSelect
+              projects={projects}
+              selectedIds={planForm.projectIds}
+              onChange={(next) => {
+                setPlanForm((current) => ({ ...current, projectIds: next }))
+                setPlanMessage(null)
+              }}
+              label={weeklyT.detail.form.projects}
+            />
+
+            <label className="flex flex-col gap-1 text-sm text-slate-700">
+              {weeklyT.detail.form.month}
+              <input
+                type="number"
+                min={1}
+                max={12}
+                value={planForm.month}
+                disabled={!canCreateMaterials}
+                onChange={(e) => {
+                  setPlanForm((current) => ({ ...current, month: e.target.value }))
+                  setPlanMessage(null)
+                }}
+                className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-300 disabled:bg-slate-50"
+              />
+            </label>
+
+            <label className="flex flex-col gap-1 text-sm text-slate-700">
+              {weeklyT.detail.form.session}
+              <input
+                type="number"
+                min={1}
+                value={planForm.session}
+                disabled={!canCreateMaterials}
+                onChange={(e) => {
+                  setPlanForm((current) => ({ ...current, session: e.target.value }))
+                  setPlanMessage(null)
+                }}
+                className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-300 disabled:bg-slate-50"
+              />
+            </label>
+
             <label className="flex flex-col gap-1 text-sm text-slate-700">
               {weeklyT.detail.form.weekStartDate}
               <input
@@ -667,6 +887,20 @@ export default function WeeklyPlanDetailClient() {
                 readOnly
                 value={computedEndDate}
                 className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500"
+              />
+            </label>
+
+            <label className="flex flex-col gap-1 text-sm text-slate-700">
+              {weeklyT.detail.form.title}
+              <input
+                type="text"
+                value={planForm.title}
+                disabled={!canCreateMaterials}
+                onChange={(e) => {
+                  setPlanForm((current) => ({ ...current, title: e.target.value }))
+                  setPlanMessage(null)
+                }}
+                className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-300 disabled:bg-slate-50"
               />
             </label>
 
@@ -703,9 +937,7 @@ export default function WeeklyPlanDetailClient() {
                 <button
                   type="button"
                   disabled={savingPlan}
-                  onClick={() => {
-                    void handlePlanSave()
-                  }}
+                  onClick={() => void handlePlanSave()}
                   className="h-[42px] rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {savingPlan ? weeklyT.detail.savingPlanInfo : weeklyT.detail.savePlanInfo}
@@ -748,28 +980,66 @@ export default function WeeklyPlanDetailClient() {
           </div>
         </div>
 
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <div ref={columnSelectorRef} className="relative">
+            <button
+              type="button"
+              onClick={() => setColumnSelectorOpen((current) => !current)}
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"
+            >
+              <span>{weeklyT.detail.columnSelector.label}</span>
+              <span className="text-slate-400">{weeklyT.detail.columnSelector.selectedCount(visibleColumns.length)}</span>
+            </button>
+            {columnSelectorOpen ? (
+              <div className="absolute z-20 mt-2 w-64 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
+                {columnOptions.map((option) => (
+                  <label
+                    key={option.key}
+                    className="flex cursor-pointer items-center gap-3 rounded-xl px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={visibleColumnSet.has(option.key)}
+                      onChange={() =>
+                        setVisibleColumns((current) =>
+                          current.includes(option.key)
+                            ? current.filter((item) => item !== option.key)
+                            : [...current, option.key],
+                        )
+                      }
+                      className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-400"
+                    />
+                    <span>{option.label}</span>
+                  </label>
+                ))}
+              </div>
+            ) : null}
+          </div>
+
+          {canCreateMaterials ? (
+            <button
+              type="button"
+              onClick={openCreateRowDialog}
+              className="rounded-xl border border-dashed border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-600 hover:border-blue-300 hover:bg-blue-50"
+            >
+              + {weeklyT.detail.addRow}
+            </button>
+          ) : null}
+        </div>
+
         <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-md">
-          <table className="w-full min-w-[1520px] border-collapse text-sm">
+          <table className="w-full min-w-[1280px] border-collapse text-sm">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50 text-xs font-semibold uppercase text-slate-500">
                 <th className="sticky left-0 bg-slate-50 px-2 py-3">{weeklyT.detail.columns.number}</th>
-                <th className="px-3 py-3 text-center" style={{ minWidth: '140px' }}>
-                  {weeklyT.detail.columns.goodsName}
-                </th>
-                <th className="px-3 py-3 text-center" style={{ minWidth: '180px' }}>
-                  {weeklyT.detail.columns.model}
-                </th>
-                <th className="px-3 py-3 text-center" style={{ minWidth: '110px' }}>
-                  {weeklyT.detail.columns.status}
-                </th>
-                {rowFields.map((field) => (
+                <th className="px-3 py-3 text-center" style={{ minWidth: '140px' }}>{weeklyT.detail.columns.goodsName}</th>
+                <th className="px-3 py-3 text-center" style={{ minWidth: '180px' }}>{weeklyT.detail.columns.model}</th>
+                <th className="px-3 py-3 text-center" style={{ minWidth: '110px' }}>{weeklyT.detail.columns.status}</th>
+                {displayedFields.map((field) => (
                   <th key={field.key} className="px-3 py-3 text-center" style={{ minWidth: field.width }}>
                     {field.label}
                   </th>
                 ))}
-                <th className="px-3 py-3 text-center" style={{ minWidth: '120px' }}>
-                  {weeklyT.detail.columns.proxyCost}
-                </th>
                 {canCreateMaterials ? <th className="px-3 py-3 text-center">{weeklyT.detail.columns.actions}</th> : null}
               </tr>
             </thead>
@@ -778,7 +1048,6 @@ export default function WeeklyPlanDetailClient() {
               {plan.items.map((item, index) => {
                 const rowStatus = normalizeWeeklyPlanItemStatus(item.status)
                 const rowBg = getStatusTone(rowStatus)
-
                 return (
                   <tr
                     key={item.id}
@@ -797,17 +1066,15 @@ export default function WeeklyPlanDetailClient() {
                         {weeklyT.detail.statusOptions[rowStatus]}
                       </span>
                     </td>
-                    {rowFields.map((field) => (
-                      <td
-                        key={field.key}
-                        className={`px-2 py-2 text-center ${!item[field.key] ? 'text-slate-300' : 'text-slate-800'}`}
-                      >
-                        {item[field.key] ?? weeklyT.detail.noValue}
+                    {displayedFields.map((field) => (
+                      <td key={field.key} className="px-2 py-2 text-center text-slate-800">
+                        {field.key === 'proxyCost'
+                          ? rowStatus === 'cancelled'
+                            ? weeklyT.detail.noValue
+                            : proxyCost(item, locale)
+                          : item[field.key] ?? weeklyT.detail.noValue}
                       </td>
                     ))}
-                    <td className="px-3 py-2 text-center font-medium text-slate-700">
-                      {rowStatus === 'cancelled' ? weeklyT.detail.noValue : proxyCost(item, locale)}
-                    </td>
                     {canCreateMaterials ? (
                       <td className="px-2 py-2 text-center">
                         <div className="flex items-center justify-center gap-2">
@@ -842,26 +1109,11 @@ export default function WeeklyPlanDetailClient() {
           </table>
         </div>
 
-        {canCreateMaterials ? (
-          <div className="mt-3 flex gap-3">
-            <button
-              type="button"
-              onClick={openCreateRowDialog}
-              className="rounded-xl border border-dashed border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-600 hover:border-blue-300 hover:bg-blue-50"
-            >
-              + {weeklyT.detail.addRow}
-            </button>
-          </div>
-        ) : null}
-
         {rowDialog ? (
-          <div
-            className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/55 p-3 backdrop-blur-sm sm:p-4"
-            onClick={closeRowDialog}
-          >
+          <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/55 p-3 backdrop-blur-sm sm:p-4" onClick={closeRowDialog}>
             <div className="flex min-h-full items-start justify-center sm:items-center">
               <div
-                className="my-4 flex w-full max-w-5xl max-h-[calc(100vh-2rem)] flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl"
+                className="my-4 flex max-h-[calc(100vh-2rem)] w-full max-w-5xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl"
                 onClick={(e) => e.stopPropagation()}
               >
                 <div className="flex shrink-0 items-start justify-between gap-4 border-b border-slate-200 px-5 py-5 sm:px-6">
@@ -906,26 +1158,9 @@ export default function WeeklyPlanDetailClient() {
                       />
                     </label>
 
-                    <HistorySuggestionInput
-                      label={weeklyT.detail.columns.supplier}
-                      value={rowForm.supplier}
-                      onChange={(value) => updateRowField('supplier', value)}
-                      options={historyOptions.supplier}
-                    />
-
-                    <HistorySuggestionInput
-                      label={weeklyT.detail.columns.goodsName}
-                      value={rowForm.goodsName}
-                      onChange={(value) => updateRowField('goodsName', value)}
-                      options={historyOptions.goodsName}
-                    />
-
-                    <HistorySuggestionInput
-                      label={weeklyT.detail.columns.unit}
-                      value={rowForm.unit}
-                      onChange={(value) => updateRowField('unit', value)}
-                      options={historyOptions.unit}
-                    />
+                    <HistorySuggestionInput label={weeklyT.detail.columns.supplier} value={rowForm.supplier} onChange={(value) => updateRowField('supplier', value)} options={historyOptions.supplier} />
+                    <HistorySuggestionInput label={weeklyT.detail.columns.goodsName} value={rowForm.goodsName} onChange={(value) => updateRowField('goodsName', value)} options={historyOptions.goodsName} />
+                    <HistorySuggestionInput label={weeklyT.detail.columns.unit} value={rowForm.unit} onChange={(value) => updateRowField('unit', value)} options={historyOptions.unit} />
 
                     <label className="flex flex-col gap-1 text-sm text-slate-700">
                       {weeklyT.detail.columns.plannedQty}
@@ -938,33 +1173,10 @@ export default function WeeklyPlanDetailClient() {
                       />
                     </label>
 
-                    <HistorySuggestionInput
-                      label={weeklyT.detail.columns.transporter}
-                      value={rowForm.transporter}
-                      onChange={(value) => updateRowField('transporter', value)}
-                      options={historyOptions.transporter}
-                    />
-
-                    <HistorySuggestionInput
-                      label={weeklyT.detail.columns.headPlateNumber}
-                      value={rowForm.headPlateNumber}
-                      onChange={(value) => updateRowField('headPlateNumber', value)}
-                      options={historyOptions.headPlateNumber}
-                    />
-
-                    <HistorySuggestionInput
-                      label={weeklyT.detail.columns.tailPlateNumber}
-                      value={rowForm.tailPlateNumber}
-                      onChange={(value) => updateRowField('tailPlateNumber', value)}
-                      options={historyOptions.tailPlateNumber}
-                    />
-
-                    <HistorySuggestionInput
-                      label={weeklyT.detail.columns.phone}
-                      value={rowForm.phone}
-                      onChange={(value) => updateRowField('phone', value)}
-                      options={historyOptions.phone}
-                    />
+                    <HistorySuggestionInput label={weeklyT.detail.columns.transporter} value={rowForm.transporter} onChange={(value) => updateRowField('transporter', value)} options={historyOptions.transporter} />
+                    <HistorySuggestionInput label={weeklyT.detail.columns.headPlateNumber} value={rowForm.headPlateNumber} onChange={(value) => updateRowField('headPlateNumber', value)} options={historyOptions.headPlateNumber} />
+                    <HistorySuggestionInput label={weeklyT.detail.columns.tailPlateNumber} value={rowForm.tailPlateNumber} onChange={(value) => updateRowField('tailPlateNumber', value)} options={historyOptions.tailPlateNumber} />
+                    <HistorySuggestionInput label={weeklyT.detail.columns.phone} value={rowForm.phone} onChange={(value) => updateRowField('phone', value)} options={historyOptions.phone} />
                   </div>
 
                   <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
@@ -984,10 +1196,7 @@ export default function WeeklyPlanDetailClient() {
 
                     <div className="mt-4 space-y-3">
                       {rowForm.model.dimensions.map((dimension, index) => (
-                        <div
-                          key={`row-dimension-${index}`}
-                          className="grid grid-cols-[1.2fr_1fr_110px_44px] gap-3"
-                        >
+                        <div key={`row-dimension-${index}`} className="grid grid-cols-[1.2fr_1fr_110px_44px] gap-3">
                           <input
                             type="text"
                             placeholder={weeklyT.detail.modelEditor.dimensionLabelPlaceholder}
@@ -1067,9 +1276,7 @@ export default function WeeklyPlanDetailClient() {
                       </label>
 
                       <div className="rounded-2xl bg-white px-4 py-3">
-                        <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">
-                          {weeklyT.detail.executionCard.proxyCostLabel}
-                        </p>
+                        <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">{weeklyT.detail.executionCard.proxyCostLabel}</p>
                         <p className="mt-2 text-2xl font-semibold text-slate-900">{rowProxyPreview}</p>
                       </div>
                     </div>
@@ -1090,9 +1297,7 @@ export default function WeeklyPlanDetailClient() {
                     type="button"
                     disabled={rowSaving}
                     className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
-                    onClick={() => {
-                      void handleSaveRow()
-                    }}
+                    onClick={() => void handleSaveRow()}
                   >
                     {rowSaving ? weeklyT.detail.savingRow : weeklyT.detail.saveRow}
                   </button>

@@ -46,13 +46,26 @@ export async function GET(req: Request) {
   }
 
   const { searchParams } = new URL(req.url)
-  const projectIdParam = searchParams.get('projectId')
-  const projectId = projectIdParam ? Number(projectIdParam) : null
+  const projectIds = Array.from(
+    new Set(
+      searchParams
+        .getAll('projectId')
+        .map((value) => Number(value))
+        .filter((value) => Number.isInteger(value) && value > 0),
+    ),
+  )
 
   try {
     const records = await prisma.weeklyDeliveryPlanItem.findMany({
-      where: projectId != null && Number.isFinite(projectId)
-        ? { plan: { projectId } }
+      where: projectIds.length
+        ? {
+            plan: {
+              OR: [
+                { projectId: { in: projectIds } },
+                { projects: { some: { projectId: { in: projectIds } } } },
+              ],
+            },
+          }
         : undefined,
       select: {
         supplier: true,

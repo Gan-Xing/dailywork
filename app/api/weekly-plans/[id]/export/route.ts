@@ -21,6 +21,10 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     where: { id: planId },
     include: {
       project: { select: { name: true } },
+      projects: {
+        include: { project: { select: { name: true } } },
+        orderBy: [{ sortOrder: 'asc' }, { projectId: 'asc' }],
+      },
       items: { orderBy: { sortOrder: 'asc' } },
     },
   });
@@ -47,11 +51,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 
   mergeAndStyle(1, 'Projet de Construction de Route Bondoukou', 13);
   mergeAndStyle(2, `DETAIL DU PLANNING DE LIVRAISON HEBDOMADAIRE ${plan.title}`, 12);
-  mergeAndStyle(
-    3,
-    `${plan.project.name}大宗物资周计划明细表（${formatPlanDateRange(plan.weekStartDate, plan.weekEndDate) || plan.title}）`,
-    12,
-  );
+  const projectNames = (plan.projects.length ? plan.projects : [{ project: plan.project }]).map((entry) => entry.project.name)
+  mergeAndStyle(3, `${projectNames.join(' / ')}大宗物资周计划明细表（${formatPlanDateRange(plan.weekStartDate, plan.weekEndDate) || plan.title}）`, 12);
 
   // ——— Header row ———
   const baseHeaders = [

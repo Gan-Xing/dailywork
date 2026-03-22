@@ -247,6 +247,7 @@ export type ResourcesCopy = {
       create: string
       empty: string
       allProjects: string
+      selectedProjects: (count: number) => string
       noRange: string
       rowCount: (count: number) => string
       viewDetail: string
@@ -257,8 +258,10 @@ export type ResourcesCopy = {
       title: string
       fields: {
         project: string
+        projects: string
         month: string
         session: string
+        title: string
         weekStartDate: string
         weekEndDate: string
         approverName: string
@@ -268,6 +271,7 @@ export type ResourcesCopy = {
         selectProject: string
         month: string
         session: string
+        title: string
         approverName: string
         editorName: string
       }
@@ -281,6 +285,7 @@ export type ResourcesCopy = {
       title: string
       rangePrefix: string
       rangeMissing: string
+      backToList: string
       exportPlan: string
       statusNote: string
       deletePlan: string
@@ -333,7 +338,15 @@ export type ResourcesCopy = {
         proxyCost: string
         actions: string
       }
+      columnSelector: {
+        label: string
+        selectedCount: (count: number) => string
+      }
       form: {
+        projects: string
+        title: string
+        month: string
+        session: string
         weekStartDate: string
         weekEndDate: string
         approverName: string
@@ -642,6 +655,7 @@ export const getResourcesCopy = (locale: Locale): ResourcesCopy => {
           create: 'Nouveau cycle',
           empty: 'Aucun plan hebdomadaire. Créez le premier cycle pour démarrer.',
           allProjects: 'Tous les projets',
+          selectedProjects: (count) => formatCopy('{count} projet(s)', { count }),
           noRange: 'Période non définie',
           rowCount: (count) => formatCopy('{count} ligne(s)', { count }),
           viewDetail: 'Voir le détail',
@@ -654,18 +668,21 @@ export const getResourcesCopy = (locale: Locale): ResourcesCopy => {
         createDialog: {
           title: 'Créer un plan hebdomadaire',
           fields: {
-            project: 'Projet',
+            project: 'Projet principal',
+            projects: 'Projets',
             month: 'Mois (M)',
             session: 'Session (S)',
+            title: 'Titre',
             weekStartDate: 'Date de début',
             weekEndDate: 'Date de fin',
             approverName: 'Approbateur',
             editorName: 'Rédacteur',
           },
           placeholders: {
-            selectProject: 'Sélectionnez un projet',
+            selectProject: 'Sélectionnez au moins un projet',
             month: 'Ex. 3',
             session: 'Ex. 3',
+            title: 'Ex. M3S3',
             approverName: "Nom de l'approbateur (optionnel)",
             editorName: 'Nom du rédacteur (optionnel)',
           },
@@ -679,6 +696,7 @@ export const getResourcesCopy = (locale: Locale): ResourcesCopy => {
           title: 'Plan hebdomadaire de livraison',
           rangePrefix: 'Période du plan',
           rangeMissing: 'Veuillez renseigner la date de début du cycle.',
+          backToList: 'Retour à la liste',
           exportPlan: 'Exporter le plan',
           statusNote: "Le statut sert uniquement au suivi interne. Les lignes annulées n'apparaissent pas dans l'export du plan.",
           deletePlan: 'Supprimer le cycle',
@@ -731,7 +749,15 @@ export const getResourcesCopy = (locale: Locale): ResourcesCopy => {
             proxyCost: 'Frais mandataire',
             actions: 'Actions',
           },
+          columnSelector: {
+            label: 'Colonnes',
+            selectedCount: (count) => formatCopy('{count} colonne(s)', { count }),
+          },
           form: {
+            projects: 'Projets',
+            title: 'Titre',
+            month: 'Mois (M)',
+            session: 'Session (S)',
             weekStartDate: 'Date de début',
             weekEndDate: 'Date de fin',
             approverName: 'Approbateur',
@@ -1033,48 +1059,53 @@ export const getResourcesCopy = (locale: Locale): ResourcesCopy => {
       comingSoon: '建设中：将提供大宗材料字典与出入库流水。',
     },
     weeklyPlans: {
-      list: {
-        title: '大宗物资周计划列表',
-        create: '新建届次',
-        empty: '暂无周计划，点击“新建届次”创建第一份。',
-        allProjects: '全部项目',
-        noRange: '未设置计划周期',
-        rowCount: (count) => formatCopy('{count} 行', { count }),
-        viewDetail: '查看详情',
+        list: {
+          title: '大宗物资周计划列表',
+          create: '新建届次',
+          empty: '暂无周计划，点击“新建届次”创建第一份。',
+          allProjects: '全部项目',
+          selectedProjects: (count) => formatCopy('{count} 个项目', { count }),
+          noRange: '未设置计划周期',
+          rowCount: (count) => formatCopy('{count} 行', { count }),
+          viewDetail: '查看详情',
         monthSession: (month, session) => formatCopy('第 {month} 月 · 第 {session} 届', { month, session }),
         approverEditor: (approver, editor) =>
           [approver ? `审批：${approver}` : '', editor ? `编制：${editor}` : ''].filter(Boolean).join(' · '),
       },
-      createDialog: {
-        title: '新建周计划届次',
-        fields: {
-          project: '项目',
-          month: '月份 (M)',
-          session: '届次 (S)',
-          weekStartDate: '开始日期',
-          weekEndDate: '结束日期',
-          approverName: '审批人',
-          editorName: '编制人',
-        },
-        placeholders: {
-          selectProject: '请选择项目',
-          month: '如 3',
-          session: '如 3',
-          approverName: '审批人姓名（可选）',
-          editorName: '编制人姓名（可选）',
-        },
+        createDialog: {
+          title: '新建周计划届次',
+          fields: {
+            project: '主项目',
+            projects: '项目',
+            month: '月份 (M)',
+            session: '届次 (S)',
+            title: '标题',
+            weekStartDate: '开始日期',
+            weekEndDate: '结束日期',
+            approverName: '审批人',
+            editorName: '编制人',
+          },
+          placeholders: {
+            selectProject: '请选择至少一个项目',
+            month: '如 3',
+            session: '如 3',
+            title: '如 M3S3',
+            approverName: '审批人姓名（可选）',
+            editorName: '编制人姓名（可选）',
+          },
         actions: {
           create: '创建',
           creating: '创建中…',
           cancel: '取消',
         },
       },
-      detail: {
-        title: '大宗物资周计划',
-        rangePrefix: '周计划范围',
-        rangeMissing: '请先填写本届计划的开始日期。',
-        exportPlan: '导出计划',
-        statusNote: '状态仅用于页面内部跟踪；取消的行不会出现在导出的计划表里。',
+        detail: {
+          title: '大宗物资周计划',
+          rangePrefix: '周计划范围',
+          rangeMissing: '请先填写本届计划的开始日期。',
+          backToList: '返回周计划列表',
+          exportPlan: '导出计划',
+          statusNote: '状态仅用于页面内部跟踪；取消的行不会出现在导出的计划表里。',
         deletePlan: '删除届次',
         deletePlanConfirm: '确定删除整个届次计划吗？此操作不可撤销。',
         editRow: '编辑',
@@ -1107,7 +1138,7 @@ export const getResourcesCopy = (locale: Locale): ResourcesCopy => {
           arrived: '到货',
           cancelled: '取消',
         },
-        columns: {
+          columns: {
           number: '序号',
           goodsName: '货物名称',
           model: '规格',
@@ -1122,14 +1153,22 @@ export const getResourcesCopy = (locale: Locale): ResourcesCopy => {
           phone: '电话',
           actualQty: '收到数量',
           unitPrice: '单价',
-          proxyCost: '代付费用',
-          actions: '操作',
-        },
-        form: {
-          weekStartDate: '开始日期',
-          weekEndDate: '结束日期',
-          approverName: '审批人',
-          editorName: '编制人',
+            proxyCost: '代付费用',
+            actions: '操作',
+          },
+          columnSelector: {
+            label: '显示列',
+            selectedCount: (count) => formatCopy('已选 {count} 列', { count }),
+          },
+          form: {
+            projects: '项目',
+            title: '标题',
+            month: '月份 (M)',
+            session: '届次 (S)',
+            weekStartDate: '开始日期',
+            weekEndDate: '结束日期',
+            approverName: '审批人',
+            editorName: '编制人',
         },
         modelEditor: {
           title: '规格',

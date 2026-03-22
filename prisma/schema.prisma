@@ -1093,6 +1093,7 @@ model Project {
   roadSections            RoadSection[]
   receivedDocumentLedgers ReceivedDocumentLedger[]
   weeklyDeliveryPlans     WeeklyDeliveryPlan[]
+  weeklyDeliveryPlanLinks WeeklyDeliveryPlanProject[]
 }
 
 model BoqItem {
@@ -1367,26 +1368,39 @@ model RoadmapIdea {
 }
 
 model WeeklyDeliveryPlan {
-  id           Int                      @id @default(autoincrement())
-  projectId    Int
-  project      Project                  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  month        Int
-  session      Int
-  title        String
+  id            Int                       @id @default(autoincrement())
+  projectId     Int
+  project       Project                   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  month         Int
+  session       Int
+  title         String
   weekStartDate DateTime?
   weekEndDate   DateTime?
-  approverName String?
-  editorName   String?
-  createdById  Int?
-  updatedById  Int?
-  createdBy    User?                    @relation("WeeklyDeliveryPlanCreator", fields: [createdById], references: [id], onDelete: SetNull)
-  updatedBy    User?                    @relation("WeeklyDeliveryPlanUpdater", fields: [updatedById], references: [id], onDelete: SetNull)
-  items        WeeklyDeliveryPlanItem[]
-  createdAt    DateTime                 @default(now())
-  updatedAt    DateTime                 @updatedAt
+  approverName  String?
+  editorName    String?
+  createdById   Int?
+  updatedById   Int?
+  createdBy     User?                     @relation("WeeklyDeliveryPlanCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy     User?                     @relation("WeeklyDeliveryPlanUpdater", fields: [updatedById], references: [id], onDelete: SetNull)
+  items         WeeklyDeliveryPlanItem[]
+  projects      WeeklyDeliveryPlanProject[]
+  createdAt     DateTime                  @default(now())
+  updatedAt     DateTime                  @updatedAt
 
   @@unique([projectId, month, session])
   @@index([projectId])
+}
+
+model WeeklyDeliveryPlanProject {
+  planId     Int
+  projectId  Int
+  sortOrder  Int               @default(0)
+  plan       WeeklyDeliveryPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  project    Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@id([planId, projectId])
+  @@index([projectId])
+  @@index([planId, sortOrder])
 }
 
 model WeeklyDeliveryPlanItem {
