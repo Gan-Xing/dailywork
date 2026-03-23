@@ -13,6 +13,7 @@ import type {
 import type { Locale } from '@/lib/i18n'
 import type { getProgressCopy } from '@/lib/i18n/progress'
 import { formatProgressCopy } from '@/lib/i18n/progress'
+import { localizeProgressTerm } from '@/lib/i18n/progressDictionary'
 import { resolveRoadName } from '@/lib/i18n/roadDictionary'
 
 type PhaseCopy = ReturnType<typeof getProgressCopy>['phase']
@@ -171,7 +172,8 @@ export function PhaseFormModal({
                 >
                   {definitions.map((item) => (
                     <option key={item.id} value={item.id}>
-                      {item.name} · {item.measure === 'POINT' ? t.form.measureOptionPoint : t.form.measureOptionLinear}
+                      {localizeProgressTerm('phase', item.name, locale)} ·{' '}
+                      {item.measure === 'POINT' ? t.form.measureOptionPoint : t.form.measureOptionLinear}
                     </option>
                   ))}
                 </select>

@@ -18,6 +18,8 @@ const compactNormalize = (value: string) =>
 
 const dictionaries: Record<DictionaryKind, Record<string, Entry>> = {
   phase: {
+    [normalize('浆砌片石')]: { zh: '浆砌片石', fr: 'Perrés maçonnés' },
+    [normalize('Perrés maçonnés')]: { zh: '浆砌片石', fr: 'Perrés maçonnés' },
     [normalize('边沟')]: { zh: '边沟', fr: 'Caniveau' },
     [normalize('现浇边沟')]: { zh: '现浇边沟', fr: 'Caniveau coulé en place' },
     [normalize('路缘石')]: { zh: '路缘石', fr: 'Bordure' },
@@ -74,6 +76,8 @@ const dictionaries: Record<DictionaryKind, Record<string, Entry>> = {
     [normalize("Recyclage de l'ancienne chaussée")]: { zh: '旧路再生', fr: "Recyclage de l'ancienne chaussée" },
   },
   layer: {
+    [normalize('浆砌片石')]: { zh: '浆砌片石', fr: 'Perrés maçonnés' },
+    [normalize('Perrés maçonnés')]: { zh: '浆砌片石', fr: 'Perrés maçonnés' },
     [normalize('预制边沟')]: { zh: '预制边沟', fr: 'Caniveau préfabriqué' },
     [normalize('现浇边沟')]: { zh: '现浇边沟', fr: 'Caniveau coulé en place' },
     [normalize('预制路缘石')]: { zh: '预制路缘石', fr: 'Bordure préfabriquée' },
@@ -165,6 +169,14 @@ const dictionaries: Record<DictionaryKind, Record<string, Entry>> = {
     [normalize("Recyclage de l'ancienne chaussée")]: { zh: '旧路再生', fr: "Recyclage de l'ancienne chaussée" },
   },
   check: {
+    [normalize('浆砌片石面积验收')]: {
+      zh: '浆砌片石面积验收',
+      fr: 'Réception de la surface des perrés maçonnés',
+    },
+    [normalize('Réception de la surface des perrés maçonnés')]: {
+      zh: '浆砌片石面积验收',
+      fr: 'Réception de la surface des perrés maçonnés',
+    },
     [normalize('钢筋绑扎验收')]: { zh: '钢筋绑扎验收', fr: 'Ferraillage' },
     [normalize('Ferraillage')]: { zh: '钢筋绑扎验收', fr: 'Ferraillage' },
     [normalize('模版验收')]: { zh: '模板安装验收', fr: 'Réception coffrage' },

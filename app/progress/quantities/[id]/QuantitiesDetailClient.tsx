@@ -10,6 +10,7 @@ import type {
 } from '@/lib/phaseItemTypes'
 import { ProgressHeader } from '../../ProgressHeader'
 import { locales } from '@/lib/i18n'
+import { localizeProgressTerm } from '@/lib/i18n/progressDictionary'
 import { usePreferredLocale } from '@/lib/usePreferredLocale'
 
 type Props = {
@@ -90,6 +91,10 @@ const calcIntervalLength = (
 export default function QuantitiesDetailClient({ detail, canEdit, variant = 'page', onClose }: Props) {
   const { locale, setLocale } = usePreferredLocale('zh', locales)
   const { addToast } = useToast()
+  const localizedPhaseName = useMemo(
+    () => localizeProgressTerm('phase', detail.phase.name, locale),
+    [detail.phase.name, locale],
+  )
   const [phaseItems, setPhaseItems] = useState<PhaseItemDTO[]>(detail.phaseItems)
   const [inputs, setInputs] = useState<PhaseItemInputDTO[]>(detail.inputs)
   const [selectedPhaseItemId, setSelectedPhaseItemId] = useState<number | null>(
@@ -450,7 +455,7 @@ export default function QuantitiesDetailClient({ detail, canEdit, variant = 'pag
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900">
       <ProgressHeader
-        title={detail.phase.name}
+        title={localizedPhaseName}
         breadcrumbs={[
           { label: '首页', href: '/' },
           { label: '进度管理', href: '/progress' },
