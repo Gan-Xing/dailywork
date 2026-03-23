@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 
 import { hasPermission } from '@/lib/server/authSession';
 import { prisma } from '@/lib/prisma';
+import { formatSupervisorLabel } from '@/lib/members/utils';
 import {
   combinePlateNumbers,
   formatMaterialModel,
@@ -24,6 +25,20 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       projects: {
         include: { project: { select: { name: true } } },
         orderBy: [{ sortOrder: 'asc' }, { projectId: 'asc' }],
+      },
+      approverUser: {
+        select: {
+          name: true,
+          username: true,
+          chineseProfile: { select: { frenchName: true } },
+        },
+      },
+      editorUser: {
+        select: {
+          name: true,
+          username: true,
+          chineseProfile: { select: { frenchName: true } },
+        },
       },
       items: { orderBy: { sortOrder: 'asc' } },
     },
@@ -115,14 +130,31 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     });
   });
 
+  const approverLabel =
+    plan.approverName ??
+    formatSupervisorLabel({
+      name: plan.approverUser?.name ?? null,
+      frenchName: plan.approverUser?.chineseProfile?.frenchName ?? null,
+      username: plan.approverUser?.username ?? null,
+    }) ??
+    '';
+  const editorLabel =
+    plan.editorName ??
+    formatSupervisorLabel({
+      name: plan.editorUser?.name ?? null,
+      frenchName: plan.editorUser?.chineseProfile?.frenchName ?? null,
+      username: plan.editorUser?.username ?? null,
+    }) ??
+    '';
+
   // ——— Signature row ———
   const sigRowNum = 4 + exportItems.length + 1;
   const half = Math.floor(colCount / 2);
   sheet.mergeCells(sigRowNum, 1, sigRowNum, half);
-  sheet.getCell(sigRowNum, 1).value = `审批人: ${plan.approverName ?? ''}`;
+  sheet.getCell(sigRowNum, 1).value = `审批人: ${approverLabel}`;
   sheet.getCell(sigRowNum, 1).alignment = { horizontal: 'left', vertical: 'middle' };
   sheet.mergeCells(sigRowNum, half + 1, sigRowNum, colCount);
-  sheet.getCell(sigRowNum, half + 1).value = `编制人: ${plan.editorName ?? ''}`;
+  sheet.getCell(sigRowNum, half + 1).value = `编制人: ${editorLabel}`;
   sheet.getCell(sigRowNum, half + 1).alignment = { horizontal: 'left', vertical: 'middle' };
   sheet.getRow(sigRowNum).height = 24;
 

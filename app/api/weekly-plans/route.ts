@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server'
 import { calculateWeekEndDate, parseDateInput } from '@/app/resources/weekly-plans/materialsConfig'
 import { prisma } from '@/lib/prisma'
 import { getSessionUser, hasPermission } from '@/lib/server/authSession'
+import { resolveWeeklyPlanSignerInput } from '@/lib/server/weeklyPlanSigners'
 
 export type PlanWithItems = WeeklyDeliveryPlan & {
   project: Pick<Project, 'id' | 'name'>
@@ -75,6 +76,8 @@ export async function POST(req: Request) {
       month: number
       session: number
       title?: string
+      approverUserId?: number | null
+      editorUserId?: number | null
       weekStartDate?: string
       approverName?: string
       editorName?: string
@@ -100,6 +103,12 @@ export async function POST(req: Request) {
     }
 
     const title = body.title?.trim() || `M${month}S${sess}`
+    const signerInput = await resolveWeeklyPlanSignerInput({
+      approverUserId: body.approverUserId,
+      editorUserId: body.editorUserId,
+      approverName: body.approverName,
+      editorName: body.editorName,
+    })
 
     const duplicatePlan = await prisma.weeklyDeliveryPlan.findFirst({
       where: {
@@ -124,8 +133,10 @@ export async function POST(req: Request) {
         title,
         weekStartDate: parsedStartDate,
         weekEndDate: parsedEndDate,
-        approverName: body.approverName ?? null,
-        editorName: body.editorName ?? null,
+        approverUserId: signerInput.approverUserId,
+        editorUserId: signerInput.editorUserId,
+        approverName: signerInput.approverName,
+        editorName: signerInput.editorName,
         createdById: session.id,
         updatedById: session.id,
         projects: {
@@ -146,6 +157,12 @@ export async function POST(req: Request) {
     })
     return NextResponse.json({ plan }, { status: 201 })
   } catch (error: unknown) {
+    if ((error as Error).message === 'INVALID_WEEKLY_PLAN_SIGNER') {
+      return NextResponse.json(
+        { code: 'INVALID_WEEKLY_PLAN_SIGNER', message: '审批人或编制人必须从中方人员名单中选择。' },
+        { status: 400 },
+      )
+    }
     if ((error as { code?: string }).code === 'P2002') {
       return NextResponse.json({ message: '该项目下同一月份届次已存在' }, { status: 409 })
     }

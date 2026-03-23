@@ -629,10 +629,12 @@
   4. `title`：标题快照，格式如 `M3S3`。
   5. `weekStartDate`：计划开始日期（手工录入）。
   6. `weekEndDate`：计划结束日期（系统按开始日期 + 7 天计算）。
-  7. `approverName` / `editorName`：审批人与编制人快照，可空。
-  8. `createdById` / `updatedById`、`createdAt` / `updatedAt`：审计字段。
+  7. `approverUserId` / `editorUserId`：关联 `User`，审批人与编制人必须从中方人员名单中选择，可空。
+  8. `approverName` / `editorName`：审批人与编制人名称快照，可空；用于导出、历史展示与兼容旧数据。
+  9. `createdById` / `updatedById`、`createdAt` / `updatedAt`：审计字段。
 - **约束**
   1. `@@unique([projectId, month, session])`：同一项目同一届次唯一。
+  2. `approverUserId` / `editorUserId` 通过外键指向 `User.id`，并限制为中方人员数据来源。
 
 ### 周计划明细（WeeklyDeliveryPlanItem）
 

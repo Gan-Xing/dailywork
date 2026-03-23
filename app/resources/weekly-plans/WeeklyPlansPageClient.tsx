@@ -10,6 +10,8 @@ import { usePreferredLocale } from '@/lib/usePreferredLocale'
 import { ResourcesHeader } from '../ResourcesHeader'
 import { useResourcesSession } from '../hooks/useResourcesSession'
 import { calculateWeekEndDate, formatDateInput, formatPlanDateRange } from './materialsConfig'
+import { WeeklyPlanSignerSelect } from './WeeklyPlanSignerSelect'
+import type { WeeklyPlanSignerOption } from './signerOptions'
 
 type Project = { id: number; name: string }
 
@@ -130,7 +132,7 @@ export default function WeeklyPlansPageClient() {
   const { locale, setLocale } = usePreferredLocale()
   const t = getResourcesCopy(locale)
   const weeklyT = t.weeklyPlans
-  const { canViewMaterials, canCreateMaterials, shouldShowAccessDenied } = useResourcesSession()
+  const { canCreateMaterials, shouldShowAccessDenied } = useResourcesSession()
 
   const [plans, setPlans] = useState<Plan[]>([])
   const [projects, setProjects] = useState<Project[]>([])
@@ -144,8 +146,9 @@ export default function WeeklyPlansPageClient() {
   const [newSession, setNewSession] = useState('')
   const [newTitle, setNewTitle] = useState('')
   const [newWeekStartDate, setNewWeekStartDate] = useState('')
-  const [newApprover, setNewApprover] = useState('')
-  const [newEditor, setNewEditor] = useState('')
+  const [newApproverUserId, setNewApproverUserId] = useState('')
+  const [newEditorUserId, setNewEditorUserId] = useState('')
+  const [signerUsers, setSignerUsers] = useState<WeeklyPlanSignerOption[]>([])
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
   const dialogRef = useRef<HTMLDivElement>(null)
@@ -200,12 +203,26 @@ export default function WeeklyPlansPageClient() {
     }
   }, [])
 
+  const fetchSignerUsers = useCallback(async () => {
+    try {
+      const res = await fetch('/api/weekly-plans/chinese-users', { credentials: 'include' })
+      if (!res.ok) return
+      const data = (await res.json()) as { users?: WeeklyPlanSignerOption[] }
+      setSignerUsers(data.users ?? [])
+    } catch {
+      // ignore
+    }
+  }, [])
+
   useEffect(() => {
     void fetchPlans()
   }, [fetchPlans])
   useEffect(() => {
     void fetchProjects()
   }, [fetchProjects])
+  useEffect(() => {
+    void fetchSignerUsers()
+  }, [fetchSignerUsers])
 
   useEffect(() => {
     if (!newOpen) return
@@ -244,19 +261,25 @@ export default function WeeklyPlansPageClient() {
           session: Number(newSession),
           title: newTitle || undefined,
           weekStartDate: newWeekStartDate,
-          approverName: newApprover || undefined,
-          editorName: newEditor || undefined,
+          approverUserId: newApproverUserId ? Number(newApproverUserId) : null,
+          editorUserId: newEditorUserId ? Number(newEditorUserId) : null,
         }),
       })
-      if (!res.ok) throw new Error(resolveCreateErrorMessage(res.status))
+      const data = (await res.json().catch(() => ({}))) as { code?: string }
+      if (!res.ok) {
+        if (data.code === 'INVALID_WEEKLY_PLAN_SIGNER') {
+          throw new Error(weeklyT.status.invalidSigner)
+        }
+        throw new Error(resolveCreateErrorMessage(res.status))
+      }
       setNewOpen(false)
       setNewProjectIds([])
       setNewMonth('')
       setNewSession('')
       setNewTitle('')
       setNewWeekStartDate('')
-      setNewApprover('')
-      setNewEditor('')
+      setNewApproverUserId('')
+      setNewEditorUserId('')
       void fetchPlans()
     } catch (e) {
       setCreateError((e as Error).message)
@@ -459,27 +482,21 @@ export default function WeeklyPlansPageClient() {
                 </label>
               </div>
 
-              <label className="flex flex-col gap-1 text-sm text-slate-700">
-                {weeklyT.createDialog.fields.approverName}
-                <input
-                  type="text"
-                  placeholder={weeklyT.createDialog.placeholders.approverName}
-                  value={newApprover}
-                  onChange={(e) => setNewApprover(e.target.value)}
-                  className="rounded-xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
-                />
-              </label>
+              <WeeklyPlanSignerSelect
+                label={weeklyT.createDialog.fields.approverName}
+                placeholder={weeklyT.createDialog.placeholders.approverName}
+                value={newApproverUserId}
+                options={signerUsers}
+                onChange={setNewApproverUserId}
+              />
 
-              <label className="flex flex-col gap-1 text-sm text-slate-700">
-                {weeklyT.createDialog.fields.editorName}
-                <input
-                  type="text"
-                  placeholder={weeklyT.createDialog.placeholders.editorName}
-                  value={newEditor}
-                  onChange={(e) => setNewEditor(e.target.value)}
-                  className="rounded-xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
-                />
-              </label>
+              <WeeklyPlanSignerSelect
+                label={weeklyT.createDialog.fields.editorName}
+                placeholder={weeklyT.createDialog.placeholders.editorName}
+                value={newEditorUserId}
+                options={signerUsers}
+                onChange={setNewEditorUserId}
+              />
 
               {createError ? <p className="text-xs text-rose-600">{createError}</p> : null}
 

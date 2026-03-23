@@ -381,6 +381,7 @@ export type ResourcesCopy = {
       createValidationFailed: string
       duplicatePlan: string
       invalidStartDate: string
+      invalidSigner: string
       permissionDenied: string
       saveFailed: string
       deleteFailed: string
@@ -675,16 +676,16 @@ export const getResourcesCopy = (locale: Locale): ResourcesCopy => {
             title: 'Titre',
             weekStartDate: 'Date de début',
             weekEndDate: 'Date de fin',
-            approverName: 'Approbateur',
-            editorName: 'Rédacteur',
+            approverName: 'Approbateur chinois',
+            editorName: 'Rédacteur chinois',
           },
           placeholders: {
             selectProject: 'Sélectionnez au moins un projet',
             month: 'Ex. 3',
             session: 'Ex. 3',
             title: 'Ex. M3S3',
-            approverName: "Nom de l'approbateur (optionnel)",
-            editorName: 'Nom du rédacteur (optionnel)',
+            approverName: "Sélectionnez l'approbateur chinois (optionnel)",
+            editorName: 'Sélectionnez le rédacteur chinois (optionnel)',
           },
           actions: {
             create: 'Créer',
@@ -760,8 +761,8 @@ export const getResourcesCopy = (locale: Locale): ResourcesCopy => {
             session: 'Session (S)',
             weekStartDate: 'Date de début',
             weekEndDate: 'Date de fin',
-            approverName: 'Approbateur',
-            editorName: 'Rédacteur',
+            approverName: 'Approbateur chinois',
+            editorName: 'Rédacteur chinois',
           },
           modelEditor: {
             title: 'Spécification',
@@ -788,13 +789,14 @@ export const getResourcesCopy = (locale: Locale): ResourcesCopy => {
           loading: 'Chargement…',
           loadFailed: 'Échec du chargement',
           notFound: 'Plan introuvable',
-          createFailed: 'Échec de la création',
-          createValidationFailed: 'Veuillez renseigner le projet, le mois, la session et la date de début.',
-          duplicatePlan: 'Un cycle existe déjà pour ce projet, ce mois et cette session.',
-          invalidStartDate: 'Le format de la date de début est invalide.',
-          permissionDenied: "Vous n'avez pas l'autorisation requise pour cette opération.",
-          saveFailed: "Échec de l'enregistrement",
-          deleteFailed: 'Échec de la suppression',
+        createFailed: 'Échec de la création',
+        createValidationFailed: 'Veuillez renseigner le projet, le mois, la session et la date de début.',
+        duplicatePlan: 'Un cycle existe déjà pour ce projet, ce mois et cette session.',
+        invalidStartDate: 'Le format de la date de début est invalide.',
+        invalidSigner: "L'approbateur et le rédacteur doivent être sélectionnés dans la liste du personnel chinois.",
+        permissionDenied: "Vous n'avez pas l'autorisation requise pour cette opération.",
+        saveFailed: "Échec de l'enregistrement",
+        deleteFailed: 'Échec de la suppression',
         },
       },
     }
@@ -1082,16 +1084,16 @@ export const getResourcesCopy = (locale: Locale): ResourcesCopy => {
             title: '标题',
             weekStartDate: '开始日期',
             weekEndDate: '结束日期',
-            approverName: '审批人',
-            editorName: '编制人',
+            approverName: '审批人（中方）',
+            editorName: '编制人（中方）',
           },
           placeholders: {
             selectProject: '请选择至少一个项目',
             month: '如 3',
             session: '如 3',
             title: '如 M3S3',
-            approverName: '审批人姓名（可选）',
-            editorName: '编制人姓名（可选）',
+            approverName: '请选择中方审批人（可选）',
+            editorName: '请选择中方编制人（可选）',
           },
         actions: {
           create: '创建',
@@ -1167,8 +1169,8 @@ export const getResourcesCopy = (locale: Locale): ResourcesCopy => {
             session: '届次 (S)',
             weekStartDate: '开始日期',
             weekEndDate: '结束日期',
-            approverName: '审批人',
-            editorName: '编制人',
+            approverName: '审批人（中方）',
+            editorName: '编制人（中方）',
         },
         modelEditor: {
           title: '规格',
@@ -1199,6 +1201,7 @@ export const getResourcesCopy = (locale: Locale): ResourcesCopy => {
         createValidationFailed: '请填写项目、月份、届次和开始日期。',
         duplicatePlan: '该项目下同一月份届次已存在。',
         invalidStartDate: '开始日期格式不正确。',
+        invalidSigner: '审批人和编制人必须从中方人员名单中选择。',
         permissionDenied: '当前没有执行此操作的权限。',
         saveFailed: '保存失败',
         deleteFailed: '删除失败',

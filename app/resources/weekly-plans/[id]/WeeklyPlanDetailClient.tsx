@@ -20,6 +20,8 @@ import {
   type MaterialModel,
   type WeeklyPlanItemStatus,
 } from '../materialsConfig'
+import { WeeklyPlanSignerSelect } from '../WeeklyPlanSignerSelect'
+import { matchWeeklyPlanSignerId, type WeeklyPlanSignerOption } from '../signerOptions'
 
 type Project = { id: number; name: string }
 
@@ -59,6 +61,8 @@ type Plan = {
   title: string
   weekStartDate: string | null
   weekEndDate: string | null
+  approverUserId: number | null
+  editorUserId: number | null
   approverName: string | null
   editorName: string | null
   items: PlanItem[]
@@ -142,8 +146,8 @@ type PlanFormState = {
   session: string
   title: string
   weekStartDate: string
-  approverName: string
-  editorName: string
+  approverUserId: string
+  editorUserId: string
 }
 
 const EMPTY_HISTORY_OPTIONS: HistoryOptions = {
@@ -253,7 +257,7 @@ function ProjectMultiSelect({
         <button
           type="button"
           onClick={() => setOpen((current) => !current)}
-          className="flex min-h-[42px] w-full flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-left text-sm outline-none focus:ring-2 focus:ring-blue-300"
+          className="flex min-h-[52px] w-full flex-wrap items-start gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-left text-sm outline-none focus:ring-2 focus:ring-blue-300"
         >
           {selectedProjects.length ? (
             selectedProjects.map((project) => (
@@ -375,6 +379,7 @@ export default function WeeklyPlanDetailClient() {
 
   const [plan, setPlan] = useState<Plan | null>(null)
   const [projects, setProjects] = useState<Project[]>([])
+  const [signerUsers, setSignerUsers] = useState<WeeklyPlanSignerOption[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [deleting, setDeleting] = useState<number | null>(null)
@@ -384,8 +389,8 @@ export default function WeeklyPlanDetailClient() {
     session: '',
     title: '',
     weekStartDate: '',
-    approverName: '',
-    editorName: '',
+    approverUserId: '',
+    editorUserId: '',
   })
   const [savingPlan, setSavingPlan] = useState(false)
   const [planMessage, setPlanMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
@@ -477,6 +482,17 @@ export default function WeeklyPlanDetailClient() {
     }
   }, [])
 
+  const fetchSignerUsers = useCallback(async () => {
+    try {
+      const res = await fetch('/api/weekly-plans/chinese-users', { credentials: 'include' })
+      if (!res.ok) return
+      const data = (await res.json()) as { users?: WeeklyPlanSignerOption[] }
+      setSignerUsers(data.users ?? [])
+    } catch {
+      // ignore
+    }
+  }, [])
+
   const fetchHistoryOptions = useCallback(async (projectIds: number[]) => {
     if (!projectIds.length) return
     try {
@@ -519,8 +535,8 @@ export default function WeeklyPlanDetailClient() {
           session: String(nextPlan.session),
           title: nextPlan.title,
           weekStartDate: formatDateInput(nextPlan.weekStartDate),
-          approverName: nextPlan.approverName ?? '',
-          editorName: nextPlan.editorName ?? '',
+          approverUserId: nextPlan.approverUserId ? String(nextPlan.approverUserId) : '',
+          editorUserId: nextPlan.editorUserId ? String(nextPlan.editorUserId) : '',
         })
         void fetchHistoryOptions(nextProjectIds.map(Number))
       }
@@ -533,8 +549,26 @@ export default function WeeklyPlanDetailClient() {
 
   useEffect(() => {
     void fetchProjects()
+    void fetchSignerUsers()
     void fetchPlan()
-  }, [fetchPlan, fetchProjects])
+  }, [fetchPlan, fetchProjects, fetchSignerUsers])
+
+  useEffect(() => {
+    if (!plan || !signerUsers.length) return
+    setPlanForm((current) => {
+      const nextApproverUserId =
+        current.approverUserId || matchWeeklyPlanSignerId(plan.approverName, signerUsers)
+      const nextEditorUserId = current.editorUserId || matchWeeklyPlanSignerId(plan.editorName, signerUsers)
+      if (nextApproverUserId === current.approverUserId && nextEditorUserId === current.editorUserId) {
+        return current
+      }
+      return {
+        ...current,
+        approverUserId: nextApproverUserId,
+        editorUserId: nextEditorUserId,
+      }
+    })
+  }, [plan, signerUsers])
 
   const fetchRecentPrice = async (goodsName: string, model: MaterialModel | null) => {
     try {
@@ -716,11 +750,17 @@ export default function WeeklyPlanDetailClient() {
           session: Number(planForm.session),
           title: planForm.title || undefined,
           weekStartDate: planForm.weekStartDate,
-          approverName: planForm.approverName || null,
-          editorName: planForm.editorName || null,
+          approverUserId: planForm.approverUserId ? Number(planForm.approverUserId) : null,
+          editorUserId: planForm.editorUserId ? Number(planForm.editorUserId) : null,
         }),
       })
-      if (!res.ok) throw new Error(resolvePlanSaveErrorMessage(res.status))
+      const data = (await res.json().catch(() => ({}))) as { code?: string }
+      if (!res.ok) {
+        if (data.code === 'INVALID_WEEKLY_PLAN_SIGNER') {
+          throw new Error(weeklyT.status.invalidSigner)
+        }
+        throw new Error(resolvePlanSaveErrorMessage(res.status))
+      }
       setPlanMessage({ type: 'success', text: weeklyT.detail.planSaved })
       await fetchPlan()
     } catch (e) {
@@ -824,16 +864,18 @@ export default function WeeklyPlanDetailClient() {
         </div>
 
         <div className="mb-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="grid gap-4 xl:grid-cols-[1.4fr_120px_120px_180px_180px_1fr_1fr_auto]">
-            <ProjectMultiSelect
-              projects={projects}
-              selectedIds={planForm.projectIds}
-              onChange={(next) => {
-                setPlanForm((current) => ({ ...current, projectIds: next }))
-                setPlanMessage(null)
-              }}
-              label={weeklyT.detail.form.projects}
-            />
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-[minmax(420px,2.4fr)_110px_110px_170px_170px_minmax(180px,1fr)_minmax(180px,1fr)_auto]">
+            <div className="min-w-0 md:col-span-2 xl:col-span-4 2xl:col-span-1">
+              <ProjectMultiSelect
+                projects={projects}
+                selectedIds={planForm.projectIds}
+                onChange={(next) => {
+                  setPlanForm((current) => ({ ...current, projectIds: next }))
+                  setPlanMessage(null)
+                }}
+                label={weeklyT.detail.form.projects}
+              />
+            </div>
 
             <label className="flex flex-col gap-1 text-sm text-slate-700">
               {weeklyT.detail.form.month}
@@ -904,36 +946,32 @@ export default function WeeklyPlanDetailClient() {
               />
             </label>
 
-            <label className="flex flex-col gap-1 text-sm text-slate-700">
-              {weeklyT.detail.form.approverName}
-              <input
-                type="text"
-                value={planForm.approverName}
-                disabled={!canCreateMaterials}
-                onChange={(e) => {
-                  setPlanForm((current) => ({ ...current, approverName: e.target.value }))
-                  setPlanMessage(null)
-                }}
-                className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-300 disabled:bg-slate-50"
-              />
-            </label>
+            <WeeklyPlanSignerSelect
+              label={weeklyT.detail.form.approverName}
+              placeholder={weeklyT.createDialog.placeholders.approverName}
+              value={planForm.approverUserId}
+              options={signerUsers}
+              disabled={!canCreateMaterials}
+              onChange={(value) => {
+                setPlanForm((current) => ({ ...current, approverUserId: value }))
+                setPlanMessage(null)
+              }}
+            />
 
-            <label className="flex flex-col gap-1 text-sm text-slate-700">
-              {weeklyT.detail.form.editorName}
-              <input
-                type="text"
-                value={planForm.editorName}
-                disabled={!canCreateMaterials}
-                onChange={(e) => {
-                  setPlanForm((current) => ({ ...current, editorName: e.target.value }))
-                  setPlanMessage(null)
-                }}
-                className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-300 disabled:bg-slate-50"
-              />
-            </label>
+            <WeeklyPlanSignerSelect
+              label={weeklyT.detail.form.editorName}
+              placeholder={weeklyT.createDialog.placeholders.editorName}
+              value={planForm.editorUserId}
+              options={signerUsers}
+              disabled={!canCreateMaterials}
+              onChange={(value) => {
+                setPlanForm((current) => ({ ...current, editorUserId: value }))
+                setPlanMessage(null)
+              }}
+            />
 
             {canCreateMaterials ? (
-              <div className="flex items-end">
+              <div className="flex items-end md:col-span-2 xl:col-span-4 2xl:col-span-1">
                 <button
                   type="button"
                   disabled={savingPlan}

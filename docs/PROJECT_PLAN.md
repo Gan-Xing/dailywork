@@ -81,6 +81,7 @@
 - 计划头规则：
   - `month` / `session` 继续保留，用于沿用 `M3S3` 这种届次表达。
   - `weekStartDate` 手工输入，`weekEndDate` 由系统按 `weekStartDate + 7 天` 自动计算。
+  - `approver` / `editor` 改为从中方人员名单中选择，数据库保存 `User` 关联，同时落一份名称快照用于 Excel 导出和历史兼容。
 - 明细规则：
   - `goodsName` 手工输入，不做硬编码固定列表。
   - `model` 为 JSON 结构，按维度数组保存（维度名 / 数值 / 单位），前端展示时拼成 `6m*5cm*5cm*5mm` 之类文本。

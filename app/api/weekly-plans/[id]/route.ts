@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { calculateWeekEndDate, parseDateInput } from '@/app/resources/weekly-plans/materialsConfig'
 import { prisma } from '@/lib/prisma'
 import { getSessionUser, hasPermission } from '@/lib/server/authSession'
+import { resolveWeeklyPlanSignerInput } from '@/lib/server/weeklyPlanSigners'
 
 const normalizeProjectIds = (value: unknown): number[] =>
   Array.isArray(value)
@@ -60,6 +61,8 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       session?: number
       title?: string | null
       weekStartDate?: string | null
+      approverUserId?: number | null
+      editorUserId?: number | null
       approverName?: string | null
       editorName?: string | null
     }
@@ -93,6 +96,19 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     const nextSession = body.session != null ? Number(body.session) : existingPlan.session
     const nextTitle = body.title?.trim() || `M${nextMonth}S${nextSession}`
     const nextPrimaryProjectId = nextProjectIds[0]
+    const shouldResolveSigners =
+      Object.prototype.hasOwnProperty.call(body, 'approverUserId') ||
+      Object.prototype.hasOwnProperty.call(body, 'editorUserId') ||
+      Object.prototype.hasOwnProperty.call(body, 'approverName') ||
+      Object.prototype.hasOwnProperty.call(body, 'editorName')
+    const signerInput = shouldResolveSigners
+      ? await resolveWeeklyPlanSignerInput({
+          approverUserId: body.approverUserId,
+          editorUserId: body.editorUserId,
+          approverName: body.approverName,
+          editorName: body.editorName,
+        })
+      : null
 
     const conflictingPlan = await prisma.weeklyDeliveryPlan.findFirst({
       where: {
@@ -114,16 +130,26 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       const updatedPlan = await tx.weeklyDeliveryPlan.update({
         where: { id: planId },
         data: {
-          projectId: nextPrimaryProjectId,
+          project: { connect: { id: nextPrimaryProjectId } },
           month: nextMonth,
           session: nextSession,
           title: nextTitle,
           weekStartDate: parsedStartDate === undefined ? undefined : parsedStartDate,
           weekEndDate:
             body.weekStartDate === undefined ? undefined : calculateWeekEndDate(parsedStartDate),
-          approverName: body.approverName,
-          editorName: body.editorName,
-          updatedById: session.id,
+          approverUser: signerInput
+            ? signerInput.approverUserId
+              ? { connect: { id: signerInput.approverUserId } }
+              : { disconnect: true }
+            : undefined,
+          editorUser: signerInput
+            ? signerInput.editorUserId
+              ? { connect: { id: signerInput.editorUserId } }
+              : { disconnect: true }
+            : undefined,
+          approverName: signerInput ? signerInput.approverName : undefined,
+          editorName: signerInput ? signerInput.editorName : undefined,
+          updatedBy: { connect: { id: session.id } },
         },
       })
 
@@ -143,6 +169,12 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 
     return NextResponse.json({ plan })
   } catch (error) {
+    if ((error as Error).message === 'INVALID_WEEKLY_PLAN_SIGNER') {
+      return NextResponse.json(
+        { code: 'INVALID_WEEKLY_PLAN_SIGNER', message: '审批人或编制人必须从中方人员名单中选择。' },
+        { status: 400 },
+      )
+    }
     console.error('[weekly-plans/[id] PUT]', error)
     return NextResponse.json({ message: '更新失败' }, { status: 500 })
   }
