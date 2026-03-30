@@ -659,6 +659,10 @@
   16. `unitPrice`：参考/结算单价，可空；若存在相同“货物名 + 规格”的历史价，则默认带出最新价。
   17. `note`：备注，可空。
   18. `createdAt` / `updatedAt`：时间戳。
+- **附件规则**
+  1. 收货单图片/PDF 不直接存到 `WeeklyDeliveryPlanItem` 字段里，而是通过 `FileAssetLink` 绑定到对应明细行。
+  2. 绑定规则：`entityType=weekly-plan-item`、`entityId=明细ID`、`purpose=receipt`。
+  3. 文件分类使用 `weekly-plan-receipt`；支持图片与 PDF，用于后续查看、核对与追踪。
 - **导出规则**
   1. 模板里的 `Contact` 列由 `headPlateNumber` 与 `tailPlateNumber` 拼接生成；若车尾为空则只导出车头车牌。
   2. `status` 不导出；导出始终保持原计划版结构，`cancelled` 状态的行自动排除。
@@ -777,7 +781,7 @@
 
 ### FileAsset（非结构化文件）
 - `id`：自增整型。
-- `category`：文件分类（初始枚举：`signature`、`inspection-receipt`、`inspection-acceptance`、`attendance-sheet`、`letter-receipt`、`face-photo`、`site-photo`、`machine-photo`、`received-document`、`attachment`、`other`）。
+- `category`：文件分类（初始枚举：`signature`、`inspection-receipt`、`inspection-acceptance`、`attendance-sheet`、`letter-receipt`、`face-photo`、`site-photo`、`machine-photo`、`weekly-plan-receipt`、`received-document`、`attachment`、`other`）。
 - `storageKey`：存储桶对象键（唯一）。
 - `bucket`：存储桶名称。
 - `originalName`：原始文件名。
@@ -794,7 +798,7 @@
 ### FileAssetLink（文件关联）
 - `id`：自增整型。
 - `fileId`：关联 `FileAsset`。
-- `entityType`：关联对象类型（如 `user`、`document`、`inspection`、`actual-boq-item`、`received-document-ledger`）。
+- `entityType`：关联对象类型（如 `user`、`document`、`inspection`、`actual-boq-item`、`received-document-ledger`、`weekly-plan-item`）。
 - `entityId`：关联对象 ID（字符串，兼容数值 ID）。
 - `purpose?`：用途标识（如 `receipt`、`acceptance`、`attendance`）。
 - `label?`：前端展示用名称（可选）。

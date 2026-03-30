@@ -374,6 +374,22 @@ export type ResourcesCopy = {
         actualQtyHelper: string
         proxyCostLabel: string
       }
+      receipts: {
+        title: string
+        hint: string
+        createHint: string
+        upload: string
+        uploading: string
+        empty: string
+        count: (count: number) => string
+        supportedTypes: string
+        open: string
+        delete: string
+        deleting: string
+        loadFailed: string
+        uploadFailed: string
+        deleteFailed: string
+      }
     }
     status: {
       loading: string
@@ -788,6 +804,22 @@ export const getResourcesCopy = (locale: Locale): ResourcesCopy => {
             actualQtyHelper: "La quantité reçue n'est renseignée qu'après passage au statut Arrivé.",
             proxyCostLabel: 'Frais mandataire',
           },
+          receipts: {
+            title: 'Bon de réception',
+            hint: 'Téléversez les images ou PDF du bon de réception pour faciliter les vérifications et le rapprochement.',
+            createHint: "Enregistrez d'abord cette ligne, puis ajoutez le bon de réception.",
+            upload: 'Téléverser image / PDF',
+            uploading: 'Téléversement…',
+            empty: 'Aucun bon de réception téléversé.',
+            count: (count) => formatCopy('{count} fichier(s) téléversé(s)', { count }),
+            supportedTypes: 'Formats acceptés : PNG, JPG, WEBP et PDF, 20 Mo maximum par fichier.',
+            open: 'Ouvrir',
+            delete: 'Supprimer',
+            deleting: 'Suppression…',
+            loadFailed: 'Chargement du bon de réception impossible',
+            uploadFailed: 'Échec du téléversement du bon de réception',
+            deleteFailed: 'Échec de la suppression du bon de réception',
+          },
         },
         status: {
           loading: 'Chargement…',
@@ -1197,6 +1229,22 @@ export const getResourcesCopy = (locale: Locale): ResourcesCopy => {
           cancelledHint: '这条记录已经取消，会保留在页面里，但不会出现在计划导出里。',
           actualQtyHelper: '只有切换为“到货”后，才需要填写收到数量。',
           proxyCostLabel: '代付费用',
+        },
+        receipts: {
+          title: '收货单',
+          hint: '上传到货收货单图片或 PDF，方便后续查看、核对与追踪。',
+          createHint: '请先保存本行，再上传收货单。',
+          upload: '上传图片 / PDF',
+          uploading: '上传中…',
+          empty: '暂未上传收货单。',
+          count: (count) => formatCopy('已上传 {count} 个文件', { count }),
+          supportedTypes: '支持 PNG、JPG、WEBP 和 PDF，单个文件不超过 20MB。',
+          open: '查看',
+          delete: '删除',
+          deleting: '删除中…',
+          loadFailed: '收货单加载失败',
+          uploadFailed: '收货单上传失败',
+          deleteFailed: '收货单删除失败',
         },
       },
       status: {

@@ -8,6 +8,7 @@ export const FILE_CATEGORIES = [
   'face-photo',
   'site-photo',
   'machine-photo',
+  'weekly-plan-receipt',
   'received-document',
   'attachment',
   'other',

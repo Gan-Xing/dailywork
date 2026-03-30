@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { calculateWeekEndDate, parseDateInput } from '@/app/resources/weekly-plans/materialsConfig'
 import { prisma } from '@/lib/prisma'
 import { getSessionUser, hasPermission } from '@/lib/server/authSession'
+import { purgeWeeklyPlanReceiptsForItemIds } from '@/lib/server/weeklyPlanReceiptStore'
 import { resolveWeeklyPlanSignerInput } from '@/lib/server/weeklyPlanSigners'
 
 const normalizeProjectIds = (value: unknown): number[] =>
@@ -189,6 +190,13 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   const planId = Number(id)
 
   try {
+    const itemIds = (
+      await prisma.weeklyDeliveryPlanItem.findMany({
+        where: { planId },
+        select: { id: true },
+      })
+    ).map((item) => item.id)
+    await purgeWeeklyPlanReceiptsForItemIds(itemIds)
     await prisma.weeklyDeliveryPlan.delete({ where: { id: planId } })
     return NextResponse.json({ ok: true })
   } catch (error) {

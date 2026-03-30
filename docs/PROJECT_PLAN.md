@@ -77,7 +77,7 @@
 - 目标：在 `/resources/weekly-plans` 提供大宗物资周计划录入、状态流转跟踪、Excel / PDF 双导出与代付费用计算，逐步替代当前手工 Excel/PDF 模板。
 - 页面结构：
   - 列表页：按项目查看周计划届次，显示 `M/S` 标识、项目、计划周期、审批/编制人与条目数。
-  - 详情页：维护计划头信息（开始日期、结束日期、审批人、编制人）与明细表；通过 `planned / in_transit / arrived` 三个状态跟踪执行进度，并在同一页补录到货数量与单价。
+  - 详情页：维护计划头信息（开始日期、结束日期、审批人、编制人）与明细表；通过 `planned / in_transit / arrived` 三个状态跟踪执行进度，并在同一页补录到货数量、单价与收货单附件。
 - 计划头规则：
   - `month` / `session` 继续保留，用于沿用 `M3S3` 这种届次表达。
   - `weekStartDate` 手工输入，`weekEndDate` 由系统按 `weekStartDate + 7 天` 自动计算。
@@ -89,6 +89,7 @@
   - `status` 用于页面内部流转，默认 `planned`；货物出发后改为 `in_transit`，到货后改为 `arrived` 并补录收到数量；若计划作废则改为 `cancelled`。
   - `supplier`、`goodsName`、`unit`、`transporter`、`headPlateNumber`、`tailPlateNumber`、`phone` 保持可手输，同时读取同项目历史记录并去重后形成下拉建议，方便复用。
   - `unitPrice` 录入后会同步刷新“最新历史价”；同货物名 + 同规格使用最新价格，旧价格归档。
+  - 到货后可在业务弹窗里直接上传收货单图片或 PDF；文件通过 `FileAsset + FileAssetLink` 绑定到具体周计划明细，支持查看、删除与后续核对。
 - 历史价策略：
   - 新建 `WeeklyMaterialLatestPrice` 保存当前最新价。
   - 新建 `WeeklyMaterialPriceHistory` 归档旧价格记录。

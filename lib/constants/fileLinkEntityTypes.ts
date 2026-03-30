@@ -5,6 +5,7 @@ export const FILE_LINK_ENTITY_TYPES = [
   'received-document-ledger',
   'actual-boq-item',
   'leader-log',
+  'weekly-plan-item',
   'other',
 ] as const
 

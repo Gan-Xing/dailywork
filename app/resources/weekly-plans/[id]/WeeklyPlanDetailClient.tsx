@@ -20,6 +20,7 @@ import {
   type MaterialModel,
   type WeeklyPlanItemStatus,
 } from '../materialsConfig'
+import { WeeklyPlanReceiptsPanel } from '../WeeklyPlanReceiptsPanel'
 import { WeeklyPlanSignerSelect } from '../WeeklyPlanSignerSelect'
 import { matchWeeklyPlanSignerId, type WeeklyPlanSignerOption } from '../signerOptions'
 
@@ -1326,6 +1327,15 @@ export default function WeeklyPlanDetailClient() {
                       </div>
                     </div>
                   </div>
+
+                  <WeeklyPlanReceiptsPanel
+                    planId={Number(planId)}
+                    itemId={rowDialog.mode === 'edit' ? rowDialog.itemId : null}
+                    canEdit={canCreateMaterials}
+                    locale={locale}
+                    copy={weeklyT.detail.receipts}
+                    loadingLabel={t.common.loading}
+                  />
 
                   {rowError ? <p className="mt-4 text-sm text-rose-600">{rowError}</p> : null}
                 </div>

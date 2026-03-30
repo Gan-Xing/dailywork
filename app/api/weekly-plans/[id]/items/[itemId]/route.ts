@@ -10,6 +10,7 @@ import {
   normalizeMaterialModel,
   normalizeWeeklyPlanItemStatus,
 } from '@/app/resources/weekly-plans/materialsConfig'
+import { purgeWeeklyPlanReceiptsForItemIds } from '@/lib/server/weeklyPlanReceiptStore'
 import { syncWeeklyPlanLatestPrice } from '@/lib/server/weeklyPlanPricing'
 
 // PUT /api/weekly-plans/[id]/items/[itemId]
@@ -123,10 +124,20 @@ export async function DELETE(
     return NextResponse.json({ message: '无权限' }, { status: 403 });
   }
 
-  const { itemId } = await params;
+  const { id, itemId } = await params;
+  const planId = Number(id);
   const itemIdNum = Number(itemId);
 
   try {
+    const item = await prisma.weeklyDeliveryPlanItem.findUnique({
+      where: { id: itemIdNum },
+      select: { id: true, planId: true },
+    })
+    if (!item || item.planId !== planId) {
+      return NextResponse.json({ message: '计划明细不存在' }, { status: 404 })
+    }
+
+    await purgeWeeklyPlanReceiptsForItemIds([itemIdNum])
     await prisma.weeklyDeliveryPlanItem.delete({ where: { id: itemIdNum } });
     return NextResponse.json({ ok: true });
   } catch (error) {
