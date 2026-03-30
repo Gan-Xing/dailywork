@@ -662,8 +662,15 @@
 - **导出规则**
   1. 模板里的 `Contact` 列由 `headPlateNumber` 与 `tailPlateNumber` 拼接生成；若车尾为空则只导出车头车牌。
   2. `status` 不导出；导出始终保持原计划版结构，`cancelled` 状态的行自动排除。
-  3. `supplier`、`goodsName`、`unit`、`transporter`、`headPlateNumber`、`tailPlateNumber`、`phone` 在前端可从同项目历史记录中去重后形成建议下拉，但仍允许手动输入新值。
-  4. `代付费用` 不单独存字段，按 `actualQty * unitPrice` 即时计算，用于页面展示。
+  3. 若关联项目中包含 `邦杜库市政路项目`（项目 code：`project-bondoukou-city`），则 `deliveryDate` 在导出中显示为 `BDK/YYYYMMDD`；否则默认保持 `YYYY-MM-DD`。
+  4. `goodsName` 在导出时可通过货物字典解析为稳定 key，再输出法语标签；若没有匹配项则回退原始录入值。
+  5. `supplier`、`goodsName`、`unit`、`transporter`、`headPlateNumber`、`tailPlateNumber`、`phone` 在前端可从同项目历史记录中去重后形成建议下拉，但仍允许手动输入新值。
+  6. `代付费用` 不单独存字段，按 `actualQty * unitPrice` 即时计算，用于页面展示。
+
+### 周计划导出说明
+
+- `Excel`：保留可编辑表格结构，签字区域仅保留空白签字位，不渲染图片签名。
+- `PDF`：使用打印模板输出；审批人与编制人通过 `WeeklyDeliveryPlan.approverUserId / editorUserId -> UserSignature` 获取当前生效签名图片，未配置签名时保持空白，不回退为文字署名。
 
 ### 最新历史价（WeeklyMaterialLatestPrice）
 

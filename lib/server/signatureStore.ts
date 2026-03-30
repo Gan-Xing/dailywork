@@ -11,25 +11,14 @@ type SignatureUrl = {
   userId: number
 }
 
-const getActiveSignatureUrlByUsername = async (username: string): Promise<SignatureUrl | null> => {
-  const user = await prisma.user.findFirst({
-    where: {
-      username: {
-        equals: username,
-        mode: 'insensitive',
-      },
-    },
-    select: { id: true },
-  })
-  if (!user) return null
-
+const getSignatureUrlForUserId = async (userId: number): Promise<SignatureUrl | null> => {
   let signature = await prisma.userSignature.findFirst({
-    where: { userId: user.id, isActive: true },
+    where: { userId, isActive: true },
     include: { file: true },
   })
   if (!signature) {
     signature = await prisma.userSignature.findFirst({
-      where: { userId: user.id },
+      where: { userId },
       include: { file: true },
       orderBy: [{ version: 'desc' }, { createdAt: 'desc' }],
     })
@@ -43,8 +32,23 @@ const getActiveSignatureUrlByUsername = async (username: string): Promise<Signat
       expiresInSeconds: SIGNATURE_URL_TTL,
     }),
     storageKey: signature.file.storageKey,
-    userId: user.id,
+    userId,
   }
+}
+
+const getActiveSignatureUrlByUsername = async (username: string): Promise<SignatureUrl | null> => {
+  const user = await prisma.user.findFirst({
+    where: {
+      username: {
+        equals: username,
+        mode: 'insensitive',
+      },
+    },
+    select: { id: true },
+  })
+  if (!user) return null
+
+  return getSignatureUrlForUserId(user.id)
 }
 
 export const getInspectionSignatureUrls = async () => {
@@ -56,5 +60,28 @@ export const getInspectionSignatureUrls = async () => {
   return {
     director: director?.url ?? null,
     quality: quality?.url ?? null,
+  }
+}
+
+export const getActiveSignatureUrlByUserId = async (
+  userId: number | null | undefined,
+): Promise<string | null> => {
+  if (!userId || !Number.isInteger(userId) || userId <= 0) return null
+  const signature = await getSignatureUrlForUserId(userId)
+  return signature?.url ?? null
+}
+
+export const getWeeklyPlanSignatureUrls = async (input: {
+  approverUserId?: number | null
+  editorUserId?: number | null
+}) => {
+  const [approver, editor] = await Promise.all([
+    getActiveSignatureUrlByUserId(input.approverUserId),
+    getActiveSignatureUrlByUserId(input.editorUserId),
+  ])
+
+  return {
+    approver,
+    editor,
   }
 }

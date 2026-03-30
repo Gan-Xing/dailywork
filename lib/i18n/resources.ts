@@ -287,6 +287,8 @@ export type ResourcesCopy = {
       rangeMissing: string
       backToList: string
       exportPlan: string
+      exportExcel: string
+      exportPdf: string
       statusNote: string
       deletePlan: string
       deletePlanConfirm: string
@@ -413,7 +415,7 @@ export const getResourcesCopy = (locale: Locale): ResourcesCopy => {
         machines: 'Registre des machines (import Excel, filtres, export).',
         machineLogs: 'Journal quotidien (ravitaillement, affectations, amortissement).',
         materials: 'Catalogue et mouvements (bientôt disponible).',
-        weeklyPlans: 'Planification hebdomadaire des livraisons de gros matériaux.',
+      weeklyPlans: 'Planification hebdomadaire des livraisons de gros matériaux avec export Excel / PDF.',
       },
       access: {
         needAnyView: "Autorisation requise: machine:view, machine-log:view ou material:view.",
@@ -698,7 +700,9 @@ export const getResourcesCopy = (locale: Locale): ResourcesCopy => {
           rangePrefix: 'Période du plan',
           rangeMissing: 'Veuillez renseigner la date de début du cycle.',
           backToList: 'Retour à la liste',
-          exportPlan: 'Exporter le plan',
+          exportPlan: 'Exporter',
+          exportExcel: 'Exporter Excel',
+          exportPdf: 'Exporter PDF',
           statusNote: "Le statut sert uniquement au suivi interne. Les lignes annulées n'apparaissent pas dans l'export du plan.",
           deletePlan: 'Supprimer le cycle',
           deletePlanConfirm: 'Supprimer définitivement ce cycle de planification ?',
@@ -824,7 +828,7 @@ export const getResourcesCopy = (locale: Locale): ResourcesCopy => {
       machines: '机械台账（Excel 导入、筛选、导出）。',
       machineLogs: '机械日志（每日运行/加油/库存/折旧）。',
       materials: '大宗材料与出入库（建设中）。',
-      weeklyPlans: '大宗物资周计划：填写计划、跟踪状态、导出 Excel。',
+      weeklyPlans: '大宗物资周计划：填写计划、跟踪状态、导出 Excel / PDF。',
     },
     access: {
       needAnyView: '需要权限：machine:view 或 machine-log:view 或 material:view。',
@@ -1106,7 +1110,9 @@ export const getResourcesCopy = (locale: Locale): ResourcesCopy => {
           rangePrefix: '周计划范围',
           rangeMissing: '请先填写本届计划的开始日期。',
           backToList: '返回周计划列表',
-          exportPlan: '导出计划',
+          exportPlan: '导出',
+          exportExcel: '导出 Excel',
+          exportPdf: '导出 PDF',
           statusNote: '状态仅用于页面内部跟踪；取消的行不会出现在导出的计划表里。',
         deletePlan: '删除届次',
         deletePlanConfirm: '确定删除整个届次计划吗？此操作不可撤销。',

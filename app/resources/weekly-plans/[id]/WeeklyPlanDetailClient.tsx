@@ -846,10 +846,17 @@ export default function WeeklyPlanDetailClient() {
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              onClick={() => window.open(`/api/weekly-plans/${planId}/export`, '_blank')}
+              onClick={() => window.open(`/api/weekly-plans/${planId}/export?format=excel`, '_blank')}
               className="inline-flex items-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm"
             >
-              {weeklyT.detail.exportPlan}
+              {weeklyT.detail.exportExcel}
+            </button>
+            <button
+              type="button"
+              onClick={() => window.open(`/api/weekly-plans/${planId}/export?format=pdf`, '_blank')}
+              className="inline-flex items-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm"
+            >
+              {weeklyT.detail.exportPdf}
             </button>
             {canCreateMaterials ? (
               <button
