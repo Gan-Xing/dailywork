@@ -143,24 +143,48 @@ export const renderWeeklyPlanPdfHtml = ({
         margin-top: 18px;
         display: flex;
         justify-content: space-between;
-        gap: 48px;
+        gap: 56px;
+        padding: 0 10px;
       }
 
       .signature-block {
-        flex: 1;
-        min-height: 70px;
+        flex: 0 0 42%;
+        min-height: 72px;
+      }
+
+      .signature-block.editor {
+        display: flex;
+        justify-content: flex-end;
+      }
+
+      .signature-row {
+        display: flex;
+        align-items: flex-end;
+        gap: 10px;
+        min-height: 62px;
+      }
+
+      .signature-block.editor .signature-row {
+        justify-content: flex-end;
       }
 
       .signature-label {
-        margin-bottom: 8px;
         font-family: "Songti SC", "SimSun", serif;
         font-size: 12px;
+        line-height: 1.4;
+        white-space: nowrap;
+        padding-bottom: 6px;
       }
 
       .signature-box {
-        position: relative;
-        min-height: 48px;
-        border-bottom: 1px solid transparent;
+        min-width: 170px;
+        min-height: 58px;
+        display: flex;
+        align-items: flex-end;
+      }
+
+      .signature-block.editor .signature-box {
+        justify-content: flex-end;
       }
 
       .signature-image {
@@ -168,12 +192,18 @@ export const renderWeeklyPlanPdfHtml = ({
         max-width: 180px;
         max-height: 52px;
         object-fit: contain;
+        transform: translate(6px, 10px);
+      }
+
+      .signature-block.editor .signature-image {
+        transform: translate(0, 10px);
       }
 
       .signature-placeholder {
         display: block;
         width: 180px;
         height: 52px;
+        transform: translateY(10px);
       }
     </style>
   </head>
@@ -206,13 +236,17 @@ export const renderWeeklyPlanPdfHtml = ({
       </table>
 
       <div class="signatures">
-        <div class="signature-block">
-          <div class="signature-label">审批人：</div>
-          <div class="signature-box">${renderSignature(approverSignatureUrl)}</div>
+        <div class="signature-block approver">
+          <div class="signature-row">
+            <div class="signature-label">审批人：</div>
+            <div class="signature-box">${renderSignature(approverSignatureUrl)}</div>
+          </div>
         </div>
-        <div class="signature-block">
-          <div class="signature-label">编制：</div>
-          <div class="signature-box">${renderSignature(editorSignatureUrl)}</div>
+        <div class="signature-block editor">
+          <div class="signature-row">
+            <div class="signature-label">编制：</div>
+            <div class="signature-box">${renderSignature(editorSignatureUrl)}</div>
+          </div>
         </div>
       </div>
     </div>
