@@ -1062,6 +1062,7 @@ model UserPayrollPayout {
   chineseSupervisorId   Int?
   chineseSupervisor     User?      @relation("PayrollPayoutSupervisor", fields: [chineseSupervisorId], references: [id], onDelete: SetNull)
   chineseSupervisorName String?
+  contractNumberSnapshot String?
   payoutDate            DateTime
   amount                Decimal    @db.Decimal(18, 2)
   currency              String     @default("XOF")

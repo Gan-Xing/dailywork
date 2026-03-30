@@ -2,7 +2,11 @@ import { NextResponse } from 'next/server'
 
 import { prisma } from '@/lib/prisma'
 import { normalizeOptionalDate, normalizeOptionalText } from '@/lib/server/compensation'
-import { canManagePayroll, canViewPayroll } from '@/lib/server/payrollRuns'
+import {
+  canManagePayroll,
+  canViewPayroll,
+  listPayrollContractSnapshotsForUsers,
+} from '@/lib/server/payrollRuns'
 
 export async function GET(_: Request, { params }: { params: Promise<{ runId: string }> }) {
   if (!(await canViewPayroll())) {
@@ -69,20 +73,46 @@ export async function PUT(
   if (attendanceCutoffDate) updatePayload.attendanceCutoffDate = attendanceCutoffDate
   if (note !== null) updatePayload.note = note
 
-  const [updated] = await prisma.$transaction([
-    prisma.payrollRun.update({
+  const updated = await prisma.$transaction(async (tx) => {
+    const nextRun = await tx.payrollRun.update({
       where: { id },
       data: updatePayload,
-    }),
-    ...(payoutDate
-      ? [
-          prisma.userPayrollPayout.updateMany({
-            where: { runId: id },
-            data: { payoutDate },
-          }),
-        ]
-      : []),
-  ])
+    })
+
+    if (payoutDate) {
+      await tx.userPayrollPayout.updateMany({
+        where: { runId: id },
+        data: { payoutDate },
+      })
+    }
+
+    if (attendanceCutoffDate) {
+      const payouts = await tx.userPayrollPayout.findMany({
+        where: { runId: id },
+        select: { id: true, userId: true },
+      })
+      if (payouts.length > 0) {
+        const contractSnapshots = await listPayrollContractSnapshotsForUsers(
+          tx,
+          payouts.map((item) => item.userId),
+          nextRun.attendanceCutoffDate,
+        )
+        await Promise.all(
+          payouts.map((item) =>
+            tx.userPayrollPayout.update({
+              where: { id: item.id },
+              data: {
+                contractNumberSnapshot:
+                  contractSnapshots.get(item.userId)?.contractNumber ?? null,
+              },
+            }),
+          ),
+        )
+      }
+    }
+
+    return nextRun
+  })
 
   return NextResponse.json({
     run: {

@@ -59,6 +59,7 @@ type PayrollPayout = {
   team: string | null
   chineseSupervisorId: number | null
   chineseSupervisorName: string | null
+  contractNumberSnapshot: string | null
   payoutDate: string
   amount: string
   currency: string
@@ -183,19 +184,36 @@ export function PayrollPayoutsTab({
     return runTwo?.id ?? runOne?.id ?? null
   }, [runs])
 
+  const payoutMap = useMemo(() => {
+    const map = new Map<number, Map<number, PayrollPayout>>()
+    payouts.forEach((payout) => {
+      if (!map.has(payout.runId)) {
+        map.set(payout.runId, new Map())
+      }
+      map.get(payout.runId)?.set(payout.userId, payout)
+    })
+    return map
+  }, [payouts])
+
   const primaryContractsByMemberId = useMemo(() => {
     const contracts: Record<number, ContractSnapshot> = {}
     if (!primaryRunId) return contracts
     const snapshotMap = contractSnapshotsByRunId[primaryRunId] ?? {}
+    const primaryPayouts = payoutMap.get(primaryRunId) ?? new Map<number, PayrollPayout>()
     payrollMembers.forEach((member) => {
       const snapshot = snapshotMap[member.id]
+      const payout = primaryPayouts.get(member.id)
       contracts[member.id] = {
-        contractNumber: snapshot?.contractNumber ?? member.expatProfile?.contractNumber ?? null,
+        contractNumber:
+          payout?.contractNumberSnapshot ??
+          snapshot?.contractNumber ??
+          member.expatProfile?.contractNumber ??
+          null,
         contractType: snapshot?.contractType ?? member.expatProfile?.contractType ?? null,
       }
     })
     return contracts
-  }, [primaryRunId, contractSnapshotsByRunId, payrollMembers])
+  }, [primaryRunId, contractSnapshotsByRunId, payrollMembers, payoutMap])
 
   const getPrimaryContractSnapshot = useCallback(
     (member: Member) =>
@@ -536,17 +554,6 @@ export function PayrollPayoutsTab({
     })
     return map
   }, [runs])
-
-  const payoutMap = useMemo(() => {
-    const map = new Map<number, Map<number, PayrollPayout>>()
-    payouts.forEach((payout) => {
-      if (!map.has(payout.runId)) {
-        map.set(payout.runId, new Map())
-      }
-      map.get(payout.runId)?.set(payout.userId, payout)
-    })
-    return map
-  }, [payouts])
 
   const sortedMembers = useMemo(() => {
     const list = [...visibleMembers]
@@ -1136,13 +1143,13 @@ export function PayrollPayoutsTab({
       const workbook = new ExcelJS.Workbook()
       const worksheet = workbook.addWorksheet(t.payroll.title)
 
-      worksheet.mergeCells('A1:G1')
+      worksheet.mergeCells('A1:H1')
       const titleCell = worksheet.getCell('A1')
       titleCell.value = "REMISE D'ORDRES DE VIREMENTS"
       titleCell.font = { size: 14, bold: true }
       titleCell.alignment = { horizontal: 'center', vertical: 'middle' }
 
-      worksheet.mergeCells('A2:G2')
+      worksheet.mergeCells('A2:H2')
       const subtitleCell = worksheet.getCell('A2')
       subtitleCell.value = "(FICHIER A TRANSFERER A LA SGCI SUR SUPPORT MAGNETIQUE)"
       subtitleCell.font = { size: 9 }
@@ -1167,7 +1174,16 @@ export function PayrollPayoutsTab({
       worksheet.getCell('A9').value = "Liste des bénéficiaires"
       worksheet.getCell('A9').font = { bold: true }
 
-      const headers = ["Code", "Nom / Raison sociale", "Banque", "Agence", "N° de Compte", "Clé Rib", "Montant CFA"]
+      const headers = [
+        "Code",
+        "Nom / Raison sociale",
+        "Matricule",
+        "Banque",
+        "Agence",
+        "N° de Compte",
+        "Clé Rib",
+        "Montant CFA",
+      ]
       const headerRow = worksheet.addRow(headers)
       headerRow.eachCell((cell) => {
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFC00000' } }
@@ -1187,6 +1203,11 @@ export function PayrollPayoutsTab({
         if (amount > 0) {
           totalAmount += amount
           const name = normalizeText(member.name) || normalizeText(member.username) || ''
+          const contractNumber =
+            normalizeText(payoutMap.get(run.id)?.get(member.id)?.contractNumberSnapshot) ||
+            normalizeText(contractSnapshotsByRunId[run.id]?.[member.id]?.contractNumber) ||
+            normalizeText(member.expatProfile?.contractNumber) ||
+            ''
           const accountNum = normalizeText(member.expatProfile?.bankAccountNumber) || ''
 
           let banque = ''
@@ -1205,15 +1226,24 @@ export function PayrollPayoutsTab({
 
           const rowIndex = worksheet.rowCount + 1
           const listIndex = rowIndex - 9 // Header is on row 9, so data starts at row 10, index 1
-          const row = worksheet.addRow([listIndex, name, banque, agence, numCompte, cleRib, amount])
+          const row = worksheet.addRow([
+            listIndex,
+            name,
+            contractNumber,
+            banque,
+            agence,
+            numCompte,
+            cleRib,
+            amount,
+          ])
           row.eachCell((cell, colNumber) => {
             cell.border = {
               top: { style: 'thin' }, left: { style: 'thin' },
               bottom: { style: 'thin' }, right: { style: 'thin' }
             }
-            if (colNumber === 7) {
+            if (colNumber === 8) {
               cell.numFmt = '#,##0'
-            } else if (colNumber >= 3 && colNumber <= 6) {
+            } else if (colNumber >= 4 && colNumber <= 7) {
               cell.alignment = { horizontal: 'center', vertical: 'middle' }
             }
           })
@@ -1223,7 +1253,7 @@ export function PayrollPayoutsTab({
       // Add blank yellow row before total
       const blankRow = worksheet.addRow([])
       blankRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
-        if (colNumber <= 7) {
+        if (colNumber <= 8) {
           cell.border = {
             top: { style: 'thin' }, left: { style: 'thin' },
             bottom: { style: 'thin' }, right: { style: 'thin' }
@@ -1233,18 +1263,18 @@ export function PayrollPayoutsTab({
       })
 
       const footerRow = worksheet.addRow([])
-      worksheet.mergeCells(`A${footerRow.number}:F${footerRow.number}`)
+      worksheet.mergeCells(`A${footerRow.number}:G${footerRow.number}`)
       const footerLabel = worksheet.getCell(`A${footerRow.number}`)
       footerLabel.value = "Montant total de la Remise"
       footerLabel.font = { bold: true }
 
-      const footerTotal = worksheet.getCell(`G${footerRow.number}`)
+      const footerTotal = worksheet.getCell(`H${footerRow.number}`)
       footerTotal.value = totalAmount
       footerTotal.numFmt = '#,##0'
       footerTotal.font = { bold: true }
 
       footerRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
-        if (colNumber <= 7) {
+        if (colNumber <= 8) {
           cell.border = {
             top: { style: 'thin' }, left: { style: 'thin' },
             bottom: { style: 'thin' }, right: { style: 'thin' }
@@ -1256,6 +1286,7 @@ export function PayrollPayoutsTab({
       worksheet.columns = [
         { width: 8 },
         { width: 35 },
+        { width: 18 },
         { width: 10 },
         { width: 10 },
         { width: 20 },

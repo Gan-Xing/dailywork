@@ -1,11 +1,16 @@
 import { NextResponse } from 'next/server'
 
 import { prisma } from '@/lib/prisma'
-import { canManagePayroll, canViewPayroll, ensurePayrollRuns, parseYearMonth } from '@/lib/server/payrollRuns'
+import {
+  canManagePayroll,
+  canViewPayroll,
+  ensurePayrollRuns,
+  parseYearMonth,
+  resolvePayrollContractSnapshot,
+  type PayrollContractSnapshot,
+} from '@/lib/server/payrollRuns'
 
-type ContractSnapshot = {
-  contractNumber: string | null
-  contractType: string | null
+type ContractSnapshot = PayrollContractSnapshot & {
   ctjOverlap?: boolean
   contractOverlap?: boolean
 }
@@ -167,34 +172,6 @@ export async function GET(request: Request) {
     contractChangesByUser.set(change.userId, list)
   })
 
-  const resolveContractSnapshot = (
-    changes: typeof contractChanges,
-    cutoffDate: Date,
-  ): ContractSnapshot | null => {
-    if (changes.length === 0) return null
-    const cutoffTime = cutoffDate.getTime()
-    const byPeriod = changes
-      .filter((change) => change.startDate && change.startDate.getTime() <= cutoffTime)
-      .filter((change) => !change.endDate || change.endDate.getTime() >= cutoffTime)
-      .sort((a, b) => (b.startDate?.getTime() ?? 0) - (a.startDate?.getTime() ?? 0))
-    const match = byPeriod[0]
-    if (match) {
-      return {
-        contractNumber: match.contractNumber ?? null,
-        contractType: match.contractType ?? null,
-      }
-    }
-    const byChangeDate = changes
-      .filter((change) => change.changeDate.getTime() <= cutoffTime)
-      .sort((a, b) => b.changeDate.getTime() - a.changeDate.getTime())
-    const fallback = byChangeDate[0]
-    if (!fallback) return null
-    return {
-      contractNumber: fallback.contractNumber ?? null,
-      contractType: fallback.contractType ?? null,
-    }
-  }
-
   const hasCtjOverlap = (changes: typeof contractChanges, periodStart: Date, periodEnd: Date) => {
     const startTime = periodStart.getTime()
     const endTime = periodEnd.getTime()
@@ -306,7 +283,7 @@ export async function GET(request: Request) {
     const contracts: Record<number, ContractSnapshot> = {}
     expatProfiles.forEach((profile) => {
       const changes = contractChangesByUser.get(profile.userId) ?? []
-      const snapshot = resolveContractSnapshot(changes, run.attendanceCutoffDate)
+      const snapshot = resolvePayrollContractSnapshot(changes, run.attendanceCutoffDate)
       const contractNumber = snapshot?.contractNumber ?? profile.contractNumber ?? null
       const contractType = snapshot?.contractType ?? profile.contractType ?? null
       const ctjOverlap =
@@ -356,6 +333,7 @@ export async function GET(request: Request) {
       payoutDate: item.payoutDate.toISOString(),
       amount: item.amount.toString(),
       currency: item.currency,
+      contractNumberSnapshot: item.contractNumberSnapshot,
       note: item.note,
       createdAt: item.createdAt.toISOString(),
       updatedAt: item.updatedAt.toISOString(),

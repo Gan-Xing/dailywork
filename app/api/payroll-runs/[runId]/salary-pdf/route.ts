@@ -227,8 +227,12 @@ export async function POST(
 
   sortedTeams.forEach(({ label, zh, fr, items }) => {
     const sortedItems = [...items].sort((left, right) => {
-      const leftContract = normalizeText(left.user.expatProfile?.contractNumber)
-      const rightContract = normalizeText(right.user.expatProfile?.contractNumber)
+      const leftContract =
+        normalizeText(left.contractNumberSnapshot) ||
+        normalizeText(left.user.expatProfile?.contractNumber)
+      const rightContract =
+        normalizeText(right.contractNumberSnapshot) ||
+        normalizeText(right.user.expatProfile?.contractNumber)
       const contractCompare = collator.compare(leftContract, rightContract)
       if (contractCompare !== 0) return contractCompare
       const leftName = normalizeText(left.user.name) || normalizeText(left.user.username)
@@ -247,7 +251,9 @@ export async function POST(
 
     chunks.forEach((chunk, chunkIndex) => {
       const rows: SalaryRow[] = chunk.map((payout, index) => {
-        const contractNumber = normalizeText(payout.user.expatProfile?.contractNumber)
+        const contractNumber =
+          normalizeText(payout.contractNumberSnapshot) ||
+          normalizeText(payout.user.expatProfile?.contractNumber)
         return {
           index: chunkIndex * ROWS_PER_PAGE + index + 1,
           matricule: contractNumber || normalizeText(payout.user.username),

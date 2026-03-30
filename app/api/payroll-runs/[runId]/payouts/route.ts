@@ -7,7 +7,10 @@ import {
   normalizeOptionalText,
   resolveSupervisorSnapshot,
 } from '@/lib/server/compensation'
-import { canManagePayroll } from '@/lib/server/payrollRuns'
+import {
+  canManagePayroll,
+  listPayrollContractSnapshotsForUsers,
+} from '@/lib/server/payrollRuns'
 
 type PayrollPayoutInput = {
   userId: number
@@ -62,6 +65,11 @@ export async function POST(
     },
   })
   const userMap = new Map(users.map((user) => [user.id, user]))
+  const contractSnapshots = await listPayrollContractSnapshotsForUsers(
+    prisma,
+    userIds,
+    run.attendanceCutoffDate,
+  )
   const invalidUsers: number[] = []
   const payloads: Array<{
     userId: number
@@ -70,6 +78,7 @@ export async function POST(
     note: string | null
     team: string | null
     chineseSupervisorId: number | null
+    contractNumberSnapshot: string | null
   }> = []
   const deleteUserIds: number[] = []
   const supervisorCache = new Map<number | null, { id: number | null; name: string | null }>()
@@ -109,6 +118,7 @@ export async function POST(
       note,
       team,
       chineseSupervisorId: supervisorSnapshot.id,
+      contractNumberSnapshot: contractSnapshots.get(userId)?.contractNumber ?? null,
     })
   }
 
@@ -130,6 +140,7 @@ export async function POST(
         team: payload.team,
         chineseSupervisorId: payload.chineseSupervisorId,
         chineseSupervisorName: supervisorCache.get(payload.chineseSupervisorId ?? null)?.name ?? null,
+        contractNumberSnapshot: payload.contractNumberSnapshot,
         payoutDate: run.payoutDate,
         amount: payload.amount,
         currency: payload.currency,
@@ -139,6 +150,7 @@ export async function POST(
         team: payload.team,
         chineseSupervisorId: payload.chineseSupervisorId,
         chineseSupervisorName: supervisorCache.get(payload.chineseSupervisorId ?? null)?.name ?? null,
+        contractNumberSnapshot: payload.contractNumberSnapshot,
         payoutDate: run.payoutDate,
         amount: payload.amount,
         currency: payload.currency,

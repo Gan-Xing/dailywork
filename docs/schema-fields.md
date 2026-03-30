@@ -240,6 +240,11 @@
 - `team`（EQUIPE）：当时班组快照，可空。
 - `chineseSupervisorId`（RESPONSABLE CHINOIS）：中方负责人 ID，可空。
 - `chineseSupervisorName`：中方负责人快照名（`name + frenchName`），可空。
+- `contractNumberSnapshot`：工资保存时固化的合同编号快照，可空，用于历史导出与银行转账单。
+- `payoutDate`：发放日期。
+- `amount`：发放金额。
+- `currency`：币种（默认 `XOF`）。
+- `note`：备注，可空。
 
 ## 负责人日志（LeaderDailyLog）
 
@@ -255,10 +260,6 @@
 - **约束**
      1. `logDate + supervisorId` 组合唯一，确保每位负责人每天仅一条日志。
      2. 权限复用 `report:view` / `report:edit`，但保存时需后端校验本人或 Admin。
-- `payoutDate`：发放日期。
-- `amount`：发放金额。
-- `currency`：币种（默认 `XOF`）。
-- `note`：备注，可空。
 
 ## 道路进度元数据（RoadSection）
 
