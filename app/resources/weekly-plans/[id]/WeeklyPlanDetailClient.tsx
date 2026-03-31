@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { getResourcesCopy } from '@/lib/i18n/resources'
+import { resolveWeeklyPlanGoodsLabel } from '@/lib/resources/weeklyPlans/goodsDictionary'
 import { usePreferredLocale } from '@/lib/usePreferredLocale'
 
 import { ResourcesHeader } from '../../ResourcesHeader'
@@ -39,6 +40,7 @@ type PlanItem = {
   deliveryDate: string | null
   supplier: string | null
   goodsName: string | null
+  goodsNameKey?: string | null
   model: unknown
   unit: string | null
   status: WeeklyPlanItemStatus | null
@@ -1094,6 +1096,11 @@ export default function WeeklyPlanDetailClient() {
               {plan.items.map((item, index) => {
                 const rowStatus = normalizeWeeklyPlanItemStatus(item.status)
                 const rowBg = getStatusTone(rowStatus)
+                const goodsLabel = resolveWeeklyPlanGoodsLabel({
+                  locale,
+                  goodsName: item.goodsName,
+                  goodsNameKey: item.goodsNameKey ?? null,
+                })
                 return (
                   <tr
                     key={item.id}
@@ -1102,7 +1109,7 @@ export default function WeeklyPlanDetailClient() {
                   >
                     <td className="sticky left-0 bg-inherit px-2 py-2 text-center text-xs text-slate-400">{index + 1}</td>
                     <td className={`px-2 py-2 text-center ${!item.goodsName ? 'text-slate-300' : 'text-slate-800'}`}>
-                      {item.goodsName ?? weeklyT.detail.noValue}
+                      {goodsLabel || weeklyT.detail.noValue}
                     </td>
                     <td className={`px-2 py-2 text-center ${!item.model ? 'text-slate-300' : 'font-medium text-slate-800'}`}>
                       {formatMaterialModel(item.goodsName, item.model) || weeklyT.detail.noValue}

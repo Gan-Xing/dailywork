@@ -4,9 +4,14 @@ export const WEEKLY_PLAN_GOODS_KEYS = [
   'diesel',
   'cement',
   'bitumen',
+  'rebar',
   'angle_steel',
   'flat_steel',
   'steel_plate',
+  'sand',
+  'gravel_5_15',
+  'gravel_15_25',
+  'water_reducer',
 ] as const
 
 export type WeeklyPlanGoodsKey = (typeof WEEKLY_PLAN_GOODS_KEYS)[number]
@@ -42,6 +47,24 @@ const weeklyPlanGoodsDefinitions: WeeklyPlanGoodsDefinition[] = [
     aliases: ['bitumen', 'bitume', '沥青'],
   },
   {
+    key: 'rebar',
+    label: { zh: '钢筋', fr: "Acier d'armature" },
+    aliases: [
+      'rebar',
+      'reinforcing steel',
+      'reinforcement steel',
+      'steel bar',
+      'rebar steel',
+      'acier darmature',
+      "acier d'armature",
+      'armature',
+      '钢筋',
+      '螺纹钢',
+      '盘螺',
+      '圆钢',
+    ],
+  },
+  {
     key: 'angle_steel',
     label: { zh: '角铁', fr: 'CORNIERES' },
     aliases: ['angle_steel', 'angle steel', 'corniere', 'cornieres', '角铁'],
@@ -55,6 +78,43 @@ const weeklyPlanGoodsDefinitions: WeeklyPlanGoodsDefinition[] = [
     key: 'steel_plate',
     label: { zh: '钢板', fr: "Tôle d'acier" },
     aliases: ['steel_plate', 'steel plate', 'tole dacier', "tôle d'acier", '钢板'],
+  },
+  {
+    key: 'sand',
+    label: { zh: '砂', fr: 'Sable' },
+    aliases: ['sand', 'sable', '砂', '细砂', '中砂'],
+  },
+  {
+    key: 'gravel_5_15',
+    label: { zh: '5-15碎石', fr: 'Gravier 5/15' },
+    aliases: ['gravel515', 'gravier515', '5-15碎石', '515碎石', '碎石5-15', '5/15 gravier', 'gravier 5/15'],
+  },
+  {
+    key: 'gravel_15_25',
+    label: { zh: '15-25碎石', fr: 'Gravier 15/25' },
+    aliases: [
+      'gravel1525',
+      'gravier1525',
+      '15-25碎石',
+      '1525碎石',
+      '碎石15-25',
+      '15/25 gravier',
+      'gravier 15/25',
+    ],
+  },
+  {
+    key: 'water_reducer',
+    label: { zh: '减水剂', fr: "Réducteur d'eau" },
+    aliases: [
+      'water reducer',
+      'water_reducer',
+      'reducteur deau',
+      "réducteur d'eau",
+      '减水剂',
+      '外加剂',
+      '速凝剂',
+      'adjuvant',
+    ],
   },
 ]
 
