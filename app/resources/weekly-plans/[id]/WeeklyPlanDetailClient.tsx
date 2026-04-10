@@ -426,6 +426,7 @@ export default function WeeklyPlanDetailClient() {
   const [rowError, setRowError] = useState<string | null>(null)
   const [selectedItemIds, setSelectedItemIds] = useState<number[]>([])
   const [bulkActionMessage, setBulkActionMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [bulkDuplicatePending, setBulkDuplicatePending] = useState(false)
   const [bulkEditOpen, setBulkEditOpen] = useState(false)
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
   const [bulkEditForm, setBulkEditForm] = useState<BulkEditFormState>(createEmptyBulkEditForm())
@@ -804,6 +805,39 @@ export default function WeeklyPlanDetailClient() {
     setBulkDeleteError(null)
     setBulkActionMessage(null)
     setBulkDeleteOpen(true)
+  }
+
+  const handleDuplicateRows = async (ids: number[]) => {
+    if (!ids.length) {
+      setBulkActionMessage({ type: 'error', text: weeklyT.detail.bulk.missingSelection })
+      return
+    }
+
+    setBulkDuplicatePending(true)
+    setBulkActionMessage(null)
+    try {
+      const res = await fetch(`/api/weekly-plans/${planId}/items/bulk-duplicate`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids }),
+      })
+      const data = (await res.json().catch(() => ({}))) as {
+        duplicatedCount?: number
+        message?: string
+      }
+      if (!res.ok) throw new Error(data.message ?? weeklyT.status.saveFailed)
+      setBulkActionMessage({
+        type: 'success',
+        text: weeklyT.detail.bulkDuplicate.success(data.duplicatedCount ?? ids.length),
+      })
+      setSelectedItemIds([])
+      await fetchPlan()
+    } catch (e) {
+      setBulkActionMessage({ type: 'error', text: (e as Error).message })
+    } finally {
+      setBulkDuplicatePending(false)
+    }
   }
 
   const handleBulkEdit = async () => {
@@ -1273,8 +1307,16 @@ export default function WeeklyPlanDetailClient() {
               <>
                 <button
                   type="button"
+                  onClick={() => void handleDuplicateRows(selectedItemIds)}
+                  disabled={selectedItemIds.length === 0 || bulkDuplicatePending}
+                  className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {bulkDuplicatePending ? weeklyT.detail.bulkDuplicate.duplicating : weeklyT.detail.bulk.duplicate}
+                </button>
+                <button
+                  type="button"
                   onClick={openBulkEdit}
-                  disabled={selectedItemIds.length === 0}
+                  disabled={selectedItemIds.length === 0 || bulkDuplicatePending}
                   className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {weeklyT.detail.bulk.edit}
@@ -1282,7 +1324,7 @@ export default function WeeklyPlanDetailClient() {
                 <button
                   type="button"
                   onClick={openBulkDelete}
-                  disabled={selectedItemIds.length === 0}
+                  disabled={selectedItemIds.length === 0 || bulkDuplicatePending}
                   className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-medium text-rose-600 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {weeklyT.detail.bulk.delete}
@@ -1391,6 +1433,17 @@ export default function WeeklyPlanDetailClient() {
                     {canCreateMaterials ? (
                       <td className="px-2 py-2 text-center">
                         <div className="flex items-center justify-center gap-2">
+                          <button
+                            type="button"
+                            disabled={bulkDuplicatePending}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              void handleDuplicateRows([item.id])
+                            }}
+                            className="rounded-lg border border-blue-200 px-2 py-1 text-xs text-blue-700 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {weeklyT.detail.duplicateRow}
+                          </button>
                           <button
                             type="button"
                             onClick={(e) => {

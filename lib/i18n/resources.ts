@@ -347,9 +347,15 @@ export type ResourcesCopy = {
       bulk: {
         selectedCount: (count: number) => string
         clearSelection: string
+        duplicate: string
         edit: string
         delete: string
         missingSelection: string
+      }
+      duplicateRow: string
+      bulkDuplicate: {
+        success: (count: number) => string
+        duplicating: string
       }
       bulkEdit: {
         title: string
@@ -817,9 +823,15 @@ export const getResourcesCopy = (locale: Locale): ResourcesCopy => {
           bulk: {
             selectedCount: (count) => formatCopy('{count} ligne(s) sélectionnée(s)', { count }),
             clearSelection: 'Effacer la sélection',
+            duplicate: 'Dupliquer la sélection',
             edit: 'Édition en lot',
             delete: 'Suppression en lot',
             missingSelection: 'Sélectionnez au moins une ligne.',
+          },
+          duplicateRow: 'Dupliquer',
+          bulkDuplicate: {
+            success: (count) => formatCopy('{count} ligne(s) dupliquée(s).', { count }),
+            duplicating: 'Duplication…',
           },
           bulkEdit: {
             title: 'Modifier les lignes sélectionnées',
@@ -1284,9 +1296,15 @@ export const getResourcesCopy = (locale: Locale): ResourcesCopy => {
         bulk: {
           selectedCount: (count) => formatCopy('已选 {count} 行', { count }),
           clearSelection: '清空选择',
+          duplicate: '复制已选',
           edit: '批量编辑',
           delete: '批量删除',
           missingSelection: '请先勾选要处理的行。',
+        },
+        duplicateRow: '复制',
+        bulkDuplicate: {
+          success: (count) => formatCopy('已复制 {count} 行。', { count }),
+          duplicating: '复制中…',
         },
         bulkEdit: {
           title: '批量编辑已选行',
