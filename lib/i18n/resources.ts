@@ -344,6 +344,46 @@ export type ResourcesCopy = {
         label: string
         selectedCount: (count: number) => string
       }
+      bulk: {
+        selectedCount: (count: number) => string
+        clearSelection: string
+        edit: string
+        delete: string
+        missingSelection: string
+      }
+      bulkEdit: {
+        title: string
+        hint: string
+        exactDate: string
+        shiftDays: string
+        status: string
+        supplier: string
+        transporter: string
+        headPlateNumber: string
+        tailPlateNumber: string
+        phone: string
+        noChangeHint: string
+        dateConflict: string
+        invalidShift: string
+        noChanges: string
+        save: string
+        saving: string
+        success: (count: number) => string
+        partial: (success: number, skipped: number) => string
+        cancel: string
+      }
+      bulkDelete: {
+        title: string
+        hint: string
+        cancel: string
+        confirm: string
+        confirming: string
+        success: (count: number) => string
+      }
+      selection: {
+        selectAll: string
+        selectRow: (index: number) => string
+      }
       form: {
         projects: string
         title: string
@@ -774,6 +814,47 @@ export const getResourcesCopy = (locale: Locale): ResourcesCopy => {
             label: 'Colonnes',
             selectedCount: (count) => formatCopy('{count} colonne(s)', { count }),
           },
+          bulk: {
+            selectedCount: (count) => formatCopy('{count} ligne(s) sélectionnée(s)', { count }),
+            clearSelection: 'Effacer la sélection',
+            edit: 'Édition en lot',
+            delete: 'Suppression en lot',
+            missingSelection: 'Sélectionnez au moins une ligne.',
+          },
+          bulkEdit: {
+            title: 'Modifier les lignes sélectionnées',
+            hint: "Appliquez les mêmes modifications à plusieurs lignes. Les champs laissés vides resteront inchangés.",
+            exactDate: 'Date exacte',
+            shiftDays: 'Décalage (jours)',
+            status: 'Statut',
+            supplier: 'Fournisseur',
+            transporter: 'Transporteur',
+            headPlateNumber: 'Plaque avant',
+            tailPlateNumber: 'Plaque arrière',
+            phone: 'Téléphone',
+            noChangeHint: "Laissez vide pour ne pas modifier ce champ. N'utilisez pas en même temps la date exacte et le décalage.",
+            dateConflict: "La date exacte et le décalage ne peuvent pas être saisis en même temps.",
+            invalidShift: 'Le décalage doit être un entier.',
+            noChanges: 'Aucune modification à appliquer.',
+            save: 'Enregistrer',
+            saving: 'Enregistrement…',
+            success: (count) => formatCopy('{count} ligne(s) mise(s) à jour.', { count }),
+            partial: (success, skipped) =>
+              formatCopy('{success} ligne(s) mises à jour, {skipped} ignorée(s).', { success, skipped }),
+            cancel: 'Annuler',
+          },
+          bulkDelete: {
+            title: 'Supprimer les lignes sélectionnées',
+            hint: 'Les lignes supprimées et leurs reçus liés seront effacés définitivement.',
+            cancel: 'Annuler',
+            confirm: 'Supprimer',
+            confirming: 'Suppression…',
+            success: (count) => formatCopy('{count} ligne(s) supprimée(s).', { count }),
+          },
+          selection: {
+            selectAll: 'Sélectionner toutes les lignes',
+            selectRow: (index) => formatCopy('Sélectionner la ligne {index}', { index }),
+          },
           form: {
             projects: 'Projets',
             title: 'Titre',
@@ -1196,13 +1277,53 @@ export const getResourcesCopy = (locale: Locale): ResourcesCopy => {
             proxyCost: '代付费用',
             actions: '操作',
           },
-          columnSelector: {
-            label: '显示列',
-            selectedCount: (count) => formatCopy('已选 {count} 列', { count }),
-          },
-          form: {
-            projects: '项目',
-            title: '标题',
+        columnSelector: {
+          label: '显示列',
+          selectedCount: (count) => formatCopy('已选 {count} 列', { count }),
+        },
+        bulk: {
+          selectedCount: (count) => formatCopy('已选 {count} 行', { count }),
+          clearSelection: '清空选择',
+          edit: '批量编辑',
+          delete: '批量删除',
+          missingSelection: '请先勾选要处理的行。',
+        },
+        bulkEdit: {
+          title: '批量编辑已选行',
+          hint: '将相同修改应用到多行。留空表示不修改该字段。',
+          exactDate: '统一日期',
+          shiftDays: '顺延天数',
+          status: '状态',
+          supplier: '供应商',
+          transporter: '承运方',
+          headPlateNumber: '车头车牌',
+          tailPlateNumber: '车尾车牌',
+          phone: '电话',
+          noChangeHint: '留空表示不修改；统一日期和顺延天数不能同时填写。',
+          dateConflict: '统一日期和顺延天数不能同时填写。',
+          invalidShift: '顺延天数必须是整数。',
+          noChanges: '没有可应用的批量修改。',
+          save: '保存',
+          saving: '保存中…',
+          success: (count) => formatCopy('已更新 {count} 行。', { count }),
+          partial: (success, skipped) => formatCopy('成功更新 {success} 行，跳过 {skipped} 行。', { success, skipped }),
+          cancel: '取消',
+        },
+        bulkDelete: {
+          title: '批量删除已选行',
+          hint: '删除后对应收货单也会一起清理，且不可撤销。',
+          cancel: '取消',
+          confirm: '确认删除',
+          confirming: '删除中…',
+          success: (count) => formatCopy('已删除 {count} 行。', { count }),
+        },
+        selection: {
+          selectAll: '选择全部行',
+          selectRow: (index) => formatCopy('选择第 {index} 行', { index }),
+        },
+        form: {
+          projects: '项目',
+          title: '标题',
             month: '月份 (M)',
             session: '届次 (S)',
             weekStartDate: '开始日期',

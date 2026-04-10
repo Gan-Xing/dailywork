@@ -133,6 +133,17 @@ type RowDialogState = {
   itemId: number | null
 } | null
 
+type BulkEditFormState = {
+  deliveryDate: string
+  shiftDays: string
+  status: WeeklyPlanItemStatus | ''
+  supplier: string
+  transporter: string
+  headPlateNumber: string
+  tailPlateNumber: string
+  phone: string
+}
+
 type HistoryOptions = {
   supplier: string[]
   goodsName: string[]
@@ -343,6 +354,17 @@ const createEmptyRowForm = (): RowFormState => ({
   unitPrice: '',
 })
 
+const createEmptyBulkEditForm = (): BulkEditFormState => ({
+  deliveryDate: '',
+  shiftDays: '',
+  status: '',
+  supplier: '',
+  transporter: '',
+  headPlateNumber: '',
+  tailPlateNumber: '',
+  phone: '',
+})
+
 const createRowFormFromItem = (item: PlanItem): RowFormState => ({
   deliveryDate: formatDateInput(item.deliveryDate),
   supplier: item.supplier ?? '',
@@ -402,6 +424,15 @@ export default function WeeklyPlanDetailClient() {
   const [historyOptions, setHistoryOptions] = useState<HistoryOptions>(EMPTY_HISTORY_OPTIONS)
   const [rowSaving, setRowSaving] = useState(false)
   const [rowError, setRowError] = useState<string | null>(null)
+  const [selectedItemIds, setSelectedItemIds] = useState<number[]>([])
+  const [bulkActionMessage, setBulkActionMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [bulkEditOpen, setBulkEditOpen] = useState(false)
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
+  const [bulkEditForm, setBulkEditForm] = useState<BulkEditFormState>(createEmptyBulkEditForm())
+  const [bulkEditPending, setBulkEditPending] = useState(false)
+  const [bulkDeletePending, setBulkDeletePending] = useState(false)
+  const [bulkEditError, setBulkEditError] = useState<string | null>(null)
+  const [bulkDeleteError, setBulkDeleteError] = useState<string | null>(null)
   const [visibleColumns, setVisibleColumns] = useState<ColumnKey[]>(defaultVisibleColumns)
   const [columnsReady, setColumnsReady] = useState(false)
   const [columnSelectorOpen, setColumnSelectorOpen] = useState(false)
@@ -573,6 +604,15 @@ export default function WeeklyPlanDetailClient() {
     })
   }, [plan, signerUsers])
 
+  useEffect(() => {
+    if (!plan) {
+      setSelectedItemIds([])
+      return
+    }
+    const validIds = new Set(plan.items.map((item) => item.id))
+    setSelectedItemIds((current) => current.filter((itemId) => validIds.has(itemId)))
+  }, [plan])
+
   const fetchRecentPrice = async (goodsName: string, model: MaterialModel | null) => {
     try {
       const params = new URLSearchParams({ goodsName })
@@ -733,6 +773,150 @@ export default function WeeklyPlanDetailClient() {
     }
   }
 
+  const clearSelection = useCallback(() => {
+    setSelectedItemIds([])
+    setBulkActionMessage(null)
+  }, [])
+
+  const toggleSelectItem = useCallback((itemId: number) => {
+    setSelectedItemIds((current) =>
+      current.includes(itemId) ? current.filter((id) => id !== itemId) : [...current, itemId],
+    )
+    setBulkActionMessage(null)
+  }, [])
+
+  const openBulkEdit = () => {
+    if (!selectedItemIds.length) {
+      setBulkActionMessage({ type: 'error', text: weeklyT.detail.bulk.missingSelection })
+      return
+    }
+    setBulkEditForm(createEmptyBulkEditForm())
+    setBulkEditError(null)
+    setBulkActionMessage(null)
+    setBulkEditOpen(true)
+  }
+
+  const openBulkDelete = () => {
+    if (!selectedItemIds.length) {
+      setBulkActionMessage({ type: 'error', text: weeklyT.detail.bulk.missingSelection })
+      return
+    }
+    setBulkDeleteError(null)
+    setBulkActionMessage(null)
+    setBulkDeleteOpen(true)
+  }
+
+  const handleBulkEdit = async () => {
+    if (!selectedItemIds.length) {
+      setBulkEditError(weeklyT.detail.bulk.missingSelection)
+      return
+    }
+
+    if (bulkEditForm.deliveryDate && bulkEditForm.shiftDays.trim()) {
+      setBulkEditError(weeklyT.detail.bulkEdit.dateConflict)
+      return
+    }
+
+    const payload: Record<string, string | number> = {}
+    if (bulkEditForm.deliveryDate) payload.deliveryDate = bulkEditForm.deliveryDate
+
+    const shiftDays = bulkEditForm.shiftDays.trim()
+    if (shiftDays) {
+      const parsedShift = Number(shiftDays)
+      if (!Number.isInteger(parsedShift)) {
+        setBulkEditError(weeklyT.detail.bulkEdit.invalidShift)
+        return
+      }
+      payload.shiftDays = parsedShift
+    }
+
+    if (bulkEditForm.status) payload.status = bulkEditForm.status
+
+    const supplier = trimNullable(bulkEditForm.supplier)
+    if (supplier) payload.supplier = supplier
+    const transporter = trimNullable(bulkEditForm.transporter)
+    if (transporter) payload.transporter = transporter
+    const headPlateNumber = trimNullable(bulkEditForm.headPlateNumber)
+    if (headPlateNumber) payload.headPlateNumber = headPlateNumber
+    const tailPlateNumber = trimNullable(bulkEditForm.tailPlateNumber)
+    if (tailPlateNumber) payload.tailPlateNumber = tailPlateNumber
+    const phone = trimNullable(bulkEditForm.phone)
+    if (phone) payload.phone = phone
+
+    if (!Object.keys(payload).length) {
+      setBulkEditError(weeklyT.detail.bulkEdit.noChanges)
+      return
+    }
+
+    setBulkEditPending(true)
+    setBulkEditError(null)
+    try {
+      const res = await fetch(`/api/weekly-plans/${planId}/items/bulk-edit`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: selectedItemIds, payload }),
+      })
+      const data = (await res.json().catch(() => ({}))) as {
+        updatedCount?: number
+        skippedCount?: number
+        message?: string
+      }
+      if (!res.ok) throw new Error(data.message ?? weeklyT.status.saveFailed)
+      const updatedCount = data.updatedCount ?? 0
+      const skippedCount = data.skippedCount ?? 0
+      setBulkActionMessage({
+        type: 'success',
+        text:
+          skippedCount > 0
+            ? weeklyT.detail.bulkEdit.partial(updatedCount, skippedCount)
+            : weeklyT.detail.bulkEdit.success(updatedCount),
+      })
+      setBulkEditOpen(false)
+      setBulkEditForm(createEmptyBulkEditForm())
+      setSelectedItemIds([])
+      await fetchPlan()
+    } catch (e) {
+      setBulkEditError((e as Error).message)
+    } finally {
+      setBulkEditPending(false)
+    }
+  }
+
+  const handleBulkDelete = async () => {
+    if (!selectedItemIds.length) {
+      setBulkDeleteError(weeklyT.detail.bulk.missingSelection)
+      return
+    }
+
+    setBulkDeletePending(true)
+    setBulkDeleteError(null)
+    try {
+      const res = await fetch(`/api/weekly-plans/${planId}/items/bulk-delete`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: selectedItemIds }),
+      })
+      const data = (await res.json().catch(() => ({}))) as {
+        deletedCount?: number
+        message?: string
+      }
+      if (!res.ok) throw new Error(data.message ?? weeklyT.status.deleteFailed)
+      setBulkActionMessage({
+        type: 'success',
+        text: weeklyT.detail.bulkDelete.success(data.deletedCount ?? selectedItemIds.length),
+      })
+      setBulkDeleteOpen(false)
+      setSelectedItemIds([])
+      await fetchPlan()
+    } catch (e) {
+      setBulkDeleteError((e as Error).message)
+    } finally {
+      setBulkDeletePending(false)
+    }
+  }
+
   const handlePlanSave = async () => {
     if (!canCreateMaterials) return
     if (!planForm.weekStartDate || !planForm.projectIds.length || !planForm.month || !planForm.session) {
@@ -785,6 +969,8 @@ export default function WeeklyPlanDetailClient() {
   const planProjects = plan.projects.length ? plan.projects : [{ projectId: plan.projectId, sortOrder: 0, project: plan.project }]
   const visibleColumnSet = new Set(visibleColumns)
   const displayedFields = columnOptions.filter((field) => visibleColumnSet.has(field.key))
+  const rowSelectionEnabled = canCreateMaterials
+  const allSelected = rowSelectionEnabled && plan.items.length > 0 && plan.items.every((item) => selectedItemIds.includes(item.id))
 
   const statusSummary = plan.items.reduce(
     (summary, item) => {
@@ -1029,57 +1215,116 @@ export default function WeeklyPlanDetailClient() {
         </div>
 
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-          <div ref={columnSelectorRef} className="relative">
-            <button
-              type="button"
-              onClick={() => setColumnSelectorOpen((current) => !current)}
-              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"
-            >
-              <span>{weeklyT.detail.columnSelector.label}</span>
-              <span className="text-slate-400">{weeklyT.detail.columnSelector.selectedCount(visibleColumns.length)}</span>
-            </button>
-            {columnSelectorOpen ? (
-              <div className="absolute z-20 mt-2 w-64 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
-                {columnOptions.map((option) => (
-                  <label
-                    key={option.key}
-                    className="flex cursor-pointer items-center gap-3 rounded-xl px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={visibleColumnSet.has(option.key)}
-                      onChange={() =>
-                        setVisibleColumns((current) =>
-                          current.includes(option.key)
-                            ? current.filter((item) => item !== option.key)
-                            : [...current, option.key],
-                        )
-                      }
-                      className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-400"
-                    />
-                    <span>{option.label}</span>
-                  </label>
-                ))}
-              </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <div ref={columnSelectorRef} className="relative">
+              <button
+                type="button"
+                onClick={() => setColumnSelectorOpen((current) => !current)}
+                className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"
+              >
+                <span>{weeklyT.detail.columnSelector.label}</span>
+                <span className="text-slate-400">{weeklyT.detail.columnSelector.selectedCount(visibleColumns.length)}</span>
+              </button>
+              {columnSelectorOpen ? (
+                <div className="absolute z-20 mt-2 w-64 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
+                  {columnOptions.map((option) => (
+                    <label
+                      key={option.key}
+                      className="flex cursor-pointer items-center gap-3 rounded-xl px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={visibleColumnSet.has(option.key)}
+                        onChange={() =>
+                          setVisibleColumns((current) =>
+                            current.includes(option.key)
+                              ? current.filter((item) => item !== option.key)
+                              : [...current, option.key],
+                          )
+                        }
+                        className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-400"
+                      />
+                      <span>{option.label}</span>
+                    </label>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+
+            {rowSelectionEnabled ? (
+              <span className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm">
+                {weeklyT.detail.bulk.selectedCount(selectedItemIds.length)}
+              </span>
+            ) : null}
+
+            {rowSelectionEnabled && selectedItemIds.length > 0 ? (
+              <button
+                type="button"
+                onClick={clearSelection}
+                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm hover:bg-slate-50"
+              >
+                {weeklyT.detail.bulk.clearSelection}
+              </button>
             ) : null}
           </div>
 
-          {canCreateMaterials ? (
-            <button
-              type="button"
-              onClick={openCreateRowDialog}
-              className="rounded-xl border border-dashed border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-600 hover:border-blue-300 hover:bg-blue-50"
-            >
-              + {weeklyT.detail.addRow}
-            </button>
-          ) : null}
+          <div className="flex flex-wrap items-center gap-2">
+            {rowSelectionEnabled ? (
+              <>
+                <button
+                  type="button"
+                  onClick={openBulkEdit}
+                  disabled={selectedItemIds.length === 0}
+                  className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {weeklyT.detail.bulk.edit}
+                </button>
+                <button
+                  type="button"
+                  onClick={openBulkDelete}
+                  disabled={selectedItemIds.length === 0}
+                  className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-medium text-rose-600 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {weeklyT.detail.bulk.delete}
+                </button>
+              </>
+            ) : null}
+            {canCreateMaterials ? (
+              <button
+                type="button"
+                onClick={openCreateRowDialog}
+                className="rounded-xl border border-dashed border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-600 hover:border-blue-300 hover:bg-blue-50"
+              >
+                + {weeklyT.detail.addRow}
+              </button>
+            ) : null}
+          </div>
         </div>
+
+        {bulkActionMessage ? (
+          <p className={`mb-3 text-sm ${bulkActionMessage.type === 'success' ? 'text-emerald-600' : 'text-rose-600'}`}>
+            {bulkActionMessage.text}
+          </p>
+        ) : null}
 
         <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-md">
           <table className="w-full min-w-[1280px] border-collapse text-sm">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50 text-xs font-semibold uppercase text-slate-500">
-                <th className="sticky left-0 bg-slate-50 px-2 py-3">{weeklyT.detail.columns.number}</th>
+                {rowSelectionEnabled ? (
+                  <th className="px-2 py-3 text-center">
+                    <input
+                      type="checkbox"
+                      checked={allSelected}
+                      onChange={() =>
+                        setSelectedItemIds(allSelected ? [] : plan.items.map((item) => item.id))
+                      }
+                      className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-400"
+                      aria-label={weeklyT.detail.selection.selectAll}
+                    />
+                  </th>
+                ) : null}
+                <th className="bg-slate-50 px-2 py-3">{weeklyT.detail.columns.number}</th>
                 <th className="px-3 py-3 text-center" style={{ minWidth: '140px' }}>{weeklyT.detail.columns.goodsName}</th>
                 <th className="px-3 py-3 text-center" style={{ minWidth: '180px' }}>{weeklyT.detail.columns.model}</th>
                 <th className="px-3 py-3 text-center" style={{ minWidth: '110px' }}>{weeklyT.detail.columns.status}</th>
@@ -1107,7 +1352,22 @@ export default function WeeklyPlanDetailClient() {
                     className={`border-b border-slate-100 transition ${rowBg} ${canCreateMaterials ? 'cursor-pointer' : ''}`}
                     onClick={() => openEditRowDialog(item)}
                   >
-                    <td className="sticky left-0 bg-inherit px-2 py-2 text-center text-xs text-slate-400">{index + 1}</td>
+                    {rowSelectionEnabled ? (
+                      <td className="px-2 py-2 text-center">
+                        <input
+                          type="checkbox"
+                          checked={selectedItemIds.includes(item.id)}
+                          onChange={(e) => {
+                            e.stopPropagation()
+                            toggleSelectItem(item.id)
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                          className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-400"
+                          aria-label={weeklyT.detail.selection.selectRow(index + 1)}
+                        />
+                      </td>
+                    ) : null}
+                    <td className="px-2 py-2 text-center text-xs text-slate-400">{index + 1}</td>
                     <td className={`px-2 py-2 text-center ${!item.goodsName ? 'text-slate-300' : 'text-slate-800'}`}>
                       {goodsLabel || weeklyT.detail.noValue}
                     </td>
@@ -1362,6 +1622,182 @@ export default function WeeklyPlanDetailClient() {
                     onClick={() => void handleSaveRow()}
                   >
                     {rowSaving ? weeklyT.detail.savingRow : weeklyT.detail.saveRow}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {bulkDeleteOpen ? (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-3 backdrop-blur-sm sm:p-4"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) {
+                setBulkDeleteOpen(false)
+                setBulkDeleteError(null)
+              }
+            }}
+          >
+            <div className="w-full max-w-xl rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl">
+              <h2 className="text-xl font-semibold text-slate-900">{weeklyT.detail.bulkDelete.title}</h2>
+              <p className="mt-2 text-sm text-slate-500">{weeklyT.detail.bulk.selectedCount(selectedItemIds.length)}</p>
+              <p className="mt-1 text-sm text-slate-500">{weeklyT.detail.bulkDelete.hint}</p>
+              {bulkDeleteError ? <p className="mt-4 text-sm text-rose-600">{bulkDeleteError}</p> : null}
+              <div className="mt-6 flex justify-end gap-3">
+                <button
+                  type="button"
+                  className="rounded-xl bg-slate-100 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-200"
+                  onClick={() => {
+                    setBulkDeleteOpen(false)
+                    setBulkDeleteError(null)
+                  }}
+                >
+                  {weeklyT.detail.bulkDelete.cancel}
+                </button>
+                <button
+                  type="button"
+                  disabled={bulkDeletePending}
+                  className="rounded-xl bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  onClick={() => void handleBulkDelete()}
+                >
+                  {bulkDeletePending ? weeklyT.detail.bulkDelete.confirming : weeklyT.detail.bulkDelete.confirm}
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {bulkEditOpen ? (
+          <div
+            className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/55 p-3 backdrop-blur-sm sm:p-4"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) {
+                setBulkEditOpen(false)
+                setBulkEditError(null)
+                setBulkEditForm(createEmptyBulkEditForm())
+              }
+            }}
+          >
+            <div className="flex min-h-full items-start justify-center sm:items-center">
+              <div className="my-4 flex max-h-[calc(100vh-2rem)] w-full max-w-4xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
+                <div className="flex shrink-0 items-start justify-between gap-4 border-b border-slate-200 px-5 py-5 sm:px-6">
+                  <div>
+                    <h2 className="text-xl font-semibold text-slate-900">{weeklyT.detail.bulkEdit.title}</h2>
+                    <p className="mt-1 text-sm text-slate-500">{weeklyT.detail.bulkEdit.hint}</p>
+                    <p className="mt-1 text-sm text-slate-500">{weeklyT.detail.bulk.selectedCount(selectedItemIds.length)}</p>
+                  </div>
+                  <button
+                    type="button"
+                    className="rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-500 hover:bg-slate-50"
+                    onClick={() => {
+                      setBulkEditOpen(false)
+                      setBulkEditError(null)
+                      setBulkEditForm(createEmptyBulkEditForm())
+                    }}
+                  >
+                    ×
+                  </button>
+                </div>
+
+                <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-6">
+                  <div className="grid gap-4 lg:grid-cols-2">
+                    <label className="flex flex-col gap-1 text-sm text-slate-700">
+                      {weeklyT.detail.bulkEdit.exactDate}
+                      <input
+                        type="date"
+                        value={bulkEditForm.deliveryDate}
+                        onChange={(e) => setBulkEditForm((current) => ({ ...current, deliveryDate: e.target.value }))}
+                        className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-300"
+                      />
+                    </label>
+
+                    <label className="flex flex-col gap-1 text-sm text-slate-700">
+                      {weeklyT.detail.bulkEdit.shiftDays}
+                      <input
+                        type="number"
+                        step={1}
+                        value={bulkEditForm.shiftDays}
+                        onChange={(e) => setBulkEditForm((current) => ({ ...current, shiftDays: e.target.value }))}
+                        className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-300"
+                      />
+                    </label>
+
+                    <label className="flex flex-col gap-1 text-sm text-slate-700">
+                      {weeklyT.detail.bulkEdit.status}
+                      <select
+                        value={bulkEditForm.status}
+                        onChange={(e) =>
+                          setBulkEditForm((current) => ({
+                            ...current,
+                            status: (e.target.value as WeeklyPlanItemStatus | '') || '',
+                          }))
+                        }
+                        className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-300"
+                      >
+                        <option value="">{weeklyT.detail.noValue}</option>
+                        <option value="planned">{weeklyT.detail.statusOptions.planned}</option>
+                        <option value="in_transit">{weeklyT.detail.statusOptions.in_transit}</option>
+                        <option value="arrived">{weeklyT.detail.statusOptions.arrived}</option>
+                        <option value="cancelled">{weeklyT.detail.statusOptions.cancelled}</option>
+                      </select>
+                    </label>
+
+                    <HistorySuggestionInput
+                      label={weeklyT.detail.bulkEdit.supplier}
+                      value={bulkEditForm.supplier}
+                      onChange={(value) => setBulkEditForm((current) => ({ ...current, supplier: value }))}
+                      options={historyOptions.supplier}
+                    />
+                    <HistorySuggestionInput
+                      label={weeklyT.detail.bulkEdit.transporter}
+                      value={bulkEditForm.transporter}
+                      onChange={(value) => setBulkEditForm((current) => ({ ...current, transporter: value }))}
+                      options={historyOptions.transporter}
+                    />
+                    <HistorySuggestionInput
+                      label={weeklyT.detail.bulkEdit.headPlateNumber}
+                      value={bulkEditForm.headPlateNumber}
+                      onChange={(value) => setBulkEditForm((current) => ({ ...current, headPlateNumber: value }))}
+                      options={historyOptions.headPlateNumber}
+                    />
+                    <HistorySuggestionInput
+                      label={weeklyT.detail.bulkEdit.tailPlateNumber}
+                      value={bulkEditForm.tailPlateNumber}
+                      onChange={(value) => setBulkEditForm((current) => ({ ...current, tailPlateNumber: value }))}
+                      options={historyOptions.tailPlateNumber}
+                    />
+                    <HistorySuggestionInput
+                      label={weeklyT.detail.bulkEdit.phone}
+                      value={bulkEditForm.phone}
+                      onChange={(value) => setBulkEditForm((current) => ({ ...current, phone: value }))}
+                      options={historyOptions.phone}
+                    />
+                  </div>
+
+                  <p className="mt-4 text-sm text-slate-500">{weeklyT.detail.bulkEdit.noChangeHint}</p>
+                  {bulkEditError ? <p className="mt-3 text-sm text-rose-600">{bulkEditError}</p> : null}
+                </div>
+
+                <div className="flex shrink-0 justify-end gap-3 border-t border-slate-200 px-5 py-4 sm:px-6">
+                  <button
+                    type="button"
+                    className="rounded-xl bg-slate-100 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-200"
+                    onClick={() => {
+                      setBulkEditOpen(false)
+                      setBulkEditError(null)
+                      setBulkEditForm(createEmptyBulkEditForm())
+                    }}
+                  >
+                    {weeklyT.detail.bulkEdit.cancel}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={bulkEditPending}
+                    className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                    onClick={() => void handleBulkEdit()}
+                  >
+                    {bulkEditPending ? weeklyT.detail.bulkEdit.saving : weeklyT.detail.bulkEdit.save}
                   </button>
                 </div>
               </div>
