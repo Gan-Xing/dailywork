@@ -18,6 +18,8 @@ import {
 } from '@/lib/server/weeklyPlanExport'
 import { renderWeeklyPlanPdfHtml } from '@/lib/templates/weeklyPlanPdf'
 
+export const dynamic = 'force-dynamic'
+
 const colCount = 10
 const EXPORT_TIMEOUT_MS = 30_000
 const EXECUTABLE_PATH =
