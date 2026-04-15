@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma'
+import { normalizeLegacyInspectionDesignation } from '@/lib/documents/submissionItems'
 import { getSessionUser } from '@/lib/server/authSession'
 
 import { DocumentsAccessDenied } from '../DocumentsAccessDenied'
@@ -166,7 +167,7 @@ export default async function SubmissionsPage({ searchParams }: { searchParams: 
       ...base,
       itemId: item.id,
       itemOrder: item.order ?? null,
-      designation: item.designation ?? '',
+      designation: normalizeLegacyInspectionDesignation(item.designation),
       quantity: item.quantity ?? null,
       observation: item.observation ?? '',
       itemCreatedAt: formatDate(item.createdAt),

@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation'
 
+import { normalizeLegacyInspectionDesignation } from '@/lib/documents/submissionItems'
 import { getSessionUser } from '@/lib/server/authSession'
 import { findSubmissionDocByIdentifier } from '@/lib/server/submissionDocStore'
 import type { SubmissionData } from '@/types/documents'
@@ -28,7 +29,7 @@ export default async function SubmissionEditPage({ params }: { params: Promise<{
     items: Array<{ designation?: string | null; quantity?: number | null; observation?: string | null }> = [],
   ) =>
     items.map((item) => ({
-      designation: item.designation ?? '',
+      designation: normalizeLegacyInspectionDesignation(item.designation),
       quantity: Number.isFinite(item.quantity) ? (item.quantity as number) : 1,
       observation: item.observation ?? undefined,
     }))

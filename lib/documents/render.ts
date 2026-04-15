@@ -1,5 +1,6 @@
 import 'server-only'
 
+import { normalizeLegacyInspectionDesignation } from '@/lib/documents/submissionItems'
 import { SubmissionData, SubmissionItem } from '@/types/documents'
 
 const PLACEHOLDER_REGEX = /{{\s*([^{}]+?)\s*}}/g
@@ -82,7 +83,7 @@ function renderItemsTable(items: SubmissionItem[], minRows: number, maxRows?: nu
 
   for (let i = 0; i < finalLength; i += 1) {
     const item = safeItems[i]
-    const designation = item?.designation ?? ''
+    const designation = normalizeLegacyInspectionDesignation(item?.designation)
     const quantity = item?.quantity ?? ''
     const observation = item?.observation ?? ''
     rows.push(
