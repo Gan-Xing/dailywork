@@ -36,4 +36,7 @@ yarn-error.log*
 next-env.d.ts
 .shared/
 .gemini/
+.codex
 .codex/
+.telegram-inbox/
+video-studio/
