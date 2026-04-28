@@ -181,12 +181,24 @@
 
 ### TeamSupervisor（班组负责人绑定）
 
-- `team`（EQUIPE）：班组名称，字符串，必填。
-- `teamZh`（EQUIPE 中文名）：班组中文名称，字符串，可空（用于中文界面显示）。
-- `teamKey`：班组标准化键（去空格 + 小写），用于唯一约束。
+- `team`（EQUIPE Key）：班组稳定键，字符串，必填；创建后不应随显示名变化而修改。
+- `teamFr`（EQUIPE français）：班组法语显示名，字符串，可空（法语界面优先显示）。
+- `teamZh`（EQUIPE 中文名）：班组中文显示名，字符串，可空（中文界面优先显示）。
+- `teamKey`：班组标准化键（由 `team` 去空格 + 小写得到），用于唯一约束。
 - `projectId`：默认项目 ID，可空（用于班组联动项目）。
 - `supervisorId`（RESPONSABLE CHINOIS）：绑定的中方负责人用户 ID（仅中国籍成员）。
 - `supervisorName`：中方负责人快照名（`name + frenchName`），可空。
+
+### TeamSupervisorHistory（班组负责人历史）
+
+- `teamSupervisorId`：当前班组绑定 ID，可空；删除当前绑定后历史仍保留。
+- `team` / `teamKey`：班组稳定键及其标准化键。
+- `teamFr` / `teamZh`：该时间段生效的法语/中文显示名。
+- `projectId`：该时间段生效的默认项目，可空。
+- `supervisorId` / `supervisorName`：该时间段生效的负责人及快照名。
+- `effectiveFrom`：生效开始时间。
+- `effectiveTo`：生效结束时间，可空（空表示当前有效）。
+- `createdAt` / `updatedAt`：时间戳。
 
 ### UserProjectAssignment（成员项目历史）
 

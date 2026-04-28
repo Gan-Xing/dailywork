@@ -1,7 +1,12 @@
 import { Prisma } from '@prisma/client'
 
 import type { Locale } from '@/lib/i18n'
-import { formatSupervisorLabel, normalizeTeamKey, normalizeText } from '@/lib/members/utils'
+import {
+  formatSupervisorLabel,
+  normalizeTeamKey,
+  normalizeText,
+  resolveTeamDisplayName,
+} from '@/lib/members/utils'
 import { prisma } from '@/lib/prisma'
 import {
   getMachineEquipmentTypeLabel,
@@ -123,6 +128,7 @@ const listTeamSupervisors = async (): Promise<TeamSupervisorOption[]> => {
     return {
       id: binding.id,
       team: binding.team,
+      teamFr: binding.teamFr ?? null,
       teamZh: binding.teamZh ?? null,
       teamKey: binding.teamKey,
       supervisorId: binding.supervisorId,
@@ -201,10 +207,10 @@ const listOperators = async (): Promise<UserOption[]> => {
   }))
 }
 
-const buildTeamLabelMap = (teamSupervisors: TeamSupervisorOption[]) => {
+const buildTeamLabelMap = (teamSupervisors: TeamSupervisorOption[], locale: Locale) => {
   const map = new Map<string, string>()
   teamSupervisors.forEach((binding) => {
-    const label = binding.teamZh ? `${binding.teamZh}（${binding.team}）` : binding.team
+    const label = resolveTeamDisplayName(binding.team, locale, new Map([[binding.teamKey, binding]]))
     map.set(binding.teamKey, label)
   })
   return map
@@ -772,7 +778,7 @@ export async function getMachineLogsSummaryPageData({
     teamSupervisors,
   })
 
-  const teamLabelByKey = buildTeamLabelMap(teamSupervisors)
+  const teamLabelByKey = buildTeamLabelMap(teamSupervisors, locale)
 
   const mineId = mineOnly && mineUserId && mineUserId > 0 ? mineUserId : null
   const safeProjectId = projectId && projectId > 0 ? projectId : null
@@ -884,7 +890,7 @@ export async function getMachineLogsGroupPageData({
     teamSupervisors,
   })
 
-  const teamLabelByKey = buildTeamLabelMap(teamSupervisors)
+  const teamLabelByKey = buildTeamLabelMap(teamSupervisors, locale)
   const mineId = mineOnly && mineUserId && mineUserId > 0 ? mineUserId : null
   const safeProjectId = projectId && projectId > 0 ? projectId : null
 

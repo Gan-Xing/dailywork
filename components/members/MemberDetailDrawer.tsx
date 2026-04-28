@@ -16,7 +16,7 @@ type Props = {
   open: boolean
   onClose: () => void
   onEdit: (member: Member) => void
-  teamSupervisorMap: Map<string, { teamZh?: string | null }>
+  teamSupervisorMap: Map<string, { teamFr?: string | null; teamZh?: string | null }>
   canViewCompensation: boolean
   viewerNationality: string | null
 }
@@ -37,6 +37,8 @@ type CompensationPayload = {
     changeDate: string
     reason: string | null
     team: string | null
+    teamDisplayZh?: string | null
+    teamDisplayFr?: string | null
     chineseSupervisorName: string | null
     position: string | null
   }>
@@ -60,6 +62,8 @@ type CompensationPayload = {
     currency: string | null
     note: string | null
     team: string | null
+    teamDisplayZh?: string | null
+    teamDisplayFr?: string | null
     chineseSupervisorName: string | null
   }>
 }

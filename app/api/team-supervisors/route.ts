@@ -4,6 +4,7 @@ import { Prisma } from '@prisma/client'
 import { formatSupervisorLabel, normalizeTeamKey } from '@/lib/members/utils'
 import { hasPermission } from '@/lib/server/authSession'
 import { prisma } from '@/lib/prisma'
+import { createTeamSupervisorHistory } from '@/lib/server/teamSupervisors'
 
 const canViewTeamSupervisors = async () =>
   (await hasPermission('member:view')) ||
@@ -52,6 +53,7 @@ export async function GET() {
     return {
       id: binding.id,
       team: binding.team,
+      teamFr: binding.teamFr ?? null,
       teamZh: binding.teamZh ?? null,
       teamKey: binding.teamKey,
       supervisorId: binding.supervisorId,
@@ -76,8 +78,11 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json().catch(() => null)
-  const teamValue = typeof body?.team === 'string' ? body.team.trim() : ''
+  const teamFrValue = typeof body?.teamFr === 'string' ? body.teamFr.trim() : ''
+  const teamInput = typeof body?.team === 'string' ? body.team.trim() : ''
+  const teamValue = teamInput || teamFrValue
   const teamZhValue = typeof body?.teamZh === 'string' ? body.teamZh.trim() : ''
+  const teamFr = teamFrValue.length ? teamFrValue : teamValue
   const teamZh = teamZhValue.length ? teamZhValue : null
   const supervisorId = Number(body?.supervisorId)
   const projectIdInput = body?.projectId
@@ -130,20 +135,39 @@ export async function POST(request: Request) {
     }) || supervisor.username
 
   try {
-    const created = await prisma.teamSupervisor.create({
-      data: {
-        team: teamValue,
-        teamZh,
-        teamKey,
-        supervisorId: supervisor.id,
-        supervisorName: supervisorLabel,
-        projectId: parsedProjectId,
-      },
+    const created = await prisma.$transaction(async (tx) => {
+      const binding = await tx.teamSupervisor.create({
+        data: {
+          team: teamValue,
+          teamFr,
+          teamZh,
+          teamKey,
+          supervisorId: supervisor.id,
+          supervisorName: supervisorLabel,
+          projectId: parsedProjectId,
+        },
+      })
+      await createTeamSupervisorHistory(
+        tx,
+        {
+          teamSupervisorId: binding.id,
+          team: binding.team,
+          teamFr: binding.teamFr,
+          teamZh: binding.teamZh,
+          teamKey: binding.teamKey,
+          supervisorId: binding.supervisorId,
+          supervisorName: binding.supervisorName,
+          projectId: binding.projectId,
+        },
+        binding.createdAt,
+      )
+      return binding
     })
     return NextResponse.json({
       teamSupervisor: {
         id: created.id,
         team: created.team,
+        teamFr: created.teamFr ?? null,
         teamZh: created.teamZh ?? null,
         teamKey: created.teamKey,
         supervisorId: created.supervisorId,

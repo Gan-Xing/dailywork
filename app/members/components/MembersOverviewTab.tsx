@@ -23,7 +23,7 @@ type Props = {
   statusFilterOptions: MultiSelectOption[]
   nationalityFilterOptions: MultiSelectOption[]
   teamFilterOptions: MultiSelectOption[]
-  teamSupervisorMap: Map<string, { teamZh?: string | null }>
+  teamSupervisorMap: Map<string, { teamFr?: string | null; teamZh?: string | null }>
   projectFilters: string[]
   statusFilters: string[]
   nationalityFilters: string[]
@@ -167,6 +167,8 @@ type PayrollPayout = {
   runId: number
   userId: number
   team: string | null
+  teamDisplayZh?: string | null
+  teamDisplayFr?: string | null
   chineseSupervisorId: number | null
   chineseSupervisorName: string | null
   payoutDate: string

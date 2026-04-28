@@ -4,6 +4,10 @@ import { Prisma } from '@prisma/client'
 import { formatSupervisorLabel, normalizeTeamKey } from '@/lib/members/utils'
 import { hasPermission } from '@/lib/server/authSession'
 import { prisma } from '@/lib/prisma'
+import {
+  closeActiveTeamSupervisorHistory,
+  createTeamSupervisorHistory,
+} from '@/lib/server/teamSupervisors'
 
 const canManageTeamSupervisors = async () =>
   (await hasPermission('member:create')) || (await hasPermission('member:manage'))
@@ -27,7 +31,10 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   }
 
   const body = await request.json().catch(() => null)
-  const nextTeam = typeof body?.team === 'string' ? body.team.trim() : existing.team
+  const nextTeam = existing.team
+  const teamFrInput = typeof body?.teamFr === 'string' ? body.teamFr.trim() : null
+  const nextTeamFr =
+    teamFrInput === null ? existing.teamFr ?? null : teamFrInput.length ? teamFrInput : null
   const teamZhInput = typeof body?.teamZh === 'string' ? body.teamZh.trim() : null
   const nextTeamZh =
     teamZhInput === null ? existing.teamZh ?? null : teamZhInput.length ? teamZhInput : null
@@ -56,14 +63,6 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     return NextResponse.json({ error: '中方负责人必须为中国籍成员' }, { status: 400 })
   }
 
-  const conflict = await prisma.teamSupervisor.findUnique({
-    where: { teamKey },
-    select: { id: true },
-  })
-  if (conflict && conflict.id !== bindingId) {
-    return NextResponse.json({ error: '班组已存在' }, { status: 409 })
-  }
-
   if (parsedProjectId !== null && !Number.isFinite(parsedProjectId)) {
     return NextResponse.json({ error: '项目无效' }, { status: 400 })
   }
@@ -85,22 +84,53 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       username: supervisor.username,
     }) || supervisor.username
 
+  const historyChanged =
+    (existing.teamFr ?? null) !== (nextTeamFr ?? null) ||
+    (existing.teamZh ?? null) !== (nextTeamZh ?? null) ||
+    existing.supervisorId !== supervisor.id ||
+    (existing.projectId ?? null) !== (parsedProjectId ?? null)
+
   try {
-    const updated = await prisma.teamSupervisor.update({
-      where: { id: bindingId },
-      data: {
-        team: nextTeam,
-        teamZh: nextTeamZh,
-        teamKey,
-        supervisorId: supervisor.id,
-        supervisorName: supervisorLabel,
-        projectId: parsedProjectId,
-      },
+    const updated = await prisma.$transaction(async (tx) => {
+      const nextBinding = await tx.teamSupervisor.update({
+        where: { id: bindingId },
+        data: {
+          team: nextTeam,
+          teamFr: nextTeamFr,
+          teamZh: nextTeamZh,
+          teamKey,
+          supervisorId: supervisor.id,
+          supervisorName: supervisorLabel,
+          projectId: parsedProjectId,
+        },
+      })
+
+      if (historyChanged) {
+        const changedAt = nextBinding.updatedAt
+        await closeActiveTeamSupervisorHistory(tx, bindingId, changedAt)
+        await createTeamSupervisorHistory(
+          tx,
+          {
+            teamSupervisorId: nextBinding.id,
+            team: nextBinding.team,
+            teamFr: nextBinding.teamFr,
+            teamZh: nextBinding.teamZh,
+            teamKey: nextBinding.teamKey,
+            supervisorId: nextBinding.supervisorId,
+            supervisorName: nextBinding.supervisorName,
+            projectId: nextBinding.projectId,
+          },
+          changedAt,
+        )
+      }
+
+      return nextBinding
     })
     return NextResponse.json({
       teamSupervisor: {
         id: updated.id,
         team: updated.team,
+        teamFr: updated.teamFr ?? null,
         teamZh: updated.teamZh ?? null,
         teamKey: updated.teamKey,
         supervisorId: updated.supervisorId,
@@ -131,7 +161,10 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ id: str
   }
 
   try {
-    await prisma.teamSupervisor.delete({ where: { id: bindingId } })
+    await prisma.$transaction(async (tx) => {
+      await closeActiveTeamSupervisorHistory(tx, bindingId)
+      await tx.teamSupervisor.delete({ where: { id: bindingId } })
+    })
     return NextResponse.json({ ok: true })
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {

@@ -8,7 +8,7 @@ type MemberCopy = (typeof memberCopy)[keyof typeof memberCopy]
 type PayrollPayoutTableProps = {
   t: MemberCopy
   locale: Locale
-  teamSupervisorMap: Map<string, { teamZh?: string | null }>
+  teamSupervisorMap: Map<string, { teamFr?: string | null; teamZh?: string | null }>
   loading: boolean
   records: PayrollPayout[]
 }
@@ -22,8 +22,13 @@ export function PayrollPayoutTable({
   loading,
   records,
 }: PayrollPayoutTableProps) {
-  const resolveTeamLabel = (team?: string | null) =>
-    resolveTeamDisplayName(team ?? null, locale, teamSupervisorMap)
+  const resolveTeamLabel = (record?: Pick<PayrollPayout, 'team' | 'teamDisplayZh' | 'teamDisplayFr'> | null) => {
+    if (!record) return ''
+    if (locale === 'fr') {
+      return record.teamDisplayFr ?? resolveTeamDisplayName(record.team ?? null, locale, teamSupervisorMap)
+    }
+    return record.teamDisplayZh ?? resolveTeamDisplayName(record.team ?? null, locale, teamSupervisorMap)
+  }
   return (
     <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
       <div className="flex items-center justify-between gap-4">
@@ -60,7 +65,7 @@ export function PayrollPayoutTable({
                 <td className="py-3">{formatDate(record.payoutDate) || t.labels.empty}</td>
                 <td className="py-3 font-medium">{record.amount}</td>
                 <td className="py-3">{record.currency || 'XOF'}</td>
-                <td className="py-3">{resolveTeamLabel(record.team) || t.labels.empty}</td>
+                <td className="py-3">{resolveTeamLabel(record) || t.labels.empty}</td>
                 <td className="py-3">{record.chineseSupervisorName || t.labels.empty}</td>
                 <td className="py-3 text-slate-500">{record.note || t.labels.empty}</td>
               </tr>

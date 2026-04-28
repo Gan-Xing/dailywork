@@ -446,6 +446,8 @@ export const memberCopy: Record<
       subtitle: string
       add: string
       team: string
+      teamName: string
+      teamFr: string
       teamZh: string
       supervisor: string
       project: string
@@ -458,6 +460,8 @@ export const memberCopy: Record<
       teamRequired: string
       supervisorRequired: string
       teamPlaceholder: string
+      teamNamePlaceholder: string
+      teamFrPlaceholder: string
       teamZhPlaceholder: string
       deleteConfirm: (team: string) => string
     }
@@ -1121,7 +1125,9 @@ export const memberCopy: Record<
       title: '班组负责人',
       subtitle: '维护班组与中方负责人绑定。',
       add: '新增班组',
-      team: '班组',
+      team: '班组 Key',
+      teamName: '班组名称',
+      teamFr: '法语班组',
       teamZh: '中文班组',
       supervisor: '中方负责人',
       project: '项目',
@@ -1133,7 +1139,9 @@ export const memberCopy: Record<
       missing: '该班组未绑定中方负责人',
       teamRequired: '班组必填',
       supervisorRequired: '中方负责人必填',
-      teamPlaceholder: '输入班组名称',
+      teamPlaceholder: '输入班组 key（创建后不建议修改）',
+      teamNamePlaceholder: '输入班组名称',
+      teamFrPlaceholder: '输入班组法语名',
       teamZhPlaceholder: '输入班组中文名',
       deleteConfirm: (team: string) => `确定删除班组 ${team} 吗？`,
     },
@@ -1813,7 +1821,9 @@ export const memberCopy: Record<
       title: "Responsables d'équipe",
       subtitle: "Lier chaque équipe à un responsable chinois.",
       add: 'Ajouter une équipe',
-      team: 'Équipe',
+      team: "Clé d'équipe",
+      teamName: "Nom de l'équipe",
+      teamFr: 'Équipe (français)',
       teamZh: "Équipe (chinois)",
       supervisor: 'Responsable chinois',
       project: 'Projet',
@@ -1825,7 +1835,9 @@ export const memberCopy: Record<
       missing: "Cette équipe n'a pas de responsable chinois",
       teamRequired: "L'équipe est obligatoire",
       supervisorRequired: 'Responsable chinois requis',
-      teamPlaceholder: "Saisir le nom de l'équipe",
+      teamPlaceholder: "Saisir la clé d'équipe (à garder stable)",
+      teamNamePlaceholder: "Saisir le nom de l'équipe",
+      teamFrPlaceholder: "Saisir le nom français de l'équipe",
       teamZhPlaceholder: "Saisir le nom chinois de l'équipe",
       deleteConfirm: (team: string) => `Supprimer l'équipe ${team} ?`,
     },

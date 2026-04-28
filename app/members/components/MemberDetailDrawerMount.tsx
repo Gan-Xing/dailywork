@@ -5,7 +5,7 @@ type MemberDetailDrawerMountProps = {
   selectedMember: Member | null
   onClose: () => void
   onEdit: (member: Member) => void
-  teamSupervisorMap: Map<string, { teamZh?: string | null }>
+  teamSupervisorMap: Map<string, { teamFr?: string | null; teamZh?: string | null }>
   canViewCompensation: boolean
   viewerNationality: string | null
 }

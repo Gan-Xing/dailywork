@@ -57,6 +57,8 @@ type PayrollPayout = {
   runId: number
   userId: number
   team: string | null
+  teamDisplayZh?: string | null
+  teamDisplayFr?: string | null
   chineseSupervisorId: number | null
   chineseSupervisorName: string | null
   contractNumberSnapshot: string | null
@@ -854,7 +856,10 @@ export function PayrollPayoutsTab({
     if (runId) {
       const payout = payoutMap.get(runId)?.get(member.id)
       if (payout?.team) {
-        const label = resolveTeamDisplayName(payout.team, locale, teamSupervisorMap)
+        const label =
+          locale === 'fr'
+            ? payout.teamDisplayFr ?? resolveTeamDisplayName(payout.team, locale, teamSupervisorMap)
+            : payout.teamDisplayZh ?? resolveTeamDisplayName(payout.team, locale, teamSupervisorMap)
         return label || t.labels.empty
       }
     }

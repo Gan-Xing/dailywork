@@ -76,6 +76,7 @@ export type UserOption = {
 export type TeamSupervisorOption = {
   id: number
   team: string
+  teamFr: string | null
   teamZh: string | null
   teamKey: string
   supervisorId: number

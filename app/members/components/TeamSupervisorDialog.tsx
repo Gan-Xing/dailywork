@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 
 import type { Locale } from '@/lib/i18n'
 import { memberCopy } from '@/lib/i18n/members'
+import { normalizeText } from '@/lib/members/utils'
 
 import type { TeamSupervisorItem } from '../hooks/useTeamSupervisors'
 
@@ -38,16 +39,21 @@ export function TeamSupervisorDialog({
 }: TeamSupervisorDialogProps) {
   const [editingId, setEditingId] = useState<EditingId>(null)
   const [draftTeam, setDraftTeam] = useState('')
+  const [draftTeamFr, setDraftTeamFr] = useState('')
   const [draftTeamZh, setDraftTeamZh] = useState('')
   const [draftSupervisorId, setDraftSupervisorId] = useState('')
   const [draftProjectId, setDraftProjectId] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
 
+  const teamNameValue = locale === 'fr' ? draftTeamFr : draftTeamZh
+  const setTeamNameValue = locale === 'fr' ? setDraftTeamFr : setDraftTeamZh
+
   useEffect(() => {
     if (!open) {
       setEditingId(null)
       setDraftTeam('')
+      setDraftTeamFr('')
       setDraftTeamZh('')
       setDraftSupervisorId('')
       setDraftProjectId('')
@@ -61,6 +67,7 @@ export function TeamSupervisorDialog({
     if (!canManage) return
     setEditingId('new')
     setDraftTeam('')
+    setDraftTeamFr('')
     setDraftTeamZh('')
     setDraftSupervisorId('')
     setDraftProjectId('')
@@ -71,6 +78,7 @@ export function TeamSupervisorDialog({
     if (!canManage) return
     setEditingId(item.id)
     setDraftTeam(item.team)
+    setDraftTeamFr(item.teamFr ?? item.team)
     setDraftTeamZh(item.teamZh ?? '')
     setDraftSupervisorId(String(item.supervisorId))
     setDraftProjectId(item.project ? String(item.project.id) : '')
@@ -80,6 +88,7 @@ export function TeamSupervisorDialog({
   const cancelEdit = () => {
     setEditingId(null)
     setDraftTeam('')
+    setDraftTeamFr('')
     setDraftTeamZh('')
     setDraftSupervisorId('')
     setDraftProjectId('')
@@ -87,7 +96,13 @@ export function TeamSupervisorDialog({
   }
 
   const submit = async () => {
-    if (!draftTeam.trim()) {
+    const derivedTeam =
+      normalizeText(draftTeam) ||
+      (locale === 'fr'
+        ? normalizeText(draftTeamFr) || normalizeText(draftTeamZh)
+        : normalizeText(draftTeamZh) || normalizeText(draftTeamFr))
+
+    if (!derivedTeam) {
       setActionError(t.teamSupervisor.teamRequired)
       return
     }
@@ -106,7 +121,8 @@ export function TeamSupervisorDialog({
         method: isCreate ? 'POST' : 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          team: draftTeam.trim(),
+          team: derivedTeam,
+          teamFr: draftTeamFr.trim(),
           teamZh: draftTeamZh.trim(),
           supervisorId: Number(draftSupervisorId),
           projectId: draftProjectId ? Number(draftProjectId) : null,
@@ -127,7 +143,10 @@ export function TeamSupervisorDialog({
 
   const deleteRow = async (item: TeamSupervisorItem) => {
     if (!canManage) return
-    const teamLabel = locale === 'zh' && item.teamZh?.trim() ? item.teamZh : item.team
+    const teamLabel =
+      locale === 'fr'
+        ? normalizeText(item.teamFr) || item.team
+        : normalizeText(item.teamZh) || item.team
     if (!confirm(t.teamSupervisor.deleteConfirm(teamLabel))) return
     setSubmitting(true)
     setActionError(null)
@@ -144,6 +163,11 @@ export function TeamSupervisorDialog({
       setSubmitting(false)
     }
   }
+
+  const resolveTeamName = (item: TeamSupervisorItem) =>
+    locale === 'fr'
+      ? normalizeText(item.teamFr) || item.team
+      : normalizeText(item.teamZh) || item.team
 
   if (!open) return null
 
@@ -175,33 +199,26 @@ export function TeamSupervisorDialog({
         </div>
 
         <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-6 py-4">
-          <div className="grid grid-cols-12 gap-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">
-            <span className="col-span-2">{t.teamSupervisor.team}</span>
-            <span className="col-span-3">{t.teamSupervisor.teamZh}</span>
-            <span className="col-span-3">{t.teamSupervisor.supervisor}</span>
-            <span className="col-span-2">{t.teamSupervisor.project}</span>
-            <span className="col-span-1 text-center">{t.teamSupervisor.edit}</span>
-            <span className="col-span-1 text-center">{t.teamSupervisor.delete}</span>
+          <div className="grid grid-cols-[1.8fr_2fr_1.6fr_auto_auto] gap-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">
+            <span>{t.teamSupervisor.teamName}</span>
+            <span>{t.teamSupervisor.supervisor}</span>
+            <span>{t.teamSupervisor.project}</span>
+            <span className="text-center">{t.teamSupervisor.edit}</span>
+            <span className="text-center">{t.teamSupervisor.delete}</span>
           </div>
 
           {editingId === 'new' ? (
-            <div className="grid grid-cols-12 gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+            <div className="grid grid-cols-[1.8fr_2fr_1.6fr_auto_auto] gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3">
               <input
-                value={draftTeam}
-                onChange={(event) => setDraftTeam(event.target.value)}
-                placeholder={t.teamSupervisor.teamPlaceholder}
-                className="col-span-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
-              />
-              <input
-                value={draftTeamZh}
-                onChange={(event) => setDraftTeamZh(event.target.value)}
-                placeholder={t.teamSupervisor.teamZhPlaceholder}
-                className="col-span-3 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+                value={teamNameValue}
+                onChange={(event) => setTeamNameValue(event.target.value)}
+                placeholder={t.teamSupervisor.teamNamePlaceholder}
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
               />
               <select
                 value={draftSupervisorId}
                 onChange={(event) => setDraftSupervisorId(event.target.value)}
-                className="col-span-3 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
               >
                 <option value="">{t.labels.empty}</option>
                 {supervisorOptions.map((option) => (
@@ -213,7 +230,7 @@ export function TeamSupervisorDialog({
               <select
                 value={draftProjectId}
                 onChange={(event) => setDraftProjectId(event.target.value)}
-                className="col-span-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
               >
                 <option value="">{t.labels.empty}</option>
                 {projectOptions.map((option) => (
@@ -228,7 +245,7 @@ export function TeamSupervisorDialog({
                 onClick={() => {
                   if (!submitting) void submit()
                 }}
-                className="col-span-1 rounded-full bg-slate-900 px-3 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+                className="rounded-full bg-slate-900 px-3 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {t.teamSupervisor.confirm}
               </button>
@@ -236,7 +253,7 @@ export function TeamSupervisorDialog({
                 type="button"
                 disabled={submitting}
                 onClick={cancelEdit}
-                className="col-span-1 rounded-full border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 disabled:cursor-not-allowed disabled:opacity-60"
+                className="rounded-full border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {t.teamSupervisor.cancel}
               </button>
@@ -259,22 +276,18 @@ export function TeamSupervisorDialog({
             editingId === item.id ? (
               <div
                 key={item.id}
-                className="grid grid-cols-12 gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3"
+                className="grid grid-cols-[1.8fr_2fr_1.6fr_auto_auto] gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3"
               >
                 <input
-                  value={draftTeam}
-                  onChange={(event) => setDraftTeam(event.target.value)}
-                  className="col-span-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
-                />
-                <input
-                  value={draftTeamZh}
-                  onChange={(event) => setDraftTeamZh(event.target.value)}
-                  className="col-span-3 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+                  value={teamNameValue}
+                  onChange={(event) => setTeamNameValue(event.target.value)}
+                  placeholder={t.teamSupervisor.teamNamePlaceholder}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
                 />
                 <select
                   value={draftSupervisorId}
                   onChange={(event) => setDraftSupervisorId(event.target.value)}
-                  className="col-span-3 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
                 >
                   <option value="">{t.labels.empty}</option>
                   {supervisorOptions.map((option) => (
@@ -286,7 +299,7 @@ export function TeamSupervisorDialog({
                 <select
                   value={draftProjectId}
                   onChange={(event) => setDraftProjectId(event.target.value)}
-                  className="col-span-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
                 >
                   <option value="">{t.labels.empty}</option>
                   {projectOptions.map((option) => (
@@ -301,7 +314,7 @@ export function TeamSupervisorDialog({
                   onClick={() => {
                     if (!submitting) void submit()
                   }}
-                  className="col-span-1 rounded-full bg-slate-900 px-3 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+                  className="rounded-full bg-slate-900 px-3 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {t.teamSupervisor.confirm}
                 </button>
@@ -309,7 +322,7 @@ export function TeamSupervisorDialog({
                   type="button"
                   disabled={submitting}
                   onClick={cancelEdit}
-                  className="col-span-1 rounded-full border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="rounded-full border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {t.teamSupervisor.cancel}
                 </button>
@@ -317,17 +330,16 @@ export function TeamSupervisorDialog({
             ) : (
               <div
                 key={item.id}
-                className="grid grid-cols-12 gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-700"
+                className="grid grid-cols-[1.8fr_2fr_1.6fr_auto_auto] gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-700"
               >
-                <span className="col-span-2 truncate">{item.team}</span>
-                <span className="col-span-3 truncate">{item.teamZh ?? t.labels.empty}</span>
-                <span className="col-span-3 truncate">{item.supervisorLabel}</span>
-                <span className="col-span-2 truncate">{item.project?.name ?? t.labels.empty}</span>
+                <span className="truncate">{resolveTeamName(item)}</span>
+                <span className="truncate">{item.supervisorLabel}</span>
+                <span className="truncate">{item.project?.name ?? t.labels.empty}</span>
                 <button
                   type="button"
                   disabled={!canManage}
                   onClick={() => startEdit(item)}
-                  className="col-span-1 rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {t.teamSupervisor.edit}
                 </button>
@@ -337,7 +349,7 @@ export function TeamSupervisorDialog({
                   onClick={() => {
                     if (!submitting) void deleteRow(item)
                   }}
-                  className="col-span-1 rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-600 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-600 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {t.teamSupervisor.delete}
                 </button>

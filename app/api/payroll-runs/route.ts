@@ -2,6 +2,10 @@ import { NextResponse } from 'next/server'
 
 import { prisma } from '@/lib/prisma'
 import {
+  buildTeamHistoryMapAtDates,
+  resolveHistoricalTeamDisplayName,
+} from '@/lib/server/teamSupervisors'
+import {
   canManagePayroll,
   canViewPayroll,
   ensurePayrollRuns,
@@ -139,6 +143,9 @@ export async function GET(request: Request) {
         orderBy: [{ runId: 'asc' }, { userId: 'asc' }],
       })
     : []
+  const payoutTeamHistoryMap = await buildTeamHistoryMapAtDates(
+    payouts.map((item) => ({ team: item.team, at: item.payoutDate })),
+  )
 
   const expatProfiles = await prisma.userExpatProfile.findMany({
     where: memberIds.length ? { userId: { in: memberIds } } : undefined,
@@ -328,6 +335,8 @@ export async function GET(request: Request) {
       runId: item.runId,
       userId: item.userId,
       team: item.team,
+      teamDisplayZh: resolveHistoricalTeamDisplayName(item.team, item.payoutDate, 'zh', payoutTeamHistoryMap) || null,
+      teamDisplayFr: resolveHistoricalTeamDisplayName(item.team, item.payoutDate, 'fr', payoutTeamHistoryMap) || null,
       chineseSupervisorId: item.chineseSupervisorId,
       chineseSupervisorName: item.chineseSupervisorName,
       payoutDate: item.payoutDate.toISOString(),

@@ -17,36 +17,54 @@ export const parseSearchTerms = (input?: string | null) =>
 export const normalizeTeamKey = (value?: string | null) =>
   normalizeText(value).toLowerCase()
 
+type TeamDisplayBinding = {
+  team?: string | null
+  teamFr?: string | null
+  teamZh?: string | null
+}
+
 export const resolveTeamDisplayName = (
   team: string | null | undefined,
   locale: Locale,
-  teamSupervisorMap?: Map<string, { teamZh?: string | null }> | null,
+  teamSupervisorMap?: Map<string, TeamDisplayBinding> | null,
 ) => {
   const normalizedTeam = normalizeText(team)
   if (!normalizedTeam) return ''
-  if (locale !== 'zh' || !teamSupervisorMap) return normalizedTeam
+  if (!teamSupervisorMap) return normalizedTeam
   const teamKey = normalizeTeamKey(normalizedTeam)
   if (!teamKey) return normalizedTeam
-  const teamZh = normalizeText(teamSupervisorMap.get(teamKey)?.teamZh ?? null)
+  const binding = teamSupervisorMap.get(teamKey)
+  if (locale === 'fr') {
+    const teamFr = normalizeText(binding?.teamFr ?? null)
+    return teamFr || normalizedTeam
+  }
+  const teamZh = normalizeText(binding?.teamZh ?? null)
   return teamZh || normalizedTeam
 }
 
 export const resolveTeamInputValue = (
   input: string,
   locale: Locale,
-  teamSupervisorMap?: Map<string, { team?: string | null; teamZh?: string | null }> | null,
+  teamSupervisorMap?: Map<string, TeamDisplayBinding> | null,
 ) => {
   const normalizedInput = normalizeText(input)
   if (!normalizedInput) return ''
   if (!teamSupervisorMap) return normalizedInput
   const inputKey = normalizeTeamKey(normalizedInput)
   let teamMatch: string | null = null
+  let teamFrMatch: string | null = null
   let teamZhMatch: string | null = null
   teamSupervisorMap.forEach((item) => {
     if (!teamMatch) {
       const team = normalizeText(item.team ?? null)
       if (team && normalizeTeamKey(team) === inputKey) {
         teamMatch = team
+      }
+    }
+    if (locale === 'fr' && !teamFrMatch) {
+      const teamFr = normalizeText(item.teamFr ?? null)
+      if (teamFr && normalizeTeamKey(teamFr) === inputKey) {
+        teamFrMatch = normalizeText(item.team ?? null)
       }
     }
     if (locale === 'zh' && !teamZhMatch) {
@@ -57,6 +75,7 @@ export const resolveTeamInputValue = (
     }
   })
   if (teamMatch) return teamMatch
+  if (teamFrMatch) return teamFrMatch
   if (teamZhMatch) return teamZhMatch
   return normalizedInput
 }

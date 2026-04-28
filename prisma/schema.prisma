@@ -954,6 +954,7 @@ model UserExpatProfile {
 model TeamSupervisor {
   id             Int      @id @default(autoincrement())
   team           String
+  teamFr         String?
   teamZh         String?
   teamKey        String   @unique
   supervisorId   Int
@@ -963,10 +964,34 @@ model TeamSupervisor {
   supervisorName String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
+  histories      TeamSupervisorHistory[]
 
   @@index([team])
   @@index([supervisorId])
   @@index([projectId])
+}
+
+model TeamSupervisorHistory {
+  id             Int             @id @default(autoincrement())
+  teamSupervisorId Int?
+  teamSupervisor TeamSupervisor? @relation(fields: [teamSupervisorId], references: [id], onDelete: SetNull)
+  team           String
+  teamFr         String?
+  teamZh         String?
+  teamKey        String
+  supervisorId   Int
+  supervisorName String?
+  projectId      Int?
+  effectiveFrom  DateTime
+  effectiveTo    DateTime?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  @@index([teamSupervisorId])
+  @@index([teamKey])
+  @@index([teamKey, effectiveFrom])
+  @@index([effectiveFrom])
+  @@index([effectiveTo])
 }
 
 model UserProjectAssignment {

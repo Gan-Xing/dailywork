@@ -93,8 +93,13 @@ export function ContractChangeTable({
   onApplyJoinDate,
   onApplyPosition,
 }: ContractChangeTableProps) {
-  const resolveTeamLabel = (team?: string | null) =>
-    resolveTeamDisplayName(team ?? null, locale, teamSupervisorMap)
+  const resolveTeamLabel = (record?: Pick<ContractChange, 'team' | 'teamDisplayZh' | 'teamDisplayFr'> | null) => {
+    if (!record) return ''
+    if (locale === 'fr') {
+      return record.teamDisplayFr ?? resolveTeamDisplayName(record.team ?? null, locale, teamSupervisorMap)
+    }
+    return record.teamDisplayZh ?? resolveTeamDisplayName(record.team ?? null, locale, teamSupervisorMap)
+  }
   const defaultForm = useMemo(
     () => buildDefaults(expatProfile, teamSupervisorMap, currentPosition),
     [currentPosition, expatProfile, teamSupervisorMap],
@@ -274,7 +279,7 @@ export function ContractChangeTable({
             {records.map((record) => (
               <tr key={record.id} className="border-b border-slate-200 last:border-0">
                 <td className="py-3">{formatDate(record.changeDate) || t.labels.empty}</td>
-                <td className="py-3">{resolveTeamLabel(record.team) || t.labels.empty}</td>
+                <td className="py-3">{resolveTeamLabel(record) || t.labels.empty}</td>
                 <td className="py-3">{record.contractNumber || t.labels.empty}</td>
                 <td className="py-3">{record.position || t.labels.empty}</td>
                 <td className="py-3">{record.contractType || t.labels.empty}</td>

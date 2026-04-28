@@ -4,6 +4,10 @@ import puppeteer from 'puppeteer'
 import { prisma } from '@/lib/prisma'
 import { canViewPayroll } from '@/lib/server/payrollRuns'
 import { normalizeTeamKey, normalizeText } from '@/lib/members/utils'
+import {
+  buildTeamHistoryMapAtDates,
+  resolveHistoricalTeamDisplayName,
+} from '@/lib/server/teamSupervisors'
 import { renderSalaryReportHtml, type SalaryPage, type SalaryRow } from '@/lib/templates/salaryReport'
 
 const EXECUTABLE_PATH =
@@ -46,16 +50,6 @@ const chunkRows = <T,>(rows: T[], size: number) => {
     result.push(rows.slice(i, i + size))
   }
   return result
-}
-
-const buildTeamLabel = (teamZh: string, teamName: string, fallback: string) => {
-  const zh = normalizeText(teamZh)
-  const name = normalizeText(teamName)
-  if (zh && name) {
-    if (zh.toLowerCase() === name.toLowerCase()) return zh
-    return `${zh} / ${name}`
-  }
-  return zh || name || fallback
 }
 
 export async function POST(
@@ -126,23 +120,12 @@ export async function POST(
     return NextResponse.json({ message: '暂无可导出的工资记录' }, { status: 404 })
   }
 
-  const teamKeys = new Set<string>()
-  payouts.forEach((payout) => {
-    const rawTeam = normalizeText(payout.team) || normalizeText(payout.user.expatProfile?.team)
-    const key = normalizeTeamKey(rawTeam)
-    if (key) teamKeys.add(key)
-  })
-  const teamSupervisors = teamKeys.size
-    ? await prisma.teamSupervisor.findMany({
-        where: { teamKey: { in: Array.from(teamKeys) } },
-        select: { teamKey: true, teamZh: true },
-      })
-    : []
-  const teamZhByKey = new Map<string, string>()
-  teamSupervisors.forEach((item) => {
-    const zh = normalizeText(item.teamZh)
-    if (zh) teamZhByKey.set(item.teamKey, zh)
-  })
+  const teamHistoryMap = await buildTeamHistoryMapAtDates(
+    payouts.map((payout) => ({
+      team: normalizeText(payout.team) || normalizeText(payout.user.expatProfile?.team),
+      at: payout.payoutDate,
+    })),
+  )
 
   const prevYear = run.month === 1 ? run.year - 1 : run.year
   const prevMonth = run.month === 1 ? 12 : run.month - 1
@@ -200,14 +183,15 @@ export async function POST(
     }
     const rawTeam = normalizeText(payout.team) || normalizeText(payout.user.expatProfile?.team)
     const teamKey = normalizeTeamKey(rawTeam)
-    const teamZh = teamKey ? teamZhByKey.get(teamKey) ?? '' : ''
-    const label = buildTeamLabel(teamZh, rawTeam, teamFallback)
+    const teamZh = resolveHistoricalTeamDisplayName(rawTeam, payout.payoutDate, 'zh', teamHistoryMap)
+    const teamFr = resolveHistoricalTeamDisplayName(rawTeam, payout.payoutDate, 'fr', teamHistoryMap)
+    const label = locale === 'fr' ? teamFr || teamFallback : teamZh || teamFallback
     const groupKey = teamKey || TEAM_FALLBACK_KEY
     const entry = teams.get(groupKey)
     if (entry) {
       entry.items.push(payout)
     } else {
-      teams.set(groupKey, { label, zh: teamZh, fr: rawTeam, items: [payout] })
+      teams.set(groupKey, { label, zh: teamZh, fr: teamFr, items: [payout] })
     }
   })
 

@@ -69,8 +69,13 @@ export function PayrollChangeTable({
   onRefresh,
   onApplyExpatProfile,
 }: PayrollChangeTableProps) {
-  const resolveTeamLabel = (team?: string | null) =>
-    resolveTeamDisplayName(team ?? null, locale, teamSupervisorMap)
+  const resolveTeamLabel = (record?: Pick<PayrollChange, 'team' | 'teamDisplayZh' | 'teamDisplayFr'> | null) => {
+    if (!record) return ''
+    if (locale === 'fr') {
+      return record.teamDisplayFr ?? resolveTeamDisplayName(record.team ?? null, locale, teamSupervisorMap)
+    }
+    return record.teamDisplayZh ?? resolveTeamDisplayName(record.team ?? null, locale, teamSupervisorMap)
+  }
   const defaultForm = useMemo(
     () => buildDefaults(expatProfile, teamSupervisorMap),
     [expatProfile, teamSupervisorMap],
@@ -222,7 +227,7 @@ export function PayrollChangeTable({
                 <td className="py-3">{record.baseSalaryAmount || record.salaryAmount || t.labels.empty}</td>
                 <td className="py-3">{record.baseSalaryUnit || record.salaryUnit || t.labels.empty}</td>
                 <td className="py-3">{record.netMonthlyAmount || t.labels.empty}</td>
-                <td className="py-3">{resolveTeamLabel(record.team) || t.labels.empty}</td>
+                <td className="py-3">{resolveTeamLabel(record) || t.labels.empty}</td>
                 <td className="py-3">{record.chineseSupervisorName || t.labels.empty}</td>
                 <td className="py-3">
                   <div className="flex items-center gap-2">

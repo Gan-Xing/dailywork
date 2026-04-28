@@ -2,6 +2,8 @@ export type ContractChange = {
   id: number
   userId: number
   team: string | null
+  teamDisplayZh?: string | null
+  teamDisplayFr?: string | null
   chineseSupervisorId: number | null
   chineseSupervisorName: string | null
   position: string | null
@@ -23,6 +25,8 @@ export type PayrollChange = {
   id: number
   userId: number
   team: string | null
+  teamDisplayZh?: string | null
+  teamDisplayFr?: string | null
   chineseSupervisorId: number | null
   chineseSupervisorName: string | null
   salaryCategory: string | null
@@ -43,6 +47,8 @@ export type PayrollPayout = {
   userId: number
   runId?: number
   team: string | null
+  teamDisplayZh?: string | null
+  teamDisplayFr?: string | null
   chineseSupervisorId: number | null
   chineseSupervisorName: string | null
   payoutDate: string

@@ -26,7 +26,7 @@ type UseFilteredMembersParams = {
   resolveRoleName: (role: { id: number; name: string }) => string
   canAssignRole: boolean
   keyword: string
-  teamSupervisorMap?: Map<string, { teamZh?: string | null }>
+  teamSupervisorMap?: Map<string, { teamFr?: string | null; teamZh?: string | null }>
   nameFilters: string[]
   usernameFilters: string[]
   genderFilters: string[]

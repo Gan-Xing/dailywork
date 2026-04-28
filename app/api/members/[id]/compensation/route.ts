@@ -2,6 +2,10 @@ import { NextResponse } from 'next/server'
 
 import { hasPermission } from '@/lib/server/authSession'
 import { prisma } from '@/lib/prisma'
+import {
+  buildTeamHistoryMapAtDates,
+  resolveHistoricalTeamDisplayName,
+} from '@/lib/server/teamSupervisors'
 
 const canAccessCompensation = async () => {
   return (
@@ -36,11 +40,19 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
     }),
   ])
 
+  const teamHistoryMap = await buildTeamHistoryMapAtDates([
+    ...contractChanges.map((item) => ({ team: item.team, at: item.changeDate })),
+    ...payrollChanges.map((item) => ({ team: item.team, at: item.changeDate })),
+    ...payrollPayouts.map((item) => ({ team: item.team, at: item.payoutDate })),
+  ])
+
   return NextResponse.json({
     contractChanges: contractChanges.map((item) => ({
       id: item.id,
       userId: item.userId,
       team: item.team,
+      teamDisplayZh: resolveHistoricalTeamDisplayName(item.team, item.changeDate, 'zh', teamHistoryMap) || null,
+      teamDisplayFr: resolveHistoricalTeamDisplayName(item.team, item.changeDate, 'fr', teamHistoryMap) || null,
       chineseSupervisorId: item.chineseSupervisorId,
       chineseSupervisorName: item.chineseSupervisorName,
       position: item.position,
@@ -61,6 +73,8 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
       id: item.id,
       userId: item.userId,
       team: item.team,
+      teamDisplayZh: resolveHistoricalTeamDisplayName(item.team, item.changeDate, 'zh', teamHistoryMap) || null,
+      teamDisplayFr: resolveHistoricalTeamDisplayName(item.team, item.changeDate, 'fr', teamHistoryMap) || null,
       chineseSupervisorId: item.chineseSupervisorId,
       chineseSupervisorName: item.chineseSupervisorName,
       salaryCategory: item.salaryCategory,
@@ -80,6 +94,8 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
       userId: item.userId,
       runId: item.runId,
       team: item.team,
+      teamDisplayZh: resolveHistoricalTeamDisplayName(item.team, item.payoutDate, 'zh', teamHistoryMap) || null,
+      teamDisplayFr: resolveHistoricalTeamDisplayName(item.team, item.payoutDate, 'fr', teamHistoryMap) || null,
       chineseSupervisorId: item.chineseSupervisorId,
       chineseSupervisorName: item.chineseSupervisorName,
       payoutDate: item.payoutDate.toISOString(),

@@ -8,6 +8,10 @@ import { prisma } from '@/lib/prisma'
 import { normalizeTeamKey, normalizeText } from '@/lib/members/utils'
 import { canViewPayroll } from '@/lib/server/payrollRuns'
 import {
+  buildTeamHistoryMapAtDates,
+  resolveHistoricalTeamDisplayName,
+} from '@/lib/server/teamSupervisors'
+import {
   PRESENCE_ROWS_PER_PAGE,
   renderPresenceReportHtml,
   type PresencePage,
@@ -146,18 +150,6 @@ const hasContractTypeOverlap = (
   if (profile.contractType !== type) return false
   if (!profile.contractStartDate) return true
   return overlaps(profile.contractStartDate, profile.contractEndDate ?? null)
-}
-
-const buildTeamLabel = (
-  locale: 'zh' | 'fr',
-  teamKey: string,
-  teamName: string,
-  teamZhByKey: Map<string, string>,
-) => {
-  if (locale === 'zh') {
-    return teamZhByKey.get(teamKey) || teamName || TEAM_FALLBACK_ZH
-  }
-  return teamName || TEAM_FALLBACK_FR
 }
 
 const sanitizeFilename = (value: string, fallback: string) => {
@@ -365,22 +357,21 @@ export async function POST(
     return NextResponse.json({ message: '暂无可导出的考勤记录' }, { status: 404 })
   }
 
-  const teamKeys = Array.from(teams.keys()).filter((key) => key !== TEAM_FALLBACK_KEY)
-  const teamSupervisors = teamKeys.length
-    ? await prisma.teamSupervisor.findMany({
-        where: { teamKey: { in: teamKeys } },
-        select: { teamKey: true, teamZh: true },
-      })
-    : []
-  const teamZhByKey = new Map<string, string>()
-  teamSupervisors.forEach((item) => {
-    const zh = normalizeText(item.teamZh)
-    if (zh) teamZhByKey.set(item.teamKey, zh)
-  })
+  const teamHistoryMap = await buildTeamHistoryMapAtDates(
+    Array.from(teams.values()).map((team) => ({
+      team: team.teamName,
+      at: run.attendanceCutoffDate,
+    })),
+  )
 
   const sortedTeams = Array.from(teams.values())
     .map((team) => {
-      const label = buildTeamLabel(locale, team.teamKey, team.teamName, teamZhByKey)
+      const label = resolveHistoricalTeamDisplayName(
+        team.teamName,
+        run.attendanceCutoffDate,
+        locale,
+        teamHistoryMap,
+      ) || (locale === 'fr' ? TEAM_FALLBACK_FR : TEAM_FALLBACK_ZH)
       return { ...team, label }
     })
     .sort((left, right) => collator.compare(left.label, right.label))
@@ -510,7 +501,13 @@ export async function POST(
           mergedBuffer = (ctjBuffer ?? cddBuffer) as Uint8Array
         }
 
-        const teamLabel = buildTeamLabel(locale, team.teamKey, team.teamName, teamZhByKey)
+        const teamLabel =
+          resolveHistoricalTeamDisplayName(
+            team.teamName,
+            run.attendanceCutoffDate,
+            locale,
+            teamHistoryMap,
+          ) || (locale === 'fr' ? TEAM_FALLBACK_FR : TEAM_FALLBACK_ZH)
         const filename = sanitizeFilename(
           `attendance-${run.year}-${String(run.month).padStart(2, '0')}-run-${run.sequence}-${teamLabel}.pdf`,
           `attendance-${team.teamKey || TEAM_FALLBACK_KEY}.pdf`,

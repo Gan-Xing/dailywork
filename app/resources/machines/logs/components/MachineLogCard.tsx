@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { ActionButton } from '@/components/ActionButton'
 import { SingleSelect, type SingleSelectOption } from '@/components/SingleSelect'
 import type { Locale } from '@/lib/i18n'
+import { resolveTeamDisplayName } from '@/lib/members/utils'
 import type { ResourcesCopy } from '@/lib/i18n/resources'
 import { computeMachineDailyDepreciation } from '@/lib/resources/machines/depreciation'
 import { resolveMachineEquipmentTypeKey } from '@/lib/resources/machines/equipmentTypes'
@@ -135,13 +136,16 @@ export function MachineLogCard({
   }, [machine])
 
   const teamOptions: SingleSelectOption[] = useMemo(() => {
+    const teamSupervisorMap = new Map(
+      teamSupervisors.map((binding) => [binding.teamKey, binding] as const),
+    )
     const entries = teamSupervisors.map((binding) => ({
       value: binding.teamKey,
-      label: binding.teamZh ? `${binding.teamZh}（${binding.team}）` : binding.team,
-      searchText: `${binding.team} ${binding.teamZh ?? ''}`.trim(),
+      label: resolveTeamDisplayName(binding.team, locale, teamSupervisorMap) || binding.team,
+      searchText: `${binding.team} ${binding.teamFr ?? ''} ${binding.teamZh ?? ''}`.trim(),
     }))
     return [{ value: '', label: t.common.clear }, ...entries]
-  }, [t.common.clear, teamSupervisors])
+  }, [locale, t.common.clear, teamSupervisors])
 
   const supervisorOptions = useMemo(
     () => buildUserOptions(supervisors, t.common.clear),

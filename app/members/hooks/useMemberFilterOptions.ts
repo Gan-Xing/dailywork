@@ -30,7 +30,7 @@ type UseMemberFilterOptionsParams = {
   canAssignRole: boolean
   statusLabels: Record<EmploymentStatus, string>
   findNationalityLabel: (value: string | null) => string
-  teamSupervisorMap?: Map<string, { teamZh?: string | null }>
+  teamSupervisorMap?: Map<string, { teamFr?: string | null; teamZh?: string | null }>
 }
 
 type Option = { value: string; label: string }
