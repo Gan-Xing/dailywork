@@ -4,6 +4,11 @@ export const WEEKLY_PLAN_GOODS_KEYS = [
   'diesel',
   'cement',
   'bitumen',
+  'engine_oil',
+  'hydraulic_oil',
+  'grease',
+  'gear_oil',
+  'brake_fluid',
   'binding_wire',
   'rebar',
   'angle_steel',
@@ -46,6 +51,31 @@ const weeklyPlanGoodsDefinitions: WeeklyPlanGoodsDefinition[] = [
     key: 'bitumen',
     label: { zh: '沥青', fr: 'Bitume' },
     aliases: ['bitumen', 'bitume', '沥青'],
+  },
+  {
+    key: 'engine_oil',
+    label: { zh: '机油', fr: 'Huile moteur' },
+    aliases: ['engine oil', 'huile moteur', '机油', '润滑油', '发动机油'],
+  },
+  {
+    key: 'hydraulic_oil',
+    label: { zh: '液压油', fr: 'Huile hydraulique' },
+    aliases: ['hydraulic oil', 'huile hydraulique', '液压油'],
+  },
+  {
+    key: 'grease',
+    label: { zh: '黄油', fr: 'Graisse' },
+    aliases: ['grease', 'lubricating grease', 'graisse', 'graisse lubrifiante', '黄油', '润滑脂'],
+  },
+  {
+    key: 'gear_oil',
+    label: { zh: '齿轮油', fr: 'Huile de transmission' },
+    aliases: ['gear oil', 'huile pour engrenages', 'huile de transmission', '齿轮油', '传动油'],
+  },
+  {
+    key: 'brake_fluid',
+    label: { zh: '刹车油', fr: 'Liquide de frein' },
+    aliases: ['brake fluid', 'liquide de frein', '刹车油', '制动液'],
   },
   {
     key: 'binding_wire',
