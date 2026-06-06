@@ -18,7 +18,7 @@ const PointProgressWave = dynamic<PointProgressWaveProps>(
   },
 )
 
-const useElementWidth = (ref: RefObject<HTMLElement>) => {
+const useElementWidth = (ref: RefObject<HTMLElement | null>) => {
   const [width, setWidth] = useState(0)
 
   useLayoutEffect(() => {

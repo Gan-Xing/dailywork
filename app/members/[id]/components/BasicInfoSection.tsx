@@ -28,7 +28,7 @@ type BasicInfoSectionProps = {
   onRemovePhone: (index: number) => void
   showPhonePicker: boolean
   onTogglePhonePicker: () => void
-  phonePickerRef: RefObject<HTMLDivElement>
+  phonePickerRef: RefObject<HTMLDivElement | null>
 }
 
 export function BasicInfoSection({

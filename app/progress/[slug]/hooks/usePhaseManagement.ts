@@ -54,7 +54,7 @@ type UsePhaseManagementResult = {
   designLength: number
   workflowMap: Map<number, WorkflowBinding>
   workflowLayersByPhaseId: Map<number, { layers: WorkflowLayerTemplate[]; phaseName: string }>
-  nameInputRef: React.RefObject<HTMLInputElement>
+  nameInputRef: React.RefObject<HTMLInputElement | null>
   setName: (value: string) => void
   setMeasure: (value: PhaseMeasure) => void
   setPointHasSides: (value: boolean) => void

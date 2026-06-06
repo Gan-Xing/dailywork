@@ -54,7 +54,7 @@ type MemberFormModalProps = {
   setPhoneInput: Dispatch<SetStateAction<string>>
   addPhoneFromInput: () => void
   removePhone: (index: number) => void
-  phonePickerRef: RefObject<HTMLDivElement>
+  phonePickerRef: RefObject<HTMLDivElement | null>
   actionError: string | null
   submitting: boolean
 }

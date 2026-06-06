@@ -147,7 +147,7 @@ export async function POST(request: Request) {
     try {
       page = await withTimeout(browser.newPage(), '创建页面', 12_000)
 
-      await withTimeout(page.setContent(html, { waitUntil: 'networkidle2' }), '渲染页面', 15_000)
+      await withTimeout(page.setContent(html, { waitUntil: 'domcontentloaded' }), '渲染页面', 15_000)
 
       const pdf = await withTimeout(
         page.pdf({

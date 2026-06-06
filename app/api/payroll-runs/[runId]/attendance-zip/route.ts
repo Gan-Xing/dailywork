@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import archiver from 'archiver'
+import { ZipArchive } from 'archiver'
 import { PDFDocument } from 'pdf-lib'
 import puppeteer, { type Browser } from 'puppeteer'
 import { PassThrough, Readable } from 'stream'
@@ -381,7 +381,7 @@ export async function POST(
     'attendance.zip',
   )
 
-  const archive = archiver('zip', { zlib: { level: 9 } })
+  const archive = new ZipArchive({ zlib: { level: 9 } })
   const stream = new PassThrough()
   let aborted = false
   let browser: Browser | null = null

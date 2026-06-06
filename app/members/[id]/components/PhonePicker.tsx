@@ -13,7 +13,7 @@ type PhonePickerProps = {
   onRemovePhone: (index: number) => void
   showPhonePicker: boolean
   onTogglePicker: () => void
-  phonePickerRef: RefObject<HTMLDivElement>
+  phonePickerRef: RefObject<HTMLDivElement | null>
   phoneSummary: string
 }
 

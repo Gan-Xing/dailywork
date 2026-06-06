@@ -40,7 +40,7 @@ export interface PhaseFormModalProps {
   layerOptions: string[]
   isPending: boolean
   error: string | null
-  nameInputRef: RefObject<HTMLInputElement>
+  nameInputRef: RefObject<HTMLInputElement | null>
   onClose: () => void
   onReset: () => void
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => void

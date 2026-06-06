@@ -222,10 +222,10 @@ type MembersTabProps = {
   onContractAuditClick: () => void
   onExport: () => void
   onDownloadTemplate: () => void
-  importInputRef: RefObject<HTMLInputElement>
-  contractChangeImportInputRef: RefObject<HTMLInputElement>
-  contractAuditInputRef: RefObject<HTMLInputElement>
-  columnSelectorRef: RefObject<HTMLDivElement>
+  importInputRef: RefObject<HTMLInputElement | null>
+  contractChangeImportInputRef: RefObject<HTMLInputElement | null>
+  contractAuditInputRef: RefObject<HTMLInputElement | null>
+  columnSelectorRef: RefObject<HTMLDivElement | null>
   handleSort: (field: SortField) => void
   sortIndicator: (field: SortField) => string
   members: Member[]

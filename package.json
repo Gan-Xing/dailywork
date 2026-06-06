@@ -2,6 +2,10 @@
   "name": "daily-work",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "pnpm@9.15.4",
+  "engines": {
+    "node": ">=24 <25"
+  },
   "scripts": {
     "dev": "next dev --turbo",
     "dev:webpack": "next dev",
@@ -13,35 +17,46 @@
     "submission:batch": "tsx scripts/submission-batch.ts"
   },
   "dependencies": {
-    "archiver": "^7.0.1",
+    "@prisma/client": "^6.19.3",
+    "archiver": "^8.0.0",
     "d3-scale": "^4.0.2",
     "exceljs": "^4.4.0",
     "file-saver": "^2.0.5",
-    "next": "16.1.0-canary.20",
+    "next": "16.2.7",
     "pdf-lib": "^1.17.1",
-    "puppeteer": "^24.32.1",
-    "react": "19.3.0-canary-b061b597-20251212",
-    "react-dom": "19.3.0-canary-b061b597-20251212",
-    "react-liquid-gauge": "^1.2.4",
+    "puppeteer": "^25.1.0",
+    "react": "19.2.7",
+    "react-dom": "19.2.7",
     "server-only": "^0.0.1",
-    "sharp": "^0.34.4",
-    "xlsx": "^0.18.5"
+    "sharp": "^0.34.5",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "devDependencies": {
-    "@prisma/client": "^6.19.0",
     "@types/file-saver": "^2.0.7",
-    "@types/node": "^20",
-    "@types/react": "^18",
-    "@types/react-dom": "^18",
-    "@typescript-eslint/parser": "^8.49.0",
-    "autoprefixer": "^10",
-    "dotenv": "^17.2.3",
-    "eslint": "^8",
-    "eslint-config-next": "16.1.0-canary.20",
-    "postcss": "^8",
-    "prisma": "^6.19.0",
+    "@types/node": "^24.13.1",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@typescript-eslint/parser": "^8.60.1",
+    "autoprefixer": "^10.5.0",
+    "dotenv": "^17.4.2",
+    "eslint": "^9.39.4",
+    "eslint-config-next": "16.2.7",
+    "postcss": "^8.5.15",
+    "prisma": "^6.19.3",
     "tailwindcss": "^3",
-    "tsx": "^4.20.6",
-    "typescript": "^5"
+    "tsx": "^4.22.4",
+    "typescript": "^5.9.3"
+  },
+  "pnpm": {
+    "overrides": {
+      "brace-expansion@1.1.12": "1.1.15",
+      "brace-expansion@2.0.2": "2.1.1",
+      "defu@6.1.4": "6.1.7",
+      "minimatch@3.1.2": "3.1.5",
+      "minimatch@5.1.6": "5.1.9",
+      "postcss@8.4.31": "8.5.15",
+      "tmp@0.2.5": "0.2.7",
+      "uuid@8.3.2": "11.1.1"
+    }
   }
 }
