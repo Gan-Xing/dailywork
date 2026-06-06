@@ -40,3 +40,4 @@ next-env.d.ts
 .codex/
 .telegram-inbox/
 video-studio/
+.tmp/
