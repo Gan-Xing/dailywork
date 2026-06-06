@@ -7,7 +7,7 @@
  *   NAME_FILTER="0.60x0.60" npx tsx scripts/inspectPhaseItemDuplicates.ts
  *   INCLUDE_INACTIVE=1 npx tsx scripts/inspectPhaseItemDuplicates.ts
  */
-/* eslint-disable no-console */
+
 import 'dotenv/config'
 
 import { PrismaClient } from '@prisma/client'

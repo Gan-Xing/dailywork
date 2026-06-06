@@ -5,7 +5,7 @@
  *   npx tsx scripts/list-contract-change-start-after-change-date.ts
  *   npx tsx scripts/list-contract-change-start-after-change-date.ts --limit 200
  */
-/* eslint-disable no-console */
+
 import 'dotenv/config'
 
 import { PrismaClient } from '@prisma/client'

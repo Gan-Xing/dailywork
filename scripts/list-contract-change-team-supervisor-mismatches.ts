@@ -8,7 +8,7 @@
  *   npx tsx scripts/list-contract-change-team-supervisor-mismatches.ts --limit 200
  *   npx tsx scripts/list-contract-change-team-supervisor-mismatches.ts --with-history
  */
-/* eslint-disable no-console */
+
 import 'dotenv/config'
 
 import fs from 'node:fs'

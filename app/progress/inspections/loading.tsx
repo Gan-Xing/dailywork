@@ -15,7 +15,7 @@ export default function Loading() {
           {Array.from({ length: 6 }).map((_, index) => (
             <div
               // skeleton cards only
-              // eslint-disable-next-line react/no-array-index-key
+
               key={index}
               className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
             >

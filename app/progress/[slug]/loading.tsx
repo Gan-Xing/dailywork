@@ -24,7 +24,7 @@ export default function Loading() {
             {Array.from({ length: 4 }).map((_, index) => (
               <SkeletonBlock
                 // skeleton only; order fixed
-                // eslint-disable-next-line react/no-array-index-key
+
                 key={index}
                 tone="light"
                 className="h-32 border border-slate-200 bg-white"

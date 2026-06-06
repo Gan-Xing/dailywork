@@ -8,7 +8,7 @@
  *   npx tsx scripts/list-payroll-payout-contract-mismatches.ts --only-team-supervisor
  *   npx tsx scripts/list-payroll-payout-contract-mismatches.ts --output reports/payout-mismatches.txt
  */
-/* eslint-disable no-console */
+
 import 'dotenv/config'
 
 import fs from 'node:fs'

@@ -1,4 +1,4 @@
-/* eslint-disable no-console */
+
 // Quick checker for culvert (过道涵) phase layers on a given road (defaults to “大学城”).
 // Usage: node scripts/checkCulvertLayers.js [roadKeyword] [phaseName]
 // roadKeyword matches road.name (ILIKE %keyword%) and slug (contains keyword).

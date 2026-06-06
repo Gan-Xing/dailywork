@@ -7,7 +7,7 @@
  *   npx tsx scripts/normalize-contract-change-overlaps.ts --confirm
  *   npx tsx scripts/normalize-contract-change-overlaps.ts --confirm --sync-profiles
  */
-/* eslint-disable no-console */
+
 import 'dotenv/config'
 
 import { PrismaClient } from '@prisma/client'

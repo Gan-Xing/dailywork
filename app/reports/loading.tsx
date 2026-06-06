@@ -31,7 +31,7 @@ export default function Loading() {
           {Array.from({ length: 21 }).map((_, index) => (
             <SkeletonBlock
               // skeleton grid only
-              // eslint-disable-next-line react/no-array-index-key
+
               key={index}
               className="h-16 rounded-2xl border border-slate-100 bg-slate-50"
             />
@@ -57,7 +57,7 @@ export default function Loading() {
           {Array.from({ length: 4 }).map((_, index) => (
             <div
               // skeleton table rows only
-              // eslint-disable-next-line react/no-array-index-key
+
               key={index}
               className="flex items-center justify-between rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3"
             >
@@ -78,7 +78,7 @@ export default function Loading() {
           {Array.from({ length: 3 }).map((_, index) => (
             <div
               // skeleton list only
-              // eslint-disable-next-line react/no-array-index-key
+
               key={index}
               className="flex items-center justify-between rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3"
             >

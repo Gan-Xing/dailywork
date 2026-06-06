@@ -6,7 +6,7 @@
  *   npx tsx scripts/check-contract-numbers-latest-team.ts
  *   npx tsx scripts/check-contract-numbers-latest-team.ts --output reports/contract-number-latest-check.txt
  */
-/* eslint-disable no-console */
+
 import 'dotenv/config'
 
 import fs from 'node:fs'

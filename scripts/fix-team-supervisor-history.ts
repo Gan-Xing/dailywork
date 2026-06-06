@@ -5,7 +5,7 @@
  *   npx tsx scripts/fix-team-supervisor-history.ts --team "TOPO"
  *   npx tsx scripts/fix-team-supervisor-history.ts --team "TOPO" --confirm
  */
-/* eslint-disable no-console */
+
 import 'dotenv/config'
 
 import { PrismaClient } from '@prisma/client'

@@ -31,7 +31,7 @@ export default function Loading() {
           {Array.from({ length: 3 }).map((_, index) => (
             <SkeletonBlock
               // skeleton summary only
-              // eslint-disable-next-line react/no-array-index-key
+
               key={index}
               className="h-32 border border-slate-100 bg-slate-50"
             />
@@ -43,7 +43,7 @@ export default function Loading() {
         {Array.from({ length: 4 }).map((_, index) => (
           <div
             // skeleton section only
-            // eslint-disable-next-line react/no-array-index-key
+
             key={index}
             className="rounded-3xl border border-slate-200 bg-white/80 p-6 shadow-sm"
           >

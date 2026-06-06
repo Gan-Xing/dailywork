@@ -7,7 +7,7 @@
  *   npx tsx scripts/backfill-latest-contract-change-team-position.ts --confirm
  *   npx tsx scripts/backfill-latest-contract-change-team-position.ts --confirm --sync-profiles
  */
-/* eslint-disable no-console */
+
 import 'dotenv/config'
 
 import { PrismaClient } from '@prisma/client'

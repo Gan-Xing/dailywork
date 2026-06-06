@@ -15,7 +15,7 @@ export default function Loading() {
         {Array.from({ length: 3 }).map((_, index) => (
           <SkeletonBar
             // skeleton tabs only
-            // eslint-disable-next-line react/no-array-index-key
+
             key={index}
             className="h-9 w-28"
           />
@@ -37,7 +37,7 @@ export default function Loading() {
           {Array.from({ length: 3 }).map((_, index) => (
             <SkeletonBlock
               // skeleton filters only
-              // eslint-disable-next-line react/no-array-index-key
+
               key={index}
               className="h-12 border border-slate-100 bg-slate-50"
             />
@@ -50,7 +50,7 @@ export default function Loading() {
           {Array.from({ length: 5 }).map((_, index) => (
             <div
               // skeleton rows only
-              // eslint-disable-next-line react/no-array-index-key
+
               key={index}
               className="flex items-center justify-between px-4 py-3"
             >

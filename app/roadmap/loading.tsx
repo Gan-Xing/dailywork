@@ -18,7 +18,7 @@ export default function Loading() {
             {Array.from({ length: 3 }).map((_, index) => (
               <SkeletonBar
                 // skeleton badges only
-                // eslint-disable-next-line react/no-array-index-key
+
                 key={index}
                 tone="dark"
                 className="h-6 w-24"
@@ -42,7 +42,7 @@ export default function Loading() {
               {Array.from({ length: 4 }).map((_, index) => (
                 <SkeletonBlock
                   // skeleton rows only
-                  // eslint-disable-next-line react/no-array-index-key
+
                   key={index}
                   tone="dark"
                   className="h-20 border border-white/10 bg-white/5"

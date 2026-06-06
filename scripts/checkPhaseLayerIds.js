@@ -1,4 +1,4 @@
-/* eslint-disable no-console */
+
 // Inspect phase layer links (id + name) for a given road keyword and phase name.
 // Usage: node scripts/checkPhaseLayerIds.js [roadKeyword] [phaseName]
 // Defaults: roadKeyword="大学城", phaseName="过道涵".

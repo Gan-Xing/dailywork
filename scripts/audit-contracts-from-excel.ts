@@ -5,7 +5,7 @@
  *   npx tsx scripts/audit-contracts-from-excel.ts /path/to/file.xlsx
  *   npx tsx scripts/audit-contracts-from-excel.ts /path/to/file.xlsx --output reports/contract-audit.txt
  */
-/* eslint-disable no-console */
+
 import 'dotenv/config'
 
 import fs from 'node:fs'

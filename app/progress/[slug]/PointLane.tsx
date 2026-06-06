@@ -1,4 +1,4 @@
-/* eslint-disable @next/next/no-img-element */
+
 'use client'
 
 import { useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'

@@ -5,7 +5,7 @@
  * 用法：
  *   npx tsx scripts/update-chinese-profiles.ts
  */
-/* eslint-disable no-console */
+
 import 'dotenv/config'
 
 import { PrismaClient } from '@prisma/client'

@@ -19,7 +19,7 @@ export default function Loading() {
             {Array.from({ length: 3 }).map((_, index) => (
               <SkeletonBar
                 // skeleton stats only
-                // eslint-disable-next-line react/no-array-index-key
+
                 key={index}
                 tone="light"
                 className="h-5 w-40"
@@ -30,7 +30,7 @@ export default function Loading() {
             {Array.from({ length: 6 }).map((_, index) => (
               <div
                 // skeleton rows only
-                // eslint-disable-next-line react/no-array-index-key
+
                 key={index}
                 className="grid items-center gap-3 px-4 py-3 sm:grid-cols-[1.5fr,1fr,1fr,1fr]"
               >

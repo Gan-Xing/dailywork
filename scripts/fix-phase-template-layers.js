@@ -11,7 +11,7 @@
  *   APPLY=1 node scripts/fix-phase-template-layers.js     # 实际写入数据库
  */
 
-/* eslint-disable no-console */
+
 
 const { PrismaClient } = require('@prisma/client')
 

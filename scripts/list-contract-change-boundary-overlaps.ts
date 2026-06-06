@@ -7,7 +7,7 @@
  *   npx tsx scripts/list-contract-change-boundary-overlaps.ts --user 123
  *   npx tsx scripts/list-contract-change-boundary-overlaps.ts --confirm
  */
-/* eslint-disable no-console */
+
 import 'dotenv/config'
 
 import { PrismaClient } from '@prisma/client'

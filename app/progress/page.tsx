@@ -110,7 +110,7 @@ function ProgressFallback() {
           {Array.from({ length: 4 }).map((_, index) => (
             <div
               // fallback skeleton only
-              // eslint-disable-next-line react/no-array-index-key
+
               key={index}
               className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
             >

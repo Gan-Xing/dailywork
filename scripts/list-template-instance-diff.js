@@ -4,7 +4,7 @@
  *   node scripts/list-template-instance-diff.js
  * 需要有效的 DATABASE_URL。
  */
-/* eslint-disable no-console */
+
 
 const { PrismaClient } = require('@prisma/client')
 

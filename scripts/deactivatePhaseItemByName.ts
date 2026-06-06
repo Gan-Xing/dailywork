@@ -6,7 +6,7 @@
  *   APPLY=1 npx tsx scripts/deactivatePhaseItemByName.ts
  *   DEFINITION_NAME="垫层" ITEM_NAME="取土场回填 包括垫层" APPLY=1 npx tsx scripts/deactivatePhaseItemByName.ts
  */
-/* eslint-disable no-console */
+
 import 'dotenv/config'
 
 import { PrismaClient } from '@prisma/client'

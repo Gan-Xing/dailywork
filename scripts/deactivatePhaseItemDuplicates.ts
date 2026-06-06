@@ -6,7 +6,7 @@
  *   APPLY=1 npx tsx scripts/deactivatePhaseItemDuplicates.ts
  *   PHASE_DEFINITION_ID=14 APPLY=1 npx tsx scripts/deactivatePhaseItemDuplicates.ts
  */
-/* eslint-disable no-console */
+
 import 'dotenv/config'
 
 import { PrismaClient } from '@prisma/client'

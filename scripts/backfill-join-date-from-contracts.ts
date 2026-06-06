@@ -5,7 +5,7 @@
  *   npx tsx scripts/backfill-join-date-from-contracts.ts
  *   npx tsx scripts/backfill-join-date-from-contracts.ts --confirm
  */
-/* eslint-disable no-console */
+
 import 'dotenv/config'
 
 import { PrismaClient } from '@prisma/client'

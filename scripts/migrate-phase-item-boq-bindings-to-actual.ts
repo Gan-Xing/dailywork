@@ -6,7 +6,7 @@
  *   npx tsx scripts/migrate-phase-item-boq-bindings-to-actual.ts --confirm
  *   npx tsx scripts/migrate-phase-item-boq-bindings-to-actual.ts --limit 200
  */
-/* eslint-disable no-console */
+
 import { prisma } from '@/lib/prisma'
 
 type ContractBinding = {

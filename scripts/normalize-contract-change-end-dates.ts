@@ -6,7 +6,7 @@
  *   npx tsx scripts/normalize-contract-change-end-dates.ts --confirm
  *   npx tsx scripts/normalize-contract-change-end-dates.ts --confirm --sync-profiles
  */
-/* eslint-disable no-console */
+
 import 'dotenv/config'
 
 import { PrismaClient } from '@prisma/client'

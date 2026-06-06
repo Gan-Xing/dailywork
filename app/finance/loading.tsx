@@ -30,7 +30,7 @@ export default function Loading() {
           {Array.from({ length: 4 }).map((_, index) => (
             <SkeletonBlock
               // skeleton filter only
-              // eslint-disable-next-line react/no-array-index-key
+
               key={index}
               className="h-12 border border-slate-100 bg-slate-50 md:col-span-3"
             />
@@ -44,7 +44,7 @@ export default function Loading() {
         {Array.from({ length: 5 }).map((_, index) => (
           <div
             // skeleton rows only
-            // eslint-disable-next-line react/no-array-index-key
+
             key={index}
             className="grid grid-cols-12 items-center gap-3"
           >

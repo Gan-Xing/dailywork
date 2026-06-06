@@ -6,7 +6,7 @@
  *   npx tsx scripts/list-contract-change-supervisor-changes.ts --limit 200
  *   npx tsx scripts/list-contract-change-supervisor-changes.ts --user 123
  */
-/* eslint-disable no-console */
+
 import 'dotenv/config'
 
 import { PrismaClient } from '@prisma/client'

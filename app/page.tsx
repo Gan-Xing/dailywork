@@ -44,7 +44,7 @@ function HomePageFallback() {
           {Array.from({ length: 6 }).map((_, index) => (
             <div
               // fallback only; index is stable for this static map
-              // eslint-disable-next-line react/no-array-index-key
+
               key={index}
               className="relative overflow-hidden rounded-3xl border border-white/10 bg-white/5 p-5 shadow-xl shadow-slate-950/30 sm:p-6"
             >

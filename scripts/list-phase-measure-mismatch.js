@@ -4,7 +4,7 @@
  *   NAME="过道涵" node scripts/list-phase-measure-mismatch.js
  *   # 不传 NAME 则列出所有分项
  */
-/* eslint-disable no-console */
+
 const { PrismaClient } = require('@prisma/client')
 const prisma = new PrismaClient()
 

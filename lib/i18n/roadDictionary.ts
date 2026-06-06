@@ -85,7 +85,7 @@ const labelsByZh: Record<string, LocalizedString> = {}
 roadNameEntries.forEach((entry) => {
   if (process.env.NODE_ENV !== 'production') {
     if (!entry.zh.trim() || !entry.fr.trim()) {
-      // eslint-disable-next-line no-console
+
       console.warn(`Road dictionary entry missing translation for ${entry.slug}`)
     }
   }

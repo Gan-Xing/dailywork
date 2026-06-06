@@ -13,7 +13,7 @@
  *   npx tsx scripts/fix-payouts-by-contract-for-users.ts --limit 50
  *   npx tsx scripts/fix-payouts-by-contract-for-users.ts --allow-gap
  */
-/* eslint-disable no-console */
+
 import 'dotenv/config'
 
 import { PrismaClient } from '@prisma/client'

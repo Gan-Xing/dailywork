@@ -4,7 +4,7 @@
  * Usage:
  *   npx tsx scripts/backfill-birthdates.ts
  */
-/* eslint-disable no-console */
+
 import 'dotenv/config'
 
 import { PrismaClient } from '@prisma/client'

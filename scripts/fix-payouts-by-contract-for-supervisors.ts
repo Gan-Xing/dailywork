@@ -14,7 +14,7 @@
  *   npx tsx scripts/fix-payouts-by-contract-for-supervisors.ts --confirm
  *   npx tsx scripts/fix-payouts-by-contract-for-supervisors.ts --limit 200
  */
-/* eslint-disable no-console */
+
 import 'dotenv/config'
 
 import { PrismaClient } from '@prisma/client'

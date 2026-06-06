@@ -18,7 +18,7 @@ export default function Loading() {
           {Array.from({ length: 3 }).map((_, index) => (
             <div
               // skeleton groups only
-              // eslint-disable-next-line react/no-array-index-key
+
               key={index}
               className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-5"
             >

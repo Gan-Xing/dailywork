@@ -16,7 +16,7 @@
  *   npx tsx scripts/backfill-contract-change-team-position.ts --confirm
  *   npx tsx scripts/backfill-contract-change-team-position.ts --limit 200
  */
-/* eslint-disable no-console */
+
 import 'dotenv/config'
 
 import { PrismaClient } from '@prisma/client'
