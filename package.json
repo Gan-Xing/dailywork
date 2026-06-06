@@ -13,6 +13,7 @@
     "build": "prisma generate && next build --webpack",
     "start": "next start",
     "lint": "ESLINT_USE_FLAT_CONFIG=true eslint .",
+    "test:unit": "node --import tsx --test tests/*.test.ts",
     "test:deepseek": "tsx tests/deepseekSmoke.ts",
     "submission:batch": "tsx scripts/submission-batch.ts"
   },
