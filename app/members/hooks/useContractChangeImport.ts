@@ -37,6 +37,7 @@ type ContractChangeImportErrorCode =
   | 'invalid_end_date'
   | 'invalid_change_date'
   | 'invalid_chinese_supervisor'
+  | 'missing_team_supervisor'
   | 'duplicate_contract_number'
   | 'contract_number_exists'
   | 'import_failed'
@@ -244,6 +245,9 @@ export function useContractChangeImport({
           break
         case 'invalid_chinese_supervisor':
           message = t.errors.importInvalidChineseSupervisor
+          break
+        case 'missing_team_supervisor':
+          message = t.errors.importMissingTeamSupervisor
           break
         case 'duplicate_contract_number':
           message = t.errors.importDuplicateContractNumber

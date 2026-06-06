@@ -6,7 +6,7 @@ import { hasPermission } from '@/lib/server/authSession'
 import { isDecimalEqual, resolveSupervisorSnapshot } from '@/lib/server/compensation'
 import { createInitialContractChangeIfMissing } from '@/lib/server/contractChanges'
 import { normalizeTagsInput, normalizeTeamKey } from '@/lib/members/utils'
-import { resolveTeamDefaults } from '@/lib/server/teamSupervisors'
+import { resolveTeamSupervisorBinding } from '@/lib/server/teamSupervisors'
 import { applyProjectAssignment } from '@/lib/server/memberProjects'
 import {
   hasExpatProfileData,
@@ -138,14 +138,20 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   if (!existingUser) {
     return NextResponse.json({ error: '成员不存在' }, { status: 404 })
   }
+  const teamBinding = expatProfileData.team
+    ? await resolveTeamSupervisorBinding(expatProfileData.team)
+    : null
+  if (expatProfileData.team && !teamBinding) {
+    return NextResponse.json({ error: '班组未绑定中方负责人' }, { status: 400 })
+  }
+  if (teamBinding) {
+    expatProfileData.team = teamBinding.team
+  }
   const teamChanged =
     normalizeTeamKey(expatProfileData.team) !==
     normalizeTeamKey(existingUser.expatProfile?.team ?? null)
-  const teamDefaults = expatProfileData.team
-    ? await resolveTeamDefaults(expatProfileData.team)
-    : { supervisorId: null, projectId: null }
   const resolvedSupervisorId = expatProfileData.team
-    ? teamDefaults.supervisorId
+    ? teamBinding?.supervisorId ?? null
     : expatProfileData.chineseSupervisorId ??
       existingUser.expatProfile?.chineseSupervisorId ??
       null
@@ -155,7 +161,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   expatProfileData.chineseSupervisorId = resolvedSupervisorId
   let resolvedProjectId = hasProjectField ? (parsedProjectId ?? null) : undefined
   if (!hasProjectField && teamChanged) {
-    resolvedProjectId = teamDefaults.projectId ?? null
+    resolvedProjectId = teamBinding?.projectId ?? null
   }
   const resolvedProject =
     resolvedProjectId !== undefined && resolvedProjectId !== null

@@ -6,7 +6,8 @@ import { prisma } from '@/lib/prisma'
 
 type TeamSupervisorClient = Prisma.TransactionClient | typeof prisma
 
-type TeamSupervisorBinding = {
+export type TeamSupervisorBinding = {
+  team: string
   teamKey: string
   teamFr?: string | null
   teamZh?: string | null
@@ -51,7 +52,7 @@ export const buildTeamHistoryLookupKey = (
 const toBindingMap = (
   rows: Array<{
     teamKey: string
-    team?: string | null
+    team: string
     teamFr?: string | null
     teamZh?: string | null
     supervisorId?: number | null
@@ -63,6 +64,7 @@ const toBindingMap = (
     rows.map((row) => [
       row.teamKey,
       {
+        team: row.team,
         teamKey: row.teamKey,
         teamFr: row.teamFr ?? null,
         teamZh: row.teamZh ?? null,
@@ -73,16 +75,28 @@ const toBindingMap = (
     ]),
   )
 
+const teamAliasKeys = (binding: TeamSupervisorBinding) =>
+  Array.from(
+    new Set(
+      [binding.teamKey, binding.team, binding.teamFr, binding.teamZh]
+        .map((value) => normalizeTeamKey(value ?? null))
+        .filter(Boolean),
+    ),
+  )
+
+const chooseTeamBinding = (bindings: TeamSupervisorBinding[], inputKey: string) => {
+  const uniqueBindings = new Map(bindings.map((binding) => [binding.teamKey, binding]))
+  const exactKeyMatch = uniqueBindings.get(inputKey)
+  if (exactKeyMatch) return exactKeyMatch
+  if (uniqueBindings.size === 1) return Array.from(uniqueBindings.values())[0]
+  return null
+}
+
 export const resolveTeamDefaults = async (
   team?: string | null,
   client: TeamSupervisorClient = prisma,
 ): Promise<{ supervisorId: number | null; projectId: number | null }> => {
-  const teamKey = normalizeTeamKey(team ?? null)
-  if (!teamKey) return { supervisorId: null, projectId: null }
-  const binding = await client.teamSupervisor.findUnique({
-    where: { teamKey },
-    select: { supervisorId: true, projectId: true },
-  })
+  const binding = await resolveTeamSupervisorBinding(team ?? null, client)
   return {
     supervisorId: binding?.supervisorId ?? null,
     projectId: binding?.projectId ?? null,
@@ -110,8 +124,8 @@ export const buildTeamSupervisorMap = async (
   )
   if (keys.length === 0) return new Map()
   const bindings = await client.teamSupervisor.findMany({
-    where: { teamKey: { in: keys } },
     select: {
+      team: true,
       teamKey: true,
       teamFr: true,
       teamZh: true,
@@ -120,7 +134,34 @@ export const buildTeamSupervisorMap = async (
       projectId: true,
     },
   })
-  return toBindingMap(bindings)
+  const bindingsByAlias = new Map<string, TeamSupervisorBinding[]>()
+  const bindingRows = Array.from(toBindingMap(bindings).values())
+  bindingRows.forEach((binding) => {
+    teamAliasKeys(binding).forEach((aliasKey) => {
+      const list = bindingsByAlias.get(aliasKey) ?? []
+      list.push(binding)
+      bindingsByAlias.set(aliasKey, list)
+    })
+  })
+
+  const result = new Map<string, TeamSupervisorBinding>()
+  keys.forEach((key) => {
+    const binding = chooseTeamBinding(bindingsByAlias.get(key) ?? [], key)
+    if (!binding) return
+    result.set(key, binding)
+    result.set(binding.teamKey, binding)
+  })
+  return result
+}
+
+export const resolveTeamSupervisorBinding = async (
+  team?: string | null,
+  client: TeamSupervisorClient = prisma,
+) => {
+  const teamKey = normalizeTeamKey(team ?? null)
+  if (!teamKey) return null
+  const bindings = await buildTeamSupervisorMap([team], client)
+  return bindings.get(teamKey) ?? null
 }
 
 export const createTeamSupervisorHistory = async (
@@ -197,6 +238,7 @@ export const buildTeamHistoryMapAtDates = async (
       },
       orderBy: [{ teamKey: 'asc' }, { effectiveFrom: 'desc' }, { id: 'desc' }],
       select: {
+        team: true,
         teamKey: true,
         teamFr: true,
         teamZh: true,
@@ -210,6 +252,7 @@ export const buildTeamHistoryMapAtDates = async (
     rows.forEach((row) => {
       if (!resolvedForDay.has(row.teamKey)) {
         resolvedForDay.set(row.teamKey, {
+          team: row.team,
           teamKey: row.teamKey,
           teamFr: row.teamFr ?? null,
           teamZh: row.teamZh ?? null,

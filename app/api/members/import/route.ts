@@ -780,9 +780,10 @@ export async function POST(request: Request) {
                 ? member.expatProfile.contractEndDate ??
                   (resolvedContractStartDate ? addOneYear(resolvedContractStartDate) : null)
                 : null
-            const resolvedTeam = member.expatProfile.team ?? null
-            const teamKey = normalizeTeamKey(resolvedTeam)
+            const rawTeam = member.expatProfile.team ?? null
+            const teamKey = normalizeTeamKey(rawTeam)
             const teamDefaults = teamKey ? teamSupervisorMap.get(teamKey) ?? null : null
+            const resolvedTeam = teamDefaults?.team ?? rawTeam
             const resolvedSupervisorId = teamKey ? teamDefaults?.supervisorId ?? null : null
             if (teamKey && !resolvedSupervisorId) {
               throw new Error('班组未绑定中方负责人')
@@ -854,9 +855,10 @@ export async function POST(request: Request) {
             : {}
           if (canBypassHistory) {
             const existingExpat = match.expatProfile ?? null
-            const resolvedTeam = member.expatProfile.team ?? existingExpat?.team ?? null
-            const teamKey = normalizeTeamKey(resolvedTeam)
+            const rawTeam = member.expatProfile.team ?? existingExpat?.team ?? null
+            const teamKey = normalizeTeamKey(rawTeam)
             const teamDefaults = teamKey ? teamSupervisorMap.get(teamKey) ?? null : null
+            const resolvedTeam = teamDefaults?.team ?? rawTeam
             const resolvedSupervisorId = teamKey
               ? teamDefaults?.supervisorId ?? null
               : existingExpat?.chineseSupervisorId ?? null
@@ -875,7 +877,7 @@ export async function POST(request: Request) {
                 : null
             const expatProfileUpdate = {
               ...(resolvedTeam ? { chineseSupervisorId: resolvedSupervisorId } : {}),
-              ...(member.expatProfile.team ? { team: member.expatProfile.team } : {}),
+              ...(member.expatProfile.team ? { team: resolvedTeam } : {}),
               ...(member.expatProfile.contractNumber
                 ? { contractNumber: member.expatProfile.contractNumber }
                 : {}),

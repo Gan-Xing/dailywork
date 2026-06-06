@@ -15,7 +15,8 @@ import {
   syncPositionFromContracts,
 } from '@/lib/server/contractChanges'
 import { normalizeTeamKey } from '@/lib/members/utils'
-import { resolveTeamSupervisorId } from '@/lib/server/teamSupervisors'
+import { applyProjectAssignment } from '@/lib/server/memberProjects'
+import { resolveTeamSupervisorBinding } from '@/lib/server/teamSupervisors'
 import { prisma } from '@/lib/prisma'
 
 const canManageCompensation = async () => {
@@ -118,7 +119,12 @@ export async function PUT(
 
   const hasTeamField = hasField('team')
   const teamInput = hasTeamField ? normalizeOptionalText(body.team) : null
-  const team = hasTeamField ? teamInput : record.team ?? null
+  const rawTeam = hasTeamField ? teamInput : record.team ?? null
+  const teamBinding = rawTeam ? await resolveTeamSupervisorBinding(rawTeam) : null
+  if (rawTeam && !teamBinding) {
+    return NextResponse.json({ error: '班组未绑定中方负责人' }, { status: 400 })
+  }
+  const team = teamBinding?.team ?? rawTeam
   const position = hasField('position') ? normalizeOptionalText(body.position) : record.position
   const contractNumber = hasField('contractNumber')
     ? normalizeOptionalText(body.contractNumber)
@@ -147,18 +153,14 @@ export async function PUT(
     : record.changeDate
   const reason = hasField('reason') ? normalizeOptionalText(body.reason) : record.reason
   const isTeamChanged =
-    hasTeamField && normalizeTeamKey(teamInput ?? null) !== normalizeTeamKey(record.team)
+    hasTeamField && normalizeTeamKey(team) !== normalizeTeamKey(record.team)
   let supervisorSnapshot = {
     id: record.chineseSupervisorId ?? null,
     name: record.chineseSupervisorName ?? null,
   }
   if (isTeamChanged) {
-    if (teamInput) {
-      const nextSupervisorId = await resolveTeamSupervisorId(teamInput)
-      if (!nextSupervisorId) {
-        return NextResponse.json({ error: '班组未绑定中方负责人' }, { status: 400 })
-      }
-      supervisorSnapshot = await resolveSupervisorSnapshot(nextSupervisorId)
+    if (team) {
+      supervisorSnapshot = await resolveSupervisorSnapshot(teamBinding?.supervisorId ?? null)
     } else {
       supervisorSnapshot = { id: null, name: null }
     }
@@ -199,7 +201,14 @@ export async function PUT(
       },
     })
 
-    await applyLatestContractSnapshot(tx, userId)
+    const latest = await applyLatestContractSnapshot(tx, userId)
+    if (latest?.id === updatedRecord.id && teamBinding) {
+      await applyProjectAssignment(tx, {
+        userId,
+        projectId: teamBinding.projectId ?? null,
+        startDate: changeDate,
+      })
+    }
 
     const joinDate = await syncJoinDateFromContracts(tx, userId)
     const positionValue = await syncPositionFromContracts(tx, userId)

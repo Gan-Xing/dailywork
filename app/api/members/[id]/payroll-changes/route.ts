@@ -8,7 +8,7 @@ import {
   resolveSupervisorSnapshot,
 } from '@/lib/server/compensation'
 import { hasPermission } from '@/lib/server/authSession'
-import { resolveTeamSupervisorId } from '@/lib/server/teamSupervisors'
+import { resolveTeamSupervisorBinding } from '@/lib/server/teamSupervisors'
 import { prisma } from '@/lib/prisma'
 
 const canManageCompensation = async () => {
@@ -79,10 +79,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const netMonthlyUnit = hasField('netMonthlyUnit')
     ? parseSalaryUnit(body.netMonthlyUnit)
     : expatProfile.netMonthlyUnit
-  const team = hasField('team') ? normalizeOptionalText(body.team) : expatProfile.team
+  const rawTeam = hasField('team') ? normalizeOptionalText(body.team) : expatProfile.team
+  const teamBinding = rawTeam ? await resolveTeamSupervisorBinding(rawTeam) : null
+  if (rawTeam && !teamBinding) {
+    return NextResponse.json({ error: '班组未绑定中方负责人' }, { status: 400 })
+  }
+  const team = teamBinding?.team ?? rawTeam
   const changeDate = normalizeOptionalDate(body.changeDate) ?? new Date()
   const nextSupervisorId = team
-    ? await resolveTeamSupervisorId(team)
+    ? teamBinding?.supervisorId ?? null
     : expatProfile.chineseSupervisorId ?? null
   if (team && !nextSupervisorId) {
     return NextResponse.json({ error: '班组未绑定中方负责人' }, { status: 400 })

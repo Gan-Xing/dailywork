@@ -16,7 +16,9 @@ import {
   syncJoinDateFromContracts,
   syncPositionFromContracts,
 } from '@/lib/server/contractChanges'
-import { formatSupervisorLabel } from '@/lib/members/utils'
+import { formatSupervisorLabel, normalizeTeamKey } from '@/lib/members/utils'
+import { applyProjectAssignment } from '@/lib/server/memberProjects'
+import { buildTeamSupervisorMap } from '@/lib/server/teamSupervisors'
 
 const canManageCompensation = async () => {
   return (
@@ -68,6 +70,7 @@ type ImportErrorCode =
   | 'invalid_start_date'
   | 'invalid_end_date'
   | 'invalid_chinese_supervisor'
+  | 'missing_team_supervisor'
   | 'contract_number_exists'
   | 'duplicate_contract_number'
   | 'missing_change_fields'
@@ -424,6 +427,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'IMPORT_VALIDATION_FAILED', errors }, { status: 400 })
   }
 
+  const teamSupervisorMap = await buildTeamSupervisorMap(candidates.map((row) => row.team))
+  candidates.forEach((row) => {
+    if (!row.hasTeam || !row.team) return
+    const binding = teamSupervisorMap.get(normalizeTeamKey(row.team))
+    if (!binding) {
+      addError(row.row, 'missing_team_supervisor', row.team)
+    }
+  })
+
+  if (errors.length > 0 && !ignoreErrors) {
+    return NextResponse.json({ error: 'IMPORT_VALIDATION_FAILED', errors }, { status: 400 })
+  }
+
   const supervisorTokens = Array.from(
     new Set(
       candidates
@@ -541,6 +557,10 @@ export async function POST(request: Request) {
       const supervisor = supervisorByToken.get(token)
       if (supervisor) supervisorIds.add(supervisor.id)
     }
+    if (row.team) {
+      const teamBinding = teamSupervisorMap.get(normalizeTeamKey(row.team))
+      if (teamBinding) supervisorIds.add(teamBinding.supervisorId)
+    }
   })
   existingUsers.forEach((user) => {
     if (user.expatProfile?.chineseSupervisorId) {
@@ -605,15 +625,22 @@ export async function POST(request: Request) {
           const supervisorOverride = supervisorToken
             ? supervisorByToken.get(supervisorToken) ?? null
             : null
+          const teamBinding =
+            row.hasTeam && row.team
+              ? teamSupervisorMap.get(normalizeTeamKey(row.team)) ?? null
+              : null
+          const resolvedTeam = row.hasTeam ? teamBinding?.team ?? row.team : snapshot.team
           const nextSupervisorId = row.hasChineseSupervisor
             ? supervisorOverride?.id ?? null
+            : row.hasTeam
+              ? teamBinding?.supervisorId ?? null
             : snapshot.chineseSupervisorId
 
           const resolvedStartDate = row.startDate ?? row.changeDate
           const resolvedEndDate = row.endDate ?? addOneYear(resolvedStartDate)
 
           const nextSnapshot: ExpatSnapshot = {
-            team: row.hasTeam ? row.team : snapshot.team,
+            team: resolvedTeam,
             position: row.hasPosition ? row.position : snapshot.position,
             contractNumber: row.hasContractNumber ? row.contractNumber : snapshot.contractNumber,
             contractType: row.hasContractType ? row.contractType : snapshot.contractType,
@@ -658,7 +685,18 @@ export async function POST(request: Request) {
           created += 1
         }
 
-        await applyLatestContractSnapshot(tx, userId)
+        const latest = await applyLatestContractSnapshot(tx, userId)
+        const latestTeamBinding = latest?.team
+          ? teamSupervisorMap.get(normalizeTeamKey(latest.team)) ?? null
+          : null
+        if (latestTeamBinding) {
+          await applyProjectAssignment(tx, {
+            userId,
+            projectId: latestTeamBinding.projectId ?? null,
+            startDate: latest?.changeDate ?? new Date(),
+            fallbackStartDate: user.joinDate ?? null,
+          })
+        }
         await syncJoinDateFromContracts(tx, userId)
         await syncPositionFromContracts(tx, userId)
       })

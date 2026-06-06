@@ -16,7 +16,8 @@ import {
   syncPositionFromContracts,
 } from '@/lib/server/contractChanges'
 import { hasPermission } from '@/lib/server/authSession'
-import { resolveTeamSupervisorId } from '@/lib/server/teamSupervisors'
+import { applyProjectAssignment } from '@/lib/server/memberProjects'
+import { resolveTeamSupervisorBinding } from '@/lib/server/teamSupervisors'
 import { prisma } from '@/lib/prisma'
 
 const canManageCompensation = async () => {
@@ -126,7 +127,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   const hasTeamField = hasField('team')
   const teamInput = hasTeamField ? normalizeOptionalText(body.team) : null
-  const resolvedTeam = hasTeamField ? teamInput : expatProfile.team ?? null
+  const rawResolvedTeam = hasTeamField ? teamInput : expatProfile.team ?? null
+  const teamBinding = rawResolvedTeam
+    ? await resolveTeamSupervisorBinding(rawResolvedTeam)
+    : null
+  if (rawResolvedTeam && !teamBinding) {
+    return NextResponse.json({ error: '班组未绑定中方负责人' }, { status: 400 })
+  }
+  const resolvedTeam = teamBinding?.team ?? rawResolvedTeam
   const position = hasField('position') ? normalizeOptionalText(body.position) : user.position ?? null
   const contractNumber = hasField('contractNumber')
     ? normalizeOptionalText(body.contractNumber)
@@ -151,7 +159,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const changeDate = normalizeOptionalDate(body.changeDate) ?? new Date()
   const reason = normalizeOptionalText(body.reason)
   const nextSupervisorId = resolvedTeam
-    ? await resolveTeamSupervisorId(resolvedTeam)
+    ? teamBinding?.supervisorId ?? null
     : expatProfile.chineseSupervisorId ?? null
   if (resolvedTeam && !nextSupervisorId) {
     return NextResponse.json({ error: '班组未绑定中方负责人' }, { status: 400 })
@@ -228,6 +236,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     })
 
     const latest = await applyLatestContractSnapshot(tx, userId)
+    if (latest?.id === change.id && teamBinding) {
+      await applyProjectAssignment(tx, {
+        userId,
+        projectId: teamBinding.projectId ?? null,
+        startDate: changeDate,
+        fallbackStartDate: user.joinDate,
+      })
+    }
 
     if (latest?.id === change.id && salaryChanged) {
       await tx.userPayrollChange.create({

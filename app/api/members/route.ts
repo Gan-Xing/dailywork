@@ -5,7 +5,7 @@ import { hasPermission } from '@/lib/server/authSession'
 import { listUsers } from '@/lib/server/authStore'
 import { resolveSupervisorSnapshot } from '@/lib/server/compensation'
 import { normalizeTagsInput } from '@/lib/members/utils'
-import { resolveTeamDefaults } from '@/lib/server/teamSupervisors'
+import { resolveTeamSupervisorBinding } from '@/lib/server/teamSupervisors'
 import { applyProjectAssignment } from '@/lib/server/memberProjects'
 import {
   hasExpatProfileData,
@@ -101,17 +101,23 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: '项目无效' }, { status: 400 })
   }
 
-  const teamDefaults = expatProfileData.team
-    ? await resolveTeamDefaults(expatProfileData.team)
-    : { supervisorId: null, projectId: null }
+  const teamBinding = expatProfileData.team
+    ? await resolveTeamSupervisorBinding(expatProfileData.team)
+    : null
+  if (expatProfileData.team && !teamBinding) {
+    return NextResponse.json({ error: '班组未绑定中方负责人' }, { status: 400 })
+  }
+  if (teamBinding) {
+    expatProfileData.team = teamBinding.team
+  }
   const resolvedSupervisorId = expatProfileData.team
-    ? teamDefaults.supervisorId
+    ? teamBinding?.supervisorId ?? null
     : expatProfileData.chineseSupervisorId ?? null
   if (expatProfileData.team && !resolvedSupervisorId) {
     return NextResponse.json({ error: '班组未绑定中方负责人' }, { status: 400 })
   }
   expatProfileData.chineseSupervisorId = resolvedSupervisorId
-  const resolvedProjectId = parsedProjectId ?? teamDefaults.projectId ?? null
+  const resolvedProjectId = parsedProjectId ?? teamBinding?.projectId ?? null
   const project = resolvedProjectId
     ? await prisma.project.findUnique({
         where: { id: resolvedProjectId },

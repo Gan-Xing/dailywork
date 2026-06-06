@@ -5,7 +5,7 @@ import { normalizeTagsInput, normalizeTeamKey } from '@/lib/members/utils'
 import { hasPermission } from '@/lib/server/authSession'
 import { isDecimalEqual, resolveSupervisorSnapshot } from '@/lib/server/compensation'
 import { createInitialContractChangeIfMissing } from '@/lib/server/contractChanges'
-import { resolveTeamDefaults } from '@/lib/server/teamSupervisors'
+import { resolveTeamSupervisorBinding, type TeamSupervisorBinding } from '@/lib/server/teamSupervisors'
 import {
   normalizeChineseProfile,
   normalizeExpatProfile,
@@ -326,6 +326,7 @@ export async function POST(request: NextRequest) {
       const expatUpdates: Prisma.UserExpatProfileUncheckedUpdateWithoutUserInput = {}
       let expatCreateData: Prisma.UserExpatProfileUncheckedCreateWithoutUserInput | null = null
       let teamDefaultProjectId: number | null = null
+      let resolvedTeamBinding: TeamSupervisorBinding | null = null
 
       if (expatPatch) {
         const normalizedExpat = normalizeExpatProfile(expatPatch)
@@ -338,8 +339,16 @@ export async function POST(request: NextRequest) {
         const hasContractEnd = expatHas('contractEndDate')
 
         if (expatHas('team')) {
-          expatUpdates.team = normalizedExpat.team
-          nextExpat.team = normalizedExpat.team
+          resolvedTeamBinding = normalizedExpat.team
+            ? await resolveTeamSupervisorBinding(normalizedExpat.team)
+            : null
+          if (normalizedExpat.team && !resolvedTeamBinding) {
+            results.push({ id: userId, ok: false, error: '班组未绑定中方负责人' })
+            continue
+          }
+          const canonicalTeam = resolvedTeamBinding?.team ?? normalizedExpat.team
+          expatUpdates.team = canonicalTeam
+          nextExpat.team = canonicalTeam
         }
         if (expatHas('contractType')) {
           expatUpdates.contractType = normalizedExpat.contractType
@@ -380,8 +389,8 @@ export async function POST(request: NextRequest) {
           nextExpat.netMonthlyUnit = normalizedExpat.netMonthlyUnit
         }
         if (nextExpat.team) {
-          const defaults = await resolveTeamDefaults(nextExpat.team)
-          if (!defaults.supervisorId) {
+          const defaults = resolvedTeamBinding ?? (await resolveTeamSupervisorBinding(nextExpat.team))
+          if (!defaults?.supervisorId) {
             results.push({ id: userId, ok: false, error: '班组未绑定中方负责人' })
             continue
           }
@@ -464,7 +473,7 @@ export async function POST(request: NextRequest) {
         }
 
         expatCreateData = {
-          team: normalizedExpat.team,
+          team: nextExpat.team,
           chineseSupervisorId: nextExpat.chineseSupervisorId,
           contractNumber: existingExpat?.contractNumber ?? null,
           contractType: normalizedExpat.contractType,
