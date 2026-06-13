@@ -65,9 +65,17 @@ type ContractCostItem = {
   color: string
 }
 
-type TrendPoint = {
+type StackedColumnSegment = {
+  key: string
   label: string
   value: number
+  color: string
+}
+
+type StackedColumnItem = {
+  label: string
+  total: number
+  segments: StackedColumnSegment[]
 }
 
 type ContractTypeTrendItem = {
@@ -188,6 +196,11 @@ type PayrollRun = {
   attendanceCutoffDate: string
 }
 
+type PayrollAmountEntry = {
+  payout: PayrollPayout
+  amount: number
+}
+
 type PayrollContractSnapshot = {
   contractNumber: string | null
   contractType: string | null
@@ -219,6 +232,11 @@ const CHART_COLORS = [
   '#06b6d4',
   '#d946ef',
 ]
+
+const PAYROLL_SEQUENCE_COLORS = {
+  first: CHART_COLORS[0],
+  second: CHART_COLORS[1],
+}
 
 const HOURS_PER_MONTH_CTJ = 22 * 8
 const SALARY_RANGES = [
@@ -427,6 +445,103 @@ const parseNumber = (value?: string | null) => {
 
 const formatMonthValue = (year: number, month: number) =>
   `${year}-${String(month).padStart(2, '0')}`
+
+const buildStackedPayrollItems = (
+  months: string[],
+  entries: PayrollAmountEntry[],
+  payrollRunsById: Map<number, PayrollRun>,
+  labels: { firstRun: string; secondRun: string },
+) => {
+  const monthMap = new Map<
+    string,
+    {
+      firstTotal: number
+      secondTotal: number
+      memberIds: Set<number>
+    }
+  >()
+
+  months.forEach((month) => {
+    monthMap.set(month, {
+      firstTotal: 0,
+      secondTotal: 0,
+      memberIds: new Set<number>(),
+    })
+  })
+
+  entries.forEach(({ payout, amount }) => {
+    const run = payrollRunsById.get(payout.runId)
+    const monthKey = run
+      ? formatMonthValue(run.year, run.month)
+      : payout.payoutDate.slice(0, 7)
+    const entry = monthMap.get(monthKey)
+    if (!entry) return
+
+    if (run?.sequence === 2) {
+      entry.secondTotal += amount
+    } else {
+      entry.firstTotal += amount
+    }
+    entry.memberIds.add(payout.userId)
+  })
+
+  const totalSeries: StackedColumnItem[] = months.map((month) => {
+    const entry = monthMap.get(month) ?? {
+      firstTotal: 0,
+      secondTotal: 0,
+      memberIds: new Set<number>(),
+    }
+    return {
+      label: month,
+      total: entry.firstTotal + entry.secondTotal,
+      segments: [
+        {
+          key: 'first',
+          label: labels.firstRun,
+          value: entry.firstTotal,
+          color: PAYROLL_SEQUENCE_COLORS.first,
+        },
+        {
+          key: 'second',
+          label: labels.secondRun,
+          value: entry.secondTotal,
+          color: PAYROLL_SEQUENCE_COLORS.second,
+        },
+      ],
+    }
+  })
+
+  const averageSeries: StackedColumnItem[] = months.map((month) => {
+    const entry = monthMap.get(month) ?? {
+      firstTotal: 0,
+      secondTotal: 0,
+      memberIds: new Set<number>(),
+    }
+    const memberCount = entry.memberIds.size
+    const firstAverage = memberCount > 0 ? entry.firstTotal / memberCount : 0
+    const secondAverage = memberCount > 0 ? entry.secondTotal / memberCount : 0
+    return {
+      label: month,
+      total: firstAverage + secondAverage,
+      segments: [
+        {
+          key: 'first',
+          label: labels.firstRun,
+          value: firstAverage,
+          color: PAYROLL_SEQUENCE_COLORS.first,
+        },
+        {
+          key: 'second',
+          label: labels.secondRun,
+          value: secondAverage,
+          color: PAYROLL_SEQUENCE_COLORS.second,
+        },
+      ],
+    }
+  })
+
+  return { totalSeries, averageSeries }
+}
 
 const buildMonthOptionsInDynamicRange = (startYear: number, startMonth: number) => {
   const options: MultiSelectOption[] = []
@@ -1494,14 +1609,17 @@ const ContractCostBulletList = ({
   )
 }
 
-const LineChart = ({
+
+const StackedColumnChart = ({
   items,
   formatValue,
   emptyLabel,
+  totalLabel,
 }: {
-  items: TrendPoint[]
+  items: StackedColumnItem[]
   formatValue: (value: number) => string
   emptyLabel: string
+  totalLabel: string
 }) => {
   const containerRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -1520,40 +1638,47 @@ const LineChart = ({
 
   const chart = useMemo(() => {
     if (items.length === 0 || size.width === 0 || size.height === 0) return null
-    const padding = { top: 14, bottom: 18, left: 10, right: 10 }
-    const values = items.map((item) => item.value)
-    const dataMin = Math.min(...values)
-    const dataMax = Math.max(...values)
-    const rangePadding = (dataMax - dataMin) * 0.2
-    const effectivePadding = rangePadding === 0 ? (dataMax * 0.1 || 10) : rangePadding
-    const minValue = Math.max(0, dataMin - effectivePadding)
-    const maxValue = dataMax + effectivePadding
-    const range = maxValue - minValue || 1
+    const padding = { top: 16, bottom: 18, left: 12, right: 12 }
+    const dataMax = Math.max(...items.map((item) => item.total), 0)
+    const maxValue = dataMax > 0 ? dataMax * 1.16 : 1
     const plotWidth = size.width - padding.left - padding.right
     const plotHeight = size.height - padding.top - padding.bottom
-    const points = items.map((item, index) => {
-      const x =
-        items.length === 1
-          ? padding.left + plotWidth / 2
-          : padding.left + (index / (items.length - 1)) * plotWidth
-      const normalized = (item.value - minValue) / range
-      const y = padding.top + (1 - normalized) * plotHeight
+    const slotWidth = items.length > 0 ? plotWidth / items.length : plotWidth
+    const columnWidth = Math.max(18, Math.min(48, slotWidth * 0.46))
+    const columns = items.map((item, index) => {
+      const centerX = padding.left + slotWidth * index + slotWidth / 2
+      let cursorY = padding.top + plotHeight
+      const segments = item.segments.map((segment) => {
+        const height = maxValue > 0 ? (segment.value / maxValue) * plotHeight : 0
+        const y = cursorY - height
+        cursorY = y
+        return {
+          ...segment,
+          x: centerX - columnWidth / 2,
+          y,
+          width: columnWidth,
+          height,
+        }
+      })
+      const topY = segments.reduce(
+        (min, segment) => Math.min(min, segment.y),
+        padding.top + plotHeight,
+      )
       return {
-        x,
-        y,
-        xPercent: size.width ? (x / size.width) * 100 : 0,
-        yPercent: size.height ? (y / size.height) * 100 : 0,
-        value: item.value,
         label: item.label,
+        total: item.total,
+        centerX,
+        xPercent: size.width ? (centerX / size.width) * 100 : 0,
+        yPercent: size.height ? (topY / size.height) * 100 : 0,
+        segments,
       }
     })
     return {
       padding,
-      plotWidth,
       plotHeight,
-      minValue,
-      maxValue,
-      points,
+      slotWidth,
+      columnWidth,
+      columns,
     }
   }, [items, size.height, size.width])
 
@@ -1570,91 +1695,85 @@ const LineChart = ({
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
     ctx.clearRect(0, 0, size.width, size.height)
 
-    const { padding, plotHeight, points } = chart
+    const { padding, plotHeight, columns } = chart
+    const baseY = padding.top + plotHeight
 
     ctx.strokeStyle = '#f1f5f9'
     ctx.lineWidth = 1
-    points.forEach((point) => {
+    columns.forEach((column) => {
       ctx.beginPath()
-      ctx.moveTo(point.x, padding.top)
-      ctx.lineTo(point.x, padding.top + plotHeight)
+      ctx.moveTo(column.centerX, padding.top)
+      ctx.lineTo(column.centerX, baseY)
       ctx.stroke()
     })
 
-    if (points.length === 0) return
-    const gradient = ctx.createLinearGradient(0, padding.top, 0, padding.top + plotHeight)
-    gradient.addColorStop(0, 'rgba(99,102,241,0.18)')
-    gradient.addColorStop(1, 'rgba(99,102,241,0)')
+    ctx.strokeStyle = '#e2e8f0'
     ctx.beginPath()
-    ctx.moveTo(points[0].x, padding.top + plotHeight)
-    points.forEach((point) => {
-      ctx.lineTo(point.x, point.y)
-    })
-    ctx.lineTo(points[points.length - 1].x, padding.top + plotHeight)
-    ctx.closePath()
-    ctx.fillStyle = gradient
-    ctx.fill()
-
-    ctx.strokeStyle = '#6366f1'
-    ctx.lineWidth = 2
-    ctx.lineJoin = 'round'
-    ctx.lineCap = 'round'
-    ctx.beginPath()
-    points.forEach((point, index) => {
-      if (index === 0) ctx.moveTo(point.x, point.y)
-      else ctx.lineTo(point.x, point.y)
-    })
+    ctx.moveTo(padding.left, baseY)
+    ctx.lineTo(size.width - padding.right, baseY)
     ctx.stroke()
 
-    if (hoveredIndex !== null && points[hoveredIndex]) {
-      ctx.save()
-      ctx.strokeStyle = 'rgba(148,163,184,0.8)'
-      ctx.setLineDash([4, 4])
-      ctx.beginPath()
-      ctx.moveTo(points[hoveredIndex].x, padding.top)
-      ctx.lineTo(points[hoveredIndex].x, padding.top + plotHeight)
-      ctx.stroke()
-      ctx.restore()
-    }
+    columns.forEach((column, index) => {
+      column.segments.forEach((segment) => {
+        if (segment.height <= 0) return
+        ctx.fillStyle = segment.color
+        ctx.globalAlpha = index === hoveredIndex ? 1 : 0.88
+        ctx.fillRect(segment.x, segment.y, segment.width, segment.height)
+      })
+      ctx.globalAlpha = 1
 
-    points.forEach((point, idx) => {
-      const isActive = idx === hoveredIndex
-      const radius = isActive ? 4 : 2
-      ctx.beginPath()
-      ctx.arc(point.x, point.y, radius, 0, Math.PI * 2)
-      ctx.fillStyle = isActive ? '#ffffff' : '#6366f1'
-      ctx.strokeStyle = isActive ? '#6366f1' : '#ffffff'
-      ctx.lineWidth = isActive ? 2 : 1
-      ctx.fill()
-      ctx.stroke()
+      if (index === hoveredIndex) {
+        ctx.save()
+        ctx.strokeStyle = 'rgba(15,23,42,0.28)'
+        ctx.lineWidth = 2
+        const barTop = column.segments.reduce(
+          (min, segment) => (segment.height > 0 ? Math.min(min, segment.y) : min),
+          baseY,
+        )
+        ctx.strokeRect(
+          column.centerX - chart.columnWidth / 2 - 2,
+          barTop - 2,
+          chart.columnWidth + 4,
+          baseY - barTop + 4,
+        )
+        ctx.restore()
+      }
     })
 
     ctx.font = '10px system-ui, -apple-system, sans-serif'
-    points.forEach((point, idx) => {
-      const isFirst = idx === 0
-      const isLast = idx === items.length - 1
-      const isActive = idx === hoveredIndex
+    columns.forEach((column, index) => {
+      const isFirst = index === 0
+      const isLast = index === items.length - 1
+      const isActive = index === hoveredIndex
       const showDense = items.length <= 6
-      const showAlternate = items.length <= 12 && idx % 2 === 0
+      const showAlternate = items.length <= 12 && index % 2 === 0
       const shouldShow = isActive || showDense || showAlternate || isFirst || isLast
       if (!shouldShow) return
-      ctx.fillStyle = isActive ? 'rgba(51,65,85,0.9)' : 'rgba(100,116,139,0.55)'
-      const text = formatValue(point.value)
+      const text = formatValue(column.total)
       const textWidth = ctx.measureText(text).width
-      const x =
-        isFirst ? point.x : isLast ? point.x - textWidth : point.x - textWidth / 2
-      const y = Math.max(point.y - 8, padding.top + 6)
-      ctx.fillText(text, x, y)
+      const barTop = column.segments.reduce(
+        (min, segment) => (segment.height > 0 ? Math.min(min, segment.y) : min),
+        baseY,
+      )
+      ctx.fillStyle = isActive ? 'rgba(15,23,42,0.92)' : 'rgba(100,116,139,0.62)'
+      ctx.fillText(text, column.centerX - textWidth / 2, Math.max(barTop - 8, padding.top + 8))
     })
-  }, [chart, hoveredIndex, items.length, formatValue, size.height, size.width])
+  }, [chart, formatValue, hoveredIndex, items.length, size.height, size.width])
 
   const handleMouseMove = (e: React.MouseEvent) => {
-    if (!size.width || items.length <= 1) return
+    if (!size.width || items.length === 0) return
     const rect = containerRef.current?.getBoundingClientRect()
     if (!rect) return
     const x = e.clientX - rect.left
-    const percent = Math.max(0, Math.min(1, x / rect.width))
-    const index = Math.round(percent * (items.length - 1))
+    const index = chart
+      ? Math.max(
+          0,
+          Math.min(
+            items.length - 1,
+            Math.floor((x - chart.padding.left) / Math.max(chart.slotWidth, 1)),
+          ),
+        )
+      : Math.round((Math.max(0, Math.min(rect.width, x)) / rect.width) * (items.length - 1))
     setHoveredIndex(index)
   }
 
@@ -1670,7 +1789,8 @@ const LineChart = ({
     )
   }
 
-  const activePoint = hoveredIndex !== null && chart ? chart.points[hoveredIndex] : null
+  const legendSegments = items[0]?.segments ?? []
+  const activeColumn = hoveredIndex !== null && chart ? chart.columns[hoveredIndex] : null
 
   return (
     <div
@@ -1678,23 +1798,47 @@ const LineChart = ({
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
     >
+      <div className="mb-3 flex flex-wrap gap-3 text-[10px] text-slate-500">
+        {legendSegments.map((segment) => (
+          <div key={segment.key} className="flex items-center gap-2">
+            <span
+              className="h-2 w-2 rounded-sm"
+              style={{ backgroundColor: segment.color }}
+            />
+            <span className="font-semibold text-slate-700">{segment.label}</span>
+          </div>
+        ))}
+      </div>
       <div ref={containerRef} className="relative h-56 w-full cursor-crosshair">
         <canvas ref={canvasRef} className="h-full w-full" />
-
-        {activePoint ? (
+        {activeColumn ? (
           <div
             className="absolute pointer-events-none z-10 -translate-x-1/2 -translate-y-full px-2 pb-2 transition-all duration-75 ease-out"
             style={{
-              left: `${activePoint.xPercent}%`,
-              top: `${activePoint.yPercent}%`,
+              left: `${activeColumn.xPercent}%`,
+              top: `${activeColumn.yPercent}%`,
             }}
           >
-            <div className="flex flex-col items-center rounded-lg bg-slate-900/90 px-2 py-1 text-white shadow-xl backdrop-blur-sm">
-              <span className="text-[10px] font-medium leading-none">{activePoint.label}</span>
-              <span className="mt-0.5 text-[11px] font-semibold leading-none">
-                {formatValue(activePoint.value)}
-              </span>
-              <div className="absolute -bottom-1 left-1/2 h-2 w-2 -translate-x-1/2 rotate-45 bg-slate-900/90" />
+            <div className="min-w-[180px] rounded-lg bg-slate-900/90 px-2 py-1 text-white shadow-xl backdrop-blur-sm">
+              <span className="text-[10px] font-medium">{activeColumn.label}</span>
+              <div className="mt-1 space-y-0.5 text-[10px]">
+                {activeColumn.segments.map((segment) => (
+                  <div key={segment.key} className="flex items-center justify-between gap-3">
+                    <span className="flex items-center gap-1">
+                      <span
+                        className="h-1.5 w-1.5 rounded-sm"
+                        style={{ backgroundColor: segment.color }}
+                      />
+                      {segment.label}
+                    </span>
+                    <span className="font-semibold">{formatValue(segment.value)}</span>
+                  </div>
+                ))}
+                <div className="mt-1 border-t border-white/20 pt-1 flex items-center justify-between gap-3">
+                  <span>{totalLabel}</span>
+                  <span className="font-semibold">{formatValue(activeColumn.total)}</span>
+                </div>
+              </div>
             </div>
           </div>
         ) : null}
@@ -1706,7 +1850,7 @@ const LineChart = ({
       >
         {items.map((item, idx) => {
           const isActive = idx === hoveredIndex
-          const valueLabel = formatValue(item.value)
+          const valueLabel = formatValue(item.total)
           return (
             <div key={item.label} className="flex min-w-0 flex-col items-center">
               <span
@@ -4212,22 +4356,24 @@ export function MembersOverviewTab({
     })
   }, [activePayrollMonths, detailPayouts, payrollRunsById])
 
-  const detailPayrollTotalSeries = useMemo(
+  const detailStackedMonthlySeries = useMemo(
     () =>
-      detailMonthlyStats.map((item) => ({
-        label: item.label,
-        value: item.total,
-      })),
-    [detailMonthlyStats],
-  )
-
-  const detailPayrollAverageSeries = useMemo(
-    () =>
-      detailMonthlyStats.map((item) => ({
-        label: item.label,
-        value: item.average,
-      })),
-    [detailMonthlyStats],
+      buildStackedPayrollItems(
+        sortMonthValues(activePayrollMonths),
+        detailPayouts,
+        payrollRunsById,
+        {
+          firstRun: t.overview.labels.firstPayrollRun,
+          secondRun: t.overview.labels.secondPayrollRun,
+        },
+      ),
+    [
+      activePayrollMonths,
+      detailPayouts,
+      payrollRunsById,
+      t.overview.labels.firstPayrollRun,
+      t.overview.labels.secondPayrollRun,
+    ],
   )
 
   const detailContractTypeTrend = useMemo(() => {
@@ -5098,17 +5244,19 @@ export function MembersOverviewTab({
 
           <div className="grid gap-6 md:grid-cols-2">
             <OverviewCard title={t.overview.charts.detailPayrollTotal} badge={t.overview.labels.localScope}>
-              <LineChart
-                items={detailPayrollTotalSeries}
+              <StackedColumnChart
+                items={detailStackedMonthlySeries.totalSeries}
                 formatValue={formatMoney}
                 emptyLabel={t.overview.labels.noData}
+                totalLabel={t.overview.labels.total}
               />
             </OverviewCard>
             <OverviewCard title={t.overview.charts.detailPayrollAverage} badge={t.overview.labels.localScope}>
-              <LineChart
-                items={detailPayrollAverageSeries}
+              <StackedColumnChart
+                items={detailStackedMonthlySeries.averageSeries}
                 formatValue={formatMoney}
                 emptyLabel={t.overview.labels.noData}
+                totalLabel={t.overview.labels.total}
               />
             </OverviewCard>
           </div>

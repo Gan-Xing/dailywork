@@ -66,6 +66,8 @@ export const memberCopy: Record<
       }
       labels: {
         total: string
+        firstPayrollRun: string
+        secondPayrollRun: string
         people: string
         noData: string
         other: string
@@ -737,6 +739,8 @@ export const memberCopy: Record<
       },
       labels: {
         total: '总数',
+        firstPayrollRun: '第一次发放',
+        secondPayrollRun: '第二次发放',
         people: '人',
         noData: '暂无数据',
         other: '其他',
@@ -1424,6 +1428,8 @@ export const memberCopy: Record<
       },
       labels: {
         total: 'Total',
+        firstPayrollRun: '1er versement',
+        secondPayrollRun: '2e versement',
         people: 'pers.',
         noData: 'Aucune donnée',
         other: 'Autres',
