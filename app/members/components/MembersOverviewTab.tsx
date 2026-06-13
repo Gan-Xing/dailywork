@@ -3729,6 +3729,59 @@ export function MembersOverviewTab({
     showTeamPayroll,
   ])
 
+  const compareAggregateMonthlySeries = useMemo(() => {
+    if (!showTeamPayroll || compareMonthLabels.length === 0) {
+      return { totalSeries: [], averageSeries: [] }
+    }
+    const monthIndex = new Map(compareMonthLabels.map((label, idx) => [label, idx]))
+    const totals = Array(compareMonthLabels.length).fill(0) as number[]
+    const memberSets = Array.from(
+      { length: compareMonthLabels.length },
+      () => new Set<number>(),
+    )
+    const selectedTeamSet = new Set(compareTeamKeys)
+    const selectedMemberIds = new Set<number>()
+    localMembers.forEach((member) => {
+      if (member.nationality === 'china') return
+      const teamKey = normalizeText(member.expatProfile?.team)
+      if (!teamKey || !selectedTeamSet.has(teamKey)) return
+      selectedMemberIds.add(member.id)
+    })
+    payrollPayouts.forEach((payout) => {
+      if (!selectedMemberIds.has(payout.userId)) return
+      const run = payrollRunsById.get(payout.runId)
+      const monthKey = run
+        ? formatMonthValue(run.year, run.month)
+        : payout.payoutDate.slice(0, 7)
+      const index = monthIndex.get(monthKey)
+      if (index === undefined) return
+      const amount = parseNumber(payout.amount)
+      if (amount === null) return
+      totals[index] += amount
+      memberSets[index]?.add(payout.userId)
+    })
+    return {
+      totalSeries: compareMonthLabels.map((label, index) => ({
+        label,
+        value: totals[index] ?? 0,
+      })),
+      averageSeries: compareMonthLabels.map((label, index) => {
+        const count = memberSets[index]?.size ?? 0
+        return {
+          label,
+          value: count > 0 ? (totals[index] ?? 0) / count : 0,
+        }
+      }),
+    }
+  }, [
+    compareMonthLabels,
+    compareTeamKeys,
+    localMembers,
+    payrollPayouts,
+    payrollRunsById,
+    showTeamPayroll,
+  ])
+
   const compareHeatmapItems = useMemo(
     () =>
       compareTeamStats.map((team) => ({
@@ -5366,58 +5419,83 @@ export function MembersOverviewTab({
             </OverviewCard>
 
             {showTeamPayroll ? (
-              <div className={`grid gap-6 ${compareChartColumnsClass}`}>
-                <div className={compareHeatmapClass}>
+              <>
+                <div className={`grid gap-6 ${compareChartColumnsClass}`}>
+                  <div className={compareHeatmapClass}>
+                    <OverviewCard
+                      title={t.overview.charts.teamCostScatter}
+                      badge={t.overview.labels.localScope}
+                    >
+                      <TeamCostHeatmap
+                        items={compareHeatmapItems}
+                        resolveTeamLabel={resolveTeamLabel}
+                        formatMoney={formatMoney}
+                        formatNumber={formatNumber}
+                        formatRatio={formatRatio}
+                        emptyLabel={t.overview.labels.noData}
+                        hint={t.overview.labels.scatterHint}
+                        labels={{
+                          team: t.table.team,
+                          people: t.overview.labels.people,
+                          payrollTotal: t.overview.labels.payoutTotal,
+                          payrollAverage: t.overview.labels.payrollAverage,
+                          payrollMedian: t.overview.labels.payrollMedian,
+                          payrollRatio: t.overview.labels.payrollRatio,
+                        }}
+                      />
+                    </OverviewCard>
+                  </div>
+                  <div className="md:col-span-1">
+                    <OverviewCard
+                      title={t.overview.charts.detailPayrollTotal}
+                      badge={t.overview.labels.localScope}
+                    >
+                      <MultiLineChart
+                        labels={compareMonthLabels}
+                        series={compareMonthlySeries.totalSeries}
+                        formatValue={formatMoney}
+                        emptyLabel={t.overview.labels.noData}
+                      />
+                    </OverviewCard>
+                  </div>
+                  <div className="md:col-span-1">
+                    <OverviewCard
+                      title={t.overview.charts.detailPayrollAverage}
+                      badge={t.overview.labels.localScope}
+                    >
+                      <MultiLineChart
+                        labels={compareMonthLabels}
+                        series={compareMonthlySeries.averageSeries}
+                        formatValue={formatMoney}
+                        emptyLabel={t.overview.labels.noData}
+                      />
+                    </OverviewCard>
+                  </div>
+                </div>
+
+                <div className="grid gap-6 md:grid-cols-2">
                   <OverviewCard
-                    title={t.overview.charts.teamCostScatter}
+                    title={t.overview.charts.compareAggregatePayrollTotalTrend}
                     badge={t.overview.labels.localScope}
                   >
-                    <TeamCostHeatmap
-                      items={compareHeatmapItems}
-                      resolveTeamLabel={resolveTeamLabel}
-                      formatMoney={formatMoney}
-                      formatNumber={formatNumber}
-                      formatRatio={formatRatio}
+                    <LineChart
+                      items={compareAggregateMonthlySeries.totalSeries}
+                      formatValue={formatMoney}
                       emptyLabel={t.overview.labels.noData}
-                      hint={t.overview.labels.scatterHint}
-                      labels={{
-                        team: t.table.team,
-                        people: t.overview.labels.people,
-                        payrollTotal: t.overview.labels.payoutTotal,
-                        payrollAverage: t.overview.labels.payrollAverage,
-                        payrollMedian: t.overview.labels.payrollMedian,
-                        payrollRatio: t.overview.labels.payrollRatio,
-                      }}
                     />
                   </OverviewCard>
-                </div>
-                <div className="md:col-span-1">
                   <OverviewCard
-                    title={t.overview.charts.detailPayrollTotal}
+                    title={t.overview.charts.compareAggregatePayrollAverageTrend}
                     badge={t.overview.labels.localScope}
                   >
-                    <MultiLineChart
-                      labels={compareMonthLabels}
-                      series={compareMonthlySeries.totalSeries}
+                    <LineChart
+                      items={compareAggregateMonthlySeries.averageSeries}
                       formatValue={formatMoney}
                       emptyLabel={t.overview.labels.noData}
                     />
                   </OverviewCard>
                 </div>
-                <div className="md:col-span-1">
-                  <OverviewCard
-                    title={t.overview.charts.detailPayrollAverage}
-                    badge={t.overview.labels.localScope}
-                  >
-                    <MultiLineChart
-                      labels={compareMonthLabels}
-                      series={compareMonthlySeries.averageSeries}
-                      formatValue={formatMoney}
-                      emptyLabel={t.overview.labels.noData}
-                    />
-                  </OverviewCard>
-                </div>
-              </div>
+              </>
             ) : null}
 
             <div className="grid gap-6 md:grid-cols-2">
