@@ -60,8 +60,6 @@ export const memberCopy: Record<
         contractExpiry: string
         detailPayrollTotal: string
         detailPayrollAverage: string
-        compareAggregatePayrollTotalTrend: string
-        compareAggregatePayrollAverageTrend: string
         contractTypeTrend: string
         salaryPyramid: string
         payoutRecords: string
@@ -733,8 +731,6 @@ export const memberCopy: Record<
         contractExpiry: '合同到期分布（未来 3 个月）',
         detailPayrollTotal: '月度实发总额趋势',
         detailPayrollAverage: '月度人均工资趋势',
-        compareAggregatePayrollTotalTrend: '选中班组工资总额趋势',
-        compareAggregatePayrollAverageTrend: '选中范围人均工资趋势',
         contractTypeTrend: '合同类型人数趋势',
         salaryPyramid: '薪酬结构金字塔',
         payoutRecords: '发放记录',
@@ -1422,8 +1418,6 @@ export const memberCopy: Record<
         contractExpiry: 'Échéances de contrat (3 mois)',
         detailPayrollTotal: 'Tendance des versements mensuels',
         detailPayrollAverage: 'Tendance du salaire moyen',
-        compareAggregatePayrollTotalTrend: 'Tendance du total des salaires des équipes sélectionnées',
-        compareAggregatePayrollAverageTrend: 'Tendance du salaire moyen du périmètre sélectionné',
         contractTypeTrend: 'Tendance CTJ/CDD',
         salaryPyramid: 'Pyramide salariale',
         payoutRecords: 'Historique des versements',
