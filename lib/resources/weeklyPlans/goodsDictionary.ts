@@ -9,6 +9,7 @@ export const WEEKLY_PLAN_GOODS_KEYS = [
   'grease',
   'gear_oil',
   'brake_fluid',
+  'coolant',
   'binding_wire',
   'rebar',
   'angle_steel',
@@ -76,6 +77,11 @@ const weeklyPlanGoodsDefinitions: WeeklyPlanGoodsDefinition[] = [
     key: 'brake_fluid',
     label: { zh: '刹车油', fr: 'Liquide de frein' },
     aliases: ['brake fluid', 'liquide de frein', '刹车油', '制动液'],
+  },
+  {
+    key: 'coolant',
+    label: { zh: '冷却液', fr: 'Liquide de refroidissement' },
+    aliases: ['coolant', 'liquide de refroidissement', 'antigel', '冷却液', '防冻液'],
   },
   {
     key: 'binding_wire',
