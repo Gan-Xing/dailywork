@@ -98,6 +98,34 @@ enum ReceivedDocumentLedgerStatus {
   VOID
 }
 
+enum SiteVariationMeasurementStatus {
+  PENDING_CONFIRMATION
+  READY_TO_MEASURE
+  MEASURED
+  ARCHIVED
+  VOID
+}
+
+enum SiteVariationMeasurementType {
+  ADDITION
+  INCREASE
+  DECREASE
+  LOCATION_ADJUSTMENT
+  SPEC_ADJUSTMENT
+  FIELD_SUBSTITUTION
+  DESIGN_OMISSION
+  OTHER
+}
+
+enum SiteVariationMeasurementReason {
+  SITE_CONDITION
+  SUPERVISION_REQUIREMENT
+  OWNER_REQUIREMENT
+  DESIGN_ERROR
+  CONSTRUCTION_OPTIMIZATION
+  OTHER
+}
+
 enum PaymentStatus {
   PENDING
   PAID
@@ -248,24 +276,26 @@ model LeaderLogPrompt {
 }
 
 model RoadSection {
-  id                         Int                      @id @default(autoincrement())
-  projectId                  Int?
-  slug                       String                   @unique
-  name                       String
-  startPk                    String
-  endPk                      String
-  createdAt                  DateTime                 @default(now())
-  updatedAt                  DateTime                 @updatedAt
-  project                    Project?                 @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  phases                     RoadPhase[]
-  inspections                InspectionRequest[]
-  locationInspectionRequests InspectionRequest[]      @relation("InspectionRequestLocationRoad")
-  inspectionEntries          InspectionEntry[]        @relation("InspectionEntryRoad")
-  locationInspectionEntries  InspectionEntry[]        @relation("InspectionEntryLocationRoad")
-  locationPhaseIntervals     PhaseInterval[]          @relation("PhaseIntervalLocationRoad")
-  measurementDetails         BoqMeasurementDetail[]
-  financeLedgerCases         FinanceLedgerCase[]
-  receivedDocumentLedgers    ReceivedDocumentLedger[]
+  id                            Int                        @id @default(autoincrement())
+  projectId                     Int?
+  slug                          String                     @unique
+  name                          String
+  startPk                       String
+  endPk                         String
+  createdAt                     DateTime                   @default(now())
+  updatedAt                     DateTime                   @updatedAt
+  project                       Project?                   @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  phases                        RoadPhase[]
+  inspections                   InspectionRequest[]
+  locationInspectionRequests    InspectionRequest[]        @relation("InspectionRequestLocationRoad")
+  inspectionEntries             InspectionEntry[]          @relation("InspectionEntryRoad")
+  locationInspectionEntries     InspectionEntry[]          @relation("InspectionEntryLocationRoad")
+  locationPhaseIntervals        PhaseInterval[]            @relation("PhaseIntervalLocationRoad")
+  measurementDetails            BoqMeasurementDetail[]
+  financeLedgerCases            FinanceLedgerCase[]
+  receivedDocumentLedgers       ReceivedDocumentLedger[]
+  siteVariationMeasurements     SiteVariationMeasurement[] @relation("SiteVariationMeasurementRoad")
+  mainSiteVariationMeasurements SiteVariationMeasurement[] @relation("SiteVariationMeasurementMainRoad")
 
   @@index([projectId])
 }
@@ -616,87 +646,90 @@ model Role {
 }
 
 model User {
-  id                              Int                      @id @default(autoincrement())
-  name                            String                   @default("")
-  gender                          String?
-  nationality                     String?
-  phones                          String[]                 @default([])
-  tags                            String[]                 @default([])
-  joinDate                        DateTime?
-  birthDate                       DateTime?
-  position                        String?
-  employmentStatus                EmploymentStatus         @default(ACTIVE)
-  terminationDate                 DateTime?
-  terminationReason               String?
-  username                        String                   @unique
-  passwordHash                    String
-  roles                           UserRole[]
-  submittedInspections            InspectionRequest[]      @relation("InspectionSubmitter")
-  createdInspections              InspectionRequest[]      @relation("InspectionCreator")
-  updatedInspections              InspectionRequest[]      @relation("InspectionUpdater")
-  submittedInspectionEntries      InspectionEntry[]        @relation("InspectionEntrySubmitter")
-  createdInspectionEntries        InspectionEntry[]        @relation("InspectionEntryCreator")
-  updatedInspectionEntries        InspectionEntry[]        @relation("InspectionEntryUpdater")
-  createdFinances                 FinanceEntry[]           @relation("FinanceEntryCreator")
-  deletedFinances                 FinanceEntry[]           @relation("FinanceEntryDeleter")
-  handledFinances                 FinanceEntry[]           @relation("FinanceEntryHandler")
-  updatedFinances                 FinanceEntry[]           @relation("FinanceEntryUpdater")
-  createdFinanceLedgerCases       FinanceLedgerCase[]      @relation("FinanceLedgerCaseCreator")
-  updatedFinanceLedgerCases       FinanceLedgerCase[]      @relation("FinanceLedgerCaseUpdater")
-  deletedFinanceLedgerCases       FinanceLedgerCase[]      @relation("FinanceLedgerCaseDeleter")
-  createdFinanceLedgerEvents      FinanceLedgerEvent[]     @relation("FinanceLedgerEventCreator")
-  updatedFinanceLedgerEvents      FinanceLedgerEvent[]     @relation("FinanceLedgerEventUpdater")
-  chineseProfile                  UserChineseProfile?
-  expatProfile                    UserExpatProfile?
-  expatSupervisees                UserExpatProfile[]       @relation("ExpatChineseSupervisor")
-  teamSupervisorBindings          TeamSupervisor[]
-  supervisedLeaderDailyLogs       LeaderDailyLog[]         @relation("LeaderDailyLogSupervisor")
-  createdLeaderDailyLogs          LeaderDailyLog[]         @relation("LeaderDailyLogCreator")
-  updatedLeaderDailyLogs          LeaderDailyLog[]         @relation("LeaderDailyLogUpdater")
-  leaderLogPrompt                 LeaderLogPrompt?         @relation("LeaderLogPromptSupervisor")
-  leaderLogPromptsUpdated         LeaderLogPrompt[]        @relation("LeaderLogPromptUpdater")
-  logExtractionConfigsUpdated     LogExtractionConfig[]    @relation("LogExtractionConfigUpdater")
-  contractChangeSupervisees       UserContractChange[]     @relation("ContractChangeSupervisor")
-  payrollChangeSupervisees        UserPayrollChange[]      @relation("PayrollChangeSupervisor")
-  payrollPayoutSupervisees        UserPayrollPayout[]      @relation("PayrollPayoutSupervisor")
-  contractChanges                 UserContractChange[]
-  payrollChanges                  UserPayrollChange[]
-  payrollPayouts                  UserPayrollPayout[]
-  projectAssignments              UserProjectAssignment[]
-  ownedFileAssets                 FileAsset[]              @relation("FileAssetOwner")
-  createdFileAssets               FileAsset[]              @relation("FileAssetCreator")
-  createdFileLinks                FileAssetLink[]          @relation("FileAssetLinkCreator")
-  signatures                      UserSignature[]
-  createdSignatures               UserSignature[]          @relation("UserSignatureCreator")
-  createdById                     Int?
-  updatedById                     Int?
-  createdBy                       User?                    @relation("UserCreator", fields: [createdById], references: [id])
-  updatedBy                       User?                    @relation("UserUpdater", fields: [updatedById], references: [id])
-  createdUsers                    User[]                   @relation("UserCreator")
-  updatedUsers                    User[]                   @relation("UserUpdater")
-  roadmapIdeasCreated             RoadmapIdea[]            @relation("RoadmapIdeaCreator")
-  roadmapIdeasUpdated             RoadmapIdea[]            @relation("RoadmapIdeaUpdater")
-  createdDocumentTemplates        DocumentTemplate[]       @relation("DocumentTemplateCreator")
-  updatedDocumentTemplates        DocumentTemplate[]       @relation("DocumentTemplateUpdater")
-  createdDocuments                Document[]               @relation("DocumentCreator")
-  updatedDocuments                Document[]               @relation("DocumentUpdater")
-  createdMachineAssets            MachineAsset[]           @relation("MachineAssetCreator")
-  updatedMachineAssets            MachineAsset[]           @relation("MachineAssetUpdater")
-  supervisedMachineDailyLogs      MachineDailyLog[]        @relation("MachineDailyLogSupervisor")
-  operatedMachineDailyLogs        MachineDailyLog[]        @relation("MachineDailyLogOperator")
-  createdMachineDailyLogs         MachineDailyLog[]        @relation("MachineDailyLogCreator")
-  updatedMachineDailyLogs         MachineDailyLog[]        @relation("MachineDailyLogUpdater")
-  createdFuelSourceDailyLogs      FuelSourceDailyLog[]     @relation("FuelSourceDailyLogCreator")
-  updatedFuelSourceDailyLogs      FuelSourceDailyLog[]     @relation("FuelSourceDailyLogUpdater")
-  receivedDocumentLedgersReceived ReceivedDocumentLedger[] @relation("ReceivedDocumentLedgerReceiver")
-  createdReceivedDocumentLedgers  ReceivedDocumentLedger[] @relation("ReceivedDocumentLedgerCreator")
-  updatedReceivedDocumentLedgers  ReceivedDocumentLedger[] @relation("ReceivedDocumentLedgerUpdater")
-  createdWeeklyDeliveryPlans      WeeklyDeliveryPlan[]     @relation("WeeklyDeliveryPlanCreator")
-  updatedWeeklyDeliveryPlans      WeeklyDeliveryPlan[]     @relation("WeeklyDeliveryPlanUpdater")
-  approvedWeeklyDeliveryPlans     WeeklyDeliveryPlan[]     @relation("WeeklyDeliveryPlanApprover")
-  editedWeeklyDeliveryPlans       WeeklyDeliveryPlan[]     @relation("WeeklyDeliveryPlanEditor")
-  createdAt                       DateTime                 @default(now())
-  updatedAt                       DateTime                 @updatedAt
+  id                                Int                        @id @default(autoincrement())
+  name                              String                     @default("")
+  gender                            String?
+  nationality                       String?
+  phones                            String[]                   @default([])
+  tags                              String[]                   @default([])
+  joinDate                          DateTime?
+  birthDate                         DateTime?
+  position                          String?
+  employmentStatus                  EmploymentStatus           @default(ACTIVE)
+  terminationDate                   DateTime?
+  terminationReason                 String?
+  username                          String                     @unique
+  passwordHash                      String
+  roles                             UserRole[]
+  submittedInspections              InspectionRequest[]        @relation("InspectionSubmitter")
+  createdInspections                InspectionRequest[]        @relation("InspectionCreator")
+  updatedInspections                InspectionRequest[]        @relation("InspectionUpdater")
+  submittedInspectionEntries        InspectionEntry[]          @relation("InspectionEntrySubmitter")
+  createdInspectionEntries          InspectionEntry[]          @relation("InspectionEntryCreator")
+  updatedInspectionEntries          InspectionEntry[]          @relation("InspectionEntryUpdater")
+  createdFinances                   FinanceEntry[]             @relation("FinanceEntryCreator")
+  deletedFinances                   FinanceEntry[]             @relation("FinanceEntryDeleter")
+  handledFinances                   FinanceEntry[]             @relation("FinanceEntryHandler")
+  updatedFinances                   FinanceEntry[]             @relation("FinanceEntryUpdater")
+  createdFinanceLedgerCases         FinanceLedgerCase[]        @relation("FinanceLedgerCaseCreator")
+  updatedFinanceLedgerCases         FinanceLedgerCase[]        @relation("FinanceLedgerCaseUpdater")
+  deletedFinanceLedgerCases         FinanceLedgerCase[]        @relation("FinanceLedgerCaseDeleter")
+  createdFinanceLedgerEvents        FinanceLedgerEvent[]       @relation("FinanceLedgerEventCreator")
+  updatedFinanceLedgerEvents        FinanceLedgerEvent[]       @relation("FinanceLedgerEventUpdater")
+  chineseProfile                    UserChineseProfile?
+  expatProfile                      UserExpatProfile?
+  expatSupervisees                  UserExpatProfile[]         @relation("ExpatChineseSupervisor")
+  teamSupervisorBindings            TeamSupervisor[]
+  supervisedLeaderDailyLogs         LeaderDailyLog[]           @relation("LeaderDailyLogSupervisor")
+  createdLeaderDailyLogs            LeaderDailyLog[]           @relation("LeaderDailyLogCreator")
+  updatedLeaderDailyLogs            LeaderDailyLog[]           @relation("LeaderDailyLogUpdater")
+  leaderLogPrompt                   LeaderLogPrompt?           @relation("LeaderLogPromptSupervisor")
+  leaderLogPromptsUpdated           LeaderLogPrompt[]          @relation("LeaderLogPromptUpdater")
+  logExtractionConfigsUpdated       LogExtractionConfig[]      @relation("LogExtractionConfigUpdater")
+  contractChangeSupervisees         UserContractChange[]       @relation("ContractChangeSupervisor")
+  payrollChangeSupervisees          UserPayrollChange[]        @relation("PayrollChangeSupervisor")
+  payrollPayoutSupervisees          UserPayrollPayout[]        @relation("PayrollPayoutSupervisor")
+  contractChanges                   UserContractChange[]
+  payrollChanges                    UserPayrollChange[]
+  payrollPayouts                    UserPayrollPayout[]
+  projectAssignments                UserProjectAssignment[]
+  ownedFileAssets                   FileAsset[]                @relation("FileAssetOwner")
+  createdFileAssets                 FileAsset[]                @relation("FileAssetCreator")
+  createdFileLinks                  FileAssetLink[]            @relation("FileAssetLinkCreator")
+  signatures                        UserSignature[]
+  createdSignatures                 UserSignature[]            @relation("UserSignatureCreator")
+  createdById                       Int?
+  updatedById                       Int?
+  createdBy                         User?                      @relation("UserCreator", fields: [createdById], references: [id])
+  updatedBy                         User?                      @relation("UserUpdater", fields: [updatedById], references: [id])
+  createdUsers                      User[]                     @relation("UserCreator")
+  updatedUsers                      User[]                     @relation("UserUpdater")
+  roadmapIdeasCreated               RoadmapIdea[]              @relation("RoadmapIdeaCreator")
+  roadmapIdeasUpdated               RoadmapIdea[]              @relation("RoadmapIdeaUpdater")
+  createdDocumentTemplates          DocumentTemplate[]         @relation("DocumentTemplateCreator")
+  updatedDocumentTemplates          DocumentTemplate[]         @relation("DocumentTemplateUpdater")
+  createdDocuments                  Document[]                 @relation("DocumentCreator")
+  updatedDocuments                  Document[]                 @relation("DocumentUpdater")
+  createdMachineAssets              MachineAsset[]             @relation("MachineAssetCreator")
+  updatedMachineAssets              MachineAsset[]             @relation("MachineAssetUpdater")
+  supervisedMachineDailyLogs        MachineDailyLog[]          @relation("MachineDailyLogSupervisor")
+  operatedMachineDailyLogs          MachineDailyLog[]          @relation("MachineDailyLogOperator")
+  createdMachineDailyLogs           MachineDailyLog[]          @relation("MachineDailyLogCreator")
+  updatedMachineDailyLogs           MachineDailyLog[]          @relation("MachineDailyLogUpdater")
+  createdFuelSourceDailyLogs        FuelSourceDailyLog[]       @relation("FuelSourceDailyLogCreator")
+  updatedFuelSourceDailyLogs        FuelSourceDailyLog[]       @relation("FuelSourceDailyLogUpdater")
+  receivedDocumentLedgersReceived   ReceivedDocumentLedger[]   @relation("ReceivedDocumentLedgerReceiver")
+  createdReceivedDocumentLedgers    ReceivedDocumentLedger[]   @relation("ReceivedDocumentLedgerCreator")
+  updatedReceivedDocumentLedgers    ReceivedDocumentLedger[]   @relation("ReceivedDocumentLedgerUpdater")
+  createdWeeklyDeliveryPlans        WeeklyDeliveryPlan[]       @relation("WeeklyDeliveryPlanCreator")
+  updatedWeeklyDeliveryPlans        WeeklyDeliveryPlan[]       @relation("WeeklyDeliveryPlanUpdater")
+  approvedWeeklyDeliveryPlans       WeeklyDeliveryPlan[]       @relation("WeeklyDeliveryPlanApprover")
+  editedWeeklyDeliveryPlans         WeeklyDeliveryPlan[]       @relation("WeeklyDeliveryPlanEditor")
+  createdSiteVariationMeasurements  SiteVariationMeasurement[] @relation("SiteVariationMeasurementCreator")
+  updatedSiteVariationMeasurements  SiteVariationMeasurement[] @relation("SiteVariationMeasurementUpdater")
+  archivedSiteVariationMeasurements SiteVariationMeasurement[] @relation("SiteVariationMeasurementArchiver")
+  createdAt                         DateTime                   @default(now())
+  updatedAt                         DateTime                   @updatedAt
 }
 
 model MachineAsset {
@@ -952,18 +985,18 @@ model UserExpatProfile {
 }
 
 model TeamSupervisor {
-  id             Int      @id @default(autoincrement())
+  id             Int                     @id @default(autoincrement())
   team           String
   teamFr         String?
   teamZh         String?
-  teamKey        String   @unique
+  teamKey        String                  @unique
   supervisorId   Int
   projectId      Int?
-  supervisor     User     @relation(fields: [supervisorId], references: [id], onDelete: Cascade)
-  project        Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  supervisor     User                    @relation(fields: [supervisorId], references: [id], onDelete: Cascade)
+  project        Project?                @relation(fields: [projectId], references: [id], onDelete: SetNull)
   supervisorName String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
   histories      TeamSupervisorHistory[]
 
   @@index([team])
@@ -972,20 +1005,20 @@ model TeamSupervisor {
 }
 
 model TeamSupervisorHistory {
-  id             Int             @id @default(autoincrement())
+  id               Int             @id @default(autoincrement())
   teamSupervisorId Int?
-  teamSupervisor TeamSupervisor? @relation(fields: [teamSupervisorId], references: [id], onDelete: SetNull)
-  team           String
-  teamFr         String?
-  teamZh         String?
-  teamKey        String
-  supervisorId   Int
-  supervisorName String?
-  projectId      Int?
-  effectiveFrom  DateTime
-  effectiveTo    DateTime?
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
+  teamSupervisor   TeamSupervisor? @relation(fields: [teamSupervisorId], references: [id], onDelete: SetNull)
+  team             String
+  teamFr           String?
+  teamZh           String?
+  teamKey          String
+  supervisorId     Int
+  supervisorName   String?
+  projectId        Int?
+  effectiveFrom    DateTime
+  effectiveTo      DateTime?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
 
   @@index([teamSupervisorId])
   @@index([teamKey])
@@ -1078,22 +1111,22 @@ model PayrollRun {
 }
 
 model UserPayrollPayout {
-  id                    Int        @id @default(autoincrement())
-  userId                Int
-  user                  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  runId                 Int
-  run                   PayrollRun @relation(fields: [runId], references: [id], onDelete: Cascade)
-  team                  String?
-  chineseSupervisorId   Int?
-  chineseSupervisor     User?      @relation("PayrollPayoutSupervisor", fields: [chineseSupervisorId], references: [id], onDelete: SetNull)
-  chineseSupervisorName String?
+  id                     Int        @id @default(autoincrement())
+  userId                 Int
+  user                   User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  runId                  Int
+  run                    PayrollRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  team                   String?
+  chineseSupervisorId    Int?
+  chineseSupervisor      User?      @relation("PayrollPayoutSupervisor", fields: [chineseSupervisorId], references: [id], onDelete: SetNull)
+  chineseSupervisorName  String?
   contractNumberSnapshot String?
-  payoutDate            DateTime
-  amount                Decimal    @db.Decimal(18, 2)
-  currency              String     @default("XOF")
-  note                  String?
-  createdAt             DateTime   @default(now())
-  updatedAt             DateTime   @updatedAt
+  payoutDate             DateTime
+  amount                 Decimal    @db.Decimal(18, 2)
+  currency               String     @default("XOF")
+  note                   String?
+  createdAt              DateTime   @default(now())
+  updatedAt              DateTime   @updatedAt
 
   @@unique([runId, userId])
   @@index([userId])
@@ -1102,26 +1135,27 @@ model UserPayrollPayout {
 }
 
 model Project {
-  id                      Int                         @id @default(autoincrement())
-  name                    String                      @unique
-  code                    String?                     @unique
-  isActive                Boolean                     @default(true)
-  createdAt               DateTime                    @default(now())
-  updatedAt               DateTime                    @updatedAt
-  finances                FinanceEntry[]
-  financeLedgerCases      FinanceLedgerCase[]
-  financeLedgerSlas       FinanceLedgerSla[]
-  teamSupervisors         TeamSupervisor[]
-  memberAssignments       UserProjectAssignment[]
-  machineDailyLogs        MachineDailyLog[]
-  boqItems                BoqItem[]
-  boqMeasurements         BoqMeasurement[]
-  measurementDetails      BoqMeasurementDetail[]
-  letters                 Letter[]
-  roadSections            RoadSection[]
-  receivedDocumentLedgers ReceivedDocumentLedger[]
-  weeklyDeliveryPlans     WeeklyDeliveryPlan[]
-  weeklyDeliveryPlanLinks WeeklyDeliveryPlanProject[]
+  id                        Int                         @id @default(autoincrement())
+  name                      String                      @unique
+  code                      String?                     @unique
+  isActive                  Boolean                     @default(true)
+  createdAt                 DateTime                    @default(now())
+  updatedAt                 DateTime                    @updatedAt
+  finances                  FinanceEntry[]
+  financeLedgerCases        FinanceLedgerCase[]
+  financeLedgerSlas         FinanceLedgerSla[]
+  teamSupervisors           TeamSupervisor[]
+  memberAssignments         UserProjectAssignment[]
+  machineDailyLogs          MachineDailyLog[]
+  boqItems                  BoqItem[]
+  boqMeasurements           BoqMeasurement[]
+  measurementDetails        BoqMeasurementDetail[]
+  letters                   Letter[]
+  roadSections              RoadSection[]
+  receivedDocumentLedgers   ReceivedDocumentLedger[]
+  weeklyDeliveryPlans       WeeklyDeliveryPlan[]
+  weeklyDeliveryPlanLinks   WeeklyDeliveryPlanProject[]
+  siteVariationMeasurements SiteVariationMeasurement[]
 }
 
 model BoqItem {
@@ -1142,13 +1176,14 @@ model BoqItem {
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
-  project            Project                @relation(fields: [projectId], references: [id])
-  contractItem       BoqItem?               @relation("BoqItemContractLink", fields: [contractItemId], references: [id])
-  derivedItems       BoqItem[]              @relation("BoqItemContractLink")
-  measurements       BoqMeasurement[]
-  measurementDetails BoqMeasurementDetail[]
-  phaseItemLinks     PhaseItemBoqItem[]
-  letters            Letter[]
+  project                   Project                    @relation(fields: [projectId], references: [id])
+  contractItem              BoqItem?                   @relation("BoqItemContractLink", fields: [contractItemId], references: [id])
+  derivedItems              BoqItem[]                  @relation("BoqItemContractLink")
+  measurements              BoqMeasurement[]
+  measurementDetails        BoqMeasurementDetail[]
+  phaseItemLinks            PhaseItemBoqItem[]
+  letters                   Letter[]
+  siteVariationMeasurements SiteVariationMeasurement[]
 
   @@index([projectId, sheetType, sortOrder])
   @@index([projectId, sheetType, code])
@@ -1188,13 +1223,72 @@ model BoqMeasurementDetail {
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 
-  project Project     @relation(fields: [projectId], references: [id])
-  boqItem BoqItem     @relation(fields: [boqItemId], references: [id], onDelete: Cascade)
-  road    RoadSection @relation(fields: [roadId], references: [id], onDelete: Restrict)
+  project                   Project                    @relation(fields: [projectId], references: [id])
+  boqItem                   BoqItem                    @relation(fields: [boqItemId], references: [id], onDelete: Cascade)
+  road                      RoadSection                @relation(fields: [roadId], references: [id], onDelete: Restrict)
+  siteVariationMeasurements SiteVariationMeasurement[]
 
   @@index([projectId, period])
   @@index([boqItemId, period])
   @@index([roadId, period])
+}
+
+model SiteVariationMeasurement {
+  id                    Int                             @id @default(autoincrement())
+  projectId             Int
+  roadSectionId         Int?
+  mainRoadSectionId     Int?
+  boqItemId             Int?
+  measurementDetailId   Int?
+  status                SiteVariationMeasurementStatus  @default(PENDING_CONFIRMATION)
+  changeType            SiteVariationMeasurementType    @default(OTHER)
+  reason                SiteVariationMeasurementReason?
+  structureName         String?
+  phaseName             String?
+  spec                  String?
+  unit                  String?
+  startPk               String?
+  endPk                 String?
+  side                  IntervalSide?
+  designDescription     String?
+  fieldDescription      String?
+  differenceDescription String?
+  designQuantity        Decimal?                        @db.Decimal(18, 2)
+  actualQuantity        Decimal?                        @db.Decimal(18, 2)
+  deltaQuantity         Decimal?                        @db.Decimal(18, 2)
+  proposedQuantity      Decimal?                        @db.Decimal(18, 2)
+  unitPrice             Decimal?                        @db.Decimal(18, 2)
+  estimatedAmount       Decimal?                        @db.Decimal(18, 2)
+  occurredAt            DateTime?
+  discoveredByText      String?
+  measurementPeriod     DateTime?
+  measuredAt            DateTime?
+  attachmentComplete    Boolean                         @default(false)
+  remark                String?
+  createdById           Int?
+  updatedById           Int?
+  archivedById          Int?
+  archivedAt            DateTime?
+  createdAt             DateTime                        @default(now())
+  updatedAt             DateTime                        @updatedAt
+
+  project           Project               @relation(fields: [projectId], references: [id])
+  roadSection       RoadSection?          @relation("SiteVariationMeasurementRoad", fields: [roadSectionId], references: [id], onDelete: SetNull)
+  mainRoadSection   RoadSection?          @relation("SiteVariationMeasurementMainRoad", fields: [mainRoadSectionId], references: [id], onDelete: SetNull)
+  boqItem           BoqItem?              @relation(fields: [boqItemId], references: [id], onDelete: SetNull)
+  measurementDetail BoqMeasurementDetail? @relation(fields: [measurementDetailId], references: [id], onDelete: SetNull)
+  creator           User?                 @relation("SiteVariationMeasurementCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  updater           User?                 @relation("SiteVariationMeasurementUpdater", fields: [updatedById], references: [id], onDelete: SetNull)
+  archiver          User?                 @relation("SiteVariationMeasurementArchiver", fields: [archivedById], references: [id], onDelete: SetNull)
+
+  @@index([projectId, status])
+  @@index([projectId, occurredAt])
+  @@index([roadSectionId])
+  @@index([mainRoadSectionId])
+  @@index([boqItemId])
+  @@index([measurementDetailId])
+  @@index([status])
+  @@index([changeType])
 }
 
 model FinanceUnit {
