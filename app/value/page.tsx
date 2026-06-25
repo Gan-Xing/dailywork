@@ -2829,6 +2829,7 @@ export default function ValuePage() {
     { key: 'comparison', label: copy.tabs.comparison, href: '/value?tab=comparison' },
     { key: 'boq', label: copy.tabs.boq, href: '/value?tab=boq' },
     { key: 'measurement', label: copy.tabs.measurement, href: '/value?tab=measurement' },
+    { key: 'variation', label: copy.tabs.variation, href: '/value/variation-measurements' },
     { key: 'manage', label: copy.tabs.manage, href: '/value/prices' },
   ] as const
   const tabs = tabItems.map((tab) => ({

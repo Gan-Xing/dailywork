@@ -1137,6 +1137,12 @@ export default function MeasurementLedgerPage() {
       href: '/value/measurement-ledger',
       active: true,
     },
+    {
+      key: 'variation',
+      label: copy.tabs.variation,
+      href: '/value/variation-measurements',
+      active: false,
+    },
   ]
 
   if (permissionDenied) {

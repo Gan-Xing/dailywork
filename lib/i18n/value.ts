@@ -18,6 +18,7 @@ export type ProductionValueCopy = {
     manage: string
     measurement: string
     comparison: string
+    variation: string
   }
   messages: {
     unauthorized: string
@@ -216,7 +217,8 @@ export const productionValueCopy: Record<Locale, ProductionValueCopy> = {
       boq: '工程量清单',
       manage: '分项管理',
       measurement: '计量',
-      comparison: '计量对比'
+      comparison: '计量对比',
+      variation: '现场变更计量'
     },
     messages: {
       unauthorized: '需“产值查看”权限才能查看产值界面',
@@ -413,7 +415,8 @@ export const productionValueCopy: Record<Locale, ProductionValueCopy> = {
       boq: 'Devis quantitatif',
       manage: 'Postes',
       measurement: 'Métrés',
-      comparison: 'Comparaison'
+      comparison: 'Comparaison',
+      variation: 'Variations terrain'
     },
     messages: {
       unauthorized: 'Permission « value:view » requise pour consulter les valeurs réalisées',
