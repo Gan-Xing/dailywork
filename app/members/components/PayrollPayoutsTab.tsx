@@ -7,7 +7,7 @@ import { ActionButton } from '@/components/members/MemberButtons'
 import { useToast } from '@/components/ToastProvider'
 import { AlertDialog } from '@/components/AlertDialog'
 import type { Locale } from '@/lib/i18n'
-import { memberCopy } from '@/lib/i18n/members'
+import { employmentStatusLabels, memberCopy, type EmploymentStatus } from '@/lib/i18n/members'
 import { formatSupervisorLabel, normalizeText, resolveTeamDisplayName } from '@/lib/members/utils'
 import {
   usePayrollImport,
@@ -145,6 +145,7 @@ export function PayrollPayoutsTab({
   const [nameFilters, setNameFilters] = useState<string[]>([])
   const [teamFilters, setTeamFilters] = useState<string[]>([])
   const [supervisorFilters, setSupervisorFilters] = useState<string[]>([])
+  const [statusFilters, setStatusFilters] = useState<string[]>([])
   const [contractTypeFilters, setContractTypeFilters] = useState<string[]>([])
   const [contractNumberFilters, setContractNumberFilters] = useState<string[]>([])
   const [sortField, setSortField] = useState<PayrollSortField | null>(null)
@@ -405,6 +406,14 @@ export function PayrollPayoutsTab({
     [],
   )
 
+  const statusFilterOptions = useMemo<MultiSelectOption[]>(() => {
+    const labels = employmentStatusLabels[locale]
+    return (['ACTIVE', 'ON_LEAVE', 'TERMINATED'] as EmploymentStatus[]).map((status) => ({
+      value: status,
+      label: labels[status],
+    }))
+  }, [locale])
+
   const contractNumberFilterOptions = useMemo(() => {
     const map = new Map<string, string>()
     baseMembers.forEach((member) => {
@@ -432,6 +441,9 @@ export function PayrollPayoutsTab({
         const supervisorId = member.expatProfile?.chineseSupervisorId
         if (!supervisorFilters.includes(String(supervisorId ?? ''))) return false
       }
+      if (statusFilters.length > 0 && !statusFilters.includes(member.employmentStatus)) {
+        return false
+      }
       if (contractTypeFilters.length > 0) {
         if (!contractSnapshot.contractType) return false
         if (!contractTypeFilters.includes(contractSnapshot.contractType)) return false
@@ -446,6 +458,7 @@ export function PayrollPayoutsTab({
       nameFilters,
       teamFilters,
       supervisorFilters,
+      statusFilters,
       contractTypeFilters,
       contractNumberFilters,
       getPrimaryContractSnapshot,
@@ -740,6 +753,7 @@ export function PayrollPayoutsTab({
     nameFilters.length +
     teamFilters.length +
     supervisorFilters.length +
+    statusFilters.length +
     contractTypeFilters.length +
     contractNumberFilters.length
   const hasActiveFilters = activeFilterCount > 0
@@ -748,6 +762,7 @@ export function PayrollPayoutsTab({
     setNameFilters([])
     setTeamFilters([])
     setSupervisorFilters([])
+    setStatusFilters([])
     setContractTypeFilters([])
     setContractNumberFilters([])
   }
@@ -1664,6 +1679,13 @@ export function PayrollPayoutsTab({
             options={supervisorFilterOptions}
             selected={supervisorFilters}
             onChange={setSupervisorFilters}
+            {...filterControlProps}
+          />
+          <MultiSelectFilter
+            label={t.form.status}
+            options={statusFilterOptions}
+            selected={statusFilters}
+            onChange={setStatusFilters}
             {...filterControlProps}
           />
           <MultiSelectFilter
