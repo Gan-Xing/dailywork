@@ -12,6 +12,8 @@ export const WEEKLY_PLAN_GOODS_KEYS = [
   'coolant',
   'binding_wire',
   'rebar',
+  'round_steel_bar',
+  'hollow_thin_wall_steel_tube',
   'angle_steel',
   'flat_steel',
   'steel_plate',
@@ -19,6 +21,7 @@ export const WEEKLY_PLAN_GOODS_KEYS = [
   'gravel_5_15',
   'gravel_15_25',
   'water_reducer',
+  'retarder',
 ] as const
 
 export type WeeklyPlanGoodsKey = (typeof WEEKLY_PLAN_GOODS_KEYS)[number]
@@ -118,7 +121,35 @@ const weeklyPlanGoodsDefinitions: WeeklyPlanGoodsDefinition[] = [
       '钢筋',
       '螺纹钢',
       '盘螺',
+    ],
+  },
+  {
+    key: 'round_steel_bar',
+    label: { zh: '圆钢', fr: 'Rond plein en acier' },
+    aliases: [
+      'round steel bar',
+      'solid round steel bar',
+      'rond plein en acier',
+      'barre ronde pleine en acier',
       '圆钢',
+      '实心圆钢',
+    ],
+  },
+  {
+    key: 'hollow_thin_wall_steel_tube',
+    label: { zh: '空心薄壁钢管', fr: 'Tube rond en acier à paroi mince' },
+    aliases: [
+      'hollow thin wall steel tube',
+      'thin wall steel tube',
+      'round thin wall steel tube',
+      'tube en acier creux a paroi mince',
+      "tube en acier creux à paroi mince",
+      'tube rond en acier a paroi mince',
+      'tube rond en acier à paroi mince',
+      'tube acier creux',
+      '空心薄壁钢管',
+      '空心钢管',
+      '薄壁钢管',
     ],
   },
   {
@@ -171,6 +202,17 @@ const weeklyPlanGoodsDefinitions: WeeklyPlanGoodsDefinition[] = [
       '外加剂',
       '速凝剂',
       'adjuvant',
+    ],
+  },
+  {
+    key: 'retarder',
+    label: { zh: '缓凝剂', fr: 'Adjuvant retardateur de prise' },
+    aliases: [
+      'retarder',
+      'retardateur',
+      'retardateur de prise',
+      'adjuvant retardateur de prise',
+      '缓凝剂',
     ],
   },
 ]
