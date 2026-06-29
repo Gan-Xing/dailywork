@@ -3,6 +3,7 @@ import type { Locale } from './index'
 export type ReportsLandingCopy = {
   nav: {
     reports: string
+    weeklyRollups: string
     leaderLogs: string
     logExtractor: string
   }
@@ -67,6 +68,7 @@ export const reportsLandingCopy: Record<Locale, ReportsLandingCopy> = {
   zh: {
     nav: {
       reports: '日报',
+      weeklyRollups: '周报汇总',
       leaderLogs: '原始日志',
       logExtractor: '日志抽取'
     },
@@ -129,6 +131,7 @@ export const reportsLandingCopy: Record<Locale, ReportsLandingCopy> = {
   fr: {
     nav: {
       reports: 'Rapports',
+      weeklyRollups: 'Synthese hebdomadaire',
       leaderLogs: 'Journal brut',
       logExtractor: 'Extraction'
     },

@@ -41,3 +41,8 @@ next-env.d.ts
 .telegram-inbox/
 video-studio/
 .tmp/
+
+# private report source files
+private/weekly-rollups/
+exports/weekly-rollups/
+*.weekly-rollup.html
