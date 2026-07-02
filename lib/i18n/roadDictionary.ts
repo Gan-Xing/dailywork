@@ -1,79 +1,110 @@
 import type { Locale, LocalizedString } from './index'
 
 type RoadDictionaryEntry = {
-  slug: string
+  slug: RoadSlug
   zh: string
   fr: string
 }
 
+export const ROAD_SLUGS = {
+  BONDOUKOU_UNIVERSITY: 'bondoukou-university',
+  TANDA_TRAVERSEE: 'tanda-traversee',
+  TANDA_VOIE_1: 'tanda-voie1',
+  TANDA_VOIE_2: 'tanda-voie2',
+  TANDA_VOIE_3A: 'tanda-voie3a',
+  TANDA_VOIE_3BC: 'tanda-voie3bc',
+  TANDA_VOIE_5A: 'tanda-voie5a',
+  TANDA_VOIE_5B: 'tanda-voie5b',
+  TANDA_VOIE_5C: 'tanda-voie5c',
+  TANDA_VOIE_7: 'tanda-voie7',
+  AGNIBILEKROU_VOIE_1: 'agnibilekrou-voie1',
+  AGNIBILEKROU_VOIE_2A: 'agnibilekrou-voie2a',
+  LEVEL_CROSSING: 'level-crossing',
+  PREFABRICATED_STRUCTURE: 'prefabricated-structure',
+} as const
+
+export type RoadSlug = (typeof ROAD_SLUGS)[keyof typeof ROAD_SLUGS]
+
+export const TANDA_ROAD_SLUGS = [
+  ROAD_SLUGS.TANDA_TRAVERSEE,
+  ROAD_SLUGS.TANDA_VOIE_1,
+  ROAD_SLUGS.TANDA_VOIE_2,
+  ROAD_SLUGS.TANDA_VOIE_3A,
+  ROAD_SLUGS.TANDA_VOIE_3BC,
+  ROAD_SLUGS.TANDA_VOIE_5A,
+  ROAD_SLUGS.TANDA_VOIE_5B,
+  ROAD_SLUGS.TANDA_VOIE_5C,
+  ROAD_SLUGS.TANDA_VOIE_7,
+] as const
+
 const roadNameEntries: RoadDictionaryEntry[] = [
   {
-    slug: 'bondoukou-university',
+    slug: ROAD_SLUGS.BONDOUKOU_UNIVERSITY,
     zh: '邦杜库大学城路',
     fr: 'BdK Univ.',
   },
   {
-    slug: 'tanda-traversee',
+    slug: ROAD_SLUGS.TANDA_TRAVERSEE,
     zh: '丹达穿城路',
     fr: 'Tanda TC',
   },
   {
-    slug: 'tanda-voie1',
+    slug: ROAD_SLUGS.TANDA_VOIE_1,
     zh: '丹达1号路',
     fr: 'Tanda 1',
   },
   {
-    slug: 'agnibilekrou-voie1',
+    slug: ROAD_SLUGS.AGNIBILEKROU_VOIE_1,
     zh: '阿尼比莱克鲁1号路',
     fr: 'Agnibilékrou 1',
   },
   {
-    slug: 'agnibilekrou-voie2a',
+    slug: ROAD_SLUGS.AGNIBILEKROU_VOIE_2A,
     zh: '阿尼比莱克鲁2A路',
     fr: 'Agnibilékrou 2A',
   },
   {
-    slug: 'tanda-voie2',
+    slug: ROAD_SLUGS.TANDA_VOIE_2,
     zh: '丹达2号路',
     fr: 'Tanda 2',
   },
   {
-    slug: 'tanda-voie3a',
+    slug: ROAD_SLUGS.TANDA_VOIE_3A,
     zh: '丹达3A路',
     fr: 'Tanda 3A',
   },
   {
-    slug: 'tanda-voie3bc',
+    slug: ROAD_SLUGS.TANDA_VOIE_3BC,
     zh: '丹达3BC路',
     fr: 'Tanda 3BC',
   },
   {
-    slug: 'tanda-voie5a',
+    slug: ROAD_SLUGS.TANDA_VOIE_5A,
     zh: '丹达5A路',
     fr: 'Tanda 5A',
   },
   {
-    slug: 'tanda-voie5b',
+    slug: ROAD_SLUGS.TANDA_VOIE_5B,
     zh: '丹达5B路',
     fr: 'Tanda 5B',
   },
   {
-    slug: 'tanda-voie5c',
+    slug: ROAD_SLUGS.TANDA_VOIE_5C,
     zh: '丹达5C路',
     fr: 'Tanda 5C',
   },
   {
-    slug: 'tanda-voie7',
+    slug: ROAD_SLUGS.TANDA_VOIE_7,
     zh: '丹达7号路',
     fr: 'Tanda 7',
   },
   {
-    slug: 'level-crossing',
+    slug: ROAD_SLUGS.LEVEL_CROSSING,
     zh: '平交路口',
     fr: 'Amorce',
   },
   {
-    slug: 'prefabricated-structure',
+    slug: ROAD_SLUGS.PREFABRICATED_STRUCTURE,
     zh: '结构物预制',
     fr: 'Structure préfabriquée',
   },
