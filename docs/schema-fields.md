@@ -284,6 +284,29 @@
      4. `projectId?`：关联 `Project`，用于按项目筛选 BoqItem，可空。
      5. `createdAt` / `updatedAt`：系统维护的时间戳，用于审计与排序。
 
+## 道路标准横断面（RoadCrossSection）
+
+- **用途**：按“道路 + 桩号区间”保存标准横断面和宽度口径，作为后续工程量计算的道路宽度来源；不再把宽度写入分项实例名称、备注或临时公式输入。
+- **字段**
+     1. `id`：唯一标识。
+     2. `roadId`：关联 `RoadSection`（必填），表示该横断面属于哪条道路。
+     3. `startPk` / `endPk`：适用桩号区间，数值，单位按道路桩号口径理解；`endPk` 不得小于 `startPk`。
+     4. `profileCode`：横断面编号或口径名称（如 `PT-2B`、`2B 标准横断面`），必填。
+     5. `carriagewayWidthM`：车行道宽度，单位 m，必填。
+     6. `leftShoulderWidthM?` / `rightShoulderWidthM?`：左右路肩宽度，单位 m，可空；如果图纸只给合并路肩，可在备注说明分配口径。
+     7. `totalWidthM`：用于工程量计算的总宽度，单位 m，必填。
+     8. `status`：枚举 `APPROVED` / `ASSUMED_FROM_REFERENCE` / `NEEDS_CONFIRMATION` / `SUPERSEDED`。
+     9. `sourceDocumentId?`：关联 `ReceivedDocumentLedger`，指向标准横断面或道路图纸台账记录，可空。
+    10. `sourcePage?` / `sourceVersion?`：来源页码、图纸版本或版本补充说明，可空。
+    11. `referenceRoadId?`：参照的 `RoadSection`，用于记录“本路无独立图纸但按另一条路横断面执行”的口径，可空。
+    12. `note?`：备注，可记录 2C/2D/2E/2F 按 2B 执行、待补图纸等说明。
+    13. `createdAt` / `updatedAt`：系统维护的时间戳。
+- **状态规则**
+     - `APPROVED`：已有明确标准横断面图或已确认的正式口径。
+     - `ASSUMED_FROM_REFERENCE`：没有独立横断面页，但按 `referenceRoadId` 对应道路执行。
+     - `NEEDS_CONFIRMATION`：已录入临时口径，仍需图纸或负责人确认。
+     - `SUPERSEDED`：旧版本口径保留审计，不再作为默认工程量口径。
+
 ## 分项定义（PhaseDefinition）
 
 - **用途**：全局的分项模板库，用于跨道路复用分项名称、展示方式及默认的层次/验收内容。
@@ -957,6 +980,7 @@
 - **关联规则**：
      - 行级 PDF 通过 `FileAssetLink` 绑定（`entityType=received-document-ledger`，`entityId=台账ID`）。
      - 主文件推荐使用 `purpose=main-pdf`，文件分类使用 `received-document`。
+     - 道路标准横断面口径通过 `RoadCrossSection.sourceDocumentId` 关联到本台账；台账只保存文件证据，宽度数值写入 `RoadCrossSection`。
      - 删除台账时，仅清理该台账对应的 `FileAssetLink` 关联，不直接删除底层 `FileAsset`。
 
 ## 日志抽取配置（LogExtractionConfig）

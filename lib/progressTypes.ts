@@ -15,6 +15,42 @@ export interface RoadSectionDTO extends RoadSectionPayload {
   updatedAt: string
 }
 
+export type RoadCrossSectionStatus =
+  | 'APPROVED'
+  | 'ASSUMED_FROM_REFERENCE'
+  | 'NEEDS_CONFIRMATION'
+  | 'SUPERSEDED'
+
+export interface RoadCrossSectionPayload {
+  startPk: number
+  endPk: number
+  profileCode: string
+  carriagewayWidthM: number
+  leftShoulderWidthM?: number | null
+  rightShoulderWidthM?: number | null
+  totalWidthM: number
+  status: RoadCrossSectionStatus
+  sourceDocumentId?: number | null
+  sourcePage?: string | null
+  sourceVersion?: string | null
+  referenceRoadId?: number | null
+  note?: string | null
+}
+
+export interface RoadCrossSectionDTO extends RoadCrossSectionPayload {
+  id: number
+  roadId: number
+  sourceDocument?: {
+    id: number
+    documentName: string
+    versionTag?: string | null
+    coverageScope?: string | null
+  } | null
+  referenceRoad?: RoadSectionDTO | null
+  createdAt: string
+  updatedAt: string
+}
+
 export interface RoadSectionWithPhasesDTO extends RoadSectionDTO {
   phases: PhaseDTO[]
 }

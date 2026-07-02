@@ -106,6 +106,13 @@ enum SiteVariationMeasurementStatus {
   VOID
 }
 
+enum RoadCrossSectionStatus {
+  APPROVED
+  ASSUMED_FROM_REFERENCE
+  NEEDS_CONFIRMATION
+  SUPERSEDED
+}
+
 enum SiteVariationMeasurementType {
   ADDITION
   INCREASE
@@ -296,8 +303,38 @@ model RoadSection {
   receivedDocumentLedgers       ReceivedDocumentLedger[]
   siteVariationMeasurements     SiteVariationMeasurement[] @relation("SiteVariationMeasurementRoad")
   mainSiteVariationMeasurements SiteVariationMeasurement[] @relation("SiteVariationMeasurementMainRoad")
+  crossSections                 RoadCrossSection[]         @relation("RoadCrossSectionRoad")
+  referencedCrossSections       RoadCrossSection[]         @relation("RoadCrossSectionReferenceRoad")
 
   @@index([projectId])
+}
+
+model RoadCrossSection {
+  id                  Int                     @id @default(autoincrement())
+  roadId              Int
+  startPk             Float
+  endPk               Float
+  profileCode         String
+  carriagewayWidthM   Decimal                 @db.Decimal(10, 2)
+  leftShoulderWidthM  Decimal?                @db.Decimal(10, 2)
+  rightShoulderWidthM Decimal?                @db.Decimal(10, 2)
+  totalWidthM         Decimal                 @db.Decimal(10, 2)
+  status              RoadCrossSectionStatus  @default(NEEDS_CONFIRMATION)
+  sourceDocumentId    Int?
+  sourcePage          String?
+  sourceVersion       String?
+  referenceRoadId     Int?
+  note                String?
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @updatedAt
+  road                RoadSection             @relation("RoadCrossSectionRoad", fields: [roadId], references: [id], onDelete: Cascade)
+  sourceDocument      ReceivedDocumentLedger? @relation(fields: [sourceDocumentId], references: [id], onDelete: SetNull)
+  referenceRoad       RoadSection?            @relation("RoadCrossSectionReferenceRoad", fields: [referenceRoadId], references: [id], onDelete: SetNull)
+
+  @@index([roadId, startPk, endPk])
+  @@index([status])
+  @@index([sourceDocumentId])
+  @@index([referenceRoadId])
 }
 
 model RoadPhase {
@@ -468,31 +505,32 @@ model Document {
 }
 
 model ReceivedDocumentLedger {
-  id             Int                          @id @default(autoincrement())
-  category       String
-  projectId      Int
-  roadSectionId  Int?
-  structureName  String?
-  sizeSpec       String?
-  versionTag     String?
-  documentName   String
-  documentCode   String?
-  coverageScope  String?
-  sourceOrg      String?
-  receivedAt     DateTime
-  receivedById   Int?
-  receivedByText String?
-  status         ReceivedDocumentLedgerStatus @default(RECEIVED)
-  remark         String?
-  createdById    Int?
-  updatedById    Int?
-  createdAt      DateTime                     @default(now())
-  updatedAt      DateTime                     @updatedAt
-  project        Project                      @relation(fields: [projectId], references: [id], onDelete: Restrict)
-  roadSection    RoadSection?                 @relation(fields: [roadSectionId], references: [id], onDelete: SetNull)
-  receivedBy     User?                        @relation("ReceivedDocumentLedgerReceiver", fields: [receivedById], references: [id], onDelete: SetNull)
-  creator        User?                        @relation("ReceivedDocumentLedgerCreator", fields: [createdById], references: [id], onDelete: SetNull)
-  updater        User?                        @relation("ReceivedDocumentLedgerUpdater", fields: [updatedById], references: [id], onDelete: SetNull)
+  id                Int                          @id @default(autoincrement())
+  category          String
+  projectId         Int
+  roadSectionId     Int?
+  structureName     String?
+  sizeSpec          String?
+  versionTag        String?
+  documentName      String
+  documentCode      String?
+  coverageScope     String?
+  sourceOrg         String?
+  receivedAt        DateTime
+  receivedById      Int?
+  receivedByText    String?
+  status            ReceivedDocumentLedgerStatus @default(RECEIVED)
+  remark            String?
+  createdById       Int?
+  updatedById       Int?
+  createdAt         DateTime                     @default(now())
+  updatedAt         DateTime                     @updatedAt
+  project           Project                      @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  roadSection       RoadSection?                 @relation(fields: [roadSectionId], references: [id], onDelete: SetNull)
+  roadCrossSections RoadCrossSection[]
+  receivedBy        User?                        @relation("ReceivedDocumentLedgerReceiver", fields: [receivedById], references: [id], onDelete: SetNull)
+  creator           User?                        @relation("ReceivedDocumentLedgerCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  updater           User?                        @relation("ReceivedDocumentLedgerUpdater", fields: [updatedById], references: [id], onDelete: SetNull)
 
   @@index([projectId, receivedAt])
   @@index([category, projectId, receivedAt])
