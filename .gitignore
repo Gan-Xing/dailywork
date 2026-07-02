@@ -46,3 +46,7 @@ video-studio/
 private/weekly-rollups/
 exports/weekly-rollups/
 *.weekly-rollup.html
+
+# local workspace data
+data/value/_local/
+data/value/_local-*/
