@@ -193,6 +193,23 @@ const copyByLocale: Record<Locale, {
   newRecord: string
   editRecord: string
   openMeasurementLedger: string
+  readOnly: {
+    title: string
+    description: string
+    updateRequired: string
+  }
+  sections: {
+    basic: string
+    location: string
+    quantities: string
+    notes: string
+  }
+  hints: {
+    provisionalBoq: string
+    amountPreview: string
+    formulaVisible: string
+    measurementBlocked: string
+  }
   filters: {
     keyword: string
     keywordPlaceholder: string
@@ -236,6 +253,23 @@ const copyByLocale: Record<Locale, {
     newRecord: '新增变更',
     editRecord: '编辑变更',
     openMeasurementLedger: '正式计量台账',
+    readOnly: {
+      title: '当前为只读模式',
+      description: '你可以查看、筛选和打开附件；新增、编辑、生成计量需要“产值更新”权限。',
+      updateRequired: '缺少 value:update 权限',
+    },
+    sections: {
+      basic: '基础信息',
+      location: '位置与规格',
+      quantities: '工程量与金额',
+      notes: '说明、公式与附件状态',
+    },
+    hints: {
+      provisionalBoq: '新分项/待确认单价',
+      amountPreview: '按拟计量数量 × 单价预估',
+      formulaVisible: '公式/备注已在列表中展示，编辑时可直接维护。',
+      measurementBlocked: '生成计量前需补齐清单、路段、计量期次和数量。',
+    },
     filters: {
       keyword: '关键词',
       keywordPlaceholder: '项目、路段、分项、规格、桩号、说明…',
@@ -324,6 +358,7 @@ const copyByLocale: Record<Locale, {
       measurementSuccess: '已生成正式计量明细',
       measurementFailed: '生成正式计量失败',
       confirmVoid: '确认作废这条现场变更计量记录？',
+      noUpdatePermission: '当前账号没有产值更新权限，不能新增或编辑。',
     },
   },
   fr: {
@@ -333,6 +368,24 @@ const copyByLocale: Record<Locale, {
     newRecord: 'Nouvelle variation',
     editRecord: 'Modifier la variation',
     openMeasurementLedger: 'Registre des métrés',
+    readOnly: {
+      title: 'Mode lecture seule',
+      description:
+        'Vous pouvez consulter, filtrer et ouvrir les pièces. La création, modification et génération de métré nécessitent le droit value:update.',
+      updateRequired: 'Droit value:update requis',
+    },
+    sections: {
+      basic: 'Informations',
+      location: 'Localisation et spécification',
+      quantities: 'Quantités et montant',
+      notes: 'Descriptions, formule et pièces',
+    },
+    hints: {
+      provisionalBoq: 'Nouveau poste / prix à confirmer',
+      amountPreview: 'Estimation quantité à métrer × prix unitaire',
+      formulaVisible: 'La formule/remarque est visible dans la liste et modifiable ici.',
+      measurementBlocked: 'Compléter poste DQE, tronçon, période et quantité avant de créer le métré.',
+    },
     filters: {
       keyword: 'Recherche',
       keywordPlaceholder: 'Projet, tronçon, poste, spécification, PK, description…',
@@ -421,6 +474,7 @@ const copyByLocale: Record<Locale, {
       measurementSuccess: 'Métré formel créé',
       measurementFailed: 'Échec de création du métré',
       confirmVoid: 'Annuler cette variation ?',
+      noUpdatePermission: 'Le compte courant ne dispose pas du droit de mise à jour de la valeur.',
     },
   },
 }
@@ -525,6 +579,31 @@ const sideLabel = (side: string | null | undefined, locale: Locale) => {
   return side === 'LEFT' ? '左侧' : side === 'RIGHT' ? '右侧' : '双侧'
 }
 
+const parseFormNumber = (value: string) => {
+  const normalized = value.trim().replace(/,/g, '')
+  if (!normalized) return null
+  const parsed = Number(normalized)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+const statusBadgeClass = (status: string) => {
+  switch (status) {
+    case 'READY_TO_MEASURE':
+      return 'border-blue-200 bg-blue-50 text-blue-700'
+    case 'MEASURED':
+      return 'border-emerald-200 bg-emerald-50 text-emerald-700'
+    case 'ARCHIVED':
+      return 'border-slate-200 bg-slate-100 text-slate-700'
+    case 'VOID':
+      return 'border-red-200 bg-red-50 text-red-700'
+    default:
+      return 'border-amber-200 bg-amber-50 text-amber-700'
+  }
+}
+
+const hasPositiveQuantity = (row: VariationRow) =>
+  (row.proposedQuantity ?? row.actualQuantity ?? row.deltaQuantity ?? 0) > 0
+
 export default function VariationMeasurementsClient({
   initialResult,
   projects,
@@ -556,6 +635,13 @@ export default function VariationMeasurementsClient({
   const [actionId, setActionId] = useState<number | null>(null)
 
   const localeId = locale === 'fr' ? 'fr-FR' : 'zh-CN'
+  const computedAmountPreview = useMemo(() => {
+    const explicit = parseFormNumber(form.estimatedAmount)
+    if (explicit !== null) return explicit
+    const quantity = parseFormNumber(form.proposedQuantity)
+    const unitPrice = parseFormNumber(form.unitPrice)
+    return quantity !== null && unitPrice !== null ? quantity * unitPrice : null
+  }, [form.estimatedAmount, form.proposedQuantity, form.unitPrice])
 
   const tabs = [
     { key: 'completion', label: valueCopy.tabs.completion, href: '/value' },
@@ -632,6 +718,10 @@ export default function VariationMeasurementsClient({
   }
 
   const openCreateModal = () => {
+    if (!canUpdate) {
+      addToast(copy.messages.noUpdatePermission, { tone: 'danger' })
+      return
+    }
     const projectId = filters.projectId || (projects[0] ? String(projects[0].id) : '')
     setEditingId(null)
     setForm(emptyForm(projectId))
@@ -639,6 +729,10 @@ export default function VariationMeasurementsClient({
   }
 
   const openEditModal = (row: VariationRow) => {
+    if (!canUpdate) {
+      addToast(copy.messages.noUpdatePermission, { tone: 'danger' })
+      return
+    }
     setEditingId(row.id)
     setForm(rowToForm(row))
     setModalOpen(true)
@@ -669,7 +763,10 @@ export default function VariationMeasurementsClient({
   }
 
   const submitForm = async () => {
-    if (!canUpdate) return
+    if (!canUpdate) {
+      addToast(copy.messages.noUpdatePermission, { tone: 'danger' })
+      return
+    }
     setSaving(true)
     try {
       const method = editingId ? 'PUT' : 'POST'
@@ -717,8 +814,24 @@ export default function VariationMeasurementsClient({
     }
   }
 
+  const getMeasurementBlockReason = useCallback(
+    (row: VariationRow) => {
+      if (row.measurementDetailId || row.status === 'MEASURED' || row.status === 'VOID') return ''
+      if (!row.boqItemId || !(row.roadSectionId || row.mainRoadSectionId) || !row.measurementPeriod || !hasPositiveQuantity(row)) {
+        return copy.hints.measurementBlocked
+      }
+      return ''
+    },
+    [copy.hints.measurementBlocked],
+  )
+
   const createMeasurementDetail = async (row: VariationRow) => {
     if (!canUpdate) return
+    const blockedReason = getMeasurementBlockReason(row)
+    if (blockedReason) {
+      addToast(blockedReason, { tone: 'danger' })
+      return
+    }
     setActionId(row.id)
     try {
       const response = await fetch('/api/value/variation-measurements', {
@@ -859,24 +972,44 @@ export default function VariationMeasurementsClient({
           <div className="flex flex-wrap gap-2">
             <Link
               href="/value/measurement-ledger"
-              className="rounded-full border border-slate-200 bg-white px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300"
+              className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300"
             >
               {copy.openMeasurementLedger}
             </Link>
-            {canUpdate ? (
-              <button
-                type="button"
-                onClick={openCreateModal}
-                className="rounded-full bg-emerald-600 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-white shadow-lg shadow-emerald-600/20 transition hover:-translate-y-0.5 hover:bg-emerald-500"
-              >
-                {copy.newRecord}
-              </button>
-            ) : null}
+            <button
+              type="button"
+              onClick={openCreateModal}
+              disabled={!canUpdate}
+              title={canUpdate ? copy.newRecord : copy.readOnly.updateRequired}
+              className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-emerald-600/20 transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-600 disabled:shadow-none"
+            >
+              {copy.newRecord}
+            </button>
           </div>
         }
       />
 
       <section className="mx-auto w-full max-w-[1760px] px-5 pb-14 pt-6 sm:px-8 xl:px-12">
+        <div className="mb-5 flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="text-sm font-black text-slate-950">
+              {canUpdate ? copy.hints.formulaVisible : copy.readOnly.title}
+            </p>
+            <p className="mt-1 text-sm text-slate-500">
+              {canUpdate ? copy.hints.amountPreview : copy.readOnly.description}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={openCreateModal}
+            disabled={!canUpdate}
+            title={canUpdate ? copy.newRecord : copy.readOnly.updateRequired}
+            className="inline-flex min-h-10 items-center justify-center rounded-xl bg-emerald-600 px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
+          >
+            {copy.newRecord}
+          </button>
+        </div>
+
         <div className="grid gap-4 md:grid-cols-4">
           {[
             { label: copy.cards.total, value: result.summary.count },
@@ -1036,6 +1169,11 @@ export default function VariationMeasurementsClient({
                           {row.reason ? ` · ${getSiteVariationMeasurementReasonLabel(row.reason, locale)}` : ''}
                         </div>
                         {row.spec ? <div className="mt-1 text-xs text-slate-500">{row.spec}</div> : null}
+                        {row.remark ? (
+                          <div className="mt-2 max-w-[360px] rounded-lg bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-600">
+                            {row.remark}
+                          </div>
+                        ) : null}
                       </td>
                       <td className="px-4 py-4">
                         <div className="font-medium text-slate-800">
@@ -1061,7 +1199,9 @@ export default function VariationMeasurementsClient({
                             </div>
                           </>
                         ) : (
-                          <span className="text-slate-400">—</span>
+                          <span className="inline-flex rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
+                            {copy.hints.provisionalBoq}
+                          </span>
                         )}
                       </td>
                       <td className="px-4 py-4 text-xs text-slate-600">
@@ -1076,7 +1216,7 @@ export default function VariationMeasurementsClient({
                         {formatMoney(row.estimatedAmount, locale)}
                       </td>
                       <td className="px-4 py-4">
-                        <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+                        <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${statusBadgeClass(row.status)}`}>
                           {getSiteVariationMeasurementStatusLabel(row.status, locale)}
                         </span>
                         {row.measurementDetailId ? (
@@ -1113,34 +1253,39 @@ export default function VariationMeasurementsClient({
                       </td>
                       <td className="px-4 py-4 text-xs text-slate-500">{formatDate(row.updatedAt, locale)}</td>
                       <td className="px-4 py-4">
-                        <div className="flex min-w-[140px] flex-col items-start gap-2 text-xs font-semibold">
-                          {canUpdate ? (
-                            <button type="button" onClick={() => openEditModal(row)} className="text-slate-700 hover:text-slate-950">
-                              {copy.actions.edit}
-                            </button>
-                          ) : null}
-                          {canUpdate && !row.measurementDetailId && row.status !== 'MEASURED' && row.status !== 'VOID' ? (
+                        <div className="flex min-w-[172px] flex-col items-stretch gap-2 text-xs font-semibold">
+                          <button
+                            type="button"
+                            onClick={() => openEditModal(row)}
+                            disabled={!canUpdate}
+                            title={canUpdate ? copy.actions.edit : copy.readOnly.updateRequired}
+                            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+                          >
+                            {copy.actions.edit}
+                          </button>
+                          {row.status !== 'MEASURED' && row.status !== 'VOID' ? (
                             <button
                               type="button"
-                              disabled={actionId === row.id}
+                              disabled={!canUpdate || actionId === row.id || Boolean(getMeasurementBlockReason(row))}
                               onClick={() => createMeasurementDetail(row)}
-                              className="text-emerald-700 hover:text-emerald-600 disabled:opacity-60"
+                              title={getMeasurementBlockReason(row) || copy.actions.generateMeasurement}
+                              className="rounded-lg bg-emerald-600 px-3 py-2 text-white shadow-sm transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500 disabled:shadow-none"
                             >
                               {copy.actions.generateMeasurement}
                             </button>
                           ) : null}
                           {canUpdate && row.status === 'PENDING_CONFIRMATION' ? (
-                            <button type="button" onClick={() => updateStatus(row, 'READY_TO_MEASURE')} className="text-blue-700">
+                            <button type="button" onClick={() => updateStatus(row, 'READY_TO_MEASURE')} className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-blue-700">
                               {copy.actions.ready}
                             </button>
                           ) : null}
                           {canUpdate && row.status === 'MEASURED' ? (
-                            <button type="button" onClick={() => updateStatus(row, 'ARCHIVED')} className="text-slate-600">
+                            <button type="button" onClick={() => updateStatus(row, 'ARCHIVED')} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-slate-600">
                               {copy.actions.archive}
                             </button>
                           ) : null}
                           {canUpdate && row.status !== 'VOID' ? (
-                            <button type="button" onClick={() => updateStatus(row, 'VOID')} className="text-red-600">
+                            <button type="button" onClick={() => updateStatus(row, 'VOID')} className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-red-600">
                               {copy.actions.void}
                             </button>
                           ) : null}
@@ -1231,171 +1376,229 @@ export default function VariationMeasurementsClient({
       </section>
 
       {modalOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 px-4 py-6">
-          <div className="max-h-[92vh] w-full max-w-5xl overflow-hidden rounded-3xl bg-white shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
-              <div>
-                <h2 className="text-lg font-black text-slate-950">
-                  {editingId ? copy.editRecord : copy.newRecord}
-                </h2>
-                {form.projectId ? (
-                  <p className="mt-1 text-xs text-slate-500">{projectNameById.get(Number(form.projectId))}</p>
-                ) : null}
-              </div>
-              <button
-                type="button"
-                onClick={() => setModalOpen(false)}
-                className="rounded-full border border-slate-200 px-3 py-1 text-lg text-slate-500 hover:bg-slate-50"
-              >
-                ×
-              </button>
-            </div>
-            <div className="max-h-[calc(92vh-136px)] overflow-y-auto px-6 py-5">
-              <div className="grid gap-4 md:grid-cols-3">
-                <Field label={copy.form.project}>
-                  <select value={form.projectId} onChange={(event) => updateForm('projectId', event.target.value)} className="input">
-                    <option value="">—</option>
-                    {sortedProjects.map((project) => (
-                      <option key={project.id} value={project.id}>
-                        {project.name}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-                <Field label={copy.form.road}>
-                  <select value={form.roadSectionId} onChange={(event) => updateForm('roadSectionId', event.target.value)} className="input">
-                    <option value="">—</option>
-                    {filteredRoads.map((road) => (
-                      <option key={road.id} value={road.id}>
-                        {road.name}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-                <Field label={copy.form.mainRoad}>
-                  <select value={form.mainRoadSectionId} onChange={(event) => updateForm('mainRoadSectionId', event.target.value)} className="input">
-                    <option value="">—</option>
-                    {filteredRoads.map((road) => (
-                      <option key={road.id} value={road.id}>
-                        {road.name}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-                <Field label={copy.form.boq} className="md:col-span-3">
-                  <select value={form.boqItemId} onChange={(event) => handleBoqChange(event.target.value)} className="input">
-                    <option value="">—</option>
-                    {filteredBoqItems.map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.code} · {locale === 'fr' ? item.designationFr : item.designationZh}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-                <Field label={copy.form.status}>
-                  <select value={form.status} onChange={(event) => updateForm('status', event.target.value)} className="input">
-                    {SITE_VARIATION_MEASUREMENT_STATUSES.map((status) => (
-                      <option key={status} value={status}>
-                        {getSiteVariationMeasurementStatusLabel(status, locale)}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-                <Field label={copy.form.type}>
-                  <select value={form.changeType} onChange={(event) => updateForm('changeType', event.target.value)} className="input">
-                    {SITE_VARIATION_MEASUREMENT_TYPES.map((type) => (
-                      <option key={type} value={type}>
-                        {getSiteVariationMeasurementTypeLabel(type, locale)}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-                <Field label={copy.form.reason}>
-                  <select value={form.reason} onChange={(event) => updateForm('reason', event.target.value)} className="input">
-                    <option value="">—</option>
-                    {SITE_VARIATION_MEASUREMENT_REASONS.map((reason) => (
-                      <option key={reason} value={reason}>
-                        {getSiteVariationMeasurementReasonLabel(reason, locale)}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-                {[
-                  ['structureName', copy.form.structureName],
-                  ['phaseName', copy.form.phaseName],
-                  ['spec', copy.form.spec],
-                  ['unit', copy.form.unit],
-                  ['startPk', copy.form.startPk],
-                  ['endPk', copy.form.endPk],
-                ].map(([key, label]) => (
-                  <Field key={key} label={label}>
-                    <input value={form[key as keyof FormState] as string} onChange={(event) => updateForm(key as keyof FormState, event.target.value)} className="input" />
-                  </Field>
-                ))}
-                <Field label={copy.form.side}>
-                  <select value={form.side} onChange={(event) => updateForm('side', event.target.value)} className="input">
-                    <option value="">—</option>
-                    <option value="LEFT">{sideLabel('LEFT', locale)}</option>
-                    <option value="RIGHT">{sideLabel('RIGHT', locale)}</option>
-                    <option value="BOTH">{sideLabel('BOTH', locale)}</option>
-                  </select>
-                </Field>
-                {[
-                  ['designQuantity', copy.form.designQuantity],
-                  ['actualQuantity', copy.form.actualQuantity],
-                  ['deltaQuantity', copy.form.deltaQuantity],
-                  ['proposedQuantity', copy.form.proposedQuantity],
-                  ['unitPrice', copy.form.unitPrice],
-                  ['estimatedAmount', copy.form.estimatedAmount],
-                ].map(([key, label]) => (
-                  <Field key={key} label={label}>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={form[key as keyof FormState] as string}
-                      onChange={(event) => updateForm(key as keyof FormState, event.target.value)}
-                      className="input"
-                    />
-                  </Field>
-                ))}
-                <Field label={copy.form.occurredAt}>
-                  <input type="date" value={form.occurredAt} onChange={(event) => updateForm('occurredAt', event.target.value)} className="input" />
-                </Field>
-                <Field label={copy.form.measurementPeriod}>
-                  <input type="month" value={form.measurementPeriod} onChange={(event) => updateForm('measurementPeriod', event.target.value)} className="input" />
-                </Field>
-                <Field label={copy.form.measuredAt}>
-                  <input type="date" value={form.measuredAt} onChange={(event) => updateForm('measuredAt', event.target.value)} className="input" />
-                </Field>
-                <Field label={copy.form.discoveredByText}>
-                  <input value={form.discoveredByText} onChange={(event) => updateForm('discoveredByText', event.target.value)} className="input" />
-                </Field>
-                <label className="flex items-center gap-2 pt-7 text-sm font-semibold text-slate-700">
-                  <input
-                    type="checkbox"
-                    checked={form.attachmentComplete}
-                    onChange={(event) => updateForm('attachmentComplete', event.target.checked)}
-                    className="h-4 w-4 rounded border-slate-300 text-emerald-600"
-                  />
-                  {copy.form.attachmentComplete}
-                </label>
-                {[
-                  ['designDescription', copy.form.designDescription],
-                  ['fieldDescription', copy.form.fieldDescription],
-                  ['differenceDescription', copy.form.differenceDescription],
-                  ['remark', copy.form.remark],
-                ].map(([key, label]) => (
-                  <Field key={key} label={label} className="md:col-span-3">
-                    <textarea
-                      value={form[key as keyof FormState] as string}
-                      onChange={(event) => updateForm(key as keyof FormState, event.target.value)}
-                      className="input min-h-[86px]"
-                    />
-                  </Field>
-                ))}
+        <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/40">
+          <button
+            type="button"
+            aria-label={copy.form.cancel}
+            onClick={() => setModalOpen(false)}
+            className="absolute inset-0 h-full w-full cursor-default"
+          />
+          <div className="relative z-10 flex h-full w-full max-w-5xl flex-col bg-white shadow-2xl">
+            <div className="border-b border-slate-100 px-5 py-4 sm:px-6">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-xs font-semibold uppercase text-emerald-700">
+                    {editingId ? `#${editingId}` : copy.newRecord}
+                  </p>
+                  <h2 className="mt-1 text-xl font-black text-slate-950">
+                    {editingId ? copy.editRecord : copy.newRecord}
+                  </h2>
+                  {form.projectId ? (
+                    <p className="mt-1 text-sm text-slate-500">{projectNameById.get(Number(form.projectId))}</p>
+                  ) : null}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setModalOpen(false)}
+                  className="rounded-lg border border-slate-200 px-3 py-2 text-lg leading-none text-slate-500 hover:bg-slate-50"
+                >
+                  ×
+                </button>
               </div>
             </div>
-            <div className="flex items-center justify-end gap-3 border-t border-slate-100 px-6 py-4">
+
+            <div className="flex-1 overflow-y-auto px-5 py-5 sm:px-6">
+              <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
+                <div className="space-y-5">
+                  <FormSection title={copy.sections.basic}>
+                    <div className="grid gap-4 md:grid-cols-3">
+                      <Field label={copy.form.project}>
+                        <select value={form.projectId} onChange={(event) => updateForm('projectId', event.target.value)} className="input">
+                          <option value="">—</option>
+                          {sortedProjects.map((project) => (
+                            <option key={project.id} value={project.id}>
+                              {project.name}
+                            </option>
+                          ))}
+                        </select>
+                      </Field>
+                      <Field label={copy.form.road}>
+                        <select value={form.roadSectionId} onChange={(event) => updateForm('roadSectionId', event.target.value)} className="input">
+                          <option value="">—</option>
+                          {filteredRoads.map((road) => (
+                            <option key={road.id} value={road.id}>
+                              {road.name}
+                            </option>
+                          ))}
+                        </select>
+                      </Field>
+                      <Field label={copy.form.mainRoad}>
+                        <select value={form.mainRoadSectionId} onChange={(event) => updateForm('mainRoadSectionId', event.target.value)} className="input">
+                          <option value="">—</option>
+                          {filteredRoads.map((road) => (
+                            <option key={road.id} value={road.id}>
+                              {road.name}
+                            </option>
+                          ))}
+                        </select>
+                      </Field>
+                      <Field label={copy.form.boq} className="md:col-span-3">
+                        <select value={form.boqItemId} onChange={(event) => handleBoqChange(event.target.value)} className="input">
+                          <option value="">— {copy.hints.provisionalBoq}</option>
+                          {filteredBoqItems.map((item) => (
+                            <option key={item.id} value={item.id}>
+                              {item.code} · {locale === 'fr' ? item.designationFr : item.designationZh}
+                            </option>
+                          ))}
+                        </select>
+                      </Field>
+                      <Field label={copy.form.status}>
+                        <select value={form.status} onChange={(event) => updateForm('status', event.target.value)} className="input">
+                          {SITE_VARIATION_MEASUREMENT_STATUSES.map((status) => (
+                            <option key={status} value={status}>
+                              {getSiteVariationMeasurementStatusLabel(status, locale)}
+                            </option>
+                          ))}
+                        </select>
+                      </Field>
+                      <Field label={copy.form.type}>
+                        <select value={form.changeType} onChange={(event) => updateForm('changeType', event.target.value)} className="input">
+                          {SITE_VARIATION_MEASUREMENT_TYPES.map((type) => (
+                            <option key={type} value={type}>
+                              {getSiteVariationMeasurementTypeLabel(type, locale)}
+                            </option>
+                          ))}
+                        </select>
+                      </Field>
+                      <Field label={copy.form.reason}>
+                        <select value={form.reason} onChange={(event) => updateForm('reason', event.target.value)} className="input">
+                          <option value="">—</option>
+                          {SITE_VARIATION_MEASUREMENT_REASONS.map((reason) => (
+                            <option key={reason} value={reason}>
+                              {getSiteVariationMeasurementReasonLabel(reason, locale)}
+                            </option>
+                          ))}
+                        </select>
+                      </Field>
+                    </div>
+                  </FormSection>
+
+                  <FormSection title={copy.sections.location}>
+                    <div className="grid gap-4 md:grid-cols-3">
+                      {[
+                        ['structureName', copy.form.structureName],
+                        ['phaseName', copy.form.phaseName],
+                        ['spec', copy.form.spec],
+                        ['startPk', copy.form.startPk],
+                        ['endPk', copy.form.endPk],
+                      ].map(([key, label]) => (
+                        <Field key={key} label={label}>
+                          <input value={form[key as keyof FormState] as string} onChange={(event) => updateForm(key as keyof FormState, event.target.value)} className="input" />
+                        </Field>
+                      ))}
+                      <Field label={copy.form.side}>
+                        <select value={form.side} onChange={(event) => updateForm('side', event.target.value)} className="input">
+                          <option value="">—</option>
+                          <option value="LEFT">{sideLabel('LEFT', locale)}</option>
+                          <option value="RIGHT">{sideLabel('RIGHT', locale)}</option>
+                          <option value="BOTH">{sideLabel('BOTH', locale)}</option>
+                        </select>
+                      </Field>
+                      <Field label={copy.form.occurredAt}>
+                        <input type="date" value={form.occurredAt} onChange={(event) => updateForm('occurredAt', event.target.value)} className="input" />
+                      </Field>
+                      <Field label={copy.form.discoveredByText} className="md:col-span-2">
+                        <input value={form.discoveredByText} onChange={(event) => updateForm('discoveredByText', event.target.value)} className="input" />
+                      </Field>
+                    </div>
+                  </FormSection>
+
+                  <FormSection title={copy.sections.quantities}>
+                    <div className="grid gap-4 md:grid-cols-3">
+                      {[
+                        ['designQuantity', copy.form.designQuantity],
+                        ['actualQuantity', copy.form.actualQuantity],
+                        ['deltaQuantity', copy.form.deltaQuantity],
+                        ['proposedQuantity', copy.form.proposedQuantity],
+                        ['unit', copy.form.unit],
+                        ['unitPrice', copy.form.unitPrice],
+                        ['estimatedAmount', copy.form.estimatedAmount],
+                      ].map(([key, label]) => (
+                        <Field key={key} label={label}>
+                          <input
+                            type={key === 'unit' ? 'text' : 'number'}
+                            step={key === 'unit' ? undefined : '0.01'}
+                            value={form[key as keyof FormState] as string}
+                            onChange={(event) => updateForm(key as keyof FormState, event.target.value)}
+                            className="input"
+                          />
+                        </Field>
+                      ))}
+                    </div>
+                  </FormSection>
+
+                  <FormSection title={copy.sections.notes}>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <Field label={copy.form.measurementPeriod}>
+                        <input type="month" value={form.measurementPeriod} onChange={(event) => updateForm('measurementPeriod', event.target.value)} className="input" />
+                      </Field>
+                      <Field label={copy.form.measuredAt}>
+                        <input type="date" value={form.measuredAt} onChange={(event) => updateForm('measuredAt', event.target.value)} className="input" />
+                      </Field>
+                      <label className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700">
+                        <input
+                          type="checkbox"
+                          checked={form.attachmentComplete}
+                          onChange={(event) => updateForm('attachmentComplete', event.target.checked)}
+                          className="h-4 w-4 rounded border-slate-300 text-emerald-600"
+                        />
+                        {copy.form.attachmentComplete}
+                      </label>
+                      {[
+                        ['designDescription', copy.form.designDescription],
+                        ['fieldDescription', copy.form.fieldDescription],
+                        ['differenceDescription', copy.form.differenceDescription],
+                        ['remark', copy.form.remark],
+                      ].map(([key, label]) => (
+                        <Field key={key} label={label} className="md:col-span-2">
+                          <textarea
+                            value={form[key as keyof FormState] as string}
+                            onChange={(event) => updateForm(key as keyof FormState, event.target.value)}
+                            className="input min-h-[96px]"
+                          />
+                        </Field>
+                      ))}
+                    </div>
+                  </FormSection>
+                </div>
+
+                <aside className="space-y-4">
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                    <p className="text-xs font-semibold uppercase text-slate-500">{copy.form.estimatedAmount}</p>
+                    <p className="mt-2 text-2xl font-black text-slate-950">
+                      {formatMoney(computedAmountPreview, locale)}
+                    </p>
+                    <p className="mt-2 text-sm text-slate-500">{copy.hints.amountPreview}</p>
+                  </div>
+                  <div className="rounded-xl border border-slate-200 bg-white p-4">
+                    <p className="text-xs font-semibold uppercase text-slate-500">{copy.form.status}</p>
+                    <span className={`mt-3 inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${statusBadgeClass(form.status)}`}>
+                      {getSiteVariationMeasurementStatusLabel(form.status, locale)}
+                    </span>
+                    {!form.boqItemId ? (
+                      <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-700">
+                        {copy.hints.provisionalBoq}
+                      </p>
+                    ) : null}
+                  </div>
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm leading-6 text-emerald-800">
+                    {copy.hints.formulaVisible}
+                  </div>
+                </aside>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 border-t border-slate-100 bg-white px-5 py-4 sm:px-6">
               <button type="button" onClick={() => setModalOpen(false)} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700">
                 {copy.form.cancel}
               </button>
@@ -1403,7 +1606,8 @@ export default function VariationMeasurementsClient({
                 type="button"
                 onClick={submitForm}
                 disabled={saving || !canUpdate}
-                className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                title={canUpdate ? copy.form.save : copy.readOnly.updateRequired}
+                className="rounded-xl bg-emerald-600 px-5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-500 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
               >
                 {saving ? '...' : copy.form.save}
               </button>
@@ -1447,5 +1651,20 @@ function Field({
       <span className="mb-1 block">{label}</span>
       {children}
     </label>
+  )
+}
+
+function FormSection({
+  title,
+  children,
+}: {
+  title: string
+  children: ReactNode
+}) {
+  return (
+    <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <h3 className="mb-4 text-sm font-black text-slate-950">{title}</h3>
+      {children}
+    </section>
   )
 }
