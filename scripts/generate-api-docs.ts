@@ -599,7 +599,6 @@ const generateCatalog = () => {
     if (!sourceFile) return
     const pathText = toApiPath(filePath)
     const text = sourceFile.getFullText()
-    const permissions = extractPermissions(text)
     const queryParams = applyEnumValues(
       mergeFieldList(
         extractSearchParamsFromText(text),
@@ -619,6 +618,7 @@ const generateCatalog = () => {
       if (!ts.isFunctionDeclaration(node) || !node.name) return
       const method = node.name.text.toUpperCase()
       if (!methodSet.has(method)) return
+      const permissions = extractPermissions(node.getText(sourceFile))
       const entry: ApiCatalogEntry = {
         key: `${method.toLowerCase()}:${pathText}`,
         method: method as ApiCatalogEntry['method'],

@@ -6,7 +6,7 @@ import {
 } from '@/lib/ai-chat/adapters/dailywork'
 import { buildSemanticContext } from '@/lib/ai-chat/adapters/dailywork/semanticContext'
 import { runChat } from '@/lib/ai-chat/runtime'
-import type { ChatMessage, ChatSession, ChatStreamEvent } from '@/lib/ai-chat/types'
+import type { ChatMessage, ChatSession, ChatStreamEvent, ModelAdapter } from '@/lib/ai-chat/types'
 import { getSessionUser, hasPermission } from '@/lib/server/authSession'
 
 export const dynamic = 'force-dynamic'
@@ -54,10 +54,16 @@ export async function POST(request: Request) {
   } catch {
     return NextResponse.json({ message: 'Invalid JSON body' }, { status: 400 })
   }
+  if (!payload || typeof payload !== 'object') {
+    return NextResponse.json({ message: 'Invalid JSON body' }, { status: 400 })
+  }
 
   const input = normalizeInput(payload.input)
   if (!input) {
     return NextResponse.json({ message: 'input is required' }, { status: 400 })
+  }
+  if (input.length > MAX_MESSAGE_LENGTH) {
+    return NextResponse.json({ message: 'input is too long' }, { status: 413 })
   }
 
   const sessionUser = await getSessionUser()
@@ -67,6 +73,7 @@ export async function POST(request: Request) {
   if (!(await hasPermission('ai-chat:view'))) {
     return NextResponse.json({ message: '缺少 ai-chat:view 权限' }, { status: 403 })
   }
+  const canDebug = await hasPermission('ai-chat:debug')
 
   const session: ChatSession = {
     id: sessionUser.id,
@@ -76,7 +83,7 @@ export async function POST(request: Request) {
 
   const history = normalizeHistory(payload.history)
   const messages: ChatMessage[] = [...history, { role: 'user', content: input }]
-  const origin = new URL(request.url).origin
+  const origin = process.env.AI_CHAT_INTERNAL_ORIGIN ?? `http://127.0.0.1:${process.env.PORT ?? '3000'}`
   const cookie = request.headers.get('cookie') ?? ''
   const encoder = new TextEncoder()
   const memoryContext =
@@ -90,15 +97,28 @@ export async function POST(request: Request) {
     locale: payload.locale ?? 'zh',
     permissions: session.permissions,
   })
-  const contextMessage = [memoryContext, semanticContext.message]
-    .filter((value) => value && value.trim())
-    .join('\n\n')
+  const contextMessage = semanticContext.message
+
+  let adapter: ModelAdapter
+  try {
+    adapter = getDailyworkChatAdapter()
+  } catch {
+    return NextResponse.json({ message: 'AI chat model is not configured' }, { status: 503 })
+  }
+  const startedAt = Date.now()
 
   const stream = new ReadableStream({
     start(controller) {
       const send = (event: ChatStreamEvent) => {
         if (event.type === 'final') finalSent = true
-        controller.enqueue(encoder.encode(buildEventMessage(event)))
+        const visibleEvent: ChatStreamEvent = canDebug
+          ? event
+          : event.type === 'tool_result'
+            ? { ...event, result: { ok: event.result.ok, content: event.result.content } }
+            : event.type === 'final'
+              ? { ...event, toolCalls: undefined }
+              : event
+        controller.enqueue(encoder.encode(buildEventMessage(visibleEvent)))
       }
 
       send({
@@ -107,15 +127,16 @@ export async function POST(request: Request) {
       })
 
       runChat({
-        adapter: getDailyworkChatAdapter(),
+        adapter,
         tools: getDailyworkChatTools(),
         session,
         locale: payload.locale ?? 'zh',
         contextMessage: contextMessage || undefined,
+        userContextMessage: memoryContext || undefined,
         contextCandidates: semanticContext.candidates,
         messages,
         permissionChecker: hasPermission,
-        request: { origin, cookie },
+        request: { origin, cookie, signal: AbortSignal.any([request.signal, AbortSignal.timeout(180000)]) },
         enablePlanning: true,
         maxTurns: 6,
         maxSteps: 8,
@@ -123,6 +144,15 @@ export async function POST(request: Request) {
         onEvent: send,
       })
         .then((result) => {
+          console.info('[ai-chat]', JSON.stringify({
+            event: 'completed',
+            userId: session.id,
+            model: adapter.name,
+            durationMs: Date.now() - startedAt,
+            tokenUsage: result.usage?.totalTokens ?? null,
+            sourceCount: result.sources.length,
+            toolErrors: result.toolCalls.filter((call) => !call.result.ok).length,
+          }))
           if (!finalSent) {
             send({
               type: 'final',
@@ -130,14 +160,22 @@ export async function POST(request: Request) {
               plan: result.plan,
               stepSummaries: result.stepSummaries,
               toolCalls: result.toolCalls,
+              sources: result.sources,
             })
           }
           controller.close()
         })
         .catch((error) => {
+          console.error('[ai-chat]', JSON.stringify({
+            event: 'failed',
+            userId: session.id,
+            model: adapter.name,
+            durationMs: Date.now() - startedAt,
+            errorType: error instanceof Error ? error.name : 'UnknownError',
+          }))
           send({
             type: 'error',
-            message: error instanceof Error ? error.message : 'Chat failed',
+            message: canDebug && error instanceof Error ? error.message : 'AI chat failed. Please retry.',
           })
           controller.close()
         })

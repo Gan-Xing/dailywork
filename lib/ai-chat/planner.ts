@@ -1,6 +1,6 @@
 import { buildPlannerPrompt } from './prompt'
 import { extractJsonObject, safeJsonParse } from './utils'
-import type { ChatLocale, ModelAdapter, PlannerPayload } from './types'
+import type { AdapterGenerateResult, ChatLocale, ModelAdapter, PlannerPayload } from './types'
 
 type PlannerOptions = {
   adapter: ModelAdapter
@@ -9,6 +9,8 @@ type PlannerOptions = {
   candidates: string[]
   contextMessage?: string
   maxSteps?: number
+  signal?: AbortSignal
+  onUsage?: (usage: AdapterGenerateResult['usage']) => void
 }
 
 const normalizeList = (value: unknown) => {
@@ -107,11 +109,14 @@ export const runPlanner = async (options: PlannerOptions): Promise<PlannerPayloa
     const response = await options.adapter.generate({
       messages,
       responseFormat: 'json_object',
+      signal: options.signal,
     })
+    options.onUsage?.(response.usage)
     const raw = extractJsonObject(response.content)
     const parsed = raw ? safeJsonParse<PlannerPayload>(raw) : null
     return normalizePlannerPayload(parsed, fallbackPlan)
   } catch {
+    if (options.signal?.aborted) throw new Error('Chat request cancelled.')
     return fallbackPlan
   }
 }

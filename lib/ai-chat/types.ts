@@ -28,6 +28,7 @@ export type ChatToolContext = {
   request?: {
     origin: string
     cookie?: string
+    signal?: AbortSignal
   }
   permissionChecker?: PermissionChecker
 }
@@ -94,6 +95,7 @@ export type ChatSession = {
 export type AdapterGenerateParams = {
   messages: ChatMessage[]
   responseFormat?: 'text' | 'json_object'
+  signal?: AbortSignal
 }
 
 export type AdapterGenerateResult = {
@@ -120,6 +122,11 @@ export type ChatToolCallRecord = {
   result: ChatToolResult
 }
 
+export type ChatSource = {
+  key: string
+  url: string
+}
+
 export type ChatStreamEvent =
   | { type: 'status'; message: string }
   | { type: 'plan'; plan: PlanPayload }
@@ -133,6 +140,7 @@ export type ChatStreamEvent =
       plan?: PlanPayload
       stepSummaries?: string[]
       toolCalls?: ChatToolCallRecord[]
+      sources?: ChatSource[]
     }
   | { type: 'error'; message: string }
 
@@ -142,6 +150,7 @@ export type ChatRunOptions = {
   session: ChatSession | null
   locale?: ChatLocale
   contextMessage?: string
+  userContextMessage?: string
   contextCandidates?: Array<{
     key: string
     score?: number
@@ -157,11 +166,13 @@ export type ChatRunOptions = {
   maxTurns?: number
   maxSteps?: number
   maxStepTurns?: number
+  maxModelCalls?: number
   enablePlanning?: boolean
   permissionChecker?: PermissionChecker
   request?: {
     origin: string
     cookie?: string
+    signal?: AbortSignal
   }
   onEvent?: (event: ChatStreamEvent) => void
 }
@@ -169,6 +180,7 @@ export type ChatRunOptions = {
 export type ChatRunResult = {
   answer: string
   toolCalls: ChatToolCallRecord[]
+  sources: ChatSource[]
   plan?: PlanPayload
   stepSummaries?: string[]
   usage?: AdapterGenerateResult['usage']

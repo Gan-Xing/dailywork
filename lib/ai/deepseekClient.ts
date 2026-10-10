@@ -15,6 +15,7 @@ export interface CallDeepseekParams {
   maxTokens?: number
   topP?: number
   responseFormat?: 'text' | 'json_object'
+  signal?: AbortSignal
 }
 
 export interface CallDeepseekResult {
@@ -55,6 +56,7 @@ export const callDeepseek = async ({
   maxTokens = 1024,
   topP = 0.9,
   responseFormat = 'text',
+  signal,
 }: CallDeepseekParams): Promise<CallDeepseekResult> => {
   if (!messages?.length) {
     throw new DeepseekRequestError('Deepseek requires at least one chat message.')
@@ -85,6 +87,7 @@ export const callDeepseek = async ({
       Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify(body),
+    signal,
   })
 
   if (!response.ok) {

@@ -1,4 +1,4 @@
-import type { ChatToolCallRecord, PlanPayload } from './types'
+import type { ChatSource, ChatToolCallRecord, PlanPayload } from './types'
 
 export type ChatApiMessage = {
   role: 'user' | 'assistant'
@@ -15,6 +15,7 @@ export type ChatApiRequest = {
 export type ChatApiResponse = {
   answer: string
   toolCalls?: ChatToolCallRecord[]
+  sources?: ChatSource[]
   plan?: PlanPayload
   stepSummaries?: string[]
   usage?: {

@@ -114,5 +114,7 @@
 - 目标：提供一个可复用的 AI 对话引擎，支持意图识别、工具调用、权限校验与多轮回答。
 - 约束：默认只读查询，工具必须基于权限放行；输出不暴露思维链。
 - 位置：核心在 `lib/ai-chat/`，项目适配在 `lib/ai-chat/adapters/dailywork/`，入口为 `/ai-chat` 与 `app/api/ai-chat`。
+- 模型网关：设置 `AI_CHAT_PROVIDER=responses`、`AI_CHAT_BASE_URL`、`AI_CHAT_MODEL`、`AI_CHAT_API_KEY` 可使用 OpenAI Responses 兼容网关；未设置时继续使用 DeepSeek。当前服务器的统一 CLIProxyAPI v8 网关运行于本机 8320 端口，模型为 `gpt-6.1-sol`，并保留本地转写和向量接口。密钥只保留在服务端环境变量中，不传到浏览器。模型可用性必须通过实际推理请求验证，不能只依赖 `/v1/models` 列表。
+- 数据检索：API 目录由 `scripts/generate-api-docs.ts` 生成；问答只调用只读 JSON GET 端点，按当前用户权限过滤，成功调用的相对业务 URL 作为答案来源。生成目录后应核对新路由的语义条目与权限。
 - Prompt：`app/ai-chat/prompt.md` 记录对话协议与工具调用格式。
 - API 目录生成：运行 `npx tsc scripts/generate-api-docs.ts --module commonjs --target es2020 --outDir .tmp --esModuleInterop --skipLibCheck`，然后 `node .tmp/generate-api-docs.js`，最后 `rm -rf .tmp`，产物写入 `lib/ai-chat/adapters/dailywork/apiCatalog.ts`。

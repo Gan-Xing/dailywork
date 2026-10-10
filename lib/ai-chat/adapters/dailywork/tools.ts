@@ -73,7 +73,9 @@ const applyPathParams = (path: string, params: Record<string, unknown>) => {
       missing.push(key)
       continue
     }
-    const replacement = Array.isArray(value) ? value.join('/') : String(value)
+    const replacement = Array.isArray(value)
+      ? value.map((item) => encodeURIComponent(String(item))).join('/')
+      : encodeURIComponent(String(value))
     resolved = resolved.replace(match, replacement)
   }
   return { resolved, missing }
@@ -93,7 +95,30 @@ const buildQueryString = (query: Record<string, unknown>) => {
   return result ? `?${result}` : ''
 }
 
-const isWriteMode = (mode: 'read' | 'write' | 'export') => mode === 'write'
+const MAX_API_RESPONSE_BYTES = 512 * 1024
+
+const readLimitedResponse = async (response: Response) => {
+  const contentLength = Number(response.headers.get('content-length'))
+  if (Number.isFinite(contentLength) && contentLength > MAX_API_RESPONSE_BYTES) {
+    throw new Error('response_too_large')
+  }
+  if (!response.body) return ''
+  const reader = response.body.getReader()
+  const decoder = new TextDecoder()
+  let bytes = 0
+  let content = ''
+  while (true) {
+    const { value, done } = await reader.read()
+    if (done) break
+    bytes += value.byteLength
+    if (bytes > MAX_API_RESPONSE_BYTES) {
+      await reader.cancel()
+      throw new Error('response_too_large')
+    }
+    content += decoder.decode(value, { stream: true })
+  }
+  return content + decoder.decode()
+}
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === 'object' && !Array.isArray(value)
@@ -188,11 +213,11 @@ export const buildDailyworkTools = (): ChatTool[] => [
         if (!entry) {
           return buildResult({ ok: false, content: 'API entry not found.', error: 'not_found' })
         }
-        if (isWriteMode(entry.mode)) {
+        if (entry.mode !== 'read' || entry.method !== 'GET') {
           return buildResult({
             ok: false,
-            content: 'Write endpoints are not allowed in chat mode.',
-            error: 'write_not_allowed',
+            content: 'Only read-only JSON endpoints are allowed in chat mode.',
+            error: 'endpoint_not_readable',
           })
         }
         const permissions = context.session?.permissions ?? []
@@ -237,22 +262,30 @@ export const buildDailyworkTools = (): ChatTool[] => [
           method: entry.method,
           headers,
           body: entry.method === 'GET' ? undefined : JSON.stringify(body ?? {}),
+          signal: context.request?.signal
+            ? AbortSignal.any([context.request.signal, AbortSignal.timeout(15000)])
+            : AbortSignal.timeout(15000),
         })
         const contentType = response.headers.get('content-type') ?? ''
         const isJson = contentType.includes('application/json')
         const isBinary = /application\/pdf|application\/octet-stream|application\/vnd\./i.test(
           contentType,
         )
-        let payload: unknown
         if (isBinary) {
-          const buffer = Buffer.from(await response.arrayBuffer())
-          payload = {
-            base64: buffer.toString('base64'),
-            mime: contentType,
-            size: buffer.length,
+          return buildResult({
+            ok: false,
+            content: 'Binary responses are not available in chat mode.',
+            error: 'binary_not_allowed',
+          })
+        }
+        const raw = await readLimitedResponse(response)
+        let payload: unknown = raw
+        if (isJson) {
+          try {
+            payload = JSON.parse(raw)
+          } catch {
+            return buildResult({ ok: false, content: 'API returned invalid JSON.', error: 'invalid_json' })
           }
-        } else {
-          payload = isJson ? await response.json() : await response.text()
         }
         if (!response.ok) {
           return buildResult({
@@ -278,7 +311,7 @@ export const buildDailyworkTools = (): ChatTool[] => [
         }
         return buildResult({
           ok: true,
-          content: isBinary ? 'API request succeeded with binary payload.' : 'API request succeeded.',
+          content: 'API request succeeded.',
           data: payload,
         })
       } catch (error) {

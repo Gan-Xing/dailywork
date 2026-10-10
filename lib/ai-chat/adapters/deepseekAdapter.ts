@@ -12,7 +12,7 @@ type DeepseekAdapterOptions = {
 export const createDeepseekAdapter = (options: DeepseekAdapterOptions = {}): ModelAdapter => {
   return {
     name: 'deepseek',
-    generate: async ({ messages, responseFormat }: AdapterGenerateParams) => {
+    generate: async ({ messages, responseFormat, signal }: AdapterGenerateParams) => {
       const result = await callDeepseek({
         messages,
         model: options.model,
@@ -20,6 +20,7 @@ export const createDeepseekAdapter = (options: DeepseekAdapterOptions = {}): Mod
         maxTokens: options.maxTokens,
         topP: options.topP,
         responseFormat: responseFormat ?? 'text',
+        signal,
       })
       return {
         content: result.content,

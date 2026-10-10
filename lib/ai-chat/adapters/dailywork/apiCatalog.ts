@@ -41,13 +41,15 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "method": "POST",
     "path": "/api/ai-chat",
     "description": "POST /api/ai-chat",
-    "permissions": [],
+    "permissions": [
+      "ai-chat:view"
+    ],
     "mode": "write",
     "pathParams": [],
     "queryParams": [],
     "bodyFields": [],
     "responseSchema": {
-      "type": "{ answer: string; plan: PlanPayload | undefined; stepSummaries: string[] | undefined; toolCalls: ChatToolCallRecord[]; usage: { promptTokens: number; completionTokens: number; totalTokens: number; } | undefined; }",
+      "type": "{ answer: string; plan: PlanPayload | undefined; stepSummaries: string[] | undefined; toolCalls: ChatToolCallRecord[]; sources: ChatSource[]; usage: { promptTokens: number; completionTokens: number; totalTokens: number; } | undefined; }",
       "fields": [
         {
           "name": "answer",
@@ -66,6 +68,10 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
           "type": "ChatToolCallRecord[]"
         },
         {
+          "name": "sources",
+          "type": "ChatSource[]"
+        },
+        {
           "name": "usage",
           "type": "{ promptTokens: number; completionTokens: number; totalTokens: number; } | undefined"
         }
@@ -79,8 +85,7 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "path": "/api/ai-chat/semantic-catalog",
     "description": "GET /api/ai-chat/semantic-catalog",
     "permissions": [
-      "permission:view",
-      "permission:update"
+      "permission:view"
     ],
     "mode": "read",
     "pathParams": [],
@@ -117,7 +122,6 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "path": "/api/ai-chat/semantic-catalog",
     "description": "PUT /api/ai-chat/semantic-catalog",
     "permissions": [
-      "permission:view",
       "permission:update"
     ],
     "mode": "write",
@@ -198,6 +202,41 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
               "optional": true
             },
             {
+              "name": "returnType",
+              "type": "ApiSemanticReturnType | undefined",
+              "optional": true
+            },
+            {
+              "name": "idField",
+              "type": "string | undefined",
+              "optional": true
+            },
+            {
+              "name": "detailEndpointKey",
+              "type": "string | undefined",
+              "optional": true
+            },
+            {
+              "name": "detailParam",
+              "type": "string | undefined",
+              "optional": true
+            },
+            {
+              "name": "detailParamLocation",
+              "type": "ApiSemanticParamLocation | undefined",
+              "optional": true
+            },
+            {
+              "name": "evidenceFields",
+              "type": "string[] | undefined",
+              "optional": true
+            },
+            {
+              "name": "detailKeys",
+              "type": "string[] | undefined",
+              "optional": true
+            },
+            {
               "name": "status",
               "type": "SemanticStatus | undefined",
               "optional": true
@@ -223,7 +262,9 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "method": "POST",
     "path": "/api/ai-chat/stream",
     "description": "POST /api/ai-chat/stream",
-    "permissions": [],
+    "permissions": [
+      "ai-chat:view"
+    ],
     "mode": "write",
     "pathParams": [],
     "queryParams": [],
@@ -487,11 +528,11 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "queryParams": [],
     "bodyFields": [],
     "responseSchema": {
-      "type": "{ users: { id: number; username: string; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: string | null; birthDate: string | null; terminationDate: string | null; terminationReason: string | null; position: string | null; employmentStatus: EmploymentStatus; createdAt: string; updatedAt: string; project: { id: number; name: string; code: string | null; isActive: boolean; } | null; roles: { id: number; name: string; }[]; chineseProfile: { createdAt: string; updatedAt: string; frenchName: string | null; idNumber: string | null; passportNumber: string | null; educationAndMajor: string | null; certifications: string[]; domesticMobile: string | null; emergencyContactName: string | null; emergencyContactPhone: string | null; redBookValidYears: number | null; cumulativeAbroadYears: number | null; birthplace: string | null; residenceInChina: string | null; medicalHistory: string | null; healthStatus: string | null; } | null; expatProfile: { chineseSupervisorId: number | null; chineseSupervisor: { id: number; name: string; username: string; chineseProfile: { frenchName: string | null; } | null; } | null; team: string | null; contractNumber: string | null; contractNumbers: string[]; contractType: ContractType | null; contractStartDate: string | null; contractEndDate: string | null; salaryCategory: string | null; prime: string | null; baseSalaryAmount: string | null; baseSalaryUnit: SalaryUnit | null; netMonthlyAmount: string | null; netMonthlyUnit: SalaryUnit | null; maritalStatus: string | null; childrenCount: number | null; cnpsNumber: string | null; cnpsDeclarationCode: string | null; provenance: string | null; emergencyContactName: string | null; emergencyContactPhone: string | null; createdAt: string; updatedAt: string; } | null; }[]; }",
+      "type": "{ users: { id: number; username: string; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: string | null; birthDate: string | null; terminationDate: string | null; terminationReason: string | null; position: string | null; employmentStatus: EmploymentStatus; createdAt: string; updatedAt: string; project: { id: number; name: string; code: string | null; isActive: boolean; } | null; roles: { id: number; name: string; }[]; chineseProfile: { createdAt: string; updatedAt: string; frenchName: string | null; idNumber: string | null; passportNumber: string | null; educationAndMajor: string | null; certifications: string[]; domesticMobile: string | null; emergencyContactName: string | null; emergencyContactPhone: string | null; redBookValidYears: number | null; cumulativeAbroadYears: number | null; birthplace: string | null; residenceInChina: string | null; medicalHistory: string | null; healthStatus: string | null; } | null; expatProfile: { chineseSupervisorId: number | null; chineseSupervisor: { id: number; name: string; username: string; chineseProfile: { frenchName: string | null; } | null; } | null; team: string | null; contractNumber: string | null; contractNumbers: string[]; contractType: ContractType | null; contractStartDate: string | null; contractEndDate: string | null; salaryCategory: string | null; prime: string | null; baseSalaryAmount: string | null; baseSalaryUnit: SalaryUnit | null; netMonthlyAmount: string | null; netMonthlyUnit: SalaryUnit | null; maritalStatus: string | null; childrenCount: number | null; cnpsNumber: string | null; cnpsDeclarationCode: string | null; provenance: string | null; bankAccountNumber: string | null; bankName: string | null; emergencyContactName: string | null; emergencyContactPhone: string | null; createdAt: string; updatedAt: string; } | null; }[]; }",
       "fields": [
         {
           "name": "users",
-          "type": "{ id: number; username: string; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: string | null; birthDate: string | null; terminationDate: string | null; terminationReason: string | null; position: string | null; employmentStatus: EmploymentStatus; createdAt: string; updatedAt: string; project: { id: number; name: string; code: string | null; isActive: boolean; } | null; roles: { id: number; name: string; }[]; chineseProfile: { createdAt: string; updatedAt: string; frenchName: string | null; idNumber: string | null; passportNumber: string | null; educationAndMajor: string | null; certifications: string[]; domesticMobile: string | null; emergencyContactName: string | null; emergencyContactPhone: string | null; redBookValidYears: number | null; cumulativeAbroadYears: number | null; birthplace: string | null; residenceInChina: string | null; medicalHistory: string | null; healthStatus: string | null; } | null; expatProfile: { chineseSupervisorId: number | null; chineseSupervisor: { id: number; name: string; username: string; chineseProfile: { frenchName: string | null; } | null; } | null; team: string | null; contractNumber: string | null; contractNumbers: string[]; contractType: ContractType | null; contractStartDate: string | null; contractEndDate: string | null; salaryCategory: string | null; prime: string | null; baseSalaryAmount: string | null; baseSalaryUnit: SalaryUnit | null; netMonthlyAmount: string | null; netMonthlyUnit: SalaryUnit | null; maritalStatus: string | null; childrenCount: number | null; cnpsNumber: string | null; cnpsDeclarationCode: string | null; provenance: string | null; emergencyContactName: string | null; emergencyContactPhone: string | null; createdAt: string; updatedAt: string; } | null; }[]",
+          "type": "{ id: number; username: string; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: string | null; birthDate: string | null; terminationDate: string | null; terminationReason: string | null; position: string | null; employmentStatus: EmploymentStatus; createdAt: string; updatedAt: string; project: { id: number; name: string; code: string | null; isActive: boolean; } | null; roles: { id: number; name: string; }[]; chineseProfile: { createdAt: string; updatedAt: string; frenchName: string | null; idNumber: string | null; passportNumber: string | null; educationAndMajor: string | null; certifications: string[]; domesticMobile: string | null; emergencyContactName: string | null; emergencyContactPhone: string | null; redBookValidYears: number | null; cumulativeAbroadYears: number | null; birthplace: string | null; residenceInChina: string | null; medicalHistory: string | null; healthStatus: string | null; } | null; expatProfile: { chineseSupervisorId: number | null; chineseSupervisor: { id: number; name: string; username: string; chineseProfile: { frenchName: string | null; } | null; } | null; team: string | null; contractNumber: string | null; contractNumbers: string[]; contractType: ContractType | null; contractStartDate: string | null; contractEndDate: string | null; salaryCategory: string | null; prime: string | null; baseSalaryAmount: string | null; baseSalaryUnit: SalaryUnit | null; netMonthlyAmount: string | null; netMonthlyUnit: SalaryUnit | null; maritalStatus: string | null; childrenCount: number | null; cnpsNumber: string | null; cnpsDeclarationCode: string | null; provenance: string | null; bankAccountNumber: string | null; bankName: string | null; emergencyContactName: string | null; emergencyContactPhone: string | null; createdAt: string; updatedAt: string; } | null; }[]",
           "enum": [
             "ACTIVE",
             "TERMINATED",
@@ -536,7 +577,6 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "path": "/api/documents/letters/:id",
     "description": "DELETE /api/documents/letters/:id",
     "permissions": [
-      "submission:update",
       "submission:delete"
     ],
     "mode": "write",
@@ -566,8 +606,7 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "path": "/api/documents/letters/:id",
     "description": "PATCH /api/documents/letters/:id",
     "permissions": [
-      "submission:update",
-      "submission:delete"
+      "submission:update"
     ],
     "mode": "write",
     "pathParams": [
@@ -591,14 +630,621 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "source": "app/api/documents/letters/[id]/route.ts"
   },
   {
+    "key": "get:/api/documents/received-ledger",
+    "method": "GET",
+    "path": "/api/documents/received-ledger",
+    "description": "GET /api/documents/received-ledger",
+    "permissions": [],
+    "mode": "read",
+    "pathParams": [],
+    "queryParams": [
+      {
+        "name": "page",
+        "type": "number",
+        "optional": true
+      },
+      {
+        "name": "pageSize",
+        "type": "number",
+        "optional": true
+      },
+      {
+        "name": "projectId",
+        "type": "number",
+        "optional": true
+      },
+      {
+        "name": "roadSectionId",
+        "type": "number",
+        "optional": true
+      },
+      {
+        "name": "search",
+        "type": "string",
+        "optional": true
+      },
+      {
+        "name": "category",
+        "type": "string",
+        "optional": true
+      },
+      {
+        "name": "status",
+        "type": "string",
+        "optional": true
+      },
+      {
+        "name": "attachmentState",
+        "type": "string",
+        "optional": true
+      },
+      {
+        "name": "sortBy",
+        "type": "string",
+        "optional": true
+      },
+      {
+        "name": "sortDir",
+        "type": "string",
+        "optional": true
+      },
+      {
+        "name": "excludeProjectId",
+        "type": "number[]",
+        "optional": true
+      }
+    ],
+    "bodyFields": [],
+    "responseSchema": {
+      "type": "{ item: ReceivedDocumentLedgerListItem; }",
+      "fields": [
+        {
+          "name": "item",
+          "type": "ReceivedDocumentLedgerListItem",
+          "fields": [
+            {
+              "name": "id",
+              "type": "number"
+            },
+            {
+              "name": "category",
+              "type": "string"
+            },
+            {
+              "name": "projectId",
+              "type": "number"
+            },
+            {
+              "name": "projectName",
+              "type": "string"
+            },
+            {
+              "name": "roadSectionId",
+              "type": "number | null"
+            },
+            {
+              "name": "roadSectionName",
+              "type": "string | null"
+            },
+            {
+              "name": "structureName",
+              "type": "string | null"
+            },
+            {
+              "name": "sizeSpec",
+              "type": "string | null"
+            },
+            {
+              "name": "versionTag",
+              "type": "string | null"
+            },
+            {
+              "name": "documentName",
+              "type": "string"
+            },
+            {
+              "name": "documentCode",
+              "type": "string | null"
+            },
+            {
+              "name": "coverageScope",
+              "type": "string | null"
+            },
+            {
+              "name": "sourceOrg",
+              "type": "string | null"
+            },
+            {
+              "name": "receivedAt",
+              "type": "string"
+            },
+            {
+              "name": "receivedById",
+              "type": "number | null"
+            },
+            {
+              "name": "receivedByName",
+              "type": "string | null"
+            },
+            {
+              "name": "receivedByText",
+              "type": "string | null"
+            },
+            {
+              "name": "status",
+              "type": "ReceivedDocumentLedgerStatus",
+              "enum": [
+                "RECEIVED",
+                "PENDING_COMPLETION",
+                "LATEST_VERSION",
+                "VOID"
+              ]
+            },
+            {
+              "name": "remark",
+              "type": "string | null"
+            },
+            {
+              "name": "mainPdf",
+              "type": "ReceivedDocumentLedgerMainPdf | null"
+            },
+            {
+              "name": "attachmentCount",
+              "type": "number"
+            },
+            {
+              "name": "createdAt",
+              "type": "string"
+            },
+            {
+              "name": "updatedAt",
+              "type": "string"
+            }
+          ]
+        }
+      ]
+    },
+    "source": "app/api/documents/received-ledger/route.ts"
+  },
+  {
+    "key": "post:/api/documents/received-ledger",
+    "method": "POST",
+    "path": "/api/documents/received-ledger",
+    "description": "POST /api/documents/received-ledger",
+    "permissions": [],
+    "mode": "write",
+    "pathParams": [],
+    "queryParams": [
+      {
+        "name": "page",
+        "type": "number",
+        "optional": true
+      },
+      {
+        "name": "pageSize",
+        "type": "number",
+        "optional": true
+      },
+      {
+        "name": "projectId",
+        "type": "number",
+        "optional": true
+      },
+      {
+        "name": "roadSectionId",
+        "type": "number",
+        "optional": true
+      },
+      {
+        "name": "search",
+        "type": "string",
+        "optional": true
+      },
+      {
+        "name": "category",
+        "type": "string",
+        "optional": true
+      },
+      {
+        "name": "status",
+        "type": "string",
+        "optional": true
+      },
+      {
+        "name": "attachmentState",
+        "type": "string",
+        "optional": true
+      },
+      {
+        "name": "sortBy",
+        "type": "string",
+        "optional": true
+      },
+      {
+        "name": "sortDir",
+        "type": "string",
+        "optional": true
+      },
+      {
+        "name": "excludeProjectId",
+        "type": "number[]",
+        "optional": true
+      }
+    ],
+    "bodyFields": [],
+    "responseSchema": {
+      "type": "{ item: ReceivedDocumentLedgerListItem; }",
+      "fields": [
+        {
+          "name": "item",
+          "type": "ReceivedDocumentLedgerListItem",
+          "fields": [
+            {
+              "name": "id",
+              "type": "number"
+            },
+            {
+              "name": "category",
+              "type": "string"
+            },
+            {
+              "name": "projectId",
+              "type": "number"
+            },
+            {
+              "name": "projectName",
+              "type": "string"
+            },
+            {
+              "name": "roadSectionId",
+              "type": "number | null"
+            },
+            {
+              "name": "roadSectionName",
+              "type": "string | null"
+            },
+            {
+              "name": "structureName",
+              "type": "string | null"
+            },
+            {
+              "name": "sizeSpec",
+              "type": "string | null"
+            },
+            {
+              "name": "versionTag",
+              "type": "string | null"
+            },
+            {
+              "name": "documentName",
+              "type": "string"
+            },
+            {
+              "name": "documentCode",
+              "type": "string | null"
+            },
+            {
+              "name": "coverageScope",
+              "type": "string | null"
+            },
+            {
+              "name": "sourceOrg",
+              "type": "string | null"
+            },
+            {
+              "name": "receivedAt",
+              "type": "string"
+            },
+            {
+              "name": "receivedById",
+              "type": "number | null"
+            },
+            {
+              "name": "receivedByName",
+              "type": "string | null"
+            },
+            {
+              "name": "receivedByText",
+              "type": "string | null"
+            },
+            {
+              "name": "status",
+              "type": "ReceivedDocumentLedgerStatus",
+              "enum": [
+                "RECEIVED",
+                "PENDING_COMPLETION",
+                "LATEST_VERSION",
+                "VOID"
+              ]
+            },
+            {
+              "name": "remark",
+              "type": "string | null"
+            },
+            {
+              "name": "mainPdf",
+              "type": "ReceivedDocumentLedgerMainPdf | null"
+            },
+            {
+              "name": "attachmentCount",
+              "type": "number"
+            },
+            {
+              "name": "createdAt",
+              "type": "string"
+            },
+            {
+              "name": "updatedAt",
+              "type": "string"
+            }
+          ]
+        }
+      ]
+    },
+    "source": "app/api/documents/received-ledger/route.ts"
+  },
+  {
+    "key": "delete:/api/documents/received-ledger/:id",
+    "method": "DELETE",
+    "path": "/api/documents/received-ledger/:id",
+    "description": "DELETE /api/documents/received-ledger/:id",
+    "permissions": [],
+    "mode": "write",
+    "pathParams": [
+      {
+        "name": "id",
+        "type": "number",
+        "optional": false
+      }
+    ],
+    "queryParams": [],
+    "bodyFields": [],
+    "responseSchema": {
+      "type": "{ item: ReceivedDocumentLedgerListItem; }",
+      "fields": [
+        {
+          "name": "item",
+          "type": "ReceivedDocumentLedgerListItem",
+          "fields": [
+            {
+              "name": "id",
+              "type": "number"
+            },
+            {
+              "name": "category",
+              "type": "string"
+            },
+            {
+              "name": "projectId",
+              "type": "number"
+            },
+            {
+              "name": "projectName",
+              "type": "string"
+            },
+            {
+              "name": "roadSectionId",
+              "type": "number | null"
+            },
+            {
+              "name": "roadSectionName",
+              "type": "string | null"
+            },
+            {
+              "name": "structureName",
+              "type": "string | null"
+            },
+            {
+              "name": "sizeSpec",
+              "type": "string | null"
+            },
+            {
+              "name": "versionTag",
+              "type": "string | null"
+            },
+            {
+              "name": "documentName",
+              "type": "string"
+            },
+            {
+              "name": "documentCode",
+              "type": "string | null"
+            },
+            {
+              "name": "coverageScope",
+              "type": "string | null"
+            },
+            {
+              "name": "sourceOrg",
+              "type": "string | null"
+            },
+            {
+              "name": "receivedAt",
+              "type": "string"
+            },
+            {
+              "name": "receivedById",
+              "type": "number | null"
+            },
+            {
+              "name": "receivedByName",
+              "type": "string | null"
+            },
+            {
+              "name": "receivedByText",
+              "type": "string | null"
+            },
+            {
+              "name": "status",
+              "type": "ReceivedDocumentLedgerStatus",
+              "enum": [
+                "RECEIVED",
+                "PENDING_COMPLETION",
+                "LATEST_VERSION",
+                "VOID"
+              ]
+            },
+            {
+              "name": "remark",
+              "type": "string | null"
+            },
+            {
+              "name": "mainPdf",
+              "type": "ReceivedDocumentLedgerMainPdf | null"
+            },
+            {
+              "name": "attachmentCount",
+              "type": "number"
+            },
+            {
+              "name": "createdAt",
+              "type": "string"
+            },
+            {
+              "name": "updatedAt",
+              "type": "string"
+            }
+          ]
+        }
+      ]
+    },
+    "source": "app/api/documents/received-ledger/[id]/route.ts"
+  },
+  {
+    "key": "patch:/api/documents/received-ledger/:id",
+    "method": "PATCH",
+    "path": "/api/documents/received-ledger/:id",
+    "description": "PATCH /api/documents/received-ledger/:id",
+    "permissions": [],
+    "mode": "write",
+    "pathParams": [
+      {
+        "name": "id",
+        "type": "number",
+        "optional": false
+      }
+    ],
+    "queryParams": [],
+    "bodyFields": [],
+    "responseSchema": {
+      "type": "{ item: ReceivedDocumentLedgerListItem; }",
+      "fields": [
+        {
+          "name": "item",
+          "type": "ReceivedDocumentLedgerListItem",
+          "fields": [
+            {
+              "name": "id",
+              "type": "number"
+            },
+            {
+              "name": "category",
+              "type": "string"
+            },
+            {
+              "name": "projectId",
+              "type": "number"
+            },
+            {
+              "name": "projectName",
+              "type": "string"
+            },
+            {
+              "name": "roadSectionId",
+              "type": "number | null"
+            },
+            {
+              "name": "roadSectionName",
+              "type": "string | null"
+            },
+            {
+              "name": "structureName",
+              "type": "string | null"
+            },
+            {
+              "name": "sizeSpec",
+              "type": "string | null"
+            },
+            {
+              "name": "versionTag",
+              "type": "string | null"
+            },
+            {
+              "name": "documentName",
+              "type": "string"
+            },
+            {
+              "name": "documentCode",
+              "type": "string | null"
+            },
+            {
+              "name": "coverageScope",
+              "type": "string | null"
+            },
+            {
+              "name": "sourceOrg",
+              "type": "string | null"
+            },
+            {
+              "name": "receivedAt",
+              "type": "string"
+            },
+            {
+              "name": "receivedById",
+              "type": "number | null"
+            },
+            {
+              "name": "receivedByName",
+              "type": "string | null"
+            },
+            {
+              "name": "receivedByText",
+              "type": "string | null"
+            },
+            {
+              "name": "status",
+              "type": "ReceivedDocumentLedgerStatus",
+              "enum": [
+                "RECEIVED",
+                "PENDING_COMPLETION",
+                "LATEST_VERSION",
+                "VOID"
+              ]
+            },
+            {
+              "name": "remark",
+              "type": "string | null"
+            },
+            {
+              "name": "mainPdf",
+              "type": "ReceivedDocumentLedgerMainPdf | null"
+            },
+            {
+              "name": "attachmentCount",
+              "type": "number"
+            },
+            {
+              "name": "createdAt",
+              "type": "string"
+            },
+            {
+              "name": "updatedAt",
+              "type": "string"
+            }
+          ]
+        }
+      ]
+    },
+    "source": "app/api/documents/received-ledger/[id]/route.ts"
+  },
+  {
     "key": "get:/api/documents/submissions",
     "method": "GET",
     "path": "/api/documents/submissions",
     "description": "GET /api/documents/submissions",
     "permissions": [
       "submission:view",
-      "submission:update",
-      "submission:create"
+      "submission:update"
     ],
     "mode": "read",
     "pathParams": [],
@@ -635,8 +1281,6 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "path": "/api/documents/submissions",
     "description": "POST /api/documents/submissions",
     "permissions": [
-      "submission:view",
-      "submission:update",
       "submission:create"
     ],
     "mode": "write",
@@ -808,7 +1452,6 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "path": "/api/documents/submissions/:id",
     "description": "PATCH /api/documents/submissions/:id",
     "permissions": [
-      "submission:view",
       "submission:update"
     ],
     "mode": "write",
@@ -1012,8 +1655,7 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "description": "GET /api/documents/templates",
     "permissions": [
       "template:view",
-      "template:update",
-      "template:create"
+      "template:update"
     ],
     "mode": "read",
     "pathParams": [],
@@ -1050,9 +1692,7 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "path": "/api/documents/templates",
     "description": "PATCH /api/documents/templates",
     "permissions": [
-      "template:view",
-      "template:update",
-      "template:create"
+      "template:update"
     ],
     "mode": "write",
     "pathParams": [],
@@ -1089,8 +1729,6 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "path": "/api/documents/templates",
     "description": "POST /api/documents/templates",
     "permissions": [
-      "template:view",
-      "template:update",
       "template:create"
     ],
     "mode": "write",
@@ -1128,8 +1766,6 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "path": "/api/documents/templates/:id",
     "description": "DELETE /api/documents/templates/:id",
     "permissions": [
-      "template:view",
-      "template:update",
       "template:delete"
     ],
     "mode": "write",
@@ -1236,8 +1872,7 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "description": "GET /api/documents/templates/:id",
     "permissions": [
       "template:view",
-      "template:update",
-      "template:delete"
+      "template:update"
     ],
     "mode": "read",
     "pathParams": [
@@ -1342,9 +1977,7 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "path": "/api/documents/templates/:id",
     "description": "PATCH /api/documents/templates/:id",
     "permissions": [
-      "template:view",
-      "template:update",
-      "template:delete"
+      "template:update"
     ],
     "mode": "write",
     "pathParams": [
@@ -1450,8 +2083,7 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "description": "GET /api/files",
     "permissions": [
       "file:view",
-      "file:manage",
-      "file:upload"
+      "file:manage"
     ],
     "mode": "read",
     "pathParams": [],
@@ -1536,9 +2168,8 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "path": "/api/files",
     "description": "POST /api/files",
     "permissions": [
-      "file:view",
-      "file:manage",
-      "file:upload"
+      "file:upload",
+      "file:manage"
     ],
     "mode": "write",
     "pathParams": [],
@@ -1623,10 +2254,8 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "path": "/api/files/:id",
     "description": "DELETE /api/files/:id",
     "permissions": [
-      "file:view",
-      "file:manage",
       "file:delete",
-      "file:update"
+      "file:manage"
     ],
     "mode": "write",
     "pathParams": [
@@ -1736,9 +2365,7 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "description": "GET /api/files/:id",
     "permissions": [
       "file:view",
-      "file:manage",
-      "file:delete",
-      "file:update"
+      "file:manage"
     ],
     "mode": "read",
     "pathParams": [
@@ -1847,10 +2474,8 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "path": "/api/files/:id",
     "description": "PATCH /api/files/:id",
     "permissions": [
-      "file:view",
-      "file:manage",
-      "file:delete",
-      "file:update"
+      "file:update",
+      "file:manage"
     ],
     "mode": "write",
     "pathParams": [
@@ -2027,7 +2652,6 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "path": "/api/finance/categories",
     "description": "DELETE /api/finance/categories",
     "permissions": [
-      "finance:view",
       "finance:manage"
     ],
     "mode": "write",
@@ -2051,8 +2675,7 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "path": "/api/finance/categories",
     "description": "GET /api/finance/categories",
     "permissions": [
-      "finance:view",
-      "finance:manage"
+      "finance:view"
     ],
     "mode": "read",
     "pathParams": [],
@@ -2075,7 +2698,6 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "path": "/api/finance/categories",
     "description": "POST /api/finance/categories",
     "permissions": [
-      "finance:view",
       "finance:manage"
     ],
     "mode": "write",
@@ -2099,8 +2721,7 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "path": "/api/finance/entries",
     "description": "GET /api/finance/entries",
     "permissions": [
-      "finance:view",
-      "finance:edit"
+      "finance:view"
     ],
     "mode": "read",
     "pathParams": [],
@@ -2270,7 +2891,6 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "path": "/api/finance/entries",
     "description": "POST /api/finance/entries",
     "permissions": [
-      "finance:view",
       "finance:edit"
     ],
     "mode": "write",
@@ -2983,6 +3603,1317 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "source": "app/api/finance/insights/route.ts"
   },
   {
+    "key": "get:/api/finance/ledger/cases",
+    "method": "GET",
+    "path": "/api/finance/ledger/cases",
+    "description": "GET /api/finance/ledger/cases",
+    "permissions": [
+      "finance:view"
+    ],
+    "mode": "read",
+    "pathParams": [],
+    "queryParams": [
+      {
+        "name": "overdue",
+        "type": "string",
+        "optional": true
+      },
+      {
+        "name": "search",
+        "type": "string",
+        "optional": true
+      },
+      {
+        "name": "periodMin",
+        "type": "number",
+        "optional": true
+      },
+      {
+        "name": "periodMax",
+        "type": "number",
+        "optional": true
+      },
+      {
+        "name": "page",
+        "type": "number",
+        "optional": true
+      },
+      {
+        "name": "pageSize",
+        "type": "number",
+        "optional": true
+      },
+      {
+        "name": "updatedFrom",
+        "type": "date",
+        "optional": true
+      },
+      {
+        "name": "updatedTo",
+        "type": "date",
+        "optional": true
+      },
+      {
+        "name": "includeDeleted",
+        "type": "boolean",
+        "optional": true
+      },
+      {
+        "name": "projectId",
+        "type": "number[]",
+        "optional": true
+      },
+      {
+        "name": "sectionId",
+        "type": "number[]",
+        "optional": true
+      },
+      {
+        "name": "status",
+        "type": "string[]",
+        "optional": true
+      },
+      {
+        "name": "stage",
+        "type": "string[]",
+        "optional": true
+      },
+      {
+        "name": "sort",
+        "type": "string[]",
+        "optional": true
+      }
+    ],
+    "bodyFields": [],
+    "responseSchema": {
+      "type": "{ cases: FinanceLedgerCaseDTO[]; total: number; page: number; pageSize: number; }",
+      "fields": [
+        {
+          "name": "cases",
+          "type": "FinanceLedgerCaseDTO[]"
+        },
+        {
+          "name": "total",
+          "type": "number"
+        },
+        {
+          "name": "page",
+          "type": "number"
+        },
+        {
+          "name": "pageSize",
+          "type": "number"
+        }
+      ]
+    },
+    "source": "app/api/finance/ledger/cases/route.ts"
+  },
+  {
+    "key": "post:/api/finance/ledger/cases",
+    "method": "POST",
+    "path": "/api/finance/ledger/cases",
+    "description": "POST /api/finance/ledger/cases",
+    "permissions": [
+      "finance:edit"
+    ],
+    "mode": "write",
+    "pathParams": [],
+    "queryParams": [
+      {
+        "name": "overdue",
+        "type": "string",
+        "optional": true
+      },
+      {
+        "name": "search",
+        "type": "string",
+        "optional": true
+      },
+      {
+        "name": "periodMin",
+        "type": "number",
+        "optional": true
+      },
+      {
+        "name": "periodMax",
+        "type": "number",
+        "optional": true
+      },
+      {
+        "name": "page",
+        "type": "number",
+        "optional": true
+      },
+      {
+        "name": "pageSize",
+        "type": "number",
+        "optional": true
+      },
+      {
+        "name": "updatedFrom",
+        "type": "date",
+        "optional": true
+      },
+      {
+        "name": "updatedTo",
+        "type": "date",
+        "optional": true
+      },
+      {
+        "name": "includeDeleted",
+        "type": "boolean",
+        "optional": true
+      },
+      {
+        "name": "projectId",
+        "type": "number[]",
+        "optional": true
+      },
+      {
+        "name": "sectionId",
+        "type": "number[]",
+        "optional": true
+      },
+      {
+        "name": "status",
+        "type": "string[]",
+        "optional": true
+      },
+      {
+        "name": "stage",
+        "type": "string[]",
+        "optional": true
+      },
+      {
+        "name": "sort",
+        "type": "string[]",
+        "optional": true
+      }
+    ],
+    "bodyFields": [],
+    "responseSchema": {
+      "type": "{ cases: FinanceLedgerCaseDTO[]; total: number; page: number; pageSize: number; }",
+      "fields": [
+        {
+          "name": "cases",
+          "type": "FinanceLedgerCaseDTO[]"
+        },
+        {
+          "name": "total",
+          "type": "number"
+        },
+        {
+          "name": "page",
+          "type": "number"
+        },
+        {
+          "name": "pageSize",
+          "type": "number"
+        }
+      ]
+    },
+    "source": "app/api/finance/ledger/cases/route.ts"
+  },
+  {
+    "key": "delete:/api/finance/ledger/cases/:id",
+    "method": "DELETE",
+    "path": "/api/finance/ledger/cases/:id",
+    "description": "DELETE /api/finance/ledger/cases/:id",
+    "permissions": [
+      "finance:edit"
+    ],
+    "mode": "write",
+    "pathParams": [
+      {
+        "name": "id",
+        "type": "number",
+        "optional": false
+      }
+    ],
+    "queryParams": [],
+    "bodyFields": [],
+    "responseSchema": {
+      "type": "{ case: FinanceLedgerCaseDTO; }",
+      "fields": [
+        {
+          "name": "case",
+          "type": "FinanceLedgerCaseDTO",
+          "fields": [
+            {
+              "name": "id",
+              "type": "number"
+            },
+            {
+              "name": "sequence",
+              "type": "number"
+            },
+            {
+              "name": "projectId",
+              "type": "number"
+            },
+            {
+              "name": "projectName",
+              "type": "string"
+            },
+            {
+              "name": "projectCode",
+              "type": "string | null"
+            },
+            {
+              "name": "sectionId",
+              "type": "number | null"
+            },
+            {
+              "name": "sectionName",
+              "type": "string | null"
+            },
+            {
+              "name": "sectionSlug",
+              "type": "string | null"
+            },
+            {
+              "name": "sectionLabelFr",
+              "type": "string | null"
+            },
+            {
+              "name": "periodIndex",
+              "type": "number"
+            },
+            {
+              "name": "status",
+              "type": "FinanceLedgerCaseStatus",
+              "enum": [
+                "IN_PROGRESS",
+                "DONE",
+                "BLOCKED"
+              ]
+            },
+            {
+              "name": "currentStage",
+              "type": "FinanceLedgerStage | null",
+              "enum": [
+                "SITE_SIGNED",
+                "HQ_BILL_RECEIVED",
+                "BE_CONFIRMED",
+                "BE_DELIVERED",
+                "HQ_INVOICE_RECEIVED",
+                "CHEQUE_ISSUED",
+                "CHEQUE_RECEIVED"
+              ]
+            },
+            {
+              "name": "nextStage",
+              "type": "FinanceLedgerStage | null",
+              "enum": [
+                "SITE_SIGNED",
+                "HQ_BILL_RECEIVED",
+                "BE_CONFIRMED",
+                "BE_DELIVERED",
+                "HQ_INVOICE_RECEIVED",
+                "CHEQUE_ISSUED",
+                "CHEQUE_RECEIVED"
+              ]
+            },
+            {
+              "name": "enteredCurrentStageAt",
+              "type": "string | null"
+            },
+            {
+              "name": "accountAmount",
+              "type": "number | null"
+            },
+            {
+              "name": "invoiceAmount",
+              "type": "number | null"
+            },
+            {
+              "name": "advanceAmount",
+              "type": "number | null"
+            },
+            {
+              "name": "chequeAmount",
+              "type": "number | null"
+            },
+            {
+              "name": "invoiceNumber",
+              "type": "string | null"
+            },
+            {
+              "name": "receiptChequeNumber",
+              "type": "string | null"
+            },
+            {
+              "name": "remark",
+              "type": "string | null"
+            },
+            {
+              "name": "constructionStartedAt",
+              "type": "string | null"
+            },
+            {
+              "name": "constructionFinishedAt",
+              "type": "string | null"
+            },
+            {
+              "name": "waitingDays",
+              "type": "number"
+            },
+            {
+              "name": "overdueDays",
+              "type": "number"
+            },
+            {
+              "name": "isOverdue",
+              "type": "boolean"
+            },
+            {
+              "name": "cycleDays",
+              "type": "number | null"
+            },
+            {
+              "name": "stageDates",
+              "type": "FinanceLedgerStageDates"
+            },
+            {
+              "name": "events",
+              "type": "FinanceLedgerEventDTO[]"
+            },
+            {
+              "name": "createdAt",
+              "type": "string"
+            },
+            {
+              "name": "updatedAt",
+              "type": "string"
+            }
+          ]
+        }
+      ]
+    },
+    "source": "app/api/finance/ledger/cases/[id]/route.ts"
+  },
+  {
+    "key": "get:/api/finance/ledger/cases/:id",
+    "method": "GET",
+    "path": "/api/finance/ledger/cases/:id",
+    "description": "GET /api/finance/ledger/cases/:id",
+    "permissions": [
+      "finance:view"
+    ],
+    "mode": "read",
+    "pathParams": [
+      {
+        "name": "id",
+        "type": "number",
+        "optional": false
+      }
+    ],
+    "queryParams": [],
+    "bodyFields": [],
+    "responseSchema": {
+      "type": "{ case: FinanceLedgerCaseDTO; }",
+      "fields": [
+        {
+          "name": "case",
+          "type": "FinanceLedgerCaseDTO",
+          "fields": [
+            {
+              "name": "id",
+              "type": "number"
+            },
+            {
+              "name": "sequence",
+              "type": "number"
+            },
+            {
+              "name": "projectId",
+              "type": "number"
+            },
+            {
+              "name": "projectName",
+              "type": "string"
+            },
+            {
+              "name": "projectCode",
+              "type": "string | null"
+            },
+            {
+              "name": "sectionId",
+              "type": "number | null"
+            },
+            {
+              "name": "sectionName",
+              "type": "string | null"
+            },
+            {
+              "name": "sectionSlug",
+              "type": "string | null"
+            },
+            {
+              "name": "sectionLabelFr",
+              "type": "string | null"
+            },
+            {
+              "name": "periodIndex",
+              "type": "number"
+            },
+            {
+              "name": "status",
+              "type": "FinanceLedgerCaseStatus",
+              "enum": [
+                "IN_PROGRESS",
+                "DONE",
+                "BLOCKED"
+              ]
+            },
+            {
+              "name": "currentStage",
+              "type": "FinanceLedgerStage | null",
+              "enum": [
+                "SITE_SIGNED",
+                "HQ_BILL_RECEIVED",
+                "BE_CONFIRMED",
+                "BE_DELIVERED",
+                "HQ_INVOICE_RECEIVED",
+                "CHEQUE_ISSUED",
+                "CHEQUE_RECEIVED"
+              ]
+            },
+            {
+              "name": "nextStage",
+              "type": "FinanceLedgerStage | null",
+              "enum": [
+                "SITE_SIGNED",
+                "HQ_BILL_RECEIVED",
+                "BE_CONFIRMED",
+                "BE_DELIVERED",
+                "HQ_INVOICE_RECEIVED",
+                "CHEQUE_ISSUED",
+                "CHEQUE_RECEIVED"
+              ]
+            },
+            {
+              "name": "enteredCurrentStageAt",
+              "type": "string | null"
+            },
+            {
+              "name": "accountAmount",
+              "type": "number | null"
+            },
+            {
+              "name": "invoiceAmount",
+              "type": "number | null"
+            },
+            {
+              "name": "advanceAmount",
+              "type": "number | null"
+            },
+            {
+              "name": "chequeAmount",
+              "type": "number | null"
+            },
+            {
+              "name": "invoiceNumber",
+              "type": "string | null"
+            },
+            {
+              "name": "receiptChequeNumber",
+              "type": "string | null"
+            },
+            {
+              "name": "remark",
+              "type": "string | null"
+            },
+            {
+              "name": "constructionStartedAt",
+              "type": "string | null"
+            },
+            {
+              "name": "constructionFinishedAt",
+              "type": "string | null"
+            },
+            {
+              "name": "waitingDays",
+              "type": "number"
+            },
+            {
+              "name": "overdueDays",
+              "type": "number"
+            },
+            {
+              "name": "isOverdue",
+              "type": "boolean"
+            },
+            {
+              "name": "cycleDays",
+              "type": "number | null"
+            },
+            {
+              "name": "stageDates",
+              "type": "FinanceLedgerStageDates"
+            },
+            {
+              "name": "events",
+              "type": "FinanceLedgerEventDTO[]"
+            },
+            {
+              "name": "createdAt",
+              "type": "string"
+            },
+            {
+              "name": "updatedAt",
+              "type": "string"
+            }
+          ]
+        }
+      ]
+    },
+    "source": "app/api/finance/ledger/cases/[id]/route.ts"
+  },
+  {
+    "key": "patch:/api/finance/ledger/cases/:id",
+    "method": "PATCH",
+    "path": "/api/finance/ledger/cases/:id",
+    "description": "PATCH /api/finance/ledger/cases/:id",
+    "permissions": [
+      "finance:edit"
+    ],
+    "mode": "write",
+    "pathParams": [
+      {
+        "name": "id",
+        "type": "number",
+        "optional": false
+      }
+    ],
+    "queryParams": [],
+    "bodyFields": [],
+    "responseSchema": {
+      "type": "{ case: FinanceLedgerCaseDTO; }",
+      "fields": [
+        {
+          "name": "case",
+          "type": "FinanceLedgerCaseDTO",
+          "fields": [
+            {
+              "name": "id",
+              "type": "number"
+            },
+            {
+              "name": "sequence",
+              "type": "number"
+            },
+            {
+              "name": "projectId",
+              "type": "number"
+            },
+            {
+              "name": "projectName",
+              "type": "string"
+            },
+            {
+              "name": "projectCode",
+              "type": "string | null"
+            },
+            {
+              "name": "sectionId",
+              "type": "number | null"
+            },
+            {
+              "name": "sectionName",
+              "type": "string | null"
+            },
+            {
+              "name": "sectionSlug",
+              "type": "string | null"
+            },
+            {
+              "name": "sectionLabelFr",
+              "type": "string | null"
+            },
+            {
+              "name": "periodIndex",
+              "type": "number"
+            },
+            {
+              "name": "status",
+              "type": "FinanceLedgerCaseStatus",
+              "enum": [
+                "IN_PROGRESS",
+                "DONE",
+                "BLOCKED"
+              ]
+            },
+            {
+              "name": "currentStage",
+              "type": "FinanceLedgerStage | null",
+              "enum": [
+                "SITE_SIGNED",
+                "HQ_BILL_RECEIVED",
+                "BE_CONFIRMED",
+                "BE_DELIVERED",
+                "HQ_INVOICE_RECEIVED",
+                "CHEQUE_ISSUED",
+                "CHEQUE_RECEIVED"
+              ]
+            },
+            {
+              "name": "nextStage",
+              "type": "FinanceLedgerStage | null",
+              "enum": [
+                "SITE_SIGNED",
+                "HQ_BILL_RECEIVED",
+                "BE_CONFIRMED",
+                "BE_DELIVERED",
+                "HQ_INVOICE_RECEIVED",
+                "CHEQUE_ISSUED",
+                "CHEQUE_RECEIVED"
+              ]
+            },
+            {
+              "name": "enteredCurrentStageAt",
+              "type": "string | null"
+            },
+            {
+              "name": "accountAmount",
+              "type": "number | null"
+            },
+            {
+              "name": "invoiceAmount",
+              "type": "number | null"
+            },
+            {
+              "name": "advanceAmount",
+              "type": "number | null"
+            },
+            {
+              "name": "chequeAmount",
+              "type": "number | null"
+            },
+            {
+              "name": "invoiceNumber",
+              "type": "string | null"
+            },
+            {
+              "name": "receiptChequeNumber",
+              "type": "string | null"
+            },
+            {
+              "name": "remark",
+              "type": "string | null"
+            },
+            {
+              "name": "constructionStartedAt",
+              "type": "string | null"
+            },
+            {
+              "name": "constructionFinishedAt",
+              "type": "string | null"
+            },
+            {
+              "name": "waitingDays",
+              "type": "number"
+            },
+            {
+              "name": "overdueDays",
+              "type": "number"
+            },
+            {
+              "name": "isOverdue",
+              "type": "boolean"
+            },
+            {
+              "name": "cycleDays",
+              "type": "number | null"
+            },
+            {
+              "name": "stageDates",
+              "type": "FinanceLedgerStageDates"
+            },
+            {
+              "name": "events",
+              "type": "FinanceLedgerEventDTO[]"
+            },
+            {
+              "name": "createdAt",
+              "type": "string"
+            },
+            {
+              "name": "updatedAt",
+              "type": "string"
+            }
+          ]
+        }
+      ]
+    },
+    "source": "app/api/finance/ledger/cases/[id]/route.ts"
+  },
+  {
+    "key": "post:/api/finance/ledger/cases/:id/events",
+    "method": "POST",
+    "path": "/api/finance/ledger/cases/:id/events",
+    "description": "POST /api/finance/ledger/cases/:id/events",
+    "permissions": [
+      "finance:edit"
+    ],
+    "mode": "write",
+    "pathParams": [
+      {
+        "name": "id",
+        "type": "number",
+        "optional": false
+      }
+    ],
+    "queryParams": [],
+    "bodyFields": [],
+    "responseSchema": {
+      "type": "{ case: FinanceLedgerCaseDTO; }",
+      "fields": [
+        {
+          "name": "case",
+          "type": "FinanceLedgerCaseDTO",
+          "fields": [
+            {
+              "name": "id",
+              "type": "number"
+            },
+            {
+              "name": "sequence",
+              "type": "number"
+            },
+            {
+              "name": "projectId",
+              "type": "number"
+            },
+            {
+              "name": "projectName",
+              "type": "string"
+            },
+            {
+              "name": "projectCode",
+              "type": "string | null"
+            },
+            {
+              "name": "sectionId",
+              "type": "number | null"
+            },
+            {
+              "name": "sectionName",
+              "type": "string | null"
+            },
+            {
+              "name": "sectionSlug",
+              "type": "string | null"
+            },
+            {
+              "name": "sectionLabelFr",
+              "type": "string | null"
+            },
+            {
+              "name": "periodIndex",
+              "type": "number"
+            },
+            {
+              "name": "status",
+              "type": "FinanceLedgerCaseStatus",
+              "enum": [
+                "IN_PROGRESS",
+                "DONE",
+                "BLOCKED"
+              ]
+            },
+            {
+              "name": "currentStage",
+              "type": "FinanceLedgerStage | null",
+              "enum": [
+                "SITE_SIGNED",
+                "HQ_BILL_RECEIVED",
+                "BE_CONFIRMED",
+                "BE_DELIVERED",
+                "HQ_INVOICE_RECEIVED",
+                "CHEQUE_ISSUED",
+                "CHEQUE_RECEIVED"
+              ]
+            },
+            {
+              "name": "nextStage",
+              "type": "FinanceLedgerStage | null",
+              "enum": [
+                "SITE_SIGNED",
+                "HQ_BILL_RECEIVED",
+                "BE_CONFIRMED",
+                "BE_DELIVERED",
+                "HQ_INVOICE_RECEIVED",
+                "CHEQUE_ISSUED",
+                "CHEQUE_RECEIVED"
+              ]
+            },
+            {
+              "name": "enteredCurrentStageAt",
+              "type": "string | null"
+            },
+            {
+              "name": "accountAmount",
+              "type": "number | null"
+            },
+            {
+              "name": "invoiceAmount",
+              "type": "number | null"
+            },
+            {
+              "name": "advanceAmount",
+              "type": "number | null"
+            },
+            {
+              "name": "chequeAmount",
+              "type": "number | null"
+            },
+            {
+              "name": "invoiceNumber",
+              "type": "string | null"
+            },
+            {
+              "name": "receiptChequeNumber",
+              "type": "string | null"
+            },
+            {
+              "name": "remark",
+              "type": "string | null"
+            },
+            {
+              "name": "constructionStartedAt",
+              "type": "string | null"
+            },
+            {
+              "name": "constructionFinishedAt",
+              "type": "string | null"
+            },
+            {
+              "name": "waitingDays",
+              "type": "number"
+            },
+            {
+              "name": "overdueDays",
+              "type": "number"
+            },
+            {
+              "name": "isOverdue",
+              "type": "boolean"
+            },
+            {
+              "name": "cycleDays",
+              "type": "number | null"
+            },
+            {
+              "name": "stageDates",
+              "type": "FinanceLedgerStageDates"
+            },
+            {
+              "name": "events",
+              "type": "FinanceLedgerEventDTO[]"
+            },
+            {
+              "name": "createdAt",
+              "type": "string"
+            },
+            {
+              "name": "updatedAt",
+              "type": "string"
+            }
+          ]
+        }
+      ]
+    },
+    "source": "app/api/finance/ledger/cases/[id]/events/route.ts"
+  },
+  {
+    "key": "patch:/api/finance/ledger/events/:eventId",
+    "method": "PATCH",
+    "path": "/api/finance/ledger/events/:eventId",
+    "description": "PATCH /api/finance/ledger/events/:eventId",
+    "permissions": [
+      "finance:edit"
+    ],
+    "mode": "write",
+    "pathParams": [
+      {
+        "name": "eventId",
+        "type": "number",
+        "optional": false
+      }
+    ],
+    "queryParams": [],
+    "bodyFields": [],
+    "responseSchema": {
+      "type": "{ case: FinanceLedgerCaseDTO; }",
+      "fields": [
+        {
+          "name": "case",
+          "type": "FinanceLedgerCaseDTO",
+          "fields": [
+            {
+              "name": "id",
+              "type": "number"
+            },
+            {
+              "name": "sequence",
+              "type": "number"
+            },
+            {
+              "name": "projectId",
+              "type": "number"
+            },
+            {
+              "name": "projectName",
+              "type": "string"
+            },
+            {
+              "name": "projectCode",
+              "type": "string | null"
+            },
+            {
+              "name": "sectionId",
+              "type": "number | null"
+            },
+            {
+              "name": "sectionName",
+              "type": "string | null"
+            },
+            {
+              "name": "sectionSlug",
+              "type": "string | null"
+            },
+            {
+              "name": "sectionLabelFr",
+              "type": "string | null"
+            },
+            {
+              "name": "periodIndex",
+              "type": "number"
+            },
+            {
+              "name": "status",
+              "type": "FinanceLedgerCaseStatus",
+              "enum": [
+                "IN_PROGRESS",
+                "DONE",
+                "BLOCKED"
+              ]
+            },
+            {
+              "name": "currentStage",
+              "type": "FinanceLedgerStage | null",
+              "enum": [
+                "SITE_SIGNED",
+                "HQ_BILL_RECEIVED",
+                "BE_CONFIRMED",
+                "BE_DELIVERED",
+                "HQ_INVOICE_RECEIVED",
+                "CHEQUE_ISSUED",
+                "CHEQUE_RECEIVED"
+              ]
+            },
+            {
+              "name": "nextStage",
+              "type": "FinanceLedgerStage | null",
+              "enum": [
+                "SITE_SIGNED",
+                "HQ_BILL_RECEIVED",
+                "BE_CONFIRMED",
+                "BE_DELIVERED",
+                "HQ_INVOICE_RECEIVED",
+                "CHEQUE_ISSUED",
+                "CHEQUE_RECEIVED"
+              ]
+            },
+            {
+              "name": "enteredCurrentStageAt",
+              "type": "string | null"
+            },
+            {
+              "name": "accountAmount",
+              "type": "number | null"
+            },
+            {
+              "name": "invoiceAmount",
+              "type": "number | null"
+            },
+            {
+              "name": "advanceAmount",
+              "type": "number | null"
+            },
+            {
+              "name": "chequeAmount",
+              "type": "number | null"
+            },
+            {
+              "name": "invoiceNumber",
+              "type": "string | null"
+            },
+            {
+              "name": "receiptChequeNumber",
+              "type": "string | null"
+            },
+            {
+              "name": "remark",
+              "type": "string | null"
+            },
+            {
+              "name": "constructionStartedAt",
+              "type": "string | null"
+            },
+            {
+              "name": "constructionFinishedAt",
+              "type": "string | null"
+            },
+            {
+              "name": "waitingDays",
+              "type": "number"
+            },
+            {
+              "name": "overdueDays",
+              "type": "number"
+            },
+            {
+              "name": "isOverdue",
+              "type": "boolean"
+            },
+            {
+              "name": "cycleDays",
+              "type": "number | null"
+            },
+            {
+              "name": "stageDates",
+              "type": "FinanceLedgerStageDates"
+            },
+            {
+              "name": "events",
+              "type": "FinanceLedgerEventDTO[]"
+            },
+            {
+              "name": "createdAt",
+              "type": "string"
+            },
+            {
+              "name": "updatedAt",
+              "type": "string"
+            }
+          ]
+        }
+      ]
+    },
+    "source": "app/api/finance/ledger/events/[eventId]/route.ts"
+  },
+  {
+    "key": "get:/api/finance/ledger/insights",
+    "method": "GET",
+    "path": "/api/finance/ledger/insights",
+    "description": "GET /api/finance/ledger/insights",
+    "permissions": [
+      "finance:view"
+    ],
+    "mode": "read",
+    "pathParams": [],
+    "queryParams": [
+      {
+        "name": "overdue",
+        "type": "string",
+        "optional": true
+      },
+      {
+        "name": "search",
+        "type": "string",
+        "optional": true
+      },
+      {
+        "name": "periodMin",
+        "type": "number",
+        "optional": true
+      },
+      {
+        "name": "periodMax",
+        "type": "number",
+        "optional": true
+      },
+      {
+        "name": "page",
+        "type": "number",
+        "optional": true
+      },
+      {
+        "name": "pageSize",
+        "type": "number",
+        "optional": true
+      },
+      {
+        "name": "updatedFrom",
+        "type": "date",
+        "optional": true
+      },
+      {
+        "name": "updatedTo",
+        "type": "date",
+        "optional": true
+      },
+      {
+        "name": "includeDeleted",
+        "type": "boolean",
+        "optional": true
+      },
+      {
+        "name": "projectId",
+        "type": "number[]",
+        "optional": true
+      },
+      {
+        "name": "sectionId",
+        "type": "number[]",
+        "optional": true
+      },
+      {
+        "name": "status",
+        "type": "string[]",
+        "optional": true
+      },
+      {
+        "name": "stage",
+        "type": "string[]",
+        "optional": true
+      },
+      {
+        "name": "sort",
+        "type": "string[]",
+        "optional": true
+      }
+    ],
+    "bodyFields": [],
+    "responseSchema": {
+      "type": "{ insights: FinanceLedgerInsights; }",
+      "fields": [
+        {
+          "name": "insights",
+          "type": "FinanceLedgerInsights",
+          "fields": [
+            {
+              "name": "summary",
+              "type": "{ caseCount: number; totalAccountAmount: number; totalInvoiceAmount: number; totalChequeAmount: number; receiptRate: number; averageCycleDays: number; overdueCount: number; }"
+            },
+            {
+              "name": "stageFunnel",
+              "type": "{ stage: FinanceLedgerStage; count: number; amount: number; }[]",
+              "enum": [
+                "SITE_SIGNED",
+                "HQ_BILL_RECEIVED",
+                "BE_CONFIRMED",
+                "BE_DELIVERED",
+                "HQ_INVOICE_RECEIVED",
+                "CHEQUE_ISSUED",
+                "CHEQUE_RECEIVED"
+              ]
+            },
+            {
+              "name": "projectProgress",
+              "type": "{ projectId: number; projectName: string; projectCode: string | null; stageCounts: { stage: FinanceLedgerStage; count: number; amount: number; }[]; }[]",
+              "enum": [
+                "SITE_SIGNED",
+                "HQ_BILL_RECEIVED",
+                "BE_CONFIRMED",
+                "BE_DELIVERED",
+                "HQ_INVOICE_RECEIVED",
+                "CHEQUE_ISSUED",
+                "CHEQUE_RECEIVED"
+              ]
+            },
+            {
+              "name": "monthlyFlow",
+              "type": "{ month: string; invoiceAmount: number; chequeAmount: number; cumulativeInvoiceAmount: number; cumulativeChequeAmount: number; }[]"
+            },
+            {
+              "name": "agingBuckets",
+              "type": "{ bucket: \"0-7\" | \"8-15\" | \"16-30\" | \"31-60\" | \"60+\"; count: number; amount: number; }[]"
+            },
+            {
+              "name": "transitionStats",
+              "type": "{ fromStage: FinanceLedgerStage; toStage: FinanceLedgerStage; count: number; averageDays: number; p90Days: number; slaDays: number; overdueCount: number; overdueRate: number; impactAmount: number; overdueImpactAmount: number; }[]",
+              "enum": [
+                "SITE_SIGNED",
+                "HQ_BILL_RECEIVED",
+                "BE_CONFIRMED",
+                "BE_DELIVERED",
+                "HQ_INVOICE_RECEIVED",
+                "CHEQUE_ISSUED",
+                "CHEQUE_RECEIVED"
+              ]
+            },
+            {
+              "name": "bottlenecks",
+              "type": "{ fromStage: FinanceLedgerStage; toStage: FinanceLedgerStage; count: number; averageDays: number; p90Days: number; slaDays: number; overdueCount: number; overdueRate: number; impactAmount: number; overdueImpactAmount: number; }[]",
+              "enum": [
+                "SITE_SIGNED",
+                "HQ_BILL_RECEIVED",
+                "BE_CONFIRMED",
+                "BE_DELIVERED",
+                "HQ_INVOICE_RECEIVED",
+                "CHEQUE_ISSUED",
+                "CHEQUE_RECEIVED"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "source": "app/api/finance/ledger/insights/route.ts"
+  },
+  {
+    "key": "get:/api/finance/ledger/metadata",
+    "method": "GET",
+    "path": "/api/finance/ledger/metadata",
+    "description": "GET /api/finance/ledger/metadata",
+    "permissions": [
+      "finance:view"
+    ],
+    "mode": "read",
+    "pathParams": [],
+    "queryParams": [],
+    "bodyFields": [],
+    "responseSchema": {
+      "type": "FinanceLedgerMetadata",
+      "fields": [
+        {
+          "name": "projects",
+          "type": "{ id: number; name: string; code: string | null; }[]"
+        },
+        {
+          "name": "sections",
+          "type": "{ id: number; projectId: number | null; slug: string; name: string; labels: { zh: string; fr: string; }; startPk: string; endPk: string; }[]"
+        },
+        {
+          "name": "stages",
+          "type": "FinanceLedgerStage[]",
+          "enum": [
+            "SITE_SIGNED",
+            "HQ_BILL_RECEIVED",
+            "BE_CONFIRMED",
+            "BE_DELIVERED",
+            "HQ_INVOICE_RECEIVED",
+            "CHEQUE_ISSUED",
+            "CHEQUE_RECEIVED"
+          ]
+        },
+        {
+          "name": "statuses",
+          "type": "FinanceLedgerCaseStatus[]",
+          "enum": [
+            "IN_PROGRESS",
+            "DONE",
+            "BLOCKED"
+          ]
+        }
+      ]
+    },
+    "source": "app/api/finance/ledger/metadata/route.ts"
+  },
+  {
     "key": "get:/api/finance/metadata",
     "method": "GET",
     "path": "/api/finance/metadata",
@@ -3035,8 +4966,7 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "path": "/api/finance/payment-types",
     "description": "GET /api/finance/payment-types",
     "permissions": [
-      "finance:view",
-      "finance:manage"
+      "finance:view"
     ],
     "mode": "read",
     "pathParams": [],
@@ -3059,7 +4989,6 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "path": "/api/finance/payment-types",
     "description": "POST /api/finance/payment-types",
     "permissions": [
-      "finance:view",
       "finance:manage"
     ],
     "mode": "write",
@@ -3193,8 +5122,7 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "path": "/api/finance/projects",
     "description": "GET /api/finance/projects",
     "permissions": [
-      "finance:view",
-      "finance:manage"
+      "finance:view"
     ],
     "mode": "read",
     "pathParams": [],
@@ -3217,7 +5145,6 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "path": "/api/finance/projects",
     "description": "POST /api/finance/projects",
     "permissions": [
-      "finance:view",
       "finance:manage"
     ],
     "mode": "write",
@@ -3351,8 +5278,7 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "path": "/api/finance/units",
     "description": "GET /api/finance/units",
     "permissions": [
-      "finance:view",
-      "finance:manage"
+      "finance:view"
     ],
     "mode": "read",
     "pathParams": [],
@@ -3375,7 +5301,6 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "path": "/api/finance/units",
     "description": "POST /api/finance/units",
     "permissions": [
-      "finance:view",
       "finance:manage"
     ],
     "mode": "write",
@@ -3517,8 +5442,7 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "path": "/api/inspection-entries",
     "description": "GET /api/inspection-entries",
     "permissions": [
-      "inspection:view",
-      "inspection:create"
+      "inspection:view"
     ],
     "mode": "read",
     "pathParams": [],
@@ -3559,6 +5483,11 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
         "optional": true
       },
       {
+        "name": "levelCrossingSide",
+        "type": "string",
+        "optional": true
+      },
+      {
         "name": "checkId",
         "type": "number",
         "optional": true
@@ -3571,6 +5500,46 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
       {
         "name": "keyword",
         "type": "string",
+        "optional": true
+      },
+      {
+        "name": "appointmentDateFrom",
+        "type": "date",
+        "optional": true
+      },
+      {
+        "name": "appointmentDateTo",
+        "type": "date",
+        "optional": true
+      },
+      {
+        "name": "submittedFrom",
+        "type": "string",
+        "optional": true
+      },
+      {
+        "name": "submittedTo",
+        "type": "string",
+        "optional": true
+      },
+      {
+        "name": "createdFrom",
+        "type": "string",
+        "optional": true
+      },
+      {
+        "name": "createdTo",
+        "type": "string",
+        "optional": true
+      },
+      {
+        "name": "updatedFrom",
+        "type": "date",
+        "optional": true
+      },
+      {
+        "name": "updatedTo",
+        "type": "date",
         "optional": true
       },
       {
@@ -3631,6 +5600,21 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
         "optional": true
       },
       {
+        "name": "submittedById",
+        "type": "number[]",
+        "optional": true
+      },
+      {
+        "name": "createdById",
+        "type": "number[]",
+        "optional": true
+      },
+      {
+        "name": "updatedById",
+        "type": "number[]",
+        "optional": true
+      },
+      {
         "name": "ids",
         "type": "number[]",
         "optional": true
@@ -3659,7 +5643,6 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "path": "/api/inspection-entries",
     "description": "POST /api/inspection-entries",
     "permissions": [
-      "inspection:view",
       "inspection:create"
     ],
     "mode": "write",
@@ -3701,6 +5684,11 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
         "optional": true
       },
       {
+        "name": "levelCrossingSide",
+        "type": "string",
+        "optional": true
+      },
+      {
         "name": "checkId",
         "type": "number",
         "optional": true
@@ -3713,6 +5701,46 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
       {
         "name": "keyword",
         "type": "string",
+        "optional": true
+      },
+      {
+        "name": "appointmentDateFrom",
+        "type": "date",
+        "optional": true
+      },
+      {
+        "name": "appointmentDateTo",
+        "type": "date",
+        "optional": true
+      },
+      {
+        "name": "submittedFrom",
+        "type": "string",
+        "optional": true
+      },
+      {
+        "name": "submittedTo",
+        "type": "string",
+        "optional": true
+      },
+      {
+        "name": "createdFrom",
+        "type": "string",
+        "optional": true
+      },
+      {
+        "name": "createdTo",
+        "type": "string",
+        "optional": true
+      },
+      {
+        "name": "updatedFrom",
+        "type": "date",
+        "optional": true
+      },
+      {
+        "name": "updatedTo",
+        "type": "date",
         "optional": true
       },
       {
@@ -3773,6 +5801,21 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
         "optional": true
       },
       {
+        "name": "submittedById",
+        "type": "number[]",
+        "optional": true
+      },
+      {
+        "name": "createdById",
+        "type": "number[]",
+        "optional": true
+      },
+      {
+        "name": "updatedById",
+        "type": "number[]",
+        "optional": true
+      },
+      {
         "name": "ids",
         "type": "number[]",
         "optional": true
@@ -3801,7 +5844,6 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "path": "/api/inspection-entries/:id",
     "description": "DELETE /api/inspection-entries/:id",
     "permissions": [
-      "inspection:view",
       "inspection:create"
     ],
     "mode": "write",
@@ -3815,11 +5857,11 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "queryParams": [],
     "bodyFields": [],
     "responseSchema": {
-      "type": "{ entry: { document: ({ submission: { createdAt: Date; updatedAt: Date; documentId: number; submissionNumber: number; projectName: string; projectCode: string; contractNumbers: JsonValue; bordereauNumber: number; subject: string; senderOrg: string; senderDate: string; senderLastName: string; senderFirstName: string; senderSignature: string | null; senderTime: string | null; recipientOrg: string; recipientDate: string; recipientLastName: string; recipientFirstName: string; recipientSignature: string | null; recipientTime: string | null; comments: string | null; } | null; } & { status: DocumentStatus; id: number; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; data: JsonValue; code: string; files: JsonValue; remark: string | null; type: DocumentType; templateId: string | null; templateVersion: number | null; title: string | null; }) | null; creator: { id: number; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: Date | null; birthDate: Date | null; position: string | null; employmentStatus: EmploymentStatus; terminationDate: Date | null; terminationReason: string | null; username: string; passwordHash: string; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; } | null; updater: { id: number; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: Date | null; birthDate: Date | null; position: string | null; employmentStatus: EmploymentStatus; terminationDate: Date | null; terminationReason: string | null; username: string; passwordHash: string; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; } | null; road: { id: number; name: string; createdAt: Date; updatedAt: Date; projectId: number | null; startPk: string; endPk: string; slug: string; }; phase: { id: number; name: string; createdAt: Date; updatedAt: Date; measure: PhaseMeasure; pointHasSides: boolean; phaseDefinitionId: number; roadId: number; designLength: number; }; submitter: { id: number; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: Date | null; birthDate: Date | null; position: string | null; employmentStatus: EmploymentStatus; terminationDate: Date | null; terminationReason: string | null; username: string; passwordHash: string; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; } | null; } & { status: InspectionStatus; id: number; createdAt: Date; updatedAt: Date; createdBy: number | null; updatedBy: number | null; roadId: number; remark: string | null; documentId: number | null; phaseId: number; side: IntervalSide; startPk: number; endPk: number; layerId: number | null; layerName: string; checkId: number | null; checkName: string; types: string[]; appointmentDate: Date | null; submissionOrder: number | null; submittedAt: Date; submittedBy: number | null; }; }",
+      "type": "{ entry: { document: ({ submission: { createdAt: Date; updatedAt: Date; documentId: number; submissionNumber: number; projectName: string; projectCode: string; contractNumbers: JsonValue; bordereauNumber: number; subject: string; senderOrg: string; senderDate: string; senderLastName: string; senderFirstName: string; senderSignature: string | null; senderTime: string | null; recipientOrg: string; recipientDate: string; recipientLastName: string; recipientFirstName: string; recipientSignature: string | null; recipientTime: string | null; comments: string | null; } | null; } & { status: DocumentStatus; id: number; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; data: JsonValue; code: string; files: JsonValue; remark: string | null; type: DocumentType; templateId: string | null; templateVersion: number | null; title: string | null; }) | null; creator: { id: number; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: Date | null; birthDate: Date | null; position: string | null; employmentStatus: EmploymentStatus; terminationDate: Date | null; terminationReason: string | null; username: string; passwordHash: string; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; } | null; updater: { id: number; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: Date | null; birthDate: Date | null; position: string | null; employmentStatus: EmploymentStatus; terminationDate: Date | null; terminationReason: string | null; username: string; passwordHash: string; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; } | null; road: { id: number; name: string; createdAt: Date; updatedAt: Date; projectId: number | null; startPk: string; endPk: string; slug: string; }; locationRoad: { id: number; name: string; createdAt: Date; updatedAt: Date; projectId: number | null; startPk: string; endPk: string; slug: string; } | null; phase: { id: number; name: string; createdAt: Date; updatedAt: Date; measure: PhaseMeasure; pointHasSides: boolean; phaseDefinitionId: number; roadId: number; designLength: number; }; submitter: { id: number; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: Date | null; birthDate: Date | null; position: string | null; employmentStatus: EmploymentStatus; terminationDate: Date | null; terminationReason: string | null; username: string; passwordHash: string; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; } | null; } & { status: InspectionStatus; id: number; createdAt: Date; updatedAt: Date; createdBy: number | null; updatedBy: number | null; roadId: number; remark: string | null; documentId: number | null; locationRoadId: number | null; levelCrossingSide: LevelCrossingSide | null; phaseId: number; intervalId: number | null; side: IntervalSide; startPk: number; endPk: number; layerId: number | null; layerName: string; checkId: number | null; checkName: string; types: string[]; appointmentDate: Date | null; submissionOrder: number | null; submittedAt: Date; submittedBy: number | null; }; }",
       "fields": [
         {
           "name": "entry",
-          "type": "{ document: ({ submission: { createdAt: Date; updatedAt: Date; documentId: number; submissionNumber: number; projectName: string; projectCode: string; contractNumbers: JsonValue; bordereauNumber: number; subject: string; senderOrg: string; senderDate: string; senderLastName: string; senderFirstName: string; senderSignature: string | null; senderTime: string | null; recipientOrg: string; recipientDate: string; recipientLastName: string; recipientFirstName: string; recipientSignature: string | null; recipientTime: string | null; comments: string | null; } | null; } & { status: DocumentStatus; id: number; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; data: JsonValue; code: string; files: JsonValue; remark: string | null; type: DocumentType; templateId: string | null; templateVersion: number | null; title: string | null; }) | null; creator: { id: number; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: Date | null; birthDate: Date | null; position: string | null; employmentStatus: EmploymentStatus; terminationDate: Date | null; terminationReason: string | null; username: string; passwordHash: string; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; } | null; updater: { id: number; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: Date | null; birthDate: Date | null; position: string | null; employmentStatus: EmploymentStatus; terminationDate: Date | null; terminationReason: string | null; username: string; passwordHash: string; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; } | null; road: { id: number; name: string; createdAt: Date; updatedAt: Date; projectId: number | null; startPk: string; endPk: string; slug: string; }; phase: { id: number; name: string; createdAt: Date; updatedAt: Date; measure: PhaseMeasure; pointHasSides: boolean; phaseDefinitionId: number; roadId: number; designLength: number; }; submitter: { id: number; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: Date | null; birthDate: Date | null; position: string | null; employmentStatus: EmploymentStatus; terminationDate: Date | null; terminationReason: string | null; username: string; passwordHash: string; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; } | null; } & { status: InspectionStatus; id: number; createdAt: Date; updatedAt: Date; createdBy: number | null; updatedBy: number | null; roadId: number; remark: string | null; documentId: number | null; phaseId: number; side: IntervalSide; startPk: number; endPk: number; layerId: number | null; layerName: string; checkId: number | null; checkName: string; types: string[]; appointmentDate: Date | null; submissionOrder: number | null; submittedAt: Date; submittedBy: number | null; }",
+          "type": "{ document: ({ submission: { createdAt: Date; updatedAt: Date; documentId: number; submissionNumber: number; projectName: string; projectCode: string; contractNumbers: JsonValue; bordereauNumber: number; subject: string; senderOrg: string; senderDate: string; senderLastName: string; senderFirstName: string; senderSignature: string | null; senderTime: string | null; recipientOrg: string; recipientDate: string; recipientLastName: string; recipientFirstName: string; recipientSignature: string | null; recipientTime: string | null; comments: string | null; } | null; } & { status: DocumentStatus; id: number; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; data: JsonValue; code: string; files: JsonValue; remark: string | null; type: DocumentType; templateId: string | null; templateVersion: number | null; title: string | null; }) | null; creator: { id: number; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: Date | null; birthDate: Date | null; position: string | null; employmentStatus: EmploymentStatus; terminationDate: Date | null; terminationReason: string | null; username: string; passwordHash: string; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; } | null; updater: { id: number; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: Date | null; birthDate: Date | null; position: string | null; employmentStatus: EmploymentStatus; terminationDate: Date | null; terminationReason: string | null; username: string; passwordHash: string; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; } | null; road: { id: number; name: string; createdAt: Date; updatedAt: Date; projectId: number | null; startPk: string; endPk: string; slug: string; }; locationRoad: { id: number; name: string; createdAt: Date; updatedAt: Date; projectId: number | null; startPk: string; endPk: string; slug: string; } | null; phase: { id: number; name: string; createdAt: Date; updatedAt: Date; measure: PhaseMeasure; pointHasSides: boolean; phaseDefinitionId: number; roadId: number; designLength: number; }; submitter: { id: number; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: Date | null; birthDate: Date | null; position: string | null; employmentStatus: EmploymentStatus; terminationDate: Date | null; terminationReason: string | null; username: string; passwordHash: string; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; } | null; } & { status: InspectionStatus; id: number; createdAt: Date; updatedAt: Date; createdBy: number | null; updatedBy: number | null; roadId: number; remark: string | null; documentId: number | null; locationRoadId: number | null; levelCrossingSide: LevelCrossingSide | null; phaseId: number; intervalId: number | null; side: IntervalSide; startPk: number; endPk: number; layerId: number | null; layerName: string; checkId: number | null; checkName: string; types: string[]; appointmentDate: Date | null; submissionOrder: number | null; submittedAt: Date; submittedBy: number | null; }",
           "enum": [
             "LINEAR",
             "POINT"
@@ -3839,6 +5881,10 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
             },
             {
               "name": "road",
+              "type": "any"
+            },
+            {
+              "name": "locationRoad",
               "type": "any"
             },
             {
@@ -3893,8 +5939,25 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
               "type": "number | null"
             },
             {
+              "name": "locationRoadId",
+              "type": "number | null"
+            },
+            {
+              "name": "levelCrossingSide",
+              "type": "LevelCrossingSide | null",
+              "enum": [
+                "LEFT",
+                "RIGHT",
+                "BOTH"
+              ]
+            },
+            {
               "name": "phaseId",
               "type": "number"
+            },
+            {
+              "name": "intervalId",
+              "type": "number | null"
             },
             {
               "name": "side",
@@ -3965,8 +6028,7 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "path": "/api/inspection-entries/:id",
     "description": "GET /api/inspection-entries/:id",
     "permissions": [
-      "inspection:view",
-      "inspection:create"
+      "inspection:view"
     ],
     "mode": "read",
     "pathParams": [
@@ -3979,11 +6041,11 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "queryParams": [],
     "bodyFields": [],
     "responseSchema": {
-      "type": "{ entry: { document: ({ submission: { createdAt: Date; updatedAt: Date; documentId: number; submissionNumber: number; projectName: string; projectCode: string; contractNumbers: JsonValue; bordereauNumber: number; subject: string; senderOrg: string; senderDate: string; senderLastName: string; senderFirstName: string; senderSignature: string | null; senderTime: string | null; recipientOrg: string; recipientDate: string; recipientLastName: string; recipientFirstName: string; recipientSignature: string | null; recipientTime: string | null; comments: string | null; } | null; } & { status: DocumentStatus; id: number; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; data: JsonValue; code: string; files: JsonValue; remark: string | null; type: DocumentType; templateId: string | null; templateVersion: number | null; title: string | null; }) | null; creator: { id: number; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: Date | null; birthDate: Date | null; position: string | null; employmentStatus: EmploymentStatus; terminationDate: Date | null; terminationReason: string | null; username: string; passwordHash: string; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; } | null; updater: { id: number; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: Date | null; birthDate: Date | null; position: string | null; employmentStatus: EmploymentStatus; terminationDate: Date | null; terminationReason: string | null; username: string; passwordHash: string; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; } | null; road: { id: number; name: string; createdAt: Date; updatedAt: Date; projectId: number | null; startPk: string; endPk: string; slug: string; }; phase: { id: number; name: string; createdAt: Date; updatedAt: Date; measure: PhaseMeasure; pointHasSides: boolean; phaseDefinitionId: number; roadId: number; designLength: number; }; submitter: { id: number; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: Date | null; birthDate: Date | null; position: string | null; employmentStatus: EmploymentStatus; terminationDate: Date | null; terminationReason: string | null; username: string; passwordHash: string; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; } | null; } & { status: InspectionStatus; id: number; createdAt: Date; updatedAt: Date; createdBy: number | null; updatedBy: number | null; roadId: number; remark: string | null; documentId: number | null; phaseId: number; side: IntervalSide; startPk: number; endPk: number; layerId: number | null; layerName: string; checkId: number | null; checkName: string; types: string[]; appointmentDate: Date | null; submissionOrder: number | null; submittedAt: Date; submittedBy: number | null; }; }",
+      "type": "{ entry: { document: ({ submission: { createdAt: Date; updatedAt: Date; documentId: number; submissionNumber: number; projectName: string; projectCode: string; contractNumbers: JsonValue; bordereauNumber: number; subject: string; senderOrg: string; senderDate: string; senderLastName: string; senderFirstName: string; senderSignature: string | null; senderTime: string | null; recipientOrg: string; recipientDate: string; recipientLastName: string; recipientFirstName: string; recipientSignature: string | null; recipientTime: string | null; comments: string | null; } | null; } & { status: DocumentStatus; id: number; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; data: JsonValue; code: string; files: JsonValue; remark: string | null; type: DocumentType; templateId: string | null; templateVersion: number | null; title: string | null; }) | null; creator: { id: number; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: Date | null; birthDate: Date | null; position: string | null; employmentStatus: EmploymentStatus; terminationDate: Date | null; terminationReason: string | null; username: string; passwordHash: string; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; } | null; updater: { id: number; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: Date | null; birthDate: Date | null; position: string | null; employmentStatus: EmploymentStatus; terminationDate: Date | null; terminationReason: string | null; username: string; passwordHash: string; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; } | null; road: { id: number; name: string; createdAt: Date; updatedAt: Date; projectId: number | null; startPk: string; endPk: string; slug: string; }; locationRoad: { id: number; name: string; createdAt: Date; updatedAt: Date; projectId: number | null; startPk: string; endPk: string; slug: string; } | null; phase: { id: number; name: string; createdAt: Date; updatedAt: Date; measure: PhaseMeasure; pointHasSides: boolean; phaseDefinitionId: number; roadId: number; designLength: number; }; submitter: { id: number; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: Date | null; birthDate: Date | null; position: string | null; employmentStatus: EmploymentStatus; terminationDate: Date | null; terminationReason: string | null; username: string; passwordHash: string; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; } | null; } & { status: InspectionStatus; id: number; createdAt: Date; updatedAt: Date; createdBy: number | null; updatedBy: number | null; roadId: number; remark: string | null; documentId: number | null; locationRoadId: number | null; levelCrossingSide: LevelCrossingSide | null; phaseId: number; intervalId: number | null; side: IntervalSide; startPk: number; endPk: number; layerId: number | null; layerName: string; checkId: number | null; checkName: string; types: string[]; appointmentDate: Date | null; submissionOrder: number | null; submittedAt: Date; submittedBy: number | null; }; }",
       "fields": [
         {
           "name": "entry",
-          "type": "{ document: ({ submission: { createdAt: Date; updatedAt: Date; documentId: number; submissionNumber: number; projectName: string; projectCode: string; contractNumbers: JsonValue; bordereauNumber: number; subject: string; senderOrg: string; senderDate: string; senderLastName: string; senderFirstName: string; senderSignature: string | null; senderTime: string | null; recipientOrg: string; recipientDate: string; recipientLastName: string; recipientFirstName: string; recipientSignature: string | null; recipientTime: string | null; comments: string | null; } | null; } & { status: DocumentStatus; id: number; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; data: JsonValue; code: string; files: JsonValue; remark: string | null; type: DocumentType; templateId: string | null; templateVersion: number | null; title: string | null; }) | null; creator: { id: number; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: Date | null; birthDate: Date | null; position: string | null; employmentStatus: EmploymentStatus; terminationDate: Date | null; terminationReason: string | null; username: string; passwordHash: string; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; } | null; updater: { id: number; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: Date | null; birthDate: Date | null; position: string | null; employmentStatus: EmploymentStatus; terminationDate: Date | null; terminationReason: string | null; username: string; passwordHash: string; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; } | null; road: { id: number; name: string; createdAt: Date; updatedAt: Date; projectId: number | null; startPk: string; endPk: string; slug: string; }; phase: { id: number; name: string; createdAt: Date; updatedAt: Date; measure: PhaseMeasure; pointHasSides: boolean; phaseDefinitionId: number; roadId: number; designLength: number; }; submitter: { id: number; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: Date | null; birthDate: Date | null; position: string | null; employmentStatus: EmploymentStatus; terminationDate: Date | null; terminationReason: string | null; username: string; passwordHash: string; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; } | null; } & { status: InspectionStatus; id: number; createdAt: Date; updatedAt: Date; createdBy: number | null; updatedBy: number | null; roadId: number; remark: string | null; documentId: number | null; phaseId: number; side: IntervalSide; startPk: number; endPk: number; layerId: number | null; layerName: string; checkId: number | null; checkName: string; types: string[]; appointmentDate: Date | null; submissionOrder: number | null; submittedAt: Date; submittedBy: number | null; }",
+          "type": "{ document: ({ submission: { createdAt: Date; updatedAt: Date; documentId: number; submissionNumber: number; projectName: string; projectCode: string; contractNumbers: JsonValue; bordereauNumber: number; subject: string; senderOrg: string; senderDate: string; senderLastName: string; senderFirstName: string; senderSignature: string | null; senderTime: string | null; recipientOrg: string; recipientDate: string; recipientLastName: string; recipientFirstName: string; recipientSignature: string | null; recipientTime: string | null; comments: string | null; } | null; } & { status: DocumentStatus; id: number; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; data: JsonValue; code: string; files: JsonValue; remark: string | null; type: DocumentType; templateId: string | null; templateVersion: number | null; title: string | null; }) | null; creator: { id: number; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: Date | null; birthDate: Date | null; position: string | null; employmentStatus: EmploymentStatus; terminationDate: Date | null; terminationReason: string | null; username: string; passwordHash: string; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; } | null; updater: { id: number; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: Date | null; birthDate: Date | null; position: string | null; employmentStatus: EmploymentStatus; terminationDate: Date | null; terminationReason: string | null; username: string; passwordHash: string; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; } | null; road: { id: number; name: string; createdAt: Date; updatedAt: Date; projectId: number | null; startPk: string; endPk: string; slug: string; }; locationRoad: { id: number; name: string; createdAt: Date; updatedAt: Date; projectId: number | null; startPk: string; endPk: string; slug: string; } | null; phase: { id: number; name: string; createdAt: Date; updatedAt: Date; measure: PhaseMeasure; pointHasSides: boolean; phaseDefinitionId: number; roadId: number; designLength: number; }; submitter: { id: number; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: Date | null; birthDate: Date | null; position: string | null; employmentStatus: EmploymentStatus; terminationDate: Date | null; terminationReason: string | null; username: string; passwordHash: string; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; } | null; } & { status: InspectionStatus; id: number; createdAt: Date; updatedAt: Date; createdBy: number | null; updatedBy: number | null; roadId: number; remark: string | null; documentId: number | null; locationRoadId: number | null; levelCrossingSide: LevelCrossingSide | null; phaseId: number; intervalId: number | null; side: IntervalSide; startPk: number; endPk: number; layerId: number | null; layerName: string; checkId: number | null; checkName: string; types: string[]; appointmentDate: Date | null; submissionOrder: number | null; submittedAt: Date; submittedBy: number | null; }",
           "enum": [
             "LINEAR",
             "POINT"
@@ -4003,6 +6065,10 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
             },
             {
               "name": "road",
+              "type": "any"
+            },
+            {
+              "name": "locationRoad",
               "type": "any"
             },
             {
@@ -4057,8 +6123,25 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
               "type": "number | null"
             },
             {
+              "name": "locationRoadId",
+              "type": "number | null"
+            },
+            {
+              "name": "levelCrossingSide",
+              "type": "LevelCrossingSide | null",
+              "enum": [
+                "LEFT",
+                "RIGHT",
+                "BOTH"
+              ]
+            },
+            {
               "name": "phaseId",
               "type": "number"
+            },
+            {
+              "name": "intervalId",
+              "type": "number | null"
             },
             {
               "name": "side",
@@ -4129,7 +6212,6 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "path": "/api/inspection-entries/:id",
     "description": "PUT /api/inspection-entries/:id",
     "permissions": [
-      "inspection:view",
       "inspection:create"
     ],
     "mode": "write",
@@ -4143,11 +6225,11 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "queryParams": [],
     "bodyFields": [],
     "responseSchema": {
-      "type": "{ entry: { document: ({ submission: { createdAt: Date; updatedAt: Date; documentId: number; submissionNumber: number; projectName: string; projectCode: string; contractNumbers: JsonValue; bordereauNumber: number; subject: string; senderOrg: string; senderDate: string; senderLastName: string; senderFirstName: string; senderSignature: string | null; senderTime: string | null; recipientOrg: string; recipientDate: string; recipientLastName: string; recipientFirstName: string; recipientSignature: string | null; recipientTime: string | null; comments: string | null; } | null; } & { status: DocumentStatus; id: number; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; data: JsonValue; code: string; files: JsonValue; remark: string | null; type: DocumentType; templateId: string | null; templateVersion: number | null; title: string | null; }) | null; creator: { id: number; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: Date | null; birthDate: Date | null; position: string | null; employmentStatus: EmploymentStatus; terminationDate: Date | null; terminationReason: string | null; username: string; passwordHash: string; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; } | null; updater: { id: number; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: Date | null; birthDate: Date | null; position: string | null; employmentStatus: EmploymentStatus; terminationDate: Date | null; terminationReason: string | null; username: string; passwordHash: string; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; } | null; road: { id: number; name: string; createdAt: Date; updatedAt: Date; projectId: number | null; startPk: string; endPk: string; slug: string; }; phase: { id: number; name: string; createdAt: Date; updatedAt: Date; measure: PhaseMeasure; pointHasSides: boolean; phaseDefinitionId: number; roadId: number; designLength: number; }; submitter: { id: number; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: Date | null; birthDate: Date | null; position: string | null; employmentStatus: EmploymentStatus; terminationDate: Date | null; terminationReason: string | null; username: string; passwordHash: string; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; } | null; } & { status: InspectionStatus; id: number; createdAt: Date; updatedAt: Date; createdBy: number | null; updatedBy: number | null; roadId: number; remark: string | null; documentId: number | null; phaseId: number; side: IntervalSide; startPk: number; endPk: number; layerId: number | null; layerName: string; checkId: number | null; checkName: string; types: string[]; appointmentDate: Date | null; submissionOrder: number | null; submittedAt: Date; submittedBy: number | null; }; }",
+      "type": "{ entry: { document: ({ submission: { createdAt: Date; updatedAt: Date; documentId: number; submissionNumber: number; projectName: string; projectCode: string; contractNumbers: JsonValue; bordereauNumber: number; subject: string; senderOrg: string; senderDate: string; senderLastName: string; senderFirstName: string; senderSignature: string | null; senderTime: string | null; recipientOrg: string; recipientDate: string; recipientLastName: string; recipientFirstName: string; recipientSignature: string | null; recipientTime: string | null; comments: string | null; } | null; } & { status: DocumentStatus; id: number; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; data: JsonValue; code: string; files: JsonValue; remark: string | null; type: DocumentType; templateId: string | null; templateVersion: number | null; title: string | null; }) | null; creator: { id: number; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: Date | null; birthDate: Date | null; position: string | null; employmentStatus: EmploymentStatus; terminationDate: Date | null; terminationReason: string | null; username: string; passwordHash: string; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; } | null; updater: { id: number; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: Date | null; birthDate: Date | null; position: string | null; employmentStatus: EmploymentStatus; terminationDate: Date | null; terminationReason: string | null; username: string; passwordHash: string; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; } | null; road: { id: number; name: string; createdAt: Date; updatedAt: Date; projectId: number | null; startPk: string; endPk: string; slug: string; }; locationRoad: { id: number; name: string; createdAt: Date; updatedAt: Date; projectId: number | null; startPk: string; endPk: string; slug: string; } | null; phase: { id: number; name: string; createdAt: Date; updatedAt: Date; measure: PhaseMeasure; pointHasSides: boolean; phaseDefinitionId: number; roadId: number; designLength: number; }; submitter: { id: number; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: Date | null; birthDate: Date | null; position: string | null; employmentStatus: EmploymentStatus; terminationDate: Date | null; terminationReason: string | null; username: string; passwordHash: string; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; } | null; } & { status: InspectionStatus; id: number; createdAt: Date; updatedAt: Date; createdBy: number | null; updatedBy: number | null; roadId: number; remark: string | null; documentId: number | null; locationRoadId: number | null; levelCrossingSide: LevelCrossingSide | null; phaseId: number; intervalId: number | null; side: IntervalSide; startPk: number; endPk: number; layerId: number | null; layerName: string; checkId: number | null; checkName: string; types: string[]; appointmentDate: Date | null; submissionOrder: number | null; submittedAt: Date; submittedBy: number | null; }; }",
       "fields": [
         {
           "name": "entry",
-          "type": "{ document: ({ submission: { createdAt: Date; updatedAt: Date; documentId: number; submissionNumber: number; projectName: string; projectCode: string; contractNumbers: JsonValue; bordereauNumber: number; subject: string; senderOrg: string; senderDate: string; senderLastName: string; senderFirstName: string; senderSignature: string | null; senderTime: string | null; recipientOrg: string; recipientDate: string; recipientLastName: string; recipientFirstName: string; recipientSignature: string | null; recipientTime: string | null; comments: string | null; } | null; } & { status: DocumentStatus; id: number; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; data: JsonValue; code: string; files: JsonValue; remark: string | null; type: DocumentType; templateId: string | null; templateVersion: number | null; title: string | null; }) | null; creator: { id: number; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: Date | null; birthDate: Date | null; position: string | null; employmentStatus: EmploymentStatus; terminationDate: Date | null; terminationReason: string | null; username: string; passwordHash: string; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; } | null; updater: { id: number; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: Date | null; birthDate: Date | null; position: string | null; employmentStatus: EmploymentStatus; terminationDate: Date | null; terminationReason: string | null; username: string; passwordHash: string; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; } | null; road: { id: number; name: string; createdAt: Date; updatedAt: Date; projectId: number | null; startPk: string; endPk: string; slug: string; }; phase: { id: number; name: string; createdAt: Date; updatedAt: Date; measure: PhaseMeasure; pointHasSides: boolean; phaseDefinitionId: number; roadId: number; designLength: number; }; submitter: { id: number; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: Date | null; birthDate: Date | null; position: string | null; employmentStatus: EmploymentStatus; terminationDate: Date | null; terminationReason: string | null; username: string; passwordHash: string; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; } | null; } & { status: InspectionStatus; id: number; createdAt: Date; updatedAt: Date; createdBy: number | null; updatedBy: number | null; roadId: number; remark: string | null; documentId: number | null; phaseId: number; side: IntervalSide; startPk: number; endPk: number; layerId: number | null; layerName: string; checkId: number | null; checkName: string; types: string[]; appointmentDate: Date | null; submissionOrder: number | null; submittedAt: Date; submittedBy: number | null; }",
+          "type": "{ document: ({ submission: { createdAt: Date; updatedAt: Date; documentId: number; submissionNumber: number; projectName: string; projectCode: string; contractNumbers: JsonValue; bordereauNumber: number; subject: string; senderOrg: string; senderDate: string; senderLastName: string; senderFirstName: string; senderSignature: string | null; senderTime: string | null; recipientOrg: string; recipientDate: string; recipientLastName: string; recipientFirstName: string; recipientSignature: string | null; recipientTime: string | null; comments: string | null; } | null; } & { status: DocumentStatus; id: number; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; data: JsonValue; code: string; files: JsonValue; remark: string | null; type: DocumentType; templateId: string | null; templateVersion: number | null; title: string | null; }) | null; creator: { id: number; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: Date | null; birthDate: Date | null; position: string | null; employmentStatus: EmploymentStatus; terminationDate: Date | null; terminationReason: string | null; username: string; passwordHash: string; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; } | null; updater: { id: number; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: Date | null; birthDate: Date | null; position: string | null; employmentStatus: EmploymentStatus; terminationDate: Date | null; terminationReason: string | null; username: string; passwordHash: string; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; } | null; road: { id: number; name: string; createdAt: Date; updatedAt: Date; projectId: number | null; startPk: string; endPk: string; slug: string; }; locationRoad: { id: number; name: string; createdAt: Date; updatedAt: Date; projectId: number | null; startPk: string; endPk: string; slug: string; } | null; phase: { id: number; name: string; createdAt: Date; updatedAt: Date; measure: PhaseMeasure; pointHasSides: boolean; phaseDefinitionId: number; roadId: number; designLength: number; }; submitter: { id: number; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: Date | null; birthDate: Date | null; position: string | null; employmentStatus: EmploymentStatus; terminationDate: Date | null; terminationReason: string | null; username: string; passwordHash: string; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; } | null; } & { status: InspectionStatus; id: number; createdAt: Date; updatedAt: Date; createdBy: number | null; updatedBy: number | null; roadId: number; remark: string | null; documentId: number | null; locationRoadId: number | null; levelCrossingSide: LevelCrossingSide | null; phaseId: number; intervalId: number | null; side: IntervalSide; startPk: number; endPk: number; layerId: number | null; layerName: string; checkId: number | null; checkName: string; types: string[]; appointmentDate: Date | null; submissionOrder: number | null; submittedAt: Date; submittedBy: number | null; }",
           "enum": [
             "LINEAR",
             "POINT"
@@ -4167,6 +6249,10 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
             },
             {
               "name": "road",
+              "type": "any"
+            },
+            {
+              "name": "locationRoad",
               "type": "any"
             },
             {
@@ -4221,8 +6307,25 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
               "type": "number | null"
             },
             {
+              "name": "locationRoadId",
+              "type": "number | null"
+            },
+            {
+              "name": "levelCrossingSide",
+              "type": "LevelCrossingSide | null",
+              "enum": [
+                "LEFT",
+                "RIGHT",
+                "BOTH"
+              ]
+            },
+            {
               "name": "phaseId",
               "type": "number"
+            },
+            {
+              "name": "intervalId",
+              "type": "number | null"
             },
             {
               "name": "side",
@@ -4325,11 +6428,11 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "queryParams": [],
     "bodyFields": [],
     "responseSchema": {
-      "type": "{ items: ({ document: ({ submission: { createdAt: Date; updatedAt: Date; documentId: number; submissionNumber: number; projectName: string; projectCode: string; contractNumbers: JsonValue; bordereauNumber: number; subject: string; senderOrg: string; senderDate: string; senderLastName: string; senderFirstName: string; senderSignature: string | null; senderTime: string | null; recipientOrg: string; recipientDate: string; recipientLastName: string; recipientFirstName: string; recipientSignature: string | null; recipientTime: string | null; comments: string | null; } | null; } & { status: DocumentStatus; id: number; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; data: JsonValue; code: string; files: JsonValue; remark: string | null; type: DocumentType; templateId: string | null; templateVersion: number | null; title: string | null; }) | null; creator: { id: number; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: Date | null; birthDate: Date | null; position: string | null; employmentStatus: EmploymentStatus; terminationDate: Date | null; terminationReason: string | null; username: string; passwordHash: string; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; } | null; updater: { id: number; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: Date | null; birthDate: Date | null; position: string | null; employmentStatus: EmploymentStatus; terminationDate: Date | null; terminationReason: string | null; username: string; passwordHash: string; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; } | null; road: { id: number; name: string; createdAt: Date; updatedAt: Date; projectId: number | null; startPk: string; endPk: string; slug: string; }; phase: { id: number; name: string; createdAt: Date; updatedAt: Date; measure: PhaseMeasure; pointHasSides: boolean; phaseDefinitionId: number; roadId: number; designLength: number; }; submitter: { id: number; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: Date | null; birthDate: Date | null; position: string | null; employmentStatus: EmploymentStatus; terminationDate: Date | null; terminationReason: string | null; username: string; passwordHash: string; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; } | null; } & { status: InspectionStatus; id: number; createdAt: Date; updatedAt: Date; createdBy: number | null; updatedBy: number | null; roadId: number; remark: string | null; documentId: number | null; phaseId: number; side: IntervalSide; startPk: number; endPk: number; layerId: number | null; layerName: string; checkId: number | null; checkName: string; types: string[]; appointmentDate: Date | null; submissionOrder: number | null; submittedAt: Date; submittedBy: number | null; })[]; }",
+      "type": "{ items: ({ document: ({ submission: { createdAt: Date; updatedAt: Date; documentId: number; submissionNumber: number; projectName: string; projectCode: string; contractNumbers: JsonValue; bordereauNumber: number; subject: string; senderOrg: string; senderDate: string; senderLastName: string; senderFirstName: string; senderSignature: string | null; senderTime: string | null; recipientOrg: string; recipientDate: string; recipientLastName: string; recipientFirstName: string; recipientSignature: string | null; recipientTime: string | null; comments: string | null; } | null; } & { status: DocumentStatus; id: number; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; data: JsonValue; code: string; files: JsonValue; remark: string | null; type: DocumentType; templateId: string | null; templateVersion: number | null; title: string | null; }) | null; creator: { id: number; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: Date | null; birthDate: Date | null; position: string | null; employmentStatus: EmploymentStatus; terminationDate: Date | null; terminationReason: string | null; username: string; passwordHash: string; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; } | null; updater: { id: number; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: Date | null; birthDate: Date | null; position: string | null; employmentStatus: EmploymentStatus; terminationDate: Date | null; terminationReason: string | null; username: string; passwordHash: string; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; } | null; road: { id: number; name: string; createdAt: Date; updatedAt: Date; projectId: number | null; startPk: string; endPk: string; slug: string; }; phase: { id: number; name: string; createdAt: Date; updatedAt: Date; measure: PhaseMeasure; pointHasSides: boolean; phaseDefinitionId: number; roadId: number; designLength: number; }; submitter: { id: number; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: Date | null; birthDate: Date | null; position: string | null; employmentStatus: EmploymentStatus; terminationDate: Date | null; terminationReason: string | null; username: string; passwordHash: string; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; } | null; } & { status: InspectionStatus; id: number; createdAt: Date; updatedAt: Date; createdBy: number | null; updatedBy: number | null; roadId: number; remark: string | null; documentId: number | null; locationRoadId: number | null; levelCrossingSide: LevelCrossingSide | null; phaseId: number; intervalId: number | null; side: IntervalSide; startPk: number; endPk: number; layerId: number | null; layerName: string; checkId: number | null; checkName: string; types: string[]; appointmentDate: Date | null; submissionOrder: number | null; submittedAt: Date; submittedBy: number | null; })[]; }",
       "fields": [
         {
           "name": "items",
-          "type": "({ document: ({ submission: { createdAt: Date; updatedAt: Date; documentId: number; submissionNumber: number; projectName: string; projectCode: string; contractNumbers: JsonValue; bordereauNumber: number; subject: string; senderOrg: string; senderDate: string; senderLastName: string; senderFirstName: string; senderSignature: string | null; senderTime: string | null; recipientOrg: string; recipientDate: string; recipientLastName: string; recipientFirstName: string; recipientSignature: string | null; recipientTime: string | null; comments: string | null; } | null; } & { status: DocumentStatus; id: number; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; data: JsonValue; code: string; files: JsonValue; remark: string | null; type: DocumentType; templateId: string | null; templateVersion: number | null; title: string | null; }) | null; creator: { id: number; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: Date | null; birthDate: Date | null; position: string | null; employmentStatus: EmploymentStatus; terminationDate: Date | null; terminationReason: string | null; username: string; passwordHash: string; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; } | null; updater: { id: number; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: Date | null; birthDate: Date | null; position: string | null; employmentStatus: EmploymentStatus; terminationDate: Date | null; terminationReason: string | null; username: string; passwordHash: string; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; } | null; road: { id: number; name: string; createdAt: Date; updatedAt: Date; projectId: number | null; startPk: string; endPk: string; slug: string; }; phase: { id: number; name: string; createdAt: Date; updatedAt: Date; measure: PhaseMeasure; pointHasSides: boolean; phaseDefinitionId: number; roadId: number; designLength: number; }; submitter: { id: number; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: Date | null; birthDate: Date | null; position: string | null; employmentStatus: EmploymentStatus; terminationDate: Date | null; terminationReason: string | null; username: string; passwordHash: string; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; } | null; } & { status: InspectionStatus; id: number; createdAt: Date; updatedAt: Date; createdBy: number | null; updatedBy: number | null; roadId: number; remark: string | null; documentId: number | null; phaseId: number; side: IntervalSide; startPk: number; endPk: number; layerId: number | null; layerName: string; checkId: number | null; checkName: string; types: string[]; appointmentDate: Date | null; submissionOrder: number | null; submittedAt: Date; submittedBy: number | null; })[]",
+          "type": "({ document: ({ submission: { createdAt: Date; updatedAt: Date; documentId: number; submissionNumber: number; projectName: string; projectCode: string; contractNumbers: JsonValue; bordereauNumber: number; subject: string; senderOrg: string; senderDate: string; senderLastName: string; senderFirstName: string; senderSignature: string | null; senderTime: string | null; recipientOrg: string; recipientDate: string; recipientLastName: string; recipientFirstName: string; recipientSignature: string | null; recipientTime: string | null; comments: string | null; } | null; } & { status: DocumentStatus; id: number; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; data: JsonValue; code: string; files: JsonValue; remark: string | null; type: DocumentType; templateId: string | null; templateVersion: number | null; title: string | null; }) | null; creator: { id: number; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: Date | null; birthDate: Date | null; position: string | null; employmentStatus: EmploymentStatus; terminationDate: Date | null; terminationReason: string | null; username: string; passwordHash: string; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; } | null; updater: { id: number; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: Date | null; birthDate: Date | null; position: string | null; employmentStatus: EmploymentStatus; terminationDate: Date | null; terminationReason: string | null; username: string; passwordHash: string; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; } | null; road: { id: number; name: string; createdAt: Date; updatedAt: Date; projectId: number | null; startPk: string; endPk: string; slug: string; }; phase: { id: number; name: string; createdAt: Date; updatedAt: Date; measure: PhaseMeasure; pointHasSides: boolean; phaseDefinitionId: number; roadId: number; designLength: number; }; submitter: { id: number; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: Date | null; birthDate: Date | null; position: string | null; employmentStatus: EmploymentStatus; terminationDate: Date | null; terminationReason: string | null; username: string; passwordHash: string; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; } | null; } & { status: InspectionStatus; id: number; createdAt: Date; updatedAt: Date; createdBy: number | null; updatedBy: number | null; roadId: number; remark: string | null; documentId: number | null; locationRoadId: number | null; levelCrossingSide: LevelCrossingSide | null; phaseId: number; intervalId: number | null; side: IntervalSide; startPk: number; endPk: number; layerId: number | null; layerName: string; checkId: number | null; checkName: string; types: string[]; appointmentDate: Date | null; submissionOrder: number | null; submittedAt: Date; submittedBy: number | null; })[]",
           "enum": [
             "LINEAR",
             "POINT"
@@ -4342,6 +6445,29 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
       ]
     },
     "source": "app/api/inspection-entries/bulk-edit/route.ts"
+  },
+  {
+    "key": "get:/api/inspection-entries/user-options",
+    "method": "GET",
+    "path": "/api/inspection-entries/user-options",
+    "description": "GET /api/inspection-entries/user-options",
+    "permissions": [
+      "inspection:view"
+    ],
+    "mode": "read",
+    "pathParams": [],
+    "queryParams": [],
+    "bodyFields": [],
+    "responseSchema": {
+      "type": "{ items: { id: number; username: string; name: string | null; }[]; }",
+      "fields": [
+        {
+          "name": "items",
+          "type": "{ id: number; username: string; name: string | null; }[]"
+        }
+      ]
+    },
+    "source": "app/api/inspection-entries/user-options/route.ts"
   },
   {
     "key": "get:/api/inspections",
@@ -4371,6 +6497,11 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
       },
       {
         "name": "side",
+        "type": "string",
+        "optional": true
+      },
+      {
+        "name": "levelCrossingSide",
         "type": "string",
         "optional": true
       },
@@ -4475,11 +6606,11 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "queryParams": [],
     "bodyFields": [],
     "responseSchema": {
-      "type": "{ inspection: { id: number; roadId: number; roadName: string; roadSlug: string; phaseId: number; phaseName: string; documentId: number | null; documentCode: string | null; submissionId: number | null; submissionCode: string | null; submissionNumber: number | null; side: IntervalSide; startPk: number; endPk: number; layers: string[]; checks: string[]; types: string[]; submissionOrder: number | undefined; status: InspectionStatus; remark: string | undefined; appointmentDate: string | undefined; submittedAt: string; submittedBy: { id: number; username: string; } | null; createdBy: { id: number; username: string; } | null; createdAt: string; updatedAt: string; updatedBy: { id: number; username: string; } | null; }; }",
+      "type": "{ inspection: { id: number; roadId: number; roadName: string; roadSlug: string; locationRoadId: number | null; levelCrossingSide: LevelCrossingSide | null; phaseId: number; intervalId: number | null; phaseName: string; documentId: number | null; documentCode: string | null; submissionId: number | null; submissionCode: string | null; submissionNumber: number | null; side: IntervalSide; startPk: number; endPk: number; layers: string[]; checks: string[]; types: string[]; submissionOrder: number | undefined; status: InspectionStatus; remark: string | undefined; appointmentDate: string | undefined; submittedAt: string; submittedBy: { id: number; username: string; } | null; createdBy: { id: number; username: string; } | null; createdAt: string; updatedAt: string; updatedBy: { id: number; username: string; } | null; }; }",
       "fields": [
         {
           "name": "inspection",
-          "type": "{ id: number; roadId: number; roadName: string; roadSlug: string; phaseId: number; phaseName: string; documentId: number | null; documentCode: string | null; submissionId: number | null; submissionCode: string | null; submissionNumber: number | null; side: IntervalSide; startPk: number; endPk: number; layers: string[]; checks: string[]; types: string[]; submissionOrder: number | undefined; status: InspectionStatus; remark: string | undefined; appointmentDate: string | undefined; submittedAt: string; submittedBy: { id: number; username: string; } | null; createdBy: { id: number; username: string; } | null; createdAt: string; updatedAt: string; updatedBy: { id: number; username: string; } | null; }",
+          "type": "{ id: number; roadId: number; roadName: string; roadSlug: string; locationRoadId: number | null; levelCrossingSide: LevelCrossingSide | null; phaseId: number; intervalId: number | null; phaseName: string; documentId: number | null; documentCode: string | null; submissionId: number | null; submissionCode: string | null; submissionNumber: number | null; side: IntervalSide; startPk: number; endPk: number; layers: string[]; checks: string[]; types: string[]; submissionOrder: number | undefined; status: InspectionStatus; remark: string | undefined; appointmentDate: string | undefined; submittedAt: string; submittedBy: { id: number; username: string; } | null; createdBy: { id: number; username: string; } | null; createdAt: string; updatedAt: string; updatedBy: { id: number; username: string; } | null; }",
           "enum": [
             "PENDING",
             "SCHEDULED",
@@ -4505,8 +6636,25 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
               "type": "string"
             },
             {
+              "name": "locationRoadId",
+              "type": "number | null"
+            },
+            {
+              "name": "levelCrossingSide",
+              "type": "LevelCrossingSide | null",
+              "enum": [
+                "LEFT",
+                "RIGHT",
+                "BOTH"
+              ]
+            },
+            {
               "name": "phaseId",
               "type": "number"
+            },
+            {
+              "name": "intervalId",
+              "type": "number | null"
             },
             {
               "name": "phaseName",
@@ -4640,11 +6788,11 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "queryParams": [],
     "bodyFields": [],
     "responseSchema": {
-      "type": "{ inspection: { id: number; roadId: number; roadName: string; roadSlug: string; phaseId: number; phaseName: string; documentId: number | null; documentCode: string | null; submissionId: number | null; submissionCode: string | null; submissionNumber: number | null; side: IntervalSide; startPk: number; endPk: number; layers: string[]; checks: string[]; types: string[]; submissionOrder: number | undefined; status: InspectionStatus; remark: string | undefined; appointmentDate: string | undefined; submittedAt: string; submittedBy: { id: number; username: string; } | null; createdBy: { id: number; username: string; } | null; createdAt: string; updatedAt: string; updatedBy: { id: number; username: string; } | null; }; }",
+      "type": "{ inspection: { id: number; roadId: number; roadName: string; roadSlug: string; locationRoadId: number | null; levelCrossingSide: LevelCrossingSide | null; phaseId: number; intervalId: number | null; phaseName: string; documentId: number | null; documentCode: string | null; submissionId: number | null; submissionCode: string | null; submissionNumber: number | null; side: IntervalSide; startPk: number; endPk: number; layers: string[]; checks: string[]; types: string[]; submissionOrder: number | undefined; status: InspectionStatus; remark: string | undefined; appointmentDate: string | undefined; submittedAt: string; submittedBy: { id: number; username: string; } | null; createdBy: { id: number; username: string; } | null; createdAt: string; updatedAt: string; updatedBy: { id: number; username: string; } | null; }; }",
       "fields": [
         {
           "name": "inspection",
-          "type": "{ id: number; roadId: number; roadName: string; roadSlug: string; phaseId: number; phaseName: string; documentId: number | null; documentCode: string | null; submissionId: number | null; submissionCode: string | null; submissionNumber: number | null; side: IntervalSide; startPk: number; endPk: number; layers: string[]; checks: string[]; types: string[]; submissionOrder: number | undefined; status: InspectionStatus; remark: string | undefined; appointmentDate: string | undefined; submittedAt: string; submittedBy: { id: number; username: string; } | null; createdBy: { id: number; username: string; } | null; createdAt: string; updatedAt: string; updatedBy: { id: number; username: string; } | null; }",
+          "type": "{ id: number; roadId: number; roadName: string; roadSlug: string; locationRoadId: number | null; levelCrossingSide: LevelCrossingSide | null; phaseId: number; intervalId: number | null; phaseName: string; documentId: number | null; documentCode: string | null; submissionId: number | null; submissionCode: string | null; submissionNumber: number | null; side: IntervalSide; startPk: number; endPk: number; layers: string[]; checks: string[]; types: string[]; submissionOrder: number | undefined; status: InspectionStatus; remark: string | undefined; appointmentDate: string | undefined; submittedAt: string; submittedBy: { id: number; username: string; } | null; createdBy: { id: number; username: string; } | null; createdAt: string; updatedAt: string; updatedBy: { id: number; username: string; } | null; }",
           "enum": [
             "PENDING",
             "SCHEDULED",
@@ -4670,8 +6818,25 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
               "type": "string"
             },
             {
+              "name": "locationRoadId",
+              "type": "number | null"
+            },
+            {
+              "name": "levelCrossingSide",
+              "type": "LevelCrossingSide | null",
+              "enum": [
+                "LEFT",
+                "RIGHT",
+                "BOTH"
+              ]
+            },
+            {
               "name": "phaseId",
               "type": "number"
+            },
+            {
+              "name": "intervalId",
+              "type": "number | null"
             },
             {
               "name": "phaseName",
@@ -4800,11 +6965,11 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "queryParams": [],
     "bodyFields": [],
     "responseSchema": {
-      "type": "{ items: ({ document: ({ submission: { createdAt: Date; updatedAt: Date; documentId: number; submissionNumber: number; projectName: string; projectCode: string; contractNumbers: JsonValue; bordereauNumber: number; subject: string; senderOrg: string; senderDate: string; senderLastName: string; senderFirstName: string; senderSignature: string | null; senderTime: string | null; recipientOrg: string; recipientDate: string; recipientLastName: string; recipientFirstName: string; recipientSignature: string | null; recipientTime: string | null; comments: string | null; } | null; } & { status: DocumentStatus; id: number; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; data: JsonValue; code: string; files: JsonValue; remark: string | null; type: DocumentType; templateId: string | null; templateVersion: number | null; title: string | null; }) | null; creator: { id: number; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: Date | null; birthDate: Date | null; position: string | null; employmentStatus: EmploymentStatus; terminationDate: Date | null; terminationReason: string | null; username: string; passwordHash: string; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; } | null; updater: { id: number; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: Date | null; birthDate: Date | null; position: string | null; employmentStatus: EmploymentStatus; terminationDate: Date | null; terminationReason: string | null; username: string; passwordHash: string; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; } | null; road: { id: number; name: string; createdAt: Date; updatedAt: Date; projectId: number | null; startPk: string; endPk: string; slug: string; }; phase: { id: number; name: string; createdAt: Date; updatedAt: Date; measure: PhaseMeasure; pointHasSides: boolean; phaseDefinitionId: number; roadId: number; designLength: number; }; submitter: { id: number; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: Date | null; birthDate: Date | null; position: string | null; employmentStatus: EmploymentStatus; terminationDate: Date | null; terminationReason: string | null; username: string; passwordHash: string; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; } | null; } & { status: InspectionStatus; id: number; createdAt: Date; updatedAt: Date; createdBy: number | null; updatedBy: number | null; roadId: number; remark: string | null; documentId: number | null; phaseId: number; side: IntervalSide; startPk: number; endPk: number; layerId: number | null; layerName: string; checkId: number | null; checkName: string; types: string[]; appointmentDate: Date | null; submissionOrder: number | null; submittedAt: Date; submittedBy: number | null; })[]; }",
+      "type": "{ items: ({ document: ({ submission: { createdAt: Date; updatedAt: Date; documentId: number; submissionNumber: number; projectName: string; projectCode: string; contractNumbers: JsonValue; bordereauNumber: number; subject: string; senderOrg: string; senderDate: string; senderLastName: string; senderFirstName: string; senderSignature: string | null; senderTime: string | null; recipientOrg: string; recipientDate: string; recipientLastName: string; recipientFirstName: string; recipientSignature: string | null; recipientTime: string | null; comments: string | null; } | null; } & { status: DocumentStatus; id: number; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; data: JsonValue; code: string; files: JsonValue; remark: string | null; type: DocumentType; templateId: string | null; templateVersion: number | null; title: string | null; }) | null; creator: { id: number; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: Date | null; birthDate: Date | null; position: string | null; employmentStatus: EmploymentStatus; terminationDate: Date | null; terminationReason: string | null; username: string; passwordHash: string; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; } | null; updater: { id: number; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: Date | null; birthDate: Date | null; position: string | null; employmentStatus: EmploymentStatus; terminationDate: Date | null; terminationReason: string | null; username: string; passwordHash: string; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; } | null; road: { id: number; name: string; createdAt: Date; updatedAt: Date; projectId: number | null; startPk: string; endPk: string; slug: string; }; phase: { id: number; name: string; createdAt: Date; updatedAt: Date; measure: PhaseMeasure; pointHasSides: boolean; phaseDefinitionId: number; roadId: number; designLength: number; }; submitter: { id: number; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: Date | null; birthDate: Date | null; position: string | null; employmentStatus: EmploymentStatus; terminationDate: Date | null; terminationReason: string | null; username: string; passwordHash: string; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; } | null; } & { status: InspectionStatus; id: number; createdAt: Date; updatedAt: Date; createdBy: number | null; updatedBy: number | null; roadId: number; remark: string | null; documentId: number | null; locationRoadId: number | null; levelCrossingSide: LevelCrossingSide | null; phaseId: number; intervalId: number | null; side: IntervalSide; startPk: number; endPk: number; layerId: number | null; layerName: string; checkId: number | null; checkName: string; types: string[]; appointmentDate: Date | null; submissionOrder: number | null; submittedAt: Date; submittedBy: number | null; })[]; }",
       "fields": [
         {
           "name": "items",
-          "type": "({ document: ({ submission: { createdAt: Date; updatedAt: Date; documentId: number; submissionNumber: number; projectName: string; projectCode: string; contractNumbers: JsonValue; bordereauNumber: number; subject: string; senderOrg: string; senderDate: string; senderLastName: string; senderFirstName: string; senderSignature: string | null; senderTime: string | null; recipientOrg: string; recipientDate: string; recipientLastName: string; recipientFirstName: string; recipientSignature: string | null; recipientTime: string | null; comments: string | null; } | null; } & { status: DocumentStatus; id: number; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; data: JsonValue; code: string; files: JsonValue; remark: string | null; type: DocumentType; templateId: string | null; templateVersion: number | null; title: string | null; }) | null; creator: { id: number; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: Date | null; birthDate: Date | null; position: string | null; employmentStatus: EmploymentStatus; terminationDate: Date | null; terminationReason: string | null; username: string; passwordHash: string; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; } | null; updater: { id: number; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: Date | null; birthDate: Date | null; position: string | null; employmentStatus: EmploymentStatus; terminationDate: Date | null; terminationReason: string | null; username: string; passwordHash: string; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; } | null; road: { id: number; name: string; createdAt: Date; updatedAt: Date; projectId: number | null; startPk: string; endPk: string; slug: string; }; phase: { id: number; name: string; createdAt: Date; updatedAt: Date; measure: PhaseMeasure; pointHasSides: boolean; phaseDefinitionId: number; roadId: number; designLength: number; }; submitter: { id: number; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: Date | null; birthDate: Date | null; position: string | null; employmentStatus: EmploymentStatus; terminationDate: Date | null; terminationReason: string | null; username: string; passwordHash: string; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; } | null; } & { status: InspectionStatus; id: number; createdAt: Date; updatedAt: Date; createdBy: number | null; updatedBy: number | null; roadId: number; remark: string | null; documentId: number | null; phaseId: number; side: IntervalSide; startPk: number; endPk: number; layerId: number | null; layerName: string; checkId: number | null; checkName: string; types: string[]; appointmentDate: Date | null; submissionOrder: number | null; submittedAt: Date; submittedBy: number | null; })[]",
+          "type": "({ document: ({ submission: { createdAt: Date; updatedAt: Date; documentId: number; submissionNumber: number; projectName: string; projectCode: string; contractNumbers: JsonValue; bordereauNumber: number; subject: string; senderOrg: string; senderDate: string; senderLastName: string; senderFirstName: string; senderSignature: string | null; senderTime: string | null; recipientOrg: string; recipientDate: string; recipientLastName: string; recipientFirstName: string; recipientSignature: string | null; recipientTime: string | null; comments: string | null; } | null; } & { status: DocumentStatus; id: number; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; data: JsonValue; code: string; files: JsonValue; remark: string | null; type: DocumentType; templateId: string | null; templateVersion: number | null; title: string | null; }) | null; creator: { id: number; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: Date | null; birthDate: Date | null; position: string | null; employmentStatus: EmploymentStatus; terminationDate: Date | null; terminationReason: string | null; username: string; passwordHash: string; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; } | null; updater: { id: number; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: Date | null; birthDate: Date | null; position: string | null; employmentStatus: EmploymentStatus; terminationDate: Date | null; terminationReason: string | null; username: string; passwordHash: string; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; } | null; road: { id: number; name: string; createdAt: Date; updatedAt: Date; projectId: number | null; startPk: string; endPk: string; slug: string; }; phase: { id: number; name: string; createdAt: Date; updatedAt: Date; measure: PhaseMeasure; pointHasSides: boolean; phaseDefinitionId: number; roadId: number; designLength: number; }; submitter: { id: number; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: Date | null; birthDate: Date | null; position: string | null; employmentStatus: EmploymentStatus; terminationDate: Date | null; terminationReason: string | null; username: string; passwordHash: string; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; } | null; } & { status: InspectionStatus; id: number; createdAt: Date; updatedAt: Date; createdBy: number | null; updatedBy: number | null; roadId: number; remark: string | null; documentId: number | null; locationRoadId: number | null; levelCrossingSide: LevelCrossingSide | null; phaseId: number; intervalId: number | null; side: IntervalSide; startPk: number; endPk: number; layerId: number | null; layerName: string; checkId: number | null; checkName: string; types: string[]; appointmentDate: Date | null; submissionOrder: number | null; submittedAt: Date; submittedBy: number | null; })[]",
           "enum": [
             "LINEAR",
             "POINT"
@@ -4832,11 +6997,11 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "queryParams": [],
     "bodyFields": [],
     "responseSchema": {
-      "type": "{ items: ({ document: ({ submission: { createdAt: Date; updatedAt: Date; documentId: number; submissionNumber: number; projectName: string; projectCode: string; contractNumbers: JsonValue; bordereauNumber: number; subject: string; senderOrg: string; senderDate: string; senderLastName: string; senderFirstName: string; senderSignature: string | null; senderTime: string | null; recipientOrg: string; recipientDate: string; recipientLastName: string; recipientFirstName: string; recipientSignature: string | null; recipientTime: string | null; comments: string | null; } | null; } & { status: DocumentStatus; id: number; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; data: JsonValue; code: string; files: JsonValue; remark: string | null; type: DocumentType; templateId: string | null; templateVersion: number | null; title: string | null; }) | null; creator: { id: number; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: Date | null; birthDate: Date | null; position: string | null; employmentStatus: EmploymentStatus; terminationDate: Date | null; terminationReason: string | null; username: string; passwordHash: string; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; } | null; updater: { id: number; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: Date | null; birthDate: Date | null; position: string | null; employmentStatus: EmploymentStatus; terminationDate: Date | null; terminationReason: string | null; username: string; passwordHash: string; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; } | null; road: { id: number; name: string; createdAt: Date; updatedAt: Date; projectId: number | null; startPk: string; endPk: string; slug: string; }; phase: { id: number; name: string; createdAt: Date; updatedAt: Date; measure: PhaseMeasure; pointHasSides: boolean; phaseDefinitionId: number; roadId: number; designLength: number; }; submitter: { id: number; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: Date | null; birthDate: Date | null; position: string | null; employmentStatus: EmploymentStatus; terminationDate: Date | null; terminationReason: string | null; username: string; passwordHash: string; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; } | null; } & { status: InspectionStatus; id: number; createdAt: Date; updatedAt: Date; createdBy: number | null; updatedBy: number | null; roadId: number; remark: string | null; documentId: number | null; phaseId: number; side: IntervalSide; startPk: number; endPk: number; layerId: number | null; layerName: string; checkId: number | null; checkName: string; types: string[]; appointmentDate: Date | null; submissionOrder: number | null; submittedAt: Date; submittedBy: number | null; })[]; }",
+      "type": "{ items: ({ document: ({ submission: { createdAt: Date; updatedAt: Date; documentId: number; submissionNumber: number; projectName: string; projectCode: string; contractNumbers: JsonValue; bordereauNumber: number; subject: string; senderOrg: string; senderDate: string; senderLastName: string; senderFirstName: string; senderSignature: string | null; senderTime: string | null; recipientOrg: string; recipientDate: string; recipientLastName: string; recipientFirstName: string; recipientSignature: string | null; recipientTime: string | null; comments: string | null; } | null; } & { status: DocumentStatus; id: number; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; data: JsonValue; code: string; files: JsonValue; remark: string | null; type: DocumentType; templateId: string | null; templateVersion: number | null; title: string | null; }) | null; creator: { id: number; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: Date | null; birthDate: Date | null; position: string | null; employmentStatus: EmploymentStatus; terminationDate: Date | null; terminationReason: string | null; username: string; passwordHash: string; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; } | null; updater: { id: number; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: Date | null; birthDate: Date | null; position: string | null; employmentStatus: EmploymentStatus; terminationDate: Date | null; terminationReason: string | null; username: string; passwordHash: string; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; } | null; road: { id: number; name: string; createdAt: Date; updatedAt: Date; projectId: number | null; startPk: string; endPk: string; slug: string; }; phase: { id: number; name: string; createdAt: Date; updatedAt: Date; measure: PhaseMeasure; pointHasSides: boolean; phaseDefinitionId: number; roadId: number; designLength: number; }; submitter: { id: number; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: Date | null; birthDate: Date | null; position: string | null; employmentStatus: EmploymentStatus; terminationDate: Date | null; terminationReason: string | null; username: string; passwordHash: string; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; } | null; } & { status: InspectionStatus; id: number; createdAt: Date; updatedAt: Date; createdBy: number | null; updatedBy: number | null; roadId: number; remark: string | null; documentId: number | null; locationRoadId: number | null; levelCrossingSide: LevelCrossingSide | null; phaseId: number; intervalId: number | null; side: IntervalSide; startPk: number; endPk: number; layerId: number | null; layerName: string; checkId: number | null; checkName: string; types: string[]; appointmentDate: Date | null; submissionOrder: number | null; submittedAt: Date; submittedBy: number | null; })[]; }",
       "fields": [
         {
           "name": "items",
-          "type": "({ document: ({ submission: { createdAt: Date; updatedAt: Date; documentId: number; submissionNumber: number; projectName: string; projectCode: string; contractNumbers: JsonValue; bordereauNumber: number; subject: string; senderOrg: string; senderDate: string; senderLastName: string; senderFirstName: string; senderSignature: string | null; senderTime: string | null; recipientOrg: string; recipientDate: string; recipientLastName: string; recipientFirstName: string; recipientSignature: string | null; recipientTime: string | null; comments: string | null; } | null; } & { status: DocumentStatus; id: number; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; data: JsonValue; code: string; files: JsonValue; remark: string | null; type: DocumentType; templateId: string | null; templateVersion: number | null; title: string | null; }) | null; creator: { id: number; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: Date | null; birthDate: Date | null; position: string | null; employmentStatus: EmploymentStatus; terminationDate: Date | null; terminationReason: string | null; username: string; passwordHash: string; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; } | null; updater: { id: number; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: Date | null; birthDate: Date | null; position: string | null; employmentStatus: EmploymentStatus; terminationDate: Date | null; terminationReason: string | null; username: string; passwordHash: string; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; } | null; road: { id: number; name: string; createdAt: Date; updatedAt: Date; projectId: number | null; startPk: string; endPk: string; slug: string; }; phase: { id: number; name: string; createdAt: Date; updatedAt: Date; measure: PhaseMeasure; pointHasSides: boolean; phaseDefinitionId: number; roadId: number; designLength: number; }; submitter: { id: number; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: Date | null; birthDate: Date | null; position: string | null; employmentStatus: EmploymentStatus; terminationDate: Date | null; terminationReason: string | null; username: string; passwordHash: string; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; } | null; } & { status: InspectionStatus; id: number; createdAt: Date; updatedAt: Date; createdBy: number | null; updatedBy: number | null; roadId: number; remark: string | null; documentId: number | null; phaseId: number; side: IntervalSide; startPk: number; endPk: number; layerId: number | null; layerName: string; checkId: number | null; checkName: string; types: string[]; appointmentDate: Date | null; submissionOrder: number | null; submittedAt: Date; submittedBy: number | null; })[]",
+          "type": "({ document: ({ submission: { createdAt: Date; updatedAt: Date; documentId: number; submissionNumber: number; projectName: string; projectCode: string; contractNumbers: JsonValue; bordereauNumber: number; subject: string; senderOrg: string; senderDate: string; senderLastName: string; senderFirstName: string; senderSignature: string | null; senderTime: string | null; recipientOrg: string; recipientDate: string; recipientLastName: string; recipientFirstName: string; recipientSignature: string | null; recipientTime: string | null; comments: string | null; } | null; } & { status: DocumentStatus; id: number; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; data: JsonValue; code: string; files: JsonValue; remark: string | null; type: DocumentType; templateId: string | null; templateVersion: number | null; title: string | null; }) | null; creator: { id: number; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: Date | null; birthDate: Date | null; position: string | null; employmentStatus: EmploymentStatus; terminationDate: Date | null; terminationReason: string | null; username: string; passwordHash: string; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; } | null; updater: { id: number; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: Date | null; birthDate: Date | null; position: string | null; employmentStatus: EmploymentStatus; terminationDate: Date | null; terminationReason: string | null; username: string; passwordHash: string; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; } | null; road: { id: number; name: string; createdAt: Date; updatedAt: Date; projectId: number | null; startPk: string; endPk: string; slug: string; }; phase: { id: number; name: string; createdAt: Date; updatedAt: Date; measure: PhaseMeasure; pointHasSides: boolean; phaseDefinitionId: number; roadId: number; designLength: number; }; submitter: { id: number; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: Date | null; birthDate: Date | null; position: string | null; employmentStatus: EmploymentStatus; terminationDate: Date | null; terminationReason: string | null; username: string; passwordHash: string; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; } | null; } & { status: InspectionStatus; id: number; createdAt: Date; updatedAt: Date; createdBy: number | null; updatedBy: number | null; roadId: number; remark: string | null; documentId: number | null; locationRoadId: number | null; levelCrossingSide: LevelCrossingSide | null; phaseId: number; intervalId: number | null; side: IntervalSide; startPk: number; endPk: number; layerId: number | null; layerName: string; checkId: number | null; checkName: string; types: string[]; appointmentDate: Date | null; submissionOrder: number | null; submittedAt: Date; submittedBy: number | null; })[]",
           "enum": [
             "LINEAR",
             "POINT"
@@ -5047,12 +7212,7 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "method": "GET",
     "path": "/api/leader-logs",
     "description": "GET /api/leader-logs",
-    "permissions": [
-      "report:view",
-      "report:edit",
-      "leader-log:view-all",
-      "leader-log:edit-all"
-    ],
+    "permissions": [],
     "mode": "read",
     "pathParams": [],
     "queryParams": [
@@ -5069,6 +7229,11 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
       {
         "name": "limit",
         "type": "number",
+        "optional": true
+      },
+      {
+        "name": "days",
+        "type": "string",
         "optional": true
       },
       {
@@ -5134,10 +7299,7 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "path": "/api/leader-logs",
     "description": "POST /api/leader-logs",
     "permissions": [
-      "report:view",
-      "report:edit",
-      "leader-log:view-all",
-      "leader-log:edit-all"
+      "report:edit"
     ],
     "mode": "write",
     "pathParams": [],
@@ -5155,6 +7317,11 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
       {
         "name": "limit",
         "type": "number",
+        "optional": true
+      },
+      {
+        "name": "days",
+        "type": "string",
         "optional": true
       },
       {
@@ -5220,7 +7387,6 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "path": "/api/leader-logs/:id",
     "description": "PUT /api/leader-logs/:id",
     "permissions": [
-      "leader-log:edit-all",
       "report:edit"
     ],
     "mode": "write",
@@ -5249,12 +7415,7 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "method": "GET",
     "path": "/api/leader-logs/leaders",
     "description": "GET /api/leader-logs/leaders",
-    "permissions": [
-      "report:view",
-      "report:edit",
-      "leader-log:view-all",
-      "leader-log:edit-all"
-    ],
+    "permissions": [],
     "mode": "read",
     "pathParams": [],
     "queryParams": [],
@@ -5308,6 +7469,252 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "source": "app/api/leader-logs/options/route.ts"
   },
   {
+    "key": "post:/api/log-extractor/apply",
+    "method": "POST",
+    "path": "/api/log-extractor/apply",
+    "description": "POST /api/log-extractor/apply",
+    "permissions": [
+      "report:edit"
+    ],
+    "mode": "write",
+    "pathParams": [],
+    "queryParams": [],
+    "bodyFields": [],
+    "responseSchema": {
+      "type": "{ mergedOutput: LogExtractionOutput; summary: { date: string; createdAt: string; updatedAt: string; }; exists: boolean; preview: false; }",
+      "fields": [
+        {
+          "name": "mergedOutput",
+          "type": "LogExtractionOutput",
+          "fields": [
+            {
+              "name": "observations",
+              "type": "{ security: string; environment: string; general: string; special: string; }"
+            },
+            {
+              "name": "works",
+              "type": "{ preparation: string; earthwork: string; pavement: string; drainage: string; safety: string; geotech: string; otherWork: string; }"
+            },
+            {
+              "name": "controls",
+              "type": "{ beTopo: string; quarry: string; subcontract: string; other: string; }"
+            }
+          ]
+        },
+        {
+          "name": "summary",
+          "type": "{ date: string; createdAt: string; updatedAt: string; }",
+          "fields": [
+            {
+              "name": "date",
+              "type": "string"
+            },
+            {
+              "name": "createdAt",
+              "type": "string"
+            },
+            {
+              "name": "updatedAt",
+              "type": "string"
+            }
+          ]
+        },
+        {
+          "name": "exists",
+          "type": "boolean"
+        },
+        {
+          "name": "preview",
+          "type": "false"
+        }
+      ]
+    },
+    "source": "app/api/log-extractor/apply/route.ts"
+  },
+  {
+    "key": "get:/api/log-extractor/config",
+    "method": "GET",
+    "path": "/api/log-extractor/config",
+    "description": "GET /api/log-extractor/config",
+    "permissions": [],
+    "mode": "read",
+    "pathParams": [],
+    "queryParams": [],
+    "bodyFields": [],
+    "responseSchema": {
+      "type": "{ promptText: string; updatedAt: string | null; updatedById: number | null; source: string; }",
+      "fields": [
+        {
+          "name": "promptText",
+          "type": "string"
+        },
+        {
+          "name": "updatedAt",
+          "type": "string | null"
+        },
+        {
+          "name": "updatedById",
+          "type": "number | null"
+        },
+        {
+          "name": "source",
+          "type": "string"
+        }
+      ]
+    },
+    "source": "app/api/log-extractor/config/route.ts"
+  },
+  {
+    "key": "put:/api/log-extractor/config",
+    "method": "PUT",
+    "path": "/api/log-extractor/config",
+    "description": "PUT /api/log-extractor/config",
+    "permissions": [
+      "report:edit"
+    ],
+    "mode": "write",
+    "pathParams": [],
+    "queryParams": [],
+    "bodyFields": [],
+    "responseSchema": {
+      "type": "{ promptText: string; updatedAt: string | null; updatedById: number | null; source: string; }",
+      "fields": [
+        {
+          "name": "promptText",
+          "type": "string"
+        },
+        {
+          "name": "updatedAt",
+          "type": "string | null"
+        },
+        {
+          "name": "updatedById",
+          "type": "number | null"
+        },
+        {
+          "name": "source",
+          "type": "string"
+        }
+      ]
+    },
+    "source": "app/api/log-extractor/config/route.ts"
+  },
+  {
+    "key": "post:/api/log-extractor/extract",
+    "method": "POST",
+    "path": "/api/log-extractor/extract",
+    "description": "POST /api/log-extractor/extract",
+    "permissions": [],
+    "mode": "write",
+    "pathParams": [],
+    "queryParams": [],
+    "bodyFields": [],
+    "responseSchema": {
+      "type": "{ output: LogExtractionOutput; raw: string; usage: { promptTokens: number; completionTokens: number; totalTokens: number; } | undefined; logs: { id: number; supervisorName: string; }[]; }",
+      "fields": [
+        {
+          "name": "output",
+          "type": "LogExtractionOutput",
+          "fields": [
+            {
+              "name": "observations",
+              "type": "{ security: string; environment: string; general: string; special: string; }"
+            },
+            {
+              "name": "works",
+              "type": "{ preparation: string; earthwork: string; pavement: string; drainage: string; safety: string; geotech: string; otherWork: string; }"
+            },
+            {
+              "name": "controls",
+              "type": "{ beTopo: string; quarry: string; subcontract: string; other: string; }"
+            }
+          ]
+        },
+        {
+          "name": "raw",
+          "type": "string"
+        },
+        {
+          "name": "usage",
+          "type": "{ promptTokens: number; completionTokens: number; totalTokens: number; } | undefined"
+        },
+        {
+          "name": "logs",
+          "type": "{ id: number; supervisorName: string; }[]"
+        }
+      ]
+    },
+    "source": "app/api/log-extractor/extract/route.ts"
+  },
+  {
+    "key": "get:/api/log-extractor/leader-prompts",
+    "method": "GET",
+    "path": "/api/log-extractor/leader-prompts",
+    "description": "GET /api/log-extractor/leader-prompts",
+    "permissions": [],
+    "mode": "read",
+    "pathParams": [],
+    "queryParams": [],
+    "bodyFields": [],
+    "responseSchema": {
+      "type": "{ supervisorId: number; promptText: string; updatedAt: string; updatedById: number | null; }",
+      "fields": [
+        {
+          "name": "supervisorId",
+          "type": "number"
+        },
+        {
+          "name": "promptText",
+          "type": "string"
+        },
+        {
+          "name": "updatedAt",
+          "type": "string"
+        },
+        {
+          "name": "updatedById",
+          "type": "number | null"
+        }
+      ]
+    },
+    "source": "app/api/log-extractor/leader-prompts/route.ts"
+  },
+  {
+    "key": "put:/api/log-extractor/leader-prompts",
+    "method": "PUT",
+    "path": "/api/log-extractor/leader-prompts",
+    "description": "PUT /api/log-extractor/leader-prompts",
+    "permissions": [
+      "report:edit"
+    ],
+    "mode": "write",
+    "pathParams": [],
+    "queryParams": [],
+    "bodyFields": [],
+    "responseSchema": {
+      "type": "{ supervisorId: number; promptText: string; updatedAt: string; updatedById: number | null; }",
+      "fields": [
+        {
+          "name": "supervisorId",
+          "type": "number"
+        },
+        {
+          "name": "promptText",
+          "type": "string"
+        },
+        {
+          "name": "updatedAt",
+          "type": "string"
+        },
+        {
+          "name": "updatedById",
+          "type": "number | null"
+        }
+      ]
+    },
+    "source": "app/api/log-extractor/leader-prompts/route.ts"
+  },
+  {
     "key": "get:/api/members",
     "method": "GET",
     "path": "/api/members",
@@ -5315,20 +7722,18 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "permissions": [
       "member:view",
       "role:update",
-      "role:manage",
-      "member:create",
-      "member:manage"
+      "role:manage"
     ],
     "mode": "read",
     "pathParams": [],
     "queryParams": [],
     "bodyFields": [],
     "responseSchema": {
-      "type": "{ members: { id: number; username: string; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: string | null; birthDate: string | null; terminationDate: string | null; terminationReason: string | null; position: string | null; employmentStatus: EmploymentStatus; createdAt: string; updatedAt: string; project: { id: number; name: string; code: string | null; isActive: boolean; } | null; roles: { id: number; name: string; }[]; chineseProfile: { createdAt: string; updatedAt: string; frenchName: string | null; idNumber: string | null; passportNumber: string | null; educationAndMajor: string | null; certifications: string[]; domesticMobile: string | null; emergencyContactName: string | null; emergencyContactPhone: string | null; redBookValidYears: number | null; cumulativeAbroadYears: number | null; birthplace: string | null; residenceInChina: string | null; medicalHistory: string | null; healthStatus: string | null; } | null; expatProfile: { chineseSupervisorId: number | null; chineseSupervisor: { id: number; name: string; username: string; chineseProfile: { frenchName: string | null; } | null; } | null; team: string | null; contractNumber: string | null; contractNumbers: string[]; contractType: ContractType | null; contractStartDate: string | null; contractEndDate: string | null; salaryCategory: string | null; prime: string | null; baseSalaryAmount: string | null; baseSalaryUnit: SalaryUnit | null; netMonthlyAmount: string | null; netMonthlyUnit: SalaryUnit | null; maritalStatus: string | null; childrenCount: number | null; cnpsNumber: string | null; cnpsDeclarationCode: string | null; provenance: string | null; emergencyContactName: string | null; emergencyContactPhone: string | null; createdAt: string; updatedAt: string; } | null; }[]; }",
+      "type": "{ members: { id: number; username: string; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: string | null; birthDate: string | null; terminationDate: string | null; terminationReason: string | null; position: string | null; employmentStatus: EmploymentStatus; createdAt: string; updatedAt: string; project: { id: number; name: string; code: string | null; isActive: boolean; } | null; roles: { id: number; name: string; }[]; chineseProfile: { createdAt: string; updatedAt: string; frenchName: string | null; idNumber: string | null; passportNumber: string | null; educationAndMajor: string | null; certifications: string[]; domesticMobile: string | null; emergencyContactName: string | null; emergencyContactPhone: string | null; redBookValidYears: number | null; cumulativeAbroadYears: number | null; birthplace: string | null; residenceInChina: string | null; medicalHistory: string | null; healthStatus: string | null; } | null; expatProfile: { chineseSupervisorId: number | null; chineseSupervisor: { id: number; name: string; username: string; chineseProfile: { frenchName: string | null; } | null; } | null; team: string | null; contractNumber: string | null; contractNumbers: string[]; contractType: ContractType | null; contractStartDate: string | null; contractEndDate: string | null; salaryCategory: string | null; prime: string | null; baseSalaryAmount: string | null; baseSalaryUnit: SalaryUnit | null; netMonthlyAmount: string | null; netMonthlyUnit: SalaryUnit | null; maritalStatus: string | null; childrenCount: number | null; cnpsNumber: string | null; cnpsDeclarationCode: string | null; provenance: string | null; bankAccountNumber: string | null; bankName: string | null; emergencyContactName: string | null; emergencyContactPhone: string | null; createdAt: string; updatedAt: string; } | null; }[]; }",
       "fields": [
         {
           "name": "members",
-          "type": "{ id: number; username: string; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: string | null; birthDate: string | null; terminationDate: string | null; terminationReason: string | null; position: string | null; employmentStatus: EmploymentStatus; createdAt: string; updatedAt: string; project: { id: number; name: string; code: string | null; isActive: boolean; } | null; roles: { id: number; name: string; }[]; chineseProfile: { createdAt: string; updatedAt: string; frenchName: string | null; idNumber: string | null; passportNumber: string | null; educationAndMajor: string | null; certifications: string[]; domesticMobile: string | null; emergencyContactName: string | null; emergencyContactPhone: string | null; redBookValidYears: number | null; cumulativeAbroadYears: number | null; birthplace: string | null; residenceInChina: string | null; medicalHistory: string | null; healthStatus: string | null; } | null; expatProfile: { chineseSupervisorId: number | null; chineseSupervisor: { id: number; name: string; username: string; chineseProfile: { frenchName: string | null; } | null; } | null; team: string | null; contractNumber: string | null; contractNumbers: string[]; contractType: ContractType | null; contractStartDate: string | null; contractEndDate: string | null; salaryCategory: string | null; prime: string | null; baseSalaryAmount: string | null; baseSalaryUnit: SalaryUnit | null; netMonthlyAmount: string | null; netMonthlyUnit: SalaryUnit | null; maritalStatus: string | null; childrenCount: number | null; cnpsNumber: string | null; cnpsDeclarationCode: string | null; provenance: string | null; emergencyContactName: string | null; emergencyContactPhone: string | null; createdAt: string; updatedAt: string; } | null; }[]",
+          "type": "{ id: number; username: string; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: string | null; birthDate: string | null; terminationDate: string | null; terminationReason: string | null; position: string | null; employmentStatus: EmploymentStatus; createdAt: string; updatedAt: string; project: { id: number; name: string; code: string | null; isActive: boolean; } | null; roles: { id: number; name: string; }[]; chineseProfile: { createdAt: string; updatedAt: string; frenchName: string | null; idNumber: string | null; passportNumber: string | null; educationAndMajor: string | null; certifications: string[]; domesticMobile: string | null; emergencyContactName: string | null; emergencyContactPhone: string | null; redBookValidYears: number | null; cumulativeAbroadYears: number | null; birthplace: string | null; residenceInChina: string | null; medicalHistory: string | null; healthStatus: string | null; } | null; expatProfile: { chineseSupervisorId: number | null; chineseSupervisor: { id: number; name: string; username: string; chineseProfile: { frenchName: string | null; } | null; } | null; team: string | null; contractNumber: string | null; contractNumbers: string[]; contractType: ContractType | null; contractStartDate: string | null; contractEndDate: string | null; salaryCategory: string | null; prime: string | null; baseSalaryAmount: string | null; baseSalaryUnit: SalaryUnit | null; netMonthlyAmount: string | null; netMonthlyUnit: SalaryUnit | null; maritalStatus: string | null; childrenCount: number | null; cnpsNumber: string | null; cnpsDeclarationCode: string | null; provenance: string | null; bankAccountNumber: string | null; bankName: string | null; emergencyContactName: string | null; emergencyContactPhone: string | null; createdAt: string; updatedAt: string; } | null; }[]",
           "enum": [
             "ACTIVE",
             "TERMINATED",
@@ -5350,22 +7755,21 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "path": "/api/members",
     "description": "POST /api/members",
     "permissions": [
-      "member:view",
-      "role:update",
-      "role:manage",
       "member:create",
-      "member:manage"
+      "member:manage",
+      "role:update",
+      "role:manage"
     ],
     "mode": "write",
     "pathParams": [],
     "queryParams": [],
     "bodyFields": [],
     "responseSchema": {
-      "type": "{ members: { id: number; username: string; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: string | null; birthDate: string | null; terminationDate: string | null; terminationReason: string | null; position: string | null; employmentStatus: EmploymentStatus; createdAt: string; updatedAt: string; project: { id: number; name: string; code: string | null; isActive: boolean; } | null; roles: { id: number; name: string; }[]; chineseProfile: { createdAt: string; updatedAt: string; frenchName: string | null; idNumber: string | null; passportNumber: string | null; educationAndMajor: string | null; certifications: string[]; domesticMobile: string | null; emergencyContactName: string | null; emergencyContactPhone: string | null; redBookValidYears: number | null; cumulativeAbroadYears: number | null; birthplace: string | null; residenceInChina: string | null; medicalHistory: string | null; healthStatus: string | null; } | null; expatProfile: { chineseSupervisorId: number | null; chineseSupervisor: { id: number; name: string; username: string; chineseProfile: { frenchName: string | null; } | null; } | null; team: string | null; contractNumber: string | null; contractNumbers: string[]; contractType: ContractType | null; contractStartDate: string | null; contractEndDate: string | null; salaryCategory: string | null; prime: string | null; baseSalaryAmount: string | null; baseSalaryUnit: SalaryUnit | null; netMonthlyAmount: string | null; netMonthlyUnit: SalaryUnit | null; maritalStatus: string | null; childrenCount: number | null; cnpsNumber: string | null; cnpsDeclarationCode: string | null; provenance: string | null; emergencyContactName: string | null; emergencyContactPhone: string | null; createdAt: string; updatedAt: string; } | null; }[]; }",
+      "type": "{ members: { id: number; username: string; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: string | null; birthDate: string | null; terminationDate: string | null; terminationReason: string | null; position: string | null; employmentStatus: EmploymentStatus; createdAt: string; updatedAt: string; project: { id: number; name: string; code: string | null; isActive: boolean; } | null; roles: { id: number; name: string; }[]; chineseProfile: { createdAt: string; updatedAt: string; frenchName: string | null; idNumber: string | null; passportNumber: string | null; educationAndMajor: string | null; certifications: string[]; domesticMobile: string | null; emergencyContactName: string | null; emergencyContactPhone: string | null; redBookValidYears: number | null; cumulativeAbroadYears: number | null; birthplace: string | null; residenceInChina: string | null; medicalHistory: string | null; healthStatus: string | null; } | null; expatProfile: { chineseSupervisorId: number | null; chineseSupervisor: { id: number; name: string; username: string; chineseProfile: { frenchName: string | null; } | null; } | null; team: string | null; contractNumber: string | null; contractNumbers: string[]; contractType: ContractType | null; contractStartDate: string | null; contractEndDate: string | null; salaryCategory: string | null; prime: string | null; baseSalaryAmount: string | null; baseSalaryUnit: SalaryUnit | null; netMonthlyAmount: string | null; netMonthlyUnit: SalaryUnit | null; maritalStatus: string | null; childrenCount: number | null; cnpsNumber: string | null; cnpsDeclarationCode: string | null; provenance: string | null; bankAccountNumber: string | null; bankName: string | null; emergencyContactName: string | null; emergencyContactPhone: string | null; createdAt: string; updatedAt: string; } | null; }[]; }",
       "fields": [
         {
           "name": "members",
-          "type": "{ id: number; username: string; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: string | null; birthDate: string | null; terminationDate: string | null; terminationReason: string | null; position: string | null; employmentStatus: EmploymentStatus; createdAt: string; updatedAt: string; project: { id: number; name: string; code: string | null; isActive: boolean; } | null; roles: { id: number; name: string; }[]; chineseProfile: { createdAt: string; updatedAt: string; frenchName: string | null; idNumber: string | null; passportNumber: string | null; educationAndMajor: string | null; certifications: string[]; domesticMobile: string | null; emergencyContactName: string | null; emergencyContactPhone: string | null; redBookValidYears: number | null; cumulativeAbroadYears: number | null; birthplace: string | null; residenceInChina: string | null; medicalHistory: string | null; healthStatus: string | null; } | null; expatProfile: { chineseSupervisorId: number | null; chineseSupervisor: { id: number; name: string; username: string; chineseProfile: { frenchName: string | null; } | null; } | null; team: string | null; contractNumber: string | null; contractNumbers: string[]; contractType: ContractType | null; contractStartDate: string | null; contractEndDate: string | null; salaryCategory: string | null; prime: string | null; baseSalaryAmount: string | null; baseSalaryUnit: SalaryUnit | null; netMonthlyAmount: string | null; netMonthlyUnit: SalaryUnit | null; maritalStatus: string | null; childrenCount: number | null; cnpsNumber: string | null; cnpsDeclarationCode: string | null; provenance: string | null; emergencyContactName: string | null; emergencyContactPhone: string | null; createdAt: string; updatedAt: string; } | null; }[]",
+          "type": "{ id: number; username: string; name: string; gender: string | null; nationality: string | null; phones: string[]; tags: string[]; joinDate: string | null; birthDate: string | null; terminationDate: string | null; terminationReason: string | null; position: string | null; employmentStatus: EmploymentStatus; createdAt: string; updatedAt: string; project: { id: number; name: string; code: string | null; isActive: boolean; } | null; roles: { id: number; name: string; }[]; chineseProfile: { createdAt: string; updatedAt: string; frenchName: string | null; idNumber: string | null; passportNumber: string | null; educationAndMajor: string | null; certifications: string[]; domesticMobile: string | null; emergencyContactName: string | null; emergencyContactPhone: string | null; redBookValidYears: number | null; cumulativeAbroadYears: number | null; birthplace: string | null; residenceInChina: string | null; medicalHistory: string | null; healthStatus: string | null; } | null; expatProfile: { chineseSupervisorId: number | null; chineseSupervisor: { id: number; name: string; username: string; chineseProfile: { frenchName: string | null; } | null; } | null; team: string | null; contractNumber: string | null; contractNumbers: string[]; contractType: ContractType | null; contractStartDate: string | null; contractEndDate: string | null; salaryCategory: string | null; prime: string | null; baseSalaryAmount: string | null; baseSalaryUnit: SalaryUnit | null; netMonthlyAmount: string | null; netMonthlyUnit: SalaryUnit | null; maritalStatus: string | null; childrenCount: number | null; cnpsNumber: string | null; cnpsDeclarationCode: string | null; provenance: string | null; bankAccountNumber: string | null; bankName: string | null; emergencyContactName: string | null; emergencyContactPhone: string | null; createdAt: string; updatedAt: string; } | null; }[]",
           "enum": [
             "ACTIVE",
             "TERMINATED",
@@ -5387,12 +7791,8 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "path": "/api/members/:id",
     "description": "DELETE /api/members/:id",
     "permissions": [
-      "member:update",
-      "member:edit",
-      "member:manage",
-      "role:update",
-      "role:manage",
-      "member:delete"
+      "member:delete",
+      "member:manage"
     ],
     "mode": "write",
     "pathParams": [
@@ -5405,11 +7805,11 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "queryParams": [],
     "bodyFields": [],
     "responseSchema": {
-      "type": "{ member: { id: number; username: string; name: string; gender: string | null; nationality: string | null; phones: string[]; joinDate: string | null; birthDate: string | null; position: string | null; employmentStatus: EmploymentStatus; terminationDate: string | null; terminationReason: string | null; createdAt: string; updatedAt: string; tags: string[]; project: { id: number; name: string; isActive: boolean; code: string | null; } | null; roles: { id: number; name: string; }[]; chineseProfile: { createdAt: Date; updatedAt: Date; userId: number; frenchName: string | null; idNumber: string | null; passportNumber: string | null; educationAndMajor: string | null; certifications: string[]; domesticMobile: string | null; emergencyContactName: string | null; emergencyContactPhone: string | null; redBookValidYears: number | null; cumulativeAbroadYears: number | null; birthplace: string | null; residenceInChina: string | null; medicalHistory: string | null; healthStatus: string | null; } | null; expatProfile: { createdAt: Date; updatedAt: Date; userId: number; emergencyContactName: string | null; emergencyContactPhone: string | null; chineseSupervisorId: number | null; team: string | null; contractNumber: string | null; contractType: ContractType | null; contractStartDate: Date | null; contractEndDate: Date | null; salaryCategory: string | null; prime: Decimal | null; baseSalaryAmount: Decimal | null; baseSalaryUnit: SalaryUnit | null; netMonthlyAmount: Decimal | null; netMonthlyUnit: SalaryUnit | null; maritalStatus: string | null; childrenCount: number | null; cnpsNumber: string | null; cnpsDeclarationCode: string | null; provenance: string | null; } | null; }; }",
+      "type": "{ member: { id: number; username: string; name: string; gender: string | null; nationality: string | null; phones: string[]; joinDate: string | null; birthDate: string | null; position: string | null; employmentStatus: EmploymentStatus; terminationDate: string | null; terminationReason: string | null; createdAt: string; updatedAt: string; tags: string[]; project: { id: number; name: string; isActive: boolean; code: string | null; } | null; roles: { id: number; name: string; }[]; chineseProfile: { createdAt: Date; updatedAt: Date; userId: number; frenchName: string | null; idNumber: string | null; passportNumber: string | null; educationAndMajor: string | null; certifications: string[]; domesticMobile: string | null; emergencyContactName: string | null; emergencyContactPhone: string | null; redBookValidYears: number | null; cumulativeAbroadYears: number | null; birthplace: string | null; residenceInChina: string | null; medicalHistory: string | null; healthStatus: string | null; } | null; expatProfile: { createdAt: Date; updatedAt: Date; userId: number; emergencyContactName: string | null; emergencyContactPhone: string | null; chineseSupervisorId: number | null; team: string | null; contractNumber: string | null; contractType: ContractType | null; contractStartDate: Date | null; contractEndDate: Date | null; salaryCategory: string | null; prime: Decimal | null; baseSalaryAmount: Decimal | null; baseSalaryUnit: SalaryUnit | null; netMonthlyAmount: Decimal | null; netMonthlyUnit: SalaryUnit | null; maritalStatus: string | null; childrenCount: number | null; cnpsNumber: string | null; cnpsDeclarationCode: string | null; provenance: string | null; bankAccountNumber: string | null; bankName: string | null; } | null; }; }",
       "fields": [
         {
           "name": "member",
-          "type": "{ id: number; username: string; name: string; gender: string | null; nationality: string | null; phones: string[]; joinDate: string | null; birthDate: string | null; position: string | null; employmentStatus: EmploymentStatus; terminationDate: string | null; terminationReason: string | null; createdAt: string; updatedAt: string; tags: string[]; project: { id: number; name: string; isActive: boolean; code: string | null; } | null; roles: { id: number; name: string; }[]; chineseProfile: { createdAt: Date; updatedAt: Date; userId: number; frenchName: string | null; idNumber: string | null; passportNumber: string | null; educationAndMajor: string | null; certifications: string[]; domesticMobile: string | null; emergencyContactName: string | null; emergencyContactPhone: string | null; redBookValidYears: number | null; cumulativeAbroadYears: number | null; birthplace: string | null; residenceInChina: string | null; medicalHistory: string | null; healthStatus: string | null; } | null; expatProfile: { createdAt: Date; updatedAt: Date; userId: number; emergencyContactName: string | null; emergencyContactPhone: string | null; chineseSupervisorId: number | null; team: string | null; contractNumber: string | null; contractType: ContractType | null; contractStartDate: Date | null; contractEndDate: Date | null; salaryCategory: string | null; prime: Decimal | null; baseSalaryAmount: Decimal | null; baseSalaryUnit: SalaryUnit | null; netMonthlyAmount: Decimal | null; netMonthlyUnit: SalaryUnit | null; maritalStatus: string | null; childrenCount: number | null; cnpsNumber: string | null; cnpsDeclarationCode: string | null; provenance: string | null; } | null; }",
+          "type": "{ id: number; username: string; name: string; gender: string | null; nationality: string | null; phones: string[]; joinDate: string | null; birthDate: string | null; position: string | null; employmentStatus: EmploymentStatus; terminationDate: string | null; terminationReason: string | null; createdAt: string; updatedAt: string; tags: string[]; project: { id: number; name: string; isActive: boolean; code: string | null; } | null; roles: { id: number; name: string; }[]; chineseProfile: { createdAt: Date; updatedAt: Date; userId: number; frenchName: string | null; idNumber: string | null; passportNumber: string | null; educationAndMajor: string | null; certifications: string[]; domesticMobile: string | null; emergencyContactName: string | null; emergencyContactPhone: string | null; redBookValidYears: number | null; cumulativeAbroadYears: number | null; birthplace: string | null; residenceInChina: string | null; medicalHistory: string | null; healthStatus: string | null; } | null; expatProfile: { createdAt: Date; updatedAt: Date; userId: number; emergencyContactName: string | null; emergencyContactPhone: string | null; chineseSupervisorId: number | null; team: string | null; contractNumber: string | null; contractType: ContractType | null; contractStartDate: Date | null; contractEndDate: Date | null; salaryCategory: string | null; prime: Decimal | null; baseSalaryAmount: Decimal | null; baseSalaryUnit: SalaryUnit | null; netMonthlyAmount: Decimal | null; netMonthlyUnit: SalaryUnit | null; maritalStatus: string | null; childrenCount: number | null; cnpsNumber: string | null; cnpsDeclarationCode: string | null; provenance: string | null; bankAccountNumber: string | null; bankName: string | null; } | null; }",
           "enum": [
             "ACTIVE",
             "TERMINATED",
@@ -5495,7 +7895,7 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
             },
             {
               "name": "expatProfile",
-              "type": "{ createdAt: Date; updatedAt: Date; userId: number; emergencyContactName: string | null; emergencyContactPhone: string | null; chineseSupervisorId: number | null; team: string | null; contractNumber: string | null; contractType: ContractType | null; contractStartDate: Date | null; contractEndDate: Date | null; salaryCategory: string | null; prime: Decimal | null; baseSalaryAmount: Decimal | null; baseSalaryUnit: SalaryUnit | null; netMonthlyAmount: Decimal | null; netMonthlyUnit: SalaryUnit | null; maritalStatus: string | null; childrenCount: number | null; cnpsNumber: string | null; cnpsDeclarationCode: string | null; provenance: string | null; } | null",
+              "type": "{ createdAt: Date; updatedAt: Date; userId: number; emergencyContactName: string | null; emergencyContactPhone: string | null; chineseSupervisorId: number | null; team: string | null; contractNumber: string | null; contractType: ContractType | null; contractStartDate: Date | null; contractEndDate: Date | null; salaryCategory: string | null; prime: Decimal | null; baseSalaryAmount: Decimal | null; baseSalaryUnit: SalaryUnit | null; netMonthlyAmount: Decimal | null; netMonthlyUnit: SalaryUnit | null; maritalStatus: string | null; childrenCount: number | null; cnpsNumber: string | null; cnpsDeclarationCode: string | null; provenance: string | null; bankAccountNumber: string | null; bankName: string | null; } | null",
               "enum": [
                 "CTJ",
                 "CDD"
@@ -5536,11 +7936,11 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "queryParams": [],
     "bodyFields": [],
     "responseSchema": {
-      "type": "{ member: { id: number; username: string; name: string; gender: string | null; nationality: string | null; phones: string[]; joinDate: string | null; birthDate: string | null; position: string | null; employmentStatus: EmploymentStatus; terminationDate: string | null; terminationReason: string | null; createdAt: string; updatedAt: string; tags: string[]; project: { id: number; name: string; isActive: boolean; code: string | null; } | null; roles: { id: number; name: string; }[]; chineseProfile: { createdAt: Date; updatedAt: Date; userId: number; frenchName: string | null; idNumber: string | null; passportNumber: string | null; educationAndMajor: string | null; certifications: string[]; domesticMobile: string | null; emergencyContactName: string | null; emergencyContactPhone: string | null; redBookValidYears: number | null; cumulativeAbroadYears: number | null; birthplace: string | null; residenceInChina: string | null; medicalHistory: string | null; healthStatus: string | null; } | null; expatProfile: { createdAt: Date; updatedAt: Date; userId: number; emergencyContactName: string | null; emergencyContactPhone: string | null; chineseSupervisorId: number | null; team: string | null; contractNumber: string | null; contractType: ContractType | null; contractStartDate: Date | null; contractEndDate: Date | null; salaryCategory: string | null; prime: Decimal | null; baseSalaryAmount: Decimal | null; baseSalaryUnit: SalaryUnit | null; netMonthlyAmount: Decimal | null; netMonthlyUnit: SalaryUnit | null; maritalStatus: string | null; childrenCount: number | null; cnpsNumber: string | null; cnpsDeclarationCode: string | null; provenance: string | null; } | null; }; }",
+      "type": "{ member: { id: number; username: string; name: string; gender: string | null; nationality: string | null; phones: string[]; joinDate: string | null; birthDate: string | null; position: string | null; employmentStatus: EmploymentStatus; terminationDate: string | null; terminationReason: string | null; createdAt: string; updatedAt: string; tags: string[]; project: { id: number; name: string; isActive: boolean; code: string | null; } | null; roles: { id: number; name: string; }[]; chineseProfile: { createdAt: Date; updatedAt: Date; userId: number; frenchName: string | null; idNumber: string | null; passportNumber: string | null; educationAndMajor: string | null; certifications: string[]; domesticMobile: string | null; emergencyContactName: string | null; emergencyContactPhone: string | null; redBookValidYears: number | null; cumulativeAbroadYears: number | null; birthplace: string | null; residenceInChina: string | null; medicalHistory: string | null; healthStatus: string | null; } | null; expatProfile: { createdAt: Date; updatedAt: Date; userId: number; emergencyContactName: string | null; emergencyContactPhone: string | null; chineseSupervisorId: number | null; team: string | null; contractNumber: string | null; contractType: ContractType | null; contractStartDate: Date | null; contractEndDate: Date | null; salaryCategory: string | null; prime: Decimal | null; baseSalaryAmount: Decimal | null; baseSalaryUnit: SalaryUnit | null; netMonthlyAmount: Decimal | null; netMonthlyUnit: SalaryUnit | null; maritalStatus: string | null; childrenCount: number | null; cnpsNumber: string | null; cnpsDeclarationCode: string | null; provenance: string | null; bankAccountNumber: string | null; bankName: string | null; } | null; }; }",
       "fields": [
         {
           "name": "member",
-          "type": "{ id: number; username: string; name: string; gender: string | null; nationality: string | null; phones: string[]; joinDate: string | null; birthDate: string | null; position: string | null; employmentStatus: EmploymentStatus; terminationDate: string | null; terminationReason: string | null; createdAt: string; updatedAt: string; tags: string[]; project: { id: number; name: string; isActive: boolean; code: string | null; } | null; roles: { id: number; name: string; }[]; chineseProfile: { createdAt: Date; updatedAt: Date; userId: number; frenchName: string | null; idNumber: string | null; passportNumber: string | null; educationAndMajor: string | null; certifications: string[]; domesticMobile: string | null; emergencyContactName: string | null; emergencyContactPhone: string | null; redBookValidYears: number | null; cumulativeAbroadYears: number | null; birthplace: string | null; residenceInChina: string | null; medicalHistory: string | null; healthStatus: string | null; } | null; expatProfile: { createdAt: Date; updatedAt: Date; userId: number; emergencyContactName: string | null; emergencyContactPhone: string | null; chineseSupervisorId: number | null; team: string | null; contractNumber: string | null; contractType: ContractType | null; contractStartDate: Date | null; contractEndDate: Date | null; salaryCategory: string | null; prime: Decimal | null; baseSalaryAmount: Decimal | null; baseSalaryUnit: SalaryUnit | null; netMonthlyAmount: Decimal | null; netMonthlyUnit: SalaryUnit | null; maritalStatus: string | null; childrenCount: number | null; cnpsNumber: string | null; cnpsDeclarationCode: string | null; provenance: string | null; } | null; }",
+          "type": "{ id: number; username: string; name: string; gender: string | null; nationality: string | null; phones: string[]; joinDate: string | null; birthDate: string | null; position: string | null; employmentStatus: EmploymentStatus; terminationDate: string | null; terminationReason: string | null; createdAt: string; updatedAt: string; tags: string[]; project: { id: number; name: string; isActive: boolean; code: string | null; } | null; roles: { id: number; name: string; }[]; chineseProfile: { createdAt: Date; updatedAt: Date; userId: number; frenchName: string | null; idNumber: string | null; passportNumber: string | null; educationAndMajor: string | null; certifications: string[]; domesticMobile: string | null; emergencyContactName: string | null; emergencyContactPhone: string | null; redBookValidYears: number | null; cumulativeAbroadYears: number | null; birthplace: string | null; residenceInChina: string | null; medicalHistory: string | null; healthStatus: string | null; } | null; expatProfile: { createdAt: Date; updatedAt: Date; userId: number; emergencyContactName: string | null; emergencyContactPhone: string | null; chineseSupervisorId: number | null; team: string | null; contractNumber: string | null; contractType: ContractType | null; contractStartDate: Date | null; contractEndDate: Date | null; salaryCategory: string | null; prime: Decimal | null; baseSalaryAmount: Decimal | null; baseSalaryUnit: SalaryUnit | null; netMonthlyAmount: Decimal | null; netMonthlyUnit: SalaryUnit | null; maritalStatus: string | null; childrenCount: number | null; cnpsNumber: string | null; cnpsDeclarationCode: string | null; provenance: string | null; bankAccountNumber: string | null; bankName: string | null; } | null; }",
           "enum": [
             "ACTIVE",
             "TERMINATED",
@@ -5626,7 +8026,7 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
             },
             {
               "name": "expatProfile",
-              "type": "{ createdAt: Date; updatedAt: Date; userId: number; emergencyContactName: string | null; emergencyContactPhone: string | null; chineseSupervisorId: number | null; team: string | null; contractNumber: string | null; contractType: ContractType | null; contractStartDate: Date | null; contractEndDate: Date | null; salaryCategory: string | null; prime: Decimal | null; baseSalaryAmount: Decimal | null; baseSalaryUnit: SalaryUnit | null; netMonthlyAmount: Decimal | null; netMonthlyUnit: SalaryUnit | null; maritalStatus: string | null; childrenCount: number | null; cnpsNumber: string | null; cnpsDeclarationCode: string | null; provenance: string | null; } | null",
+              "type": "{ createdAt: Date; updatedAt: Date; userId: number; emergencyContactName: string | null; emergencyContactPhone: string | null; chineseSupervisorId: number | null; team: string | null; contractNumber: string | null; contractType: ContractType | null; contractStartDate: Date | null; contractEndDate: Date | null; salaryCategory: string | null; prime: Decimal | null; baseSalaryAmount: Decimal | null; baseSalaryUnit: SalaryUnit | null; netMonthlyAmount: Decimal | null; netMonthlyUnit: SalaryUnit | null; maritalStatus: string | null; childrenCount: number | null; cnpsNumber: string | null; cnpsDeclarationCode: string | null; provenance: string | null; bankAccountNumber: string | null; bankName: string | null; } | null",
               "enum": [
                 "CTJ",
                 "CDD"
@@ -5648,11 +8048,7 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "method": "GET",
     "path": "/api/members/:id/compensation",
     "description": "GET /api/members/:id/compensation",
-    "permissions": [
-      "member:update",
-      "member:edit",
-      "member:manage"
-    ],
+    "permissions": [],
     "mode": "read",
     "pathParams": [
       {
@@ -5664,11 +8060,11 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "queryParams": [],
     "bodyFields": [],
     "responseSchema": {
-      "type": "{ contractChanges: { id: number; userId: number; team: string | null; chineseSupervisorId: number | null; chineseSupervisorName: string | null; position: string | null; contractNumber: string | null; contractType: ContractType | null; salaryCategory: string | null; salaryAmount: string | null; salaryUnit: SalaryUnit | null; prime: string | null; startDate: string | null; endDate: string | null; changeDate: string; reason: string | null; createdAt: string; updatedAt: string; }[]; payrollChanges: { id: number; userId: number; team: string | null; chineseSupervisorId: number | null; chineseSupervisorName: string | null; salaryCategory: string | null; salaryAmount: string | null; salaryUnit: SalaryUnit | null; prime: string | null; baseSalaryAmount: string | null; baseSalaryUnit: SalaryUnit | null; netMonthlyAmount: string | null; netMonthlyUnit: SalaryUnit | null; changeDate: string; createdAt: string; updatedAt: string; }[]; payrollPayouts: { id: number; userId: number; runId: number; team: string | null; chineseSupervisorId: number | null; chineseSupervisorName: string | null; payoutDate: string; amount: string; currency: string; note: string | null; createdAt: string; updatedAt: string; }[]; }",
+      "type": "{ contractChanges: { id: number; userId: number; team: string | null; teamDisplayZh: string | null; teamDisplayFr: string | null; chineseSupervisorId: number | null; chineseSupervisorName: string | null; position: string | null; contractNumber: string | null; contractType: ContractType | null; salaryCategory: string | null; salaryAmount: string | null; salaryUnit: SalaryUnit | null; prime: string | null; startDate: string | null; endDate: string | null; changeDate: string; reason: string | null; createdAt: string; updatedAt: string; }[]; payrollChanges: { id: number; userId: number; team: string | null; teamDisplayZh: string | null; teamDisplayFr: string | null; chineseSupervisorId: number | null; chineseSupervisorName: string | null; salaryCategory: string | null; salaryAmount: string | null; salaryUnit: SalaryUnit | null; prime: string | null; baseSalaryAmount: string | null; baseSalaryUnit: SalaryUnit | null; netMonthlyAmount: string | null; netMonthlyUnit: SalaryUnit | null; changeDate: string; createdAt: string; updatedAt: string; }[]; payrollPayouts: { id: number; userId: number; runId: number; team: string | null; teamDisplayZh: string | null; teamDisplayFr: string | null; chineseSupervisorId: number | null; chineseSupervisorName: string | null; payoutDate: string; amount: string; currency: string; note: string | null; createdAt: string; updatedAt: string; }[]; }",
       "fields": [
         {
           "name": "contractChanges",
-          "type": "{ id: number; userId: number; team: string | null; chineseSupervisorId: number | null; chineseSupervisorName: string | null; position: string | null; contractNumber: string | null; contractType: ContractType | null; salaryCategory: string | null; salaryAmount: string | null; salaryUnit: SalaryUnit | null; prime: string | null; startDate: string | null; endDate: string | null; changeDate: string; reason: string | null; createdAt: string; updatedAt: string; }[]",
+          "type": "{ id: number; userId: number; team: string | null; teamDisplayZh: string | null; teamDisplayFr: string | null; chineseSupervisorId: number | null; chineseSupervisorName: string | null; position: string | null; contractNumber: string | null; contractType: ContractType | null; salaryCategory: string | null; salaryAmount: string | null; salaryUnit: SalaryUnit | null; prime: string | null; startDate: string | null; endDate: string | null; changeDate: string; reason: string | null; createdAt: string; updatedAt: string; }[]",
           "enum": [
             "CTJ",
             "CDD"
@@ -5676,7 +8072,7 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
         },
         {
           "name": "payrollChanges",
-          "type": "{ id: number; userId: number; team: string | null; chineseSupervisorId: number | null; chineseSupervisorName: string | null; salaryCategory: string | null; salaryAmount: string | null; salaryUnit: SalaryUnit | null; prime: string | null; baseSalaryAmount: string | null; baseSalaryUnit: SalaryUnit | null; netMonthlyAmount: string | null; netMonthlyUnit: SalaryUnit | null; changeDate: string; createdAt: string; updatedAt: string; }[]",
+          "type": "{ id: number; userId: number; team: string | null; teamDisplayZh: string | null; teamDisplayFr: string | null; chineseSupervisorId: number | null; chineseSupervisorName: string | null; salaryCategory: string | null; salaryAmount: string | null; salaryUnit: SalaryUnit | null; prime: string | null; baseSalaryAmount: string | null; baseSalaryUnit: SalaryUnit | null; netMonthlyAmount: string | null; netMonthlyUnit: SalaryUnit | null; changeDate: string; createdAt: string; updatedAt: string; }[]",
           "enum": [
             "MONTH",
             "HOUR"
@@ -5684,7 +8080,7 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
         },
         {
           "name": "payrollPayouts",
-          "type": "{ id: number; userId: number; runId: number; team: string | null; chineseSupervisorId: number | null; chineseSupervisorName: string | null; payoutDate: string; amount: string; currency: string; note: string | null; createdAt: string; updatedAt: string; }[]"
+          "type": "{ id: number; userId: number; runId: number; team: string | null; teamDisplayZh: string | null; teamDisplayFr: string | null; chineseSupervisorId: number | null; chineseSupervisorName: string | null; payoutDate: string; amount: string; currency: string; note: string | null; createdAt: string; updatedAt: string; }[]"
         }
       ],
       "enum": [
@@ -5699,11 +8095,7 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "method": "POST",
     "path": "/api/members/:id/contract-changes",
     "description": "POST /api/members/:id/contract-changes",
-    "permissions": [
-      "member:update",
-      "member:edit",
-      "member:manage"
-    ],
+    "permissions": [],
     "mode": "write",
     "pathParams": [
       {
@@ -5776,7 +8168,7 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
       }
     ],
     "responseSchema": {
-      "type": "{ contractChange: { id: number; userId: number; team: string | null; chineseSupervisorId: number | null; chineseSupervisorName: string | null; position: string | null; contractNumber: string | null; contractType: ContractType | null; salaryCategory: string | null; salaryAmount: string | null; salaryUnit: SalaryUnit | null; prime: string | null; startDate: string | null; endDate: string | null; changeDate: string; reason: string | null; createdAt: string; updatedAt: string; }; expatProfile: { team: string | null; chineseSupervisorId: number | null; contractNumber: string | null; contractType: string | null; contractStartDate: string | null; contractEndDate: string | null; salaryCategory: string | null; prime: string | null; baseSalaryAmount: string | null; baseSalaryUnit: string | null; netMonthlyAmount: string | null; netMonthlyUnit: string | null; maritalStatus: string | null; childrenCount: number | null; cnpsNumber: string | null; cnpsDeclarationCode: string | null; provenance: string | null; emergencyContactName: string | null; emergencyContactPhone: string | null; } | null; joinDate: string | null; position: string | null; }",
+      "type": "{ contractChange: { id: number; userId: number; team: string | null; chineseSupervisorId: number | null; chineseSupervisorName: string | null; position: string | null; contractNumber: string | null; contractType: ContractType | null; salaryCategory: string | null; salaryAmount: string | null; salaryUnit: SalaryUnit | null; prime: string | null; startDate: string | null; endDate: string | null; changeDate: string; reason: string | null; createdAt: string; updatedAt: string; }; expatProfile: { team: string | null; chineseSupervisorId: number | null; contractNumber: string | null; contractType: string | null; contractStartDate: string | null; contractEndDate: string | null; salaryCategory: string | null; prime: string | null; baseSalaryAmount: string | null; baseSalaryUnit: string | null; netMonthlyAmount: string | null; netMonthlyUnit: string | null; maritalStatus: string | null; childrenCount: number | null; cnpsNumber: string | null; cnpsDeclarationCode: string | null; provenance: string | null; bankAccountNumber: string | null; bankName: string | null; emergencyContactName: string | null; emergencyContactPhone: string | null; } | null; joinDate: string | null; position: string | null; }",
       "fields": [
         {
           "name": "contractChange",
@@ -5870,7 +8262,7 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
         },
         {
           "name": "expatProfile",
-          "type": "{ team: string | null; chineseSupervisorId: number | null; contractNumber: string | null; contractType: string | null; contractStartDate: string | null; contractEndDate: string | null; salaryCategory: string | null; prime: string | null; baseSalaryAmount: string | null; baseSalaryUnit: string | null; netMonthlyAmount: string | null; netMonthlyUnit: string | null; maritalStatus: string | null; childrenCount: number | null; cnpsNumber: string | null; cnpsDeclarationCode: string | null; provenance: string | null; emergencyContactName: string | null; emergencyContactPhone: string | null; } | null"
+          "type": "{ team: string | null; chineseSupervisorId: number | null; contractNumber: string | null; contractType: string | null; contractStartDate: string | null; contractEndDate: string | null; salaryCategory: string | null; prime: string | null; baseSalaryAmount: string | null; baseSalaryUnit: string | null; netMonthlyAmount: string | null; netMonthlyUnit: string | null; maritalStatus: string | null; childrenCount: number | null; cnpsNumber: string | null; cnpsDeclarationCode: string | null; provenance: string | null; bankAccountNumber: string | null; bankName: string | null; emergencyContactName: string | null; emergencyContactPhone: string | null; } | null"
         },
         {
           "name": "joinDate",
@@ -5893,11 +8285,7 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "method": "DELETE",
     "path": "/api/members/:id/contract-changes/:changeId",
     "description": "DELETE /api/members/:id/contract-changes/:changeId",
-    "permissions": [
-      "member:update",
-      "member:edit",
-      "member:manage"
-    ],
+    "permissions": [],
     "mode": "write",
     "pathParams": [
       {
@@ -5975,7 +8363,7 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
       }
     ],
     "responseSchema": {
-      "type": "{ contractChange: { id: number; userId: number; team: string | null; chineseSupervisorId: number | null; chineseSupervisorName: string | null; position: string | null; contractNumber: string | null; contractType: ContractType | null; salaryCategory: string | null; salaryAmount: string | null; salaryUnit: SalaryUnit | null; prime: string | null; startDate: string | null; endDate: string | null; changeDate: string; reason: string | null; createdAt: string; updatedAt: string; }; expatProfile: { team: string | null; chineseSupervisorId: number | null; contractNumber: string | null; contractType: string | null; contractStartDate: string | null; contractEndDate: string | null; salaryCategory: string | null; prime: string | null; baseSalaryAmount: string | null; baseSalaryUnit: string | null; netMonthlyAmount: string | null; netMonthlyUnit: string | null; maritalStatus: string | null; childrenCount: number | null; cnpsNumber: string | null; cnpsDeclarationCode: string | null; provenance: string | null; emergencyContactName: string | null; emergencyContactPhone: string | null; } | null; joinDate: string | null; position: string | null; }",
+      "type": "{ contractChange: { id: number; userId: number; team: string | null; chineseSupervisorId: number | null; chineseSupervisorName: string | null; position: string | null; contractNumber: string | null; contractType: ContractType | null; salaryCategory: string | null; salaryAmount: string | null; salaryUnit: SalaryUnit | null; prime: string | null; startDate: string | null; endDate: string | null; changeDate: string; reason: string | null; createdAt: string; updatedAt: string; }; expatProfile: { team: string | null; chineseSupervisorId: number | null; contractNumber: string | null; contractType: string | null; contractStartDate: string | null; contractEndDate: string | null; salaryCategory: string | null; prime: string | null; baseSalaryAmount: string | null; baseSalaryUnit: string | null; netMonthlyAmount: string | null; netMonthlyUnit: string | null; maritalStatus: string | null; childrenCount: number | null; cnpsNumber: string | null; cnpsDeclarationCode: string | null; provenance: string | null; bankAccountNumber: string | null; bankName: string | null; emergencyContactName: string | null; emergencyContactPhone: string | null; } | null; joinDate: string | null; position: string | null; }",
       "fields": [
         {
           "name": "contractChange",
@@ -6069,7 +8457,7 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
         },
         {
           "name": "expatProfile",
-          "type": "{ team: string | null; chineseSupervisorId: number | null; contractNumber: string | null; contractType: string | null; contractStartDate: string | null; contractEndDate: string | null; salaryCategory: string | null; prime: string | null; baseSalaryAmount: string | null; baseSalaryUnit: string | null; netMonthlyAmount: string | null; netMonthlyUnit: string | null; maritalStatus: string | null; childrenCount: number | null; cnpsNumber: string | null; cnpsDeclarationCode: string | null; provenance: string | null; emergencyContactName: string | null; emergencyContactPhone: string | null; } | null"
+          "type": "{ team: string | null; chineseSupervisorId: number | null; contractNumber: string | null; contractType: string | null; contractStartDate: string | null; contractEndDate: string | null; salaryCategory: string | null; prime: string | null; baseSalaryAmount: string | null; baseSalaryUnit: string | null; netMonthlyAmount: string | null; netMonthlyUnit: string | null; maritalStatus: string | null; childrenCount: number | null; cnpsNumber: string | null; cnpsDeclarationCode: string | null; provenance: string | null; bankAccountNumber: string | null; bankName: string | null; emergencyContactName: string | null; emergencyContactPhone: string | null; } | null"
         },
         {
           "name": "joinDate",
@@ -6092,11 +8480,7 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "method": "PUT",
     "path": "/api/members/:id/contract-changes/:changeId",
     "description": "PUT /api/members/:id/contract-changes/:changeId",
-    "permissions": [
-      "member:update",
-      "member:edit",
-      "member:manage"
-    ],
+    "permissions": [],
     "mode": "write",
     "pathParams": [
       {
@@ -6174,7 +8558,7 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
       }
     ],
     "responseSchema": {
-      "type": "{ contractChange: { id: number; userId: number; team: string | null; chineseSupervisorId: number | null; chineseSupervisorName: string | null; position: string | null; contractNumber: string | null; contractType: ContractType | null; salaryCategory: string | null; salaryAmount: string | null; salaryUnit: SalaryUnit | null; prime: string | null; startDate: string | null; endDate: string | null; changeDate: string; reason: string | null; createdAt: string; updatedAt: string; }; expatProfile: { team: string | null; chineseSupervisorId: number | null; contractNumber: string | null; contractType: string | null; contractStartDate: string | null; contractEndDate: string | null; salaryCategory: string | null; prime: string | null; baseSalaryAmount: string | null; baseSalaryUnit: string | null; netMonthlyAmount: string | null; netMonthlyUnit: string | null; maritalStatus: string | null; childrenCount: number | null; cnpsNumber: string | null; cnpsDeclarationCode: string | null; provenance: string | null; emergencyContactName: string | null; emergencyContactPhone: string | null; } | null; joinDate: string | null; position: string | null; }",
+      "type": "{ contractChange: { id: number; userId: number; team: string | null; chineseSupervisorId: number | null; chineseSupervisorName: string | null; position: string | null; contractNumber: string | null; contractType: ContractType | null; salaryCategory: string | null; salaryAmount: string | null; salaryUnit: SalaryUnit | null; prime: string | null; startDate: string | null; endDate: string | null; changeDate: string; reason: string | null; createdAt: string; updatedAt: string; }; expatProfile: { team: string | null; chineseSupervisorId: number | null; contractNumber: string | null; contractType: string | null; contractStartDate: string | null; contractEndDate: string | null; salaryCategory: string | null; prime: string | null; baseSalaryAmount: string | null; baseSalaryUnit: string | null; netMonthlyAmount: string | null; netMonthlyUnit: string | null; maritalStatus: string | null; childrenCount: number | null; cnpsNumber: string | null; cnpsDeclarationCode: string | null; provenance: string | null; bankAccountNumber: string | null; bankName: string | null; emergencyContactName: string | null; emergencyContactPhone: string | null; } | null; joinDate: string | null; position: string | null; }",
       "fields": [
         {
           "name": "contractChange",
@@ -6268,7 +8652,7 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
         },
         {
           "name": "expatProfile",
-          "type": "{ team: string | null; chineseSupervisorId: number | null; contractNumber: string | null; contractType: string | null; contractStartDate: string | null; contractEndDate: string | null; salaryCategory: string | null; prime: string | null; baseSalaryAmount: string | null; baseSalaryUnit: string | null; netMonthlyAmount: string | null; netMonthlyUnit: string | null; maritalStatus: string | null; childrenCount: number | null; cnpsNumber: string | null; cnpsDeclarationCode: string | null; provenance: string | null; emergencyContactName: string | null; emergencyContactPhone: string | null; } | null"
+          "type": "{ team: string | null; chineseSupervisorId: number | null; contractNumber: string | null; contractType: string | null; contractStartDate: string | null; contractEndDate: string | null; salaryCategory: string | null; prime: string | null; baseSalaryAmount: string | null; baseSalaryUnit: string | null; netMonthlyAmount: string | null; netMonthlyUnit: string | null; maritalStatus: string | null; childrenCount: number | null; cnpsNumber: string | null; cnpsDeclarationCode: string | null; provenance: string | null; bankAccountNumber: string | null; bankName: string | null; emergencyContactName: string | null; emergencyContactPhone: string | null; } | null"
         },
         {
           "name": "joinDate",
@@ -6291,11 +8675,7 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "method": "POST",
     "path": "/api/members/:id/payroll-changes",
     "description": "POST /api/members/:id/payroll-changes",
-    "permissions": [
-      "member:update",
-      "member:edit",
-      "member:manage"
-    ],
+    "permissions": [],
     "mode": "write",
     "pathParams": [
       {
@@ -6449,11 +8829,7 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "method": "DELETE",
     "path": "/api/members/:id/payroll-changes/:changeId",
     "description": "DELETE /api/members/:id/payroll-changes/:changeId",
-    "permissions": [
-      "member:update",
-      "member:edit",
-      "member:manage"
-    ],
+    "permissions": [],
     "mode": "write",
     "pathParams": [
       {
@@ -6612,11 +8988,7 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "method": "PUT",
     "path": "/api/members/:id/payroll-changes/:changeId",
     "description": "PUT /api/members/:id/payroll-changes/:changeId",
-    "permissions": [
-      "member:update",
-      "member:edit",
-      "member:manage"
-    ],
+    "permissions": [],
     "mode": "write",
     "pathParams": [
       {
@@ -6775,11 +9147,7 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "method": "POST",
     "path": "/api/members/:id/payroll-payouts",
     "description": "POST /api/members/:id/payroll-payouts",
-    "permissions": [
-      "member:update",
-      "member:edit",
-      "member:manage"
-    ],
+    "permissions": [],
     "mode": "write",
     "pathParams": [
       {
@@ -6882,11 +9250,7 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "method": "DELETE",
     "path": "/api/members/:id/payroll-payouts/:payoutId",
     "description": "DELETE /api/members/:id/payroll-payouts/:payoutId",
-    "permissions": [
-      "member:update",
-      "member:edit",
-      "member:manage"
-    ],
+    "permissions": [],
     "mode": "write",
     "pathParams": [
       {
@@ -6994,11 +9358,7 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "method": "PUT",
     "path": "/api/members/:id/payroll-payouts/:payoutId",
     "description": "PUT /api/members/:id/payroll-payouts/:payoutId",
-    "permissions": [
-      "member:update",
-      "member:edit",
-      "member:manage"
-    ],
+    "permissions": [],
     "mode": "write",
     "pathParams": [
       {
@@ -7107,8 +9467,7 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "path": "/api/members/:id/signatures",
     "description": "GET /api/members/:id/signatures",
     "permissions": [
-      "signature:view",
-      "signature:upload"
+      "signature:view"
     ],
     "mode": "read",
     "pathParams": [
@@ -7137,7 +9496,6 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "path": "/api/members/:id/signatures",
     "description": "POST /api/members/:id/signatures",
     "permissions": [
-      "signature:view",
       "signature:upload"
     ],
     "mode": "write",
@@ -7167,7 +9525,6 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "path": "/api/members/:id/signatures/:signatureId",
     "description": "DELETE /api/members/:id/signatures/:signatureId",
     "permissions": [
-      "signature:upload",
       "signature:delete"
     ],
     "mode": "write",
@@ -7228,8 +9585,7 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "path": "/api/members/:id/signatures/:signatureId",
     "description": "PATCH /api/members/:id/signatures/:signatureId",
     "permissions": [
-      "signature:upload",
-      "signature:delete"
+      "signature:upload"
     ],
     "mode": "write",
     "pathParams": [
@@ -7465,11 +9821,7 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "method": "POST",
     "path": "/api/members/contract-changes/import",
     "description": "POST /api/members/contract-changes/import",
-    "permissions": [
-      "member:update",
-      "member:edit",
-      "member:manage"
-    ],
+    "permissions": [],
     "mode": "write",
     "pathParams": [],
     "queryParams": [],
@@ -7552,7 +9904,7 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     ],
     "bodyFields": [],
     "responseSchema": {
-      "type": "{ months: string[]; runs: { id: number; year: number; month: number; sequence: number; payoutDate: string; attendanceCutoffDate: string; note: string | null; createdAt: string; updatedAt: string; }[]; payouts: { id: number; runId: number; userId: number; team: string | null; chineseSupervisorId: number | null; chineseSupervisorName: string | null; payoutDate: string; amount: string; currency: string; note: string | null; createdAt: string; updatedAt: string; }[]; contractSnapshots: { runId: number; cutoffDate: string; contracts: Record<number, ContractSnapshot>; }[]; year?: number | undefined; month?: number | undefined; }",
+      "type": "{ months: string[]; runs: { id: number; year: number; month: number; sequence: number; payoutDate: string; attendanceCutoffDate: string; note: string | null; createdAt: string; updatedAt: string; }[]; payouts: { id: number; runId: number; userId: number; team: string | null; teamDisplayZh: string | null; teamDisplayFr: string | null; chineseSupervisorId: number | null; chineseSupervisorName: string | null; payoutDate: string; amount: string; currency: string; contractNumberSnapshot: string | null; note: string | null; createdAt: string; updatedAt: string; }[]; contractSnapshots: { runId: number; cutoffDate: string; contracts: Record<number, ContractSnapshot>; }[]; year?: number | undefined; month?: number | undefined; }",
       "fields": [
         {
           "name": "months",
@@ -7564,7 +9916,7 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
         },
         {
           "name": "payouts",
-          "type": "{ id: number; runId: number; userId: number; team: string | null; chineseSupervisorId: number | null; chineseSupervisorName: string | null; payoutDate: string; amount: string; currency: string; note: string | null; createdAt: string; updatedAt: string; }[]"
+          "type": "{ id: number; runId: number; userId: number; team: string | null; teamDisplayZh: string | null; teamDisplayFr: string | null; chineseSupervisorId: number | null; chineseSupervisorName: string | null; payoutDate: string; amount: string; currency: string; contractNumberSnapshot: string | null; note: string | null; createdAt: string; updatedAt: string; }[]"
         },
         {
           "name": "contractSnapshots",
@@ -7876,8 +10228,7 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "path": "/api/progress/:slug/phases",
     "description": "GET /api/progress/:slug/phases",
     "permissions": [
-      "progress:view",
-      "progress:edit"
+      "progress:view"
     ],
     "mode": "read",
     "pathParams": [
@@ -7961,7 +10312,6 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "path": "/api/progress/:slug/phases",
     "description": "POST /api/progress/:slug/phases",
     "permissions": [
-      "progress:view",
       "progress:edit"
     ],
     "mode": "write",
@@ -8287,6 +10637,43 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "source": "app/api/progress/[slug]/phases/[id]/route.ts"
   },
   {
+    "key": "get:/api/progress/quantities",
+    "method": "GET",
+    "path": "/api/progress/quantities",
+    "description": "GET /api/progress/quantities",
+    "permissions": [],
+    "mode": "read",
+    "pathParams": [],
+    "queryParams": [
+      {
+        "name": "page",
+        "type": "number",
+        "optional": true
+      },
+      {
+        "name": "pageSize",
+        "type": "number",
+        "optional": true
+      },
+      {
+        "name": "sort",
+        "type": "string[]",
+        "optional": true
+      }
+    ],
+    "bodyFields": [],
+    "responseSchema": {
+      "type": "{ message: string; }",
+      "fields": [
+        {
+          "name": "message",
+          "type": "string"
+        }
+      ]
+    },
+    "source": "app/api/progress/quantities/route.ts"
+  },
+  {
     "key": "post:/api/progress/quantities/boq-binding",
     "method": "POST",
     "path": "/api/progress/quantities/boq-binding",
@@ -8517,6 +10904,29 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "source": "app/api/progress/quantities/input/route.ts"
   },
   {
+    "key": "post:/api/progress/quantities/input/batch",
+    "method": "POST",
+    "path": "/api/progress/quantities/input/batch",
+    "description": "POST /api/progress/quantities/input/batch",
+    "permissions": [
+      "progress:edit"
+    ],
+    "mode": "write",
+    "pathParams": [],
+    "queryParams": [],
+    "bodyFields": [],
+    "responseSchema": {
+      "type": "{ message: string; }",
+      "fields": [
+        {
+          "name": "message",
+          "type": "string"
+        }
+      ]
+    },
+    "source": "app/api/progress/quantities/input/batch/route.ts"
+  },
+  {
     "key": "get:/api/progress/summary",
     "method": "GET",
     "path": "/api/progress/summary",
@@ -8613,13 +11023,7 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "method": "GET",
     "path": "/api/projects",
     "description": "GET /api/projects",
-    "permissions": [
-      "member:view",
-      "member:update",
-      "member:edit",
-      "member:create",
-      "member:manage"
-    ],
+    "permissions": [],
     "mode": "read",
     "pathParams": [],
     "queryParams": [],
@@ -8762,7 +11166,6 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "path": "/api/reports/:date",
     "description": "PUT /api/reports/:date",
     "permissions": [
-      "report:view",
       "report:edit"
     ],
     "mode": "write",
@@ -8887,6 +11290,1906 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
       ]
     },
     "source": "app/api/reports/template-preview/route.ts"
+  },
+  {
+    "key": "get:/api/reports/weekly-rollups",
+    "method": "GET",
+    "path": "/api/reports/weekly-rollups",
+    "description": "GET /api/reports/weekly-rollups",
+    "permissions": [
+      "report:view",
+      "report:edit"
+    ],
+    "mode": "read",
+    "pathParams": [],
+    "queryParams": [],
+    "bodyFields": [],
+    "responseSchema": {
+      "type": "{ items: WeeklyRollupRecord[]; }",
+      "fields": [
+        {
+          "name": "items",
+          "type": "WeeklyRollupRecord[]"
+        }
+      ]
+    },
+    "source": "app/api/reports/weekly-rollups/route.ts"
+  },
+  {
+    "key": "get:/api/reports/weekly-rollups/:period",
+    "method": "GET",
+    "path": "/api/reports/weekly-rollups/:period",
+    "description": "GET /api/reports/weekly-rollups/:period",
+    "permissions": [
+      "report:view",
+      "report:edit"
+    ],
+    "mode": "read",
+    "pathParams": [
+      {
+        "name": "period",
+        "type": "string",
+        "optional": false
+      }
+    ],
+    "queryParams": [],
+    "bodyFields": [],
+    "responseSchema": {
+      "type": "{ item: { html: string; periodKey: string; title: string; reportPeriod: string; weekLabel: string | null; description: string | null; projectNames: string[]; fileId: number; originalName: string; size: number; updatedAt: string; createdAt: string; }; }",
+      "fields": [
+        {
+          "name": "item",
+          "type": "{ html: string; periodKey: string; title: string; reportPeriod: string; weekLabel: string | null; description: string | null; projectNames: string[]; fileId: number; originalName: string; size: number; updatedAt: string; createdAt: string; }",
+          "fields": [
+            {
+              "name": "html",
+              "type": "string"
+            },
+            {
+              "name": "periodKey",
+              "type": "string"
+            },
+            {
+              "name": "title",
+              "type": "string"
+            },
+            {
+              "name": "reportPeriod",
+              "type": "string"
+            },
+            {
+              "name": "weekLabel",
+              "type": "string | null"
+            },
+            {
+              "name": "description",
+              "type": "string | null"
+            },
+            {
+              "name": "projectNames",
+              "type": "string[]"
+            },
+            {
+              "name": "fileId",
+              "type": "number"
+            },
+            {
+              "name": "originalName",
+              "type": "string"
+            },
+            {
+              "name": "size",
+              "type": "number"
+            },
+            {
+              "name": "updatedAt",
+              "type": "string"
+            },
+            {
+              "name": "createdAt",
+              "type": "string"
+            }
+          ]
+        }
+      ]
+    },
+    "source": "app/api/reports/weekly-rollups/[period]/route.ts"
+  },
+  {
+    "key": "get:/api/resources/fuel-sources/daily",
+    "method": "GET",
+    "path": "/api/resources/fuel-sources/daily",
+    "description": "GET /api/resources/fuel-sources/daily",
+    "permissions": [
+      "fuel-source:view",
+      "machine-log:view"
+    ],
+    "mode": "read",
+    "pathParams": [],
+    "queryParams": [
+      {
+        "name": "date",
+        "type": "date",
+        "optional": true
+      }
+    ],
+    "bodyFields": [],
+    "responseSchema": {
+      "type": "{ id: number; }",
+      "fields": [
+        {
+          "name": "id",
+          "type": "number"
+        }
+      ]
+    },
+    "source": "app/api/resources/fuel-sources/daily/route.ts"
+  },
+  {
+    "key": "post:/api/resources/fuel-sources/daily",
+    "method": "POST",
+    "path": "/api/resources/fuel-sources/daily",
+    "description": "POST /api/resources/fuel-sources/daily",
+    "permissions": [
+      "fuel-source:create",
+      "fuel-source:update"
+    ],
+    "mode": "write",
+    "pathParams": [],
+    "queryParams": [
+      {
+        "name": "date",
+        "type": "date",
+        "optional": true
+      }
+    ],
+    "bodyFields": [],
+    "responseSchema": {
+      "type": "{ id: number; }",
+      "fields": [
+        {
+          "name": "id",
+          "type": "number"
+        }
+      ]
+    },
+    "source": "app/api/resources/fuel-sources/daily/route.ts"
+  },
+  {
+    "key": "post:/api/resources/fuel-sources/trucks",
+    "method": "POST",
+    "path": "/api/resources/fuel-sources/trucks",
+    "description": "POST /api/resources/fuel-sources/trucks",
+    "permissions": [
+      "fuel-source:create",
+      "fuel-source:update"
+    ],
+    "mode": "write",
+    "pathParams": [],
+    "queryParams": [],
+    "bodyFields": [],
+    "responseSchema": {
+      "type": "{ fuelSource: { id: number; type: FuelSourceType; code: string; name: string; machineId: number | null; isActive: boolean; machine: { id: number; assetNumber: string; assetName: string | null; alias: string | null; plateNumber: string | null; } | null; createdAt: string; updatedAt: string; }; }",
+      "fields": [
+        {
+          "name": "fuelSource",
+          "type": "{ id: number; type: FuelSourceType; code: string; name: string; machineId: number | null; isActive: boolean; machine: { id: number; assetNumber: string; assetName: string | null; alias: string | null; plateNumber: string | null; } | null; createdAt: string; updatedAt: string; }",
+          "enum": [
+            "TANK",
+            "TRUCK"
+          ],
+          "fields": [
+            {
+              "name": "id",
+              "type": "number"
+            },
+            {
+              "name": "type",
+              "type": "FuelSourceType",
+              "enum": [
+                "TANK",
+                "TRUCK"
+              ]
+            },
+            {
+              "name": "code",
+              "type": "string"
+            },
+            {
+              "name": "name",
+              "type": "string"
+            },
+            {
+              "name": "machineId",
+              "type": "number | null"
+            },
+            {
+              "name": "isActive",
+              "type": "boolean"
+            },
+            {
+              "name": "machine",
+              "type": "{ id: number; assetNumber: string; assetName: string | null; alias: string | null; plateNumber: string | null; } | null"
+            },
+            {
+              "name": "createdAt",
+              "type": "string"
+            },
+            {
+              "name": "updatedAt",
+              "type": "string"
+            }
+          ]
+        }
+      ],
+      "enum": [
+        "TANK",
+        "TRUCK"
+      ]
+    },
+    "source": "app/api/resources/fuel-sources/trucks/route.ts"
+  },
+  {
+    "key": "get:/api/resources/machines",
+    "method": "GET",
+    "path": "/api/resources/machines",
+    "description": "GET /api/resources/machines",
+    "permissions": [
+      "machine:view"
+    ],
+    "mode": "read",
+    "pathParams": [],
+    "queryParams": [],
+    "bodyFields": [],
+    "responseSchema": {
+      "type": "{ machines: MachineAsset[]; }",
+      "fields": [
+        {
+          "name": "machines",
+          "type": "MachineAsset[]"
+        }
+      ]
+    },
+    "source": "app/api/resources/machines/route.ts"
+  },
+  {
+    "key": "post:/api/resources/machines",
+    "method": "POST",
+    "path": "/api/resources/machines",
+    "description": "POST /api/resources/machines",
+    "permissions": [
+      "machine:manage"
+    ],
+    "mode": "write",
+    "pathParams": [],
+    "queryParams": [],
+    "bodyFields": [],
+    "responseSchema": {
+      "type": "{ machines: MachineAsset[]; }",
+      "fields": [
+        {
+          "name": "machines",
+          "type": "MachineAsset[]"
+        }
+      ]
+    },
+    "source": "app/api/resources/machines/route.ts"
+  },
+  {
+    "key": "patch:/api/resources/machines/:id",
+    "method": "PATCH",
+    "path": "/api/resources/machines/:id",
+    "description": "PATCH /api/resources/machines/:id",
+    "permissions": [
+      "machine:update",
+      "machine:manage"
+    ],
+    "mode": "write",
+    "pathParams": [
+      {
+        "name": "id",
+        "type": "number",
+        "optional": false
+      }
+    ],
+    "queryParams": [],
+    "bodyFields": [],
+    "responseSchema": {
+      "type": "{ machine: MachineAsset; }",
+      "fields": [
+        {
+          "name": "machine",
+          "type": "MachineAsset",
+          "fields": [
+            {
+              "name": "id",
+              "type": "number"
+            },
+            {
+              "name": "assetCategoryName",
+              "type": "string | null"
+            },
+            {
+              "name": "assetNumber",
+              "type": "string"
+            },
+            {
+              "name": "manufacturer",
+              "type": "string | null"
+            },
+            {
+              "name": "assetName",
+              "type": "string | null"
+            },
+            {
+              "name": "assetStatusName",
+              "type": "string | null"
+            },
+            {
+              "name": "specModel",
+              "type": "string | null"
+            },
+            {
+              "name": "equipmentTypeKey",
+              "type": "string | null"
+            },
+            {
+              "name": "registrationDate",
+              "type": "string | null"
+            },
+            {
+              "name": "originalValue",
+              "type": "number | null"
+            },
+            {
+              "name": "usedMonths",
+              "type": "number | null"
+            },
+            {
+              "name": "currentValue",
+              "type": "number | null"
+            },
+            {
+              "name": "depreciatedMonths",
+              "type": "number | null"
+            },
+            {
+              "name": "remainingMonths",
+              "type": "number | null"
+            },
+            {
+              "name": "usageStatus",
+              "type": "string | null"
+            },
+            {
+              "name": "alias",
+              "type": "string | null"
+            },
+            {
+              "name": "plateNumber",
+              "type": "string | null"
+            },
+            {
+              "name": "photoLinks",
+              "type": "string[]"
+            },
+            {
+              "name": "uploadedPhotoCount",
+              "type": "number"
+            },
+            {
+              "name": "photoCount",
+              "type": "number"
+            },
+            {
+              "name": "meta",
+              "type": "unknown",
+              "optional": true
+            },
+            {
+              "name": "createdAt",
+              "type": "string"
+            },
+            {
+              "name": "updatedAt",
+              "type": "string"
+            }
+          ]
+        }
+      ]
+    },
+    "source": "app/api/resources/machines/[id]/route.ts"
+  },
+  {
+    "key": "get:/api/resources/machines/:id/photos",
+    "method": "GET",
+    "path": "/api/resources/machines/:id/photos",
+    "description": "GET /api/resources/machines/:id/photos",
+    "permissions": [
+      "machine:view"
+    ],
+    "mode": "read",
+    "pathParams": [
+      {
+        "name": "id",
+        "type": "number",
+        "optional": false
+      }
+    ],
+    "queryParams": [],
+    "bodyFields": [],
+    "responseSchema": {
+      "type": "{ photos: MachinePhotoDTO[]; }",
+      "fields": [
+        {
+          "name": "photos",
+          "type": "MachinePhotoDTO[]"
+        }
+      ]
+    },
+    "source": "app/api/resources/machines/[id]/photos/route.ts"
+  },
+  {
+    "key": "post:/api/resources/machines/:id/photos",
+    "method": "POST",
+    "path": "/api/resources/machines/:id/photos",
+    "description": "POST /api/resources/machines/:id/photos",
+    "permissions": [
+      "machine:update",
+      "machine:manage"
+    ],
+    "mode": "write",
+    "pathParams": [
+      {
+        "name": "id",
+        "type": "number",
+        "optional": false
+      }
+    ],
+    "queryParams": [],
+    "bodyFields": [],
+    "responseSchema": {
+      "type": "{ photos: MachinePhotoDTO[]; }",
+      "fields": [
+        {
+          "name": "photos",
+          "type": "MachinePhotoDTO[]"
+        }
+      ]
+    },
+    "source": "app/api/resources/machines/[id]/photos/route.ts"
+  },
+  {
+    "key": "delete:/api/resources/machines/:id/photos/:fileId",
+    "method": "DELETE",
+    "path": "/api/resources/machines/:id/photos/:fileId",
+    "description": "DELETE /api/resources/machines/:id/photos/:fileId",
+    "permissions": [
+      "machine:update",
+      "machine:manage"
+    ],
+    "mode": "write",
+    "pathParams": [
+      {
+        "name": "id",
+        "type": "number",
+        "optional": false
+      },
+      {
+        "name": "fileId",
+        "type": "number",
+        "optional": false
+      }
+    ],
+    "queryParams": [],
+    "bodyFields": [],
+    "responseSchema": {
+      "type": "{ ok: true; }",
+      "fields": [
+        {
+          "name": "ok",
+          "type": "true"
+        }
+      ]
+    },
+    "source": "app/api/resources/machines/[id]/photos/[fileId]/route.ts"
+  },
+  {
+    "key": "post:/api/resources/machines/:id/photos/upload-url",
+    "method": "POST",
+    "path": "/api/resources/machines/:id/photos/upload-url",
+    "description": "POST /api/resources/machines/:id/photos/upload-url",
+    "permissions": [
+      "machine:update",
+      "machine:manage"
+    ],
+    "mode": "write",
+    "pathParams": [
+      {
+        "name": "id",
+        "type": "number",
+        "optional": false
+      }
+    ],
+    "queryParams": [],
+    "bodyFields": [],
+    "responseSchema": {
+      "type": "{ uploadUrl: string; storageKey: string; requiredHeaders: { 'Content-Type': string; }; }",
+      "fields": [
+        {
+          "name": "uploadUrl",
+          "type": "string"
+        },
+        {
+          "name": "storageKey",
+          "type": "string"
+        },
+        {
+          "name": "requiredHeaders",
+          "type": "{ 'Content-Type': string; }",
+          "fields": [
+            {
+              "name": "Content-Type",
+              "type": "string"
+            }
+          ]
+        }
+      ]
+    },
+    "source": "app/api/resources/machines/[id]/photos/upload-url/route.ts"
+  },
+  {
+    "key": "post:/api/resources/machines/bulk",
+    "method": "POST",
+    "path": "/api/resources/machines/bulk",
+    "description": "POST /api/resources/machines/bulk",
+    "permissions": [
+      "machine:update",
+      "machine:manage"
+    ],
+    "mode": "write",
+    "pathParams": [],
+    "queryParams": [],
+    "bodyFields": [
+      {
+        "name": "items",
+        "type": "unknown",
+        "optional": true
+      }
+    ],
+    "responseSchema": {
+      "type": "{ results: { id: number; ok: boolean; error?: string | undefined; }[]; }",
+      "fields": [
+        {
+          "name": "results",
+          "type": "{ id: number; ok: boolean; error?: string | undefined; }[]"
+        }
+      ]
+    },
+    "source": "app/api/resources/machines/bulk/route.ts"
+  },
+  {
+    "key": "post:/api/resources/machines/import",
+    "method": "POST",
+    "path": "/api/resources/machines/import",
+    "description": "POST /api/resources/machines/import",
+    "permissions": [
+      "machine:create",
+      "machine:update",
+      "machine:manage"
+    ],
+    "mode": "write",
+    "pathParams": [],
+    "queryParams": [],
+    "bodyFields": [],
+    "responseSchema": {
+      "type": "UpsertResult",
+      "fields": [
+        {
+          "name": "created",
+          "type": "number"
+        },
+        {
+          "name": "updated",
+          "type": "number"
+        }
+      ]
+    },
+    "source": "app/api/resources/machines/import/route.ts"
+  },
+  {
+    "key": "get:/api/resources/machines/logs",
+    "method": "GET",
+    "path": "/api/resources/machines/logs",
+    "description": "GET /api/resources/machines/logs",
+    "permissions": [
+      "machine-log:view"
+    ],
+    "mode": "read",
+    "pathParams": [],
+    "queryParams": [
+      {
+        "name": "date",
+        "type": "date",
+        "optional": true
+      }
+    ],
+    "bodyFields": [],
+    "responseSchema": {
+      "type": "{ log: MachineDailyLog; }",
+      "fields": [
+        {
+          "name": "log",
+          "type": "MachineDailyLog",
+          "fields": [
+            {
+              "name": "id",
+              "type": "number"
+            },
+            {
+              "name": "machineId",
+              "type": "number"
+            },
+            {
+              "name": "logDate",
+              "type": "string"
+            },
+            {
+              "name": "usageStatus",
+              "type": "string | null"
+            },
+            {
+              "name": "team",
+              "type": "string | null"
+            },
+            {
+              "name": "teamKey",
+              "type": "string | null"
+            },
+            {
+              "name": "chineseSupervisorId",
+              "type": "number | null"
+            },
+            {
+              "name": "chineseSupervisorName",
+              "type": "string | null"
+            },
+            {
+              "name": "projectId",
+              "type": "number | null"
+            },
+            {
+              "name": "operatorId",
+              "type": "number | null"
+            },
+            {
+              "name": "operatorName",
+              "type": "string | null"
+            },
+            {
+              "name": "workContent",
+              "type": "string | null"
+            },
+            {
+              "name": "fuelRemainingEnd",
+              "type": "number | null"
+            },
+            {
+              "name": "dailyDepreciation",
+              "type": "number | null"
+            },
+            {
+              "name": "meta",
+              "type": "unknown",
+              "optional": true
+            },
+            {
+              "name": "fuelEvents",
+              "type": "MachineFuelEvent[]"
+            },
+            {
+              "name": "createdAt",
+              "type": "string"
+            },
+            {
+              "name": "updatedAt",
+              "type": "string"
+            }
+          ]
+        }
+      ]
+    },
+    "source": "app/api/resources/machines/logs/route.ts"
+  },
+  {
+    "key": "post:/api/resources/machines/logs",
+    "method": "POST",
+    "path": "/api/resources/machines/logs",
+    "description": "POST /api/resources/machines/logs",
+    "permissions": [
+      "machine-log:create",
+      "machine-log:update"
+    ],
+    "mode": "write",
+    "pathParams": [],
+    "queryParams": [
+      {
+        "name": "date",
+        "type": "date",
+        "optional": true
+      }
+    ],
+    "bodyFields": [],
+    "responseSchema": {
+      "type": "{ log: MachineDailyLog; }",
+      "fields": [
+        {
+          "name": "log",
+          "type": "MachineDailyLog",
+          "fields": [
+            {
+              "name": "id",
+              "type": "number"
+            },
+            {
+              "name": "machineId",
+              "type": "number"
+            },
+            {
+              "name": "logDate",
+              "type": "string"
+            },
+            {
+              "name": "usageStatus",
+              "type": "string | null"
+            },
+            {
+              "name": "team",
+              "type": "string | null"
+            },
+            {
+              "name": "teamKey",
+              "type": "string | null"
+            },
+            {
+              "name": "chineseSupervisorId",
+              "type": "number | null"
+            },
+            {
+              "name": "chineseSupervisorName",
+              "type": "string | null"
+            },
+            {
+              "name": "projectId",
+              "type": "number | null"
+            },
+            {
+              "name": "operatorId",
+              "type": "number | null"
+            },
+            {
+              "name": "operatorName",
+              "type": "string | null"
+            },
+            {
+              "name": "workContent",
+              "type": "string | null"
+            },
+            {
+              "name": "fuelRemainingEnd",
+              "type": "number | null"
+            },
+            {
+              "name": "dailyDepreciation",
+              "type": "number | null"
+            },
+            {
+              "name": "meta",
+              "type": "unknown",
+              "optional": true
+            },
+            {
+              "name": "fuelEvents",
+              "type": "MachineFuelEvent[]"
+            },
+            {
+              "name": "createdAt",
+              "type": "string"
+            },
+            {
+              "name": "updatedAt",
+              "type": "string"
+            }
+          ]
+        }
+      ]
+    },
+    "source": "app/api/resources/machines/logs/route.ts"
+  },
+  {
+    "key": "get:/api/resources/machines/logs/group",
+    "method": "GET",
+    "path": "/api/resources/machines/logs/group",
+    "description": "GET /api/resources/machines/logs/group",
+    "permissions": [
+      "machine-log:view"
+    ],
+    "mode": "read",
+    "pathParams": [],
+    "queryParams": [
+      {
+        "name": "date",
+        "type": "date",
+        "optional": true
+      },
+      {
+        "name": "groupBy",
+        "type": "string",
+        "optional": true
+      },
+      {
+        "name": "groupKey",
+        "type": "string",
+        "optional": true
+      },
+      {
+        "name": "projectId",
+        "type": "number",
+        "optional": true
+      },
+      {
+        "name": "mine",
+        "type": "boolean",
+        "optional": true
+      },
+      {
+        "name": "locale",
+        "type": "string",
+        "optional": true
+      }
+    ],
+    "bodyFields": [],
+    "responseSchema": {
+      "type": "MachineLogsGroupPageData",
+      "fields": [
+        {
+          "name": "date",
+          "type": "string"
+        },
+        {
+          "name": "locale",
+          "type": "\"fr\" | \"zh\"",
+          "fields": [
+            {
+              "name": "toString",
+              "type": "() => string"
+            },
+            {
+              "name": "charAt",
+              "type": "(pos: number) => string"
+            },
+            {
+              "name": "charCodeAt",
+              "type": "(index: number) => number"
+            },
+            {
+              "name": "concat",
+              "type": "(...strings: string[]) => string"
+            },
+            {
+              "name": "indexOf",
+              "type": "(searchString: string, position?: number | undefined) => number"
+            },
+            {
+              "name": "lastIndexOf",
+              "type": "(searchString: string, position?: number | undefined) => number"
+            },
+            {
+              "name": "localeCompare",
+              "type": "{ (that: string): number; (that: string, locales?: string | string[] | undefined, options?: CollatorOptions | undefined): number; (that: string, locales?: LocalesArgument, options?: CollatorOptions | undefined): number; }"
+            },
+            {
+              "name": "match",
+              "type": "{ (regexp: string | RegExp): RegExpMatchArray | null; (matcher: { [Symbol.match](string: string): RegExpMatchArray | null; }): RegExpMatchArray | null; }"
+            },
+            {
+              "name": "replace",
+              "type": "{ (searchValue: string | RegExp, replaceValue: string): string; (searchValue: string | RegExp, replacer: (substring: string, ...args: any[]) => string): string; (searchValue: { [Symbol.replace](string: string, replaceValue: string): string; }, replaceValue: string): string; (searchValue: { [Symbol.replace](string: string, replacer: (substring: string, ...args: any[]) => string): string; }, replacer: (substring: string, ...args: any[]) => string): string; }"
+            },
+            {
+              "name": "search",
+              "type": "{ (regexp: string | RegExp): number; (searcher: { [Symbol.search](string: string): number; }): number; }"
+            },
+            {
+              "name": "slice",
+              "type": "(start?: number | undefined, end?: number | undefined) => string"
+            },
+            {
+              "name": "split",
+              "type": "{ (separator: string | RegExp, limit?: number | undefined): string[]; (splitter: { [Symbol.split](string: string, limit?: number | undefined): string[]; }, limit?: number | undefined): string[]; }"
+            },
+            {
+              "name": "substring",
+              "type": "(start: number, end?: number | undefined) => string"
+            },
+            {
+              "name": "toLowerCase",
+              "type": "() => string"
+            },
+            {
+              "name": "toLocaleLowerCase",
+              "type": "{ (locales?: string | string[] | undefined): string; (locales?: LocalesArgument): string; }"
+            },
+            {
+              "name": "toUpperCase",
+              "type": "() => string"
+            },
+            {
+              "name": "toLocaleUpperCase",
+              "type": "{ (locales?: string | string[] | undefined): string; (locales?: LocalesArgument): string; }"
+            },
+            {
+              "name": "trim",
+              "type": "() => string"
+            },
+            {
+              "name": "length",
+              "type": "number"
+            },
+            {
+              "name": "substr",
+              "type": "(from: number, length?: number | undefined) => string"
+            },
+            {
+              "name": "valueOf",
+              "type": "() => string"
+            },
+            {
+              "name": "codePointAt",
+              "type": "(pos: number) => number | undefined"
+            },
+            {
+              "name": "includes",
+              "type": "(searchString: string, position?: number | undefined) => boolean"
+            },
+            {
+              "name": "endsWith",
+              "type": "(searchString: string, endPosition?: number | undefined) => boolean"
+            },
+            {
+              "name": "normalize",
+              "type": "{ (form: \"NFC\" | \"NFD\" | \"NFKC\" | \"NFKD\"): string; (form?: string | undefined): string; }"
+            },
+            {
+              "name": "repeat",
+              "type": "(count: number) => string"
+            },
+            {
+              "name": "startsWith",
+              "type": "(searchString: string, position?: number | undefined) => boolean"
+            },
+            {
+              "name": "anchor",
+              "type": "(name: string) => string"
+            },
+            {
+              "name": "big",
+              "type": "() => string"
+            },
+            {
+              "name": "blink",
+              "type": "() => string"
+            },
+            {
+              "name": "bold",
+              "type": "() => string"
+            },
+            {
+              "name": "fixed",
+              "type": "() => string"
+            },
+            {
+              "name": "fontcolor",
+              "type": "(color: string) => string"
+            },
+            {
+              "name": "fontsize",
+              "type": "{ (size: number): string; (size: string): string; }"
+            },
+            {
+              "name": "italics",
+              "type": "() => string"
+            },
+            {
+              "name": "link",
+              "type": "(url: string) => string"
+            },
+            {
+              "name": "small",
+              "type": "() => string"
+            },
+            {
+              "name": "strike",
+              "type": "() => string"
+            },
+            {
+              "name": "sub",
+              "type": "() => string"
+            },
+            {
+              "name": "sup",
+              "type": "() => string"
+            },
+            {
+              "name": "padStart",
+              "type": "(maxLength: number, fillString?: string | undefined) => string"
+            },
+            {
+              "name": "padEnd",
+              "type": "(maxLength: number, fillString?: string | undefined) => string"
+            },
+            {
+              "name": "trimEnd",
+              "type": "() => string"
+            },
+            {
+              "name": "trimStart",
+              "type": "() => string"
+            },
+            {
+              "name": "trimLeft",
+              "type": "() => string"
+            },
+            {
+              "name": "trimRight",
+              "type": "() => string"
+            },
+            {
+              "name": "matchAll",
+              "type": "(regexp: RegExp) => RegExpStringIterator<RegExpExecArray>"
+            },
+            {
+              "name": "replaceAll",
+              "type": "{ (searchValue: string | RegExp, replaceValue: string): string; (searchValue: string | RegExp, replacer: (substring: string, ...args: any[]) => string): string; }"
+            },
+            {
+              "name": "at",
+              "type": "(index: number) => string | undefined"
+            },
+            {
+              "name": "isWellFormed",
+              "type": "() => boolean"
+            },
+            {
+              "name": "toWellFormed",
+              "type": "() => string"
+            },
+            {
+              "name": "__@iterator@74",
+              "type": "() => StringIterator<string>"
+            }
+          ]
+        },
+        {
+          "name": "groupBy",
+          "type": "MachineLogGroupBy",
+          "fields": [
+            {
+              "name": "toString",
+              "type": "() => string"
+            },
+            {
+              "name": "charAt",
+              "type": "(pos: number) => string"
+            },
+            {
+              "name": "charCodeAt",
+              "type": "(index: number) => number"
+            },
+            {
+              "name": "concat",
+              "type": "(...strings: string[]) => string"
+            },
+            {
+              "name": "indexOf",
+              "type": "(searchString: string, position?: number | undefined) => number"
+            },
+            {
+              "name": "lastIndexOf",
+              "type": "(searchString: string, position?: number | undefined) => number"
+            },
+            {
+              "name": "localeCompare",
+              "type": "{ (that: string): number; (that: string, locales?: string | string[] | undefined, options?: CollatorOptions | undefined): number; (that: string, locales?: LocalesArgument, options?: CollatorOptions | undefined): number; }"
+            },
+            {
+              "name": "match",
+              "type": "{ (regexp: string | RegExp): RegExpMatchArray | null; (matcher: { [Symbol.match](string: string): RegExpMatchArray | null; }): RegExpMatchArray | null; }"
+            },
+            {
+              "name": "replace",
+              "type": "{ (searchValue: string | RegExp, replaceValue: string): string; (searchValue: string | RegExp, replacer: (substring: string, ...args: any[]) => string): string; (searchValue: { [Symbol.replace](string: string, replaceValue: string): string; }, replaceValue: string): string; (searchValue: { [Symbol.replace](string: string, replacer: (substring: string, ...args: any[]) => string): string; }, replacer: (substring: string, ...args: any[]) => string): string; }"
+            },
+            {
+              "name": "search",
+              "type": "{ (regexp: string | RegExp): number; (searcher: { [Symbol.search](string: string): number; }): number; }"
+            },
+            {
+              "name": "slice",
+              "type": "(start?: number | undefined, end?: number | undefined) => string"
+            },
+            {
+              "name": "split",
+              "type": "{ (separator: string | RegExp, limit?: number | undefined): string[]; (splitter: { [Symbol.split](string: string, limit?: number | undefined): string[]; }, limit?: number | undefined): string[]; }"
+            },
+            {
+              "name": "substring",
+              "type": "(start: number, end?: number | undefined) => string"
+            },
+            {
+              "name": "toLowerCase",
+              "type": "() => string"
+            },
+            {
+              "name": "toLocaleLowerCase",
+              "type": "{ (locales?: string | string[] | undefined): string; (locales?: LocalesArgument): string; }"
+            },
+            {
+              "name": "toUpperCase",
+              "type": "() => string"
+            },
+            {
+              "name": "toLocaleUpperCase",
+              "type": "{ (locales?: string | string[] | undefined): string; (locales?: LocalesArgument): string; }"
+            },
+            {
+              "name": "trim",
+              "type": "() => string"
+            },
+            {
+              "name": "length",
+              "type": "number"
+            },
+            {
+              "name": "substr",
+              "type": "(from: number, length?: number | undefined) => string"
+            },
+            {
+              "name": "valueOf",
+              "type": "() => string"
+            },
+            {
+              "name": "codePointAt",
+              "type": "(pos: number) => number | undefined"
+            },
+            {
+              "name": "includes",
+              "type": "(searchString: string, position?: number | undefined) => boolean"
+            },
+            {
+              "name": "endsWith",
+              "type": "(searchString: string, endPosition?: number | undefined) => boolean"
+            },
+            {
+              "name": "normalize",
+              "type": "{ (form: \"NFC\" | \"NFD\" | \"NFKC\" | \"NFKD\"): string; (form?: string | undefined): string; }"
+            },
+            {
+              "name": "repeat",
+              "type": "(count: number) => string"
+            },
+            {
+              "name": "startsWith",
+              "type": "(searchString: string, position?: number | undefined) => boolean"
+            },
+            {
+              "name": "anchor",
+              "type": "(name: string) => string"
+            },
+            {
+              "name": "big",
+              "type": "() => string"
+            },
+            {
+              "name": "blink",
+              "type": "() => string"
+            },
+            {
+              "name": "bold",
+              "type": "() => string"
+            },
+            {
+              "name": "fixed",
+              "type": "() => string"
+            },
+            {
+              "name": "fontcolor",
+              "type": "(color: string) => string"
+            },
+            {
+              "name": "fontsize",
+              "type": "{ (size: number): string; (size: string): string; }"
+            },
+            {
+              "name": "italics",
+              "type": "() => string"
+            },
+            {
+              "name": "link",
+              "type": "(url: string) => string"
+            },
+            {
+              "name": "small",
+              "type": "() => string"
+            },
+            {
+              "name": "strike",
+              "type": "() => string"
+            },
+            {
+              "name": "sub",
+              "type": "() => string"
+            },
+            {
+              "name": "sup",
+              "type": "() => string"
+            },
+            {
+              "name": "padStart",
+              "type": "(maxLength: number, fillString?: string | undefined) => string"
+            },
+            {
+              "name": "padEnd",
+              "type": "(maxLength: number, fillString?: string | undefined) => string"
+            },
+            {
+              "name": "trimEnd",
+              "type": "() => string"
+            },
+            {
+              "name": "trimStart",
+              "type": "() => string"
+            },
+            {
+              "name": "trimLeft",
+              "type": "() => string"
+            },
+            {
+              "name": "trimRight",
+              "type": "() => string"
+            },
+            {
+              "name": "matchAll",
+              "type": "(regexp: RegExp) => RegExpStringIterator<RegExpExecArray>"
+            },
+            {
+              "name": "replaceAll",
+              "type": "{ (searchValue: string | RegExp, replaceValue: string): string; (searchValue: string | RegExp, replacer: (substring: string, ...args: any[]) => string): string; }"
+            },
+            {
+              "name": "at",
+              "type": "(index: number) => string | undefined"
+            },
+            {
+              "name": "isWellFormed",
+              "type": "() => boolean"
+            },
+            {
+              "name": "toWellFormed",
+              "type": "() => string"
+            },
+            {
+              "name": "__@iterator@74",
+              "type": "() => StringIterator<string>"
+            }
+          ]
+        },
+        {
+          "name": "groupKey",
+          "type": "string"
+        },
+        {
+          "name": "groupLabel",
+          "type": "string"
+        },
+        {
+          "name": "mine",
+          "type": "boolean"
+        },
+        {
+          "name": "projectId",
+          "type": "number | null"
+        },
+        {
+          "name": "summary",
+          "type": "MachineLogGroupSummary",
+          "fields": [
+            {
+              "name": "groupBy",
+              "type": "MachineLogGroupBy"
+            },
+            {
+              "name": "groupKey",
+              "type": "string"
+            },
+            {
+              "name": "groupLabel",
+              "type": "string"
+            },
+            {
+              "name": "machineCount",
+              "type": "number"
+            },
+            {
+              "name": "filledCount",
+              "type": "number"
+            },
+            {
+              "name": "missingCount",
+              "type": "number"
+            },
+            {
+              "name": "fuelAddedTotal",
+              "type": "number"
+            },
+            {
+              "name": "fuelConsumedTotal",
+              "type": "number | null"
+            },
+            {
+              "name": "dailyDepreciationTotal",
+              "type": "number"
+            },
+            {
+              "name": "issues",
+              "type": "{ negativeFuelConsumedCount: number; missingFuelRemainingEndCount: number; }"
+            }
+          ]
+        },
+        {
+          "name": "machines",
+          "type": "MachineAsset[]"
+        },
+        {
+          "name": "logs",
+          "type": "MachineDailyLog[]"
+        },
+        {
+          "name": "prevFuelByMachineId",
+          "type": "Record<string, number | null>"
+        },
+        {
+          "name": "effectiveByMachineId",
+          "type": "Record<string, MachineLogEffectiveBinding>"
+        },
+        {
+          "name": "fuelSources",
+          "type": "FuelSource[]"
+        },
+        {
+          "name": "options",
+          "type": "{ teamSupervisors: TeamSupervisorOption[]; supervisors: UserOption[]; operators: UserOption[]; projects: ProjectOption[]; }",
+          "fields": [
+            {
+              "name": "teamSupervisors",
+              "type": "TeamSupervisorOption[]"
+            },
+            {
+              "name": "supervisors",
+              "type": "UserOption[]"
+            },
+            {
+              "name": "operators",
+              "type": "UserOption[]"
+            },
+            {
+              "name": "projects",
+              "type": "ProjectOption[]"
+            }
+          ]
+        }
+      ]
+    },
+    "source": "app/api/resources/machines/logs/group/route.ts"
+  },
+  {
+    "key": "get:/api/resources/machines/logs/summary",
+    "method": "GET",
+    "path": "/api/resources/machines/logs/summary",
+    "description": "GET /api/resources/machines/logs/summary",
+    "permissions": [
+      "machine-log:view"
+    ],
+    "mode": "read",
+    "pathParams": [],
+    "queryParams": [
+      {
+        "name": "date",
+        "type": "date",
+        "optional": true
+      },
+      {
+        "name": "groupBy",
+        "type": "string",
+        "optional": true
+      },
+      {
+        "name": "projectId",
+        "type": "number",
+        "optional": true
+      },
+      {
+        "name": "mine",
+        "type": "boolean",
+        "optional": true
+      },
+      {
+        "name": "locale",
+        "type": "string",
+        "optional": true
+      }
+    ],
+    "bodyFields": [],
+    "responseSchema": {
+      "type": "MachineLogsSummaryPageData",
+      "fields": [
+        {
+          "name": "date",
+          "type": "string"
+        },
+        {
+          "name": "locale",
+          "type": "\"fr\" | \"zh\"",
+          "fields": [
+            {
+              "name": "toString",
+              "type": "() => string"
+            },
+            {
+              "name": "charAt",
+              "type": "(pos: number) => string"
+            },
+            {
+              "name": "charCodeAt",
+              "type": "(index: number) => number"
+            },
+            {
+              "name": "concat",
+              "type": "(...strings: string[]) => string"
+            },
+            {
+              "name": "indexOf",
+              "type": "(searchString: string, position?: number | undefined) => number"
+            },
+            {
+              "name": "lastIndexOf",
+              "type": "(searchString: string, position?: number | undefined) => number"
+            },
+            {
+              "name": "localeCompare",
+              "type": "{ (that: string): number; (that: string, locales?: string | string[] | undefined, options?: CollatorOptions | undefined): number; (that: string, locales?: LocalesArgument, options?: CollatorOptions | undefined): number; }"
+            },
+            {
+              "name": "match",
+              "type": "{ (regexp: string | RegExp): RegExpMatchArray | null; (matcher: { [Symbol.match](string: string): RegExpMatchArray | null; }): RegExpMatchArray | null; }"
+            },
+            {
+              "name": "replace",
+              "type": "{ (searchValue: string | RegExp, replaceValue: string): string; (searchValue: string | RegExp, replacer: (substring: string, ...args: any[]) => string): string; (searchValue: { [Symbol.replace](string: string, replaceValue: string): string; }, replaceValue: string): string; (searchValue: { [Symbol.replace](string: string, replacer: (substring: string, ...args: any[]) => string): string; }, replacer: (substring: string, ...args: any[]) => string): string; }"
+            },
+            {
+              "name": "search",
+              "type": "{ (regexp: string | RegExp): number; (searcher: { [Symbol.search](string: string): number; }): number; }"
+            },
+            {
+              "name": "slice",
+              "type": "(start?: number | undefined, end?: number | undefined) => string"
+            },
+            {
+              "name": "split",
+              "type": "{ (separator: string | RegExp, limit?: number | undefined): string[]; (splitter: { [Symbol.split](string: string, limit?: number | undefined): string[]; }, limit?: number | undefined): string[]; }"
+            },
+            {
+              "name": "substring",
+              "type": "(start: number, end?: number | undefined) => string"
+            },
+            {
+              "name": "toLowerCase",
+              "type": "() => string"
+            },
+            {
+              "name": "toLocaleLowerCase",
+              "type": "{ (locales?: string | string[] | undefined): string; (locales?: LocalesArgument): string; }"
+            },
+            {
+              "name": "toUpperCase",
+              "type": "() => string"
+            },
+            {
+              "name": "toLocaleUpperCase",
+              "type": "{ (locales?: string | string[] | undefined): string; (locales?: LocalesArgument): string; }"
+            },
+            {
+              "name": "trim",
+              "type": "() => string"
+            },
+            {
+              "name": "length",
+              "type": "number"
+            },
+            {
+              "name": "substr",
+              "type": "(from: number, length?: number | undefined) => string"
+            },
+            {
+              "name": "valueOf",
+              "type": "() => string"
+            },
+            {
+              "name": "codePointAt",
+              "type": "(pos: number) => number | undefined"
+            },
+            {
+              "name": "includes",
+              "type": "(searchString: string, position?: number | undefined) => boolean"
+            },
+            {
+              "name": "endsWith",
+              "type": "(searchString: string, endPosition?: number | undefined) => boolean"
+            },
+            {
+              "name": "normalize",
+              "type": "{ (form: \"NFC\" | \"NFD\" | \"NFKC\" | \"NFKD\"): string; (form?: string | undefined): string; }"
+            },
+            {
+              "name": "repeat",
+              "type": "(count: number) => string"
+            },
+            {
+              "name": "startsWith",
+              "type": "(searchString: string, position?: number | undefined) => boolean"
+            },
+            {
+              "name": "anchor",
+              "type": "(name: string) => string"
+            },
+            {
+              "name": "big",
+              "type": "() => string"
+            },
+            {
+              "name": "blink",
+              "type": "() => string"
+            },
+            {
+              "name": "bold",
+              "type": "() => string"
+            },
+            {
+              "name": "fixed",
+              "type": "() => string"
+            },
+            {
+              "name": "fontcolor",
+              "type": "(color: string) => string"
+            },
+            {
+              "name": "fontsize",
+              "type": "{ (size: number): string; (size: string): string; }"
+            },
+            {
+              "name": "italics",
+              "type": "() => string"
+            },
+            {
+              "name": "link",
+              "type": "(url: string) => string"
+            },
+            {
+              "name": "small",
+              "type": "() => string"
+            },
+            {
+              "name": "strike",
+              "type": "() => string"
+            },
+            {
+              "name": "sub",
+              "type": "() => string"
+            },
+            {
+              "name": "sup",
+              "type": "() => string"
+            },
+            {
+              "name": "padStart",
+              "type": "(maxLength: number, fillString?: string | undefined) => string"
+            },
+            {
+              "name": "padEnd",
+              "type": "(maxLength: number, fillString?: string | undefined) => string"
+            },
+            {
+              "name": "trimEnd",
+              "type": "() => string"
+            },
+            {
+              "name": "trimStart",
+              "type": "() => string"
+            },
+            {
+              "name": "trimLeft",
+              "type": "() => string"
+            },
+            {
+              "name": "trimRight",
+              "type": "() => string"
+            },
+            {
+              "name": "matchAll",
+              "type": "(regexp: RegExp) => RegExpStringIterator<RegExpExecArray>"
+            },
+            {
+              "name": "replaceAll",
+              "type": "{ (searchValue: string | RegExp, replaceValue: string): string; (searchValue: string | RegExp, replacer: (substring: string, ...args: any[]) => string): string; }"
+            },
+            {
+              "name": "at",
+              "type": "(index: number) => string | undefined"
+            },
+            {
+              "name": "isWellFormed",
+              "type": "() => boolean"
+            },
+            {
+              "name": "toWellFormed",
+              "type": "() => string"
+            },
+            {
+              "name": "__@iterator@74",
+              "type": "() => StringIterator<string>"
+            }
+          ]
+        },
+        {
+          "name": "groupBy",
+          "type": "MachineLogGroupBy",
+          "fields": [
+            {
+              "name": "toString",
+              "type": "() => string"
+            },
+            {
+              "name": "charAt",
+              "type": "(pos: number) => string"
+            },
+            {
+              "name": "charCodeAt",
+              "type": "(index: number) => number"
+            },
+            {
+              "name": "concat",
+              "type": "(...strings: string[]) => string"
+            },
+            {
+              "name": "indexOf",
+              "type": "(searchString: string, position?: number | undefined) => number"
+            },
+            {
+              "name": "lastIndexOf",
+              "type": "(searchString: string, position?: number | undefined) => number"
+            },
+            {
+              "name": "localeCompare",
+              "type": "{ (that: string): number; (that: string, locales?: string | string[] | undefined, options?: CollatorOptions | undefined): number; (that: string, locales?: LocalesArgument, options?: CollatorOptions | undefined): number; }"
+            },
+            {
+              "name": "match",
+              "type": "{ (regexp: string | RegExp): RegExpMatchArray | null; (matcher: { [Symbol.match](string: string): RegExpMatchArray | null; }): RegExpMatchArray | null; }"
+            },
+            {
+              "name": "replace",
+              "type": "{ (searchValue: string | RegExp, replaceValue: string): string; (searchValue: string | RegExp, replacer: (substring: string, ...args: any[]) => string): string; (searchValue: { [Symbol.replace](string: string, replaceValue: string): string; }, replaceValue: string): string; (searchValue: { [Symbol.replace](string: string, replacer: (substring: string, ...args: any[]) => string): string; }, replacer: (substring: string, ...args: any[]) => string): string; }"
+            },
+            {
+              "name": "search",
+              "type": "{ (regexp: string | RegExp): number; (searcher: { [Symbol.search](string: string): number; }): number; }"
+            },
+            {
+              "name": "slice",
+              "type": "(start?: number | undefined, end?: number | undefined) => string"
+            },
+            {
+              "name": "split",
+              "type": "{ (separator: string | RegExp, limit?: number | undefined): string[]; (splitter: { [Symbol.split](string: string, limit?: number | undefined): string[]; }, limit?: number | undefined): string[]; }"
+            },
+            {
+              "name": "substring",
+              "type": "(start: number, end?: number | undefined) => string"
+            },
+            {
+              "name": "toLowerCase",
+              "type": "() => string"
+            },
+            {
+              "name": "toLocaleLowerCase",
+              "type": "{ (locales?: string | string[] | undefined): string; (locales?: LocalesArgument): string; }"
+            },
+            {
+              "name": "toUpperCase",
+              "type": "() => string"
+            },
+            {
+              "name": "toLocaleUpperCase",
+              "type": "{ (locales?: string | string[] | undefined): string; (locales?: LocalesArgument): string; }"
+            },
+            {
+              "name": "trim",
+              "type": "() => string"
+            },
+            {
+              "name": "length",
+              "type": "number"
+            },
+            {
+              "name": "substr",
+              "type": "(from: number, length?: number | undefined) => string"
+            },
+            {
+              "name": "valueOf",
+              "type": "() => string"
+            },
+            {
+              "name": "codePointAt",
+              "type": "(pos: number) => number | undefined"
+            },
+            {
+              "name": "includes",
+              "type": "(searchString: string, position?: number | undefined) => boolean"
+            },
+            {
+              "name": "endsWith",
+              "type": "(searchString: string, endPosition?: number | undefined) => boolean"
+            },
+            {
+              "name": "normalize",
+              "type": "{ (form: \"NFC\" | \"NFD\" | \"NFKC\" | \"NFKD\"): string; (form?: string | undefined): string; }"
+            },
+            {
+              "name": "repeat",
+              "type": "(count: number) => string"
+            },
+            {
+              "name": "startsWith",
+              "type": "(searchString: string, position?: number | undefined) => boolean"
+            },
+            {
+              "name": "anchor",
+              "type": "(name: string) => string"
+            },
+            {
+              "name": "big",
+              "type": "() => string"
+            },
+            {
+              "name": "blink",
+              "type": "() => string"
+            },
+            {
+              "name": "bold",
+              "type": "() => string"
+            },
+            {
+              "name": "fixed",
+              "type": "() => string"
+            },
+            {
+              "name": "fontcolor",
+              "type": "(color: string) => string"
+            },
+            {
+              "name": "fontsize",
+              "type": "{ (size: number): string; (size: string): string; }"
+            },
+            {
+              "name": "italics",
+              "type": "() => string"
+            },
+            {
+              "name": "link",
+              "type": "(url: string) => string"
+            },
+            {
+              "name": "small",
+              "type": "() => string"
+            },
+            {
+              "name": "strike",
+              "type": "() => string"
+            },
+            {
+              "name": "sub",
+              "type": "() => string"
+            },
+            {
+              "name": "sup",
+              "type": "() => string"
+            },
+            {
+              "name": "padStart",
+              "type": "(maxLength: number, fillString?: string | undefined) => string"
+            },
+            {
+              "name": "padEnd",
+              "type": "(maxLength: number, fillString?: string | undefined) => string"
+            },
+            {
+              "name": "trimEnd",
+              "type": "() => string"
+            },
+            {
+              "name": "trimStart",
+              "type": "() => string"
+            },
+            {
+              "name": "trimLeft",
+              "type": "() => string"
+            },
+            {
+              "name": "trimRight",
+              "type": "() => string"
+            },
+            {
+              "name": "matchAll",
+              "type": "(regexp: RegExp) => RegExpStringIterator<RegExpExecArray>"
+            },
+            {
+              "name": "replaceAll",
+              "type": "{ (searchValue: string | RegExp, replaceValue: string): string; (searchValue: string | RegExp, replacer: (substring: string, ...args: any[]) => string): string; }"
+            },
+            {
+              "name": "at",
+              "type": "(index: number) => string | undefined"
+            },
+            {
+              "name": "isWellFormed",
+              "type": "() => boolean"
+            },
+            {
+              "name": "toWellFormed",
+              "type": "() => string"
+            },
+            {
+              "name": "__@iterator@74",
+              "type": "() => StringIterator<string>"
+            }
+          ]
+        },
+        {
+          "name": "mine",
+          "type": "boolean"
+        },
+        {
+          "name": "projectId",
+          "type": "number | null"
+        },
+        {
+          "name": "groups",
+          "type": "MachineLogGroupSummary[]"
+        },
+        {
+          "name": "options",
+          "type": "{ projects: ProjectOption[]; }",
+          "fields": [
+            {
+              "name": "projects",
+              "type": "ProjectOption[]"
+            }
+          ]
+        }
+      ]
+    },
+    "source": "app/api/resources/machines/logs/summary/route.ts"
   },
   {
     "key": "get:/api/roadmap",
@@ -9154,7 +13457,6 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "path": "/api/roads",
     "description": "POST /api/roads",
     "permissions": [
-      "road:view",
       "road:manage"
     ],
     "mode": "write",
@@ -9309,6 +13611,316 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "source": "app/api/roads/[id]/route.ts"
   },
   {
+    "key": "get:/api/roads/:id/cross-sections",
+    "method": "GET",
+    "path": "/api/roads/:id/cross-sections",
+    "description": "GET /api/roads/:id/cross-sections",
+    "permissions": [],
+    "mode": "read",
+    "pathParams": [
+      {
+        "name": "id",
+        "type": "number",
+        "optional": false
+      }
+    ],
+    "queryParams": [],
+    "bodyFields": [],
+    "responseSchema": {
+      "type": "{ crossSections: RoadCrossSectionDTO[]; }",
+      "fields": [
+        {
+          "name": "crossSections",
+          "type": "RoadCrossSectionDTO[]"
+        }
+      ]
+    },
+    "source": "app/api/roads/[id]/cross-sections/route.ts"
+  },
+  {
+    "key": "post:/api/roads/:id/cross-sections",
+    "method": "POST",
+    "path": "/api/roads/:id/cross-sections",
+    "description": "POST /api/roads/:id/cross-sections",
+    "permissions": [
+      "road:manage"
+    ],
+    "mode": "write",
+    "pathParams": [
+      {
+        "name": "id",
+        "type": "number",
+        "optional": false
+      }
+    ],
+    "queryParams": [],
+    "bodyFields": [],
+    "responseSchema": {
+      "type": "{ crossSections: RoadCrossSectionDTO[]; }",
+      "fields": [
+        {
+          "name": "crossSections",
+          "type": "RoadCrossSectionDTO[]"
+        }
+      ]
+    },
+    "source": "app/api/roads/[id]/cross-sections/route.ts"
+  },
+  {
+    "key": "delete:/api/roads/:id/cross-sections/:crossSectionId",
+    "method": "DELETE",
+    "path": "/api/roads/:id/cross-sections/:crossSectionId",
+    "description": "DELETE /api/roads/:id/cross-sections/:crossSectionId",
+    "permissions": [
+      "road:manage"
+    ],
+    "mode": "write",
+    "pathParams": [
+      {
+        "name": "id",
+        "type": "number",
+        "optional": false
+      },
+      {
+        "name": "crossSectionId",
+        "type": "number",
+        "optional": false
+      }
+    ],
+    "queryParams": [],
+    "bodyFields": [],
+    "responseSchema": {
+      "type": "{ crossSection: RoadCrossSectionDTO; }",
+      "fields": [
+        {
+          "name": "crossSection",
+          "type": "RoadCrossSectionDTO",
+          "fields": [
+            {
+              "name": "id",
+              "type": "number"
+            },
+            {
+              "name": "roadId",
+              "type": "number"
+            },
+            {
+              "name": "sourceDocument",
+              "type": "{ id: number; documentName: string; versionTag?: string | null | undefined; coverageScope?: string | null | undefined; } | null | undefined",
+              "optional": true
+            },
+            {
+              "name": "referenceRoad",
+              "type": "RoadSectionDTO | null | undefined",
+              "optional": true
+            },
+            {
+              "name": "createdAt",
+              "type": "string"
+            },
+            {
+              "name": "updatedAt",
+              "type": "string"
+            },
+            {
+              "name": "startPk",
+              "type": "number"
+            },
+            {
+              "name": "endPk",
+              "type": "number"
+            },
+            {
+              "name": "profileCode",
+              "type": "string"
+            },
+            {
+              "name": "carriagewayWidthM",
+              "type": "number"
+            },
+            {
+              "name": "leftShoulderWidthM",
+              "type": "number | null | undefined",
+              "optional": true
+            },
+            {
+              "name": "rightShoulderWidthM",
+              "type": "number | null | undefined",
+              "optional": true
+            },
+            {
+              "name": "totalWidthM",
+              "type": "number"
+            },
+            {
+              "name": "status",
+              "type": "RoadCrossSectionStatus",
+              "enum": [
+                "APPROVED",
+                "ASSUMED_FROM_REFERENCE",
+                "NEEDS_CONFIRMATION",
+                "SUPERSEDED"
+              ]
+            },
+            {
+              "name": "sourceDocumentId",
+              "type": "number | null | undefined",
+              "optional": true
+            },
+            {
+              "name": "sourcePage",
+              "type": "string | null | undefined",
+              "optional": true
+            },
+            {
+              "name": "sourceVersion",
+              "type": "string | null | undefined",
+              "optional": true
+            },
+            {
+              "name": "referenceRoadId",
+              "type": "number | null | undefined",
+              "optional": true
+            },
+            {
+              "name": "note",
+              "type": "string | null | undefined",
+              "optional": true
+            }
+          ]
+        }
+      ]
+    },
+    "source": "app/api/roads/[id]/cross-sections/[crossSectionId]/route.ts"
+  },
+  {
+    "key": "put:/api/roads/:id/cross-sections/:crossSectionId",
+    "method": "PUT",
+    "path": "/api/roads/:id/cross-sections/:crossSectionId",
+    "description": "PUT /api/roads/:id/cross-sections/:crossSectionId",
+    "permissions": [
+      "road:manage"
+    ],
+    "mode": "write",
+    "pathParams": [
+      {
+        "name": "id",
+        "type": "number",
+        "optional": false
+      },
+      {
+        "name": "crossSectionId",
+        "type": "number",
+        "optional": false
+      }
+    ],
+    "queryParams": [],
+    "bodyFields": [],
+    "responseSchema": {
+      "type": "{ crossSection: RoadCrossSectionDTO; }",
+      "fields": [
+        {
+          "name": "crossSection",
+          "type": "RoadCrossSectionDTO",
+          "fields": [
+            {
+              "name": "id",
+              "type": "number"
+            },
+            {
+              "name": "roadId",
+              "type": "number"
+            },
+            {
+              "name": "sourceDocument",
+              "type": "{ id: number; documentName: string; versionTag?: string | null | undefined; coverageScope?: string | null | undefined; } | null | undefined",
+              "optional": true
+            },
+            {
+              "name": "referenceRoad",
+              "type": "RoadSectionDTO | null | undefined",
+              "optional": true
+            },
+            {
+              "name": "createdAt",
+              "type": "string"
+            },
+            {
+              "name": "updatedAt",
+              "type": "string"
+            },
+            {
+              "name": "startPk",
+              "type": "number"
+            },
+            {
+              "name": "endPk",
+              "type": "number"
+            },
+            {
+              "name": "profileCode",
+              "type": "string"
+            },
+            {
+              "name": "carriagewayWidthM",
+              "type": "number"
+            },
+            {
+              "name": "leftShoulderWidthM",
+              "type": "number | null | undefined",
+              "optional": true
+            },
+            {
+              "name": "rightShoulderWidthM",
+              "type": "number | null | undefined",
+              "optional": true
+            },
+            {
+              "name": "totalWidthM",
+              "type": "number"
+            },
+            {
+              "name": "status",
+              "type": "RoadCrossSectionStatus",
+              "enum": [
+                "APPROVED",
+                "ASSUMED_FROM_REFERENCE",
+                "NEEDS_CONFIRMATION",
+                "SUPERSEDED"
+              ]
+            },
+            {
+              "name": "sourceDocumentId",
+              "type": "number | null | undefined",
+              "optional": true
+            },
+            {
+              "name": "sourcePage",
+              "type": "string | null | undefined",
+              "optional": true
+            },
+            {
+              "name": "sourceVersion",
+              "type": "string | null | undefined",
+              "optional": true
+            },
+            {
+              "name": "referenceRoadId",
+              "type": "number | null | undefined",
+              "optional": true
+            },
+            {
+              "name": "note",
+              "type": "string | null | undefined",
+              "optional": true
+            }
+          ]
+        }
+      ]
+    },
+    "source": "app/api/roads/[id]/cross-sections/[crossSectionId]/route.ts"
+  },
+  {
     "key": "get:/api/roles",
     "method": "GET",
     "path": "/api/roles",
@@ -9349,10 +13961,7 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "path": "/api/roles",
     "description": "POST /api/roles",
     "permissions": [
-      "role:view",
       "role:create",
-      "role:update",
-      "role:delete",
       "role:manage"
     ],
     "mode": "write",
@@ -9384,9 +13993,8 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "path": "/api/roles/:id",
     "description": "DELETE /api/roles/:id",
     "permissions": [
-      "role:update",
-      "role:manage",
-      "role:delete"
+      "role:delete",
+      "role:manage"
     ],
     "mode": "write",
     "pathParams": [
@@ -9461,8 +14069,7 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "description": "PUT /api/roles/:id",
     "permissions": [
       "role:update",
-      "role:manage",
-      "role:delete"
+      "role:manage"
     ],
     "mode": "write",
     "pathParams": [
@@ -9536,8 +14143,7 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "path": "/api/submissions",
     "description": "GET /api/submissions",
     "permissions": [
-      "inspection:view",
-      "inspection:create"
+      "inspection:view"
     ],
     "mode": "read",
     "pathParams": [],
@@ -9560,7 +14166,6 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "path": "/api/submissions",
     "description": "POST /api/submissions",
     "permissions": [
-      "inspection:view",
       "inspection:create"
     ],
     "mode": "write",
@@ -9583,17 +14188,16 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "method": "GET",
     "path": "/api/team-supervisors",
     "description": "GET /api/team-supervisors",
-    "permissions": [
-      "member:view",
-      "member:update",
-      "member:edit",
-      "member:create",
-      "member:manage"
-    ],
+    "permissions": [],
     "mode": "read",
     "pathParams": [],
     "queryParams": [],
     "bodyFields": [
+      {
+        "name": "teamFr",
+        "type": "unknown",
+        "optional": true
+      },
       {
         "name": "team",
         "type": "unknown",
@@ -9606,11 +14210,11 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
       }
     ],
     "responseSchema": {
-      "type": "{ teamSupervisors: { id: number; team: string; teamZh: string | null; teamKey: string; supervisorId: number; supervisorLabel: string; project: { id: number; name: string; code: string | null; isActive: boolean; } | null; }[]; }",
+      "type": "{ teamSupervisors: { id: number; team: string; teamFr: string | null; teamZh: string | null; teamKey: string; supervisorId: number; supervisorLabel: string; project: { id: number; name: string; code: string | null; isActive: boolean; } | null; }[]; }",
       "fields": [
         {
           "name": "teamSupervisors",
-          "type": "{ id: number; team: string; teamZh: string | null; teamKey: string; supervisorId: number; supervisorLabel: string; project: { id: number; name: string; code: string | null; isActive: boolean; } | null; }[]"
+          "type": "{ id: number; team: string; teamFr: string | null; teamZh: string | null; teamKey: string; supervisorId: number; supervisorLabel: string; project: { id: number; name: string; code: string | null; isActive: boolean; } | null; }[]"
         }
       ]
     },
@@ -9621,17 +14225,16 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "method": "POST",
     "path": "/api/team-supervisors",
     "description": "POST /api/team-supervisors",
-    "permissions": [
-      "member:view",
-      "member:update",
-      "member:edit",
-      "member:create",
-      "member:manage"
-    ],
+    "permissions": [],
     "mode": "write",
     "pathParams": [],
     "queryParams": [],
     "bodyFields": [
+      {
+        "name": "teamFr",
+        "type": "unknown",
+        "optional": true
+      },
       {
         "name": "team",
         "type": "unknown",
@@ -9644,11 +14247,11 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
       }
     ],
     "responseSchema": {
-      "type": "{ teamSupervisors: { id: number; team: string; teamZh: string | null; teamKey: string; supervisorId: number; supervisorLabel: string; project: { id: number; name: string; code: string | null; isActive: boolean; } | null; }[]; }",
+      "type": "{ teamSupervisors: { id: number; team: string; teamFr: string | null; teamZh: string | null; teamKey: string; supervisorId: number; supervisorLabel: string; project: { id: number; name: string; code: string | null; isActive: boolean; } | null; }[]; }",
       "fields": [
         {
           "name": "teamSupervisors",
-          "type": "{ id: number; team: string; teamZh: string | null; teamKey: string; supervisorId: number; supervisorLabel: string; project: { id: number; name: string; code: string | null; isActive: boolean; } | null; }[]"
+          "type": "{ id: number; team: string; teamFr: string | null; teamZh: string | null; teamKey: string; supervisorId: number; supervisorLabel: string; project: { id: number; name: string; code: string | null; isActive: boolean; } | null; }[]"
         }
       ]
     },
@@ -9659,10 +14262,7 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "method": "DELETE",
     "path": "/api/team-supervisors/:id",
     "description": "DELETE /api/team-supervisors/:id",
-    "permissions": [
-      "member:create",
-      "member:manage"
-    ],
+    "permissions": [],
     "mode": "write",
     "pathParams": [
       {
@@ -9674,7 +14274,7 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "queryParams": [],
     "bodyFields": [
       {
-        "name": "team",
+        "name": "teamFr",
         "type": "unknown",
         "optional": true
       },
@@ -9685,11 +14285,11 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
       }
     ],
     "responseSchema": {
-      "type": "{ teamSupervisor: { id: number; team: string; teamZh: string | null; teamKey: string; supervisorId: number; supervisorLabel: string; project: { id: number; name: string; isActive: boolean; code: string | null; } | null; }; }",
+      "type": "{ teamSupervisor: { id: number; team: string; teamFr: string | null; teamZh: string | null; teamKey: string; supervisorId: number; supervisorLabel: string; project: { id: number; name: string; isActive: boolean; code: string | null; } | null; }; }",
       "fields": [
         {
           "name": "teamSupervisor",
-          "type": "{ id: number; team: string; teamZh: string | null; teamKey: string; supervisorId: number; supervisorLabel: string; project: { id: number; name: string; isActive: boolean; code: string | null; } | null; }",
+          "type": "{ id: number; team: string; teamFr: string | null; teamZh: string | null; teamKey: string; supervisorId: number; supervisorLabel: string; project: { id: number; name: string; isActive: boolean; code: string | null; } | null; }",
           "fields": [
             {
               "name": "id",
@@ -9698,6 +14298,10 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
             {
               "name": "team",
               "type": "string"
+            },
+            {
+              "name": "teamFr",
+              "type": "string | null"
             },
             {
               "name": "teamZh",
@@ -9730,10 +14334,7 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "method": "PUT",
     "path": "/api/team-supervisors/:id",
     "description": "PUT /api/team-supervisors/:id",
-    "permissions": [
-      "member:create",
-      "member:manage"
-    ],
+    "permissions": [],
     "mode": "write",
     "pathParams": [
       {
@@ -9745,7 +14346,7 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "queryParams": [],
     "bodyFields": [
       {
-        "name": "team",
+        "name": "teamFr",
         "type": "unknown",
         "optional": true
       },
@@ -9756,11 +14357,11 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
       }
     ],
     "responseSchema": {
-      "type": "{ teamSupervisor: { id: number; team: string; teamZh: string | null; teamKey: string; supervisorId: number; supervisorLabel: string; project: { id: number; name: string; isActive: boolean; code: string | null; } | null; }; }",
+      "type": "{ teamSupervisor: { id: number; team: string; teamFr: string | null; teamZh: string | null; teamKey: string; supervisorId: number; supervisorLabel: string; project: { id: number; name: string; isActive: boolean; code: string | null; } | null; }; }",
       "fields": [
         {
           "name": "teamSupervisor",
-          "type": "{ id: number; team: string; teamZh: string | null; teamKey: string; supervisorId: number; supervisorLabel: string; project: { id: number; name: string; isActive: boolean; code: string | null; } | null; }",
+          "type": "{ id: number; team: string; teamFr: string | null; teamZh: string | null; teamKey: string; supervisorId: number; supervisorLabel: string; project: { id: number; name: string; isActive: boolean; code: string | null; } | null; }",
           "fields": [
             {
               "name": "id",
@@ -9769,6 +14370,10 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
             {
               "name": "team",
               "type": "string"
+            },
+            {
+              "name": "teamFr",
+              "type": "string | null"
             },
             {
               "name": "teamZh",
@@ -9903,9 +14508,6 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "path": "/api/value/boq-items",
     "description": "DELETE /api/value/boq-items",
     "permissions": [
-      "value:view",
-      "value:create",
-      "value:update",
       "value:delete"
     ],
     "mode": "write",
@@ -9960,10 +14562,7 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "path": "/api/value/boq-items",
     "description": "GET /api/value/boq-items",
     "permissions": [
-      "value:view",
-      "value:create",
-      "value:update",
-      "value:delete"
+      "value:view"
     ],
     "mode": "read",
     "pathParams": [],
@@ -10017,10 +14616,7 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "path": "/api/value/boq-items",
     "description": "PATCH /api/value/boq-items",
     "permissions": [
-      "value:view",
-      "value:create",
-      "value:update",
-      "value:delete"
+      "value:update"
     ],
     "mode": "write",
     "pathParams": [],
@@ -10074,10 +14670,7 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "path": "/api/value/boq-items",
     "description": "POST /api/value/boq-items",
     "permissions": [
-      "value:view",
-      "value:create",
-      "value:update",
-      "value:delete"
+      "value:create"
     ],
     "mode": "write",
     "pathParams": [],
@@ -10246,8 +14839,7 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "path": "/api/value/boq-letters",
     "description": "GET /api/value/boq-letters",
     "permissions": [
-      "value:view",
-      "value:update"
+      "value:view"
     ],
     "mode": "read",
     "pathParams": [],
@@ -10281,7 +14873,6 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "path": "/api/value/boq-letters",
     "description": "POST /api/value/boq-letters",
     "permissions": [
-      "value:view",
       "value:update"
     ],
     "mode": "write",
@@ -10369,6 +14960,72 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "source": "app/api/value/boq-letters/[id]/route.ts"
   },
   {
+    "key": "get:/api/value/boq-measurements",
+    "method": "GET",
+    "path": "/api/value/boq-measurements",
+    "description": "GET /api/value/boq-measurements",
+    "permissions": [
+      "value:view"
+    ],
+    "mode": "read",
+    "pathParams": [],
+    "queryParams": [
+      {
+        "name": "projectId",
+        "type": "Error",
+        "optional": true
+      }
+    ],
+    "bodyFields": [],
+    "responseSchema": {
+      "type": "{ measurements: { id: number; createdAt: Date; updatedAt: Date; unitPrice: Decimal | null; projectId: number; quantity: Decimal; amount: Decimal | null; note: string | null; boqItemId: number; period: Date; }[]; advanceItemId: number | null; }",
+      "fields": [
+        {
+          "name": "measurements",
+          "type": "{ id: number; createdAt: Date; updatedAt: Date; unitPrice: Decimal | null; projectId: number; quantity: Decimal; amount: Decimal | null; note: string | null; boqItemId: number; period: Date; }[]"
+        },
+        {
+          "name": "advanceItemId",
+          "type": "number | null"
+        }
+      ]
+    },
+    "source": "app/api/value/boq-measurements/route.ts"
+  },
+  {
+    "key": "post:/api/value/boq-measurements",
+    "method": "POST",
+    "path": "/api/value/boq-measurements",
+    "description": "POST /api/value/boq-measurements",
+    "permissions": [
+      "value:update"
+    ],
+    "mode": "write",
+    "pathParams": [],
+    "queryParams": [
+      {
+        "name": "projectId",
+        "type": "Error",
+        "optional": true
+      }
+    ],
+    "bodyFields": [],
+    "responseSchema": {
+      "type": "{ measurements: { id: number; createdAt: Date; updatedAt: Date; unitPrice: Decimal | null; projectId: number; quantity: Decimal; amount: Decimal | null; note: string | null; boqItemId: number; period: Date; }[]; advanceItemId: number | null; }",
+      "fields": [
+        {
+          "name": "measurements",
+          "type": "{ id: number; createdAt: Date; updatedAt: Date; unitPrice: Decimal | null; projectId: number; quantity: Decimal; amount: Decimal | null; note: string | null; boqItemId: number; period: Date; }[]"
+        },
+        {
+          "name": "advanceItemId",
+          "type": "number | null"
+        }
+      ]
+    },
+    "source": "app/api/value/boq-measurements/route.ts"
+  },
+  {
     "key": "get:/api/value/boq-projects",
     "method": "GET",
     "path": "/api/value/boq-projects",
@@ -10392,13 +15049,412 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "source": "app/api/value/boq-projects/route.ts"
   },
   {
+    "key": "delete:/api/value/measurement-details",
+    "method": "DELETE",
+    "path": "/api/value/measurement-details",
+    "description": "DELETE /api/value/measurement-details",
+    "permissions": [
+      "value:delete"
+    ],
+    "mode": "write",
+    "pathParams": [],
+    "queryParams": [
+      {
+        "name": "projectId",
+        "type": "Error",
+        "optional": true
+      },
+      {
+        "name": "search",
+        "type": "string",
+        "optional": true
+      },
+      {
+        "name": "roadId",
+        "type": "Error",
+        "optional": true
+      },
+      {
+        "name": "period",
+        "type": "Error",
+        "optional": true
+      }
+    ],
+    "bodyFields": [],
+    "responseSchema": {
+      "type": "{ project: { id: number; name: string; code: string | null; } | null; details: { id: number; projectId: number; projectName: string; projectCode: string | null; period: string; periodKey: string | null; boqItemId: number; code: string; designationZh: string; designationFr: string; unit: string | null; unitPrice: number | null; roadId: number; roadName: string; roadSlug: string; startPk: string | null; endPk: string | null; side: IntervalSide | null; quantity: number; manualAmount: number | null; amount: number | null; note: string | null; createdAt: string; updatedAt: string; }[]; boqItems: { id: number; code: string; designationZh: string; designationFr: string; unit: string | null; unitPrice: number | null; }[]; roads: { id: number; name: string; projectId: number | null; slug: string; }[]; periodOptions: string[]; summary: { detailQuantity: number; detailAmount: number; measuredQuantity: number; measuredAmount: number; quantityDelta: number; amountDelta: number; }; }",
+      "fields": [
+        {
+          "name": "project",
+          "type": "{ id: number; name: string; code: string | null; } | null"
+        },
+        {
+          "name": "details",
+          "type": "{ id: number; projectId: number; projectName: string; projectCode: string | null; period: string; periodKey: string | null; boqItemId: number; code: string; designationZh: string; designationFr: string; unit: string | null; unitPrice: number | null; roadId: number; roadName: string; roadSlug: string; startPk: string | null; endPk: string | null; side: IntervalSide | null; quantity: number; manualAmount: number | null; amount: number | null; note: string | null; createdAt: string; updatedAt: string; }[]",
+          "enum": [
+            "BOTH",
+            "LEFT",
+            "RIGHT"
+          ]
+        },
+        {
+          "name": "boqItems",
+          "type": "{ id: number; code: string; designationZh: string; designationFr: string; unit: string | null; unitPrice: number | null; }[]"
+        },
+        {
+          "name": "roads",
+          "type": "{ id: number; name: string; projectId: number | null; slug: string; }[]"
+        },
+        {
+          "name": "periodOptions",
+          "type": "string[]"
+        },
+        {
+          "name": "summary",
+          "type": "{ detailQuantity: number; detailAmount: number; measuredQuantity: number; measuredAmount: number; quantityDelta: number; amountDelta: number; }",
+          "fields": [
+            {
+              "name": "detailQuantity",
+              "type": "number"
+            },
+            {
+              "name": "detailAmount",
+              "type": "number"
+            },
+            {
+              "name": "measuredQuantity",
+              "type": "number"
+            },
+            {
+              "name": "measuredAmount",
+              "type": "number"
+            },
+            {
+              "name": "quantityDelta",
+              "type": "number"
+            },
+            {
+              "name": "amountDelta",
+              "type": "number"
+            }
+          ]
+        }
+      ],
+      "enum": [
+        "BOTH",
+        "LEFT",
+        "RIGHT"
+      ]
+    },
+    "source": "app/api/value/measurement-details/route.ts"
+  },
+  {
+    "key": "get:/api/value/measurement-details",
+    "method": "GET",
+    "path": "/api/value/measurement-details",
+    "description": "GET /api/value/measurement-details",
+    "permissions": [
+      "value:view"
+    ],
+    "mode": "read",
+    "pathParams": [],
+    "queryParams": [
+      {
+        "name": "projectId",
+        "type": "Error",
+        "optional": true
+      },
+      {
+        "name": "search",
+        "type": "string",
+        "optional": true
+      },
+      {
+        "name": "roadId",
+        "type": "Error",
+        "optional": true
+      },
+      {
+        "name": "period",
+        "type": "Error",
+        "optional": true
+      }
+    ],
+    "bodyFields": [],
+    "responseSchema": {
+      "type": "{ project: { id: number; name: string; code: string | null; } | null; details: { id: number; projectId: number; projectName: string; projectCode: string | null; period: string; periodKey: string | null; boqItemId: number; code: string; designationZh: string; designationFr: string; unit: string | null; unitPrice: number | null; roadId: number; roadName: string; roadSlug: string; startPk: string | null; endPk: string | null; side: IntervalSide | null; quantity: number; manualAmount: number | null; amount: number | null; note: string | null; createdAt: string; updatedAt: string; }[]; boqItems: { id: number; code: string; designationZh: string; designationFr: string; unit: string | null; unitPrice: number | null; }[]; roads: { id: number; name: string; projectId: number | null; slug: string; }[]; periodOptions: string[]; summary: { detailQuantity: number; detailAmount: number; measuredQuantity: number; measuredAmount: number; quantityDelta: number; amountDelta: number; }; }",
+      "fields": [
+        {
+          "name": "project",
+          "type": "{ id: number; name: string; code: string | null; } | null"
+        },
+        {
+          "name": "details",
+          "type": "{ id: number; projectId: number; projectName: string; projectCode: string | null; period: string; periodKey: string | null; boqItemId: number; code: string; designationZh: string; designationFr: string; unit: string | null; unitPrice: number | null; roadId: number; roadName: string; roadSlug: string; startPk: string | null; endPk: string | null; side: IntervalSide | null; quantity: number; manualAmount: number | null; amount: number | null; note: string | null; createdAt: string; updatedAt: string; }[]",
+          "enum": [
+            "BOTH",
+            "LEFT",
+            "RIGHT"
+          ]
+        },
+        {
+          "name": "boqItems",
+          "type": "{ id: number; code: string; designationZh: string; designationFr: string; unit: string | null; unitPrice: number | null; }[]"
+        },
+        {
+          "name": "roads",
+          "type": "{ id: number; name: string; projectId: number | null; slug: string; }[]"
+        },
+        {
+          "name": "periodOptions",
+          "type": "string[]"
+        },
+        {
+          "name": "summary",
+          "type": "{ detailQuantity: number; detailAmount: number; measuredQuantity: number; measuredAmount: number; quantityDelta: number; amountDelta: number; }",
+          "fields": [
+            {
+              "name": "detailQuantity",
+              "type": "number"
+            },
+            {
+              "name": "detailAmount",
+              "type": "number"
+            },
+            {
+              "name": "measuredQuantity",
+              "type": "number"
+            },
+            {
+              "name": "measuredAmount",
+              "type": "number"
+            },
+            {
+              "name": "quantityDelta",
+              "type": "number"
+            },
+            {
+              "name": "amountDelta",
+              "type": "number"
+            }
+          ]
+        }
+      ],
+      "enum": [
+        "BOTH",
+        "LEFT",
+        "RIGHT"
+      ]
+    },
+    "source": "app/api/value/measurement-details/route.ts"
+  },
+  {
+    "key": "post:/api/value/measurement-details",
+    "method": "POST",
+    "path": "/api/value/measurement-details",
+    "description": "POST /api/value/measurement-details",
+    "permissions": [
+      "value:update"
+    ],
+    "mode": "write",
+    "pathParams": [],
+    "queryParams": [
+      {
+        "name": "projectId",
+        "type": "Error",
+        "optional": true
+      },
+      {
+        "name": "search",
+        "type": "string",
+        "optional": true
+      },
+      {
+        "name": "roadId",
+        "type": "Error",
+        "optional": true
+      },
+      {
+        "name": "period",
+        "type": "Error",
+        "optional": true
+      }
+    ],
+    "bodyFields": [],
+    "responseSchema": {
+      "type": "{ project: { id: number; name: string; code: string | null; } | null; details: { id: number; projectId: number; projectName: string; projectCode: string | null; period: string; periodKey: string | null; boqItemId: number; code: string; designationZh: string; designationFr: string; unit: string | null; unitPrice: number | null; roadId: number; roadName: string; roadSlug: string; startPk: string | null; endPk: string | null; side: IntervalSide | null; quantity: number; manualAmount: number | null; amount: number | null; note: string | null; createdAt: string; updatedAt: string; }[]; boqItems: { id: number; code: string; designationZh: string; designationFr: string; unit: string | null; unitPrice: number | null; }[]; roads: { id: number; name: string; projectId: number | null; slug: string; }[]; periodOptions: string[]; summary: { detailQuantity: number; detailAmount: number; measuredQuantity: number; measuredAmount: number; quantityDelta: number; amountDelta: number; }; }",
+      "fields": [
+        {
+          "name": "project",
+          "type": "{ id: number; name: string; code: string | null; } | null"
+        },
+        {
+          "name": "details",
+          "type": "{ id: number; projectId: number; projectName: string; projectCode: string | null; period: string; periodKey: string | null; boqItemId: number; code: string; designationZh: string; designationFr: string; unit: string | null; unitPrice: number | null; roadId: number; roadName: string; roadSlug: string; startPk: string | null; endPk: string | null; side: IntervalSide | null; quantity: number; manualAmount: number | null; amount: number | null; note: string | null; createdAt: string; updatedAt: string; }[]",
+          "enum": [
+            "BOTH",
+            "LEFT",
+            "RIGHT"
+          ]
+        },
+        {
+          "name": "boqItems",
+          "type": "{ id: number; code: string; designationZh: string; designationFr: string; unit: string | null; unitPrice: number | null; }[]"
+        },
+        {
+          "name": "roads",
+          "type": "{ id: number; name: string; projectId: number | null; slug: string; }[]"
+        },
+        {
+          "name": "periodOptions",
+          "type": "string[]"
+        },
+        {
+          "name": "summary",
+          "type": "{ detailQuantity: number; detailAmount: number; measuredQuantity: number; measuredAmount: number; quantityDelta: number; amountDelta: number; }",
+          "fields": [
+            {
+              "name": "detailQuantity",
+              "type": "number"
+            },
+            {
+              "name": "detailAmount",
+              "type": "number"
+            },
+            {
+              "name": "measuredQuantity",
+              "type": "number"
+            },
+            {
+              "name": "measuredAmount",
+              "type": "number"
+            },
+            {
+              "name": "quantityDelta",
+              "type": "number"
+            },
+            {
+              "name": "amountDelta",
+              "type": "number"
+            }
+          ]
+        }
+      ],
+      "enum": [
+        "BOTH",
+        "LEFT",
+        "RIGHT"
+      ]
+    },
+    "source": "app/api/value/measurement-details/route.ts"
+  },
+  {
+    "key": "put:/api/value/measurement-details",
+    "method": "PUT",
+    "path": "/api/value/measurement-details",
+    "description": "PUT /api/value/measurement-details",
+    "permissions": [
+      "value:update"
+    ],
+    "mode": "write",
+    "pathParams": [],
+    "queryParams": [
+      {
+        "name": "projectId",
+        "type": "Error",
+        "optional": true
+      },
+      {
+        "name": "search",
+        "type": "string",
+        "optional": true
+      },
+      {
+        "name": "roadId",
+        "type": "Error",
+        "optional": true
+      },
+      {
+        "name": "period",
+        "type": "Error",
+        "optional": true
+      }
+    ],
+    "bodyFields": [],
+    "responseSchema": {
+      "type": "{ project: { id: number; name: string; code: string | null; } | null; details: { id: number; projectId: number; projectName: string; projectCode: string | null; period: string; periodKey: string | null; boqItemId: number; code: string; designationZh: string; designationFr: string; unit: string | null; unitPrice: number | null; roadId: number; roadName: string; roadSlug: string; startPk: string | null; endPk: string | null; side: IntervalSide | null; quantity: number; manualAmount: number | null; amount: number | null; note: string | null; createdAt: string; updatedAt: string; }[]; boqItems: { id: number; code: string; designationZh: string; designationFr: string; unit: string | null; unitPrice: number | null; }[]; roads: { id: number; name: string; projectId: number | null; slug: string; }[]; periodOptions: string[]; summary: { detailQuantity: number; detailAmount: number; measuredQuantity: number; measuredAmount: number; quantityDelta: number; amountDelta: number; }; }",
+      "fields": [
+        {
+          "name": "project",
+          "type": "{ id: number; name: string; code: string | null; } | null"
+        },
+        {
+          "name": "details",
+          "type": "{ id: number; projectId: number; projectName: string; projectCode: string | null; period: string; periodKey: string | null; boqItemId: number; code: string; designationZh: string; designationFr: string; unit: string | null; unitPrice: number | null; roadId: number; roadName: string; roadSlug: string; startPk: string | null; endPk: string | null; side: IntervalSide | null; quantity: number; manualAmount: number | null; amount: number | null; note: string | null; createdAt: string; updatedAt: string; }[]",
+          "enum": [
+            "BOTH",
+            "LEFT",
+            "RIGHT"
+          ]
+        },
+        {
+          "name": "boqItems",
+          "type": "{ id: number; code: string; designationZh: string; designationFr: string; unit: string | null; unitPrice: number | null; }[]"
+        },
+        {
+          "name": "roads",
+          "type": "{ id: number; name: string; projectId: number | null; slug: string; }[]"
+        },
+        {
+          "name": "periodOptions",
+          "type": "string[]"
+        },
+        {
+          "name": "summary",
+          "type": "{ detailQuantity: number; detailAmount: number; measuredQuantity: number; measuredAmount: number; quantityDelta: number; amountDelta: number; }",
+          "fields": [
+            {
+              "name": "detailQuantity",
+              "type": "number"
+            },
+            {
+              "name": "detailAmount",
+              "type": "number"
+            },
+            {
+              "name": "measuredQuantity",
+              "type": "number"
+            },
+            {
+              "name": "measuredAmount",
+              "type": "number"
+            },
+            {
+              "name": "quantityDelta",
+              "type": "number"
+            },
+            {
+              "name": "amountDelta",
+              "type": "number"
+            }
+          ]
+        }
+      ],
+      "enum": [
+        "BOTH",
+        "LEFT",
+        "RIGHT"
+      ]
+    },
+    "source": "app/api/value/measurement-details/route.ts"
+  },
+  {
     "key": "get:/api/value/phase-item-bindings",
     "method": "GET",
     "path": "/api/value/phase-item-bindings",
     "description": "GET /api/value/phase-item-bindings",
     "permissions": [
-      "value:view",
-      "value:update"
+      "value:view"
     ],
     "mode": "read",
     "pathParams": [],
@@ -10432,7 +15488,6 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "path": "/api/value/phase-item-bindings",
     "description": "POST /api/value/phase-item-bindings",
     "permissions": [
-      "value:view",
       "value:update"
     ],
     "mode": "write",
@@ -10604,9 +15659,6 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "path": "/api/value/prices",
     "description": "DELETE /api/value/prices",
     "permissions": [
-      "value:view",
-      "value:create",
-      "value:update",
       "value:delete"
     ],
     "mode": "write",
@@ -10630,10 +15682,7 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "path": "/api/value/prices",
     "description": "GET /api/value/prices",
     "permissions": [
-      "value:view",
-      "value:create",
-      "value:update",
-      "value:delete"
+      "value:view"
     ],
     "mode": "read",
     "pathParams": [],
@@ -10656,10 +15705,7 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "path": "/api/value/prices",
     "description": "PATCH /api/value/prices",
     "permissions": [
-      "value:view",
-      "value:create",
-      "value:update",
-      "value:delete"
+      "value:update"
     ],
     "mode": "write",
     "pathParams": [],
@@ -10682,10 +15728,7 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
     "path": "/api/value/prices",
     "description": "POST /api/value/prices",
     "permissions": [
-      "value:view",
-      "value:create",
-      "value:update",
-      "value:delete"
+      "value:create"
     ],
     "mode": "write",
     "pathParams": [],
@@ -10701,5 +15744,1698 @@ export const dailyworkApiCatalog: ApiCatalogEntry[] = [
       ]
     },
     "source": "app/api/value/prices/route.ts"
+  },
+  {
+    "key": "delete:/api/value/variation-measurements",
+    "method": "DELETE",
+    "path": "/api/value/variation-measurements",
+    "description": "DELETE /api/value/variation-measurements",
+    "permissions": [
+      "value:update"
+    ],
+    "mode": "write",
+    "pathParams": [],
+    "queryParams": [
+      {
+        "name": "projectId",
+        "type": "number",
+        "optional": true
+      },
+      {
+        "name": "roadSectionId",
+        "type": "number",
+        "optional": true
+      },
+      {
+        "name": "boqItemId",
+        "type": "number",
+        "optional": true
+      },
+      {
+        "name": "search",
+        "type": "string",
+        "optional": true
+      },
+      {
+        "name": "status",
+        "type": "string",
+        "optional": true
+      },
+      {
+        "name": "changeType",
+        "type": "string",
+        "optional": true
+      },
+      {
+        "name": "attachmentState",
+        "type": "string",
+        "optional": true
+      },
+      {
+        "name": "sortBy",
+        "type": "string",
+        "optional": true
+      },
+      {
+        "name": "sortDir",
+        "type": "string",
+        "optional": true
+      },
+      {
+        "name": "page",
+        "type": "number",
+        "optional": true
+      },
+      {
+        "name": "pageSize",
+        "type": "number",
+        "optional": true
+      }
+    ],
+    "bodyFields": [],
+    "responseSchema": {
+      "type": "{ message: string; }",
+      "fields": [
+        {
+          "name": "message",
+          "type": "string"
+        }
+      ]
+    },
+    "source": "app/api/value/variation-measurements/route.ts"
+  },
+  {
+    "key": "get:/api/value/variation-measurements",
+    "method": "GET",
+    "path": "/api/value/variation-measurements",
+    "description": "GET /api/value/variation-measurements",
+    "permissions": [
+      "value:view"
+    ],
+    "mode": "read",
+    "pathParams": [],
+    "queryParams": [
+      {
+        "name": "projectId",
+        "type": "number",
+        "optional": true
+      },
+      {
+        "name": "roadSectionId",
+        "type": "number",
+        "optional": true
+      },
+      {
+        "name": "boqItemId",
+        "type": "number",
+        "optional": true
+      },
+      {
+        "name": "search",
+        "type": "string",
+        "optional": true
+      },
+      {
+        "name": "status",
+        "type": "string",
+        "optional": true
+      },
+      {
+        "name": "changeType",
+        "type": "string",
+        "optional": true
+      },
+      {
+        "name": "attachmentState",
+        "type": "string",
+        "optional": true
+      },
+      {
+        "name": "sortBy",
+        "type": "string",
+        "optional": true
+      },
+      {
+        "name": "sortDir",
+        "type": "string",
+        "optional": true
+      },
+      {
+        "name": "page",
+        "type": "number",
+        "optional": true
+      },
+      {
+        "name": "pageSize",
+        "type": "number",
+        "optional": true
+      }
+    ],
+    "bodyFields": [],
+    "responseSchema": {
+      "type": "{ message: string; }",
+      "fields": [
+        {
+          "name": "message",
+          "type": "string"
+        }
+      ]
+    },
+    "source": "app/api/value/variation-measurements/route.ts"
+  },
+  {
+    "key": "post:/api/value/variation-measurements",
+    "method": "POST",
+    "path": "/api/value/variation-measurements",
+    "description": "POST /api/value/variation-measurements",
+    "permissions": [
+      "value:update"
+    ],
+    "mode": "write",
+    "pathParams": [],
+    "queryParams": [
+      {
+        "name": "projectId",
+        "type": "number",
+        "optional": true
+      },
+      {
+        "name": "roadSectionId",
+        "type": "number",
+        "optional": true
+      },
+      {
+        "name": "boqItemId",
+        "type": "number",
+        "optional": true
+      },
+      {
+        "name": "search",
+        "type": "string",
+        "optional": true
+      },
+      {
+        "name": "status",
+        "type": "string",
+        "optional": true
+      },
+      {
+        "name": "changeType",
+        "type": "string",
+        "optional": true
+      },
+      {
+        "name": "attachmentState",
+        "type": "string",
+        "optional": true
+      },
+      {
+        "name": "sortBy",
+        "type": "string",
+        "optional": true
+      },
+      {
+        "name": "sortDir",
+        "type": "string",
+        "optional": true
+      },
+      {
+        "name": "page",
+        "type": "number",
+        "optional": true
+      },
+      {
+        "name": "pageSize",
+        "type": "number",
+        "optional": true
+      }
+    ],
+    "bodyFields": [],
+    "responseSchema": {
+      "type": "{ message: string; }",
+      "fields": [
+        {
+          "name": "message",
+          "type": "string"
+        }
+      ]
+    },
+    "source": "app/api/value/variation-measurements/route.ts"
+  },
+  {
+    "key": "put:/api/value/variation-measurements",
+    "method": "PUT",
+    "path": "/api/value/variation-measurements",
+    "description": "PUT /api/value/variation-measurements",
+    "permissions": [
+      "value:update"
+    ],
+    "mode": "write",
+    "pathParams": [],
+    "queryParams": [
+      {
+        "name": "projectId",
+        "type": "number",
+        "optional": true
+      },
+      {
+        "name": "roadSectionId",
+        "type": "number",
+        "optional": true
+      },
+      {
+        "name": "boqItemId",
+        "type": "number",
+        "optional": true
+      },
+      {
+        "name": "search",
+        "type": "string",
+        "optional": true
+      },
+      {
+        "name": "status",
+        "type": "string",
+        "optional": true
+      },
+      {
+        "name": "changeType",
+        "type": "string",
+        "optional": true
+      },
+      {
+        "name": "attachmentState",
+        "type": "string",
+        "optional": true
+      },
+      {
+        "name": "sortBy",
+        "type": "string",
+        "optional": true
+      },
+      {
+        "name": "sortDir",
+        "type": "string",
+        "optional": true
+      },
+      {
+        "name": "page",
+        "type": "number",
+        "optional": true
+      },
+      {
+        "name": "pageSize",
+        "type": "number",
+        "optional": true
+      }
+    ],
+    "bodyFields": [],
+    "responseSchema": {
+      "type": "{ message: string; }",
+      "fields": [
+        {
+          "name": "message",
+          "type": "string"
+        }
+      ]
+    },
+    "source": "app/api/value/variation-measurements/route.ts"
+  },
+  {
+    "key": "delete:/api/value/variation-raw-records",
+    "method": "DELETE",
+    "path": "/api/value/variation-raw-records",
+    "description": "DELETE /api/value/variation-raw-records",
+    "permissions": [
+      "value:update"
+    ],
+    "mode": "write",
+    "pathParams": [],
+    "queryParams": [
+      {
+        "name": "projectId",
+        "type": "number",
+        "optional": true
+      },
+      {
+        "name": "roadSectionId",
+        "type": "number",
+        "optional": true
+      },
+      {
+        "name": "search",
+        "type": "string",
+        "optional": true
+      },
+      {
+        "name": "status",
+        "type": "string",
+        "optional": true
+      },
+      {
+        "name": "sortBy",
+        "type": "string",
+        "optional": true
+      },
+      {
+        "name": "sortDir",
+        "type": "string",
+        "optional": true
+      },
+      {
+        "name": "page",
+        "type": "number",
+        "optional": true
+      },
+      {
+        "name": "pageSize",
+        "type": "number",
+        "optional": true
+      }
+    ],
+    "bodyFields": [],
+    "responseSchema": {
+      "type": "{ message: string; }",
+      "fields": [
+        {
+          "name": "message",
+          "type": "string"
+        }
+      ]
+    },
+    "source": "app/api/value/variation-raw-records/route.ts"
+  },
+  {
+    "key": "get:/api/value/variation-raw-records",
+    "method": "GET",
+    "path": "/api/value/variation-raw-records",
+    "description": "GET /api/value/variation-raw-records",
+    "permissions": [
+      "value:view"
+    ],
+    "mode": "read",
+    "pathParams": [],
+    "queryParams": [
+      {
+        "name": "projectId",
+        "type": "number",
+        "optional": true
+      },
+      {
+        "name": "roadSectionId",
+        "type": "number",
+        "optional": true
+      },
+      {
+        "name": "search",
+        "type": "string",
+        "optional": true
+      },
+      {
+        "name": "status",
+        "type": "string",
+        "optional": true
+      },
+      {
+        "name": "sortBy",
+        "type": "string",
+        "optional": true
+      },
+      {
+        "name": "sortDir",
+        "type": "string",
+        "optional": true
+      },
+      {
+        "name": "page",
+        "type": "number",
+        "optional": true
+      },
+      {
+        "name": "pageSize",
+        "type": "number",
+        "optional": true
+      }
+    ],
+    "bodyFields": [],
+    "responseSchema": {
+      "type": "{ message: string; }",
+      "fields": [
+        {
+          "name": "message",
+          "type": "string"
+        }
+      ]
+    },
+    "source": "app/api/value/variation-raw-records/route.ts"
+  },
+  {
+    "key": "post:/api/value/variation-raw-records",
+    "method": "POST",
+    "path": "/api/value/variation-raw-records",
+    "description": "POST /api/value/variation-raw-records",
+    "permissions": [
+      "value:update"
+    ],
+    "mode": "write",
+    "pathParams": [],
+    "queryParams": [
+      {
+        "name": "projectId",
+        "type": "number",
+        "optional": true
+      },
+      {
+        "name": "roadSectionId",
+        "type": "number",
+        "optional": true
+      },
+      {
+        "name": "search",
+        "type": "string",
+        "optional": true
+      },
+      {
+        "name": "status",
+        "type": "string",
+        "optional": true
+      },
+      {
+        "name": "sortBy",
+        "type": "string",
+        "optional": true
+      },
+      {
+        "name": "sortDir",
+        "type": "string",
+        "optional": true
+      },
+      {
+        "name": "page",
+        "type": "number",
+        "optional": true
+      },
+      {
+        "name": "pageSize",
+        "type": "number",
+        "optional": true
+      }
+    ],
+    "bodyFields": [],
+    "responseSchema": {
+      "type": "{ message: string; }",
+      "fields": [
+        {
+          "name": "message",
+          "type": "string"
+        }
+      ]
+    },
+    "source": "app/api/value/variation-raw-records/route.ts"
+  },
+  {
+    "key": "put:/api/value/variation-raw-records",
+    "method": "PUT",
+    "path": "/api/value/variation-raw-records",
+    "description": "PUT /api/value/variation-raw-records",
+    "permissions": [
+      "value:update"
+    ],
+    "mode": "write",
+    "pathParams": [],
+    "queryParams": [
+      {
+        "name": "projectId",
+        "type": "number",
+        "optional": true
+      },
+      {
+        "name": "roadSectionId",
+        "type": "number",
+        "optional": true
+      },
+      {
+        "name": "search",
+        "type": "string",
+        "optional": true
+      },
+      {
+        "name": "status",
+        "type": "string",
+        "optional": true
+      },
+      {
+        "name": "sortBy",
+        "type": "string",
+        "optional": true
+      },
+      {
+        "name": "sortDir",
+        "type": "string",
+        "optional": true
+      },
+      {
+        "name": "page",
+        "type": "number",
+        "optional": true
+      },
+      {
+        "name": "pageSize",
+        "type": "number",
+        "optional": true
+      }
+    ],
+    "bodyFields": [],
+    "responseSchema": {
+      "type": "{ message: string; }",
+      "fields": [
+        {
+          "name": "message",
+          "type": "string"
+        }
+      ]
+    },
+    "source": "app/api/value/variation-raw-records/route.ts"
+  },
+  {
+    "key": "get:/api/weekly-plans",
+    "method": "GET",
+    "path": "/api/weekly-plans",
+    "description": "GET /api/weekly-plans",
+    "permissions": [
+      "material:view"
+    ],
+    "mode": "read",
+    "pathParams": [],
+    "queryParams": [
+      {
+        "name": "projectId",
+        "type": "number",
+        "optional": true
+      }
+    ],
+    "bodyFields": [],
+    "responseSchema": {
+      "type": "{ plans: ({ _count: { items: number; }; project: { id: number; name: string; }; projects: ({ project: { id: number; name: string; }; } & { projectId: number; sortOrder: number; planId: number; })[]; } & { id: number; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; projectId: number; title: string; month: number; session: number; weekStartDate: Date | null; weekEndDate: Date | null; approverUserId: number | null; editorUserId: number | null; approverName: string | null; editorName: string | null; })[]; }",
+      "fields": [
+        {
+          "name": "plans",
+          "type": "({ _count: { items: number; }; project: { id: number; name: string; }; projects: ({ project: { id: number; name: string; }; } & { projectId: number; sortOrder: number; planId: number; })[]; } & { id: number; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; projectId: number; title: string; month: number; session: number; weekStartDate: Date | null; weekEndDate: Date | null; approverUserId: number | null; editorUserId: number | null; approverName: string | null; editorName: string | null; })[]"
+        }
+      ]
+    },
+    "source": "app/api/weekly-plans/route.ts"
+  },
+  {
+    "key": "post:/api/weekly-plans",
+    "method": "POST",
+    "path": "/api/weekly-plans",
+    "description": "POST /api/weekly-plans",
+    "permissions": [
+      "material:create"
+    ],
+    "mode": "write",
+    "pathParams": [],
+    "queryParams": [
+      {
+        "name": "projectId",
+        "type": "number",
+        "optional": true
+      }
+    ],
+    "bodyFields": [],
+    "responseSchema": {
+      "type": "{ plans: ({ _count: { items: number; }; project: { id: number; name: string; }; projects: ({ project: { id: number; name: string; }; } & { projectId: number; sortOrder: number; planId: number; })[]; } & { id: number; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; projectId: number; title: string; month: number; session: number; weekStartDate: Date | null; weekEndDate: Date | null; approverUserId: number | null; editorUserId: number | null; approverName: string | null; editorName: string | null; })[]; }",
+      "fields": [
+        {
+          "name": "plans",
+          "type": "({ _count: { items: number; }; project: { id: number; name: string; }; projects: ({ project: { id: number; name: string; }; } & { projectId: number; sortOrder: number; planId: number; })[]; } & { id: number; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; projectId: number; title: string; month: number; session: number; weekStartDate: Date | null; weekEndDate: Date | null; approverUserId: number | null; editorUserId: number | null; approverName: string | null; editorName: string | null; })[]"
+        }
+      ]
+    },
+    "source": "app/api/weekly-plans/route.ts"
+  },
+  {
+    "key": "delete:/api/weekly-plans/:id",
+    "method": "DELETE",
+    "path": "/api/weekly-plans/:id",
+    "description": "DELETE /api/weekly-plans/:id",
+    "permissions": [
+      "material:delete"
+    ],
+    "mode": "write",
+    "pathParams": [
+      {
+        "name": "id",
+        "type": "number",
+        "optional": false
+      }
+    ],
+    "queryParams": [],
+    "bodyFields": [],
+    "responseSchema": {
+      "type": "{ plan: { project: { id: number; name: string; }; items: { status: string; id: number; createdAt: Date; updatedAt: Date; model: JsonValue; unitPrice: Decimal | null; sortOrder: number; unit: string | null; note: string | null; planId: number; deliveryDate: string | null; supplier: string | null; goodsName: string | null; goodsNameKey: string | null; modelKey: string | null; plannedQty: Decimal | null; transporter: string | null; headPlateNumber: string | null; tailPlateNumber: string | null; phone: string | null; actualQty: Decimal | null; }[]; projects: ({ project: { id: number; name: string; }; } & { projectId: number; sortOrder: number; planId: number; })[]; } & { id: number; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; projectId: number; title: string; month: number; session: number; weekStartDate: Date | null; weekEndDate: Date | null; approverUserId: number | null; editorUserId: number | null; approverName: string | null; editorName: string | null; }; }",
+      "fields": [
+        {
+          "name": "plan",
+          "type": "{ project: { id: number; name: string; }; items: { status: string; id: number; createdAt: Date; updatedAt: Date; model: JsonValue; unitPrice: Decimal | null; sortOrder: number; unit: string | null; note: string | null; planId: number; deliveryDate: string | null; supplier: string | null; goodsName: string | null; goodsNameKey: string | null; modelKey: string | null; plannedQty: Decimal | null; transporter: string | null; headPlateNumber: string | null; tailPlateNumber: string | null; phone: string | null; actualQty: Decimal | null; }[]; projects: ({ project: { id: number; name: string; }; } & { projectId: number; sortOrder: number; planId: number; })[]; } & { id: number; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; projectId: number; title: string; month: number; session: number; weekStartDate: Date | null; weekEndDate: Date | null; approverUserId: number | null; editorUserId: number | null; approverName: string | null; editorName: string | null; }",
+          "fields": [
+            {
+              "name": "project",
+              "type": "any"
+            },
+            {
+              "name": "items",
+              "type": "any"
+            },
+            {
+              "name": "projects",
+              "type": "any"
+            },
+            {
+              "name": "id",
+              "type": "number"
+            },
+            {
+              "name": "createdById",
+              "type": "number | null"
+            },
+            {
+              "name": "updatedById",
+              "type": "number | null"
+            },
+            {
+              "name": "createdAt",
+              "type": "Date"
+            },
+            {
+              "name": "updatedAt",
+              "type": "Date"
+            },
+            {
+              "name": "projectId",
+              "type": "number"
+            },
+            {
+              "name": "title",
+              "type": "string"
+            },
+            {
+              "name": "month",
+              "type": "number"
+            },
+            {
+              "name": "session",
+              "type": "number"
+            },
+            {
+              "name": "weekStartDate",
+              "type": "Date | null"
+            },
+            {
+              "name": "weekEndDate",
+              "type": "Date | null"
+            },
+            {
+              "name": "approverUserId",
+              "type": "number | null"
+            },
+            {
+              "name": "editorUserId",
+              "type": "number | null"
+            },
+            {
+              "name": "approverName",
+              "type": "string | null"
+            },
+            {
+              "name": "editorName",
+              "type": "string | null"
+            }
+          ]
+        }
+      ]
+    },
+    "source": "app/api/weekly-plans/[id]/route.ts"
+  },
+  {
+    "key": "get:/api/weekly-plans/:id",
+    "method": "GET",
+    "path": "/api/weekly-plans/:id",
+    "description": "GET /api/weekly-plans/:id",
+    "permissions": [
+      "material:view"
+    ],
+    "mode": "read",
+    "pathParams": [
+      {
+        "name": "id",
+        "type": "number",
+        "optional": false
+      }
+    ],
+    "queryParams": [],
+    "bodyFields": [],
+    "responseSchema": {
+      "type": "{ plan: { project: { id: number; name: string; }; items: { status: string; id: number; createdAt: Date; updatedAt: Date; model: JsonValue; unitPrice: Decimal | null; sortOrder: number; unit: string | null; note: string | null; planId: number; deliveryDate: string | null; supplier: string | null; goodsName: string | null; goodsNameKey: string | null; modelKey: string | null; plannedQty: Decimal | null; transporter: string | null; headPlateNumber: string | null; tailPlateNumber: string | null; phone: string | null; actualQty: Decimal | null; }[]; projects: ({ project: { id: number; name: string; }; } & { projectId: number; sortOrder: number; planId: number; })[]; } & { id: number; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; projectId: number; title: string; month: number; session: number; weekStartDate: Date | null; weekEndDate: Date | null; approverUserId: number | null; editorUserId: number | null; approverName: string | null; editorName: string | null; }; }",
+      "fields": [
+        {
+          "name": "plan",
+          "type": "{ project: { id: number; name: string; }; items: { status: string; id: number; createdAt: Date; updatedAt: Date; model: JsonValue; unitPrice: Decimal | null; sortOrder: number; unit: string | null; note: string | null; planId: number; deliveryDate: string | null; supplier: string | null; goodsName: string | null; goodsNameKey: string | null; modelKey: string | null; plannedQty: Decimal | null; transporter: string | null; headPlateNumber: string | null; tailPlateNumber: string | null; phone: string | null; actualQty: Decimal | null; }[]; projects: ({ project: { id: number; name: string; }; } & { projectId: number; sortOrder: number; planId: number; })[]; } & { id: number; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; projectId: number; title: string; month: number; session: number; weekStartDate: Date | null; weekEndDate: Date | null; approverUserId: number | null; editorUserId: number | null; approverName: string | null; editorName: string | null; }",
+          "fields": [
+            {
+              "name": "project",
+              "type": "any"
+            },
+            {
+              "name": "items",
+              "type": "any"
+            },
+            {
+              "name": "projects",
+              "type": "any"
+            },
+            {
+              "name": "id",
+              "type": "number"
+            },
+            {
+              "name": "createdById",
+              "type": "number | null"
+            },
+            {
+              "name": "updatedById",
+              "type": "number | null"
+            },
+            {
+              "name": "createdAt",
+              "type": "Date"
+            },
+            {
+              "name": "updatedAt",
+              "type": "Date"
+            },
+            {
+              "name": "projectId",
+              "type": "number"
+            },
+            {
+              "name": "title",
+              "type": "string"
+            },
+            {
+              "name": "month",
+              "type": "number"
+            },
+            {
+              "name": "session",
+              "type": "number"
+            },
+            {
+              "name": "weekStartDate",
+              "type": "Date | null"
+            },
+            {
+              "name": "weekEndDate",
+              "type": "Date | null"
+            },
+            {
+              "name": "approverUserId",
+              "type": "number | null"
+            },
+            {
+              "name": "editorUserId",
+              "type": "number | null"
+            },
+            {
+              "name": "approverName",
+              "type": "string | null"
+            },
+            {
+              "name": "editorName",
+              "type": "string | null"
+            }
+          ]
+        }
+      ]
+    },
+    "source": "app/api/weekly-plans/[id]/route.ts"
+  },
+  {
+    "key": "put:/api/weekly-plans/:id",
+    "method": "PUT",
+    "path": "/api/weekly-plans/:id",
+    "description": "PUT /api/weekly-plans/:id",
+    "permissions": [
+      "material:create"
+    ],
+    "mode": "write",
+    "pathParams": [
+      {
+        "name": "id",
+        "type": "number",
+        "optional": false
+      }
+    ],
+    "queryParams": [],
+    "bodyFields": [],
+    "responseSchema": {
+      "type": "{ plan: { project: { id: number; name: string; }; items: { status: string; id: number; createdAt: Date; updatedAt: Date; model: JsonValue; unitPrice: Decimal | null; sortOrder: number; unit: string | null; note: string | null; planId: number; deliveryDate: string | null; supplier: string | null; goodsName: string | null; goodsNameKey: string | null; modelKey: string | null; plannedQty: Decimal | null; transporter: string | null; headPlateNumber: string | null; tailPlateNumber: string | null; phone: string | null; actualQty: Decimal | null; }[]; projects: ({ project: { id: number; name: string; }; } & { projectId: number; sortOrder: number; planId: number; })[]; } & { id: number; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; projectId: number; title: string; month: number; session: number; weekStartDate: Date | null; weekEndDate: Date | null; approverUserId: number | null; editorUserId: number | null; approverName: string | null; editorName: string | null; }; }",
+      "fields": [
+        {
+          "name": "plan",
+          "type": "{ project: { id: number; name: string; }; items: { status: string; id: number; createdAt: Date; updatedAt: Date; model: JsonValue; unitPrice: Decimal | null; sortOrder: number; unit: string | null; note: string | null; planId: number; deliveryDate: string | null; supplier: string | null; goodsName: string | null; goodsNameKey: string | null; modelKey: string | null; plannedQty: Decimal | null; transporter: string | null; headPlateNumber: string | null; tailPlateNumber: string | null; phone: string | null; actualQty: Decimal | null; }[]; projects: ({ project: { id: number; name: string; }; } & { projectId: number; sortOrder: number; planId: number; })[]; } & { id: number; createdById: number | null; updatedById: number | null; createdAt: Date; updatedAt: Date; projectId: number; title: string; month: number; session: number; weekStartDate: Date | null; weekEndDate: Date | null; approverUserId: number | null; editorUserId: number | null; approverName: string | null; editorName: string | null; }",
+          "fields": [
+            {
+              "name": "project",
+              "type": "any"
+            },
+            {
+              "name": "items",
+              "type": "any"
+            },
+            {
+              "name": "projects",
+              "type": "any"
+            },
+            {
+              "name": "id",
+              "type": "number"
+            },
+            {
+              "name": "createdById",
+              "type": "number | null"
+            },
+            {
+              "name": "updatedById",
+              "type": "number | null"
+            },
+            {
+              "name": "createdAt",
+              "type": "Date"
+            },
+            {
+              "name": "updatedAt",
+              "type": "Date"
+            },
+            {
+              "name": "projectId",
+              "type": "number"
+            },
+            {
+              "name": "title",
+              "type": "string"
+            },
+            {
+              "name": "month",
+              "type": "number"
+            },
+            {
+              "name": "session",
+              "type": "number"
+            },
+            {
+              "name": "weekStartDate",
+              "type": "Date | null"
+            },
+            {
+              "name": "weekEndDate",
+              "type": "Date | null"
+            },
+            {
+              "name": "approverUserId",
+              "type": "number | null"
+            },
+            {
+              "name": "editorUserId",
+              "type": "number | null"
+            },
+            {
+              "name": "approverName",
+              "type": "string | null"
+            },
+            {
+              "name": "editorName",
+              "type": "string | null"
+            }
+          ]
+        }
+      ]
+    },
+    "source": "app/api/weekly-plans/[id]/route.ts"
+  },
+  {
+    "key": "get:/api/weekly-plans/:id/export",
+    "method": "GET",
+    "path": "/api/weekly-plans/:id/export",
+    "description": "GET /api/weekly-plans/:id/export",
+    "permissions": [
+      "material:view"
+    ],
+    "mode": "export",
+    "pathParams": [
+      {
+        "name": "id",
+        "type": "number",
+        "optional": false
+      }
+    ],
+    "queryParams": [
+      {
+        "name": "format",
+        "type": "string",
+        "optional": true
+      }
+    ],
+    "bodyFields": [],
+    "responseSchema": {
+      "type": "Binary (application/pdf)"
+    },
+    "source": "app/api/weekly-plans/[id]/export/route.ts"
+  },
+  {
+    "key": "post:/api/weekly-plans/:id/items",
+    "method": "POST",
+    "path": "/api/weekly-plans/:id/items",
+    "description": "POST /api/weekly-plans/:id/items",
+    "permissions": [
+      "material:create"
+    ],
+    "mode": "write",
+    "pathParams": [
+      {
+        "name": "id",
+        "type": "number",
+        "optional": false
+      }
+    ],
+    "queryParams": [],
+    "bodyFields": [],
+    "responseSchema": {
+      "type": "{ item: { status: string; id: number; createdAt: Date; updatedAt: Date; model: JsonValue; unitPrice: Decimal | null; sortOrder: number; unit: string | null; note: string | null; planId: number; deliveryDate: string | null; supplier: string | null; goodsName: string | null; goodsNameKey: string | null; modelKey: string | null; plannedQty: Decimal | null; transporter: string | null; headPlateNumber: string | null; tailPlateNumber: string | null; phone: string | null; actualQty: Decimal | null; }; }",
+      "fields": [
+        {
+          "name": "item",
+          "type": "{ status: string; id: number; createdAt: Date; updatedAt: Date; model: JsonValue; unitPrice: Decimal | null; sortOrder: number; unit: string | null; note: string | null; planId: number; deliveryDate: string | null; supplier: string | null; goodsName: string | null; goodsNameKey: string | null; modelKey: string | null; plannedQty: Decimal | null; transporter: string | null; headPlateNumber: string | null; tailPlateNumber: string | null; phone: string | null; actualQty: Decimal | null; }",
+          "fields": [
+            {
+              "name": "status",
+              "type": "string"
+            },
+            {
+              "name": "id",
+              "type": "number"
+            },
+            {
+              "name": "createdAt",
+              "type": "Date"
+            },
+            {
+              "name": "updatedAt",
+              "type": "Date"
+            },
+            {
+              "name": "model",
+              "type": "JsonValue"
+            },
+            {
+              "name": "unitPrice",
+              "type": "Decimal | null"
+            },
+            {
+              "name": "sortOrder",
+              "type": "number"
+            },
+            {
+              "name": "unit",
+              "type": "string | null"
+            },
+            {
+              "name": "note",
+              "type": "string | null"
+            },
+            {
+              "name": "planId",
+              "type": "number"
+            },
+            {
+              "name": "deliveryDate",
+              "type": "string | null"
+            },
+            {
+              "name": "supplier",
+              "type": "string | null"
+            },
+            {
+              "name": "goodsName",
+              "type": "string | null"
+            },
+            {
+              "name": "goodsNameKey",
+              "type": "string | null"
+            },
+            {
+              "name": "modelKey",
+              "type": "string | null"
+            },
+            {
+              "name": "plannedQty",
+              "type": "Decimal | null"
+            },
+            {
+              "name": "transporter",
+              "type": "string | null"
+            },
+            {
+              "name": "headPlateNumber",
+              "type": "string | null"
+            },
+            {
+              "name": "tailPlateNumber",
+              "type": "string | null"
+            },
+            {
+              "name": "phone",
+              "type": "string | null"
+            },
+            {
+              "name": "actualQty",
+              "type": "Decimal | null"
+            }
+          ]
+        }
+      ]
+    },
+    "source": "app/api/weekly-plans/[id]/items/route.ts"
+  },
+  {
+    "key": "delete:/api/weekly-plans/:id/items/:itemId",
+    "method": "DELETE",
+    "path": "/api/weekly-plans/:id/items/:itemId",
+    "description": "DELETE /api/weekly-plans/:id/items/:itemId",
+    "permissions": [
+      "material:delete"
+    ],
+    "mode": "write",
+    "pathParams": [
+      {
+        "name": "id",
+        "type": "number",
+        "optional": false
+      },
+      {
+        "name": "itemId",
+        "type": "number",
+        "optional": false
+      }
+    ],
+    "queryParams": [],
+    "bodyFields": [],
+    "responseSchema": {
+      "type": "{ item: { status: string; id: number; createdAt: Date; updatedAt: Date; model: JsonValue; unitPrice: Decimal | null; sortOrder: number; unit: string | null; note: string | null; planId: number; deliveryDate: string | null; supplier: string | null; goodsName: string | null; goodsNameKey: string | null; modelKey: string | null; plannedQty: Decimal | null; transporter: string | null; headPlateNumber: string | null; tailPlateNumber: string | null; phone: string | null; actualQty: Decimal | null; }; }",
+      "fields": [
+        {
+          "name": "item",
+          "type": "{ status: string; id: number; createdAt: Date; updatedAt: Date; model: JsonValue; unitPrice: Decimal | null; sortOrder: number; unit: string | null; note: string | null; planId: number; deliveryDate: string | null; supplier: string | null; goodsName: string | null; goodsNameKey: string | null; modelKey: string | null; plannedQty: Decimal | null; transporter: string | null; headPlateNumber: string | null; tailPlateNumber: string | null; phone: string | null; actualQty: Decimal | null; }",
+          "fields": [
+            {
+              "name": "status",
+              "type": "string"
+            },
+            {
+              "name": "id",
+              "type": "number"
+            },
+            {
+              "name": "createdAt",
+              "type": "Date"
+            },
+            {
+              "name": "updatedAt",
+              "type": "Date"
+            },
+            {
+              "name": "model",
+              "type": "JsonValue"
+            },
+            {
+              "name": "unitPrice",
+              "type": "Decimal | null"
+            },
+            {
+              "name": "sortOrder",
+              "type": "number"
+            },
+            {
+              "name": "unit",
+              "type": "string | null"
+            },
+            {
+              "name": "note",
+              "type": "string | null"
+            },
+            {
+              "name": "planId",
+              "type": "number"
+            },
+            {
+              "name": "deliveryDate",
+              "type": "string | null"
+            },
+            {
+              "name": "supplier",
+              "type": "string | null"
+            },
+            {
+              "name": "goodsName",
+              "type": "string | null"
+            },
+            {
+              "name": "goodsNameKey",
+              "type": "string | null"
+            },
+            {
+              "name": "modelKey",
+              "type": "string | null"
+            },
+            {
+              "name": "plannedQty",
+              "type": "Decimal | null"
+            },
+            {
+              "name": "transporter",
+              "type": "string | null"
+            },
+            {
+              "name": "headPlateNumber",
+              "type": "string | null"
+            },
+            {
+              "name": "tailPlateNumber",
+              "type": "string | null"
+            },
+            {
+              "name": "phone",
+              "type": "string | null"
+            },
+            {
+              "name": "actualQty",
+              "type": "Decimal | null"
+            }
+          ]
+        }
+      ]
+    },
+    "source": "app/api/weekly-plans/[id]/items/[itemId]/route.ts"
+  },
+  {
+    "key": "put:/api/weekly-plans/:id/items/:itemId",
+    "method": "PUT",
+    "path": "/api/weekly-plans/:id/items/:itemId",
+    "description": "PUT /api/weekly-plans/:id/items/:itemId",
+    "permissions": [
+      "material:create"
+    ],
+    "mode": "write",
+    "pathParams": [
+      {
+        "name": "id",
+        "type": "number",
+        "optional": false
+      },
+      {
+        "name": "itemId",
+        "type": "number",
+        "optional": false
+      }
+    ],
+    "queryParams": [],
+    "bodyFields": [],
+    "responseSchema": {
+      "type": "{ item: { status: string; id: number; createdAt: Date; updatedAt: Date; model: JsonValue; unitPrice: Decimal | null; sortOrder: number; unit: string | null; note: string | null; planId: number; deliveryDate: string | null; supplier: string | null; goodsName: string | null; goodsNameKey: string | null; modelKey: string | null; plannedQty: Decimal | null; transporter: string | null; headPlateNumber: string | null; tailPlateNumber: string | null; phone: string | null; actualQty: Decimal | null; }; }",
+      "fields": [
+        {
+          "name": "item",
+          "type": "{ status: string; id: number; createdAt: Date; updatedAt: Date; model: JsonValue; unitPrice: Decimal | null; sortOrder: number; unit: string | null; note: string | null; planId: number; deliveryDate: string | null; supplier: string | null; goodsName: string | null; goodsNameKey: string | null; modelKey: string | null; plannedQty: Decimal | null; transporter: string | null; headPlateNumber: string | null; tailPlateNumber: string | null; phone: string | null; actualQty: Decimal | null; }",
+          "fields": [
+            {
+              "name": "status",
+              "type": "string"
+            },
+            {
+              "name": "id",
+              "type": "number"
+            },
+            {
+              "name": "createdAt",
+              "type": "Date"
+            },
+            {
+              "name": "updatedAt",
+              "type": "Date"
+            },
+            {
+              "name": "model",
+              "type": "JsonValue"
+            },
+            {
+              "name": "unitPrice",
+              "type": "Decimal | null"
+            },
+            {
+              "name": "sortOrder",
+              "type": "number"
+            },
+            {
+              "name": "unit",
+              "type": "string | null"
+            },
+            {
+              "name": "note",
+              "type": "string | null"
+            },
+            {
+              "name": "planId",
+              "type": "number"
+            },
+            {
+              "name": "deliveryDate",
+              "type": "string | null"
+            },
+            {
+              "name": "supplier",
+              "type": "string | null"
+            },
+            {
+              "name": "goodsName",
+              "type": "string | null"
+            },
+            {
+              "name": "goodsNameKey",
+              "type": "string | null"
+            },
+            {
+              "name": "modelKey",
+              "type": "string | null"
+            },
+            {
+              "name": "plannedQty",
+              "type": "Decimal | null"
+            },
+            {
+              "name": "transporter",
+              "type": "string | null"
+            },
+            {
+              "name": "headPlateNumber",
+              "type": "string | null"
+            },
+            {
+              "name": "tailPlateNumber",
+              "type": "string | null"
+            },
+            {
+              "name": "phone",
+              "type": "string | null"
+            },
+            {
+              "name": "actualQty",
+              "type": "Decimal | null"
+            }
+          ]
+        }
+      ]
+    },
+    "source": "app/api/weekly-plans/[id]/items/[itemId]/route.ts"
+  },
+  {
+    "key": "get:/api/weekly-plans/:id/items/:itemId/receipts",
+    "method": "GET",
+    "path": "/api/weekly-plans/:id/items/:itemId/receipts",
+    "description": "GET /api/weekly-plans/:id/items/:itemId/receipts",
+    "permissions": [
+      "material:view"
+    ],
+    "mode": "read",
+    "pathParams": [
+      {
+        "name": "id",
+        "type": "number",
+        "optional": false
+      },
+      {
+        "name": "itemId",
+        "type": "number",
+        "optional": false
+      }
+    ],
+    "queryParams": [],
+    "bodyFields": [],
+    "responseSchema": {
+      "type": "{ receipts: WeeklyPlanReceiptDTO[]; }",
+      "fields": [
+        {
+          "name": "receipts",
+          "type": "WeeklyPlanReceiptDTO[]"
+        }
+      ]
+    },
+    "source": "app/api/weekly-plans/[id]/items/[itemId]/receipts/route.ts"
+  },
+  {
+    "key": "post:/api/weekly-plans/:id/items/:itemId/receipts",
+    "method": "POST",
+    "path": "/api/weekly-plans/:id/items/:itemId/receipts",
+    "description": "POST /api/weekly-plans/:id/items/:itemId/receipts",
+    "permissions": [
+      "material:create",
+      "material:update"
+    ],
+    "mode": "write",
+    "pathParams": [
+      {
+        "name": "id",
+        "type": "number",
+        "optional": false
+      },
+      {
+        "name": "itemId",
+        "type": "number",
+        "optional": false
+      }
+    ],
+    "queryParams": [],
+    "bodyFields": [],
+    "responseSchema": {
+      "type": "{ receipts: WeeklyPlanReceiptDTO[]; }",
+      "fields": [
+        {
+          "name": "receipts",
+          "type": "WeeklyPlanReceiptDTO[]"
+        }
+      ]
+    },
+    "source": "app/api/weekly-plans/[id]/items/[itemId]/receipts/route.ts"
+  },
+  {
+    "key": "delete:/api/weekly-plans/:id/items/:itemId/receipts/:fileId",
+    "method": "DELETE",
+    "path": "/api/weekly-plans/:id/items/:itemId/receipts/:fileId",
+    "description": "DELETE /api/weekly-plans/:id/items/:itemId/receipts/:fileId",
+    "permissions": [
+      "material:create",
+      "material:update",
+      "material:delete"
+    ],
+    "mode": "write",
+    "pathParams": [
+      {
+        "name": "id",
+        "type": "number",
+        "optional": false
+      },
+      {
+        "name": "itemId",
+        "type": "number",
+        "optional": false
+      },
+      {
+        "name": "fileId",
+        "type": "number",
+        "optional": false
+      }
+    ],
+    "queryParams": [],
+    "bodyFields": [],
+    "responseSchema": {
+      "type": "{ ok: true; }",
+      "fields": [
+        {
+          "name": "ok",
+          "type": "true"
+        }
+      ]
+    },
+    "source": "app/api/weekly-plans/[id]/items/[itemId]/receipts/[fileId]/route.ts"
+  },
+  {
+    "key": "post:/api/weekly-plans/:id/items/:itemId/receipts/upload-url",
+    "method": "POST",
+    "path": "/api/weekly-plans/:id/items/:itemId/receipts/upload-url",
+    "description": "POST /api/weekly-plans/:id/items/:itemId/receipts/upload-url",
+    "permissions": [
+      "material:create",
+      "material:update"
+    ],
+    "mode": "write",
+    "pathParams": [
+      {
+        "name": "id",
+        "type": "number",
+        "optional": false
+      },
+      {
+        "name": "itemId",
+        "type": "number",
+        "optional": false
+      }
+    ],
+    "queryParams": [],
+    "bodyFields": [],
+    "responseSchema": {
+      "type": "{ uploadUrl: string; storageKey: string; requiredHeaders: { 'Content-Type': string; }; }",
+      "fields": [
+        {
+          "name": "uploadUrl",
+          "type": "string"
+        },
+        {
+          "name": "storageKey",
+          "type": "string"
+        },
+        {
+          "name": "requiredHeaders",
+          "type": "{ 'Content-Type': string; }",
+          "fields": [
+            {
+              "name": "Content-Type",
+              "type": "string"
+            }
+          ]
+        }
+      ]
+    },
+    "source": "app/api/weekly-plans/[id]/items/[itemId]/receipts/upload-url/route.ts"
+  },
+  {
+    "key": "post:/api/weekly-plans/:id/items/bulk-delete",
+    "method": "POST",
+    "path": "/api/weekly-plans/:id/items/bulk-delete",
+    "description": "POST /api/weekly-plans/:id/items/bulk-delete",
+    "permissions": [
+      "material:delete"
+    ],
+    "mode": "write",
+    "pathParams": [
+      {
+        "name": "id",
+        "type": "number",
+        "optional": false
+      }
+    ],
+    "queryParams": [],
+    "bodyFields": [],
+    "responseSchema": {
+      "type": "{ deletedCount: number; }",
+      "fields": [
+        {
+          "name": "deletedCount",
+          "type": "number"
+        }
+      ]
+    },
+    "source": "app/api/weekly-plans/[id]/items/bulk-delete/route.ts"
+  },
+  {
+    "key": "post:/api/weekly-plans/:id/items/bulk-duplicate",
+    "method": "POST",
+    "path": "/api/weekly-plans/:id/items/bulk-duplicate",
+    "description": "POST /api/weekly-plans/:id/items/bulk-duplicate",
+    "permissions": [
+      "material:create"
+    ],
+    "mode": "write",
+    "pathParams": [
+      {
+        "name": "id",
+        "type": "number",
+        "optional": false
+      }
+    ],
+    "queryParams": [],
+    "bodyFields": [],
+    "responseSchema": {
+      "type": "{ duplicatedCount: number; }",
+      "fields": [
+        {
+          "name": "duplicatedCount",
+          "type": "number"
+        }
+      ]
+    },
+    "source": "app/api/weekly-plans/[id]/items/bulk-duplicate/route.ts"
+  },
+  {
+    "key": "post:/api/weekly-plans/:id/items/bulk-edit",
+    "method": "POST",
+    "path": "/api/weekly-plans/:id/items/bulk-edit",
+    "description": "POST /api/weekly-plans/:id/items/bulk-edit",
+    "permissions": [
+      "material:create"
+    ],
+    "mode": "write",
+    "pathParams": [
+      {
+        "name": "id",
+        "type": "number",
+        "optional": false
+      }
+    ],
+    "queryParams": [],
+    "bodyFields": [],
+    "responseSchema": {
+      "type": "{ updatedCount: number; skippedCount: number; }",
+      "fields": [
+        {
+          "name": "updatedCount",
+          "type": "number"
+        },
+        {
+          "name": "skippedCount",
+          "type": "number"
+        }
+      ]
+    },
+    "source": "app/api/weekly-plans/[id]/items/bulk-edit/route.ts"
+  },
+  {
+    "key": "get:/api/weekly-plans/chinese-users",
+    "method": "GET",
+    "path": "/api/weekly-plans/chinese-users",
+    "description": "GET /api/weekly-plans/chinese-users",
+    "permissions": [
+      "material:view"
+    ],
+    "mode": "read",
+    "pathParams": [],
+    "queryParams": [],
+    "bodyFields": [],
+    "responseSchema": {
+      "type": "{ users: WeeklyPlanSignerOption[]; }",
+      "fields": [
+        {
+          "name": "users",
+          "type": "WeeklyPlanSignerOption[]"
+        }
+      ]
+    },
+    "source": "app/api/weekly-plans/chinese-users/route.ts"
+  },
+  {
+    "key": "get:/api/weekly-plans/options",
+    "method": "GET",
+    "path": "/api/weekly-plans/options",
+    "description": "GET /api/weekly-plans/options",
+    "permissions": [
+      "material:view"
+    ],
+    "mode": "read",
+    "pathParams": [],
+    "queryParams": [
+      {
+        "name": "projectId",
+        "type": "number[]",
+        "optional": true
+      }
+    ],
+    "bodyFields": [],
+    "responseSchema": {
+      "type": "{ options: { supplier: string[]; goodsName: string[]; unit: string[]; transporter: string[]; headPlateNumber: string[]; tailPlateNumber: string[]; phone: string[]; }; }",
+      "fields": [
+        {
+          "name": "options",
+          "type": "{ supplier: string[]; goodsName: string[]; unit: string[]; transporter: string[]; headPlateNumber: string[]; tailPlateNumber: string[]; phone: string[]; }",
+          "fields": [
+            {
+              "name": "supplier",
+              "type": "string[]"
+            },
+            {
+              "name": "goodsName",
+              "type": "string[]"
+            },
+            {
+              "name": "unit",
+              "type": "string[]"
+            },
+            {
+              "name": "transporter",
+              "type": "string[]"
+            },
+            {
+              "name": "headPlateNumber",
+              "type": "string[]"
+            },
+            {
+              "name": "tailPlateNumber",
+              "type": "string[]"
+            },
+            {
+              "name": "phone",
+              "type": "string[]"
+            }
+          ]
+        }
+      ]
+    },
+    "source": "app/api/weekly-plans/options/route.ts"
+  },
+  {
+    "key": "get:/api/weekly-plans/recent-price",
+    "method": "GET",
+    "path": "/api/weekly-plans/recent-price",
+    "description": "GET /api/weekly-plans/recent-price",
+    "permissions": [
+      "material:view"
+    ],
+    "mode": "read",
+    "pathParams": [],
+    "queryParams": [
+      {
+        "name": "goodsName",
+        "type": "string",
+        "optional": true
+      },
+      {
+        "name": "model",
+        "type": "string",
+        "optional": true
+      }
+    ],
+    "bodyFields": [],
+    "responseSchema": {
+      "type": "{ price: number | null; updatedAt: Date | null; }",
+      "fields": [
+        {
+          "name": "price",
+          "type": "number | null"
+        },
+        {
+          "name": "updatedAt",
+          "type": "Date | null"
+        }
+      ]
+    },
+    "source": "app/api/weekly-plans/recent-price/route.ts"
   }
 ]

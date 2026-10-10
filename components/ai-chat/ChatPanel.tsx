@@ -168,7 +168,7 @@ const compressHistoryForRequest = (messages: ChatMessage[], locale: Locale): Cha
 
 const renderInlineMarkdown = (text: string) => {
   const nodes: ReactNode[] = []
-  const regex = /(\*\*[^*]+\*\*|`[^`]+`|\*[^*]+\*)/g
+  const regex = /(\[[^\]]+\]\(\/api\/[^\s)]+\)|\*\*[^*]+\*\*|`[^`]+`|\*[^*]+\*)/g
   let lastIndex = 0
   let match: RegExpExecArray | null
   while ((match = regex.exec(text)) !== null) {
@@ -178,7 +178,16 @@ const renderInlineMarkdown = (text: string) => {
       nodes.push(<span key={`text-${lastIndex}`}>{text.slice(lastIndex, start)}</span>)
     }
     const token = match[0]
-    if (token.startsWith('**')) {
+    if (token.startsWith('[')) {
+      const link = /^\[([^\]]+)\]\((\/api\/[^\s)]+)\)$/.exec(token)
+      if (link) {
+        nodes.push(
+          <a key={`link-${start}`} href={link[2]} className="text-blue-700 underline underline-offset-2" target="_blank" rel="noopener noreferrer">
+            {link[1]}
+          </a>,
+        )
+      }
+    } else if (token.startsWith('**')) {
       nodes.push(
         <strong key={`bold-${start}`} className="font-semibold text-slate-900">
           {token.slice(2, -2)}

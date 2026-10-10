@@ -11,6 +11,7 @@ This folder contains a project-agnostic chat runtime with tool calling support.
 
 ## How to reuse
 1. Implement a model adapter (see `adapters/deepseekAdapter.ts`).
+   DailyWork can also use `adapters/responsesAdapter.ts` through `AI_CHAT_PROVIDER=responses` with `AI_CHAT_BASE_URL`, `AI_CHAT_MODEL`, and a server-only `AI_CHAT_API_KEY`. On this server, the unified CLIProxyAPI v8 gateway runs on port 8320 with `gpt-6.1-sol` and retains the custom transcription and embeddings routes. Verify model access with a real inference request because `/v1/models` is only a catalog.
 2. Define tool list with permission gates.
 3. Call `runChat()` with your adapter, tools, session, and messages.
 4. (Optional) Pass `onEvent` to stream planner/executor plan/step/tool progress to your UI.
@@ -32,6 +33,7 @@ rm -rf .tmp
 
 ## Semantic hints
 - `docs/api-semantic.json` stores API semantic hints (summary/intents/examples + returnType/detailEndpointKey/evidenceFields).
+- Routes without a curated semantic entry remain discoverable through path/domain hints; generated entries are not treated as verified business meaning.
 - The planner/executor uses these hints to expand list endpoints into detail calls when evidence is missing.
 
 ## Streaming UI

@@ -44,29 +44,77 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 
 const normalizeText = (value: string) => value.trim().toLowerCase()
 
+const searchTokens = (value: string) => {
+  const tokens = new Set<string>()
+  const normalized = value.toLowerCase().replace(/查询|查看|获取|请问|本月|最近/g, ' ')
+  for (const part of normalized.match(/[\u3400-\u9fff]+|[a-z0-9]+/g) ?? []) {
+    if (/^[\u3400-\u9fff]+$/.test(part)) {
+      if (part.length === 1) continue
+      for (let index = 0; index < part.length - 1; index += 1) {
+        tokens.add(part.slice(index, index + 2))
+      }
+    } else if (part.length >= 3) {
+      tokens.add(part)
+    }
+  }
+  return tokens
+}
+
 const matchScore = (query: string, candidate?: string, weight = 1) => {
   if (!candidate) return 0
   const normalizedCandidate = normalizeText(candidate)
   if (!normalizedCandidate) return 0
-  return query.includes(normalizedCandidate) || normalizedCandidate.includes(query) ? weight : 0
+  if (query.includes(normalizedCandidate) || normalizedCandidate.includes(query)) return weight
+  const questionTokens = searchTokens(query)
+  const candidateTokens = searchTokens(normalizedCandidate)
+  if (!questionTokens.size || !candidateTokens.size) return 0
+  const overlap = Array.from(questionTokens).filter((token) => candidateTokens.has(token)).length
+  return overlap ? (overlap / questionTokens.size) * weight : 0
 }
+
+const routeTerms: Record<string, string> = {
+  finance: '财务 费用 成本 收支 finance dépense',
+  ledger: '台账 记账 财务账目 ledger comptabilité',
+  payroll: '工资 薪酬 发薪 payroll salaire',
+  compensation: '工资 薪酬 劳务报酬 compensation salaire',
+  members: '人员 员工 成员 工人 members employés',
+  reports: '日报 报告 施工记录 reports rapport',
+  'leader-logs': '领导日志 工作日志 现场工作 journal chantier',
+  value: '产值 工程量 计量 清单 value métrés',
+  'weekly-plans': '周计划 周交付 计划 weekly plan',
+  inspections: '检查 巡检 验收 inspections contrôle',
+  roads: '道路 路段 桩号 roads routes',
+  resources: '资源 设备 材料 resources matériel',
+  machines: '机械 设备 machines engins',
+  documents: '文件 文档 资料 documents',
+  progress: '进度 施工进展 progress avancement',
+  insights: '统计 分析 汇总 insights résumé',
+  summary: '统计 汇总 摘要 summary résumé',
+  boq: '工程量清单 清单 BOQ bordereau',
+}
+
+const buildRouteSearchText = (path: string) =>
+  path
+    .split('/')
+    .filter(Boolean)
+    .flatMap((segment) => [segment.replace(/[-_]/g, ' '), routeTerms[segment] ?? ''])
+    .filter(Boolean)
+    .join(' ')
+
+const scoreRouteHints = (query: string, path: string) =>
+  path
+    .split('/')
+    .filter(Boolean)
+    .reduce((score, segment) => {
+      const hints = routeTerms[segment]?.split(' ') ?? []
+      const matches = hints.filter((hint) => hint.length >= 2 && query.includes(hint.toLowerCase()))
+      return score + Math.min(matches.length, 2) * 4
+    }, 0)
 
 const scoreList = (query: string, list: string[] | undefined, weight: number) => {
   if (!list || list.length === 0) return 0
   return list.reduce((total, item) => total + matchScore(query, item, weight), 0)
 }
-
-const hasContent = (entry: ApiSemanticEntry) =>
-  Boolean(
-    entry.summary ||
-      entry.intents?.length ||
-      entry.examples?.length ||
-      entry.inputNotes?.length ||
-      entry.outputNotes?.length ||
-      entry.returnType ||
-      entry.detailEndpointKey ||
-      entry.evidenceFields?.length,
-  )
 
 const canAccess = (permissions: string[] | undefined, required: string[]) => {
   if (!required.length) return true
@@ -74,13 +122,13 @@ const canAccess = (permissions: string[] | undefined, required: string[]) => {
   return required.some((permission) => permissions.includes(permission))
 }
 
-const scoreEntry = (query: string, entry: ApiSemanticEntry) => {
+const scoreEntry = (query: string, entry: ApiSemanticEntry, path: string) => {
   let score = 0
+  score += scoreRouteHints(query, path)
   score += matchScore(query, entry.summary, 2)
   score += scoreList(query, entry.intents, 4)
   score += scoreList(query, entry.examples, 3)
-  score += scoreList(query, entry.inputNotes, 1)
-  score += scoreList(query, entry.outputNotes, 1)
+  score += matchScore(query, buildRouteSearchText(path), 2)
   if (score <= 0) return 0
   if (entry.status === 'verified') score += 1
   return score
@@ -108,14 +156,15 @@ export const buildSemanticContext = async ({
   const catalogMap = new Map(dailyworkApiCatalog.map((entry) => [entry.key, entry]))
   const scored: ScoredEntry[] = []
 
-  Object.values(semanticCatalog.entries).forEach((entry) => {
-    if (!entry?.key) return
-    if (!hasContent(entry)) return
-    const catalogEntry = catalogMap.get(entry.key)
-    if (!catalogEntry) return
-    if (catalogEntry.mode === 'write') return
+  dailyworkApiCatalog.forEach((catalogEntry) => {
+    if (catalogEntry.method !== 'GET' || catalogEntry.mode !== 'read') return
     if (!canAccess(permissions, catalogEntry.permissions)) return
-    const score = scoreEntry(trimmedQuery, entry)
+    const entry = semanticCatalog.entries[catalogEntry.key] ?? {
+      key: catalogEntry.key,
+      summary: buildRouteSearchText(catalogEntry.path),
+      status: 'draft',
+    }
+    const score = scoreEntry(trimmedQuery, entry, catalogEntry.path)
     if (score <= 0) return
     scored.push({ entry, method: catalogEntry.method, path: catalogEntry.path, score })
   })
@@ -148,7 +197,7 @@ export const buildSemanticContext = async ({
       const detailCatalogEntry = catalogMap.get(entry.detailEndpointKey)
       if (
         detailCatalogEntry &&
-        detailCatalogEntry.mode !== 'write' &&
+        detailCatalogEntry.mode === 'read' &&
         canAccess(permissions, detailCatalogEntry.permissions)
       ) {
         const detailEntry = semanticCatalog.entries[entry.detailEndpointKey]
