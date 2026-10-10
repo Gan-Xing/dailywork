@@ -1,26 +1,26 @@
 'use client'
 
 import Link from 'next/link'
-import { useCallback, useMemo, useState, type ChangeEvent, type ReactNode } from 'react'
+import { useCallback, useMemo, useState, type ReactNode } from 'react'
 
 import { PageHeaderNav } from '@/components/PageHeaderNav'
 import { useToast } from '@/components/ToastProvider'
-import { locales, type Locale } from '@/lib/i18n'
+import { formatCopy, locales, type Locale } from '@/lib/i18n'
 import { productionValueCopy } from '@/lib/i18n/value'
 import { usePreferredLocale } from '@/lib/usePreferredLocale'
 import {
   getSiteVariationMeasurementReasonLabel,
   getSiteVariationMeasurementStatusLabel,
   getSiteVariationMeasurementTypeLabel,
-  SITE_VARIATION_MEASUREMENT_FILE_CATEGORY,
-  SITE_VARIATION_MEASUREMENT_FILE_ENTITY_TYPE,
-  SITE_VARIATION_MEASUREMENT_FILE_PURPOSE_EVIDENCE,
   SITE_VARIATION_MEASUREMENT_REASONS,
   SITE_VARIATION_MEASUREMENT_STATUSES,
   SITE_VARIATION_MEASUREMENT_TYPES,
 } from '@/lib/value/siteVariationMeasurements'
 
 const PAGE_SIZE_OPTIONS = [20, 50, 100]
+const PERIOD_OPTIONS = Array.from({ length: 60 }, (_, index) => String(index + 1))
+const PERIOD_BASE_DATE = new Date(Date.UTC(2000, 0, 1))
+const PERIOD_DAY_MS = 24 * 60 * 60 * 1000
 
 type ProjectOption = {
   id: number
@@ -184,7 +184,6 @@ type Props = {
   roadSections: RoadOption[]
   boqItems: BoqItemOption[]
   canUpdate: boolean
-  canUpload: boolean
 }
 
 const copyByLocale: Record<Locale, {
@@ -238,8 +237,7 @@ const copyByLocale: Record<Locale, {
     quantities: string
     amount: string
     status: string
-    files: string
-    updatedAt: string
+    confirmedAt: string
     actions: string
     empty: string
   }
@@ -255,7 +253,7 @@ const copyByLocale: Record<Locale, {
     openMeasurementLedger: '正式计量台账',
     readOnly: {
       title: '当前为只读模式',
-      description: '你可以查看、筛选和打开附件；新增、编辑、生成计量需要“产值更新”权限。',
+      description: '你可以查看、筛选和打开附件；新增、编辑和归档需要“产值更新”权限。',
       updateRequired: '缺少 value:update 权限',
     },
     sections: {
@@ -298,8 +296,7 @@ const copyByLocale: Record<Locale, {
       quantities: '数量',
       amount: '金额',
       status: '状态',
-      files: '附件',
-      updatedAt: '更新时间',
+      confirmedAt: '现场确认时间',
       actions: '操作',
       empty: '暂无现场变更计量记录',
     },
@@ -324,7 +321,7 @@ const copyByLocale: Record<Locale, {
       proposedQuantity: '拟计量数量',
       unitPrice: '单价',
       estimatedAmount: '预计金额',
-      occurredAt: '发生/确认日期',
+      occurredAt: '现场确认时间',
       measurementPeriod: '计量期次',
       measuredAt: '已计量日期',
       discoveredByText: '发现/记录人',
@@ -371,7 +368,7 @@ const copyByLocale: Record<Locale, {
     readOnly: {
       title: 'Mode lecture seule',
       description:
-        'Vous pouvez consulter, filtrer et ouvrir les pièces. La création, modification et génération de métré nécessitent le droit value:update.',
+        'Vous pouvez consulter, filtrer et ouvrir les pièces. La création, modification et archivage nécessitent le droit value:update.',
       updateRequired: 'Droit value:update requis',
     },
     sections: {
@@ -414,8 +411,7 @@ const copyByLocale: Record<Locale, {
       quantities: 'Quantités',
       amount: 'Montant',
       status: 'Statut',
-      files: 'Pièces',
-      updatedAt: 'Mise à jour',
+      confirmedAt: 'Date constatée',
       actions: 'Actions',
       empty: 'Aucune variation terrain',
     },
@@ -513,9 +509,31 @@ const emptyForm = (projectId = ''): FormState => ({
 })
 
 const dateInputValue = (value: string | null) => (value ? value.slice(0, 10) : '')
-const monthInputValue = (value: string | null) => (value ? value.slice(0, 7) : '')
 const numberInputValue = (value: number | null | undefined) =>
   value === null || value === undefined ? '' : String(value)
+
+const parsePeriodKey = (value: string) => {
+  const trimmed = value.trim()
+  if (!trimmed) return null
+  const normalized = trimmed.startsWith('P') || trimmed.startsWith('p') ? trimmed.slice(1) : trimmed
+  const parsed = Number(normalized)
+  if (!Number.isInteger(parsed) || parsed < 0) return null
+  return parsed
+}
+
+const resolvePeriodKeyFromValue = (value: string | null) => {
+  if (!value) return null
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return null
+  const diff = Math.round((parsed.getTime() - PERIOD_BASE_DATE.getTime()) / PERIOD_DAY_MS)
+  if (!Number.isFinite(diff) || diff < 0) return null
+  return String(diff)
+}
+
+const normalizePeriodLabel = (template: string, periodKey: string) => {
+  const index = parsePeriodKey(periodKey)
+  return index === null ? periodKey : formatCopy(template, { value: index })
+}
 
 const rowToForm = (row: VariationRow): FormState => ({
   id: String(row.id),
@@ -544,7 +562,7 @@ const rowToForm = (row: VariationRow): FormState => ({
   estimatedAmount: numberInputValue(row.estimatedAmount),
   occurredAt: dateInputValue(row.occurredAt),
   discoveredByText: row.discoveredByText ?? '',
-  measurementPeriod: monthInputValue(row.measurementPeriod),
+  measurementPeriod: resolvePeriodKeyFromValue(row.measurementPeriod) ?? '',
   measuredAt: dateInputValue(row.measuredAt),
   attachmentComplete: row.attachmentComplete,
   remark: row.remark ?? '',
@@ -601,16 +619,12 @@ const statusBadgeClass = (status: string) => {
   }
 }
 
-const hasPositiveQuantity = (row: VariationRow) =>
-  (row.proposedQuantity ?? row.actualQuantity ?? row.deltaQuantity ?? 0) > 0
-
 export default function VariationMeasurementsClient({
   initialResult,
   projects,
   roadSections,
   boqItems,
   canUpdate,
-  canUpload,
 }: Props) {
   const { locale, setLocale } = usePreferredLocale('zh', locales)
   const { addToast } = useToast()
@@ -631,7 +645,6 @@ export default function VariationMeasurementsClient({
   const [editingId, setEditingId] = useState<number | null>(null)
   const [form, setForm] = useState<FormState>(() => emptyForm(projects[0] ? String(projects[0].id) : ''))
   const [saving, setSaving] = useState(false)
-  const [uploadingId, setUploadingId] = useState<number | null>(null)
   const [actionId, setActionId] = useState<number | null>(null)
 
   const localeId = locale === 'fr' ? 'fr-FR' : 'zh-CN'
@@ -671,6 +684,21 @@ export default function VariationMeasurementsClient({
     const projectId = Number(filters.projectId)
     return roadSections.filter((road) => !projectId || !road.projectId || road.projectId === projectId)
   }, [filters.projectId, roadSections])
+
+  const periodOptions = useMemo(() => {
+    const keys = new Set(PERIOD_OPTIONS)
+    result.items.forEach((row) => {
+      const key = resolvePeriodKeyFromValue(row.measurementPeriod)
+      if (key) keys.add(key)
+    })
+    if (form.measurementPeriod) keys.add(form.measurementPeriod)
+    return Array.from(keys).sort((a, b) => {
+      const aIndex = parsePeriodKey(a)
+      const bIndex = parsePeriodKey(b)
+      if (aIndex !== null && bIndex !== null) return aIndex - bIndex
+      return a.localeCompare(b)
+    })
+  }, [form.measurementPeriod, result.items])
 
   const fetchRows = useCallback(
     async (
@@ -814,121 +842,6 @@ export default function VariationMeasurementsClient({
     }
   }
 
-  const getMeasurementBlockReason = useCallback(
-    (row: VariationRow) => {
-      if (row.measurementDetailId || row.status === 'MEASURED' || row.status === 'VOID') return ''
-      if (!row.boqItemId || !(row.roadSectionId || row.mainRoadSectionId) || !row.measurementPeriod || !hasPositiveQuantity(row)) {
-        return copy.hints.measurementBlocked
-      }
-      return ''
-    },
-    [copy.hints.measurementBlocked],
-  )
-
-  const createMeasurementDetail = async (row: VariationRow) => {
-    if (!canUpdate) return
-    const blockedReason = getMeasurementBlockReason(row)
-    if (blockedReason) {
-      addToast(blockedReason, { tone: 'danger' })
-      return
-    }
-    setActionId(row.id)
-    try {
-      const response = await fetch('/api/value/variation-measurements', {
-        method: 'PUT',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: row.id, action: 'createMeasurementDetail' }),
-      })
-      const payload = (await response.json().catch(() => ({}))) as { message?: string }
-      if (!response.ok) throw new Error(payload.message ?? copy.messages.measurementFailed)
-      addToast(copy.messages.measurementSuccess, { tone: 'success' })
-      await fetchRows(result.page, result.pageSize, filters, sort, { silent: true })
-    } catch (error) {
-      addToast((error as Error).message, { tone: 'danger' })
-    } finally {
-      setActionId(null)
-    }
-  }
-
-  const uploadAttachment = async (row: VariationRow, file: File | null) => {
-    if (!file || !canUpload) return
-    setUploadingId(row.id)
-    try {
-      const uploadUrlRes = await fetch('/api/files/upload-url', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          filename: file.name,
-          contentType: file.type || 'application/octet-stream',
-          size: file.size,
-          category: SITE_VARIATION_MEASUREMENT_FILE_CATEGORY,
-        }),
-      })
-      const uploadUrlBody = (await uploadUrlRes.json().catch(() => ({}))) as {
-        uploadUrl?: string
-        storageKey?: string
-        requiredHeaders?: Record<string, string>
-        message?: string
-        error?: string
-      }
-      if (!uploadUrlRes.ok || !uploadUrlBody.uploadUrl || !uploadUrlBody.storageKey) {
-        throw new Error(uploadUrlBody.error ?? uploadUrlBody.message ?? copy.messages.uploadFailed)
-      }
-      const putRes = await fetch(uploadUrlBody.uploadUrl, {
-        method: 'PUT',
-        headers: uploadUrlBody.requiredHeaders,
-        body: file,
-      })
-      if (!putRes.ok) throw new Error(copy.messages.uploadFailed)
-
-      const registerRes = await fetch('/api/files', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          storageKey: uploadUrlBody.storageKey,
-          originalName: file.name,
-          mimeType: file.type || 'application/octet-stream',
-          size: file.size,
-          category: SITE_VARIATION_MEASUREMENT_FILE_CATEGORY,
-          links: [
-            {
-              entityType: SITE_VARIATION_MEASUREMENT_FILE_ENTITY_TYPE,
-              entityId: String(row.id),
-              purpose: SITE_VARIATION_MEASUREMENT_FILE_PURPOSE_EVIDENCE,
-              label: row.structureName || row.phaseName || `variation-${row.id}`,
-            },
-          ],
-        }),
-      })
-      const registerBody = (await registerRes.json().catch(() => ({}))) as { message?: string }
-      if (!registerRes.ok) throw new Error(registerBody.message ?? copy.messages.uploadFailed)
-      addToast(copy.messages.uploadSuccess, { tone: 'success' })
-      await fetchRows(result.page, result.pageSize, filters, sort, { silent: true })
-    } catch (error) {
-      addToast((error as Error).message, { tone: 'danger' })
-    } finally {
-      setUploadingId(null)
-    }
-  }
-
-  const openAttachment = async (attachment: Attachment) => {
-    try {
-      const response = await fetch(`/api/files/${attachment.id}?includeUrl=1`, { credentials: 'include' })
-      const body = (await response.json().catch(() => ({}))) as {
-        file?: { url?: string | null; previewUrl?: string | null }
-        message?: string
-      }
-      const target = body.file?.url || body.file?.previewUrl
-      if (!response.ok || !target) throw new Error(body.message ?? copy.messages.openFailed)
-      window.open(target, '_blank', 'noopener,noreferrer')
-    } catch (error) {
-      addToast((error as Error).message, { tone: 'danger' })
-    }
-  }
-
   const setSortField = (field: SortState['field']) => {
     const next: SortState = {
       field,
@@ -1010,12 +923,11 @@ export default function VariationMeasurementsClient({
           </button>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-3">
           {[
             { label: copy.cards.total, value: result.summary.count },
             { label: copy.cards.unmeasuredAmount, value: formatMoney(result.summary.unmeasuredAmount, locale) },
             { label: copy.cards.measuredAmount, value: formatMoney(result.summary.measuredAmount, locale) },
-            { label: copy.cards.missingAttachment, value: result.summary.missingAttachmentCount },
           ].map((card) => (
             <div key={card.label} className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">{card.label}</p>
@@ -1151,14 +1063,23 @@ export default function VariationMeasurementsClient({
                     <th className="px-4 py-3">{copy.table.quantities}</th>
                     <th className="px-4 py-3">{headerButton(copy.table.amount, 'estimatedAmount')}</th>
                     <th className="px-4 py-3">{headerButton(copy.table.status, 'status')}</th>
-                    <th className="px-4 py-3">{copy.table.files}</th>
-                    <th className="px-4 py-3">{headerButton(copy.table.updatedAt, 'updatedAt')}</th>
-                    <th className="px-4 py-3">{copy.table.actions}</th>
+                    <th className="px-4 py-3">{headerButton(copy.table.confirmedAt, 'occurredAt')}</th>
+                    <th className="sticky right-0 z-10 bg-slate-100 px-4 py-3 shadow-[-8px_0_12px_-12px_rgb(15_23_42/0.35)]">
+                      {copy.table.actions}
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {result.items.map((row, index) => (
-                    <tr key={row.id} className="align-top hover:bg-slate-50">
+                    <tr
+                      key={row.id}
+                      onClick={(event) => {
+                        const target = event.target
+                        if (target instanceof HTMLElement && target.closest('a,button,input,label,select,textarea')) return
+                        openEditModal(row)
+                      }}
+                      className="cursor-pointer align-top hover:bg-slate-50"
+                    >
                       <td className="px-4 py-4 font-semibold text-slate-500">
                         #{(result.page - 1) * result.pageSize + index + 1}
                       </td>
@@ -1223,79 +1144,40 @@ export default function VariationMeasurementsClient({
                           <div className="mt-2 text-xs text-slate-500">MD #{row.measurementDetailId}</div>
                         ) : null}
                       </td>
-                      <td className="px-4 py-4">
-                        <div className="flex flex-col gap-1">
-                          <span className="text-xs text-slate-500">{row.attachmentCount}</span>
-                          {row.attachments.slice(0, 2).map((attachment) => (
-                            <button
-                              key={attachment.id}
-                              type="button"
-                              onClick={() => openAttachment(attachment)}
-                              className="max-w-[140px] truncate text-left text-xs font-semibold text-emerald-700 hover:text-emerald-600"
-                            >
-                              {attachment.originalName}
-                            </button>
-                          ))}
-                          {canUpload ? (
-                            <label className="mt-1 inline-flex cursor-pointer text-xs font-semibold text-slate-600 hover:text-slate-900">
-                              {uploadingId === row.id ? '...' : copy.actions.upload}
-                              <input
-                                type="file"
-                                className="hidden"
-                                onChange={(event: ChangeEvent<HTMLInputElement>) => {
-                                  void uploadAttachment(row, event.target.files?.[0] ?? null)
-                                  event.currentTarget.value = ''
-                                }}
-                              />
-                            </label>
-                          ) : null}
-                        </div>
-                      </td>
-                      <td className="px-4 py-4 text-xs text-slate-500">{formatDate(row.updatedAt, locale)}</td>
-                      <td className="px-4 py-4">
-                        <div className="flex min-w-[172px] flex-col items-stretch gap-2 text-xs font-semibold">
+                      <td className="px-4 py-4 text-xs text-slate-500">{formatDate(row.occurredAt, locale)}</td>
+                      <td className="sticky right-0 z-10 bg-white px-4 py-4 shadow-[-8px_0_12px_-12px_rgb(15_23_42/0.35)]">
+                        <div className="flex min-w-[104px] flex-col items-stretch gap-2 text-xs font-semibold">
                           <button
                             type="button"
-                            onClick={() => openEditModal(row)}
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              openEditModal(row)
+                            }}
                             disabled={!canUpdate}
                             title={canUpdate ? copy.actions.edit : copy.readOnly.updateRequired}
                             className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
                           >
                             {copy.actions.edit}
                           </button>
-                          {row.status !== 'MEASURED' && row.status !== 'VOID' ? (
-                            <button
-                              type="button"
-                              disabled={!canUpdate || actionId === row.id || Boolean(getMeasurementBlockReason(row))}
-                              onClick={() => createMeasurementDetail(row)}
-                              title={getMeasurementBlockReason(row) || copy.actions.generateMeasurement}
-                              className="rounded-lg bg-emerald-600 px-3 py-2 text-white shadow-sm transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500 disabled:shadow-none"
-                            >
-                              {copy.actions.generateMeasurement}
-                            </button>
-                          ) : null}
-                          {canUpdate && row.status === 'PENDING_CONFIRMATION' ? (
-                            <button type="button" onClick={() => updateStatus(row, 'READY_TO_MEASURE')} className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-blue-700">
-                              {copy.actions.ready}
-                            </button>
-                          ) : null}
-                          {canUpdate && row.status === 'MEASURED' ? (
-                            <button type="button" onClick={() => updateStatus(row, 'ARCHIVED')} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-slate-600">
-                              {copy.actions.archive}
-                            </button>
-                          ) : null}
-                          {canUpdate && row.status !== 'VOID' ? (
-                            <button type="button" onClick={() => updateStatus(row, 'VOID')} className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-red-600">
-                              {copy.actions.void}
-                            </button>
-                          ) : null}
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              updateStatus(row, 'ARCHIVED')
+                            }}
+                            disabled={!canUpdate || actionId === row.id || row.status === 'ARCHIVED' || row.status === 'VOID'}
+                            title={canUpdate ? copy.actions.archive : copy.readOnly.updateRequired}
+                            className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-slate-600 transition hover:border-slate-300 hover:bg-slate-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+                          >
+                            {copy.actions.archive}
+                          </button>
                         </div>
                       </td>
                     </tr>
                   ))}
                   {!result.items.length ? (
                     <tr>
-                      <td colSpan={10} className="px-4 py-12 text-center text-sm text-slate-500">
+                      <td colSpan={9} className="px-4 py-12 text-center text-sm text-slate-500">
                         {copy.table.empty}
                       </td>
                     </tr>
@@ -1540,10 +1422,14 @@ export default function VariationMeasurementsClient({
                   <FormSection title={copy.sections.notes}>
                     <div className="grid gap-4 md:grid-cols-2">
                       <Field label={copy.form.measurementPeriod}>
-                        <input type="month" value={form.measurementPeriod} onChange={(event) => updateForm('measurementPeriod', event.target.value)} className="input" />
-                      </Field>
-                      <Field label={copy.form.measuredAt}>
-                        <input type="date" value={form.measuredAt} onChange={(event) => updateForm('measuredAt', event.target.value)} className="input" />
+                        <select value={form.measurementPeriod} onChange={(event) => updateForm('measurementPeriod', event.target.value)} className="input">
+                          <option value="">—</option>
+                          {periodOptions.map((periodKey) => (
+                            <option key={periodKey} value={periodKey}>
+                              {normalizePeriodLabel(valueCopy.measurement.periodLabel, periodKey)}
+                            </option>
+                          ))}
+                        </select>
                       </Field>
                       <label className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700">
                         <input

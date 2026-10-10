@@ -56,6 +56,9 @@ const SORT_FIELDS: SiteVariationMeasurementSortField[] = [
   'estimatedAmount',
 ]
 
+const PERIOD_BASE_DATE = new Date(Date.UTC(2000, 0, 1))
+const PERIOD_DAY_MS = 24 * 60 * 60 * 1000
+
 const parsePositiveInt = (value: unknown, label: string) => {
   const parsed = typeof value === 'number' ? value : Number(value)
   if (!Number.isInteger(parsed) || parsed <= 0) {
@@ -107,6 +110,21 @@ const parseDate = (value: unknown) => {
     throw new Error('日期格式无效')
   }
   return parsed
+}
+
+const parsePeriod = (value: unknown) => {
+  if (value === null || value === undefined || value === '') return null
+  const text = String(value).trim()
+  if (!text) return null
+  const normalized = text.startsWith('P') || text.startsWith('p') ? text.slice(1) : text
+  if (/^\d+$/.test(normalized)) {
+    const index = Number(normalized)
+    if (!Number.isInteger(index) || index < 0) {
+      throw new Error('期次格式无效')
+    }
+    return new Date(PERIOD_BASE_DATE.getTime() + index * PERIOD_DAY_MS)
+  }
+  return parseDate(text)
 }
 
 const parseStatus = (value: unknown, fallback = SiteVariationMeasurementStatus.PENDING_CONFIRMATION) => {
@@ -190,7 +208,7 @@ const parseWritePayload = (payload: Record<string, unknown>): SiteVariationMeasu
     estimatedAmount: parseDecimal(payload.estimatedAmount, '预计金额'),
     occurredAt: parseDate(payload.occurredAt),
     discoveredByText: parseNullableText(payload.discoveredByText, 120),
-    measurementPeriod: parseDate(payload.measurementPeriod),
+    measurementPeriod: parsePeriod(payload.measurementPeriod),
     measuredAt: parseDate(payload.measuredAt),
     attachmentComplete: parseBoolean(payload.attachmentComplete),
     remark: parseNullableText(payload.remark, 4000),
@@ -291,7 +309,7 @@ export async function PUT(request: NextRequest) {
           id,
           boqItemId: parseNullableId(payload.boqItemId, '清单条目'),
           roadId: parseNullableId(payload.roadId, '路段'),
-          period: parseDate(payload.period),
+          period: parsePeriod(payload.period),
           quantity: parseDecimal(payload.quantity, '计量数量'),
           amount: parseDecimal(payload.amount, '计量金额'),
           note: parseNullableText(payload.note, 2000),

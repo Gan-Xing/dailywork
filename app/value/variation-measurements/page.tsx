@@ -11,10 +11,6 @@ export default async function VariationMeasurementsPage() {
   const canView = permissions.includes('value:view') || sessionUser?.roles.some((role) => role.name === 'Admin')
   const canUpdate =
     permissions.includes('value:update') || sessionUser?.roles.some((role) => role.name === 'Admin')
-  const canUpload =
-    permissions.includes('file:upload') ||
-    permissions.includes('file:manage') ||
-    sessionUser?.roles.some((role) => role.name === 'Admin')
 
   if (!sessionUser || !canView) {
     return <AccessDenied locale="zh" permissions={['value:view']} hint="需“产值查看”权限才能查看现场变更计量台账" />
@@ -61,7 +57,6 @@ export default async function VariationMeasurementsPage() {
         unitPrice: item.unitPrice === null ? null : Number(item.unitPrice),
       }))}
       canUpdate={Boolean(canUpdate)}
-      canUpload={Boolean(canUpload)}
     />
   )
 }
