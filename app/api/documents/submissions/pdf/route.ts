@@ -56,6 +56,7 @@ export async function POST(request: Request) {
     const browser = await puppeteer.launch({
       headless: true,
       executablePath,
+      pipe: true,
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
     })
     console.log('[PDF Export] Browser launched.')
