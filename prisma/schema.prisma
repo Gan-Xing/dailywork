@@ -106,6 +106,15 @@ enum SiteVariationMeasurementStatus {
   VOID
 }
 
+enum SiteVariationRawRecordStatus {
+  PENDING_REVIEW
+  IN_REVIEW
+  CONFIRMED
+  CONVERTED
+  DUPLICATE
+  VOID
+}
+
 enum RoadCrossSectionStatus {
   APPROVED
   ASSUMED_FROM_REFERENCE
@@ -303,6 +312,7 @@ model RoadSection {
   receivedDocumentLedgers       ReceivedDocumentLedger[]
   siteVariationMeasurements     SiteVariationMeasurement[] @relation("SiteVariationMeasurementRoad")
   mainSiteVariationMeasurements SiteVariationMeasurement[] @relation("SiteVariationMeasurementMainRoad")
+  siteVariationRawRecords       SiteVariationRawRecord[]   @relation("SiteVariationRawRecordRoad")
   crossSections                 RoadCrossSection[]         @relation("RoadCrossSectionRoad")
   referencedCrossSections       RoadCrossSection[]         @relation("RoadCrossSectionReferenceRoad")
 
@@ -766,6 +776,8 @@ model User {
   createdSiteVariationMeasurements  SiteVariationMeasurement[] @relation("SiteVariationMeasurementCreator")
   updatedSiteVariationMeasurements  SiteVariationMeasurement[] @relation("SiteVariationMeasurementUpdater")
   archivedSiteVariationMeasurements SiteVariationMeasurement[] @relation("SiteVariationMeasurementArchiver")
+  createdSiteVariationRawRecords    SiteVariationRawRecord[]   @relation("SiteVariationRawRecordCreator")
+  updatedSiteVariationRawRecords    SiteVariationRawRecord[]   @relation("SiteVariationRawRecordUpdater")
   createdAt                         DateTime                   @default(now())
   updatedAt                         DateTime                   @updatedAt
 }
@@ -1194,6 +1206,7 @@ model Project {
   weeklyDeliveryPlans       WeeklyDeliveryPlan[]
   weeklyDeliveryPlanLinks   WeeklyDeliveryPlanProject[]
   siteVariationMeasurements SiteVariationMeasurement[]
+  siteVariationRawRecords   SiteVariationRawRecord[]
 }
 
 model BoqItem {
@@ -1310,14 +1323,15 @@ model SiteVariationMeasurement {
   createdAt             DateTime                        @default(now())
   updatedAt             DateTime                        @updatedAt
 
-  project           Project               @relation(fields: [projectId], references: [id])
-  roadSection       RoadSection?          @relation("SiteVariationMeasurementRoad", fields: [roadSectionId], references: [id], onDelete: SetNull)
-  mainRoadSection   RoadSection?          @relation("SiteVariationMeasurementMainRoad", fields: [mainRoadSectionId], references: [id], onDelete: SetNull)
-  boqItem           BoqItem?              @relation(fields: [boqItemId], references: [id], onDelete: SetNull)
-  measurementDetail BoqMeasurementDetail? @relation(fields: [measurementDetailId], references: [id], onDelete: SetNull)
-  creator           User?                 @relation("SiteVariationMeasurementCreator", fields: [createdById], references: [id], onDelete: SetNull)
-  updater           User?                 @relation("SiteVariationMeasurementUpdater", fields: [updatedById], references: [id], onDelete: SetNull)
-  archiver          User?                 @relation("SiteVariationMeasurementArchiver", fields: [archivedById], references: [id], onDelete: SetNull)
+  project           Project                  @relation(fields: [projectId], references: [id])
+  roadSection       RoadSection?             @relation("SiteVariationMeasurementRoad", fields: [roadSectionId], references: [id], onDelete: SetNull)
+  mainRoadSection   RoadSection?             @relation("SiteVariationMeasurementMainRoad", fields: [mainRoadSectionId], references: [id], onDelete: SetNull)
+  boqItem           BoqItem?                 @relation(fields: [boqItemId], references: [id], onDelete: SetNull)
+  measurementDetail BoqMeasurementDetail?    @relation(fields: [measurementDetailId], references: [id], onDelete: SetNull)
+  creator           User?                    @relation("SiteVariationMeasurementCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  updater           User?                    @relation("SiteVariationMeasurementUpdater", fields: [updatedById], references: [id], onDelete: SetNull)
+  archiver          User?                    @relation("SiteVariationMeasurementArchiver", fields: [archivedById], references: [id], onDelete: SetNull)
+  sourceRawRecords  SiteVariationRawRecord[] @relation("SiteVariationRawRecordConvertedVariation")
 
   @@index([projectId, status])
   @@index([projectId, occurredAt])
@@ -1327,6 +1341,96 @@ model SiteVariationMeasurement {
   @@index([measurementDetailId])
   @@index([status])
   @@index([changeType])
+}
+
+model SiteVariationRawRecord {
+  id                   Int                          @id @default(autoincrement())
+  title                String
+  rawContent           String
+  recordDate           DateTime?
+  projectId            Int?
+  roadSectionId        Int?
+  status               SiteVariationRawRecordStatus @default(PENDING_REVIEW)
+  extractedJson        Json?
+  reviewNote           String?
+  convertedVariationId Int?
+  createdById          Int?
+  updatedById          Int?
+  createdAt            DateTime                     @default(now())
+  updatedAt            DateTime                     @updatedAt
+
+  project            Project?                  @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  roadSection        RoadSection?              @relation("SiteVariationRawRecordRoad", fields: [roadSectionId], references: [id], onDelete: SetNull)
+  convertedVariation SiteVariationMeasurement? @relation("SiteVariationRawRecordConvertedVariation", fields: [convertedVariationId], references: [id], onDelete: SetNull)
+  creator            User?                     @relation("SiteVariationRawRecordCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  updater            User?                     @relation("SiteVariationRawRecordUpdater", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@index([status])
+  @@index([recordDate])
+  @@index([projectId])
+  @@index([roadSectionId])
+  @@index([convertedVariationId])
+  @@index([createdAt])
+}
+
+model ValueBillReview {
+  id                 Int                     @id @default(autoincrement())
+  key                String                  @unique
+  projectCode        String
+  projectName        String
+  attachmentNumber   Int
+  attachmentLabel    String
+  sourceFileName     String?
+  sourceSha256       String?
+  recordCount        Int                     @default(0)
+  problemRecordCount Int                     @default(0)
+  importedAt         DateTime                @default(now())
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
+  records            ValueBillReviewRecord[]
+
+  @@unique([projectCode, attachmentNumber])
+  @@index([projectCode])
+  @@index([attachmentNumber])
+  @@index([importedAt])
+}
+
+model ValueBillReviewRecord {
+  id             Int             @id @default(autoincrement())
+  reviewId       Int
+  recordId       String          @unique
+  status         String
+  issueId        String?
+  boqCode        String?
+  boqNameZh      String?
+  boqNameFr      String?
+  unit           String?
+  roadSlug       String?
+  roadZh         String?
+  roadRaw        String?
+  sideCode       String?
+  sideZh         String?
+  pkStart        String?
+  pkEnd          String?
+  quantity       Decimal?        @db.Decimal(18, 4)
+  formula        String?
+  note           String?
+  sourceExcelRow Int?
+  source         Json?
+  project        Json?
+  attachment     Json?
+  data           Json?
+  rawRecord      Json?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  review         ValueBillReview @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+
+  @@index([reviewId, status])
+  @@index([reviewId, boqCode])
+  @@index([reviewId, roadSlug])
+  @@index([reviewId, sideCode])
+  @@index([reviewId, sourceExcelRow])
+  @@index([status])
 }
 
 model FinanceUnit {
