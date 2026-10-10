@@ -50,3 +50,9 @@ exports/weekly-rollups/
 # local workspace data
 data/value/_local/
 data/value/_local-*/
+
+# local one-off scripts and generated exports
+/.codex-*.ts
+/.tmp_*.ts
+/scripts/import-value-bill-review-records.js
+/exports/
