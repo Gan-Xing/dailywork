@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { PDFDocument } from 'pdf-lib'
 import puppeteer from 'puppeteer'
 
+import { inlineSubmissionPdfAssets } from '@/lib/documents/pdfAssets'
 import { renderBordereauTemplate } from '@/lib/documents/render'
 import { MAX_SUBMISSION_ITEM_ROWS } from '@/lib/documents/submissionItems'
 import { loadBordereauTemplateFromFile } from '@/lib/documents/templateLoader'
@@ -39,12 +40,13 @@ export async function POST(request: Request) {
   const headerOrigin = forwardedProto && forwardedHost ? `${forwardedProto}://${forwardedHost}` : undefined
   const origin = process.env.SITE_BASE_URL || headerOrigin || new URL(request.url).origin
 
-  const html = renderBordereauTemplate(fallback.html, payload.data as any, {
+  const renderedHtml = renderBordereauTemplate(fallback.html, payload.data as any, {
     pageNumberText: payload.pageNumberText ?? '',
     minItemRows: 10,
     maxItemRows: MAX_SUBMISSION_ITEM_ROWS,
     baseUrl: origin,
   })
+  const html = await inlineSubmissionPdfAssets(renderedHtml)
 
   const executablePath = process.env.PUPPETEER_EXECUTABLE_PATH || '/snap/bin/chromium'
 
@@ -65,6 +67,14 @@ export async function POST(request: Request) {
     console.log('[PDF Export] Generating Submission PDF...')
     const page = await browser.newPage()
     await page.setContent(html, { waitUntil: 'load', timeout: 60000 })
+    const unloadedImages = await page.$$eval('img', (images) =>
+      images
+        .filter((image) => !image.complete || image.naturalWidth === 0)
+        .map((image) => image.getAttribute('src') || image.getAttribute('alt') || '<unknown>'),
+    )
+    if (unloadedImages.length > 0) {
+      throw new Error(`PDF image assets failed to load: ${unloadedImages.join(', ')}`)
+    }
     const submissionPdfBuffer = await page.pdf({
       format: 'A4',
       printBackground: true,
