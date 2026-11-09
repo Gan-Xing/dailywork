@@ -8,6 +8,7 @@ import { AccessDenied } from '@/components/AccessDenied'
 import { PageHeaderNav } from '@/components/PageHeaderNav'
 import { useToast } from '@/components/ToastProvider'
 import { addWorkQuantities, formatWorkQuantity, normalizeWorkQuantity } from '@/lib/boq/quantityDecimal'
+import { buildAdvanceMeasurementEntry } from '@/lib/boq/measurementDrafts'
 import {
   buildActualBoqRows,
   sortBoqItemsByOrder,
@@ -76,6 +77,7 @@ type BoqMeasurementRecord = {
 type MeasurementDraftEntry = {
   quantity?: string
   amount?: string
+  note?: string
 }
 
 type FetchStatus = 'idle' | 'loading' | 'success' | 'error'
@@ -2012,7 +2014,7 @@ export default function ValuePage() {
   const handleMeasurementChange = (
     boqItemId: number,
     periodKey: string,
-    field: 'quantity' | 'amount',
+    field: 'quantity' | 'amount' | 'note',
     value: string,
   ) => {
     const draftKey = buildMeasurementKey(boqItemId, periodKey)
@@ -2024,7 +2026,7 @@ export default function ValuePage() {
     })
   }
 
-  const handleAdvanceChange = (periodKey: string, value: string) => {
+  const handleAdvanceChange = (periodKey: string, value: string, field: 'amount' | 'note' = 'amount') => {
     const draftKey = buildAdvanceKey(periodKey)
     setMeasurementDrafts((prev) => {
       const next = { ...prev }
@@ -2073,7 +2075,9 @@ export default function ValuePage() {
       const value = existing.amount
       const next = { ...prev }
       if (value === '') {
-        delete next[draftKey]
+        const { amount: _removed, ...rest } = existing
+        if (Object.keys(rest).length) next[draftKey] = rest
+        else delete next[draftKey]
         return next
       }
       const rounded = toOneDecimalString(value)
@@ -2106,29 +2110,19 @@ export default function ValuePage() {
       quantity: string
       amount: string | null
       unitPrice: string | null
+      note: string | null
     }> = []
     const advanceEntries: Array<{
       period: string
       amount: string | null
+      note: string | null
     }> = []
 
     Object.entries(measurementDrafts).forEach(([key, draft]) => {
       if (key.startsWith('advance:')) {
         const periodKey = key.split(':')[1]
         if (!periodKey) return
-        const rawAmount = draft.amount ?? ''
-        if (rawAmount === '') {
-          advanceEntries.push({ period: periodKey, amount: null })
-          return
-        }
-        const parsed = parseBoqNumber(rawAmount)
-        const amount =
-          parsed !== null
-            ? toOneDecimalString(parsed)
-            : typeof rawAmount === 'string'
-              ? rawAmount
-              : null
-        advanceEntries.push({ period: periodKey, amount })
+        advanceEntries.push(buildAdvanceMeasurementEntry(periodKey, draft, advanceMeasurementMap.get(periodKey)))
         return
       }
 
@@ -2167,6 +2161,7 @@ export default function ValuePage() {
         quantity,
         amount,
         unitPrice,
+        note: draft.note ?? record?.note ?? null,
       })
     })
 
@@ -4387,6 +4382,18 @@ export default function ValuePage() {
                                         ) : (
                                           <span className="text-slate-400">—</span>
                                         )}
+                                        {isEditable || isAdvanceRow ? (
+                                          <input
+                                            type="text"
+                                            aria-label={isFrenchLocale ? 'Observation' : '备注'}
+                                            placeholder={isFrenchLocale ? 'Observation' : '备注'}
+                                            value={(isAdvanceRow ? advanceDraft?.note ?? advanceRecord?.note : draft?.note ?? record?.note) ?? ''}
+                                            onChange={(event) => isAdvanceRow
+                                              ? handleAdvanceChange(period.key, event.target.value, 'note')
+                                              : handleMeasurementChange(row.id, period.key, 'note', event.target.value)}
+                                            className="mx-auto mt-1 block w-full max-w-[180px] rounded border border-slate-200 bg-white px-2 py-1 text-center text-xs text-slate-600 focus:border-emerald-400 focus:outline-none"
+                                          />
+                                        ) : null}
                                       </td>
                                     ) : null}
                                   </Fragment>
