@@ -13,7 +13,7 @@ import { renderSalaryReportHtml, type SalaryPage, type SalaryRow } from '@/lib/t
 const EXECUTABLE_PATH =
   process.env.CHROMIUM_EXECUTABLE_PATH ??
   process.env.PUPPETEER_EXECUTABLE_PATH ??
-  '/snap/bin/chromium'
+  '/opt/google/chrome/chrome'
 
 const LAUNCH_ARGS = ['--no-sandbox', '--disable-setuid-sandbox']
 const ROWS_PER_PAGE = 12
