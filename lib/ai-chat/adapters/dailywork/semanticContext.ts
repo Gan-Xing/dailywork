@@ -7,6 +7,7 @@ import type {
 } from '@/lib/ai-chat/semanticTypes'
 
 import { dailyworkApiCatalog } from './apiCatalog'
+import { getAiChatRequiredPermissions, isAiChatReadableEntry } from './readPolicy'
 
 type SemanticContextOptions = {
   query: string
@@ -157,8 +158,8 @@ export const buildSemanticContext = async ({
   const scored: ScoredEntry[] = []
 
   dailyworkApiCatalog.forEach((catalogEntry) => {
-    if (catalogEntry.method !== 'GET' || catalogEntry.mode !== 'read') return
-    if (!canAccess(permissions, catalogEntry.permissions)) return
+    if (!isAiChatReadableEntry(catalogEntry)) return
+    if (!canAccess(permissions, getAiChatRequiredPermissions(catalogEntry))) return
     const entry = semanticCatalog.entries[catalogEntry.key] ?? {
       key: catalogEntry.key,
       summary: buildRouteSearchText(catalogEntry.path),
@@ -197,8 +198,8 @@ export const buildSemanticContext = async ({
       const detailCatalogEntry = catalogMap.get(entry.detailEndpointKey)
       if (
         detailCatalogEntry &&
-        detailCatalogEntry.mode === 'read' &&
-        canAccess(permissions, detailCatalogEntry.permissions)
+        isAiChatReadableEntry(detailCatalogEntry) &&
+        canAccess(permissions, getAiChatRequiredPermissions(detailCatalogEntry))
       ) {
         const detailEntry = semanticCatalog.entries[entry.detailEndpointKey]
         if (detailEntry) {

@@ -1,5 +1,15 @@
 # 日报字段整理
 
+## AI 服务端工作流（2026-11-09）
+
+- `AiChatSession`：UUID、所属 `userId`、标题、标题来源（auto/manual）、创建/更新时间；按账号索引。
+- `AiChatMessage`：会话、幂等 `clientKey`、user/assistant 角色、正文、服务端时间；`requiredPermissions` 保存服务端答案所需权限，`requiresAdmin` 标记Admin来源；撤权后返回占位说明，不再把原文带入模型。客户端不能指定授权元数据。会话和 clientKey 唯一；游标按整数 ID 排序。
+- `AiChatMemory`：账号、global/project/route/session 作用域、作用域键、标题、参考内容、启用状态；账号和作用域唯一。不是业务事实或授权来源。
+- `AiChatJob`：账号、可空会话、幂等 requestKey、固定任务种类、状态、预览输入/版本、结果、错误、过期时间、租约令牌/期限和尝试次数。账号和 requestKey 唯一；会话删除时保留任务并置空关联。
+- 任务种类：`WEEKLY_PLAN_CHANGE`、`WEEKLY_PDF`。状态：`CONFIRMATION_REQUIRED`、`QUEUED`、`RUNNING`、`SUCCEEDED`、`FAILED`、`CANCELLED`。只有用户确认端点可以从预览进入执行。
+- 周计划变更结果和业务行在同一事务提交；PDF结果保存私有 FileAsset ID及是否生成，完成后返回按账号鉴权的下载链接。网页AI不连接Telegram；CodexBridge发送机制独立且不变。不保存用户Cookie或凭证。
+- 字段约束、迁移、权限与验收详见 [AI业务工作流](./ai-chat-upgrade.md)。
+
 ## 气象条件（Condition météorologique）
 
 - **用途**：记录当天 7h30、12h30、17h30 三个固定时段的天气状况与降雨量。

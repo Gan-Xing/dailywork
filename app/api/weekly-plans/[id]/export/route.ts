@@ -1,14 +1,7 @@
-import fs from 'fs/promises'
-import os from 'os'
-import path from 'path'
-
 import ExcelJS from 'exceljs'
 import { NextResponse } from 'next/server'
-import puppeteer from 'puppeteer'
 
 import { hasPermission } from '@/lib/server/authSession'
-import { prisma } from '@/lib/prisma'
-import { getWeeklyPlanSignatureUrls } from '@/lib/server/signatureStore'
 import {
   buildWeeklyPlanExportRows,
   buildWeeklyPlanFrDetailTitle,
@@ -16,77 +9,14 @@ import {
   buildWeeklyPlanZhTitle,
   resolveWeeklyPlanExportContext,
 } from '@/lib/server/weeklyPlanExport'
-import { renderWeeklyPlanPdfHtml } from '@/lib/templates/weeklyPlanPdf'
+import {
+  buildWeeklyPlanPdf,
+  getWeeklyPlanWithItems as getPlanWithItems,
+} from '@/lib/server/weeklyPlanPdfExport'
 
 export const dynamic = 'force-dynamic'
 
 const colCount = 10
-const EXPORT_TIMEOUT_MS = 30_000
-const EXECUTABLE_PATH =
-  process.env.CHROMIUM_EXECUTABLE_PATH ??
-  process.env.PUPPETEER_EXECUTABLE_PATH ??
-  (process.platform === 'darwin'
-    ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
-    : '/usr/bin/chromium-browser')
-const USER_DATA_DIR_PREFIX = path.join(os.tmpdir(), 'weekly-plan-puppeteer-')
-const LAUNCH_ARGS = [
-  '--single-process',
-  '--no-sandbox',
-  '--disable-setuid-sandbox',
-  '--disable-dev-shm-usage',
-  '--disable-gpu',
-]
-
-const withTimeout = async <T>(promise: Promise<T>, label: string, timeoutMs = EXPORT_TIMEOUT_MS) => {
-  let timer: NodeJS.Timeout | null = null
-  const timeoutPromise = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new Error(`${label} 超时 (${timeoutMs}ms)，请稍后重试`)), timeoutMs)
-  })
-
-  try {
-    return await Promise.race([promise, timeoutPromise])
-  } finally {
-    if (timer) clearTimeout(timer)
-  }
-}
-
-const cleanupUserDataDir = async (dir: string | null) => {
-  if (!dir) return
-  try {
-    await fs.rm(dir, { recursive: true, force: true })
-  } catch (error) {
-    console.warn('[weekly-plan-export] cleanup profile dir failed', error)
-  }
-}
-
-const launchBrowser = async () => {
-  const userDataDir = await fs.mkdtemp(USER_DATA_DIR_PREFIX)
-  try {
-    const browser = await puppeteer.launch({
-      headless: true,
-      executablePath: EXECUTABLE_PATH,
-      args: LAUNCH_ARGS,
-      userDataDir,
-    })
-    return { browser, userDataDir }
-  } catch (error) {
-    await cleanupUserDataDir(userDataDir)
-    throw error
-  }
-}
-
-const getPlanWithItems = async (planId: number) =>
-  prisma.weeklyDeliveryPlan.findUnique({
-    where: { id: planId },
-    include: {
-      project: { select: { id: true, name: true, code: true } },
-      projects: {
-        include: { project: { select: { id: true, name: true, code: true } } },
-        orderBy: [{ sortOrder: 'asc' }, { projectId: 'asc' }],
-      },
-      items: { orderBy: { sortOrder: 'asc' } },
-    },
-  })
 
 const buildWorkbook = async (planId: number) => {
   const plan = await getPlanWithItems(planId)
@@ -203,65 +133,6 @@ const buildWorkbook = async (planId: number) => {
   }
 }
 
-const buildPdfBuffer = async (planId: number) => {
-  const plan = await getPlanWithItems(planId)
-  if (!plan) return null
-
-  const exportItems = plan.items.filter((item) => item.status !== 'cancelled')
-  const context = resolveWeeklyPlanExportContext(plan)
-  const rows = buildWeeklyPlanExportRows(exportItems, context)
-
-  let signatures: { approver: string | null; editor: string | null } | undefined
-  if (await hasPermission('signature:use')) {
-    try {
-      signatures = await getWeeklyPlanSignatureUrls({
-        approverUserId: plan.approverUserId,
-        editorUserId: plan.editorUserId,
-      })
-    } catch (error) {
-      console.warn('[weekly-plan-export] signature fetch failed', error)
-    }
-  }
-
-  const html = renderWeeklyPlanPdfHtml({
-    frTitle: buildWeeklyPlanFrTitle(context),
-    frSubtitle: buildWeeklyPlanFrDetailTitle(plan),
-    zhTitle: buildWeeklyPlanZhTitle(plan, context),
-    rows,
-    approverSignatureUrl: signatures?.approver ?? null,
-    editorSignatureUrl: signatures?.editor ?? null,
-  })
-
-  const { browser, userDataDir } = await withTimeout(launchBrowser(), '启动浏览器')
-  let page: Awaited<ReturnType<typeof browser.newPage>> | null = null
-
-  try {
-    page = await withTimeout(browser.newPage(), '创建页面', 12_000)
-    await withTimeout(page.setContent(html, { waitUntil: 'domcontentloaded' }), '渲染页面', 15_000)
-    const pdf = await withTimeout(
-      page.pdf({
-        format: 'A4',
-        landscape: true,
-        printBackground: true,
-        margin: { top: '10mm', bottom: '12mm', left: '12mm', right: '12mm' },
-      }),
-      '生成 PDF',
-      20_000,
-    )
-
-    return {
-      buffer: pdf,
-      filename: `weekly-plan-${plan.title}.pdf`,
-    }
-  } finally {
-    if (page) {
-      await page.close().catch((error) => console.error('[weekly-plan-export] close page error', error))
-    }
-    await browser.close().catch((error) => console.error('[weekly-plan-export] close browser error', error))
-    await cleanupUserDataDir(userDataDir)
-  }
-}
-
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   if (!(await hasPermission('material:view'))) {
     return NextResponse.json({ message: '无权限' }, { status: 403 })
@@ -274,7 +145,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 
   try {
     if (format === 'pdf') {
-      const result = await buildPdfBuffer(planId)
+      const result = await buildWeeklyPlanPdf(planId, { signed: await hasPermission('signature:use') })
       if (!result) return NextResponse.json({ message: '计划不存在' }, { status: 404 })
 
       return new NextResponse(result.buffer as unknown as BodyInit, {

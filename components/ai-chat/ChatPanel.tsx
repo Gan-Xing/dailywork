@@ -17,6 +17,8 @@ import type { AiChatCopy } from '@/lib/i18n/aiChat'
 import type { ChatApiMessage, ChatApiRequest } from '@/lib/ai-chat/http'
 import type { ChatStreamEvent, ChatToolCallRecord, PlanPayload } from '@/lib/ai-chat/types'
 import { AlertDialog } from '@/components/AlertDialog'
+import { WorkflowCards } from './WorkflowCards'
+import { migrateOwnedLocalHistory } from '@/lib/ai-chat/migrateLocalHistory'
 import {
   appendMessage,
   createSession,
@@ -28,9 +30,10 @@ import {
   updateSession,
   type ChatSessionRecord,
   type MemoryScopeType,
-} from '@/lib/ai-chat/localStore'
+} from '@/lib/ai-chat/remoteStore'
 
 type ChatPanelProps = {
+  userId: number
   locale: Locale
   endpoint: string
   labels: AiChatCopy
@@ -49,11 +52,13 @@ const buildRequestBody = (
   history: ChatMessage[],
   locale: Locale,
   memoryContext?: string,
+  sessionId?: string,
 ): ChatApiRequest => ({
   input,
   history,
   locale,
   memoryContext,
+  sessionId,
 })
 
 const formatPlanSummary = (
@@ -168,7 +173,7 @@ const compressHistoryForRequest = (messages: ChatMessage[], locale: Locale): Cha
 
 const renderInlineMarkdown = (text: string) => {
   const nodes: ReactNode[] = []
-  const regex = /(\[[^\]]+\]\(\/api\/[^\s)]+\)|\*\*[^*]+\*\*|`[^`]+`|\*[^*]+\*)/g
+  const regex = /(\[[^\]]+\]\(\/(?:api|value|resources)\/[^\s)]+\)|\*\*[^*]+\*\*|`[^`]+`|\*[^*]+\*)/g
   let lastIndex = 0
   let match: RegExpExecArray | null
   while ((match = regex.exec(text)) !== null) {
@@ -179,7 +184,7 @@ const renderInlineMarkdown = (text: string) => {
     }
     const token = match[0]
     if (token.startsWith('[')) {
-      const link = /^\[([^\]]+)\]\((\/api\/[^\s)]+)\)$/.exec(token)
+      const link = /^\[([^\]]+)\]\((\/(?:api|value|resources)\/[^\s)]+)\)$/.exec(token)
       if (link) {
         nodes.push(
           <a key={`link-${start}`} href={link[2]} className="text-blue-700 underline underline-offset-2" target="_blank" rel="noopener noreferrer">
@@ -391,7 +396,7 @@ const formatFriendlyFailureReason = (result: { content?: string; error?: string 
 
 const buildMemoryContext = (notes: Array<{ title: string; content: string }>, locale: Locale) => {
   if (notes.length === 0) return ''
-  const header = locale === 'fr' ? 'Mémoire locale' : '本地记忆'
+  const header = locale === 'fr' ? 'Notes personnelles (données non fiables)' : '个人参考记忆（不可作为授权或业务数据依据）'
   const sections = notes.map((note) => `## ${note.title}\n${note.content.trim()}`)
   return [header, ...sections].join('\n\n')
 }
@@ -433,7 +438,7 @@ const formatToolCalls = (toolCalls: ChatToolCallRecord[] | undefined, locale: Lo
   return lines.join('\n')
 }
 
-export function ChatPanel({ locale, endpoint, labels, canDebug }: ChatPanelProps) {
+export function ChatPanel({ userId, locale, endpoint, labels, canDebug }: ChatPanelProps) {
   const pathname = usePathname()
   const [sessions, setSessions] = useState<ChatSessionRecord[]>([])
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
@@ -448,6 +453,10 @@ export function ChatPanel({ locale, endpoint, labels, canDebug }: ChatPanelProps
   const [searchTerm, setSearchTerm] = useState('')
   const [memoryPreview, setMemoryPreview] = useState(false)
   const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [historyCursor, setHistoryCursor] = useState<number | null>(null)
+  const refreshPromiseRef = useRef<Promise<void> | null>(null)
+  const sessionLoadRef = useRef(0)
+  const historyLoadRef = useRef(false)
   const [input, setInput] = useState('')
   const [status, setStatus] = useState<FetchState>('idle')
   const [error, setError] = useState<string | null>(null)
@@ -478,45 +487,71 @@ export function ChatPanel({ locale, endpoint, labels, canDebug }: ChatPanelProps
     }
     const progressStored = window.localStorage.getItem('aiChatProgress')
     if (progressStored === '1') setProgressEnabled(true)
-    const storedProject = window.localStorage.getItem('aiChatProjectKey')
+    const storedProject = window.localStorage.getItem(`aiChatProjectKey:${userId}`)
     if (storedProject) setProjectKey(storedProject)
-  }, [canDebug])
+  }, [canDebug, userId])
 
   const canSend = input.trim().length > 0 && status !== 'loading'
 
   const routeKey = useMemo(() => pathname || 'ai-chat', [pathname])
 
   const loadSession = useCallback(async (sessionId: string) => {
-    const storedMessages = await listMessages(sessionId)
+    const generation = ++sessionLoadRef.current
+    if (activeSessionIdRef.current !== sessionId) setMessages([])
+    activeSessionIdRef.current = sessionId
+    setActiveSessionId(sessionId)
+    const storedMessages = await listMessages(userId, sessionId)
+    if (generation !== sessionLoadRef.current) return
     setMessages(storedMessages.map((item) => ({ role: item.role, content: item.content })))
+    setHistoryCursor(storedMessages.nextBeforeId)
     setActiveSessionId(sessionId)
     setStatus('idle')
     setError(null)
     setProgressLog([])
-  }, [])
+  }, [userId])
 
   const refreshSessions = useCallback(async () => {
-    const items = await listSessions()
-    setSessions(items)
-    if (!activeSessionId && items.length > 0) {
-      await loadSession(items[0].id)
+    if (refreshPromiseRef.current) return refreshPromiseRef.current
+    const refresh = async () => {
+      const generation = sessionLoadRef.current
+      const items = await listSessions(userId)
+      setSessions(items)
+      if (!activeSessionIdRef.current && generation === sessionLoadRef.current && items.length > 0) await loadSession(items[0].id)
+      if (items.length === 0 && generation === sessionLoadRef.current && !activeSessionIdRef.current) {
+        const created = await createSession(userId, labels.newChat)
+        if (generation !== sessionLoadRef.current) return
+        activeSessionIdRef.current = created.id
+        setSessions([created])
+        setActiveSessionId(created.id)
+        setMessages([])
+        setHistoryCursor(null)
+      }
     }
-    if (items.length === 0) {
-      const created = await createSession(labels.newChat)
-      setSessions([created])
-      setActiveSessionId(created.id)
-      setMessages([])
-    }
-  }, [activeSessionId, labels.newChat, loadSession])
+    const pending = refresh()
+    refreshPromiseRef.current = pending
+    try { await pending } finally { refreshPromiseRef.current = null }
+  }, [labels.newChat, loadSession, userId])
 
   useEffect(() => {
-    refreshSessions().catch(() => undefined)
-  }, [refreshSessions])
+    refreshSessions().catch((error) => setError(error instanceof Error ? error.message : labels.error))
+  }, [refreshSessions, labels.error])
+
+  useEffect(() => {
+    let mounted = true
+    void migrateOwnedLocalHistory(userId).then(() => {
+      if (mounted) return refreshSessions()
+    }).catch(() => {
+      if (mounted) setError(locale === 'fr'
+        ? 'Historique local non importé ; les données originales sont conservées.'
+        : '本机旧对话暂未导入，原数据仍保留；服务端对话可继续使用。')
+    })
+    return () => { mounted = false }
+  }, [userId, refreshSessions, locale])
 
   useEffect(() => {
     if (!projectKey) return
-    window.localStorage.setItem('aiChatProjectKey', projectKey)
-  }, [projectKey])
+    window.localStorage.setItem(`aiChatProjectKey:${userId}`, projectKey)
+  }, [projectKey, userId])
 
   useEffect(() => {
     activeSessionIdRef.current = activeSessionId
@@ -550,12 +585,12 @@ export function ChatPanel({ locale, endpoint, labels, canDebug }: ChatPanelProps
 
   const loadMemoryDraft = useCallback(async () => {
     const scopeKey = resolveScopeKey(memoryScope)
-    const record = await getMemory(memoryScope, scopeKey)
+    const record = await getMemory(userId, memoryScope, scopeKey)
     setMemoryTitle(record?.title ?? '')
     setMemoryDraft(record?.content ?? '')
     setMemoryEnabled(record?.enabled ?? true)
     setMemoryUpdatedAt(record?.updatedAt ?? null)
-  }, [memoryScope, resolveScopeKey])
+  }, [memoryScope, resolveScopeKey, userId])
 
   useEffect(() => {
     if (!memoryOpen) return
@@ -582,7 +617,7 @@ export function ChatPanel({ locale, endpoint, labels, canDebug }: ChatPanelProps
 
       for (const item of scopes) {
         if (!item.key) continue
-        const record = await getMemory(item.scope, item.key)
+        const record = await getMemory(userId, item.scope, item.key)
         if (!record || !record.enabled) continue
         if (!record.content?.trim()) continue
         const title = record.title?.trim() || item.title
@@ -602,6 +637,7 @@ export function ChatPanel({ locale, endpoint, labels, canDebug }: ChatPanelProps
     locale,
     projectKey,
     routeKey,
+    userId,
   ])
 
   const updateAssistantMessage = useCallback((content: string) => {
@@ -622,22 +658,30 @@ export function ChatPanel({ locale, endpoint, labels, canDebug }: ChatPanelProps
   }, [])
 
   const onCreateSession = useCallback(async () => {
-    const created = await createSession(labels.newChat)
-    const updated = await listSessions()
-    setSessions(updated.length ? updated : [created])
-    setActiveSessionId(created.id)
-    setMessages([])
-    setInput('')
-    setStatus('idle')
-    setError(null)
-    setProgressLog([])
-    setSidebarOpen(false)
-  }, [labels.newChat])
+    const generation = ++sessionLoadRef.current
+    try {
+      const created = await createSession(userId, labels.newChat)
+      const updated = await listSessions(userId)
+      if (generation !== sessionLoadRef.current) return
+      activeSessionIdRef.current = created.id
+      setSessions(updated.length ? updated : [created])
+      setActiveSessionId(created.id)
+      setMessages([])
+      setHistoryCursor(null)
+      setInput('')
+      setStatus('idle')
+      setError(null)
+      setProgressLog([])
+      setSidebarOpen(false)
+    } catch (error) {
+      if (generation === sessionLoadRef.current) setError(error instanceof Error ? error.message : labels.error)
+    }
+  }, [labels.newChat, labels.error, userId])
 
   const onSaveMemory = useCallback(async () => {
     const scopeKey = resolveScopeKey(memoryScope)
     if (!scopeKey) return
-    const record = await saveMemory(memoryScope, scopeKey, {
+    const record = await saveMemory(userId, memoryScope, scopeKey, {
       title: memoryTitle.trim(),
       content: memoryDraft.trim(),
       enabled: memoryEnabled,
@@ -645,7 +689,7 @@ export function ChatPanel({ locale, endpoint, labels, canDebug }: ChatPanelProps
     setMemoryUpdatedAt(record.updatedAt)
     setMemoryTitle(record.title)
     setMemoryDraft(record.content)
-  }, [memoryDraft, memoryEnabled, memoryScope, memoryTitle, resolveScopeKey])
+  }, [memoryDraft, memoryEnabled, memoryScope, memoryTitle, resolveScopeKey, userId])
 
   const onEditSession = useCallback((session: ChatSessionRecord) => {
     setEditingSessionId(session.id)
@@ -659,20 +703,23 @@ export function ChatPanel({ locale, endpoint, labels, canDebug }: ChatPanelProps
 
   const onSelectSession = useCallback(
     async (sessionId: string) => {
-      if (sessionId === activeSessionId) return
+      if (sessionId === activeSessionIdRef.current) return
       if (editingSessionId) {
         onCancelEditSession()
       }
-      await loadSession(sessionId)
+      try { await loadSession(sessionId) }
+      catch (error) {
+        if (activeSessionIdRef.current === sessionId) setError(error instanceof Error ? error.message : labels.error)
+      }
       setSidebarOpen(false)
     },
-    [activeSessionId, editingSessionId, loadSession, onCancelEditSession],
+    [editingSessionId, loadSession, onCancelEditSession, labels.error],
   )
 
   const onSaveSessionTitle = useCallback(async () => {
     if (!editingSessionId) return
     const nextTitle = editingTitle.trim() || labels.newChat
-    const updated = await updateSession(editingSessionId, {
+    const updated = await updateSession(userId, editingSessionId, {
       summary: nextTitle,
       summarySource: 'manual',
     })
@@ -690,7 +737,7 @@ export function ChatPanel({ locale, endpoint, labels, canDebug }: ChatPanelProps
     )
     setEditingSessionId(null)
     setEditingTitle('')
-  }, [editingSessionId, editingTitle, labels.newChat])
+  }, [editingSessionId, editingTitle, labels.newChat, userId])
 
   const onDeleteSession = useCallback((session: ChatSessionRecord) => {
     setDeleteTarget(session)
@@ -701,14 +748,14 @@ export function ChatPanel({ locale, endpoint, labels, canDebug }: ChatPanelProps
     const sessionId = deleteTarget.id
     setDeleteTarget(null)
     cancelSessionRequest(sessionId)
-    await deleteSession(sessionId)
-    const updated = await listSessions()
+    await deleteSession(userId, sessionId)
+    const updated = await listSessions(userId)
     setSessions(updated)
     if (sessionId === activeSessionId) {
       if (updated.length > 0) {
         await loadSession(updated[0].id)
       } else {
-        const created = await createSession(labels.newChat)
+        const created = await createSession(userId, labels.newChat)
         setSessions([created])
         setActiveSessionId(created.id)
         setMessages([])
@@ -717,7 +764,7 @@ export function ChatPanel({ locale, endpoint, labels, canDebug }: ChatPanelProps
     if (editingSessionId === sessionId) {
       onCancelEditSession()
     }
-  }, [activeSessionId, cancelSessionRequest, deleteTarget, editingSessionId, labels.newChat, loadSession, onCancelEditSession])
+  }, [activeSessionId, cancelSessionRequest, deleteTarget, editingSessionId, labels.newChat, loadSession, onCancelEditSession, userId])
 
   const onSessionTitleKeyDown = useCallback(
     (event: KeyboardEvent<HTMLInputElement>) => {
@@ -735,6 +782,8 @@ export function ChatPanel({ locale, endpoint, labels, canDebug }: ChatPanelProps
 
   const onSubmit = useCallback(async () => {
     if (!canSend) return
+    // Pending history must not replace this request's messages or loading state.
+    sessionLoadRef.current += 1
     const trimmed = input.trim()
     const historySnapshot = [...messages]
     setMessages([...historySnapshot, { role: 'user', content: trimmed }, { role: 'assistant', content: labels.thinking }])
@@ -746,21 +795,24 @@ export function ChatPanel({ locale, endpoint, labels, canDebug }: ChatPanelProps
     let sessionId = activeSessionId
     try {
       if (!sessionId) {
-        const created = await createSession(labels.newChat)
+        const created = await createSession(userId, labels.newChat)
         setSessions((prev) => (prev.length ? [created, ...prev] : [created]))
         setActiveSessionId(created.id)
         sessionId = created.id
       }
       if (sessionId) {
-        await appendMessage({
+        await appendMessage(userId, {
           sessionId,
           role: 'user',
           content: trimmed,
           createdAt: new Date().toISOString(),
         })
       }
-    } catch {
-      // ignore local persistence errors
+    } catch (error) {
+      setInput(trimmed)
+      setError(error instanceof Error ? error.message : labels.error)
+      setStatus('error')
+      return
     }
 
     if (sessionId) {
@@ -768,23 +820,29 @@ export function ChatPanel({ locale, endpoint, labels, canDebug }: ChatPanelProps
     }
 
     const historyForRequest = compressHistoryForRequest(historySnapshot, locale)
-    const memoryContext = await buildMemoryContextForRequest()
 
     let requestId: string | null = null
+    let serverRequestId: string | null = null
+    const withRequestId = (message: string) => serverRequestId
+      ? `${message}\n${locale === 'fr' ? 'ID de requête' : '请求编号'}：${serverRequestId}`
+      : message
     try {
       const controller = new AbortController()
       requestId = `${Date.now()}-${Math.random().toString(16).slice(2)}`
       if (sessionId) {
         requestRegistryRef.current.set(sessionId, { controller, requestId })
       }
+      const memoryContext = await buildMemoryContextForRequest()
       const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(buildRequestBody(trimmed, historyForRequest, locale, memoryContext)),
+        body: JSON.stringify(buildRequestBody(trimmed, historyForRequest, locale, memoryContext, sessionId ?? undefined)),
         signal: controller.signal,
       })
+      serverRequestId = res.headers.get('x-ai-request-id')
       if (!res.ok) {
-        const payload = (await res.json().catch(() => ({}))) as { message?: string }
+        const payload = (await res.json().catch(() => ({}))) as { message?: string; requestId?: string }
+        serverRequestId = serverRequestId || payload.requestId || null
         throw new Error(payload.message ?? labels.error)
       }
       if (!res.body) {
@@ -918,12 +976,12 @@ export function ChatPanel({ locale, endpoint, labels, canDebug }: ChatPanelProps
             }
             break
           case 'error':
-            statusMessage = event.message
+            statusMessage = withRequestId(event.message)
             hasError = true
             if (isActiveSession) {
-              setError(event.message)
+              setError(statusMessage)
               setStatus('error')
-              appendProgress(event.message)
+              appendProgress(statusMessage)
             }
             break
           default:
@@ -964,7 +1022,7 @@ export function ChatPanel({ locale, endpoint, labels, canDebug }: ChatPanelProps
       const currentRequest =
         sessionId && requestId && requestRegistryRef.current.get(sessionId)?.requestId === requestId
       if (!gotFinal && !hasError && currentRequest && activeSessionIdRef.current === sessionId) {
-        const message = labels.error
+        const message = withRequestId(labels.error)
         setError(message)
         updateAssistantMessage(message)
         setStatus('error')
@@ -972,19 +1030,11 @@ export function ChatPanel({ locale, endpoint, labels, canDebug }: ChatPanelProps
 
       try {
         if (sessionId && currentRequest) {
-          const assistantContent = answer || (hasError ? labels.error : '')
-          if (assistantContent) {
-            await appendMessage({
-              sessionId,
-              role: 'assistant',
-              content: assistantContent,
-              createdAt: new Date().toISOString(),
-            })
-          }
+          // Final answers are persisted by the server before the stream closes.
           const currentSession = sessions.find((item) => item.id === sessionId)
           if (!currentSession || currentSession.summarySource !== 'manual') {
             const summary = buildSessionSummary(trimmed, plan, locale)
-            await updateSession(sessionId, { summary, summarySource: 'auto' })
+            await updateSession(userId, sessionId, { summary, summarySource: 'auto' })
           }
           await refreshSessions()
         }
@@ -999,7 +1049,7 @@ export function ChatPanel({ locale, endpoint, labels, canDebug }: ChatPanelProps
       if (err instanceof DOMException && err.name === 'AbortError') {
         return
       }
-      const message = err instanceof Error ? err.message : labels.error
+      const message = withRequestId(err instanceof Error ? err.message : labels.error)
       if (sessionId && requestId && requestRegistryRef.current.get(sessionId)?.requestId === requestId) {
         requestRegistryRef.current.delete(sessionId)
       }
@@ -1010,7 +1060,7 @@ export function ChatPanel({ locale, endpoint, labels, canDebug }: ChatPanelProps
       }
       try {
         if (sessionId) {
-          await appendMessage({
+          await appendMessage(userId, {
             sessionId,
             role: 'assistant',
             content: message,
@@ -1038,6 +1088,7 @@ export function ChatPanel({ locale, endpoint, labels, canDebug }: ChatPanelProps
     sessions,
     refreshSessions,
     updateAssistantMessage,
+    userId,
   ])
 
   const onKeyDown = useCallback(
@@ -1277,6 +1328,19 @@ export function ChatPanel({ locale, endpoint, labels, canDebug }: ChatPanelProps
         <div className="flex-1 min-h-0 overflow-hidden">
           <div className="flex h-full min-h-0 flex-col">
             <div className="flex-1 min-h-0 space-y-4 overflow-y-auto px-6 py-5">
+              {historyCursor && activeSessionId ? <button type="button" className="text-xs text-slate-600 underline" onClick={async () => {
+                if (historyLoadRef.current) return
+                const sessionId = activeSessionId
+                const generation = sessionLoadRef.current
+                historyLoadRef.current = true
+                try {
+                  const older = await listMessages(userId, sessionId, { beforeId: historyCursor })
+                  if (activeSessionIdRef.current !== sessionId || generation !== sessionLoadRef.current) return
+                  setMessages((current) => [...older.map((item) => ({ role: item.role, content: item.content })), ...current])
+                  setHistoryCursor(older.nextBeforeId)
+                } catch (error) { setError(error instanceof Error ? error.message : labels.error) }
+                finally { historyLoadRef.current = false }
+              }}>{locale === 'fr' ? 'Messages précédents' : '加载更早的消息'}</button> : null}
               {messages.length === 0 ? (
                 <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-500">
                   {labels.emptyState}
@@ -1323,6 +1387,11 @@ export function ChatPanel({ locale, endpoint, labels, canDebug }: ChatPanelProps
               )}
             </div>
 
+            <WorkflowCards sessionId={activeSessionId} busy={status === 'loading'} locale={locale} onCompleted={async () => {
+              if (requestRegistryRef.current.size > 0) return
+              if (activeSessionId) await loadSession(activeSessionId)
+              await refreshSessions()
+            }} />
             <div className="border-t border-slate-200 px-5 py-4">
               <div className="flex flex-col gap-3">
                 <textarea

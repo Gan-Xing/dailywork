@@ -31,7 +31,7 @@ export function ChatClient({ sessionUser, canDebug }: ChatClientProps) {
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900">
       <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col px-4 py-6 sm:px-6">
-        <ChatPanel locale={locale} endpoint="/api/ai-chat/stream" labels={copy} canDebug={canDebug} />
+        <ChatPanel key={sessionUser.id} userId={sessionUser.id} locale={locale} endpoint="/api/ai-chat/stream" labels={copy} canDebug={canDebug} />
       </div>
     </main>
   )

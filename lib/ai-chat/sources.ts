@@ -6,6 +6,14 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 export const collectSuccessfulSources = (calls: ChatToolCallRecord[]): ChatSource[] => {
   const sources = new Map<string, ChatSource>()
   calls.forEach((call) => {
+    if (call.result.ok && call.result.sources) {
+      call.result.sources.forEach((source) => {
+        if (/^\/(?:api\/|value\/|resources\/)/.test(source.url) &&
+            !/[\\\r\n]/.test(source.url)) {
+          sources.set(source.url, source)
+        }
+      })
+    }
     if (call.tool !== 'call_api' || !call.result.ok) return
     const key = typeof call.arguments.key === 'string' ? call.arguments.key : ''
     if (!key.startsWith('get:/api/')) return

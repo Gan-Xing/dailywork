@@ -702,6 +702,9 @@ model Role {
 
 model User {
   id                                Int                        @id @default(autoincrement())
+  aiChatSessions                    AiChatSession[]
+  aiChatMemories                    AiChatMemory[]
+  aiChatJobs                        AiChatJob[]
   name                              String                     @default("")
   gender                            String?
   nationality                       String?
@@ -798,9 +801,72 @@ model User {
 
 }
 
+model AiChatSession {
+  id            String          @id @default(uuid()) @db.Uuid
+  userId        Int
+  summary       String
+  summarySource String          @default("auto")
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages      AiChatMessage[]
+  jobs          AiChatJob[]
 
+  @@index([userId, updatedAt])
+}
 
+model AiChatMessage {
+  id        Int           @id @default(autoincrement())
+  sessionId String        @db.Uuid
+  clientKey String
+  role      String
+  content   String
+  requiredPermissions String[] @default([])
+  requiresAdmin Boolean @default(false)
+  createdAt DateTime      @default(now())
+  session   AiChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
+  @@unique([sessionId, clientKey])
+  @@index([sessionId, createdAt, id])
+}
+
+model AiChatMemory {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    Int
+  scopeType String
+  scopeKey  String
+  title     String
+  content   String
+  enabled   Boolean  @default(true)
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, scopeType, scopeKey])
+}
+
+model AiChatJob {
+  id         String         @id @default(uuid()) @db.Uuid
+  userId     Int
+  sessionId  String?        @db.Uuid
+  requestKey String
+  kind       String
+  status     String
+  input      Json
+  result     Json?
+  error      String?
+  expiresAt  DateTime?
+  leaseToken String?
+  leaseUntil DateTime?
+  attempts   Int            @default(0)
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+  user       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  session    AiChatSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, requestKey])
+  @@index([userId, sessionId, createdAt])
+  @@index([status, leaseUntil, createdAt])
+}
 
 model MachineAsset {
   id                Int               @id @default(autoincrement())

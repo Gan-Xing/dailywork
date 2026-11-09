@@ -1,17 +1,16 @@
 import { ChatClient } from './ChatClient'
 
 import { AccessDenied } from '@/components/AccessDenied'
-import { getSessionUser, hasPermission } from '@/lib/server/authSession'
+import { getSessionUser } from '@/lib/server/authSession'
+import { loadAiChatActor } from '@/lib/server/aiChatAccess'
 
 export default async function AiChatPage() {
   const sessionUser = await getSessionUser()
   if (!sessionUser) {
     return <ChatClient sessionUser={null} canDebug={false} />
   }
-  const canView = await hasPermission('ai-chat:view')
-  const canDebug = await hasPermission('ai-chat:debug')
-
-  if (!canView) {
+  let actor
+  try { actor = await loadAiChatActor(sessionUser.id) } catch {
     return (
       <AccessDenied
         permissions={['ai-chat:view']}
@@ -23,7 +22,7 @@ export default async function AiChatPage() {
   return (
     <ChatClient
       sessionUser={{ id: sessionUser.id, username: sessionUser.username }}
-      canDebug={canDebug}
+      canDebug={actor.permissions.includes('ai-chat:debug')}
     />
   )
 }

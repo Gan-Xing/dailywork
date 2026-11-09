@@ -7,6 +7,7 @@ export type ChatApiMessage = {
 
 export type ChatApiRequest = {
   input: string
+  sessionId?: string
   history?: ChatApiMessage[]
   locale?: string
   memoryContext?: string

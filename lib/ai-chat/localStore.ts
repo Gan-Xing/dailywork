@@ -26,7 +26,7 @@ export type MemoryRecord = {
   updatedAt: string
 }
 
-const DB_NAME = 'dailywork-ai-chat'
+const DB_NAME_PREFIX = 'dailywork-ai-chat-user-'
 const DB_VERSION = 1
 const STORE_SESSIONS = 'sessions'
 const STORE_MESSAGES = 'messages'
@@ -44,10 +44,17 @@ const requestToPromise = <T>(request: IDBRequest<T>) =>
     request.onerror = () => reject(request.error)
   })
 
-const openDb = () => {
+export const getChatLocalDbName = (userId: number) => {
+  if (!Number.isSafeInteger(userId) || userId <= 0) {
+    throw new Error('A valid user ID is required for local chat storage')
+  }
+  return `${DB_NAME_PREFIX}${userId}`
+}
+
+const openDb = (userId: number) => {
   ensureBrowser()
   return new Promise<IDBDatabase>((resolve, reject) => {
-    const request = window.indexedDB.open(DB_NAME, DB_VERSION)
+    const request = window.indexedDB.open(getChatLocalDbName(userId), DB_VERSION)
     request.onupgradeneeded = () => {
       const db = request.result
       if (!db.objectStoreNames.contains(STORE_SESSIONS)) {
@@ -72,11 +79,12 @@ const openDb = () => {
 }
 
 const withStore = async <T>(
+  userId: number,
   storeName: string,
   mode: IDBTransactionMode,
   handler: (store: IDBObjectStore) => IDBRequest<T>,
 ) => {
-  const db = await openDb()
+  const db = await openDb(userId)
   return new Promise<T>((resolve, reject) => {
     const transaction = db.transaction(storeName, mode)
     const store = transaction.objectStore(storeName)
@@ -86,8 +94,8 @@ const withStore = async <T>(
   })
 }
 
-const getAllFromStore = async <T>(storeName: string) => {
-  const db = await openDb()
+const getAllFromStore = async <T>(userId: number, storeName: string) => {
+  const db = await openDb(userId)
   return new Promise<T[]>((resolve, reject) => {
     const transaction = db.transaction(storeName, 'readonly')
     const store = transaction.objectStore(storeName)
@@ -97,14 +105,14 @@ const getAllFromStore = async <T>(storeName: string) => {
   })
 }
 
-export const listSessions = async (): Promise<ChatSessionRecord[]> => {
-  const sessions = await getAllFromStore<ChatSessionRecord>(STORE_SESSIONS)
+export const listSessions = async (userId: number): Promise<ChatSessionRecord[]> => {
+  const sessions = await getAllFromStore<ChatSessionRecord>(userId, STORE_SESSIONS)
   return sessions.sort(
     (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
   )
 }
 
-export const createSession = async (summary: string): Promise<ChatSessionRecord> => {
+export const createSession = async (userId: number, summary: string): Promise<ChatSessionRecord> => {
   const now = new Date().toISOString()
   const id = typeof crypto !== 'undefined' && crypto.randomUUID
     ? crypto.randomUUID()
@@ -116,15 +124,17 @@ export const createSession = async (summary: string): Promise<ChatSessionRecord>
     updatedAt: now,
     summarySource: 'auto',
   }
-  await withStore(STORE_SESSIONS, 'readwrite', (store) => store.put(session))
+  await withStore(userId, STORE_SESSIONS, 'readwrite', (store) => store.put(session))
   return session
 }
 
 export const updateSession = async (
+  userId: number,
   id: string,
   patch: Partial<ChatSessionRecord>,
 ) => {
   const existing = await withStore<ChatSessionRecord | undefined>(
+    userId,
     STORE_SESSIONS,
     'readonly',
     (store) => store.get(id),
@@ -137,13 +147,13 @@ export const updateSession = async (
     updatedAt: patch.updatedAt ?? now,
     summarySource: patch.summarySource ?? existing?.summarySource ?? 'auto',
   }
-  await withStore(STORE_SESSIONS, 'readwrite', (store) => store.put(updated))
+  await withStore(userId, STORE_SESSIONS, 'readwrite', (store) => store.put(updated))
   return updated
 }
 
-export const deleteSession = async (id: string) => {
-  await withStore(STORE_SESSIONS, 'readwrite', (store) => store.delete(id))
-  const db = await openDb()
+export const deleteSession = async (userId: number, id: string) => {
+  await withStore(userId, STORE_SESSIONS, 'readwrite', (store) => store.delete(id))
+  const db = await openDb(userId)
   await new Promise<void>((resolve, reject) => {
     const transaction = db.transaction(STORE_MESSAGES, 'readwrite')
     const store = transaction.objectStore(STORE_MESSAGES)
@@ -162,8 +172,8 @@ export const deleteSession = async (id: string) => {
   })
 }
 
-export const listMessages = async (sessionId: string): Promise<ChatMessageRecord[]> => {
-  const db = await openDb()
+export const listMessages = async (userId: number, sessionId: string): Promise<ChatMessageRecord[]> => {
+  const db = await openDb(userId)
   return new Promise<ChatMessageRecord[]>((resolve, reject) => {
     const transaction = db.transaction(STORE_MESSAGES, 'readonly')
     const store = transaction.objectStore(STORE_MESSAGES)
@@ -180,17 +190,19 @@ export const listMessages = async (sessionId: string): Promise<ChatMessageRecord
   })
 }
 
-export const appendMessage = async (message: ChatMessageRecord) => {
-  await withStore(STORE_MESSAGES, 'readwrite', (store) => store.add(message))
-  await updateSession(message.sessionId, { updatedAt: message.createdAt })
+export const appendMessage = async (userId: number, message: ChatMessageRecord) => {
+  await withStore(userId, STORE_MESSAGES, 'readwrite', (store) => store.add(message))
+  await updateSession(userId, message.sessionId, { updatedAt: message.createdAt })
 }
 
 export const getMemory = async (
+  userId: number,
   scopeType: MemoryScopeType,
   scopeKey: string,
 ): Promise<MemoryRecord | undefined> => {
   const id = `${scopeType}:${scopeKey}`
   const record = await withStore<MemoryRecord | undefined>(
+    userId,
     STORE_MEMORIES,
     'readonly',
     (store) => store.get(id),
@@ -199,12 +211,13 @@ export const getMemory = async (
 }
 
 export const saveMemory = async (
+  userId: number,
   scopeType: MemoryScopeType,
   scopeKey: string,
   patch: Partial<MemoryRecord>,
 ) => {
   const id = `${scopeType}:${scopeKey}`
-  const existing = await getMemory(scopeType, scopeKey)
+  const existing = await getMemory(userId, scopeType, scopeKey)
   const updated: MemoryRecord = {
     id,
     scopeType,
@@ -214,10 +227,10 @@ export const saveMemory = async (
     enabled: patch.enabled ?? existing?.enabled ?? true,
     updatedAt: new Date().toISOString(),
   }
-  await withStore(STORE_MEMORIES, 'readwrite', (store) => store.put(updated))
+  await withStore(userId, STORE_MEMORIES, 'readwrite', (store) => store.put(updated))
   return updated
 }
 
-export const listMemories = async (): Promise<MemoryRecord[]> => {
-  return getAllFromStore<MemoryRecord>(STORE_MEMORIES)
+export const listMemories = async (userId: number): Promise<MemoryRecord[]> => {
+  return getAllFromStore<MemoryRecord>(userId, STORE_MEMORIES)
 }

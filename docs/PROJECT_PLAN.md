@@ -113,9 +113,14 @@
 
 ## 12. AI 对话模块（可拔插）
 - 目标：提供一个可复用的 AI 对话引擎，支持意图识别、工具调用、权限校验与多轮回答。
-- 约束：默认只读查询，工具必须基于权限放行；输出不暴露思维链。
+- 约束：通用 API 工具维持只读；周计划专用工具只生成操作预览，用户在对话内确认后由固定业务服务执行。工具必须基于权限放行；输出不暴露思维链。
 - 位置：核心在 `lib/ai-chat/`，项目适配在 `lib/ai-chat/adapters/dailywork/`，入口为 `/ai-chat` 与 `app/api/ai-chat`。
 - 模型网关：设置 `AI_CHAT_PROVIDER=responses`、`AI_CHAT_BASE_URL`、`AI_CHAT_MODEL`、`AI_CHAT_API_KEY` 可使用 OpenAI Responses 兼容网关；未设置时继续使用 DeepSeek。当前服务器的统一 CLIProxyAPI v8 网关运行于本机 8320 端口，模型为 `gpt-6.1-sol`，并保留本地转写和向量接口。密钥只保留在服务端环境变量中，不传到浏览器。模型可用性必须通过实际推理请求验证，不能只依赖 `/v1/models` 列表。
-- 数据检索：API 目录由 `scripts/generate-api-docs.ts` 生成；问答只调用只读 JSON GET 端点，按当前用户权限过滤，成功调用的相对业务 URL 作为答案来源。生成目录后应核对新路由的语义条目与权限。
+- 数据检索：API 目录由 `scripts/generate-api-docs.ts` 生成；问答仅开放 `readPolicy.ts` 明确批准的业务 GET 端点，新增路由默认不可用。AI 层补齐目录缺失的权限要求，调用时仍由原业务路由二次鉴权；拒绝重定向和非 JSON 响应。成员完整接口含身份证、医疗、银行及薪酬字段，不提供给 AI，改用最小字段的成员工具。成功调用的相对业务 URL 作为答案来源。新增路由需复核语义、权限、GET 写副作用与响应字段后才可加入批准清单。
+- 财务分类：原 `/api/finance/categories` GET 会初始化分类，故不允许 AI 调用；`list_finance_categories` 仅用 Prisma 查询已存在的启用分类，需 `finance:view`，不执行初始化或写库。
+- 权限感知提示：财务统计和领导日志的强制查询提示仅对具备相应当前权限的用户启用；无财务权限时不强制重复调用不可用的财务接口。
+- 请求保护与追踪：两个 AI 问答入口先鉴权、获取单进程请求额度，再限量读取 JSON 请求体（最多 512 KiB）。默认每用户每分钟最多 8 次、同时最多 2 次，全局同时最多 16 次；可用 `AI_CHAT_REQUESTS_PER_MINUTE`、`AI_CHAT_CONCURRENT_PER_USER`、`AI_CHAT_CONCURRENT_GLOBAL` 调整。超限返回 429 与 `Retry-After`。响应和不含问题正文的服务日志记录同一个 `X-AI-Request-ID`，并记录模型调用次数及 token 使用量。流式连接取消后会中止执行并释放占用。多实例部署前须改用共享存储实现全局限流与持久化用量配额，当前机制不能视为分布式企业配额。
+- 会话与记忆：新增按当前账号鉴权的服务端会话、幂等消息和个人记忆。原浏览器按用户 ID 分库的数据保留，仅导入已归属当前账号的旧记录；无归属的 `dailywork-ai-chat` 数据不自动迁移。个人记忆不作为业务数值或授权依据。
+- 2026-11-09 业务 AI 升级：完整 Amorce 查询保留全部记录和来源，明确部分结果；周计划使用有时效的预览、版本冲突检查、事务和写后回查；PDF任务持久化，普通/签字PDF生成后只返回私有下载链接，不接入Telegram，CodexBridge机制保持独立。AI入口与业务权限分别校验，撤权后旧业务答案脱敏。保留原聊天入口。实施范围、权限、迁移和隔离验收见 [ai-chat-upgrade.md](./ai-chat-upgrade.md)。
 - Prompt：`app/ai-chat/prompt.md` 记录对话协议与工具调用格式。
 - API 目录生成：运行 `npx tsc scripts/generate-api-docs.ts --module commonjs --target es2020 --outDir .tmp --esModuleInterop --skipLibCheck`，然后 `node .tmp/generate-api-docs.js`，最后 `rm -rf .tmp`，产物写入 `lib/ai-chat/adapters/dailywork/apiCatalog.ts`。

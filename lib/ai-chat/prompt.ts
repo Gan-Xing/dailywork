@@ -1,4 +1,5 @@
 import type { ChatLocale, ChatTool } from './types'
+import { AI_BUSINESS_RULES } from './weeklyPlanChanges'
 
 const localeInstruction = (locale: ChatLocale) => {
   if (locale === 'fr') return 'Respond in French.'
@@ -21,10 +22,14 @@ export const buildSystemPrompt = ({
   tools,
   locale,
   enablePlanning = false,
+  canViewFinance = false,
+  canViewLeaderLogs = false,
 }: {
   tools: ChatTool[]
   locale: ChatLocale
   enablePlanning?: boolean
+  canViewFinance?: boolean
+  canViewLeaderLogs?: boolean
 }) => {
   const planningProtocol = enablePlanning
     ? [
@@ -45,16 +50,25 @@ export const buildSystemPrompt = ({
   return [
     'You are an AI assistant for a project management system.',
     'Your job is to answer questions by using available tools when needed.',
+    AI_BUSINESS_RULES,
     'You may receive an extra system message with API semantic guidance; treat it as the primary source for choosing endpoints.',
-    'Prefer call_api with a catalog key over custom list_* tools when an API endpoint exists for the request.',
+    'Prefer call_api only when a relevant endpoint appears in the approved API catalog. Never guess or call an unlisted API key.',
+    'For member questions, prefer list_active_members or count_members_by_project; the full member API contains private profile data and is not available to chat.',
     'Only use list_api_catalog when no relevant semantic guidance is available.',
     localeInstruction(locale),
     'Do not expose chain-of-thought. Provide concise answers with clear results.',
     'If data is unavailable or permissions are insufficient, explain the limitation and suggest next steps.',
     'Before finalizing, verify the answer fully addresses the question. If not, return an updated plan and continue.',
-    'Finance/cost questions: always call the finance insights API (key: get:/api/finance/insights) before answering. If date range is missing, ask for it or call get_system_time to build the current month range.',
+    ...(canViewFinance
+      ? [
+          'Finance/cost questions: always call the finance insights API (key: get:/api/finance/insights) before answering. If date range is missing, ask for it or call get_system_time to build the current month range.',
+          'For category-specific finance questions, use list_finance_categories to find an existing categoryKey, then filter finance insights. The category API GET is unavailable because it writes data.',
+        ]
+      : ['Do not claim access to finance data. If finance information is requested, explain that finance:view permission is required.']),
     'Summary/comparison/detail questions should combine multiple relevant APIs when needed; if one API already provides sufficient evidence, answer directly.',
-    'Work content questions: prefer leader logs (key: get:/api/leader-logs). Daily report drafts may return exists=false and should not be treated as actual work content.',
+    ...(canViewLeaderLogs
+      ? ['Work content questions: prefer leader logs (key: get:/api/leader-logs). Daily report drafts may return exists=false and should not be treated as actual work content.']
+      : []),
     'If evidence fields are missing in tool results, continue calling detail endpoints using available identifiers.',
     'A truncated tool result is only a preview: never infer totals or complete lists from its sample rows.',
     'Do not cite failed tool calls. If a requested fact is unsupported by successful results, state that it could not be verified.',

@@ -46,7 +46,8 @@ const hasRequiredPermissions = async (
   const checks = await Promise.all(
     required.map(async (permission) => {
       if (!permissionChecker) return permissions.includes(permission)
-      return permissionChecker(permission)
+      try { return await permissionChecker(permission) }
+      catch { return false }
     }),
   )
   return mode === 'any' ? checks.some(Boolean) : checks.every(Boolean)
@@ -76,15 +77,18 @@ const parseModelPayload = (content: string): ModelResponsePayload | null => {
 
 const formatToolResultMessage = (tool: ChatTool, result: ChatToolResult) => {
   if (tool.formatResult) return tool.formatResult(result)
+  if (tool.resultMode === 'complete') return `TOOL_RESULT ${tool.name}: ${JSON.stringify(result)}`
   const summarized = summarizeToolResult(result)
   return `TOOL_RESULT ${tool.name}: ${JSON.stringify(summarized)}`
 }
 
 const buildToolContext = (options: ChatRunOptions): ChatToolContext => ({
+  workflow: options.workflow,
   session: options.session,
   locale: options.locale ?? 'zh',
   request: options.request,
   permissionChecker: options.permissionChecker,
+  roleChecker: options.roleChecker,
 })
 
 const buildToolLabelMap = async () => {
@@ -316,6 +320,12 @@ const summarizeToolResult = (result: ChatToolResult): ChatToolResult => {
       data: {
         summary,
         truncated: true,
+        coverage: { complete: false, reason: 'truncated_for_model' },
+        pagination: data && !Array.isArray(data) && typeof data === 'object'
+          ? Object.fromEntries(Object.entries(data).filter(([key, value]) =>
+              ['total', 'count', 'hasMore', 'nextCursor', 'nextOffset', 'page', 'pageSize'].includes(key) &&
+              (value === null || ['number', 'boolean', 'string'].includes(typeof value))))
+          : undefined,
       },
     }
   } catch {
@@ -892,11 +902,20 @@ export const runChat = async (options: ChatRunOptions): Promise<ChatRunResult> =
   const maxModelCalls = options.maxModelCalls ?? 24
   const requestedPlanning = options.enablePlanning ?? false
   const lastUserQuestion = extractLastUserMessage(options.messages)
-  const needsFinanceInsights = isFinanceQuestion(lastUserQuestion)
   const financeSubject = extractFinanceSubject(lastUserQuestion)
   const monthHint = extractMonthYearHint(lastUserQuestion)
   const sessionPermissions = options.session?.permissions ?? []
-  const contextCandidates = options.contextCandidates ?? []
+  const hasCurrentPermission = async (permission: string) =>
+    sessionPermissions.includes(permission) &&
+    (!options.permissionChecker || await options.permissionChecker(permission))
+  const canViewFinance = await hasCurrentPermission('finance:view')
+  const canViewLeaderLogs = (await hasCurrentPermission('report:view')) ||
+    (await hasCurrentPermission('report:edit'))
+  const needsFinanceInsights = isFinanceQuestion(lastUserQuestion) && canViewFinance
+  const dedicatedBusiness = !needsFinanceInsights && /(?:Amorce|平交|路口|周计划|weekly\s+plan|plan\s+hebdomadaire)/i.test(lastUserQuestion)
+    && options.tools.some((tool) => ['get_junction_quantities', 'get_weekly_plan_snapshot'].includes(tool.name)
+      && (tool.requiredPermissions ?? []).every((permission) => sessionPermissions.includes(permission)))
+  const contextCandidates = dedicatedBusiness ? [] : options.contextCandidates ?? []
   const candidateMeta = new Map(
     contextCandidates.map((item) => [item.key, item]),
   )
@@ -1000,9 +1019,16 @@ export const runChat = async (options: ChatRunOptions): Promise<ChatRunResult> =
   const allowedTools = allowedToolsBase
 
   const toolMap = new Map(allowedTools.map((tool) => [tool.name, tool]))
-  const systemPrompt = buildSystemPrompt({ tools: allowedTools, locale, enablePlanning })
+  const registeredToolMap = new Map(options.tools.map((tool) => [tool.name, tool]))
+  const systemPrompt = buildSystemPrompt({
+    tools: allowedTools,
+    locale,
+    enablePlanning,
+    canViewFinance,
+    canViewLeaderLogs,
+  })
   const conversation: ChatMessage[] = [{ role: 'system', content: systemPrompt }]
-  if (options.contextMessage) {
+  if (options.contextMessage && !dedicatedBusiness) {
     conversation.push({ role: 'system', content: options.contextMessage })
   }
   if (uniqueCandidates.length > 0) {
@@ -1102,6 +1128,20 @@ export const runChat = async (options: ChatRunOptions): Promise<ChatRunResult> =
   }
 
   const finalizeAnswer = (answer: string): ChatRunResult => {
+    const outcomes = new Map<string, ChatToolCallRecord>()
+    for (const call of toolCalls) {
+      const tool = registeredToolMap.get(call.tool)
+      if (tool?.effect === 'proposal' || tool?.resultMode === 'complete' || call.result.jobId) {
+        outcomes.set(buildToolCacheKey(call.tool, call.arguments), call)
+      }
+    }
+    if (outcomes.size) answer = Array.from(outcomes.values()).map((call) => {
+      if (call.result.jobId && call.result.ok) return locale === 'fr'
+        ? 'Aperçu préparé, aucune opération exécutée. Vérifiez puis confirmez ci-dessous.'
+        : '已准备操作预览，尚未执行。请核对下方目标、数量及范围，再点击确认。'
+      if (!call.result.ok) return `${locale === 'fr' ? 'Non exécuté / non vérifié' : '未执行或未能核实'}：${call.result.content}`
+      return call.result.answer ?? call.result.content
+    }).join('\n\n')
     const sources = collectSuccessfulSources(toolCalls)
     const sourceLines = sources.map((source, index) => {
       const label = (apiLabelMap.get(source.key) ?? source.key)
@@ -1112,11 +1152,12 @@ export const runChat = async (options: ChatRunOptions): Promise<ChatRunResult> =
     const sourceSection = sourceLines.length
       ? `\n\n${locale === 'fr' ? 'Sources vérifiées:' : '已查询的数据来源：'}\n${sourceLines.join('\n')}`
       : ''
-    const finalAnswer = `${stripAnswerMeta(answer)}${sourceSection}`.trim()
+    const finalAnswer = `${outcomes.size ? answer : stripAnswerMeta(answer)}${sourceSection}`.trim()
     const result: ChatRunResult = {
       answer: finalAnswer,
       toolCalls,
       sources,
+      modelCalls,
       plan,
       stepSummaries,
       usage: totalUsage,
@@ -1139,7 +1180,15 @@ export const runChat = async (options: ChatRunOptions): Promise<ChatRunResult> =
     emitEvent({ type: 'tool_call', tool: payload.tool, arguments: args, label: toolLabel })
     appendMessage(conversation, { role: 'assistant', content: JSON.stringify(payload) })
 
-    if (!tool) {
+    const hasAccess = async () => {
+      if (options.accessPermission) {
+        try {
+          if (!options.permissionChecker || !await options.permissionChecker(options.accessPermission)) return false
+        } catch { return false }
+      }
+      return !!tool && await hasRequiredPermissions(tool, options.session?.permissions ?? [], options.permissionChecker)
+    }
+    if (!tool || !await hasAccess()) {
       const result: ChatToolResult = {
         ok: false,
         content: 'Tool not available for this user.',
@@ -1168,10 +1217,14 @@ export const runChat = async (options: ChatRunOptions): Promise<ChatRunResult> =
       let attempt = 0
       while (true) {
         try {
+          if (!await hasAccess()) {
+            result = { ok: false, content: 'Permission denied for this tool.', error: 'permission_denied' }
+            break
+          }
           result = await withTimeout(tool.handler(args, buildToolContext(options)), TOOL_TIMEOUT_MS)
           break
         } catch (error) {
-          if (attempt >= TOOL_MAX_RETRIES) {
+          if (tool.effect === 'proposal' || attempt >= TOOL_MAX_RETRIES) {
             throw error
           }
           attempt += 1
@@ -1183,6 +1236,9 @@ export const runChat = async (options: ChatRunOptions): Promise<ChatRunResult> =
         content: 'Tool execution failed.',
         error: error instanceof Error ? error.message : String(error),
       }
+    }
+    if (result.ok && !await hasAccess()) {
+      result = { ok: false, content: 'Permission changed before the tool completed.', error: 'permission_denied' }
     }
     toolResultCache.set(cacheKey, result)
     toolCalls.push({ tool: tool.name, arguments: args, result })
@@ -1255,8 +1311,8 @@ export const runChat = async (options: ChatRunOptions): Promise<ChatRunResult> =
       if (filteredResults.length > 0 && !hasPositive) {
         hints.push(
           locale === 'fr'
-            ? `Aucun résultat trouvé pour \"${financeSubject}\". Essaie get:/api/finance/categories pour trouver le categoryKey, puis relance insights avec categoryKey.`
-            : `未找到“${financeSubject}”相关结果，可先调用 get:/api/finance/categories 找到 categoryKey，再用 categoryKey 重新查询。`,
+            ? `Aucun résultat trouvé pour \"${financeSubject}\". Essaie list_finance_categories pour trouver un categoryKey, puis relance insights; vérifie aussi la période.`
+            : `未找到“${financeSubject}”相关结果，可用 list_finance_categories 查找 categoryKey 后重试 insights，并核对时间范围。`,
         )
       }
     }
@@ -1312,7 +1368,7 @@ export const runChat = async (options: ChatRunOptions): Promise<ChatRunResult> =
         )
       }
     }
-    if (isWorkContentQuestion(lastUserQuestion) && !hasLeaderLogsCall(toolCalls)) {
+    if (canViewLeaderLogs && isWorkContentQuestion(lastUserQuestion) && !hasLeaderLogsCall(toolCalls)) {
       const reportStatus = extractReportCallStatus(toolCalls)
       if (reportStatus?.exists === false) {
         const dateHint = reportStatus.date
@@ -1345,11 +1401,11 @@ export const runChat = async (options: ChatRunOptions): Promise<ChatRunResult> =
     financeGuardApplied = true
     const subjectHint = financeSubject
       ? locale === 'fr'
-        ? `Pour le terme "${financeSubject}", cherche d'abord la catégorie via get:/api/finance/categories, puis utilise reasonKeyword/remarkKeyword.`
-        : `关于“${financeSubject}”可先调用 get:/api/finance/categories 寻找分类，再用 reasonKeyword/remarkKeyword 过滤。`
+        ? `Pour le terme "${financeSubject}", utilise list_finance_categories pour trouver un categoryKey, ou filtre avec reasonKeyword/remarkKeyword.`
+        : `关于“${financeSubject}”，可用 list_finance_categories 查找 categoryKey，或用 reasonKeyword/remarkKeyword 过滤。`
       : locale === 'fr'
-        ? 'Si la question vise une catégorie précise, commence par get:/api/finance/categories, puis filtre via reasonKeyword/remarkKeyword.'
-        : '如需按具体材料/项目筛选，先调用 get:/api/finance/categories，再用 reasonKeyword/remarkKeyword 过滤。'
+        ? 'Pour une matière précise, cherche categoryKey avec list_finance_categories, ou filtre avec reasonKeyword/remarkKeyword.'
+        : '如需按具体材料筛选，可用 list_finance_categories 查找 categoryKey，或用 reasonKeyword/remarkKeyword 过滤。'
     const monthHintText =
       monthHint.month && !monthHint.year && !hasSystemTimeCall(toolCalls)
         ? locale === 'fr'
@@ -1370,6 +1426,12 @@ export const runChat = async (options: ChatRunOptions): Promise<ChatRunResult> =
     | { type: 'result'; result: ChatRunResult }
 
   const handleFinalPayload = async (payload: { answer?: string }): Promise<FinalHandling> => {
+    if (dedicatedBusiness && !toolCalls.some((call) => call.result.ok &&
+        (toolMap.get(call.tool)?.resultMode === 'complete' || call.result.jobId || call.tool === 'get_weekly_plan_snapshot'))) {
+      return { type: 'result', result: finalizeAnswer(locale === 'fr'
+        ? 'Précisez le projet, la route et le côté, ou le numéro du plan et la modification. Aucun résultat métier vérifié ni changement effectué.'
+        : '尚未取得可核实的业务结果，也未执行修改。请明确项目、道路、左右侧及桩号，或周计划编号和具体改动。') }
+    }
     if (maybeEnforceFinanceGuard()) {
       return { type: 'continue' }
     }

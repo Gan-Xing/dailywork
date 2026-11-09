@@ -1,5 +1,9 @@
 # AI Chat Module (Portable)
 
+Business workflow contract: `docs/ai-chat-upgrade.md`. The core has no shell or
+arbitrary write tools; complete results and proposal-only effects are explicit
+tool capabilities. DailyWork persistence lives in `lib/server/aiChat*.ts`.
+
 This folder contains a project-agnostic chat runtime with tool calling support.
 
 ## Core
@@ -20,6 +24,8 @@ The core files do not depend on Next.js or Prisma and can be copied to another p
 
 ## Dailywork API catalog
 - `scripts/generate-api-docs.ts` regenerates `lib/ai-chat/adapters/dailywork/apiCatalog.ts` with input/output schemas.
+- `adapters/dailywork/readPolicy.ts` is the opt-in AI read allowlist. Review route side effects, permissions, and response fields before approving a new key. The AI adapter rejects redirects and non-JSON responses; sensitive full member profiles are intentionally excluded in favor of narrow member tools.
+- `list_finance_categories` reads existing active category keys without calling the finance GET route that initializes rows. It requires `finance:view` and supports keyword search and pagination.
 - Regenerate via:
 
 ```bash
@@ -38,3 +44,4 @@ rm -rf .tmp
 
 ## Streaming UI
 - The dailywork UI uses an SSE endpoint at `/api/ai-chat/stream` to render live plan/step progress.
+- Both chat endpoints share a per-process request guard (`requestGuard.ts`) and return an `X-AI-Request-ID` for support correlation. The guard defaults to 8 requests/minute and 2 concurrent requests per user, with 16 globally; see `docs/PROJECT_PLAN.md` for environment overrides and the multi-instance limitation.

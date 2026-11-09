@@ -7,6 +7,9 @@ import { listRoadSections } from '@/lib/server/roadStore'
 
 import type { ChatTool, ChatToolResult } from '../../types'
 import { dailyworkApiCatalog } from './apiCatalog'
+import { getAiChatRequiredPermissions, isAiChatReadableEntry } from './readPolicy'
+import { buildJunctionTools } from './junctionTools'
+import { buildWorkflowTools } from './workflowTools'
 
 const clampLimit = (value: unknown, fallback: number) => {
   const parsed = Number(value)
@@ -58,8 +61,8 @@ type AssignmentRow = Prisma.UserProjectAssignmentGetPayload<{ select: typeof ass
 
 const filterCatalogByPermissions = (permissions: string[]) =>
   dailyworkApiCatalog.filter((entry) => {
-    if (!entry.permissions.length) return true
-    return entry.permissions.some((permission) => permissions.includes(permission))
+    if (!isAiChatReadableEntry(entry)) return false
+    return getAiChatRequiredPermissions(entry).some((permission) => permissions.includes(permission))
   })
 
 const applyPathParams = (path: string, params: Record<string, unknown>) => {
@@ -73,6 +76,11 @@ const applyPathParams = (path: string, params: Record<string, unknown>) => {
       missing.push(key)
       continue
     }
+    const segments = Array.isArray(value) ? value : [value]
+    if (segments.some((segment) => {
+      const part = String(segment)
+      return !part || part === '.' || part === '..' || /[/\\\u0000-\u001f\u007f]/.test(part)
+    })) throw new Error('Invalid API path parameter')
     const replacement = Array.isArray(value)
       ? value.map((item) => encodeURIComponent(String(item))).join('/')
       : encodeURIComponent(String(value))
@@ -151,6 +159,8 @@ const buildSystemTimePayload = () => {
 }
 
 export const buildDailyworkTools = (): ChatTool[] => [
+  ...buildJunctionTools(),
+  ...buildWorkflowTools(),
   {
     name: 'get_system_time',
     description: 'Get current server time for date range calculations.',
@@ -182,11 +192,16 @@ export const buildDailyworkTools = (): ChatTool[] => [
       const includeAll = Boolean(args.includeAll)
       const permissions = context.session?.permissions ?? []
       const canViewAll = includeAll && permissions.includes('permission:view')
-      const items = canViewAll ? dailyworkApiCatalog : filterCatalogByPermissions(permissions)
+      const items = canViewAll
+        ? dailyworkApiCatalog.filter(isAiChatReadableEntry)
+        : filterCatalogByPermissions(permissions)
       return buildResult({
         ok: true,
         content: `Loaded ${items.length} API entries.`,
-        data: items,
+        data: items.map((entry) => ({
+          ...entry,
+          permissions: getAiChatRequiredPermissions(entry),
+        })),
       })
     },
   },
@@ -213,7 +228,7 @@ export const buildDailyworkTools = (): ChatTool[] => [
         if (!entry) {
           return buildResult({ ok: false, content: 'API entry not found.', error: 'not_found' })
         }
-        if (entry.mode !== 'read' || entry.method !== 'GET') {
+        if (!isAiChatReadableEntry(entry)) {
           return buildResult({
             ok: false,
             content: 'Only read-only JSON endpoints are allowed in chat mode.',
@@ -222,7 +237,7 @@ export const buildDailyworkTools = (): ChatTool[] => [
         }
         const permissions = context.session?.permissions ?? []
         const checker = context.permissionChecker
-        const allowed = await canAccessEntry(permissions, entry.permissions, checker)
+        const allowed = await canAccessEntry(permissions, getAiChatRequiredPermissions(entry), checker)
         if (!allowed) {
           return buildResult({
             ok: false,
@@ -233,6 +248,16 @@ export const buildDailyworkTools = (): ChatTool[] => [
         const params = isRecord(args.params) ? args.params : {}
         const query = isRecord(args.query) ? args.query : {}
         const body = isRecord(args.body) ? args.body : null
+        const forbiddenQueryParams = Object.keys(query).filter((name) =>
+          ['debug', 'includeUrl'].includes(name),
+        )
+        if (forbiddenQueryParams.length) {
+          return buildResult({
+            ok: false,
+            content: `Query params are not available in chat mode: ${forbiddenQueryParams.join(', ')}`,
+            error: 'invalid_query_params',
+          })
+        }
         if (entry.key === 'get:/api/finance/insights') {
           const allowed = new Set(entry.queryParams.map((item) => item.name))
           const unknown = Object.keys(query).filter((name) => !allowed.has(name))
@@ -256,45 +281,46 @@ export const buildDailyworkTools = (): ChatTool[] => [
         const origin = context.request?.origin ?? 'http://localhost:3000'
         const url = `${origin}${resolved}${buildQueryString(query)}`
         const headers: Record<string, string> = {}
-        if (context.request?.cookie) headers.cookie = context.request.cookie
+        const cookie = context.request?.getCookie ? await context.request.getCookie() : context.request?.cookie
+        if (cookie) headers.cookie = cookie
         if (entry.method !== 'GET') headers['Content-Type'] = 'application/json'
         const response = await fetch(url, {
           method: entry.method,
           headers,
           body: entry.method === 'GET' ? undefined : JSON.stringify(body ?? {}),
+          redirect: 'error',
           signal: context.request?.signal
             ? AbortSignal.any([context.request.signal, AbortSignal.timeout(15000)])
             : AbortSignal.timeout(15000),
         })
-        const contentType = response.headers.get('content-type') ?? ''
-        const isJson = contentType.includes('application/json')
-        const isBinary = /application\/pdf|application\/octet-stream|application\/vnd\./i.test(
-          contentType,
-        )
-        if (isBinary) {
+        const mediaType = (response.headers.get('content-type') ?? '').split(';')[0].trim().toLowerCase()
+        const isJson = mediaType === 'application/json' || mediaType.endsWith('+json')
+        if (!isJson) {
           return buildResult({
             ok: false,
-            content: 'Binary responses are not available in chat mode.',
-            error: 'binary_not_allowed',
+            content: 'Only JSON API responses are available in chat mode.',
+            error: 'unsupported_content_type',
           })
         }
         const raw = await readLimitedResponse(response)
-        let payload: unknown = raw
-        if (isJson) {
-          try {
-            payload = JSON.parse(raw)
-          } catch {
-            return buildResult({ ok: false, content: 'API returned invalid JSON.', error: 'invalid_json' })
-          }
+        let payload: unknown
+        try {
+          payload = JSON.parse(raw)
+        } catch {
+          return buildResult({ ok: false, content: 'API returned invalid JSON.', error: 'invalid_json' })
         }
         if (!response.ok) {
           return buildResult({
             ok: false,
             content: 'API request failed.',
-            error: isJson ? JSON.stringify(payload) : String(payload),
+            error: JSON.stringify(payload),
             data: { status: response.status },
           })
         }
+        if (!await canAccessEntry(permissions, getAiChatRequiredPermissions(entry), checker)) {
+          return buildResult({ ok: false, content: 'Permission changed during the API request.', error: 'permission_denied' })
+        }
+        await context.request?.assertScope?.()
         if (entry.key === 'get:/api/finance/insights' && isRecord(payload) && isRecord(payload.insights)) {
           const insights = payload.insights as Record<string, unknown>
           const totalAmount = typeof insights.totalAmount === 'number' ? insights.totalAmount : 0
@@ -324,6 +350,83 @@ export const buildDailyworkTools = (): ChatTool[] => [
     },
   },
   {
+    name: 'list_finance_categories',
+    description: 'Read active finance categories and their keys without initializing or changing data.',
+    schema: {
+      type: 'object',
+      properties: {
+        keyword: { type: 'string', description: 'Optional category name or code to search.' },
+        limit: { type: 'number', description: 'Default 20 categories, maximum 100; prefer keyword search.' },
+        offset: { type: 'number', description: 'Number of categories to skip for pagination.' },
+      },
+      required: [],
+    },
+    requiredPermissions: ['finance:view'],
+    handler: async (args, context) => {
+      const allowed = await canAccessEntry(
+        context.session?.permissions ?? [],
+        ['finance:view'],
+        context.permissionChecker,
+      )
+      if (!allowed) {
+        return buildResult({ ok: false, content: 'Permission denied.', error: 'permission_denied' })
+      }
+      const keyword = typeof args.keyword === 'string' ? args.keyword.trim().slice(0, 100) : ''
+      const parsedLimit = Number(args.limit)
+      const limit = Number.isFinite(parsedLimit) && parsedLimit > 0
+        ? Math.min(Math.floor(parsedLimit), 100)
+        : 20
+      const parsedOffset = Number(args.offset)
+      const offset = Number.isSafeInteger(parsedOffset) && parsedOffset > 0
+        ? Math.min(parsedOffset, 10_000)
+        : 0
+      try {
+        const categories = await prisma.financeCategory.findMany({
+          where: {
+            isActive: true,
+            ...(keyword
+              ? {
+                  OR: [
+                    { key: { contains: keyword, mode: 'insensitive' } },
+                    { code: { contains: keyword, mode: 'insensitive' } },
+                    { labelZh: { contains: keyword, mode: 'insensitive' } },
+                    { labelEn: { contains: keyword, mode: 'insensitive' } },
+                    { labelFr: { contains: keyword, mode: 'insensitive' } },
+                  ],
+                }
+              : {}),
+          },
+          orderBy: [{ sortOrder: 'asc' }, { key: 'asc' }],
+          skip: offset,
+          take: limit + 1,
+          select: {
+            key: true,
+            parentKey: true,
+            labelZh: true,
+            labelEn: true,
+            labelFr: true,
+            code: true,
+          },
+        })
+        return buildResult({
+          ok: true,
+          content: `Loaded ${Math.min(categories.length, limit)} finance categories.`,
+          data: {
+            categories: categories.slice(0, limit),
+            hasMore: categories.length > limit,
+            nextOffset: categories.length > limit ? offset + limit : null,
+          },
+        })
+      } catch {
+        return buildResult({
+          ok: false,
+          content: 'Failed to load finance categories.',
+          error: 'category_lookup_failed',
+        })
+      }
+    },
+  },
+  {
     name: 'list_road_sections',
     description: 'List road sections with slug, name, PK range, and project id.',
     schema: {
@@ -333,7 +436,7 @@ export const buildDailyworkTools = (): ChatTool[] => [
       },
       required: [],
     },
-    requiredPermissions: ['road:view', 'progress:view'],
+    requiredPermissions: ['road:view', 'road:manage'],
     permissionMode: 'any',
     handler: async (args) => {
       try {

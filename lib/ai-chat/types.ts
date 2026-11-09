@@ -20,6 +20,9 @@ export type ChatToolResult = {
   content: string
   data?: unknown
   error?: string
+  jobId?: string
+  sources?: ChatSource[]
+  answer?: string
 }
 
 export type ChatToolContext = {
@@ -28,9 +31,13 @@ export type ChatToolContext = {
   request?: {
     origin: string
     cookie?: string
+    getCookie?: () => Promise<string>
+    assertScope?: () => Promise<void>
     signal?: AbortSignal
   }
   permissionChecker?: PermissionChecker
+  roleChecker?: PermissionChecker
+  workflow?: { requestId: string; sessionId?: string }
 }
 
 export type ChatTool = {
@@ -39,6 +46,8 @@ export type ChatTool = {
   schema: ChatToolSchema
   requiredPermissions?: string[]
   permissionMode?: ChatToolPermissionMode
+  effect?: 'read' | 'proposal'
+  resultMode?: 'complete'
   handler: (args: Record<string, unknown>, context: ChatToolContext) => Promise<ChatToolResult>
   formatResult?: (result: ChatToolResult) => string
 }
@@ -90,6 +99,7 @@ export type ChatSession = {
   id: number
   username: string
   permissions: string[]
+  roles?: string[]
 }
 
 export type AdapterGenerateParams = {
@@ -169,18 +179,24 @@ export type ChatRunOptions = {
   maxModelCalls?: number
   enablePlanning?: boolean
   permissionChecker?: PermissionChecker
+  roleChecker?: PermissionChecker
+  accessPermission?: string
   request?: {
     origin: string
     cookie?: string
+    getCookie?: () => Promise<string>
+    assertScope?: () => Promise<void>
     signal?: AbortSignal
   }
   onEvent?: (event: ChatStreamEvent) => void
+  workflow?: { requestId: string; sessionId?: string }
 }
 
 export type ChatRunResult = {
   answer: string
   toolCalls: ChatToolCallRecord[]
   sources: ChatSource[]
+  modelCalls: number
   plan?: PlanPayload
   stepSummaries?: string[]
   usage?: AdapterGenerateResult['usage']
