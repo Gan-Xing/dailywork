@@ -7,6 +7,7 @@ import { useSearchParams } from 'next/navigation'
 import { AccessDenied } from '@/components/AccessDenied'
 import { PageHeaderNav } from '@/components/PageHeaderNav'
 import { useToast } from '@/components/ToastProvider'
+import { SignedBillsPanel } from '@/components/value/SignedBillsPanel'
 import { addWorkQuantities, formatWorkQuantity, normalizeWorkQuantity } from '@/lib/boq/quantityDecimal'
 import { buildAdvanceMeasurementEntry } from '@/lib/boq/measurementDrafts'
 import {
@@ -504,6 +505,23 @@ export default function ValuePage() {
   const [completionSearch, setCompletionSearch] = useState('')
   const [completionViewMode, setCompletionViewMode] = useState<'full' | 'summary'>('full')
   const [measurementSearch, setMeasurementSearch] = useState('')
+  const [measurementMode, setMeasurementMode] = useState<'signed' | 'working'>(
+    searchParams?.get('mode') === 'working' ? 'working' : 'signed',
+  )
+  const measurementModeParam = searchParams?.get('mode')
+  const requestedProjectId = searchParams?.get('projectId')
+  const requestedBillPeriod = searchParams?.get('periodIndex') ?? undefined
+  const requestedBillRevision = searchParams?.get('revisionId') ?? undefined
+  useEffect(() => {
+    if (measurementModeParam === 'signed' || measurementModeParam === 'working') {
+      setMeasurementMode(measurementModeParam)
+    }
+  }, [measurementModeParam])
+  useEffect(() => {
+    if (requestedProjectId && boqProjects.some((project) => String(project.id) === requestedProjectId)) {
+      setSelectedProjectId(requestedProjectId)
+    }
+  }, [requestedProjectId, boqProjects])
   const [comparisonSearch, setComparisonSearch] = useState('')
   const [comparisonSourceFilter, setComparisonSourceFilter] = useState<
     'all' | ComparisonSource
@@ -3788,6 +3806,35 @@ export default function ValuePage() {
           ) : null}
 
           {activeTab === 'measurement' ? (
+            <div className="flex flex-wrap items-end justify-between gap-4 border-b border-slate-200 p-6">
+              <div className="inline-flex rounded-xl border border-slate-200 bg-slate-50 p-1" role="group" aria-label={isFrenchLocale ? 'Vue des décomptes' : '计量展示方式'}>
+                {(['signed', 'working'] as const).map((mode) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    aria-pressed={measurementMode === mode}
+                    onClick={() => setMeasurementMode(mode)}
+                    className={`rounded-lg px-4 py-2 text-sm font-semibold transition ${measurementMode === mode ? 'bg-white text-emerald-800 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
+                  >
+                    {mode === 'signed' ? (isFrenchLocale ? 'Décomptes signés' : '签字账单') : (isFrenchLocale ? 'Calculs de travail' : '编制计量')}
+                  </button>
+                ))}
+              </div>
+              {measurementMode === 'signed' ? (
+                <label className="text-sm font-semibold text-slate-700">
+                  <span className="mb-1 block">{copy.measurement.projectLabel}</span>
+                  <select className="w-full min-w-[200px] rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-200" value={selectedProjectId} onChange={(event) => setSelectedProjectId(event.target.value)}>
+                    {!boqProjects.length ? <option value="">{copy.measurement.projectPlaceholder}</option> : null}
+                    {boqProjects.map((project) => <option key={project.id} value={String(project.id)}>{resolveProjectLabel(project)}</option>)}
+                  </select>
+                </label>
+              ) : null}
+            </div>
+          ) : null}
+          {activeTab === 'measurement' && measurementMode === 'signed' ? (
+            <SignedBillsPanel key={`${selectedProjectId}:${requestedBillPeriod}:${requestedBillRevision}`} projectId={selectedProjectId ? Number(selectedProjectId) : null} projectName={selectedBoqProject ? resolveProjectLabel(selectedBoqProject) : ''} locale={locale} initialPeriod={selectedProjectId === requestedProjectId ? requestedBillPeriod : undefined} initialRevisionId={selectedProjectId === requestedProjectId && requestedBillRevision ? Number(requestedBillRevision) : undefined} />
+          ) : null}
+          {activeTab === 'measurement' && measurementMode === 'working' ? (
             <div className="p-6">
               <div className="space-y-5">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">

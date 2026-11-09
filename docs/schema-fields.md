@@ -417,6 +417,18 @@
 - 记录只追加，数据库触发器禁止更新或删除。版本主要原件的文件外键使用 `Restrict`；文件删除接口也拒绝移除已被版本来源引用的其他证据，避免归档后失去依据。
 - `GET/POST /api/value/signed-bills` 分别需要 `value:view` / `value:update`；`PATCH /api/value/signed-bills/[id]/activate` 需要 `value:update`。归档已有签字原件不是电子签署流程。
 
+## 清单剩余范围计划（BoqWorkPlan / Scope / Binding / Allocation / Event）
+
+- **隔离与初始状态**：五张新表独立保存用户未来逐项核定的待计量范围，不修改签字账单、计算底稿、编制计量、原清单价或财务数据，也不把普通合同工作存为现场变更。读取无计划时返回 `UNCONFIRMED`，数量与金额为空；GET 不创建计划或默认完成事实。
+- **稳定身份**：`BoqWorkPlan` 以 `projectId + anchorRevisionId + anchorLineKey` 唯一定位源项目；`boqItemId` 可空，价号可重复或空白。源成员为签字 `ITEM` 行及经项目、期次、SHA256 验证的计算明细 manifest 补充模板叶子，不按价号字符串匹配。`BoqWorkBinding` 以 `signedRevisionId + lineKey` 唯一，明确关联计划与原单。
+- **未定价原件事项**：`SOURCE_ACTIVITY` 只从同一已验证原件底稿中，包含未映射 `DETAIL` 的真实 `ITEM_HEADER` 派生；以原记录 `recordId` 定位并返回关联 `sourceRecordIds`。原件价号、签认量、单价和金额保留为空，单位仅取原记录。独立显示为待核事项，只能暂存草稿，禁止确认、确认无剩余或核销；不创建虚构清单项，也不写入编制计量。GET 不创建记录，签字原件和既有基线保持原样。
+- **范围与量价**：`BoqWorkScope.id` 为稳定 UUID；道路必须属于同一项目，PK、侧别、规格、说明及数量依据独立保存。`completionState` 为已完成/未完成/未知；`scopeBasis` 为原合同/已批变更/待批范围，已批变更需批准依据。`quantity Decimal(38,18)` 可空，`quantityConfirmed` 独立于 `priceJson.confirmed`；数量非负，不自动换算单位或采用全局价。未知单位可存草稿，不能确认。
+- **原签字单价默认值**：保存原合同范围时，计划价缺省、空白或与本签字行同价但未确认，自动沿用所选版本精确 `lineKey` 的 `sourceUnitPrice`，保存为 `confirmed=true / ORIGINAL` 并记录版本、价号和条目依据。不同自定义价、变更/暂定价和范围独立价不覆盖；补充模板行、无原签字价或跨价号均不自动补价。原合同计划价不能自动计入已批或待批变更范围。GET 不写入或追认价格，签字账单量价保持原样。
+- **确认版本**：`version` 用于乐观锁；`draftJson` 与 `confirmedSnapshotJson` 分开，草稿不替换上次确认。`confirm` 可确认已核部分，但 `scopeComplete=false` 时最终预计量额仍为空；`confirm-none` 必须明确版本、基线、范围完整且空清单。备注选填，未填时按实际操作记录审计说明，逐行数量确认独立保留。历史只读期保留当时确认累计与摘要，并标识历史；当前原单、源修正或 manifest 基线变化时显示 `NEEDS_REVIEW`，不沿用最终预计值。
+- **预计口径**：原合同及已批变更的剩余量，与待批范围分别列示。预计最终工程 HT＝签字项目行累计工程金额原值＋经独立确认的适用价格×剩余量；不把历史累计量按新价重算，不用本期净应付代替累计工程金额。未确认数量、价格或完整性不补零；部分完成可拆成不同范围行。
+- **只读核销预审**：`BoqWorkAllocation` 预留有正负号的精确增量、来源 Binding、稳定范围、版本及反向关联，本阶段无新增核销接口。`match-preflight` 始终 `written=false`、`matched=false`；后续真实账单绑定流程尚未开放，非空匹配明确返回暂不支持，不能解释为核销已验证。基线期及更早期不能重复核销；负向冲回缺原关联、范围完成事实未确认均返回待核。已有核销的范围不能删除或改写。
+- **审计与接口**：`BoqWorkEvent` 每次保存追加前后草稿/确认快照、原因、用户和版本；事件与核销表有禁止修改/删除的触发器。新表外键删除限制，更新级联。`GET /api/value/signed-bills/[id]/work-plans` 需 `value:view`；单项 POST 及 `/work-plans/match-preflight` POST 需 `value:update`。仅项目最大正式期次的当前签字版本可编辑；事务比较 `baselineHash + expectedVersion`，冲突返回409。
+
 ## 计量明细（BoqMeasurementDetail）
 
 - **用途**：独立记录计量明细行（按项目、期次、分项清单、路段），用于追踪“每条计量来自哪个路段、多少工程量”，并支持和主计量表做累计核对。

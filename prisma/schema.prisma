@@ -322,6 +322,7 @@ model RoadSection {
   referencedCrossSections       RoadCrossSection[]         @relation("RoadCrossSectionReferenceRoad")
 
   @@index([projectId])
+  boqWorkScopes BoqWorkScope[]
 
 }
 
@@ -790,6 +791,10 @@ model User {
   updatedSiteVariationRawRecords    SiteVariationRawRecord[]   @relation("SiteVariationRawRecordUpdater")
   createdAt                         DateTime                   @default(now())
   updatedAt                         DateTime                   @updatedAt
+  boqWorkPlansCreated BoqWorkPlan[] @relation("BoqWorkPlanCreator")
+  boqWorkPlansUpdated BoqWorkPlan[] @relation("BoqWorkPlanUpdater")
+  boqWorkAllocations BoqWorkAllocation[]
+  boqWorkEvents BoqWorkEvent[]
 
 }
 
@@ -1225,6 +1230,8 @@ model Project {
   weeklyDeliveryPlanLinks   WeeklyDeliveryPlanProject[]
   siteVariationMeasurements SiteVariationMeasurement[]
   siteVariationRawRecords   SiteVariationRawRecord[]
+  boqWorkPlans BoqWorkPlan[]
+  boqWorkBindings BoqWorkBinding[]
 
 }
 
@@ -1257,6 +1264,7 @@ model BoqItem {
 
   @@index([projectId, sheetType, sortOrder])
   @@index([projectId, sheetType, code])
+  workPlans BoqWorkPlan[]
 
 }
 
@@ -1320,6 +1328,8 @@ model BoqBillRevision {
   @@unique([projectId, periodIndex, revision])
   @@unique([projectId, periodIndex, contentSha256])
   @@index([projectId, periodIndex, isCurrent])
+  workPlanAnchors BoqWorkPlan[] @relation("BoqWorkAnchor")
+  workPlanBindings BoqWorkBinding[] @relation("BoqWorkBindingSource")
 
 }
 
@@ -1810,3 +1820,105 @@ model WeeklyMaterialPriceHistory {
 
 
 // Independent future-work planning; signed bill rows are only referenced.
+model BoqWorkPlan {
+  id                    Int @id @default(autoincrement())
+  projectId             Int
+  anchorRevisionId      Int
+  anchorLineKey         String
+  boqItemId             Int?
+  version               Int @default(1)
+  state                 String @default("DRAFT")
+  draftJson             Json
+  confirmedSnapshotJson Json?
+  createdById           Int
+  updatedById           Int
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @default(now()) @updatedAt
+  project               Project @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  anchorRevision        BoqBillRevision @relation("BoqWorkAnchor", fields: [anchorRevisionId], references: [id], onDelete: Restrict)
+  boqItem               BoqItem? @relation(fields: [boqItemId], references: [id], onDelete: Restrict)
+  creator               User @relation("BoqWorkPlanCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  updater               User @relation("BoqWorkPlanUpdater", fields: [updatedById], references: [id], onDelete: Restrict)
+  scopes                BoqWorkScope[]
+  bindings              BoqWorkBinding[]
+  events                BoqWorkEvent[]
+  @@unique([projectId, anchorRevisionId, anchorLineKey])
+  @@index([projectId, boqItemId])
+}
+
+model BoqWorkScope {
+  id                    String @id @db.Uuid
+  planId                Int
+  sortOrder             Int @default(0)
+  description           String
+  roadId                Int?
+  startPk               String?
+  endPk                 String?
+  side                  String?
+  spec                  String?
+  unit                  String?
+  completionState       String @default("UNKNOWN")
+  scopeBasis            String @default("ORIGINAL")
+  quantity              Decimal? @db.Decimal(38, 18)
+  quantityConfirmed     Boolean @default(false)
+  quantityEvidence      String
+  approvalEvidence      String
+  priceJson             Json?
+  isActive              Boolean @default(true)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @default(now()) @updatedAt
+  plan                  BoqWorkPlan @relation(fields: [planId], references: [id], onDelete: Restrict)
+  road                  RoadSection? @relation(fields: [roadId], references: [id], onDelete: Restrict)
+  allocations           BoqWorkAllocation[]
+  @@index([planId, isActive])
+}
+
+model BoqWorkBinding {
+  id                    Int @id @default(autoincrement())
+  projectId             Int
+  planId                Int
+  signedRevisionId      Int
+  lineKey               String
+  sourceKind            String
+  sourceHash            String @db.VarChar(64)
+  createdAt             DateTime @default(now())
+  project               Project @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  plan                  BoqWorkPlan @relation(fields: [planId], references: [id], onDelete: Restrict)
+  signedRevision        BoqBillRevision @relation("BoqWorkBindingSource", fields: [signedRevisionId], references: [id], onDelete: Restrict)
+  allocations           BoqWorkAllocation[]
+  @@unique([signedRevisionId, lineKey])
+  @@index([planId])
+}
+
+model BoqWorkAllocation {
+  id                    Int @id @default(autoincrement())
+  bindingId             Int
+  scopeId               String @db.Uuid
+  deltaQuantity         Decimal @db.Decimal(38, 18)
+  planVersion           Int
+  reversesId            Int?
+  reason                String
+  createdById           Int
+  createdAt             DateTime @default(now())
+  binding               BoqWorkBinding @relation(fields: [bindingId], references: [id], onDelete: Restrict)
+  scope                 BoqWorkScope @relation(fields: [scopeId], references: [id], onDelete: Restrict)
+  reverses              BoqWorkAllocation? @relation("BoqWorkAllocationReversal", fields: [reversesId], references: [id], onDelete: Restrict)
+  reversedBy            BoqWorkAllocation[] @relation("BoqWorkAllocationReversal")
+  creator               User @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  @@index([bindingId, scopeId])
+}
+
+model BoqWorkEvent {
+  id                    Int @id @default(autoincrement())
+  planId                Int
+  version               Int
+  kind                  String
+  beforeJson            Json?
+  afterJson             Json
+  actorId               Int
+  reason                String
+  createdAt             DateTime @default(now())
+  plan                  BoqWorkPlan @relation(fields: [planId], references: [id], onDelete: Restrict)
+  actor                 User @relation(fields: [actorId], references: [id], onDelete: Restrict)
+  @@unique([planId, version])
+}
