@@ -15,6 +15,7 @@ import {
 import { prisma } from '@/lib/prisma'
 import { resolveRoadLabels } from '@/lib/i18n/roadDictionary'
 import { ensureFinanceDefaults } from './financeStore'
+import { signedBillDifference, sumSignedBillAmounts } from '@/lib/finance/signedBillAmounts'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 
@@ -98,6 +99,14 @@ export type FinanceLedgerCaseDTO = {
   nextStage: FinanceLedgerStage | null
   enteredCurrentStageAt: string | null
   accountAmount: number | null
+  currentSignedBill: {
+    id: number
+    revision: number
+    netTtc: string | null
+    ledgerDifference: string | null
+    signedPdfFileId: number | null
+    viewUrl: string
+  } | null
   invoiceAmount: number | null
   advanceAmount: number | null
   chequeAmount: number | null
@@ -167,6 +176,8 @@ export type FinanceLedgerInsights = {
   summary: {
     caseCount: number
     totalAccountAmount: number
+    totalSignedBillNetTtc: string | null
+    signedBillCaseCount: number
     totalInvoiceAmount: number
     totalChequeAmount: number
     receiptRate: number
@@ -509,7 +520,14 @@ const compareBySortField = (
     case 'status':
       return FINANCE_LEDGER_CASE_STATUSES.indexOf(left.status) - FINANCE_LEDGER_CASE_STATUSES.indexOf(right.status)
     case 'accountAmount':
-      return compareNullableNumbers(left.accountAmount, right.accountAmount)
+      {
+        const leftAmount = left.currentSignedBill?.netTtc ?? left.accountAmount
+        const rightAmount = right.currentSignedBill?.netTtc ?? right.accountAmount
+        if (leftAmount == null && rightAmount == null) return 0
+        if (leftAmount == null) return 1
+        if (rightAmount == null) return -1
+        return new Prisma.Decimal(leftAmount).comparedTo(new Prisma.Decimal(rightAmount))
+      }
     case 'invoiceAmount':
       return compareNullableNumbers(left.invoiceAmount, right.invoiceAmount)
     case 'chequeAmount':
@@ -575,6 +593,7 @@ const mapCase = (
     nextStage,
     enteredCurrentStageAt: row.enteredCurrentStageAt?.toISOString() ?? null,
     accountAmount: toNumberOrNull(row.accountAmount),
+    currentSignedBill: null,
     invoiceAmount: toNumberOrNull(row.invoiceAmount),
     advanceAmount: toNumberOrNull(row.advanceAmount),
     chequeAmount: toNumberOrNull(row.chequeAmount),
@@ -628,6 +647,32 @@ const buildCaseWhere = (filters: FinanceLedgerCaseFilterOptions): Prisma.Finance
   }
 }
 
+const attachCurrentSignedBills = async (cases: FinanceLedgerCaseDTO[], sourceRows: Array<Pick<FinanceLedgerCaseRow, 'id' | 'accountAmount'>>) => {
+  const identities = cases.filter((row) => row.periodIndex > 0).map((row) => ({ projectId: row.projectId, periodIndex: row.periodIndex }))
+  if (!identities.length) return cases
+  const revisions = await prisma.boqBillRevision.findMany({
+    where: { status: 'SIGNED', isCurrent: true, OR: identities },
+    select: { id: true, projectId: true, periodIndex: true, revision: true, netTtc: true, signedPdfFileId: true },
+  })
+  const byPeriod = new Map(revisions.map((revision) => [`${revision.projectId}:${revision.periodIndex}`, revision]))
+  const exactLedgerAmounts = new Map(sourceRows.map((row) => [row.id, row.accountAmount?.toFixed() ?? null]))
+  return cases.map((row): FinanceLedgerCaseDTO => {
+    const revision = byPeriod.get(`${row.projectId}:${row.periodIndex}`)
+    if (!revision) return row
+    return {
+      ...row,
+      currentSignedBill: {
+        id: revision.id,
+        revision: revision.revision,
+        netTtc: revision.netTtc?.toFixed() ?? null,
+        ledgerDifference: signedBillDifference(revision.netTtc?.toFixed() ?? null, exactLedgerAmounts.get(row.id) ?? null),
+        signedPdfFileId: revision.signedPdfFileId,
+        viewUrl: `/value?tab=measurement&mode=signed&projectId=${row.projectId}&periodIndex=${row.periodIndex}`,
+      },
+    }
+  })
+}
+
 const listDerivedCases = async (filters: FinanceLedgerCaseFilterOptions): Promise<FinanceLedgerCaseDTO[]> => {
   assertFinanceLedgerModels()
   const where = buildCaseWhere(filters)
@@ -639,7 +684,7 @@ const listDerivedCases = async (filters: FinanceLedgerCaseFilterOptions): Promis
   const projectIds = Array.from(new Set(rows.map((item) => item.projectId)))
   const slaMap = await listSlaMap(projectIds)
   const now = new Date()
-  let mapped = rows.map((row) => mapCase(row, slaMap, now))
+  let mapped = await attachCurrentSignedBills(rows.map((row) => mapCase(row, slaMap, now)), rows)
 
   if (filters.search?.trim()) {
     const tokens = filters.search
@@ -764,7 +809,7 @@ export const getFinanceLedgerCase = async (id: number): Promise<FinanceLedgerCas
   assertFinanceLedgerModels()
   const row = await getCaseByIdRaw(id)
   const slaMap = await listSlaMap([row.projectId])
-  return mapCase(row, slaMap, new Date())
+  return (await attachCurrentSignedBills([mapCase(row, slaMap, new Date())], [row]))[0]
 }
 
 export const createFinanceLedgerCase = async (
@@ -789,7 +834,7 @@ export const createFinanceLedgerCase = async (
       include: ledgerCaseInclude,
     })
     const slaMap = await listSlaMap([created.projectId])
-    return mapCase(created, slaMap, new Date())
+    return (await attachCurrentSignedBills([mapCase(created, slaMap, new Date())], [created]))[0]
   } catch (error) {
     if (
       error instanceof Prisma.PrismaClientKnownRequestError &&
@@ -930,7 +975,7 @@ export const updateFinanceLedgerCase = async (
   })
 
   const slaMap = await listSlaMap([updated.projectId])
-  return mapCase(updated, slaMap, new Date())
+  return (await attachCurrentSignedBills([mapCase(updated, slaMap, new Date())], [updated]))[0]
 }
 
 export const softDeleteFinanceLedgerCase = async (id: number, userId?: number | null) => {
@@ -1003,7 +1048,7 @@ export const createFinanceLedgerEvent = async (
   })
 
   const slaMap = await listSlaMap([updatedCase.projectId])
-  return mapCase(updatedCase, slaMap, new Date())
+  return (await attachCurrentSignedBills([mapCase(updatedCase, slaMap, new Date())], [updatedCase]))[0]
 }
 
 export const updateFinanceLedgerEvent = async (
@@ -1066,7 +1111,7 @@ export const updateFinanceLedgerEvent = async (
   })
 
   const slaMap = await listSlaMap([updatedCase.projectId])
-  return mapCase(updatedCase, slaMap, new Date())
+  return (await attachCurrentSignedBills([mapCase(updatedCase, slaMap, new Date())], [updatedCase]))[0]
 }
 
 export const getFinanceLedgerInsights = async (
@@ -1079,6 +1124,8 @@ export const getFinanceLedgerInsights = async (
   }))
 
   const totalAccountAmount = items.reduce((sum, item) => sum + (item.accountAmount ?? 0), 0)
+  const signedAmounts = items.flatMap((item) => item.currentSignedBill?.netTtc == null ? [] : [item.currentSignedBill.netTtc])
+  const totalSignedBillNetTtc = sumSignedBillAmounts(signedAmounts)
   const totalInvoiceAmount = items.reduce((sum, item) => sum + (item.invoiceAmount ?? 0), 0)
   const totalChequeAmount = items.reduce((sum, item) => sum + (item.chequeAmount ?? 0), 0)
   const cycleValues = items.map((item) => item.cycleDays).filter((value): value is number => value !== null)
@@ -1292,6 +1339,8 @@ export const getFinanceLedgerInsights = async (
     summary: {
       caseCount: items.length,
       totalAccountAmount: Math.round(totalAccountAmount * 100) / 100,
+      totalSignedBillNetTtc,
+      signedBillCaseCount: signedAmounts.length,
       totalInvoiceAmount: Math.round(totalInvoiceAmount * 100) / 100,
       totalChequeAmount: Math.round(totalChequeAmount * 100) / 100,
       receiptRate: totalInvoiceAmount > 0 ? Math.round((totalChequeAmount / totalInvoiceAmount) * 1000) / 10 : 0,

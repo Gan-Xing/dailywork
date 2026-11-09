@@ -55,6 +55,14 @@ type LedgerCase = {
   nextStage: FinanceLedgerStage | null
   enteredCurrentStageAt: string | null
   accountAmount: number | null
+  currentSignedBill: {
+    id: number
+    revision: number
+    netTtc: string | null
+    ledgerDifference: string | null
+    signedPdfFileId: number | null
+    viewUrl: string
+  } | null
   invoiceAmount: number | null
   advanceAmount: number | null
   chequeAmount: number | null
@@ -77,6 +85,8 @@ type LedgerInsights = {
   summary: {
     caseCount: number
     totalAccountAmount: number
+    totalSignedBillNetTtc: string | null
+    signedBillCaseCount: number
     totalInvoiceAmount: number
     totalChequeAmount: number
     receiptRate: number
@@ -450,7 +460,7 @@ const ledgerText: Record<
     delaysTab: 'Délais',
     createCaseButton: 'Nouveau dossier',
     summaryCases: 'Dossiers',
-    summaryAccountAmount: 'Montant compte',
+    summaryAccountAmount: 'Net des décomptes signés',
     summaryInvoiceAmount: 'Montant facture',
     summaryChequeAmount: 'Montant chèque',
     summaryReceiptRate: 'Taux encaissement',
@@ -478,7 +488,7 @@ const ledgerText: Record<
     colPeriod: 'Période',
     colConstructionStart: 'Début travaux',
     colConstructionEnd: 'Fin travaux',
-    colAccount: 'Compte',
+    colAccount: 'Net signé',
     colInvoice: 'Facture',
     colCheque: 'Chèque',
     colWaiting: 'Attente',
@@ -576,7 +586,7 @@ const ledgerText: Record<
     delaysTab: '时效',
     createCaseButton: '新建台账',
     summaryCases: '台账数',
-    summaryAccountAmount: '账单金额',
+    summaryAccountAmount: '签认账单净应付',
     summaryInvoiceAmount: '发票金额',
     summaryChequeAmount: '支票金额',
     summaryReceiptRate: '收款率',
@@ -604,7 +614,7 @@ const ledgerText: Record<
     colPeriod: '期次',
     colConstructionStart: '施工开始',
     colConstructionEnd: '施工结束',
-    colAccount: '账单',
+    colAccount: '签认净应付',
     colInvoice: '发票',
     colCheque: '支票',
     colWaiting: '等待',
@@ -681,6 +691,18 @@ const formatNumber = (value: number | null | undefined, locale: Locale) => {
   if (value == null || !Number.isFinite(value)) return '—'
   const localeId = locale === 'fr' ? 'fr-FR' : 'zh-CN'
   return new Intl.NumberFormat(localeId, { maximumFractionDigits: 2 }).format(value)
+}
+
+/** Keep signed document decimals intact without converting them to binary floating point. */
+const formatSignedDecimal = (value: string | null | undefined, locale: Locale) => {
+  if (value == null || !/^-?\d+(?:\.\d+)?$/.test(value)) return '—'
+  const negative = value.startsWith('-')
+  const [whole, fractional = ''] = value.replace(/^-/, '').split('.')
+  const localeId = locale === 'fr' ? 'fr-FR' : 'zh-CN'
+  const grouped = new Intl.NumberFormat(localeId).format(BigInt(whole))
+  const decimalMark = new Intl.NumberFormat(localeId).formatToParts(1.1).find((part) => part.type === 'decimal')?.value ?? '.'
+  const fraction = fractional.replace(/0+$/, '')
+  return `${negative ? '-' : ''}${grouped}${fraction ? decimalMark + fraction : ''}`
 }
 
 const formatDateTime = (value: string | null, locale: Locale) => {
@@ -1415,7 +1437,13 @@ export default function FinanceLedgerPage() {
               </article>
               <article className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                 <p className="text-xs uppercase tracking-wide text-slate-500">{t.summaryAccountAmount}</p>
-                <p className="mt-1 text-lg font-semibold">{formatNumber(insights.summary.totalAccountAmount, locale)}</p>
+                <p className="mt-1 text-lg font-semibold">{formatSignedDecimal(insights.summary.totalSignedBillNetTtc, locale)}</p>
+                <p className="mt-1 text-xs text-slate-500">
+                  {locale === 'fr' ? `${insights.summary.signedBillCaseCount} décomptes signés` : `${insights.summary.signedBillCaseCount} 份正式签字账单`}
+                </p>
+                <p className="mt-1 text-xs text-slate-500">
+                  {locale === 'fr' ? 'Ancien registre : ' : '原台账合计：'}{formatNumber(insights.summary.totalAccountAmount, locale)}
+                </p>
               </article>
               <article className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                 <p className="text-xs uppercase tracking-wide text-slate-500">{t.summaryInvoiceAmount}</p>
@@ -1758,7 +1786,32 @@ export default function FinanceLedgerPage() {
                               )}
                             </td>
                           ) : null}
-                          {isVisibleColumn('accountAmount') ? <td>{formatNumber(item.accountAmount, locale)}</td> : null}
+                          {isVisibleColumn('accountAmount') ? (
+                            <td className="min-w-[160px] px-3 py-2">
+                              {item.currentSignedBill ? (
+                                <>
+                                  <Link href={item.currentSignedBill.viewUrl} className="font-medium text-blue-700 underline underline-offset-2">
+                                    {formatSignedDecimal(item.currentSignedBill.netTtc, locale)}
+                                  </Link>
+                                  <div className="mt-1 text-xs text-slate-500">
+                                    {locale === 'fr' ? 'Registre : ' : '原台账：'}{formatNumber(item.accountAmount, locale)}
+                                  </div>
+                                  {item.currentSignedBill.ledgerDifference != null && !/^-?0(?:\.0+)?$/.test(item.currentSignedBill.ledgerDifference) ? (
+                                    <div className="mt-1 text-xs text-amber-700">
+                                      {locale === 'fr' ? 'Écart : ' : '差异：'}{formatSignedDecimal(item.currentSignedBill.ledgerDifference, locale)}
+                                    </div>
+                                  ) : null}
+                                </>
+                              ) : (
+                                <>
+                                  <span>{formatNumber(item.accountAmount, locale)}</span>
+                                  <div className="mt-1 text-xs text-slate-500">
+                                    {locale === 'fr' ? 'Registre, sans version signée liée' : '原台账，未关联正式签字版'}
+                                  </div>
+                                </>
+                              )}
+                            </td>
+                          ) : null}
                           {isVisibleColumn('invoiceAmount') ? <td>{formatNumber(item.invoiceAmount, locale)}</td> : null}
                           {isVisibleColumn('chequeAmount') ? <td>{formatNumber(item.chequeAmount, locale)}</td> : null}
                           {isVisibleColumn('waitingDays') ? <td>{item.waitingDays}</td> : null}
