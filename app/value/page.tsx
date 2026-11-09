@@ -7,6 +7,7 @@ import { useSearchParams } from 'next/navigation'
 import { AccessDenied } from '@/components/AccessDenied'
 import { PageHeaderNav } from '@/components/PageHeaderNav'
 import { useToast } from '@/components/ToastProvider'
+import { addWorkQuantities, formatWorkQuantity, normalizeWorkQuantity } from '@/lib/boq/quantityDecimal'
 import {
   buildActualBoqRows,
   sortBoqItemsByOrder,
@@ -208,6 +209,7 @@ const resolveItemPeriodAmount = (
   const record = measurementMap.get(boqItemId)?.get(periodKey)
   const quantityRaw = draft?.quantity ?? record?.quantity ?? ''
   const quantityValue = parseBoqNumber(quantityRaw)
+  const quantityExact = normalizeWorkQuantity(quantityRaw)
   const draftAmountRaw = draft?.amount
   const draftAmountValue =
     draftAmountRaw !== undefined && draftAmountRaw !== '' ? parseBoqNumber(draftAmountRaw) : null
@@ -228,7 +230,7 @@ const resolveItemPeriodAmount = (
           ? quantityValue * unitPriceValue
           : null
 
-  return { quantityValue, amountValue }
+  return { quantityValue, quantityExact, amountValue }
 }
 
 const resolveAdvancePeriodAmount = (
@@ -374,7 +376,7 @@ type CompletionTotals = {
 }
 
 type MeasurementTotals = {
-  measuredQuantity: number
+  measuredQuantity: string
   measuredValue: number
   totalPrice: number
   itemCount: number
@@ -435,14 +437,14 @@ type ComparisonSummaryRow = {
 }
 
 type PeriodGroupTotals = {
-  quantity: number
+  quantity: string
   amount: number
   hasQuantity: boolean
   hasAmount: boolean
 }
 
 type PeriodRowTotals = {
-  quantity: number | null
+  quantity: string | null
   amount: number | null
 }
 
@@ -472,7 +474,7 @@ export default function ValuePage() {
   const [boqProjects, setBoqProjects] = useState<BoqProject[]>([])
   const [boqProjectsStatus, setBoqProjectsStatus] = useState<FetchStatus>('idle')
   const [boqProjectsError, setBoqProjectsError] = useState<string | null>(null)
-  const [selectedProjectId, setSelectedProjectId] = useState('')
+  const [selectedProjectId, setSelectedProjectId] = useState(searchParams?.get('projectId') ?? '')
   const [boqItems, setBoqItems] = useState<BoqItemRecord[]>([])
   const [boqItemsStatus, setBoqItemsStatus] = useState<FetchStatus>('idle')
   const [boqItemsError, setBoqItemsError] = useState<string | null>(null)
@@ -1287,17 +1289,17 @@ export default function ValuePage() {
       locale,
     }).map((row) => {
       const isItem = row.tone === 'ITEM'
-      let measuredQuantity: number | null = null
+      let measuredQuantity: string | null = null
       let measuredValue: number | null = null
 
       if (isItem && measurementPeriodKeys.length) {
-        let quantityTotal = 0
+        let quantityTotal = '0'
         let valueTotal = 0
         let hasQuantity = false
         let hasValue = false
 
         measurementPeriodKeys.forEach((periodKey) => {
-          const { quantityValue, amountValue } = resolveItemPeriodAmount(
+          const { quantityExact, amountValue } = resolveItemPeriodAmount(
             row.id,
             periodKey,
             row.unitPrice,
@@ -1305,8 +1307,8 @@ export default function ValuePage() {
             measurementMap,
           )
 
-          if (quantityValue !== null) {
-            quantityTotal += quantityValue
+          if (quantityExact !== null) {
+            quantityTotal = addWorkQuantities(quantityTotal, quantityExact)
             hasQuantity = true
           }
           if (amountValue !== null) {
@@ -1333,7 +1335,7 @@ export default function ValuePage() {
     const totalsByMajorCode = new Map<string, MeasurementTotals>()
     const subsectionIndexBySectionAndCode = new Map<number, Map<string, number>>()
     const overallTotals: MeasurementTotals = {
-      measuredQuantity: 0,
+      measuredQuantity: '0',
       measuredValue: 0,
       totalPrice: 0,
       itemCount: 0,
@@ -1344,7 +1346,7 @@ export default function ValuePage() {
     let currentSubsectionCode: string | null = null
 
     const addTotals = (target: MeasurementTotals, addition: MeasurementTotals) => {
-      target.measuredQuantity += addition.measuredQuantity
+      target.measuredQuantity = addWorkQuantities(target.measuredQuantity, addition.measuredQuantity)
       target.measuredValue += addition.measuredValue
       target.totalPrice += addition.totalPrice
       target.itemCount += addition.itemCount
@@ -1356,7 +1358,7 @@ export default function ValuePage() {
       addition: MeasurementTotals,
     ) => {
       const existing = map.get(key) ?? {
-        measuredQuantity: 0,
+        measuredQuantity: '0',
         measuredValue: 0,
         totalPrice: 0,
         itemCount: 0,
@@ -1371,7 +1373,7 @@ export default function ValuePage() {
       addition: MeasurementTotals,
     ) => {
       const existing = map.get(key) ?? {
-        measuredQuantity: 0,
+        measuredQuantity: '0',
         measuredValue: 0,
         totalPrice: 0,
         itemCount: 0,
@@ -1406,7 +1408,7 @@ export default function ValuePage() {
       sectionIndexByRow[index] = currentSectionIndex
       if (row.tone !== 'item') return
       const addition: MeasurementTotals = {
-        measuredQuantity: row.measuredQuantity ?? 0,
+        measuredQuantity: row.measuredQuantity ?? '0',
         measuredValue: row.measuredValue ?? 0,
         totalPrice: row.totalPriceValue ?? 0,
         itemCount: 1,
@@ -1779,7 +1781,7 @@ export default function ValuePage() {
     })
 
     const initTotals = (): PeriodGroupTotals => ({
-      quantity: 0,
+      quantity: '0',
       amount: 0,
       hasQuantity: false,
       hasAmount: false,
@@ -1787,11 +1789,11 @@ export default function ValuePage() {
 
     const addTotals = (
       target: PeriodGroupTotals,
-      quantityValue: number | null,
+      quantityValue: string | null,
       amountValue: number | null,
     ) => {
       if (quantityValue !== null) {
-        target.quantity += quantityValue
+        target.quantity = addWorkQuantities(target.quantity, quantityValue)
         target.hasQuantity = true
       }
       if (amountValue !== null) {
@@ -1803,7 +1805,7 @@ export default function ValuePage() {
     const addToMap = (
       map: Map<number, PeriodGroupTotals>,
       key: number,
-      quantityValue: number | null,
+      quantityValue: string | null,
       amountValue: number | null,
     ) => {
       const existing = map.get(key) ?? initTotals()
@@ -1814,7 +1816,7 @@ export default function ValuePage() {
     const addToCodeMap = (
       map: Map<string, PeriodGroupTotals>,
       key: string,
-      quantityValue: number | null,
+      quantityValue: string | null,
       amountValue: number | null,
     ) => {
       const existing = map.get(key) ?? initTotals()
@@ -1892,25 +1894,25 @@ export default function ValuePage() {
       const overallTotals = initTotals()
 
       itemGroups.forEach((group) => {
-        const { quantityValue, amountValue } = resolveItemPeriodAmount(
+        const { quantityExact, amountValue } = resolveItemPeriodAmount(
           group.id,
           periodKey,
           group.unitPrice,
           measurementDrafts,
           measurementMap,
         )
-        addTotals(overallTotals, quantityValue, amountValue)
+        addTotals(overallTotals, quantityExact, amountValue)
         if (group.sectionIndex !== null) {
-          addToMap(totalsBySection, group.sectionIndex, quantityValue, amountValue)
+          addToMap(totalsBySection, group.sectionIndex, quantityExact, amountValue)
         }
         if (group.subsectionIndex !== null) {
-          addToMap(totalsBySubsection, group.subsectionIndex, quantityValue, amountValue)
+          addToMap(totalsBySubsection, group.subsectionIndex, quantityExact, amountValue)
         }
         if (group.subsectionCode) {
-          addToCodeMap(totalsBySubsectionCode, group.subsectionCode, quantityValue, amountValue)
+          addToCodeMap(totalsBySubsectionCode, group.subsectionCode, quantityExact, amountValue)
         }
         if (group.majorCode) {
-          addToCodeMap(totalsByMajorCode, group.majorCode, quantityValue, amountValue)
+          addToCodeMap(totalsByMajorCode, group.majorCode, quantityExact, amountValue)
         }
       })
 
@@ -2027,7 +2029,7 @@ export default function ValuePage() {
     setMeasurementDrafts((prev) => {
       const next = { ...prev }
       const existing = next[draftKey] ?? {}
-      next[draftKey] = { ...existing, amount: value }
+      next[draftKey] = { ...existing, [field]: value }
       return next
     })
   }
@@ -4212,7 +4214,7 @@ export default function ValuePage() {
                               ) : null}
                               {measurementColumnVisibility.quantity ? (
                                 <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums">
-                                  {formatBoqCell(row.quantity, { numeric: true, localeId })}
+                                  {formatWorkQuantity(row.quantity == null ? null : String(row.quantity))}
                                 </td>
                               ) : null}
                               {measurementColumnVisibility.totalPrice ? (
@@ -4223,10 +4225,7 @@ export default function ValuePage() {
                               {measurementColumnVisibility.totalMeasuredQuantity ? (
                                 <td className="px-3 py-3 text-right tabular-nums">
                                   <div className="truncate">
-                                    {formatBoqCell(
-                                      rowKind ? null : row.measuredQuantity,
-                                      { numeric: true, localeId },
-                                    )}
+                                    {formatWorkQuantity(rowKind ? null : row.measuredQuantity)}
                                   </div>
                                 </td>
                               ) : null}
@@ -4312,10 +4311,7 @@ export default function ValuePage() {
                                           <span className="text-slate-400">—</span>
                                         ) : periodRowQuantity !== null ? (
                                           <span className="block text-right tabular-nums text-slate-600">
-                                            {formatBoqCell(periodRowQuantity, {
-                                              numeric: true,
-                                              localeId,
-                                            })}
+                                            {formatWorkQuantity(periodRowQuantity)}
                                           </span>
                                         ) : (
                                           <span className="text-slate-400">—</span>

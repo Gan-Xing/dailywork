@@ -1245,7 +1245,7 @@ model BoqMeasurement {
   projectId Int
   boqItemId Int
   period    DateTime
-  quantity  Decimal  @db.Decimal(18, 2)
+  quantity  Decimal  @db.Decimal(38, 18)
   unitPrice Decimal? @db.Decimal(18, 2)
   amount    Decimal? @db.Decimal(18, 2)
   note      String?
@@ -1268,7 +1268,7 @@ model BoqMeasurementDetail {
   endPk        String?
   side         IntervalSide?
   period       DateTime
-  quantity     Decimal       @db.Decimal(18, 2)
+  quantity     Decimal       @db.Decimal(38, 18)
   manualAmount Decimal?      @db.Decimal(18, 2)
   note         String?
   createdAt    DateTime      @default(now())
