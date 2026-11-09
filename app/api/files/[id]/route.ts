@@ -3,9 +3,11 @@ import { NextResponse, type NextRequest } from 'next/server'
 import type { Prisma } from '@prisma/client'
 
 import { FILE_CATEGORIES, type FileCategory } from '@/lib/constants/fileCategories'
+import { mutableFileLinkReplacements, ReservedFileLinkError, SIGNED_BILL_FILE_LINK_ENTITY } from '@/lib/files/reservedFileLinks'
 import { prisma } from '@/lib/prisma'
 import { getSessionUser, hasPermission } from '@/lib/server/authSession'
 import { createPresignedUrl, deleteObject } from '@/lib/server/r2'
+import { isAiChatArtifact } from '@/lib/files/aiChatArtifacts'
 
 const FILE_URL_TTL = 300
 
@@ -47,7 +49,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     },
   })
 
-  if (!file) {
+  if (!file || isAiChatArtifact(file.storageKey)) {
     return NextResponse.json({ message: '文件不存在' }, { status: 404 })
   }
 
@@ -111,22 +113,49 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
     return NextResponse.json({ message: '缺少文件删除权限' }, { status: 403 })
   }
 
-  const file = await prisma.fileAsset.findUnique({
-    where: { id: fileId },
-    include: {
-      _count: { select: { links: true, signatures: true } },
-    },
-  })
+  const result = await prisma.$transaction(async (tx) => {
+    // FK inserts take KEY SHARE on this row. Hold UPDATE through the reference
+    // recheck and deletion so an archive cannot commit dangling JSON evidence.
+    await tx.$queryRaw`SELECT "id" FROM "FileAsset" WHERE "id" = ${fileId} FOR UPDATE`
+    const file = await tx.fileAsset.findUnique({
+      where: { id: fileId },
+      include: {
+        _count: { select: { links: true, signatures: true } },
+      },
+    })
 
-  if (!file) {
-    return NextResponse.json({ message: '文件不存在' }, { status: 404 })
+    if (!file || isAiChatArtifact(file.storageKey)) {
+      return { message: '文件不存在', status: 404 }
+    }
+
+    // Keep JSON evidence even if its generic link was relabelled or removed.
+    const archivedBill = await tx.boqBillRevision.findFirst({
+      where: {
+        OR: [
+          { signedPdfFileId: fileId },
+          { calculationFileId: fileId },
+          { sourceJson: { path: ['files'], array_contains: [{ fileId }] } },
+        ],
+      },
+      select: { id: true },
+    })
+    if (archivedBill) {
+      return { message: '文件已作为不可变账单原件或证据归档，无法删除', status: 409 }
+    }
+
+    if (file._count.links > 0 || file._count.signatures > 0) {
+      return { message: '文件已被引用，无法删除', status: 409 }
+    }
+
+    await tx.fileAsset.delete({ where: { id: fileId } })
+    return { file }
+  }, { isolationLevel: 'ReadCommitted' })
+
+  if ('message' in result) {
+    return NextResponse.json({ message: result.message }, { status: result.status })
   }
 
-  if (file._count.links > 0 || file._count.signatures > 0) {
-    return NextResponse.json({ message: '文件已被引用，无法删除' }, { status: 409 })
-  }
-
-  await prisma.fileAsset.delete({ where: { id: fileId } })
+  const { file } = result
 
   try {
     await deleteObject(file.storageKey)
@@ -176,7 +205,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   }
 
   const file = await prisma.fileAsset.findUnique({ where: { id: fileId } })
-  if (!file) {
+  if (!file || isAiChatArtifact(file.storageKey)) {
     return NextResponse.json({ message: '文件不存在' }, { status: 404 })
   }
 
@@ -184,6 +213,10 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const userId = sessionUser?.id
 
   const result = await prisma.$transaction(async (tx) => {
+    const existingReserved = Array.isArray(body.links)
+      ? await tx.fileAssetLink.findMany({ where: { fileId, entityType: SIGNED_BILL_FILE_LINK_ENTITY } })
+      : []
+    const mutableLinks = Array.isArray(body.links) ? mutableFileLinkReplacements(body.links, existingReserved) : null
     const updatedFile = await tx.fileAsset.update({
       where: { id: fileId },
       data: {
@@ -194,11 +227,11 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     let currentLinks = []
 
-    if (Array.isArray(body.links)) {
-      // Replace links
-      await tx.fileAssetLink.deleteMany({ where: { fileId } })
+    if (mutableLinks) {
+      // Keep archived revision evidence and calculation manifests in their original rows.
+      await tx.fileAssetLink.deleteMany({ where: { fileId, entityType: { not: SIGNED_BILL_FILE_LINK_ENTITY } } })
 
-      const newLinks = body.links
+      const newLinks = mutableLinks
         .map((link) => {
           const eType = link.entityType?.trim()
           const eId = link.entityId?.trim()
@@ -236,7 +269,14 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     })
 
     return { file: updatedFile, links: currentLinks }
+  }).catch((error: unknown) => {
+    if (error instanceof ReservedFileLinkError) return error
+    throw error
   })
+
+  if (result instanceof ReservedFileLinkError) {
+    return NextResponse.json({ message: result.message }, { status: 409 })
+  }
 
   return NextResponse.json({
     file: {

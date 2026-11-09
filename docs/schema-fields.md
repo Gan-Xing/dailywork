@@ -400,6 +400,23 @@
      8. `note?`：备注。
      9. `createdAt` / `updatedAt`：时间戳。
 
+## 签字账单版本（BoqBillRevision）
+
+- **用途**：按项目和整数期次保存已经核对的签字账单文档快照。它与可编辑的 `BoqMeasurement` 编制计量各有来源；正式页面只读取选中的签字版本，不能把两套数相加。
+- **身份与状态**：`projectId`、`periodIndex`（1–10000，期0预付款另存）、`revision`；`status` 为 `DRAFT` / `SIGNED`；`isCurrent` 表示本期正式展示版本。`projectId + periodIndex + revision` 唯一，SQL 部分唯一索引确保每期最多一个当前版本。草稿不能成为当前正式版。
+- **原件金额**：`currency`（默认 `XOF`），`grossHt`、`netHt`、`vatAmount`、`netTtc` 为可空 `Decimal(30,10)`。归档签字版必须填写原件四项总额；不以工程数量、全局清单价或统一取整公式覆盖它们。签认净应付不表示实际收款。
+- **文档内容**：`linesJson` 保存源价号、说明、单位、当期价格和前期/本期/累计的量、额及证据定位；十进制以字符串保留精度，空白为 `null`，允许冲销负量。`rowType` 区分工程行、小计和注释，避免重复汇总。`adjustmentsJson` 保存预付款扣回、质保金扣留、质保金退还、材料扣减、明确其他调整及其正负影响；计算取整差仅为诊断结果，不能凭空作为扣款。
+- **累计与证据**：`summaryJson` 保存所选原单的前期/累计金额、税率和是否包含期0等说明；后期重列的历史口径不能覆盖旧原单。`sourceJson` 保存文件 ID、SHA256、页码/工作表/单元格、原始金额文本和核查范围。`signedPdfFileId`、`calculationFileId` 直接引用既有 `FileAsset`，不复制文件；其他证据通过已有文件关联复用。
+- **核查与追溯**：`signedAt` 是可空原件日期（`Date`），不能由上传日或文件名推定。`createdAt/createdById`、`verifiedAt/verifiedById`、`activatedAt/activatedById`、`changeReason` 记录归档、签章核查与选版。`contentSha256` 为同一期内容幂等键。
+- **不可覆盖**：数据库触发器禁止修改文档字段或删除版本，只允许切换 `isCurrent` 及选版元数据。修订创建新版本。按项目期次加事务锁、校验 `expectedCurrentRevisionId` 后原子切换，历史版本只供查阅，不再次进入正式统计。
+- **与旧模块关系**：`ValueBillReview/Record` 仍是道路算量核查；其 `CONFIRMED` 不代表签章。`FinanceLedgerCase` 的原台账金额、发票、支票及流程日期保留，正式签认金额另从当前签字版本关联展示。
+
+## 签字账单修改记录（BoqBillRevisionEvent）
+
+- `revisionId` 关联版本；`kind`、`reason`、`payload` 记录创建与选版（包括上一版本和新选版本）；`actorId`、`createdAt` 记录操作人及时间。
+- 记录只追加，数据库触发器禁止更新或删除。版本主要原件的文件外键使用 `Restrict`；文件删除接口也拒绝移除已被版本来源引用的其他证据，避免归档后失去依据。
+- `GET/POST /api/value/signed-bills` 分别需要 `value:view` / `value:update`；`PATCH /api/value/signed-bills/[id]/activate` 需要 `value:update`。归档已有签字原件不是电子签署流程。
+
 ## 计量明细（BoqMeasurementDetail）
 
 - **用途**：独立记录计量明细行（按项目、期次、分项清单、路段），用于追踪“每条计量来自哪个路段、多少工程量”，并支持和主计量表做累计核对。
@@ -1002,3 +1019,9 @@
      4. `createdAt` / `updatedAt`：创建与更新时间戳。
 - **约束**
      1. `supervisorId` 唯一，确保每位负责人仅一条提示词。
+
+## Signed bill calculation companion (2026-10-22)
+
+No new tables or columns. `ValueBillReview` identifies the imported project/period/Excel checksum; `ValueBillReviewRecord.data` preserves raw source cells and exact decimal strings, with `note` reserved for manual remarks and `updatedAt` used for optimistic concurrency. Source notes stay in `data`. `FileAssetLink` purpose `calculation-review` on `signed-bill-revision` stores the manifest (dataset key, project/period/checksum, template leaves, coverage), reusing the original Excel asset. `BoqBillRevisionEvent` additionally accepts `CALCULATIONS_IMPORTED` and `DETAIL_NOTE_UPDATED`; the latter records old/new remarks and actor. Frozen `BoqBillRevision` content does not change. See `signed-bill-calculation-details.md` for API and completion-evidence boundaries.
+
+`ValueBillReview.key` remains globally unique. Dataset uniqueness is `(projectCode, attachmentNumber, sourceSha256)`, allowing a different source workbook for the same project and period without replacing the legacy dataset or its records. The migration only replaces the compound unique index and does not modify rows. `sourceSha256` remains nullable for legacy records; PostgreSQL allows separate null-checksum rows, so new companion imports must provide the verified non-null source checksum and a distinct key.

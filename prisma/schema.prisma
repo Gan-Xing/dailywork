@@ -20,6 +20,11 @@ enum PhaseMeasure {
   POINT
 }
 
+enum BoqBillRevisionStatus {
+  DRAFT
+  SIGNED
+}
+
 enum InspectionStatus {
   PENDING
   SCHEDULED
@@ -317,6 +322,7 @@ model RoadSection {
   referencedCrossSections       RoadCrossSection[]         @relation("RoadCrossSectionReferenceRoad")
 
   @@index([projectId])
+
 }
 
 model RoadCrossSection {
@@ -744,6 +750,10 @@ model User {
   ownedFileAssets                   FileAsset[]                @relation("FileAssetOwner")
   createdFileAssets                 FileAsset[]                @relation("FileAssetCreator")
   createdFileLinks                  FileAssetLink[]            @relation("FileAssetLinkCreator")
+  createdBoqBillRevisions            BoqBillRevision[]          @relation("BoqBillRevisionCreator")
+  verifiedBoqBillRevisions           BoqBillRevision[]          @relation("BoqBillRevisionVerifier")
+  activatedBoqBillRevisions          BoqBillRevision[]          @relation("BoqBillRevisionActivator")
+  boqBillRevisionEvents             BoqBillRevisionEvent[]
   signatures                        UserSignature[]
   createdSignatures                 UserSignature[]            @relation("UserSignatureCreator")
   createdById                       Int?
@@ -780,7 +790,12 @@ model User {
   updatedSiteVariationRawRecords    SiteVariationRawRecord[]   @relation("SiteVariationRawRecordUpdater")
   createdAt                         DateTime                   @default(now())
   updatedAt                         DateTime                   @updatedAt
+
 }
+
+
+
+
 
 model MachineAsset {
   id                Int               @id @default(autoincrement())
@@ -924,6 +939,8 @@ model FileAsset {
   createdBy         User?           @relation("FileAssetCreator", fields: [createdById], references: [id], onDelete: SetNull)
   signatures        UserSignature[]
   links             FileAssetLink[]
+  signedBillPdfs    BoqBillRevision[] @relation("BoqBillSignedPdf")
+  billCalculations BoqBillRevision[] @relation("BoqBillCalculation")
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
 
@@ -1199,6 +1216,7 @@ model Project {
   machineDailyLogs          MachineDailyLog[]
   boqItems                  BoqItem[]
   boqMeasurements           BoqMeasurement[]
+  boqBillRevisions          BoqBillRevision[]
   measurementDetails        BoqMeasurementDetail[]
   letters                   Letter[]
   roadSections              RoadSection[]
@@ -1207,6 +1225,7 @@ model Project {
   weeklyDeliveryPlanLinks   WeeklyDeliveryPlanProject[]
   siteVariationMeasurements SiteVariationMeasurement[]
   siteVariationRawRecords   SiteVariationRawRecord[]
+
 }
 
 model BoqItem {
@@ -1238,6 +1257,7 @@ model BoqItem {
 
   @@index([projectId, sheetType, sortOrder])
   @@index([projectId, sheetType, code])
+
 }
 
 model BoqMeasurement {
@@ -1257,6 +1277,64 @@ model BoqMeasurement {
 
   @@unique([boqItemId, period])
   @@index([projectId, period])
+}
+
+// A frozen document snapshot. Only current-selection metadata may be updated.
+// Partial unique index and immutability checks are enforced by the SQL migration.
+model BoqBillRevision {
+  id                Int                   @id @default(autoincrement())
+  projectId         Int
+  periodIndex       Int
+  revision          Int
+  status            BoqBillRevisionStatus @default(DRAFT)
+  isCurrent         Boolean               @default(false)
+  currency          String                @default("XOF")
+  signedAt          DateTime?             @db.Date
+  signedPdfFileId   Int?
+  calculationFileId Int?
+  grossHt           Decimal?              @db.Decimal(30, 10)
+  netHt             Decimal?              @db.Decimal(30, 10)
+  vatAmount         Decimal?              @db.Decimal(30, 10)
+  netTtc            Decimal?              @db.Decimal(30, 10)
+  linesJson         Json
+  adjustmentsJson   Json
+  summaryJson       Json
+  sourceJson        Json
+  contentSha256     String                @db.VarChar(64)
+  changeReason      String
+  createdAt         DateTime              @default(now())
+  createdById       Int
+  verifiedAt        DateTime?
+  verifiedById      Int?
+  activatedAt       DateTime?
+  activatedById     Int?
+
+  project         Project                @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  signedPdf       FileAsset?             @relation("BoqBillSignedPdf", fields: [signedPdfFileId], references: [id], onDelete: Restrict)
+  calculationFile FileAsset?             @relation("BoqBillCalculation", fields: [calculationFileId], references: [id], onDelete: Restrict)
+  createdBy       User                   @relation("BoqBillRevisionCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  verifiedBy      User?                  @relation("BoqBillRevisionVerifier", fields: [verifiedById], references: [id], onDelete: Restrict)
+  activatedBy     User?                  @relation("BoqBillRevisionActivator", fields: [activatedById], references: [id], onDelete: Restrict)
+  events          BoqBillRevisionEvent[]
+
+  @@unique([projectId, periodIndex, revision])
+  @@unique([projectId, periodIndex, contentSha256])
+  @@index([projectId, periodIndex, isCurrent])
+
+}
+
+model BoqBillRevisionEvent {
+  id         Int             @id @default(autoincrement())
+  revisionId Int
+  kind       String
+  reason     String
+  payload    Json
+  actorId    Int
+  createdAt  DateTime        @default(now())
+  revision   BoqBillRevision @relation(fields: [revisionId], references: [id], onDelete: Restrict)
+  actor      User            @relation(fields: [actorId], references: [id], onDelete: Restrict)
+
+  @@index([revisionId, createdAt])
 }
 
 model BoqMeasurementDetail {
@@ -1389,7 +1467,7 @@ model ValueBillReview {
   updatedAt          DateTime                @updatedAt
   records            ValueBillReviewRecord[]
 
-  @@unique([projectCode, attachmentNumber])
+  @@unique([projectCode, attachmentNumber, sourceSha256])
   @@index([projectCode])
   @@index([attachmentNumber])
   @@index([importedAt])
@@ -1729,3 +1807,6 @@ model WeeklyMaterialPriceHistory {
 
   @@index([goodsNameKey, modelKey, archivedAt])
 }
+
+
+// Independent future-work planning; signed bill rows are only referenced.

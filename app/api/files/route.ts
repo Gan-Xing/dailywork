@@ -2,9 +2,11 @@ import { NextResponse, type NextRequest } from 'next/server'
 
 import { prisma } from '@/lib/prisma'
 import { FILE_CATEGORIES } from '@/lib/constants/fileCategories'
+import { mutableFileLinkReplacements, ReservedFileLinkError } from '@/lib/files/reservedFileLinks'
 import { getSessionUser, hasPermission } from '@/lib/server/authSession'
-import { deleteObject, getR2Config } from '@/lib/server/r2'
+import { getR2Config } from '@/lib/server/r2'
 import { processImageAsset } from '@/lib/server/imageProcessing'
+import { AI_CHAT_ARTIFACT_PREFIX, isAiChatArtifact } from '@/lib/files/aiChatArtifacts'
 
 const DEFAULT_PAGE_SIZE = 50
 const MAX_PAGE_SIZE = 200
@@ -43,7 +45,7 @@ export async function GET(request: NextRequest) {
     Math.max(1, Number(searchParams.get('pageSize') ?? DEFAULT_PAGE_SIZE) || DEFAULT_PAGE_SIZE),
   )
 
-  const where: any = {}
+  const where: any = { NOT: { storageKey: { startsWith: AI_CHAT_ARTIFACT_PREFIX } } }
   if (categories.length) {
     where.category = { in: categories }
   }
@@ -166,6 +168,9 @@ export async function POST(request: NextRequest) {
   }
 
   const storageKey = typeof payload.storageKey === 'string' ? payload.storageKey.trim() : ''
+  if (isAiChatArtifact(storageKey)) {
+    return NextResponse.json({ message: 'AI任务文件只能由任务流程管理' }, { status: 403 })
+  }
   const originalName = typeof payload.originalName === 'string' ? payload.originalName.trim() : ''
   const mimeType = typeof payload.mimeType === 'string' ? payload.mimeType.trim() : ''
   const category = typeof payload.category === 'string' ? payload.category.trim() : ''
@@ -214,37 +219,50 @@ export async function POST(request: NextRequest) {
   }
 
   const validLinks = normalizedLinks as Exclude<(typeof normalizedLinks)[number], null>[]
-
-  const { bucket } = getR2Config()
-  let processedName = originalName
-  let processedMimeType = mimeType
-  let processedSize = parsedSize
-  let preview: { storageKey: string; mimeType: string; size: number } | undefined
-
   try {
-    const processed = await processImageAsset({
-      storageKey,
-      originalName,
-      mimeType,
-      size: parsedSize,
-      category,
-    })
-    if (processed) {
-      processedName = processed.original.originalName
-      processedMimeType = processed.original.mimeType
-      processedSize = processed.original.size
-      preview = processed.preview
-    }
+    mutableFileLinkReplacements(validLinks, [])
   } catch (error) {
-    try {
-      await deleteObject(storageKey)
-    } catch (cleanupError) {
-      console.error('[FileAsset Upload] Cleanup failed', cleanupError)
+    if (error instanceof ReservedFileLinkError) {
+      return NextResponse.json({ message: error.message }, { status: 409 })
     }
-    return NextResponse.json({ message: (error as Error).message || '图片处理失败' }, { status: 400 })
+    throw error
   }
 
+  const { bucket } = getR2Config()
   const result = await prisma.$transaction(async (tx) => {
+    // Serialize processing and registration so a duplicate cannot rewrite the winner.
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('dailywork:file-registration'), hashtext(${storageKey}))`
+    const existing = await tx.fileAsset.findFirst({
+      where: { OR: [{ storageKey }, { previewStorageKey: storageKey }] },
+      select: { id: true },
+    })
+    if (existing) {
+      return { message: '文件存储路径已被使用', status: 409 }
+    }
+
+    let processedName = originalName
+    let processedMimeType = mimeType
+    let processedSize = parsedSize
+    let preview: { storageKey: string; mimeType: string; size: number } | undefined
+    try {
+      const processed = await processImageAsset({
+        storageKey,
+        originalName,
+        mimeType,
+        size: parsedSize,
+        category,
+      })
+      if (processed) {
+        processedName = processed.original.originalName
+        processedMimeType = processed.original.mimeType
+        processedSize = processed.original.size
+        preview = processed.preview
+      }
+    } catch (error) {
+      // A supplied key is not proof of upload ownership. Never delete it on failure.
+      return { message: (error as Error).message || '图片处理失败', status: 400 }
+    }
+
     const file = await tx.fileAsset.create({
       data: {
         category,
@@ -295,7 +313,11 @@ export async function POST(request: NextRequest) {
       : []
 
     return { file, links }
-  })
+  }, { isolationLevel: 'ReadCommitted', timeout: 30_000 })
+
+  if ('message' in result) {
+    return NextResponse.json({ message: result.message }, { status: result.status })
+  }
 
   return NextResponse.json(
     {
