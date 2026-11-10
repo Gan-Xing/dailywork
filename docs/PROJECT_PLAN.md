@@ -122,5 +122,6 @@
 - 请求保护与追踪：两个 AI 问答入口先鉴权、获取单进程请求额度，再限量读取 JSON 请求体（最多 512 KiB）。默认每用户每分钟最多 8 次、同时最多 2 次，全局同时最多 16 次；可用 `AI_CHAT_REQUESTS_PER_MINUTE`、`AI_CHAT_CONCURRENT_PER_USER`、`AI_CHAT_CONCURRENT_GLOBAL` 调整。超限返回 429 与 `Retry-After`。响应和不含问题正文的服务日志记录同一个 `X-AI-Request-ID`，并记录模型调用次数及 token 使用量。流式连接取消后会中止执行并释放占用。多实例部署前须改用共享存储实现全局限流与持久化用量配额，当前机制不能视为分布式企业配额。
 - 会话与记忆：新增按当前账号鉴权的服务端会话、幂等消息和个人记忆。原浏览器按用户 ID 分库的数据保留，仅导入已归属当前账号的旧记录；无归属的 `dailywork-ai-chat` 数据不自动迁移。个人记忆不作为业务数值或授权依据。
 - 2026-11-09 业务 AI 升级：完整 Amorce 查询保留全部记录和来源，明确部分结果；周计划使用有时效的预览、版本冲突检查、事务和写后回查；PDF任务持久化，普通/签字PDF生成后只返回私有下载链接，不接入Telegram，CodexBridge机制保持独立。AI入口与业务权限分别校验，撤权后旧业务答案脱敏。保留原聊天入口。实施范围、权限、迁移和隔离验收见 [ai-chat-upgrade.md](./ai-chat-upgrade.md)。
+- 2026-11-10 业务 AI 性能修正：Amorce 与周计划专用工具使用自身的范围、覆盖率和预览契约，不再被通用 API 的字段名猜测反复触发重规划；普通 API 的显式证据要求、部分结果提示及用户确认保持不变。工具执行、缓存命中及最终输出前复查完整角色与数据范围，保留接口层的输出前权限检查。回归覆盖中法查询、空计划、多计划、部分结果和 PDF 预览，不以提前结束多目标任务换取速度。
 - Prompt：`app/ai-chat/prompt.md` 记录对话协议与工具调用格式。
 - API 目录生成：运行 `npx tsc scripts/generate-api-docs.ts --module commonjs --target es2020 --outDir .tmp --esModuleInterop --skipLibCheck`，然后 `node .tmp/generate-api-docs.js`，最后 `rm -rf .tmp`，产物写入 `lib/ai-chat/adapters/dailywork/apiCatalog.ts`。

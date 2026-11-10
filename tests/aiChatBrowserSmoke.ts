@@ -73,6 +73,10 @@ const main = async () => {
       if (await fetch(`${base}/api/ai-chat/storage?action=sessions`).then(() => true).catch(() => false)) break
       await new Promise((resolve) => setTimeout(resolve, 500))
     }
+    // Compile and fully stream client chunks before the first browser navigation.
+    const warmup = await fetch(`${base}/ai-chat`)
+    await warmup.text()
+    assert.equal(warmup.status, 200)
     browser = await puppeteer.launch({ headless: true, executablePath: process.env.CHROMIUM_EXECUTABLE_PATH ?? '/opt/google/chrome/chrome', args: ['--no-sandbox', '--disable-dev-shm-usage', '--disable-background-timer-throttling', '--disable-renderer-backgrounding', '--disable-backgrounding-occluded-windows'] })
     const page = await browser.newPage()
     debugPage = page

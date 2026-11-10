@@ -486,6 +486,7 @@ const deriveEvidenceFields = (
   plannerFields: string[] | undefined,
   candidateMeta: Map<string, { evidenceFields?: string[] }>,
   requiredKeys: string[],
+  allowHeuristicFallback = true,
 ) => {
   const provided = (plannerFields ?? []).map((field) => field.trim()).filter(Boolean)
   if (provided.length > 0) return provided
@@ -495,6 +496,7 @@ const deriveEvidenceFields = (
     .map((field) => field.trim())
     .filter(Boolean)
   if (fromCandidates.length > 0) return Array.from(new Set(fromCandidates))
+  if (!allowHeuristicFallback) return []
   const text = question.toLowerCase()
   const detailHints = ['内容', '详情', '明细', '主要', 'summary', 'detail', 'breakdown', 'list']
   if (!detailHints.some((hint) => text.includes(hint))) return []
@@ -1002,11 +1004,14 @@ export const runChat = async (options: ChatRunOptions): Promise<ChatRunResult> =
     : uniqueCandidates.slice(0, minApiCallsBase)
   const requiredApiKeys = requiredApiKeysRaw.filter((key) => uniqueCandidates.includes(key))
   const minApiCalls = Math.max(minApiCallsBase, requiredApiKeys.length || 1)
+  // Dedicated business tools define their own coverage and preview contracts;
+  // generic API field-name guesses do not apply to these result schemas.
   const evidenceFields = deriveEvidenceFields(
     lastUserQuestion,
     plannerPlan?.evidenceFields,
     candidateMeta,
     requiredApiKeys,
+    !dedicatedBusiness,
   )
   const detailKeys = (plannerPlan?.detailKeys ?? [])
     .filter(Boolean)
@@ -1127,7 +1132,8 @@ export const runChat = async (options: ChatRunOptions): Promise<ChatRunResult> =
     }
   }
 
-  const finalizeAnswer = (answer: string): ChatRunResult => {
+  const finalizeAnswer = async (answer: string): Promise<ChatRunResult> => {
+    await options.request?.assertScope?.()
     const outcomes = new Map<string, ChatToolCallRecord>()
     for (const call of toolCalls) {
       const tool = registeredToolMap.get(call.tool)
@@ -1181,12 +1187,13 @@ export const runChat = async (options: ChatRunOptions): Promise<ChatRunResult> =
     appendMessage(conversation, { role: 'assistant', content: JSON.stringify(payload) })
 
     const hasAccess = async () => {
-      if (options.accessPermission) {
-        try {
+      try {
+        await options.request?.assertScope?.()
+        if (options.accessPermission) {
           if (!options.permissionChecker || !await options.permissionChecker(options.accessPermission)) return false
-        } catch { return false }
-      }
-      return !!tool && await hasRequiredPermissions(tool, options.session?.permissions ?? [], options.permissionChecker)
+        }
+        return !!tool && await hasRequiredPermissions(tool, options.session?.permissions ?? [], options.permissionChecker)
+      } catch { return false }
     }
     if (!tool || !await hasAccess()) {
       const result: ChatToolResult = {
@@ -1428,7 +1435,7 @@ export const runChat = async (options: ChatRunOptions): Promise<ChatRunResult> =
   const handleFinalPayload = async (payload: { answer?: string }): Promise<FinalHandling> => {
     if (dedicatedBusiness && !toolCalls.some((call) => call.result.ok &&
         (toolMap.get(call.tool)?.resultMode === 'complete' || call.result.jobId || call.tool === 'get_weekly_plan_snapshot'))) {
-      return { type: 'result', result: finalizeAnswer(locale === 'fr'
+      return { type: 'result', result: await finalizeAnswer(locale === 'fr'
         ? 'Précisez le projet, la route et le côté, ou le numéro du plan et la modification. Aucun résultat métier vérifié ni changement effectué.'
         : '尚未取得可核实的业务结果，也未执行修改。请明确项目、道路、左右侧及桩号，或周计划编号和具体改动。') }
     }
@@ -1469,7 +1476,7 @@ export const runChat = async (options: ChatRunOptions): Promise<ChatRunResult> =
       typeof payload.answer === 'string' && payload.answer.trim().length > 0
         ? payload.answer.trim()
         : fallbackAnswer(locale)
-    return { type: 'result', result: finalizeAnswer(answer) }
+    return { type: 'result', result: await finalizeAnswer(answer) }
   }
 
   const maxReplans = 2
