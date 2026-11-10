@@ -95,6 +95,7 @@ export default function HomePageClient() {
 				'template:delete'
 			],
 			'/roadmap': ['roadmap:view'],
+			'/ai-chat': ['ai-chat:view'],
 		}),
 		[]
 	);
@@ -637,7 +638,7 @@ export default function HomePageClient() {
 						<div className='flex items-center gap-3 overflow-x-auto pb-1'>
 							<span className='inline-flex items-center gap-2 whitespace-nowrap text-base font-semibold text-slate-50'>
 								<span className='h-2 w-2 rounded-full bg-emerald-300 shadow-[0_0_0_4px_rgba(16,185,129,0.16)]' />
-								路线预告
+								{t.extension.previewTitle}
 							</span>
 							<div className='flex items-center gap-2'>
 								{t.extension.previewItems.map((item) => (

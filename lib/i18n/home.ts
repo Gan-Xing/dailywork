@@ -94,7 +94,7 @@ export const homeCopy: Record<Locale, HomeCopy> = {
       progress: '进度',
       suffix: '。',
       description:
-        '把一线更新、项目里程碑放在同一块操作面板，保持团队节奏一致。当前开放 7 个核心入口（日报系统内嵌原始日志导航，成员管理、机物管理、产值界面与财务记账等保持在一起），后续模块可随时接入。',
+        '把一线更新、项目里程碑放在同一块操作面板，保持团队节奏一致。日报、进度、成员、机物、产值、财务、文档与 AI 助手集中访问，按权限使用各项功能。',
       primaryCta: '立即填写日报',
       secondaryCta: '查看项目进度'
     },
@@ -157,11 +157,19 @@ export const homeCopy: Record<Locale, HomeCopy> = {
         description: '基于实际工程量清单汇总已完成产值与占比，实时跟踪产值进度。',
         tags: ['单价/产值', '完成率', '工程汇总'],
         cta: '查看产值界面'
+      },
+      {
+        title: 'AI助手',
+        href: '/ai-chat',
+        tone: 'from-sky-300/80 via-cyan-200/80 to-teal-200/70',
+        description: '按权限查询项目数据、核对工程量，协助处理周计划及 PDF 导出。',
+        tags: ['业务查询', '周计划', 'PDF 导出'],
+        cta: '进入AI助手'
       }
     ],
     stats: {
       entriesLabel: '当前入口',
-      entriesValue: '7',
+      entriesValue: '8',
       recentLabel: '最近更新',
       recentValue: '日报系统已整合原始日志入口；成员管理、产值界面上线，日报/进度/财务持续维护',
       upcomingTitle: '即将推出',
@@ -241,7 +249,7 @@ export const homeCopy: Record<Locale, HomeCopy> = {
       progress: "suivi d'avancement",
       suffix: '.',
       description:
-        "Regroupez les mises à jour terrain et les jalons projet sur le même tableau de bord. Sept accès clés sont actifs (journal brut intégré aux rapports, membres, engins/matériaux, valeurs et comptabilité inclus), les suivants se brancheront facilement.",
+        "Regroupez les mises à jour terrain et les jalons projet sur le même tableau de bord. Accédez aux rapports, à l'avancement, aux membres, aux engins et matériaux, aux valeurs, à la comptabilité, aux documents et à l'assistant IA selon vos droits.",
       primaryCta: 'Remplir un rapport',
       secondaryCta: "Voir l'avancement"
     },
@@ -308,11 +316,19 @@ export const homeCopy: Record<Locale, HomeCopy> = {
           'Tableau des quantités réalisées basé sur le devis réel pour suivre les montants validés.',
         tags: ['Devis réel', 'Valeurs réalisées', 'Progression'],
         cta: 'Voir les valeurs réalisées'
+      },
+      {
+        title: 'Assistant IA',
+        href: '/ai-chat',
+        tone: 'from-sky-300/80 via-cyan-200/80 to-teal-200/70',
+        description: 'Interrogez les données projet, vérifiez les quantités et gérez les plans hebdomadaires et les exports PDF selon vos droits.',
+        tags: ['Requêtes métier', 'Plans hebdomadaires', 'Export PDF'],
+        cta: "Ouvrir l'assistant IA"
       }
     ],
     stats: {
       entriesLabel: 'Entrées actives',
-      entriesValue: '7',
+      entriesValue: '8',
       recentLabel: 'Mise à jour',
       recentValue:
         'Journal brut intégré aux rapports ; modules membres/valeurs réalisées en ligne, rapports/progrès/finance maintenus',

@@ -8,6 +8,12 @@ Amorce queries, previewed changes to existing weekly plans, and weekly-plan PDF
 generation/download. Bill measurement writes, photo upload/binding, payroll writes
 and submission-document changes still require separately reviewed tools.
 
+The home module grid includes an AI assistant card in Chinese and French, linking
+to the existing `/ai-chat` page. It uses the existing recent-visit ordering and
+locked-card behavior: guests must log in, and accounts without `ai-chat:view`
+cannot enter. The card does not load conversations, invoke a model, or grant any
+business permissions.
+
 ## Query Contract
 
 - `list_bill_junctions` uses an exact project code and optionally a review/road.
@@ -128,6 +134,9 @@ AI_CHAT_TEST_DATABASE_URL="$ISOLATED_TEST_URL" DATABASE_URL="$ISOLATED_TEST_URL"
   node --import tsx --test tests/aiChatWorkflows.test.ts
 AI_CHAT_TEST_DATABASE_URL="$ISOLATED_TEST_URL" \
   node --import tsx tests/aiChatBrowserSmoke.ts
+HOME_AI_TEST_ARTIFACTS="$(mktemp -d /tmp/dailywork-home-qa-XXXXXX)" \
+AI_CHAT_TEST_DATABASE_URL="$ISOLATED_TEST_URL" \
+  node --import tsx tests/homeAiCardBrowserSmoke.ts
 pnpm exec tsc --noEmit --incremental false
 ```
 
